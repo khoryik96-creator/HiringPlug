@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -85,7 +86,7 @@ func CreateUser(ctx context.Context, admin *pgxpool.Pool, tenantID, email, name 
 func UserTenant(ctx context.Context, admin *pgxpool.Pool, userID string) (string, error) {
 	var tenantID string
 	err := admin.QueryRow(ctx, `SELECT tenant_id FROM app_user WHERE id = $1`, userID).Scan(&tenantID)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("no user with id %s", userID)
 	}
 	return tenantID, err

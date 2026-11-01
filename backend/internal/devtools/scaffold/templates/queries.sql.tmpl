@@ -1,0 +1,9 @@
+-- Queries owned by the [[.Module]] module. Run inside a tenant-scoped transaction.
+
+-- name: Insert[[.Entity]] :one
+INSERT INTO [[.Table]] (tenant_id, name, created_by)
+VALUES (app_current_tenant(), @name, app_current_user())
+RETURNING *;
+
+-- name: List[[.Plural]] :many
+SELECT * FROM [[.Table]] ORDER BY id DESC LIMIT 100;

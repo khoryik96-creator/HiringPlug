@@ -55,7 +55,7 @@ func (v *Verifier) Verify(token string) (Claims, error) {
 		jwt.WithTimeFunc(v.now),
 	)
 	if err != nil {
-		return Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		return Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 	if !tenantIDRe.MatchString(c.TenantID) || !userIDRe.MatchString(c.Subject) {
 		return Claims{}, fmt.Errorf("%w: malformed tid or sub", ErrInvalidToken)

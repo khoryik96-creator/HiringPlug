@@ -1,0 +1,24 @@
+// Package [[.Package]] TODO: describe what this module is for.
+//
+// Layout (the same in every module):
+//
+//	[[.Package]].go     the module's public API: what internal/app and other modules may use
+//	domain.go     the rules, as pure functions on plain values (unit tested)
+//	service.go    use cases: one transaction each, rules + storage + audit
+//	http.go       HTTP handlers: contract types <-> service calls; no business rules
+//	internal/store  generated SQL (db/queries/[[.Module]].sql); private to this module
+package [[.Package]]
+
+import "github.com/jackc/pgx/v5/pgxpool"
+
+// Module is the [[.Module]] module.
+type Module struct {
+	service *Service
+	HTTP    *HTTP
+}
+
+// New wires the module.
+func New(pool *pgxpool.Pool) *Module {
+	svc := &Service{pool: pool}
+	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}

@@ -1,0 +1,60 @@
+package [[.Package]]
+
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/[[.Package]]/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+)
+
+// Service holds the [[.Module]] use cases.
+type Service struct {
+	pool *pgxpool.Pool
+}
+
+// Create adds a record.
+func (s *Service) Create(ctx context.Context, p authz.Principal, name string) ([[.Entity]], error) {
+	name, errs := NormalizeName(name)
+	if err := errs.Err(); err != nil {
+		return [[.Entity]]{}, err
+	}
+	var out [[.Entity]]
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		row, err := store.New(tx).Insert[[.Entity]](ctx, name)
+		if err != nil {
+			return err
+		}
+		if err := audit.Record(ctx, tx, audit.Entry{Action: "[[.Table]].created", EntityType: "[[.Table]]", EntityID: row.ID}); err != nil {
+			return err
+		}
+		out = fromRow(row)
+		return nil
+	})
+	return out, err
+}
+
+// List returns the newest records.
+func (s *Service) List(ctx context.Context, p authz.Principal) ([][[.Entity]], error) {
+	var out [][[.Entity]]
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		rows, err := store.New(tx).List[[.Plural]](ctx)
+		if err != nil {
+			return err
+		}
+		out = make([][[.Entity]], len(rows))
+		for i, r := range rows {
+			out[i] = fromRow(r)
+		}
+		return nil
+	})
+	return out, err
+}
+
+func fromRow(r store.[[.Entity]]) [[.Entity]] {
+	return [[.Entity]]{ID: r.ID, Name: r.Name, CreatedAt: r.CreatedAt}
+}

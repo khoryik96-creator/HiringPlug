@@ -1,0 +1,73 @@
+# Local-first deployment: the whole system on one machine.
+#   docker compose -f deploy/docker-compose.yml up -d --build
+# then open http://localhost:3000 (web) and http://localhost:8080/docs (API docs).
+# For development you usually start only PostgreSQL: `task db:up`.
+#
+# Before running this anywhere but your own laptop, replace every *_dev
+# password and secret below (see .env.example).
+name: hiringplug
+
+x-backend-env: &backend-env
+  HP_ENV: development
+  HP_DATABASE_URL: postgres://hp_api:hp_api_dev@postgres:5432/hiringplug?sslmode=disable
+  HP_DATABASE_ADMIN_URL: postgres://postgres:postgres@postgres:5432/hiringplug?sslmode=disable
+  HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
+  HP_AUTH_JWT_SECRET: dev-only-secret-change-me-0123456789abcdef
+  HP_FILES_URL_SECRET: dev-only-secret-change-me-0123456789abcdef
+  HP_FILES_DIR: /data/files
+  HP_INTERNAL_BASE_URL: http://api:8080
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hiringplug
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 30
+
+  # Applies migrations and creates the database roles, then exits.
+  bootstrap:
+    build: { context: .., dockerfile: deploy/backend.Dockerfile }
+    command: ["/app/hp", "bootstrap"]
+    environment: *backend-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: { context: .., dockerfile: deploy/backend.Dockerfile }
+    command: ["/app/api"]
+    environment: *backend-env
+    ports: ["8080:8080"]
+    volumes: [files:/data/files]
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: .., dockerfile: deploy/backend.Dockerfile }
+    command: ["/app/worker"]
+    environment: *backend-env
+    volumes: [files:/data/files]
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
+  ai-worker:
+    build: { context: .., dockerfile: deploy/ai.Dockerfile }
+    environment:
+      HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
+      HP_AI_OCR_LANGUAGES: eng
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
+  web:
+    build: { context: .., dockerfile: deploy/web.Dockerfile }
+    ports: ["3000:80"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  files:

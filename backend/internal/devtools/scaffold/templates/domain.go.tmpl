@@ -1,0 +1,27 @@
+package [[.Package]]
+
+// The [[.Module]] rules, as plain functions on plain values: no database, no HTTP.
+
+import (
+	"strings"
+	"time"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+)
+
+// [[.Entity]] is one [[.Human]] record.
+type [[.Entity]] struct {
+	ID        string
+	Name      string
+	CreatedAt time.Time
+}
+
+// NormalizeName trims and squeezes spaces, and checks the name is not blank.
+func NormalizeName(name string) (string, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	name = strings.Join(strings.Fields(name), " ")
+	if name == "" {
+		errs.Add("name", "is required")
+	}
+	return name, errs
+}

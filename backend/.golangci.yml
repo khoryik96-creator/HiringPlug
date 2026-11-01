@@ -1,0 +1,36 @@
+# golangci-lint v2. Run with `task lint` (go tool -modfile=tools/go.mod golangci-lint run).
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - errorlint # wrapped errors are compared with errors.Is/As
+    - exhaustive # every enum value handled in switches
+    - gosec
+    - nilerr
+    - nilnil
+    - noctx # HTTP requests carry a context
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - misspell
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    gosec:
+      excludes:
+        - G104 # covered by errcheck
+  exclusions:
+    generated: strict # skip *.gen.go and sqlc output
+    rules:
+      - path: _test\.go
+        linters: [gosec, noctx]
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [github.com/khoryik96-creator/hiringplug]

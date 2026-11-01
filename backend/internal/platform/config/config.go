@@ -47,7 +47,7 @@ type Config struct {
 }
 
 // devSecret is only accepted outside production.
-const devSecret = "dev-only-secret-change-me-0123456789abcdef"
+const devSecret = "dev-only-secret-change-me-0123456789abcdef" //nolint:gosec // placeholder; production refuses it
 
 // Load reads the configuration using getenv (pass os.Getenv). It reports every
 // problem at once rather than stopping at the first.

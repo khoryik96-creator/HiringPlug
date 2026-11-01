@@ -34,7 +34,7 @@ type Options struct {
 // New returns the complete HTTP handler.
 func New(o Options) (http.Handler, error) {
 	// A private copy of the contract for routing: matching ignores `servers`.
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	if err != nil {
 		return nil, fmt.Errorf("httpserver: embedded contract: %w", err)
 	}

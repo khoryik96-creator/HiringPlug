@@ -1,0 +1,79 @@
+# HiringPlug
+
+An applicant tracking system (ATS) for recruitment agencies and in-house
+hiring teams. It works for one company or many: it can run for your own team
+and be sold to others (each company's data is isolated). It runs on your own
+machine first and is built to move to the cloud later.
+
+![A candidate profile as a recruiter sees it](docs/images/candidate-recruiter.png)
+
+## What is here today (milestone 1: the foundation)
+
+- **Candidates** with the profile fields recruiters need: name, email, phone,
+  nationality, work authorization (local / expat with RP-T, PR or spouse visa /
+  needs a visa), notice period, industry, specialization, source.
+- **Salary details** (current and expected, with currency and period) that only
+  permitted roles can see. The database itself refuses them to everyone else.
+- **CV upload** (PDF and Word). The Python AI worker extracts the text, using
+  OCR for scanned pages (including sideways scans), and the text appears on the
+  candidate.
+- **Users and roles** (owner, admin, recruiter, sourcer, hiring manager,
+  viewer) with view / create / update permissions per area.
+- **API documentation** generated from the contract, at `/docs`.
+- **A web app** to search, add and view candidates, see salary (or the
+  "restricted" notice), and upload CVs.
+- **Guardrails** so things do not regress: one contract for all languages,
+  data isolated between companies in the database, automatic checks on every
+  change, and a generator that creates new modules already wired and tested.
+
+Your full feature list and how each item is designed: [docs/features.md](docs/features.md).
+
+## How it is built (one minute version)
+
+| Part | Language | Does |
+|---|---|---|
+| `contracts/` | OpenAPI (YAML) | The single source of truth for the API and job messages. Each module has its own file. |
+| `backend/` | Go | The API and the business rules, the database, and the worker for core jobs. One codebase split into modules. |
+| `ai/` | Python | Reading CVs (text extraction, OCR). Next: parsing, formatting, blind CVs, matching, AI assistant. |
+| `web/` | TypeScript (React) | The screens recruiters use. |
+| `deploy/` | Docker | Runs everything on one machine. |
+
+Go and Python only talk through a job queue in PostgreSQL; the web app only
+talks to the Go API. Read [docs/README.md](docs/README.md) first; it gives a
+reading order.
+
+## Quick start
+
+You need [Go](https://go.dev/dl/), [uv](https://docs.astral.sh/uv/) (Python),
+[Node 22+ with pnpm](https://pnpm.io/installation), [Task](https://taskfile.dev),
+Docker (for PostgreSQL) and [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (OCR).
+On Windows, use WSL2 or install the same tools natively; every command is `task ...`.
+
+```bash
+cp .env.example .env
+task setup       # install dependencies
+task db:up       # start PostgreSQL in Docker
+task db:setup    # create tables and roles, plus demo users; prints sign-in tokens
+task dev         # API on :8080, both workers, web app on http://localhost:5173
+```
+
+Sign in to the web app with the `recruiter` token printed by `task db:setup`,
+and with the `sourcer` token to see salary hidden. API docs: http://localhost:8080/docs.
+
+To run everything in Docker instead (local-first deployment):
+`docker compose -f deploy/docker-compose.yml up -d --build`, then open http://localhost:3000.
+
+## Everyday commands
+
+| Command | Does |
+|---|---|
+| `task gen` | Regenerate code after changing `contracts/` or `backend/db/` |
+| `task verify` | Everything CI checks: generation, lint, type checks, all tests, web build |
+| `task new:module -- name=job_ads entity=job_ad` | Create a new module, wired and tested |
+| `task test` / `task lint` | Just the tests / just the linters |
+| `task e2e` | End-to-end test across the running services |
+
+## Documentation
+
+- [docs/README.md](docs/README.md): start here
+- [AGENTS.md](AGENTS.md): the rules for anyone (human or AI) changing this code

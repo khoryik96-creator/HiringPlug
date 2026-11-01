@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	defaultAdminURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	defaultAdminURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" //nolint:gosec // local test database only
 	// Test-only login roles (cluster-wide, shared by all test databases).
 	appLogin = "hp_api_test"
 	aiLogin  = "hp_ai_test"

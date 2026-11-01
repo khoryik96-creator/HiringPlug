@@ -1,7 +1,8 @@
 // Command hp is the HiringPlug admin tool.
 //
 //	hp migrate                         apply database migrations (uses HP_DATABASE_ADMIN_URL)
-//	hp dev-setup                       local development: migrate, create login roles, demo tenant + users, print tokens
+//	hp bootstrap                       migrate, then create/update the login roles in HP_DATABASE_URL and HP_AI_DATABASE_URL
+//	hp dev-setup                       local development: bootstrap, plus a demo tenant with users, and print their tokens
 //	hp tenant -name "Acme Recruitment" -owner-email you@acme.com -owner-name "Your Name"
 //	hp user -tenant tnt_... -email a@b.com -name "A B" -role recruiter
 //	hp token -user usr_... [-ttl 12h]  print a sign-in token for a user (development)
@@ -41,13 +42,15 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: hp <migrate|dev-setup|tenant|user|token> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token> [flags]")
 }
 
 func run(ctx context.Context, cmd string, args []string) error {
 	switch cmd {
 	case "migrate":
 		return database.Migrate(ctx, adminURL(), db.Migrations())
+	case "bootstrap":
+		return bootstrap(ctx)
 	case "dev-setup":
 		return devSetup(ctx)
 	case "tenant":
@@ -71,16 +74,10 @@ func adminPool(ctx context.Context) (*pgxpool.Pool, error) {
 	return database.Connect(ctx, adminURL())
 }
 
-// devSetup prepares a local database: migrations, login roles for the API and
-// the AI worker, and a demo tenant with one user per role.
-func devSetup(ctx context.Context) error {
-	cfg, err := config.Load(os.Getenv)
-	if err != nil {
-		return err
-	}
-	if cfg.Env == config.EnvProduction {
-		return errors.New("dev-setup refuses to run with HP_ENV=production")
-	}
+// bootstrap prepares a database for the app: migrations, then the login roles
+// for the API/worker (HP_DATABASE_URL) and the AI worker (HP_AI_DATABASE_URL).
+// Safe to run on every deploy.
+func bootstrap(ctx context.Context) error {
 	if err := database.Migrate(ctx, adminURL(), db.Migrations()); err != nil {
 		return err
 	}
@@ -89,7 +86,11 @@ func devSetup(ctx context.Context) error {
 		return err
 	}
 	defer admin.Close()
-	if err := app.EnsureLoginRole(ctx, admin, cfg.DatabaseURL, app.GroupApp); err != nil {
+	appURL := os.Getenv("HP_DATABASE_URL")
+	if appURL == "" {
+		return errors.New("HP_DATABASE_URL is required")
+	}
+	if err := app.EnsureLoginRole(ctx, admin, appURL, app.GroupApp); err != nil {
 		return err
 	}
 	if aiURL := os.Getenv("HP_AI_DATABASE_URL"); aiURL != "" {
@@ -97,6 +98,28 @@ func devSetup(ctx context.Context) error {
 			return err
 		}
 	}
+	fmt.Println("database ready")
+	return nil
+}
+
+// devSetup prepares a local database: bootstrap, then a demo tenant with one
+// user per role, and prints sign-in tokens for them.
+func devSetup(ctx context.Context) error {
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return err
+	}
+	if cfg.Env == config.EnvProduction {
+		return errors.New("dev-setup refuses to run with HP_ENV=production")
+	}
+	if err := bootstrap(ctx); err != nil {
+		return err
+	}
+	admin, err := adminPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer admin.Close()
 
 	var tenantID string
 	err = admin.QueryRow(ctx, `SELECT id FROM tenant WHERE name = 'Demo Recruitment' ORDER BY id LIMIT 1`).Scan(&tenantID)

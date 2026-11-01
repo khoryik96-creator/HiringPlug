@@ -1,0 +1,16 @@
+package [[.Package]]
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestNormalizeName(t *testing.T) {
+	name, errs := NormalizeName("  First   one ")
+	assert.Empty(t, errs)
+	assert.Equal(t, "First one", name)
+
+	_, errs = NormalizeName("   ")
+	assert.Len(t, errs, 1)
+}

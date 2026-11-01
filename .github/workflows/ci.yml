@@ -1,0 +1,168 @@
+name: CI
+
+# Every push and pull request runs the same checks as `task verify`, split by
+# language so failures point at the right place. Merging is blocked until all
+# jobs pass (set this up in GitHub: Settings > Branches > branch protection).
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HP_TEST_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+
+jobs:
+  backend:
+    name: Go backend and contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run: { working-directory: backend }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: |
+            backend/go.sum
+            backend/tools/go.sum
+      - uses: arduino/setup-task@v2
+        with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Contract and generated Go code are up to date
+        run: |
+          task gen:contract gen:go
+          git diff --exit-code -- ../contracts internal
+          test -z "$(git status --porcelain -- ../contracts internal)"
+      - name: Committed migrations are unchanged
+        run: task check:migrations
+      - name: Lint
+        run: task lint:go
+      - name: Test (unit and integration, real PostgreSQL)
+        run: task test:go
+      - name: A newly generated module passes every check
+        run: |
+          task new:module -- name=ci_samples entity=ci_sample
+          task gen:contract gen:go
+          go test ./internal/app/ ./internal/modules/... ./internal/devtools/...
+          task lint:go
+
+  ai:
+    name: Python AI worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run: { working-directory: ai }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tesseract
+        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-eng
+      - uses: astral-sh/setup-uv@v5
+      - uses: arduino/setup-task@v2
+        with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - run: uv sync --frozen
+      - name: Generated models are up to date
+        run: task gen:py && git diff --exit-code -- src/hiringplug_ai/contracts.py
+      - run: task lint:py
+      - run: task test:py
+
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run: { working-directory: web }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: web/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: arduino/setup-task@v2
+        with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - run: task setup:web
+      - name: Generated API types are up to date
+        run: task gen:ts && git diff --exit-code -- src/api
+      - run: task lint:web
+      - run: task test:web
+      - run: task build:web
+
+  e2e:
+    name: End to end (API + Go worker + Python worker)
+    needs: [backend, ai, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: hiringplug }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      HP_ENV: development
+      HP_DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/hiringplug?sslmode=disable
+      HP_DATABASE_URL: postgres://hp_api:hp_api_ci@localhost:5432/hiringplug?sslmode=disable
+      HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_ci@localhost:5432/hiringplug?sslmode=disable
+      HP_FILES_DIR: ./data/files
+      HP_AI_POLL_SECONDS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Install Tesseract
+        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-eng
+      - uses: astral-sh/setup-uv@v5
+      - name: Build and prepare the database
+        working-directory: backend
+        run: |
+          go build -o "$RUNNER_TEMP/bin/" ./cmd/api ./cmd/worker ./cmd/hp
+          "$RUNNER_TEMP/bin/hp" dev-setup > "$RUNNER_TEMP/devsetup.txt"
+          echo "HP_E2E_TOKEN=$(grep -A1 '^recruiter' "$RUNNER_TEMP/devsetup.txt" | tail -1)" >> "$GITHUB_ENV"
+      - name: Start the services
+        run: |
+          "$RUNNER_TEMP/bin/api" > "$RUNNER_TEMP/api.log" 2>&1 &
+          "$RUNNER_TEMP/bin/worker" > "$RUNNER_TEMP/worker.log" 2>&1 &
+          (cd ai && uv sync --frozen && uv run hiringplug-ai > "$RUNNER_TEMP/ai.log" 2>&1 &)
+          for i in $(seq 1 60); do curl -sf localhost:8080/health/ready && break; sleep 1; done
+      - name: Run the end-to-end test
+        working-directory: ai
+        run: uv run pytest -m e2e tests/e2e
+      - name: Service logs
+        if: always()
+        run: tail -n 50 "$RUNNER_TEMP"/*.log
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/backend.Dockerfile -t hiringplug-backend .
+      - run: docker build -f deploy/ai.Dockerfile -t hiringplug-ai .
+      - run: docker build -f deploy/web.Dockerfile -t hiringplug-web .

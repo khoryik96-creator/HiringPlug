@@ -36,7 +36,7 @@ func main() {
 		}
 		return
 	}
-	if err := os.WriteFile(*out, bundled, 0o644); err != nil {
+	if err := os.WriteFile(*out, bundled, 0o644); err != nil { //nolint:gosec // a committed source file, meant to be readable
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

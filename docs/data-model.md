@@ -1,0 +1,54 @@
+# Data model
+
+IDs are a type prefix plus a time-sortable code (`cand_01jbz6w0...`), so an ID
+in a log says what it is. Every table with company data has `tenant_id` and
+row-level security. Times are UTC (`timestamptz`).
+
+## Built (milestone 1)
+
+```
+tenant ─┬─ app_user (role)
+        ├─ candidate ─┬─ candidate_compensation   (salary; own security policy)
+        │             └─ document                 (CV files and extracted text)
+        ├─ audit_log
+        └─ job                                    (the job queue)
+```
+
+| Table | Key fields |
+|---|---|
+| `tenant` | name |
+| `app_user` | email, name, role, active |
+| `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, `version`, search text |
+| `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |
+| `document` | candidate, source (jobstreet/linkedin/original/formatted/other), file name, type, size, SHA-256, storage key, status (queued/extracted/needs_ocr/failed), extracted text, page count, extractor, warnings, error |
+| `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |
+| `job` | queue (core/ai), kind, payload, status (pending/running/done/dead), attempts, lease, last error, request ID |
+
+The database repeats the important rules as constraints: the work-authorization
+basis only with `expat_eligible`, a complete notice period, complete salary
+figures, an expected range that does not run backwards, and the document's
+candidate belonging to the same company.
+
+## Planned
+
+| Module | Records | Milestone |
+|---|---|---|
+| `candidates` | taxonomy (industries, specializations), tags, skills, consent and retention | M2 |
+| `notes` | note (type: screening/cv/interview/general; candidate, optional job or application; visibility; sensitive flag), note templates | M2 |
+| `identity` | custom roles, team, data scope, invites | M2 |
+| `parsing` | parsed profile (experience, education, skills) with source quotes | M2 |
+| `companies` | company (client/prospect), domain, industry, size, address, enrichment suggestions with source | M3 |
+| `contacts` | contact (company, role), email verification result + evidence + date | M3 |
+| `jobs` | job (client company or department, owner, status, salary range, location), job ad (text, channels) | M3 |
+| `pipeline` | application (candidate × job, stage, status, rejection reason, `version`), stage templates, stage history | M3 |
+| `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
+| `documents` | formatted CV (template, options), templates per company | M4 |
+| `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
+| `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
+| `communications` | email message, thread, template, sequence | M5 |
+| `placements` | placement (agency: fee, start date, guarantee period); offer (in-house) | M5 |
+| `job_leads` | job lead (source, URL, company, parsed fields, status) | M6 |
+| `integrations` | API key, webhook subscription and delivery | M6 |
+
+Each planned module gets its own contract file, migration, queries and code via
+`task new:module`, following [the playbook](playbooks/add-a-module.md).

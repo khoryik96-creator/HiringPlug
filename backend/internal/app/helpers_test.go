@@ -61,7 +61,7 @@ func newTestApp(t *testing.T) *testApp {
 	handler, err := app.NewHTTPHandler(deps, modules)
 	require.NoError(t, err)
 
-	spec, err := api.GetSwagger()
+	spec, err := api.GetSpec()
 	require.NoError(t, err)
 	spec.Servers = nil
 	router, err := legacy.NewRouter(spec)

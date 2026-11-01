@@ -1,0 +1,37 @@
+package [[.Package]]
+
+import (
+	"context"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+)
+
+// HTTP implements the [[.Module]] operations of the contract.
+type HTTP struct{ svc *Service }
+
+// List[[.Plural]] handles GET /v1/[[.Path]].
+func (h *HTTP) List[[.Plural]](ctx context.Context, _ api.List[[.Plural]]RequestObject) (api.List[[.Plural]]ResponseObject, error) {
+	items, err := h.svc.List(ctx, authz.MustFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	out := api.List[[.Plural]]200JSONResponse{Items: make([]api.[[.Entity]], len(items))}
+	for i, item := range items {
+		out.Items[i] = toAPI(item)
+	}
+	return out, nil
+}
+
+// Create[[.Entity]] handles POST /v1/[[.Path]].
+func (h *HTTP) Create[[.Entity]](ctx context.Context, req api.Create[[.Entity]]RequestObject) (api.Create[[.Entity]]ResponseObject, error) {
+	item, err := h.svc.Create(ctx, authz.MustFromContext(ctx), req.Body.Name)
+	if err != nil {
+		return nil, err
+	}
+	return api.Create[[.Entity]]201JSONResponse(toAPI(item)), nil
+}
+
+func toAPI(item [[.Entity]]) api.[[.Entity]] {
+	return api.[[.Entity]]{Id: item.ID, Name: item.Name, CreatedAt: item.CreatedAt}
+}

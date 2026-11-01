@@ -148,7 +148,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 	default:
 		status, failErr := w.fail(ctx, job, err)
 		if failErr != nil {
-			return true, fmt.Errorf("recording failure of job %s: %w (job error: %v)", job.ID, failErr, err)
+			return true, fmt.Errorf("recording failure of job %s: %w (job error: %w)", job.ID, failErr, err)
 		}
 		log.Error("job failed", "error", err, "new_status", status, "max_attempts", job.MaxAttempts)
 	}
