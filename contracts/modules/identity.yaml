@@ -1,0 +1,49 @@
+# Module contract: identity (tenants, users, who is signed in).
+# See contracts/README.md for the format.
+x-module:
+  name: identity
+  description: Tenants (companies using HiringPlug), their users, and who is signed in.
+  permissions: {}
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/me:
+    get:
+      operationId: getMe
+      tags: [identity]
+      summary: Who is signed in, their tenant, and what they may do
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+components:
+  schemas:
+    Me:
+      type: object
+      required: [user, tenant, role, permissions]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        tenant: { $ref: '#/components/schemas/Tenant' }
+        role: { $ref: '#/components/schemas/Role' }
+        permissions:
+          type: array
+          items: { $ref: '#/components/schemas/Permission' }
+    User:
+      type: object
+      required: [id, email, name]
+      properties:
+        id: { $ref: '#/components/schemas/UserId' }
+        email: { type: string, format: email }
+        name: { type: string }
+    Tenant:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/TenantId' }
+        name: { type: string }

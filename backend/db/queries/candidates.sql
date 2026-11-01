@@ -1,0 +1,93 @@
+-- Queries owned by the candidates module. Run inside a tenant-scoped
+-- transaction: row-level security limits every query to the current tenant.
+
+-- name: InsertCandidate :one
+INSERT INTO candidate (
+  tenant_id, first_name, last_name, email, phone, nationality,
+  work_authorization, work_authorization_basis, work_authorization_note,
+  notice_period_value, notice_period_unit, industry, specialization,
+  current_title, current_company, location, source, created_by
+) VALUES (
+  app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality),
+  sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
+  sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
+  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), app_current_user()
+)
+RETURNING *;
+
+-- name: GetCandidate :one
+SELECT * FROM candidate WHERE id = @id;
+
+-- name: CandidateExists :one
+SELECT EXISTS (SELECT 1 FROM candidate WHERE id = @id);
+
+-- name: FindCandidateIDByEmail :one
+SELECT id FROM candidate WHERE email = @email;
+
+-- Optimistic concurrency: only updates if nobody changed the row since
+-- `expected_version` was read. No row returned = stale version (or not found).
+-- name: UpdateCandidate :one
+UPDATE candidate SET
+  first_name = @first_name,
+  last_name = @last_name,
+  email = sqlc.narg(email),
+  phone = sqlc.narg(phone),
+  nationality = sqlc.narg(nationality),
+  work_authorization = sqlc.narg(work_authorization),
+  work_authorization_basis = sqlc.narg(work_authorization_basis),
+  work_authorization_note = sqlc.narg(work_authorization_note),
+  notice_period_value = sqlc.narg(notice_period_value),
+  notice_period_unit = sqlc.narg(notice_period_unit),
+  industry = sqlc.narg(industry),
+  specialization = sqlc.narg(specialization),
+  current_title = sqlc.narg(current_title),
+  current_company = sqlc.narg(current_company),
+  location = sqlc.narg(location),
+  source = sqlc.narg(source),
+  version = version + 1,
+  updated_at = now()
+WHERE id = @id AND version = @expected_version
+RETURNING *;
+
+-- Newest first, keyset pagination on id (IDs sort by creation time).
+-- name: ListCandidates :many
+SELECT id, first_name, last_name, email, phone, current_title, current_company,
+       location, work_authorization, updated_at
+FROM candidate
+WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
+  AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
+ORDER BY id DESC
+LIMIT @row_limit;
+
+-- Amounts are numeric in the database; the Go code converts them to and
+-- from exact decimal strings, so no precision is ever lost.
+-- name: GetCompensation :one
+SELECT * FROM candidate_compensation WHERE candidate_id = @candidate_id;
+
+-- name: InsertCompensation :one
+INSERT INTO candidate_compensation (
+  candidate_id, tenant_id, current_amount, current_currency, current_period,
+  expected_min, expected_max, expected_currency, expected_period, updated_by
+) VALUES (
+  @candidate_id, app_current_tenant(),
+  sqlc.narg(current_amount)::text::numeric, sqlc.narg(current_currency), sqlc.narg(current_period),
+  sqlc.narg(expected_min)::text::numeric, sqlc.narg(expected_max)::text::numeric,
+  sqlc.narg(expected_currency), sqlc.narg(expected_period), app_current_user()
+)
+ON CONFLICT (candidate_id) DO NOTHING
+RETURNING *;
+
+-- name: UpdateCompensation :one
+UPDATE candidate_compensation SET
+  current_amount = sqlc.narg(current_amount)::text::numeric,
+  current_currency = sqlc.narg(current_currency),
+  current_period = sqlc.narg(current_period),
+  expected_min = sqlc.narg(expected_min)::text::numeric,
+  expected_max = sqlc.narg(expected_max)::text::numeric,
+  expected_currency = sqlc.narg(expected_currency),
+  expected_period = sqlc.narg(expected_period),
+  version = version + 1,
+  updated_by = app_current_user(),
+  updated_at = now()
+WHERE candidate_id = @candidate_id AND version = @expected_version
+RETURNING *;

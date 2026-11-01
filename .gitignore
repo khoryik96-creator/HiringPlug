@@ -1,0 +1,27 @@
+# Dependencies and builds
+node_modules/
+.venv/
+dist/
+build/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+
+# Local data and secrets
+.env
+.env.*
+!.env.example
+backend/data/
+data/
+*.log
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

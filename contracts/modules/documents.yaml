@@ -1,0 +1,199 @@
+# Module contract: documents (CVs and other files attached to candidates).
+# See contracts/README.md for the format.
+x-module:
+  name: documents
+  description: >
+    Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and
+    formatted CVs. Uploading a CV queues text extraction in the Python AI worker.
+  permissions:
+    documents:read:
+      description: View and download candidate documents, including extracted text.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+    documents:create:
+      description: Upload candidate documents.
+      roles: [owner, admin, recruiter, sourcer]
+  errorCodes: {}
+  jobs:
+    document.extract_text:
+      queue: ai
+      payload: DocumentExtractTextJob
+      description: Extract plain text from an uploaded document (Python AI worker).
+    document.text_extracted:
+      queue: core
+      payload: DocumentTextExtractedJob
+      description: Save the result of text extraction on the document (Go worker).
+
+paths:
+  /v1/candidates/{candidateId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    get:
+      operationId: listCandidateDocuments
+      tags: [documents]
+      summary: List a candidate's documents, newest first
+      x-permission: documents:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: uploadCandidateDocument
+      tags: [documents]
+      summary: Upload a CV or other document (PDF or DOCX, up to 10 MB)
+      description: >
+        Returns immediately with status `queued`; text extraction runs in the
+        background. Poll GET /v1/documents/{documentId} for the result.
+      x-permission: documents:create
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, source]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                source: { $ref: '#/components/schemas/DocumentSource' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /v1/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: getDocument
+      tags: [documents]
+      summary: Get a document, including its extracted text
+      x-permission: documents:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    DocumentIdPath:
+      name: documentId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/DocumentId' }
+
+  schemas:
+    DocumentId:
+      type: string
+      pattern: '^doc_[0-9a-hjkmnp-tv-z]{26}$'
+      example: doc_01jbz6w0m0k8q9x2r3s4t5v6w7
+
+    DocumentSource:
+      type: string
+      description: >
+        Where the file came from. original = the candidate's own CV;
+        formatted = a CV formatted by your team for clients.
+      enum: [jobstreet, linkedin, original, formatted, other]
+    DocumentStatus:
+      type: string
+      description: >
+        queued = waiting for text extraction; extracted = text available;
+        needs_ocr = scanned document, no text layer yet; failed = could not be read.
+      enum: [queued, extracted, needs_ocr, failed]
+
+    Document:
+      type: object
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/DocumentId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        source: { $ref: '#/components/schemas/DocumentSource' }
+        fileName: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        pageCount: { type: integer, nullable: true }
+        extractor:
+          type: string
+          nullable: true
+          description: Which extractor produced the text, e.g. pdfplumber@0.11+tesseract@5.3.
+        errorMessage: { type: string, nullable: true }
+        extractionWarnings:
+          type: array
+          items: { type: string }
+          description: >
+            Problems a recruiter should know about, e.g. "OCR could not read page 3;
+            this document may be incomplete." Empty when extraction was clean.
+        extractedText:
+          type: string
+          nullable: true
+          description: Only included when fetching a single document.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    DocumentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Document' }
+
+    # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    DocumentExtractTextJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, downloadUrl, contentType, fileName, sizeBytes]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        downloadUrl:
+          type: string
+          description: Short-lived signed URL to download the file from.
+        contentType: { type: string }
+        fileName: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+    ExtractionStatus:
+      type: string
+      enum: [extracted, needs_ocr, failed]
+    DocumentTextExtractedJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, status, text, pageCount, extractor, errorMessage, warnings]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        status: { $ref: '#/components/schemas/ExtractionStatus' }
+        text:
+          type: string
+          nullable: true
+          # PostgreSQL cannot store NUL characters (often found in PDF text):
+          # the worker must remove them before sending.
+          pattern: '^[^\x00]*$'
+          description: The document's plain text, with NUL characters removed.
+        pageCount: { type: integer, nullable: true }
+        extractor:
+          type: string
+          description: name@version of the extractor(s), e.g. pdfplumber@0.11+tesseract@5.3.
+        errorMessage: { type: string, nullable: true }
+        warnings:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 500 }
+          description: Problems found while reading, e.g. pages OCR could not read.

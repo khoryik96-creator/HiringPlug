@@ -1,0 +1,77 @@
+[project]
+name = "hiringplug-ai"
+version = "0.1.0"
+description = "HiringPlug AI worker: CV text extraction and OCR now; parsing, formatting and matching next."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic[email]>=2.14,<3",
+  "psycopg[binary]>=3.3,<4",
+  "httpx>=0.28,<1",
+  "pdfplumber>=0.11.10,<0.12",
+  "pypdfium2>=5.13,<6",
+  "pytesseract>=0.3.13,<0.4",
+  "pillow>=12.3,<13",
+  "python-docx>=1.2,<2",
+]
+
+[project.scripts]
+hiringplug-ai = "hiringplug_ai.worker:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=9",
+  "ruff>=0.17",
+  "mypy>=2.4",
+  "datamodel-code-generator>=0.87",
+  "reportlab>=5",
+  "pypdf>=6.16",
+  "pyyaml>=6",
+  "types-pyyaml>=6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hiringplug_ai"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["src/hiringplug_ai/contracts.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "C4", "PT", "RET", "S", "PL", "BLE", "TRY"]
+ignore = [
+  "PLR2004", # magic numbers: thresholds are named where they matter
+  "TRY003",  # long messages in exceptions are fine and helpful
+  "PLR0913", # some extraction helpers take several limits
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "S105", "S106", "S608"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+exclude = ["src/hiringplug_ai/contracts\\.py$"]
+
+[[tool.mypy.overrides]]
+module = ["pytesseract", "pytesseract.*", "pdfplumber", "pdfplumber.*", "pypdfium2", "pypdfium2.*", "docx", "docx.*", "reportlab", "reportlab.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["hiringplug_ai.contracts"]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers -m 'not e2e'"
+markers = [
+  "db: needs PostgreSQL (HP_TEST_ADMIN_URL); set HP_SKIP_DB_TESTS=1 to skip",
+  "ocr: needs the Tesseract binary; set HP_SKIP_OCR_TESTS=1 to skip",
+  "e2e: needs the running API and workers; run with `task e2e`",
+]

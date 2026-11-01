@@ -1,0 +1,18 @@
+# Generates internal/api/api.gen.go from the bundled contract. Run via `task gen`.
+package: api
+output: internal/api/api.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  # Keep job payload schemas even though no endpoint references them.
+  skip-prune: true
+  # Optional + nullable fields become nullable.Nullable[T], so PATCH can tell
+  # "not sent" (no change) from "null" (clear the field).
+  nullable-type: true
+compatibility:
+  # Enum constants are always TypeName + Value (e.g. ErrorCodeNOTFOUND), so two
+  # modules' enums can never collide.
+  always-prefix-enum-values: true

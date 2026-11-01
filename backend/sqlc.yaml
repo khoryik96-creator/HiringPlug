@@ -1,0 +1,36 @@
+# sqlc turns the SQL in db/queries/<module>.sql into typed Go functions in
+# internal/modules/<module>/internal/store. Go's `internal` rule means only
+# that module can import its store: no module can query another module's tables
+# through generated code. Run via `task gen`.
+version: "2"
+sql:
+  - &module
+    engine: postgresql
+    schema: db/migrations
+    queries: db/queries/identity.sql
+    gen:
+      go: &go
+        package: store
+        out: internal/modules/identity/internal/store
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+  - <<: *module
+    queries: db/queries/candidates.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/candidates/internal/store
+  - <<: *module
+    queries: db/queries/documents.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/documents/internal/store
