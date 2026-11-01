@@ -5,7 +5,7 @@ hiring teams. It works for one company or many: it can run for your own team
 and be sold to others (each company's data is isolated). It runs on your own
 machine first and is built to move to the cloud later.
 
-![A candidate profile as a recruiter sees it](docs/images/candidate-recruiter.png)
+![A candidate profile as a recruiter sees it](docs/images/candidate-edited.png)
 
 ## What is here today (milestone 1: the foundation)
 
@@ -20,8 +20,9 @@ machine first and is built to move to the cloud later.
 - **Users and roles** (owner, admin, recruiter, sourcer, hiring manager,
   viewer) with view / create / update permissions per area.
 - **API documentation** generated from the contract, at `/docs`.
-- **A web app** to search, add and view candidates, see salary (or the
-  "restricted" notice), and upload CVs.
+- **A web app** to search and add candidates, edit their profile and salary
+  (each needs its own permission), see the "restricted" notice where salary is
+  hidden, and upload CVs and read their text.
 - **Guardrails** so things do not regress: one contract for all languages,
   data isolated between companies in the database, automatic checks on every
   change, and a generator that creates new modules already wired and tested.

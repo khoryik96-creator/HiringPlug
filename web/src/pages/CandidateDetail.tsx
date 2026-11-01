@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { api, type Candidate, type Permission, unwrap } from "../api/client";
+import { CandidateForm } from "../components/CandidateForm";
 import { Documents } from "../components/Documents";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SalaryPanel } from "../components/SalaryPanel";
@@ -27,6 +29,7 @@ function workAuthorization(c: Candidate): string {
 
 /** One candidate: profile, salary (if permitted) and documents. */
 export function CandidateDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
+  const [editing, setEditing] = useState(false);
   const candidate = useQuery({
     queryKey: ["candidate", id],
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId: id } } })),
@@ -43,8 +46,16 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   return (
     <main>
       <a href="#/candidates">← Candidates</a>
-      <h2>{c.fullName}</h2>
+      <div className="row spread">
+        <h2>{c.fullName}</h2>
+        {permissions.includes("candidates:update") && !editing && (
+          <button type="button" onClick={() => { setEditing(true); }}>Edit profile</button>
+        )}
+      </div>
       <p className="muted">{[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}</p>
+      {editing ? (
+        <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
+      ) : (
       <section className="panel" aria-label="Profile">
         <dl>
           <dt>Email</dt>
@@ -59,9 +70,12 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           <dd>{notice}</dd>
           <dt>Industry / specialization</dt>
           <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
+          <dt>Source</dt>
+          <dd>{c.source?.replace("_", " ") ?? "—"}</dd>
         </dl>
       </section>
-      <SalaryPanel candidate={c} />
+      )}
+      <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       <Documents candidateId={c.id} canUpload={permissions.includes("documents:create")} />
     </main>
   );

@@ -37,8 +37,13 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Current title and company, location, source | Source: JobStreet, LinkedIn, referral, careers page, direct, other |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
-Edits are protected against lost updates (`version`), every change is in the
-audit log, and search ignores case and accents (`jose` finds `José`).
+The web app edits every field above. Salary has its own form, shown only to
+roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
+are protected against lost updates (`version`): if someone else saved first,
+the form says so and offers to reload. Validation messages appear next to the
+field (e.g. "Pass held" is required for an expat who can work here). Every
+change is in the audit log, and search ignores case and accents (`jose` finds
+`José`).
 
 **CV versions.** A candidate has documents, each with a `source`: `jobstreet`,
 `linkedin`, `original`, `formatted` or `other`. Each upload keeps its file, its

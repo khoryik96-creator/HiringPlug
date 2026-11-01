@@ -49,6 +49,8 @@ Salary is the example; every sensitive field follows the same pattern.
    buggy query, or a new endpoint someone forgets to protect, gets no rows.
    `TestTheDatabaseEnforcesIsolationEvenForRawSQL` proves it with raw SQL.
 
+![A sourcer sees that salary is restricted](images/candidate-sourcer.png)
+
 The same permissions also bound what leaves the system. Audit entries record
 that a salary changed but never the amounts, and the AI assistant (M4) only
 receives the fields the user may see.
