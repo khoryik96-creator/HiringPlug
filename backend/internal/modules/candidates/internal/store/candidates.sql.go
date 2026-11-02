@@ -329,6 +329,74 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 	return items, nil
 }
 
+const similarCandidates = `-- name: SimilarCandidates :many
+SELECT id, first_name, last_name, email, phone, current_title, current_company, location, work_authorization, updated_at,
+       (phone IS NOT NULL AND phone = $1::text)::boolean AS same_phone,
+       (similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) >= 0.6)::boolean AS similar_name
+FROM candidate
+WHERE id <> $3
+  AND ((phone IS NOT NULL AND phone = $1::text)
+       OR similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) >= 0.6)
+ORDER BY similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) DESC, id DESC
+LIMIT 10
+`
+
+type SimilarCandidatesParams struct {
+	Phone    *string
+	FullName string
+	ID       string
+}
+
+type SimilarCandidatesRow struct {
+	ID                string
+	FirstName         string
+	LastName          string
+	Email             *string
+	Phone             *string
+	CurrentTitle      *string
+	CurrentCompany    *string
+	Location          *string
+	WorkAuthorization *string
+	UpdatedAt         time.Time
+	SamePhone         bool
+	SimilarName       bool
+}
+
+// Possible duplicates: the same phone, or a name at least 60% alike
+// (trigram similarity, ignoring case and accents). Best matches first.
+func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesParams) ([]SimilarCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, similarCandidates, arg.Phone, arg.FullName, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SimilarCandidatesRow
+	for rows.Next() {
+		var i SimilarCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Phone,
+			&i.CurrentTitle,
+			&i.CurrentCompany,
+			&i.Location,
+			&i.WorkAuthorization,
+			&i.UpdatedAt,
+			&i.SamePhone,
+			&i.SimilarName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCandidate = `-- name: UpdateCandidate :one
 UPDATE candidate SET
   first_name = $1,

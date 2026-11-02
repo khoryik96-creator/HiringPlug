@@ -122,6 +122,24 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/candidates/{candidateId}/similar:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    get:
+      operationId: listSimilarCandidates
+      tags: [candidates]
+      summary: Possible duplicates of a candidate (same phone, or a very similar name)
+      x-permission: candidates:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SimilarCandidateList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/candidates/{candidateId}/compensation:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -406,3 +424,21 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{ $ref: '#/components/schemas/CandidateId' }]
           nullable: true
+    SimilarCandidate:
+      type: object
+      required: [candidate, reasons]
+      properties:
+        candidate: { $ref: '#/components/schemas/CandidateSummary' }
+        reasons:
+          type: array
+          description: Why they may be the same person.
+          items:
+            type: string
+            enum: [same_phone, similar_name]
+    SimilarCandidateList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SimilarCandidate' }

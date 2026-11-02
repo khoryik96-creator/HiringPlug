@@ -314,6 +314,20 @@ class CandidatePage(BaseModel):
     ]
 
 
+class Reason(StrEnum):
+    same_phone = "same_phone"
+    similar_name = "similar_name"
+
+
+class SimilarCandidate(BaseModel):
+    candidate: CandidateSummary
+    reasons: Annotated[list[Reason], Field(description="Why they may be the same person.")]
+
+
+class SimilarCandidateList(BaseModel):
+    items: list[SimilarCandidate]
+
+
 class CompanyId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["comp_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^comp_[0-9a-hjkmnp-tv-z]{26}$")

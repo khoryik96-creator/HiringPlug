@@ -49,6 +49,11 @@ separators (`8,500`, `1,00,000`); a decimal comma (`8500,50`) is refused rather
 than guessed. Every change is in the audit log, and search ignores case and
 accents (`jose` finds `José`).
 
+**Possible duplicates** ✅: a candidate's page warns about others with the
+same phone number or a very similar name ("Siti Aisyah" and "Siti Aishah",
+at least 60% alike ignoring case and accents). The same email is refused when
+adding. Merging two records comes next.
+
 **CV versions.** A candidate has documents, each with a `source`: `jobstreet`,
 `linkedin`, `original`, `formatted` or `other`. Each upload keeps its file, its
 extracted text and any extraction warnings, so the web app can show the

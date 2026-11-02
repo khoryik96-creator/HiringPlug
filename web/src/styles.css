@@ -62,3 +62,5 @@ tr.total td { font-weight: 600; }
 .timeline li { border-left: 3px solid #e5e7eb; padding: 0.25rem 0 0.25rem 0.75rem; margin: 0.5rem 0; }
 .timeline li.note { border-left-color: #2563eb; }
 .timeline li p { margin: 0.25rem 0; }
+.warning-panel { background: #fffbeb; border-color: #fcd34d; }
+.warning-panel ul { margin: 0.25rem 0 0; }

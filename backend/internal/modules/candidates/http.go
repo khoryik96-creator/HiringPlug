@@ -31,14 +31,18 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	}
 	out := api.ListCandidates200JSONResponse{Items: make([]api.CandidateSummary, len(page.Items)), NextCursor: orNull(page.NextCursor)}
 	for i, s := range page.Items {
-		out.Items[i] = api.CandidateSummary{
-			Id: s.ID, FullName: s.FullName, Email: orNull(s.Email), Phone: orNull(s.Phone),
-			CurrentTitle: orNull(s.CurrentTitle), CurrentCompany: orNull(s.CurrentCompany), Location: orNull(s.Location),
-			WorkAuthorizationStatus: orNull(convertPtr[api.WorkAuthorizationStatus](s.WorkAuthorizationStatus)),
-			UpdatedAt:               s.UpdatedAt,
-		}
+		out.Items[i] = summaryToAPI(s)
 	}
 	return out, nil
+}
+
+func summaryToAPI(s Summary) api.CandidateSummary {
+	return api.CandidateSummary{
+		Id: s.ID, FullName: s.FullName, Email: orNull(s.Email), Phone: orNull(s.Phone),
+		CurrentTitle: orNull(s.CurrentTitle), CurrentCompany: orNull(s.CurrentCompany), Location: orNull(s.Location),
+		WorkAuthorizationStatus: orNull(convertPtr[api.WorkAuthorizationStatus](s.WorkAuthorizationStatus)),
+		UpdatedAt:               s.UpdatedAt,
+	}
 }
 
 // CreateCandidate handles POST /v1/candidates.

@@ -45,7 +45,7 @@ job. Today the app has candidates but nothing to place them into.
 | Step | Delivers |
 |---|---|
 | 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, work history, education, skills), each value showing where in the CV it came from; you review and accept |
-| 2.2 **Duplicates** | Warn on the same email, phone or a very similar name; merge two candidates with their CVs, notes and applications |
+| 2.2 **Duplicates** | ✅ The same email is refused; the same phone or a very similar name is flagged on the candidate's page. ⬜ Merge two candidates with their CVs, notes and applications |
 | ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | 2.4 **Tags, skills and lists** | Tags, skills, and shared industry / specialization lists; filters and saved searches |
 | 2.5 **CV versions side by side** | Original, JobStreet, LinkedIn and formatted CVs of one candidate compared side by side |

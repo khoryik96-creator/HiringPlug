@@ -74,3 +74,18 @@ describe("candidate page", () => {
     expect(screen.getByText("Expat, can work here: Residence Pass-Talent (RP-T)")).toBeTruthy();
   });
 });
+
+describe("possible duplicates", () => {
+  it("warns about candidates with the same phone or a similar name", async () => {
+    const similar = { items: [{ candidate: { id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Siti Aishah", email: null, phone: null, currentTitle: "Accountant", currentCompany: null, location: null, workAuthorizationStatus: null, updatedAt: "2026-11-01T00:00:00Z" }, reasons: ["similar_name"] }] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => {
+      if (path === "/v1/candidates/{candidateId}/similar") return Promise.resolve(ok(similar));
+      if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(testCandidate()));
+      return Promise.resolve(ok({ items: [] }));
+    }));
+    renderWithClient(<CandidateDetail id={testCandidate().id} permissions={RECRUITER} />);
+    const warning = await screen.findByRole("region", { name: "Possible duplicates" });
+    expect(warning.textContent).toContain("Siti Aishah");
+    expect(warning.textContent).toContain("similar name; Accountant");
+  });
+});

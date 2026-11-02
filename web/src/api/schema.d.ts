@@ -51,6 +51,25 @@ export interface paths {
         patch: operations["updateCandidate"];
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Possible duplicates of a candidate (same phone, or a very similar name) */
+        get: operations["listSimilarCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/compensation": {
         parameters: {
             query?: never;
@@ -627,6 +646,14 @@ export interface components {
             items: components["schemas"]["CandidateSummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["CandidateId"] | null;
+        };
+        SimilarCandidate: {
+            candidate: components["schemas"]["CandidateSummary"];
+            /** @description Why they may be the same person. */
+            reasons: ("same_phone" | "similar_name")[];
+        };
+        SimilarCandidateList: {
+            items: components["schemas"]["SimilarCandidate"][];
         };
         /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyId: string;
@@ -1291,6 +1318,31 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listSimilarCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarCandidateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     putCandidateCompensation: {

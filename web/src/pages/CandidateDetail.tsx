@@ -9,6 +9,7 @@ import { Documents } from "../components/Documents";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
+import { SimilarCandidates } from "../components/SimilarCandidates";
 import { CANDIDATE_SOURCE, countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
 function workAuthorization(c: Candidate): string {
@@ -47,6 +48,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         )}
       </div>
       <p className="muted">{[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}</p>
+      <SimilarCandidates candidateId={c.id} />
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
       ) : (
