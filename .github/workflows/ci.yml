@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Tesseract
-        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-eng
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-eng antiword libreoffice-writer-nogui
       - uses: astral-sh/setup-uv@v5
       - uses: arduino/setup-task@v2
         with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
@@ -136,7 +136,7 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - name: Install Tesseract
-        run: sudo apt-get update -q && sudo apt-get install -y -q tesseract-ocr tesseract-ocr-eng
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-eng antiword libreoffice-writer-nogui
       - uses: astral-sh/setup-uv@v5
       - name: Build and prepare the database
         working-directory: backend

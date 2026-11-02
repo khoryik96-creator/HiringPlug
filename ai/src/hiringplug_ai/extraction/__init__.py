@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 
+from .doc_reader import extract_doc
 from .docx_reader import extract_docx
 from .limits import DEFAULT_LIMITS, DocumentRejectedError, Limits
 from .ocr import OcrEngine, TesseractOcr
@@ -30,10 +31,14 @@ def extract(data: bytes, *, ocr: OcrEngine | None, limits: Limits = DEFAULT_LIMI
             return extract_pdf(data, limits, ocr)
         if kind == "docx":
             return extract_docx(data, limits)
+        if kind == "doc":
+            return extract_doc(data, limits)
     except DocumentRejectedError as exc:
         return Extraction("failed", None, None, kind, error=str(exc))
     except Exception:
         # A damaged file can make the parsing libraries raise almost anything.
         log.warning("document could not be parsed", exc_info=True, extra={"document_kind": kind})
         return Extraction("failed", None, None, kind, error="The file is damaged or not a valid document.")
-    return Extraction("failed", None, None, "none", error="Only PDF and Word (.docx) files can be read.")
+    return Extraction(
+        "failed", None, None, "none", error="Only PDF and Word (.docx or .doc) files can be read."
+    )

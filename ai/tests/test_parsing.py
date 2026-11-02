@@ -33,9 +33,10 @@ def assert_grounded(text: str, p: ParsedProfile) -> None:
         values += [j.title, j.company, j.dates]
     for e in p.education:
         values += [e.qualification, e.institution, e.dates]
+    flat = " ".join(text.split())  # quotes may join wrapped lines (Go compares the same way)
     for s in values:
         if s:
-            assert s.quote in text, s
+            assert " ".join(s.quote.split()) in flat, s
 
 
 MODERN = """SITI AISYAH BINTI AHMAD
@@ -133,7 +134,7 @@ Data Analyst
 """
     p = parse_cv(text)
     assert jobs(p) == [
-        ("Senior Data Engineer", "KINESSO LLC., Bangsar, KL", "2022-10", None, True),
+        ("Senior Data Engineer", "KINESSO LLC.", "2022-10", None, True),
         ("Data Analyst", "Maybank Berhad", "2018-01", "2022-09", False),
     ]
 

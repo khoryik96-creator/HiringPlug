@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any
 
+from .columns import page_text
 from .limits import DocumentRejectedError, Limits
 from .ocr import OcrEngine, OcrPages
 from .result import Extraction
@@ -49,7 +50,7 @@ def extract_pdf(data: bytes, limits: Limits, ocr: OcrEngine | None) -> Extractio
             )
         pages = []
         for page in pdf.pages:
-            text = page.extract_text() or ""
+            text = page_text(page)
             pages.append(_Page(text=text, ocr_reason=page_ocr_reason(page, text)))
 
     # A renderable PDF that exposes no text at all: try OCR on every page.

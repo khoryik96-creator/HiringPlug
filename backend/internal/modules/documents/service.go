@@ -37,7 +37,7 @@ type Service struct {
 func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, source, fileName string, data []byte) (Document, error) {
 	contentType, ok := DetectContentType(data)
 	if !ok {
-		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx) file.")
+		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx or .doc) file.")
 	}
 	sum := sha256.Sum256(data)
 	var doc Document

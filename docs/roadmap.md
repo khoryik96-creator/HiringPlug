@@ -13,7 +13,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 |---|---|
 | ✅ | Candidates: add, search, view, edit every profile field (work authorization, notice period, nationality, source, ...) |
 | ✅ | Salary (current and expected) that only permitted roles see or edit, enforced by the database too |
-| ✅ | CV upload (PDF, Word) with text extraction and OCR for scanned pages |
+| ✅ | CV upload (PDF, Word .docx and old .doc) with text extraction, OCR for scanned pages and two-column layouts |
 | ✅ | Roles (owner, admin, recruiter, sourcer, hiring manager, viewer) and an audit log of every change |
 | ✅ | Companies: clients, prospects or your own departments; search, add, edit |
 | ✅ | Contacts at companies with a built-in email check |
@@ -46,7 +46,7 @@ job. Today the app has candidates but nothing to place them into.
 
 | Step | Delivers |
 |---|---|
-| ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills), each value showing where in the CV it came from; you review and accept. Next: work history and education saved on the profile, the AI reader, two-column CVs and a quality set (needs your sample CVs). |
+| ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills), each value showing where in the CV it came from; you review and accept. Tuned on 25 real CVs, including two-column and old .doc files. Next: work history and education saved on the profile, and the AI reader. |
 | 2.2 **Duplicates** | ✅ The same email is refused; the same phone or a very similar name is flagged on the candidate's page; merge two candidates with their CVs, jobs, notes and salary |
 | ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | ✅ 2.4 **Tags, skills and lists** | Tags and skills on candidates, suggestions from values already used (also for industry and specialization), and list filters. Saved searches come with reports (6.3). |
@@ -107,8 +107,6 @@ sign-in (1.7).
 
 - **Your stages.** The pipeline stages you use today and the rejection reasons
   (step 1.4).
-- **Anonymised sample CVs** (10–30, including two-column and scanned ones) for
-  CV parsing quality tests (step 2.1).
 - **Your existing data**, if any, as Excel/CSV exports (step 2.3).
 - **Your branded CV template** in Word (step 5.1).
 - **The AI provider and hosting region** for DeepSeek (step 5.3).

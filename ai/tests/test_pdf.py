@@ -101,7 +101,7 @@ def test_too_many_pages_are_refused() -> None:
 
 def test_damaged_files_fail_with_a_readable_message() -> None:
     assert extract(b"%PDF-1.4 garbage", ocr=None).error == "The file is damaged or not a valid document."
-    assert extract(b"hello", ocr=None).error == "Only PDF and Word (.docx) files can be read."
+    assert extract(b"hello", ocr=None).error == "Only PDF and Word (.docx or .doc) files can be read."
 
 
 @pytest.mark.ocr

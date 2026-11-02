@@ -101,7 +101,7 @@ def _numbering_id(paragraph: Any) -> str | None:
     return None
 
 
-def _row_lines(row: Any) -> list[str]:
+def _row_lines(row: Any, depth: int = 0) -> list[str]:
     groups: list[list[str]] = []
     seen: set[tuple[str, ...]] = set()
     for cell in row.cells:  # merged cells repeat; keep the first copy
@@ -110,6 +110,12 @@ def _row_lines(row: Any) -> list[str]:
             line = _paragraph_line(paragraph)
             if line and (not group or group[-1] != line):
                 group.append(line)
+        # Tables inside a cell (layout tables, and old .doc files converted by
+        # LibreOffice) hold contact details often enough to matter.
+        if depth < 3:
+            for table in cell.tables:
+                for inner in table.rows:
+                    group.extend(_row_lines(inner, depth + 1))
         if group and tuple(group) not in seen:
             seen.add(tuple(group))
             groups.append(group)

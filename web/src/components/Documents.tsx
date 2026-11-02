@@ -64,7 +64,7 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
           </select>
           <input
             type="file"
-            accept=".pdf,.docx"
+            accept=".pdf,.docx,.doc"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) upload.mutate(file);

@@ -59,3 +59,19 @@ def test_an_empty_word_document_fails_clearly() -> None:
     result = extract(out.getvalue(), ocr=None)
     assert result.status == "failed"
     assert result.error == "The Word document has no readable text."
+
+
+def test_tables_inside_table_cells_are_read() -> None:
+    # Layout tables nest contact details in a cell (old .doc files converted by
+    # LibreOffice look like this too).
+    doc = Document()
+    outer = doc.add_table(rows=1, cols=2)
+    outer.cell(0, 0).paragraphs[0].text = "Nur Aisyah binti Rahman"
+    inner = outer.cell(0, 1).add_table(rows=2, cols=2)
+    inner.cell(0, 0).text, inner.cell(0, 1).text = "Email", "nur@example.com"
+    inner.cell(1, 0).text, inner.cell(1, 1).text = "Mobile", "012-000 0001"
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    text = extract(buffer.getvalue(), ocr=None).text or ""
+    assert "Email | nur@example.com" in text
+    assert "Mobile | 012-000 0001" in text

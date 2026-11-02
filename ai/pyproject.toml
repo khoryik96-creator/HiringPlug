@@ -55,6 +55,7 @@ ignore = [
 # CVs use en dashes, curly quotes and bullets; the parser must match them.
 "src/hiringplug_ai/parsing/**" = ["RUF001", "RUF002"]
 "tests/test_parsing.py" = ["RUF001"]
+"tests/test_parsing_layouts.py" = ["RUF001", "E501"]  # whole CV lines as test data
 
 [tool.mypy]
 strict = true

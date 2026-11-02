@@ -21,8 +21,7 @@ The mechanisms come from **CV Studio**, where they were tuned on real CVs,
 rebuilt here as small, separately tested modules.
 
 1. **Identify the file from its bytes**, never from its name or claimed type
-   (`sniff.py`). PDF and Word (.docx) today; images and old `.doc` (via antiword)
-   next.
+   (`sniff.py`). PDF, Word (.docx) and old Word (.doc); images next.
 2. **PDF, page by page** (`pdf.py`):
    - read each page's text layer (pdfplumber);
    - decide per page whether to OCR it. *Unextractable*: the text is glyph
@@ -42,10 +41,14 @@ rebuilt here as small, separately tested modules.
    list paragraphs keep a `•` marker (including numbering inherited from
    styles), tables keep their rows and multi-line cells, and text boxes are read
    where they appear, with Word's duplicate fallback copies removed.
-5. **Safety** (`limits.py`, `zipsafety.py`): page limits, zip-bomb checks for
+5. **Old Word (.doc)** (`doc_reader.py`): antiword first (small and fast);
+   files it cannot read (other Word versions, files saved by other programs)
+   are converted by LibreOffice to .docx and read by the Word reader. Each
+   tool runs in its own temporary folder with a time limit.
+6. **Safety** (`limits.py`, `zipsafety.py`): page limits, zip-bomb checks for
    Word files, pixel limits for images. A damaged or unsafe file becomes a
    `failed` result with a readable message, not a retry loop.
-6. **Clean-up** (`text.py`): known ligature codes are fixed
+7. **Clean-up** (`text.py`): known ligature codes are fixed
    (`Accoun(cid:415)ng` → `Accounting`), NUL characters (which PostgreSQL cannot
    store) are removed, and whitespace is tidied. Real words are never rewritten.
 
@@ -89,38 +92,57 @@ fills what they miss (messy work history), and both are checked. Values are
 **suggestions**: the recruiter reviews them next to the profile and ticks
 what to use; nothing a person entered is replaced unless they tick it.
 
-**The rules** (`parsing/`) come from Kano's CV scanner, rebuilt as small
-tested modules:
+**The rules** (`parsing/`) come from Kano's CV scanner and CV Studio's
+normaliser, rebuilt as small tested modules and tuned on 25 real CVs
+(JobStreet and LinkedIn exports, Word and PDF, designer two-column layouts,
+old .doc files):
 
-- `layout.py`: lines and sections (English and Malay headings, headings with
-  content on the same line such as "Skills: Excel, SAP").
-- `contacts.py`: email; phone (labelled numbers first; never a year range such
-  as 1999-2001; never joined across lines; bare 8-digit runs only when they look
-  like Singapore mobiles); LinkedIn; name ("Name:" labels, JobStreet exports,
-  a name sharing the first line with a phone, ALL CAPS to Title Case, OCR's
-  "BINT]" for "BINTI"); location; nationality; notice period.
+- `layout.py`: lines and sections. English and Malay headings, plurals
+  ("Experiences"), letter-spaced headings ("C ON TA CT"), headings with content
+  on the same line ("Skills: Excel"; JobStreet's "Career history Senior
+  Engineer at ..."). Page footers and page numbers are dropped. One-word
+  headings that also end company names ("... at Dell" + "Technologies") count
+  only in capitals or with a colon.
+- `names.py`: candidates from the top of the CV (a line, the start of a line
+  shared with contacts or a title, a labelled value), checked against CV
+  Studio's rules (no digits, "@", commas, address words or places) and against
+  job titles and company words. The candidate that shares words with the email
+  address or LinkedIn link wins. Honorifics ("Ts.", "Dr."), letters after the
+  name (", PMP"), nicknames ("(Aaron)") and OCR's "BINT]" are handled.
+- `contacts.py`: email; phone (labelled anywhere, including a label on the line
+  above; never a year range; never joined across lines; bare 8-digit runs only
+  as Singapore mobiles); LinkedIn; location; nationality; notice period.
 - `dates.py`: "Jan 2020 – Present", "03/2019 - 12/2021", "2015 to 2018",
-  Malay month names.
-- `history.py`: a job is anchored on its date range; title and company come
-  from the same line ("Title | Company | dates", "Title at Company") or the
-  short lines around it, told apart by company words (Sdn Bhd, Pte Ltd,
-  Berhad, ...) and role words. Education by qualification and institution
-  words.
-- `skills.py`: items of the skills section only (never guessed from prose),
-  without levels ("Excel (Advanced)" → Excel), languages or personal facts.
+  year-first "2022-Oct", days of the month, "Dec – Jan 2026", two-digit
+  years, "till date", Malay months. CV Studio's date cases are the test.
+- `experience.py`: a job is anchored on its date range; title and company come
+  from the same line ("Title | Company", "Title at Company", "Company - Title
+  (dates)", "Title, Dept | Company, City"), labelled lines ("Company:",
+  "Role:"), or the short lines around it, before or after the dates as the CV's
+  first job shows. Places, durations ("(2 years 3 months)"), numbering,
+  "Employer client: X", duties after a title and dates broken over two lines
+  are handled. A dated line under another heading counts when it plainly holds
+  a title and a company (sidebars and page breaks move work history).
+- `education.py`, `skills.py`: by qualification and institution words; skills
+  from skills sections only, without levels, rating bars, prose or job lines,
+  keeping brackets together ("AWS (EC2, EKS, S3)").
+
+**Two-column PDFs** (`extraction/columns.py`): a page is split at the gap
+between its columns, found from word positions, and each column is read top
+to bottom (the one that starts higher first). It splits only when almost no
+line crosses the gap and both sides run down much of the page with real text,
+so right-aligned dates on a one-column CV keep the page whole.
+
+**Quality.** The real CVs stay private (they are never committed). Every
+layout they showed is copied into an invented CV in `tests/test_parsing_layouts.py`
+and `tests/test_columns.py`, so a rule change that breaks one fails the build.
 
 Each result records the parser version (`rules@1`), and **Read details
 again** re-runs it, so CVs can be re-parsed when the parser improves.
 
-**Next:**
-
-- **A quality set**: anonymised sample CVs with expected results, run in CI,
-  so a rule change that makes parsing worse fails the build. This needs real
-  CVs (10–30, including two-column and scanned ones).
-- **Two-column CVs** (a sidebar next to the main column) come out of PDFs with
-  the columns interleaved. Column-aware reading order (finding the gap
-  between columns from word positions) needs the same sample set to validate.
-- **The AI reader**, behind the same quote check.
+**Next:** the AI reader (DeepSeek, once its host and region are chosen),
+behind the same quote check, for what rules still miss: unusual layouts and
+very messy two-column CVs.
 
 ## CV formatting and blind CVs (M4)
 

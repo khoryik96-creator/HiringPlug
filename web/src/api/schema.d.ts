@@ -251,7 +251,7 @@ export interface paths {
         get: operations["listCandidateDocuments"];
         put?: never;
         /**
-         * Upload a CV or other document (PDF or DOCX, up to 10 MB)
+         * Upload a CV or other document (PDF, DOCX or old Word .doc, up to 10 MB)
          * @description Returns immediately with status `queued`; text extraction runs in the background. Poll GET /v1/documents/{documentId} for the result.
          */
         post: operations["uploadCandidateDocument"];

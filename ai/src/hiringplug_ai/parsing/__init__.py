@@ -8,8 +8,11 @@ reader added later (an AI model, a better rule) is checked the same way.
 from __future__ import annotations
 
 from ..contracts import ParsedEducation, ParsedJob, ParsedProfile, SourcedText
-from . import contacts, history
+from . import contacts
+from .education import education
+from .experience import experience
 from .layout import read_lines
+from .names import name
 from .skills import skills
 
 PARSER = "rules@1"
@@ -28,6 +31,7 @@ def _text(value: str | None) -> SourcedText | None:
 
 def parse_cv(text: str) -> ParsedProfile:
     lines = read_lines(text)
+    email, linkedin = contacts.email(lines), contacts.linkedin(lines)
     jobs = [
         ParsedJob(
             title=_text(job.title),
@@ -37,7 +41,7 @@ def parse_cv(text: str) -> ParsedProfile:
             endDate=job.dates.end,
             current=job.dates.current,
         )
-        for job in history.experience(lines)
+        for job in experience(lines)
     ]
     schools = [
         ParsedEducation(
@@ -46,14 +50,14 @@ def parse_cv(text: str) -> ParsedProfile:
             dates=_text(s.dates),
             endYear=s.end_year if s.end_year and 1950 <= s.end_year <= 2100 else None,
         )
-        for s in history.education(lines)
+        for s in education(lines)
     ]
     return ParsedProfile(
         parser=PARSER,
-        fullName=_sourced(contacts.name(lines)),
-        email=_sourced(contacts.email(lines)),
+        fullName=_sourced(name(lines, email and email[0], linkedin and linkedin[0])),
+        email=_sourced(email),
         phone=_sourced(contacts.phone(lines)),
-        linkedinUrl=_sourced(contacts.linkedin(lines)),
+        linkedinUrl=_sourced(linkedin),
         location=_sourced(contacts.location(lines)),
         nationality=_sourced(contacts.nationality(lines)),
         noticePeriod=_sourced(contacts.notice_period(lines)),

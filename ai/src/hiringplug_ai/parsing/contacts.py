@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from .layout import Line, is_bullet
+from .layout import Line
 
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)
 LINKEDIN_RE = re.compile(
@@ -58,95 +58,29 @@ def _phone_ok(candidate: str) -> bool:
     return not (len(digits) == 8 and not candidate.strip().startswith("+") and digits[0] not in "89")
 
 
+_LABEL_ONLY = re.compile(rf"^{PHONE_LABEL_RE.pattern}\s*[:：]?\s*$", re.IGNORECASE)
+
+
 def phone(lines: list[Line]) -> tuple[str, str] | None:
-    """Labelled numbers first ("Mobile: ..."), then the first plausible number near the top."""
-    fallback: tuple[str, str] | None = None
-    for line in lines[:40]:
+    """A labelled number anywhere ("Mobile: ...", or "Mobile" on the line above,
+    as sidebars put it); else the first plausible number near the top; else
+    the first international (+) number."""
+    near: tuple[str, str] | None = None
+    plus: tuple[str, str] | None = None
+    for n, line in enumerate(lines):
         text = mask(mask(mask(line.text, EMAIL_RE), LINKEDIN_RE), URL_RE)
+        label_above = n > 0 and bool(_LABEL_ONLY.match(lines[n - 1].text))
         for m in PHONE_RE.finditer(text):
             quote = line.text[m.start() : m.end()].strip(" .-(")
             if not _phone_ok(quote):
                 continue
-            if PHONE_LABEL_RE.search(text[: m.start()][-30:]):
+            if PHONE_LABEL_RE.search(text[: m.start()][-30:]) or (label_above and m.start() == 0):
                 return quote, quote
-            fallback = fallback or (quote, quote)
-    return fallback
-
-
-_NOT_NAME = re.compile(
-    r"@|https?:|www\.|linkedin|curriculum|vitae|\bresume\b|\bcv\b|profile|summary|objective|address|"
-    r"\b(?:jalan|jln|taman|lorong|persiaran|block|blok|street|road|avenue|floor)\b|mobile|phone|email|"
-    r"nationality|personal|details|experience|education|skills",
-    re.IGNORECASE,
-)
-_ROLE_WORDS = re.compile(
-    r"\b(engineer|developer|architect|manager|lead|analyst|consultant|director|specialist|executive|"
-    r"administrator|officer|designer|scientist|head|accountant|assistant|clerk|intern|supervisor|"
-    r"technician|coordinator|associate|recruiter|auditor|sales|marketing|finance|graduate|student)\b",
-    re.IGNORECASE,
-)
-_NAME_RE = re.compile(r"^[^\W\d_]+(?:[ .,'’/-]+[^\W\d_]+)*\.?$")  # letters in any script
-NAME_LABEL_RE = re.compile(r"^(?:full\s+)?name\s*[:：]?\s*(.*)$", re.IGNORECASE)
-
-
-def _looks_like_name(text: str) -> bool:
-    words = text.split()
-    return (
-        2 <= len(words) <= 7
-        and len(text) <= 70
-        and bool(_NAME_RE.match(text))
-        and not _NOT_NAME.search(text)
-        and not _ROLE_WORDS.search(text)
-    )
-
-
-def _tidy_name(text: str) -> str:
-    """ALL CAPS names become Title Case; mixed case is kept as written ("McDonald", "bin")."""
-    text = re.sub(r"\s+", " ", text).strip(" ,.")
-    if text.isupper():
-        return " ".join(w if w in {"A/L", "A/P"} else w.capitalize() for w in text.split())
-    return text
-
-
-_OCR_I = re.compile(r"(?<=[^\W\d_])[\]!](?=\s|$)")
-
-
-def _ocr_fixed(text: str) -> str:
-    """OCR reads a final "I" as "]" or "!" ("BINT]"): read it back as a letter.
-    The Go grounding check treats these characters as "i" too."""
-    return _OCR_I.sub(
-        lambda m: "I" if text.isupper() or m.string[: m.start()].split()[-1].isupper() else "i", text
-    )
-
-
-def _found_name(text: str) -> tuple[str, str] | None:
-    fixed = _ocr_fixed(text)
-    return (_tidy_name(fixed), text) if _looks_like_name(fixed) else None
-
-
-def name(lines: list[Line]) -> tuple[str, str] | None:
-    # "Name: Teng Shi Li", or "Name" with the value on one of the next lines.
-    for i, line in enumerate(lines[:60]):
-        m = NAME_LABEL_RE.match(line.text)
-        if not m:
-            continue
-        rest = m.group(1).strip()
-        options = [rest] if rest else [x.text for x in lines[i + 1 : i + 4]]
-        for option in options:
-            if found := _found_name(option):
-                return found
-    # JobStreet profile exports start with "Created with Jobstreet Profile", then the name.
-    start = next((i + 1 for i, x in enumerate(lines[:5]) if "created with jobstreet" in x.text.lower()), 0)
-    for line in lines[start : start + 8]:
-        if line.heading or is_bullet(line.text):
-            continue
-        if found := _found_name(line.text):
-            return found
-        # "SOH YONG HUAT 013-2899564": the name shares the first line with contacts.
-        stripped = re.split(r"\s*[|•·,]\s*|\s+(?=\+?\d)", line.text)[0].strip()
-        if stripped != line.text and (found := _found_name(stripped)):
-            return found
-    return None
+            if n < 40:
+                near = near or (quote, quote)
+            elif quote.startswith("+"):
+                plus = plus or (quote, quote)
+    return near or plus
 
 
 LOCATION_LABEL_RE = re.compile(

@@ -33,19 +33,64 @@ _MONTH = (
     r"|aug(?:ust)?|ogos|sep(?:t(?:ember)?)?|oct(?:ober)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?|disember)"
 )
 _YEAR = r"(?:19[5-9]\d|20\d\d)"
+_DAY = r"(?:0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?"
 DATE = (
-    rf"(?:{_MONTH}\.?,?\s*['’]?\s*{_YEAR}"  # Jan 2020, Sept. '2019
+    # Jan 2020, 1 Dec 2025, Dec 1, 2025
+    rf"(?:(?:{_DAY}\s+)?{_MONTH}\.?(?:\s+{_DAY})?[,\-]?\s*['’]?\s*{_YEAR}"
+    rf"|{_YEAR}\s*[-/ ]\s*{_MONTH}\b\.?"  # 2022-Oct, 2025 June (year first, from CV Studio)
     rf"|(?:0?[1-9]|1[0-2])\s*[/.\-]\s*{_YEAR}"  # 03/2019
     rf"|{_YEAR}\s*[/.\-]\s*(?:0?[1-9]|1[0-2])(?!\d)"  # 2019-03
     rf"|{_YEAR})"
 )
-_NOW = r"(?:present|current(?:ly)?|now|to\s*date|till\s*date|until\s*now|ongoing|today|kini|sekarang)"
+_NOW = (
+    r"(?:(?:till|until|up\s?to|to)\s?(?:date|now|present|current)|todate|present(?:ly)?|current(?:ly)?|now"
+    r"|ongoing|today|kini|sekarang|masa\s+kini|date)"
+)
 RANGE_RE = re.compile(
-    rf"(?<![\w/])(?P<start>{DATE})\s*(?:[-–—~]+|\bto\b|\buntil\b|\bhingga\b)\s*(?P<end>{DATE}|{_NOW})(?![\w/])",
+    rf"(?<![\w/])(?P<start>{DATE})\s*(?:[-–—~]+|\bto\b|\buntil\b|\btill\b|\bhingga\b"
+    # "2022-Oct 2023-May": two year-first dates side by side
+    rf"|(?<=[a-z.])\s+(?=(?:19|20)\d\d\s*[-/ ]\s*[a-z]))\s*(?P<end>{DATE}|{_NOW})(?![\w/])",
     re.IGNORECASE,
 )
 YEAR_RE = re.compile(rf"(?<!\d){_YEAR}(?!\d)")
 _NOW_RE = re.compile(rf"^{_NOW}$", re.IGNORECASE)
+_SEP = r"\s*(?:[-–—~]+|\bto\b|\buntil\b|\btill\b)\s*"
+# "Dec - Jan 2026", "1 Jul - 31 Aug, 2026": both months share the year at the end.
+_SHARED_YEAR_RE = re.compile(
+    rf"(?<![\w/])(?:{_DAY}\s+)?(?P<sm>{_MONTH})\.?(?:\s+{_DAY})?{_SEP}(?:{_DAY}\s+)?(?P<em>{_MONTH})\.?"
+    rf"(?:\s+{_DAY})?,?\s*(?P<ey>{_YEAR})(?![\w/])",
+    re.IGNORECASE,
+)
+# "Jan '20 - Dec '21", "Sep 99 - May 01", "Jan 2020 to Dec 21": two-digit years after a month.
+_SHORT_YEAR_RE = re.compile(
+    rf"(?<![\w/])(?P<sm>{_MONTH})\.?\s*['’]?(?P<sy>\d{{2}}|{_YEAR})(?!\d){_SEP}"
+    rf"(?:(?P<em>{_MONTH})\.?\s*['’]?(?P<ey>\d{{2}}|{_YEAR})(?!\d)|(?P<now>{_NOW}))(?![\w/])",
+    re.IGNORECASE,
+)
+
+
+def _month(word: str) -> int:
+    w = word.lower().rstrip(".")
+    return MONTHS.get(w) or MONTHS.get(w[:3]) or 0
+
+
+def _year(text: str) -> int:
+    n = int(text)
+    return n if n > 99 else (1900 + n if n > 50 else 2000 + n)
+
+
+def _other_forms(text: str) -> DateRange | None:
+    if m := _SHARED_YEAR_RE.search(text):
+        sm, em, ey = _month(m.group("sm")), _month(m.group("em")), int(m.group("ey"))
+        sy = ey - 1 if sm > em else ey  # "Dec - Jan 2026" starts in 2025
+        return DateRange(m.group(0).strip(), f"{sy}-{sm:02d}", f"{ey}-{em:02d}", False)
+    if m := _SHORT_YEAR_RE.search(text):
+        start = f"{_year(m.group('sy'))}-{_month(m.group('sm')):02d}"
+        if m.group("now"):
+            return DateRange(m.group(0).strip(), start, None, True)
+        end = f"{_year(m.group('ey'))}-{_month(m.group('em')):02d}"
+        return DateRange(m.group(0).strip(), start, end, False) if end >= start else None
+    return None
 
 
 @dataclass(frozen=True)
@@ -63,7 +108,7 @@ def to_iso(token: str) -> str | None:
     if not year_match:
         return None
     year = year_match.group(0)
-    word = re.match(r"[a-z]+", t)
+    word = re.search(r"[a-z]+", re.sub(r"(?<=\d)(?:st|nd|rd|th)\b", "", t))
     if word:
         month = MONTHS.get(word.group(0)) or MONTHS.get(word.group(0)[:3])
         return f"{year}-{month:02d}" if month else year
@@ -76,7 +121,7 @@ def to_iso(token: str) -> str | None:
 def find_range(text: str) -> DateRange | None:
     m = RANGE_RE.search(text)
     if not m:
-        return None
+        return _other_forms(text)
     end_raw = m.group("end")
     current = bool(_NOW_RE.match(end_raw.strip()))
     start = to_iso(m.group("start"))

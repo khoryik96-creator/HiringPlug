@@ -28,11 +28,15 @@ func TestDetectContentType(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, ContentTypeDOCX, got)
 
+	got, ok = DetectContentType([]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0})
+	assert.True(t, ok)
+	assert.Equal(t, ContentTypeDOC, got)
+
 	for name, data := range map[string][]byte{
-		"plain text":          []byte("hello"),
-		"a zip that is no CV": zipWith(t, "photo.jpg"),
-		"empty":               nil,
-		"old .doc":            {0xD0, 0xCF, 0x11, 0xE0},
+		"plain text":           []byte("hello"),
+		"a zip that is no CV":  zipWith(t, "photo.jpg"),
+		"empty":                nil,
+		"a cut-off OLE header": {0xD0, 0xCF, 0x11, 0xE0},
 	} {
 		_, ok := DetectContentType(data)
 		assert.False(t, ok, name)

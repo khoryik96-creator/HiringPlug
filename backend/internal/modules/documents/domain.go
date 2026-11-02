@@ -13,6 +13,7 @@ import (
 const (
 	ContentTypePDF  = "application/pdf"
 	ContentTypeDOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	ContentTypeDOC  = "application/msword"
 )
 
 // Document statuses (mirroring the contract's DocumentStatus enum).
@@ -44,7 +45,9 @@ type Document struct {
 	UpdatedAt     time.Time
 }
 
-// DetectContentType identifies a PDF or a Word (.docx) file from its bytes,
+var oleMagic = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
+
+// DetectContentType identifies a PDF or a Word (.docx or old .doc) file from its bytes,
 // never trusting the name or the browser's claimed type alone.
 func DetectContentType(data []byte) (string, bool) {
 	switch {
@@ -52,6 +55,10 @@ func DetectContentType(data []byte) (string, bool) {
 		return ContentTypePDF, true
 	case bytes.HasPrefix(data, []byte("PK\x03\x04")) && isDOCX(data):
 		return ContentTypeDOCX, true
+	case bytes.HasPrefix(data, oleMagic):
+		// Old Word files are OLE compound documents (as are old Excel and
+		// PowerPoint files, which the AI worker refuses with advice).
+		return ContentTypeDOC, true
 	default:
 		return "", false
 	}
