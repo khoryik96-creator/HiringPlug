@@ -6,6 +6,7 @@ import { jobKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { JobForm } from "../components/JobForm";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
+import { PipelineBoard } from "../components/PipelineBoard";
 import { JOB_STATUS, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 
 /** One job. Render it with key={id} so edit state never carries over. */
@@ -50,6 +51,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
           <p className="pre">{j.description ?? <span className="muted">No description yet.</span>}</p>
         </section>
       )}
+      {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} />}
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
     </main>
   );

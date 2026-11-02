@@ -54,3 +54,15 @@ func New(pool *pgxpool.Pool, companies Companies, contacts Contacts) *Module {
 func (m *Module) Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error) {
 	return m.service.Exists(ctx, tx, jobID)
 }
+
+// Brief is what other modules need to show a job.
+type Brief struct {
+	Title     string
+	CompanyID string
+}
+
+// Briefs returns title and company of the given jobs (missing ones are left
+// out), for other modules (e.g. a candidate's applications).
+func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
+	return m.service.Briefs(ctx, tx, ids)
+}

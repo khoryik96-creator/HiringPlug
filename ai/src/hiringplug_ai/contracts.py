@@ -35,9 +35,12 @@ class Permission(StrEnum):
     jobs_create = "jobs:create"
     jobs_read = "jobs:read"
     jobs_update = "jobs:update"
+    pipeline_read = "pipeline:read"
+    pipeline_update = "pipeline:update"
 
 
 class ErrorCode(StrEnum):
+    APPLICATION_EXISTS = "APPLICATION_EXISTS"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
@@ -49,6 +52,7 @@ class ErrorCode(StrEnum):
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
     UNAUTHENTICATED = "UNAUTHENTICATED"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     VALIDATION_FAILED = "VALIDATION_FAILED"
@@ -736,6 +740,77 @@ class JobOrderPage(BaseModel):
     nextCursor: Annotated[
         JobOrderId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
     ]
+
+
+class ApplicationId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["appl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^appl_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class Stage(StrEnum):
+    applied = "applied"
+    screening = "screening"
+    submitted = "submitted"
+    interview = "interview"
+    offer = "offer"
+    placed = "placed"
+    rejected = "rejected"
+    withdrawn = "withdrawn"
+
+
+class CloseReason(StrEnum):
+    not_qualified = "not_qualified"
+    salary_mismatch = "salary_mismatch"
+    client_rejected = "client_rejected"
+    failed_interview = "failed_interview"
+    position_filled = "position_filled"
+    candidate_declined = "candidate_declined"
+    accepted_other_offer = "accepted_other_offer"
+    no_response = "no_response"
+    other = "other"
+
+
+class Application(BaseModel):
+    id: ApplicationId
+    version: int
+    jobId: JobOrderId
+    jobTitle: str
+    companyId: CompanyId
+    companyName: str
+    candidateId: CandidateId
+    candidateName: str
+    candidateTitle: Annotated[str | None, Field(description="The candidate's current job title.")]
+    stage: Stage
+    reason: Annotated[CloseReason | None, Field(description="Set when rejected or withdrawn.")]
+    reasonNote: Annotated[str | None, Field(...)]
+    stageChangedAt: Annotated[AwareDatetime, Field(description="When it entered its current stage.")]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class ApplicationList(BaseModel):
+    items: list[Application]
+
+
+class ApplicationCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId
+    stage: Annotated[Stage | None, Field(description="Defaults to applied. Must be an open stage.")] = None
+
+
+class ApplicationMove(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    stage: Stage
+    reason: Annotated[
+        CloseReason | None, Field(description="Required for rejected and withdrawn; not allowed otherwise.")
+    ] = None
+    reasonNote: Annotated[str | None, Field(max_length=1000)] = None
 
 
 class Me(BaseModel):

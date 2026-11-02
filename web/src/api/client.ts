@@ -16,6 +16,7 @@ export type Contact = Schemas["Contact"];
 export type ContactSummary = Schemas["ContactSummary"];
 export type JobOrder = Schemas["JobOrder"];
 export type JobOrderSummary = Schemas["JobOrderSummary"];
+export type Application = Schemas["Application"];
 export type Document = Schemas["Document"];
 export type Me = Schemas["Me"];
 export type Permission = Schemas["Permission"];

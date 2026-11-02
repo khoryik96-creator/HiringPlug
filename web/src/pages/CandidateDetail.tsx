@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Candidate, type Permission, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
+import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
 import { Documents } from "../components/Documents";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -67,6 +68,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </dl>
         </section>
       )}
+      {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       <Documents candidateId={c.id} canUpload={permissions.includes("documents:create")} />
     </main>

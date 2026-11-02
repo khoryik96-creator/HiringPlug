@@ -9,3 +9,6 @@ export const contactKey = (id: string) => ["contact", id] as const;
 export const contactsKey = ["contacts"] as const;
 export const jobKey = (id: string) => ["job", id] as const;
 export const jobsKey = ["jobs"] as const;
+export const jobApplicationsKey = (jobId: string) => ["applications", "job", jobId] as const;
+export const candidateApplicationsKey = (candidateId: string) => ["applications", "candidate", candidateId] as const;
+export const applicationsKey = ["applications"] as const;

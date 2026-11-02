@@ -23,6 +23,7 @@ tenant ─┬─ app_user (role)
 | `contact` | company (same tenant, foreign key), names, job title, email (unique per company) with check status + reasons + date, office phone, mobile, LinkedIn, status (active/left), notes, `version`, search text |
 | `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, `version`, search text. (Not `job`: that is the background job queue.) |
 | `job_order_salary` | the salary budget (min, optional max, currency, period, `version`); row-level security needs `jobs.salary:read` to see and `jobs.salary:update` to write; clearing deletes the row |
+| `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, `version` |
 | `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |
 | `document` | candidate, source (jobstreet/linkedin/original/formatted/other), file name, type, size, SHA-256, storage key, status (queued/extracted/needs_ocr/failed), extracted text, page count, extractor, warnings, error |
 | `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |

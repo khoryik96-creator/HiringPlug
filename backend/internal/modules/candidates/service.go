@@ -217,6 +217,19 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 	return store.New(tx).CandidateExists(ctx, id)
 }
 
+// Briefs returns id -> name and current title for the candidates that exist.
+func (s *Service) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
+	rows, err := store.New(tx).CandidateBriefs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]Brief, len(rows))
+	for _, r := range rows {
+		out[r.ID] = Brief{Name: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}), CurrentTitle: r.CurrentTitle}
+	}
+	return out, nil
+}
+
 func canSeeSalary(p authz.Principal) bool {
 	return p.Can(api.PermissionCandidatesCompensationRead)
 }

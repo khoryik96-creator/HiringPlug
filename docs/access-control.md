@@ -36,6 +36,8 @@ details get their own permissions.
 | `jobs:create`, `jobs:update` | ✓ | ✓ | ✓ | | | |
 | `jobs.salary:read` (budget) | ✓ | ✓ | ✓ | | ✓ | |
 | `jobs.salary:update` (budget) | ✓ | ✓ | ✓ | | | |
+| `pipeline:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `pipeline:update` (add to jobs, move) | ✓ | ✓ | ✓ | ✓ | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

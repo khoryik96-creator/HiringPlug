@@ -10,6 +10,42 @@ import (
 	"time"
 )
 
+const candidateBriefs = `-- name: CandidateBriefs :many
+SELECT id, first_name, last_name, current_title FROM candidate WHERE id = ANY($1::text[])
+`
+
+type CandidateBriefsRow struct {
+	ID           string
+	FirstName    string
+	LastName     string
+	CurrentTitle *string
+}
+
+func (q *Queries) CandidateBriefs(ctx context.Context, ids []string) ([]CandidateBriefsRow, error) {
+	rows, err := q.db.Query(ctx, candidateBriefs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CandidateBriefsRow
+	for rows.Next() {
+		var i CandidateBriefsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.CurrentTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const candidateExists = `-- name: CandidateExists :one
 SELECT EXISTS (SELECT 1 FROM candidate WHERE id = $1)
 `

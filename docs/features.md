@@ -132,11 +132,18 @@ requirements), de-duplicated, and kept with its source and date.
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
   text) come in Phase 3.
-- **Pipeline:** a candidate on a job is an *application* moving through stages
-  (e.g. applied → screened → submitted to client → interview → offer →
-  placed/hired, or rejected/withdrawn with a reason). Allowed moves are defined
-  in one place (`pipeline/domain.go`) and tested move by move. The dashboard is
-  a board per job plus counts, time in stage and conversion per recruiter.
+- **Pipeline** ✅: a candidate on a job is an *application* moving through
+  stages: applied → screening → submitted (to the client or hiring manager) →
+  interview → offer → placed, or rejected / withdrawn with a reason (not
+  qualified, salary, client said no, took another offer, ...) and a note. Each
+  job has a **board** (drag a card to another column, or use its "Move to"
+  menu) showing how long each candidate has been in their stage; closed
+  applications are listed below with their reasons and can be reopened. A
+  candidate's page lists their jobs and adds them to another. The rules are in
+  one place (`pipeline/domain.go`) and tested for every from → to move: a
+  reason exactly when closing, reopen before placing, and a placed candidate
+  only goes back to offer or is withdrawn. Two people moving the same card:
+  the second is told and reloads. Next: dashboard counts and conversion.
 - **Interviews:** scheduling with interviewers, Google and Microsoft calendar
   sync, reminders, and feedback forms.
 - **CV vs job match:** the AI worker scores fit and explains it. Every reason

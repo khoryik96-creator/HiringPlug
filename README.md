@@ -12,7 +12,9 @@ machine first and is built to move to the cloud later.
 - **Companies** (clients, prospects or your own departments) and their
   **contacts**, whose email is checked (format, mail server, shared or
   throwaway addresses), and **jobs** for them, with a salary budget that only
-  permitted roles see.
+  permitted roles see, and a **pipeline board** per job (drag candidates
+  through applied, screening, submitted, interview, offer, placed; reject or
+  withdraw with a reason).
 - **Candidates** with the profile fields recruiters need: name, email, phone,
   nationality, work authorization (local / expat with RP-T, PR or spouse visa /
   needs a visa), notice period, industry, specialization, source.

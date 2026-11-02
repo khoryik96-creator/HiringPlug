@@ -38,3 +38,15 @@ func New(pool *pgxpool.Pool, phoneRegion string) *Module {
 func (m *Module) Exists(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error) {
 	return m.service.Exists(ctx, tx, candidateID)
 }
+
+// Brief is what other modules need to show a candidate.
+type Brief struct {
+	Name         string
+	CurrentTitle *string
+}
+
+// Briefs returns name and current title of the given candidates (missing ones
+// are left out), for other modules (e.g. a job's pipeline).
+func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
+	return m.service.Briefs(ctx, tx, ids)
+}

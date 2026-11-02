@@ -305,6 +305,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The candidates on a job (its pipeline), oldest first */
+        get: operations["listJobApplications"];
+        put?: never;
+        /** Put a candidate on a job */
+        post: operations["addApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The jobs a candidate is on, newest first */
+        get: operations["listCandidateApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/applications/{applicationId}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move an application to another stage
+         * @description Moving to rejected or withdrawn needs a `reason`. `version` must be the version you loaded, so two people moving the same card cannot overwrite each other.
+         */
+        post: operations["moveApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -312,9 +373,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
-        ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.extract_text" | "document.text_extracted";
         Error: {
@@ -829,6 +890,59 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["JobOrderId"] | null;
         };
+        /** @example appl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        ApplicationId: string;
+        /**
+         * @description In order: applied, screening, submitted (to the client or hiring manager), interview, offer, placed. rejected and withdrawn close the application (with a reason); it can be reopened later.
+         * @enum {string}
+         */
+        Stage: "applied" | "screening" | "submitted" | "interview" | "offer" | "placed" | "rejected" | "withdrawn";
+        /**
+         * @description Why an application was rejected or withdrawn.
+         * @enum {string}
+         */
+        CloseReason: "not_qualified" | "salary_mismatch" | "client_rejected" | "failed_interview" | "position_filled" | "candidate_declined" | "accepted_other_offer" | "no_response" | "other";
+        Application: {
+            id: components["schemas"]["ApplicationId"];
+            version: number;
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            /** @description The candidate's current job title. */
+            candidateTitle: string | null;
+            stage: components["schemas"]["Stage"];
+            /** @description Set when rejected or withdrawn. */
+            reason: components["schemas"]["CloseReason"] | null;
+            reasonNote: string | null;
+            /**
+             * Format: date-time
+             * @description When it entered its current stage.
+             */
+            stageChangedAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ApplicationList: {
+            items: components["schemas"]["Application"][];
+        };
+        ApplicationCreate: {
+            candidateId: components["schemas"]["CandidateId"];
+            /** @description Defaults to applied. Must be an open stage. */
+            stage?: components["schemas"]["Stage"];
+        };
+        ApplicationMove: {
+            /** @description The version you loaded. */
+            version: number;
+            stage: components["schemas"]["Stage"];
+            /** @description Required for rejected and withdrawn; not allowed otherwise. */
+            reason?: components["schemas"]["CloseReason"];
+            reasonNote?: string;
+        };
     };
     responses: {
         /** @description The request is invalid (VALIDATION_FAILED). */
@@ -901,6 +1015,7 @@ export interface components {
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
+        ApplicationIdPath: components["schemas"]["ApplicationId"];
     };
     requestBodies: never;
     headers: never;
@@ -1557,6 +1672,127 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listJobApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listCandidateApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    moveApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationMove"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The move is not allowed (STAGE_MOVE_NOT_ALLOWED). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
 }

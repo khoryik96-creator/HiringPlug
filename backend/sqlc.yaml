@@ -52,3 +52,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/jobs/internal/store
+  - <<: *module
+    queries: db/queries/pipeline.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/pipeline/internal/store

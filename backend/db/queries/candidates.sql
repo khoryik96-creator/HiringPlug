@@ -91,3 +91,6 @@ UPDATE candidate_compensation SET
   updated_at = now()
 WHERE candidate_id = @candidate_id AND version = @expected_version
 RETURNING *;
+
+-- name: CandidateBriefs :many
+SELECT id, first_name, last_name, current_title FROM candidate WHERE id = ANY(@ids::text[]);

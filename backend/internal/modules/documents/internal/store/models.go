@@ -20,6 +20,21 @@ type AppUser struct {
 	CreatedAt time.Time
 }
 
+type Application struct {
+	ID             string
+	TenantID       string
+	Version        int32
+	JobOrderID     string
+	CandidateID    string
+	Stage          string
+	Reason         *string
+	ReasonNote     *string
+	StageChangedAt time.Time
+	CreatedBy      string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type AuditLog struct {
 	ID         string
 	TenantID   string

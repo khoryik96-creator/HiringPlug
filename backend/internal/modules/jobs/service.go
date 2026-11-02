@@ -215,6 +215,19 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 	return store.New(tx).JobOrderExists(ctx, id)
 }
 
+// Briefs returns id -> title and company for the jobs that exist.
+func (s *Service) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
+	rows, err := store.New(tx).JobOrderTitles(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]Brief, len(rows))
+	for _, r := range rows {
+		out[r.ID] = Brief{Title: r.Title, CompanyID: r.CompanyID}
+	}
+	return out, nil
+}
+
 // checkReferences checks the company exists and the contact works there.
 func (s *Service) checkReferences(ctx context.Context, tx pgx.Tx, d Details) error {
 	var errs apperr.FieldErrors

@@ -87,6 +87,32 @@ export const WORK_ARRANGEMENT: Record<Schemas["WorkArrangement"], string> = {
   remote: "Remote",
 };
 
+/** Pipeline stages, in order; rejected and withdrawn close an application. */
+export const STAGE: Record<Schemas["Stage"], string> = {
+  applied: "Applied",
+  screening: "Screening",
+  submitted: "Submitted",
+  interview: "Interview",
+  offer: "Offer",
+  placed: "Placed",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+};
+
+export const OPEN_STAGES: Schemas["Stage"][] = ["applied", "screening", "submitted", "interview", "offer", "placed"];
+
+export const CLOSE_REASON: Record<Schemas["CloseReason"], string> = {
+  not_qualified: "Not qualified",
+  salary_mismatch: "Salary does not match",
+  client_rejected: "Client said no",
+  failed_interview: "Did not pass the interview",
+  position_filled: "Position filled",
+  candidate_declined: "Candidate declined",
+  accepted_other_offer: "Took another offer",
+  no_response: "No response",
+  other: "Other",
+};
+
 /** The values of a label map, in its order: the options of a select. */
 export function keysOf<K extends string>(labels: Record<K, unknown>): K[] {
   return Object.keys(labels) as K[];
