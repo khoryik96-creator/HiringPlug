@@ -12,6 +12,8 @@ import {
   toUpdateBody,
 } from "./candidateFormState";
 import { Field } from "./Field";
+import { LabelInput } from "./LabelInput";
+import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
 
@@ -42,6 +44,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       onDone();
     },
   });
+  const used = useUsedValues();
   const errors = fieldErrors(save.error);
   const errorFor = (key: keyof CandidateFormState) => errors[FIELD_PATHS[key]];
   const set = <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => {
@@ -97,8 +100,10 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
           {keysOf(NOTICE_UNIT).map((u) => <option key={u} value={u}>{NOTICE_UNIT[u].many}</option>)}
         </select>
       </Field>
-      {text("industry", "Industry")}
-      {text("specialization", "Specialization")}
+      {text("industry", "Industry", { list: "industries" })}
+      {text("specialization", "Specialization", { list: "specializations" })}
+      <datalist id="industries">{used.industries.map((v) => <option key={v} value={v} />)}</datalist>
+      <datalist id="specializations">{used.specializations.map((v) => <option key={v} value={v} />)}</datalist>
       {text("currentTitle", "Current title")}
       {text("currentCompany", "Current company")}
       {text("location", "Location")}
@@ -108,6 +113,17 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
           {keysOf(CANDIDATE_SOURCE).map((s) => <option key={s} value={s}>{CANDIDATE_SOURCE[s]}</option>)}
         </select>
       </Field>
+
+      <div className="full">
+        <Field label="Skills" error={errorFor("skills")}>
+          <LabelInput value={form.skills} onChange={(v) => { set("skills", v); }} suggestions={used.skills} placeholder="Type a skill, then Enter" />
+        </Field>
+      </div>
+      <div className="full">
+        <Field label="Tags" error={errorFor("tags")}>
+          <LabelInput value={form.tags} onChange={(v) => { set("tags", v); }} suggestions={used.tags} placeholder="e.g. relocate, then Enter" />
+        </Field>
+      </div>
 
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save</button>

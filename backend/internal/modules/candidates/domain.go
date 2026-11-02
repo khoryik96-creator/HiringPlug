@@ -36,6 +36,8 @@ type Profile struct {
 	CurrentCompany    *string
 	Location          *string
 	Source            *string
+	Tags              []string // your own labels, e.g. relocate
+	Skills            []string
 }
 
 // WorkAuthorization says whether the candidate can work here, and why.
@@ -115,6 +117,8 @@ type ProfilePatch struct {
 	CurrentCompany    Change[*string]
 	Location          Change[*string]
 	Source            Change[*string]
+	Tags              Change[[]string]
+	Skills            Change[[]string]
 }
 
 // Apply returns p with the patch's fields replaced.
@@ -132,6 +136,8 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.CurrentCompany, pp.CurrentCompany)
 	apply(&p.Location, pp.Location)
 	apply(&p.Source, pp.Source)
+	apply(&p.Tags, pp.Tags)
+	apply(&p.Skills, pp.Skills)
 	return p
 }
 
@@ -191,6 +197,8 @@ func NormalizeProfile(p Profile, phoneRegion string) (Profile, apperr.FieldError
 	for _, f := range []**string{&p.Industry, &p.Specialization, &p.CurrentTitle, &p.CurrentCompany, &p.Location} {
 		*f = trimmedOrNil(*f)
 	}
+	p.Tags = CleanLabels(p.Tags)
+	p.Skills = CleanLabels(p.Skills)
 	return p, errs
 }
 
@@ -267,4 +275,21 @@ func trimmedOrNil(s *string) *string {
 		return nil
 	}
 	return &t
+}
+
+// CleanLabels tidies tags or skills: spaces squeezed, empty ones dropped, and
+// duplicates ignoring case removed (the first spelling is kept). Never nil.
+func CleanLabels(labels []string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, l := range labels {
+		l = squeeze(l)
+		key := strings.ToLower(l)
+		if l == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, l)
+	}
+	return out
 }

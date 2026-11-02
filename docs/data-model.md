@@ -18,7 +18,7 @@ tenant ─┬─ app_user (role)
 |---|---|
 | `tenant` | name |
 | `app_user` | email, name, role, active |
-| `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, `version`, search text |
+| `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, tags and skills (text arrays, indexed for case-insensitive filters), `version`, search text |
 | `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text |
 | `contact` | company (same tenant, foreign key), names, job title, email (unique per company) with check status + reasons + date, office phone, mobile, LinkedIn, status (active/left), notes, `version`, search text |
 | `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, `version`, search text. (Not `job`: that is the background job queue.) |
@@ -39,7 +39,7 @@ candidate belonging to the same company.
 
 | Module | Records | Milestone |
 |---|---|---|
-| `candidates` | taxonomy (industries, specializations), tags, skills, consent and retention | M2 |
+| `candidates` | managed taxonomy lists (industries, specializations), saved searches, consent and retention | M2 |
 | `notes` | note templates per company, notes on an application, editing | Phase 2 |
 | `identity` | custom roles, team, data scope, invites | M2 |
 | `parsing` | parsed profile (experience, education, skills) with source quotes | M2 |

@@ -81,7 +81,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -111,6 +111,8 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Tags,
+		&i.Skills,
 	)
 	return i, err
 }
@@ -147,14 +149,14 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, created_by
+  current_title, current_company, location, source, tags, skills, created_by
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5,
   $6, $7, $8,
   $9, $10, $11, $12,
-  $13, $14, $15, $16, app_current_user()
+  $13, $14, $15, $16, $17, $18, app_current_user()
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
 `
 
 type InsertCandidateParams struct {
@@ -174,6 +176,8 @@ type InsertCandidateParams struct {
 	CurrentCompany         *string
 	Location               *string
 	Source                 *string
+	Tags                   []string
+	Skills                 []string
 }
 
 // Queries owned by the candidates module. Run inside a tenant-scoped
@@ -196,6 +200,8 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		arg.CurrentCompany,
 		arg.Location,
 		arg.Source,
+		arg.Tags,
+		arg.Skills,
 	)
 	var i Candidate
 	err := row.Scan(
@@ -222,6 +228,8 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Tags,
+		&i.Skills,
 	)
 	return i, err
 }
@@ -282,17 +290,21 @@ func (q *Queries) InsertCompensation(ctx context.Context, arg InsertCompensation
 
 const listCandidates = `-- name: ListCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company,
-       location, work_authorization, updated_at
+       location, work_authorization, tags, updated_at
 FROM candidate
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR search_text LIKE '%' || app_normalize_text($2::text) || '%')
+  AND ($3::text IS NULL OR app_lower_array(tags) @> ARRAY[lower($3::text)])
+  AND ($4::text IS NULL OR app_lower_array(skills) @> ARRAY[lower($4::text)])
 ORDER BY id DESC
-LIMIT $3
+LIMIT $5
 `
 
 type ListCandidatesParams struct {
 	Cursor   *string
 	Query    *string
+	Tag      *string
+	Skill    *string
 	RowLimit int32
 }
 
@@ -306,12 +318,19 @@ type ListCandidatesRow struct {
 	CurrentCompany    *string
 	Location          *string
 	WorkAuthorization *string
+	Tags              []string
 	UpdatedAt         time.Time
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, listCandidates, arg.Cursor, arg.Query, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listCandidates,
+		arg.Cursor,
+		arg.Query,
+		arg.Tag,
+		arg.Skill,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -329,6 +348,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.CurrentCompany,
 			&i.Location,
 			&i.WorkAuthorization,
+			&i.Tags,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -446,10 +466,12 @@ UPDATE candidate SET
   current_company = $14,
   location = $15,
   source = $16,
+  tags = $17,
+  skills = $18,
   version = version + 1,
   updated_at = now()
-WHERE id = $17 AND version = $18
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at
+WHERE id = $19 AND version = $20
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
 `
 
 type UpdateCandidateParams struct {
@@ -469,6 +491,8 @@ type UpdateCandidateParams struct {
 	CurrentCompany         *string
 	Location               *string
 	Source                 *string
+	Tags                   []string
+	Skills                 []string
 	ID                     string
 	ExpectedVersion        int32
 }
@@ -493,6 +517,8 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		arg.CurrentCompany,
 		arg.Location,
 		arg.Source,
+		arg.Tags,
+		arg.Skills,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -521,6 +547,8 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Tags,
+		&i.Skills,
 	)
 	return i, err
 }
@@ -581,4 +609,46 @@ func (q *Queries) UpdateCompensation(ctx context.Context, arg UpdateCompensation
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const usedValues = `-- name: UsedValues :many
+SELECT kind::text AS kind, value::text AS value, n FROM (
+  SELECT 'tag' AS kind, t AS value, count(*)::integer AS n FROM candidate, unnest(tags) AS t GROUP BY t
+  UNION ALL
+  SELECT 'skill', s, count(*)::integer FROM candidate, unnest(skills) AS s GROUP BY s
+  UNION ALL
+  SELECT 'industry', industry, count(*)::integer FROM candidate WHERE industry IS NOT NULL GROUP BY industry
+  UNION ALL
+  SELECT 'specialization', specialization, count(*)::integer FROM candidate WHERE specialization IS NOT NULL GROUP BY specialization
+) used
+ORDER BY kind, n DESC, value
+LIMIT 2000
+`
+
+type UsedValuesRow struct {
+	Kind  string
+	Value string
+	N     int32
+}
+
+// Values already used in this company, most used first, for suggestions
+// (keeps spellings consistent: one shared list).
+func (q *Queries) UsedValues(ctx context.Context) ([]UsedValuesRow, error) {
+	rows, err := q.db.Query(ctx, usedValues)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UsedValuesRow
+	for rows.Next() {
+		var i UsedValuesRow
+		if err := rows.Scan(&i.Kind, &i.Value, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

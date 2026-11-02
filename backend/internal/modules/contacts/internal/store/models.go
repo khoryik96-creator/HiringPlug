@@ -71,6 +71,8 @@ type Candidate struct {
 	CreatedBy              string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
+	Tags                   []string
+	Skills                 []string
 }
 
 type CandidateCompensation struct {

@@ -6,12 +6,12 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, created_by
+  current_title, current_company, location, source, tags, skills, created_by
 ) VALUES (
   app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality),
   sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
   sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
-  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), app_current_user()
+  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills, app_current_user()
 )
 RETURNING *;
 
@@ -44,6 +44,8 @@ UPDATE candidate SET
   current_company = sqlc.narg(current_company),
   location = sqlc.narg(location),
   source = sqlc.narg(source),
+  tags = @tags,
+  skills = @skills,
   version = version + 1,
   updated_at = now()
 WHERE id = @id AND version = @expected_version
@@ -52,10 +54,12 @@ RETURNING *;
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company,
-       location, work_authorization, updated_at
+       location, work_authorization, tags, updated_at
 FROM candidate
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
+  AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
+  AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
 ORDER BY id DESC
 LIMIT @row_limit;
 
@@ -115,3 +119,18 @@ UPDATE candidate_compensation SET candidate_id = @to_id WHERE candidate_id = @fr
 
 -- name: DeleteCandidate :execrows
 DELETE FROM candidate WHERE id = @id;
+
+-- Values already used in this company, most used first, for suggestions
+-- (keeps spellings consistent: one shared list).
+-- name: UsedValues :many
+SELECT kind::text AS kind, value::text AS value, n FROM (
+  SELECT 'tag' AS kind, t AS value, count(*)::integer AS n FROM candidate, unnest(tags) AS t GROUP BY t
+  UNION ALL
+  SELECT 'skill', s, count(*)::integer FROM candidate, unnest(skills) AS s GROUP BY s
+  UNION ALL
+  SELECT 'industry', industry, count(*)::integer FROM candidate WHERE industry IS NOT NULL GROUP BY industry
+  UNION ALL
+  SELECT 'specialization', specialization, count(*)::integer FROM candidate WHERE specialization IS NOT NULL GROUP BY specialization
+) used
+ORDER BY kind, n DESC, value
+LIMIT 2000;

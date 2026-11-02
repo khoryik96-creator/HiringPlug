@@ -100,4 +100,20 @@ describe("candidate form", () => {
     change("Work authorization", "expat_eligible");
     expect(screen.getByText("Pass held")).toBeTruthy();
   });
+
+  it("adds skills with Enter or a comma, ignores the same skill in other case, and removes them", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ tags: [], skills: ["Excel"], industries: [], specializations: [] }));
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
+    const onDone = vi.fn();
+    renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP"] })} onDone={onDone} />);
+    const skills = screen.getByLabelText("Skills");
+    fireEvent.change(skills, { target: { value: "  Power   BI " } });
+    fireEvent.keyDown(skills, { key: "Enter" });
+    fireEvent.change(skills, { target: { value: "sap," } });
+    fireEvent.change(skills, { target: { value: "Excel," } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove SAP" }));
+    save();
+    await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
+    expect(sentBody(patch)).toMatchObject({ skills: ["Power BI", "Excel"], tags: [] });
+  });
 });

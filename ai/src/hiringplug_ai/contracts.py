@@ -244,6 +244,8 @@ class Candidate(BaseModel):
     currentCompany: Annotated[str | None, Field(...)]
     location: Annotated[str | None, Field(...)]
     source: Annotated[CandidateSource | None, Field(...)]
+    tags: list[str]
+    skills: list[str]
     compensation: Annotated[
         Compensation | None,
         Field(
@@ -253,6 +255,14 @@ class Candidate(BaseModel):
     restrictedFields: list[RestrictedField]
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
+
+
+class Tag(RootModel[str]):
+    root: Annotated[str, Field(max_length=60, min_length=1)]
+
+
+class Skill(RootModel[str]):
+    root: Annotated[str, Field(max_length=60, min_length=1)]
 
 
 class CandidateCreate(BaseModel):
@@ -274,6 +284,14 @@ class CandidateCreate(BaseModel):
     currentCompany: Annotated[str | None, Field(max_length=200)] = None
     location: Annotated[str | None, Field(max_length=200)] = None
     source: CandidateSource | None = None
+    tags: Annotated[
+        list[Tag] | None,
+        Field(
+            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
+            max_length=50,
+        ),
+    ] = None
+    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
 
 
 class CandidateUpdate(BaseModel):
@@ -294,6 +312,14 @@ class CandidateUpdate(BaseModel):
     currentCompany: Annotated[str | None, Field(max_length=200)] = None
     location: Annotated[str | None, Field(max_length=200)] = None
     source: CandidateSource | None = None
+    tags: Annotated[
+        list[Tag] | None,
+        Field(
+            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
+            max_length=50,
+        ),
+    ] = None
+    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
 
 
 class CandidateSummary(BaseModel):
@@ -305,6 +331,7 @@ class CandidateSummary(BaseModel):
     currentCompany: Annotated[str | None, Field(...)]
     location: Annotated[str | None, Field(...)]
     workAuthorizationStatus: Annotated[WorkAuthorizationStatus | None, Field(...)]
+    tags: list[str]
     updatedAt: AwareDatetime
 
 
@@ -335,6 +362,13 @@ class CandidateMerge(BaseModel):
     )
     duplicateId: Annotated[CandidateId, Field(description="The candidate to merge in (and delete).")]
     version: Annotated[int, Field(description="The version of the candidate you keep.", ge=1)]
+
+
+class UsedValues(BaseModel):
+    tags: list[str]
+    skills: list[str]
+    industries: list[str]
+    specializations: list[str]
 
 
 class CompanyId(RootModel[str]):

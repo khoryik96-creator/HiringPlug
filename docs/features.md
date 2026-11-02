@@ -33,7 +33,8 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Nationality | ISO country code (`MY`, `SG`, ...) |
 | Work authorization | `local`; `expat_eligible` with basis `rp_t` (Residence Pass-Talent), `permanent_resident`, `spouse_visa` or `other`; `requires_visa`. The basis is required exactly when the status is `expat_eligible` (checked in Go and again by the database). |
 | Notice period | Value and unit (days, weeks, months); 0 means immediate |
-| Industry, specialization | Free text now; a shared list (taxonomy) in M2 so search and reports are consistent |
+| Industry, specialization | Free text; the form suggests values already used in your company so everyone spells them the same way |
+| Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. The form suggests labels already in use; the candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
 | Current title and company, location, source | Source: JobStreet, LinkedIn, referral, careers page, direct, other |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 

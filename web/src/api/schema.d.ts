@@ -25,6 +25,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/used-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tags, skills, industries and specializations already used, most used first
+         * @description For suggestions while typing, so everyone spells them the same way.
+         */
+        get: operations["listCandidateUsedValues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}": {
         parameters: {
             query?: never;
@@ -609,6 +629,8 @@ export interface components {
             currentCompany: string | null;
             location: string | null;
             source: components["schemas"]["CandidateSource"] | null;
+            tags: string[];
+            skills: string[];
             /** @description Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded. */
             compensation?: components["schemas"]["Compensation"] | null;
             restrictedFields: components["schemas"]["RestrictedField"][];
@@ -633,6 +655,9 @@ export interface components {
             currentCompany?: string | null;
             location?: string | null;
             source?: components["schemas"]["CandidateSource"] | null;
+            /** @description Your own labels, e.g. relocate (duplicates ignoring case are removed). */
+            tags?: string[];
+            skills?: string[];
         };
         CandidateUpdate: {
             /** @description The version you loaded. */
@@ -651,6 +676,9 @@ export interface components {
             currentCompany?: string | null;
             location?: string | null;
             source?: components["schemas"]["CandidateSource"] | null;
+            /** @description Your own labels, e.g. relocate (duplicates ignoring case are removed). */
+            tags?: string[];
+            skills?: string[];
         };
         CandidateSummary: {
             id: components["schemas"]["CandidateId"];
@@ -661,6 +689,7 @@ export interface components {
             currentCompany: string | null;
             location: string | null;
             workAuthorizationStatus: components["schemas"]["WorkAuthorizationStatus"] | null;
+            tags: string[];
             /** Format: date-time */
             updatedAt: string;
         };
@@ -682,6 +711,12 @@ export interface components {
             duplicateId: components["schemas"]["CandidateId"];
             /** @description The version of the candidate you keep. */
             version: number;
+        };
+        UsedValues: {
+            tags: string[];
+            skills: string[];
+            industries: string[];
+            specializations: string[];
         };
         /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyId: string;
@@ -1240,6 +1275,10 @@ export interface operations {
             query?: {
                 /** @description Matches name or email, ignoring case and accents. */
                 q?: string;
+                /** @description Only candidates with this tag (ignoring case). */
+                tag?: string;
+                /** @description Only candidates with this skill (ignoring case). */
+                skill?: string;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CandidateId"];
@@ -1290,6 +1329,28 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listCandidateUsedValues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsedValues"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getCandidate: {

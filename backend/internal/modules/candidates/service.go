@@ -88,6 +88,7 @@ type Summary struct {
 	CurrentCompany          *string
 	Location                *string
 	WorkAuthorizationStatus *string
+	Tags                    []string
 	UpdatedAt               time.Time
 }
 
@@ -97,13 +98,18 @@ type Page struct {
 	NextCursor *string
 }
 
-// List returns up to limit candidates, optionally matching query, starting
-// after cursor (the last ID of the previous page).
-func (s *Service) List(ctx context.Context, p authz.Principal, query, cursor *string, limit int) (Page, error) {
+// Filter narrows a list: text, tag and skill (each optional).
+type Filter struct {
+	Query, Tag, Skill *string
+}
+
+// List returns up to limit candidates matching f, starting after cursor (the
+// last ID of the previous page).
+func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -118,7 +124,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, cursor *st
 			page.Items[i] = Summary{
 				ID: r.ID, FullName: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}),
 				Email: r.Email, Phone: r.Phone, CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
-				Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, UpdatedAt: r.UpdatedAt,
+				Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, Tags: r.Tags, UpdatedAt: r.UpdatedAt,
 			}
 		}
 		return nil
@@ -290,7 +296,7 @@ func fromRow(r store.Candidate) Candidate {
 		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality,
 		Industry: r.Industry, Specialization: r.Specialization,
 		CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
-		Location: r.Location, Source: r.Source,
+		Location: r.Location, Source: r.Source, Tags: r.Tags, Skills: r.Skills,
 	}
 	if r.WorkAuthorization != nil {
 		p.WorkAuthorization = &WorkAuthorization{Status: *r.WorkAuthorization, Basis: r.WorkAuthorizationBasis, Note: r.WorkAuthorizationNote}
@@ -309,6 +315,7 @@ func insertParams(p Profile) store.InsertCandidateParams {
 		WorkAuthorizationNote: u.WorkAuthorizationNote, NoticePeriodValue: u.NoticePeriodValue,
 		NoticePeriodUnit: u.NoticePeriodUnit, Industry: u.Industry, Specialization: u.Specialization,
 		CurrentTitle: u.CurrentTitle, CurrentCompany: u.CurrentCompany, Location: u.Location, Source: u.Source,
+		Tags: u.Tags, Skills: u.Skills,
 	}
 }
 
@@ -318,6 +325,7 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 		FirstName: p.FirstName, LastName: p.LastName, Email: p.Email, Phone: p.Phone, Nationality: p.Nationality,
 		Industry: p.Industry, Specialization: p.Specialization, CurrentTitle: p.CurrentTitle,
 		CurrentCompany: p.CurrentCompany, Location: p.Location, Source: p.Source,
+		Tags: CleanLabels(p.Tags), Skills: CleanLabels(p.Skills),
 	}
 	if wa := p.WorkAuthorization; wa != nil {
 		u.WorkAuthorization, u.WorkAuthorizationBasis, u.WorkAuthorizationNote = &wa.Status, wa.Basis, wa.Note
@@ -336,6 +344,7 @@ func profileFields(p Profile) map[string]any {
 		"nationality": p.Nationality, "industry": p.Industry, "specialization": p.Specialization,
 		"currentTitle": p.CurrentTitle, "currentCompany": p.CurrentCompany, "location": p.Location,
 		"source": p.Source, "workAuthorization": nil, "noticePeriod": nil,
+		"tags": CleanLabels(p.Tags), "skills": CleanLabels(p.Skills),
 	}
 	if wa := p.WorkAuthorization; wa != nil {
 		m["workAuthorization"] = map[string]any{"status": wa.Status, "basis": wa.Basis, "note": wa.Note}
@@ -403,4 +412,32 @@ func decimalString(n pgtype.Numeric) (*string, error) {
 		return nil, fmt.Errorf("numeric value has unexpected type %T", v)
 	}
 	return &s, nil
+}
+
+// UsedValues are tags, skills, industries and specializations already used in
+// the company, most used first.
+type UsedValues struct {
+	Tags, Skills, Industries, Specializations []string
+}
+
+// Used returns the values already used, for suggestions.
+func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, error) {
+	out := UsedValues{Tags: []string{}, Skills: []string{}, Industries: []string{}, Specializations: []string{}}
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		rows, err := store.New(tx).UsedValues(ctx)
+		for _, r := range rows {
+			switch r.Kind {
+			case "tag":
+				out.Tags = append(out.Tags, r.Value)
+			case "skill":
+				out.Skills = append(out.Skills, r.Value)
+			case "industry":
+				out.Industries = append(out.Industries, r.Value)
+			case "specialization":
+				out.Specializations = append(out.Specializations, r.Value)
+			}
+		}
+		return err
+	})
+	return out, err
 }

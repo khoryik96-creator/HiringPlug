@@ -108,6 +108,14 @@ paths:
           in: query
           description: Matches name or email, ignoring case and accents.
           schema: {type: string, minLength: 1, maxLength: 200}
+        - name: tag
+          in: query
+          description: Only candidates with this tag (ignoring case).
+          schema: {type: string, minLength: 1, maxLength: 60}
+        - name: skill
+          in: query
+          description: Only candidates with this skill (ignoring case).
+          schema: {type: string, minLength: 1, maxLength: 60}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -145,6 +153,21 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/used-values:
+    get:
+      operationId: listCandidateUsedValues
+      tags: [candidates]
+      summary: Tags, skills, industries and specializations already used, most used first
+      description: For suggestions while typing, so everyone spells them the same way.
+      x-permission: candidates:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/UsedValues'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/candidates/{candidateId}:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -1105,6 +1128,8 @@ components:
       type: object
       required:
         - id
+        - tags
+        - skills
         - version
         - firstName
         - lastName
@@ -1151,6 +1176,8 @@ components:
         source:
           allOf: [{$ref: '#/components/schemas/CandidateSource'}]
           nullable: true
+        tags: {type: array, items: {type: string}}
+        skills: {type: array, items: {type: string}}
         compensation:
           description: Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded.
           allOf: [{$ref: '#/components/schemas/Compensation'}]
@@ -1190,6 +1217,15 @@ components:
         source:
           allOf: [{$ref: '#/components/schemas/CandidateSource'}]
           nullable: true
+        tags:
+          type: array
+          description: Your own labels, e.g. relocate (duplicates ignoring case are removed).
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 60}
+        skills:
+          type: array
+          maxItems: 100
+          items: {type: string, minLength: 1, maxLength: 60}
     CandidateUpdate:
       type: object
       additionalProperties: false
@@ -1220,9 +1256,18 @@ components:
         source:
           allOf: [{$ref: '#/components/schemas/CandidateSource'}]
           nullable: true
+        tags:
+          type: array
+          description: Your own labels, e.g. relocate (duplicates ignoring case are removed).
+          maxItems: 50
+          items: {type: string, minLength: 1, maxLength: 60}
+        skills:
+          type: array
+          maxItems: 100
+          items: {type: string, minLength: 1, maxLength: 60}
     CandidateSummary:
       type: object
-      required: [id, fullName, email, phone, currentTitle, currentCompany, location, workAuthorizationStatus, updatedAt]
+      required: [tags, id, fullName, email, phone, currentTitle, currentCompany, location, workAuthorizationStatus, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/CandidateId'}
         fullName: {type: string}
@@ -1234,6 +1279,7 @@ components:
         workAuthorizationStatus:
           allOf: [{$ref: '#/components/schemas/WorkAuthorizationStatus'}]
           nullable: true
+        tags: {type: array, items: {type: string}}
         updatedAt: {type: string, format: date-time}
     CandidatePage:
       type: object
@@ -1273,6 +1319,14 @@ components:
           description: The candidate to merge in (and delete).
           allOf: [{$ref: '#/components/schemas/CandidateId'}]
         version: {type: integer, minimum: 1, description: The version of the candidate you keep.}
+    UsedValues:
+      type: object
+      required: [tags, skills, industries, specializations]
+      properties:
+        tags: {type: array, items: {type: string}}
+        skills: {type: array, items: {type: string}}
+        industries: {type: array, items: {type: string}}
+        specializations: {type: array, items: {type: string}}
     CompanyId:
       type: string
       pattern: '^comp_[0-9a-hjkmnp-tv-z]{26}$'

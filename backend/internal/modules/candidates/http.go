@@ -25,7 +25,7 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +41,24 @@ func summaryToAPI(s Summary) api.CandidateSummary {
 		Id: s.ID, FullName: s.FullName, Email: orNull(s.Email), Phone: orNull(s.Phone),
 		CurrentTitle: orNull(s.CurrentTitle), CurrentCompany: orNull(s.CurrentCompany), Location: orNull(s.Location),
 		WorkAuthorizationStatus: orNull(convertPtr[api.WorkAuthorizationStatus](s.WorkAuthorizationStatus)),
-		UpdatedAt:               s.UpdatedAt,
+		Tags:                    nonNil(s.Tags), UpdatedAt: s.UpdatedAt,
 	}
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+// ListCandidateUsedValues handles GET /v1/candidates/used-values.
+func (h *HTTP) ListCandidateUsedValues(ctx context.Context, _ api.ListCandidateUsedValuesRequestObject) (api.ListCandidateUsedValuesResponseObject, error) {
+	u, err := h.svc.Used(ctx, authz.MustFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return api.ListCandidateUsedValues200JSONResponse{Tags: u.Tags, Skills: u.Skills, Industries: u.Industries, Specializations: u.Specializations}, nil
 }
 
 // CreateCandidate handles POST /v1/candidates.
@@ -60,6 +76,8 @@ func (h *HTTP) CreateCandidate(ctx context.Context, req api.CreateCandidateReque
 		Specialization:    valueOrNil(b.Specialization),
 		CurrentTitle:      valueOrNil(b.CurrentTitle),
 		CurrentCompany:    valueOrNil(b.CurrentCompany),
+		Tags:              deref(b.Tags),
+		Skills:            deref(b.Skills),
 		Location:          valueOrNil(b.Location),
 		Source:            convertPtr[string](valueOrNil(b.Source)),
 	}
@@ -96,6 +114,8 @@ func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateReque
 		CurrentCompany:    change(b.CurrentCompany, identity[string]),
 		Location:          change(b.Location, identity[string]),
 		Source:            change(b.Source, func(s api.CandidateSource) string { return string(s) }),
+		Tags:              Change[[]string]{Set: b.Tags != nil, Value: deref(b.Tags)},
+		Skills:            Change[[]string]{Set: b.Skills != nil, Value: deref(b.Skills)},
 	}
 	view, err := h.svc.Update(ctx, authz.MustFromContext(ctx), req.CandidateId, b.Version, patch)
 	if err != nil {
@@ -143,6 +163,8 @@ func candidateToAPI(v View) api.Candidate {
 		CurrentCompany:    orNull(p.CurrentCompany),
 		Location:          orNull(p.Location),
 		Source:            orNull(convertPtr[api.CandidateSource](p.Source)),
+		Tags:              nonNil(p.Tags),
+		Skills:            nonNil(p.Skills),
 		RestrictedFields:  []api.RestrictedField{},
 		CreatedAt:         v.CreatedAt,
 		UpdatedAt:         v.UpdatedAt,

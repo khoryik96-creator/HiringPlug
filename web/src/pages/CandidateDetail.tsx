@@ -6,6 +6,7 @@ import { candidateKey } from "../api/keys";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
 import { Documents } from "../components/Documents";
+import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
@@ -68,6 +69,10 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
             <dt>Source</dt>
             <dd>{c.source ? CANDIDATE_SOURCE[c.source] : "—"}</dd>
+            <dt>Skills</dt>
+            <dd><Chips labels={c.skills} /></dd>
+            <dt>Tags</dt>
+            <dd><Chips labels={c.tags} /></dd>
           </dl>
         </section>
       )}

@@ -4,22 +4,42 @@ import { useState } from "react";
 import { api, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Chips } from "../components/LabelInput";
+import { useUsedValues } from "../components/useUsedValues";
 import { WORK_AUTH_STATUS } from "../labels";
 
 /** Search and add candidates. */
 export function CandidateList({ canCreate }: { canCreate: boolean }) {
   const [q, setQ] = useState("");
+  const [tag, setTag] = useState("");
+  const [skill, setSkill] = useState("");
+  const used = useUsedValues();
   const list = useQuery({
-    queryKey: [...candidatesKey, q],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/candidates", { params: { query: q.trim() ? { q: q.trim() } : {} } })),
+    queryKey: [...candidatesKey, q, tag, skill],
+    queryFn: async () => {
+      const query: { q?: string; tag?: string; skill?: string } = {};
+      if (q.trim()) query.q = q.trim();
+      if (tag) query.tag = tag;
+      if (skill) query.skill = skill;
+      return unwrap(await api.GET("/v1/candidates", { params: { query } }));
+    },
   });
 
   return (
     <main>
       <div className="row spread">
         <h2>Candidates</h2>
-        <input placeholder="Search name or email" value={q} onChange={(e) => { setQ(e.target.value); }} />
+        <div className="row">
+          <input aria-label="Search candidates" placeholder="Search name or email" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <select aria-label="Skill" value={skill} onChange={(e) => { setSkill(e.target.value); }}>
+            <option value="">Any skill</option>
+            {used.skills.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select aria-label="Tag" value={tag} onChange={(e) => { setTag(e.target.value); }}>
+            <option value="">Any tag</option>
+            {used.tags.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
       </div>
       {canCreate && <AddCandidate />}
       <ErrorMessage error={list.error} />
@@ -36,7 +56,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
           {list.data?.items.map((c) => (
             <tr key={c.id}>
               <td>
-                <a href={`#/candidates/${c.id}`}>{c.fullName}</a>
+                <a href={`#/candidates/${c.id}`}>{c.fullName}</a> {c.tags.length > 0 && <Chips labels={c.tags} />}
               </td>
               <td>{[c.currentTitle, c.currentCompany].filter(Boolean).join(", ")}</td>
               <td>{c.email}</td>
