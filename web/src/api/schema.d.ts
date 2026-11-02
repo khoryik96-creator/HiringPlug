@@ -410,6 +410,49 @@ export interface paths {
         patch: operations["updateJob"];
         trace?: never;
     };
+    "/v1/jobs/{jobId}/ads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** List a job's ads, newest first */
+        get: operations["listJobAds"];
+        put?: never;
+        /** Add an ad for a job (as a draft) */
+        post: operations["createJobAd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/job-ads/{adId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Get a job ad */
+        get: operations["getJobAd"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change an ad, or publish, unpublish or close it
+         * @description Only the fields you send change; send `null` to clear one. `version` must be the version you loaded. Publishing needs an open job, the ad's text, and a closing date that has not passed (JOB_AD_NOT_PUBLISHABLE).
+         */
+        patch: operations["updateJobAd"];
+        trace?: never;
+    };
     "/v1/jobs/{jobId}/salary": {
         parameters: {
             query?: never;
@@ -579,7 +622,7 @@ export interface components {
         /** @enum {string} */
         Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted";
         Error: {
@@ -1109,6 +1152,61 @@ export interface components {
             id: components["schemas"]["TenantId"];
             name: string;
         };
+        /** @example ad_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        JobAdId: string;
+        /**
+         * @description draft = not shown anywhere; published = advertised; closed = taken down.
+         * @enum {string}
+         */
+        JobAdStatus: "draft" | "published" | "closed";
+        JobAd: {
+            id: components["schemas"]["JobAdId"];
+            version: number;
+            jobId: components["schemas"]["JobOrderId"];
+            title: string;
+            location: string | null;
+            workType: components["schemas"]["WorkType"] | null;
+            workArrangement: components["schemas"]["WorkArrangement"] | null;
+            /** @description Shown on the ad as written, e.g. "RM 8,000 - 10,000 a month". Separate from the job's private budget. */
+            salaryText: string | null;
+            /** @description The ad's text. Lines starting with "- " are shown as bullet points. */
+            description: string | null;
+            /** Format: date */
+            closesOn: string | null;
+            status: components["schemas"]["JobAdStatus"];
+            /** Format: date-time */
+            publishedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        JobAdList: {
+            items: components["schemas"]["JobAd"][];
+        };
+        JobAdCreate: {
+            title: string;
+            location?: string | null;
+            workType?: components["schemas"]["WorkType"] | null;
+            workArrangement?: components["schemas"]["WorkArrangement"] | null;
+            salaryText?: string | null;
+            description?: string | null;
+            /** Format: date */
+            closesOn?: string | null;
+        };
+        JobAdUpdate: {
+            /** @description The version you loaded. */
+            version: number;
+            title?: string;
+            location?: string | null;
+            workType?: components["schemas"]["WorkType"] | null;
+            workArrangement?: components["schemas"]["WorkArrangement"] | null;
+            salaryText?: string | null;
+            description?: string | null;
+            /** Format: date */
+            closesOn?: string | null;
+            status?: components["schemas"]["JobAdStatus"];
+        };
         /** @example jo_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobOrderId: string;
         /**
@@ -1410,6 +1508,7 @@ export interface components {
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
+        JobAdIdPath: components["schemas"]["JobAdId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
     };
     requestBodies: never;
@@ -2201,6 +2300,126 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listJobAds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAdList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createJobAd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobAdCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAd"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getJobAd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAd"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateJobAd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobAdUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAd"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description The ad cannot be published (JOB_AD_NOT_PUBLISHABLE). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     putJobSalary: {

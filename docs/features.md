@@ -169,6 +169,17 @@ requirements), de-duplicated, and kept with its source and date.
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
   text) come in Phase 3.
+- **Job ads** ✅: the advertised text of a job, separate from the internal job
+  order (a job can have several). Each has its own title, location, work type
+  and arrangement, an optional salary line shown as written (separate from the
+  job's private budget), a closing date and the ad's text, where lines starting
+  with "- " become bullet points (plain text only: nothing typed into an ad can
+  run in a reader's browser). A new ad starts from the job's details. Status:
+  draft, published or closed. Publishing needs an open job, the ad's text and
+  a closing date that has not passed, and says which is missing. A published
+  ad stays up while its job is on hold; a job that is filled or closed takes
+  its published ads down in the same change. The careers page (3.2) shows
+  published ads.
 - **Pipeline** ✅: a candidate on a job is an *application* moving through
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not

@@ -106,6 +106,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "job.updated", EntityType: "job", EntityID: id, Changes: changes}); err != nil {
 			return err
 		}
+		if before.Status != after.Status {
+			if err := closeAdsWithJob(ctx, tx, id, after.Status); err != nil {
+				return err
+			}
+		}
 		out, err = s.view(ctx, tx, p, fromRow(updated))
 		return err
 	})

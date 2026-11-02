@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -22,6 +23,8 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
+
+var claimLock sync.Mutex
 
 var minimalPDF = []byte("%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n")
 
@@ -176,9 +179,13 @@ type claimedJob struct {
 
 // claimAIJobFor claims the AI-queue job for documentID exactly as the Python
 // worker does (job_claim, as the AI role). Other tests may have queued AI jobs
-// too, so the job is first moved to the front of the queue.
+// too, so the job is first moved to the front of the queue. Tests run in
+// parallel: moving and claiming happen under one lock, or two tests could each
+// move their job forward and then claim the other's.
 func claimAIJobFor(t *testing.T, conn *pgx.Conn, documentID string) claimedJob {
 	t.Helper()
+	claimLock.Lock()
+	defer claimLock.Unlock()
 	ctx := context.Background()
 	_, err := testutil.Current.Admin.Exec(ctx,
 		`UPDATE job SET run_after = now() - interval '1 hour' WHERE queue = 'ai' AND payload->>'documentId' = $1`, documentID)

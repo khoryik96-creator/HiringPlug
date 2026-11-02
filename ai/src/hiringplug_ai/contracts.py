@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Any
 from pydantic import AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, RootModel
+from datetime import date
 
 
 class Role(StrEnum):
@@ -54,6 +55,7 @@ class ErrorCode(StrEnum):
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
+    JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
@@ -755,6 +757,18 @@ class Tenant(BaseModel):
     name: str
 
 
+class JobAdId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ad_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ad_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class JobAdStatus(StrEnum):
+    draft = "draft"
+    published = "published"
+    closed = "closed"
+
+
 class JobOrderId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["jo_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jo_[0-9a-hjkmnp-tv-z]{26}$")
@@ -1113,3 +1127,59 @@ class Me(BaseModel):
     tenant: Tenant
     role: Role
     permissions: list[Permission]
+
+
+class JobAd(BaseModel):
+    id: JobAdId
+    version: int
+    jobId: JobOrderId
+    title: str
+    location: Annotated[str | None, Field(...)]
+    workType: Annotated[WorkType | None, Field(...)]
+    workArrangement: Annotated[WorkArrangement | None, Field(...)]
+    salaryText: Annotated[
+        str | None,
+        Field(
+            description='Shown on the ad as written, e.g. "RM 8,000 - 10,000 a month". Separate from the job\'s private budget.'
+        ),
+    ]
+    description: Annotated[
+        str | None, Field(description='The ad\'s text. Lines starting with "- " are shown as bullet points.')
+    ]
+    closesOn: Annotated[date | None, Field(...)]
+    status: JobAdStatus
+    publishedAt: Annotated[AwareDatetime | None, Field(...)]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class JobAdList(BaseModel):
+    items: list[JobAd]
+
+
+class JobAdCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    location: Annotated[str | None, Field(max_length=200)] = None
+    workType: WorkType | None = None
+    workArrangement: WorkArrangement | None = None
+    salaryText: Annotated[str | None, Field(max_length=100)] = None
+    description: Annotated[str | None, Field(max_length=20000)] = None
+    closesOn: date | None = None
+
+
+class JobAdUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    title: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    location: Annotated[str | None, Field(max_length=200)] = None
+    workType: WorkType | None = None
+    workArrangement: WorkArrangement | None = None
+    salaryText: Annotated[str | None, Field(max_length=100)] = None
+    description: Annotated[str | None, Field(max_length=20000)] = None
+    closesOn: date | None = None
+    status: JobAdStatus | None = None

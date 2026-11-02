@@ -53,11 +53,11 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ 2.4 **Tags, skills and lists** | Tags and skills on candidates, suggestions from values already used (also for industry and specialization), and list filters. Saved searches come with reports (6.3). |
 | ✅ 2.5 **CV versions side by side** | Original, JobStreet, LinkedIn and formatted CVs of one candidate compared side by side, with the differences in their details (changed dates, missing jobs) listed |
 
-### Phase 3: job ads and applicants ⬜
+### Phase 3: job ads and applicants 🔜
 
 | Step | Delivers |
 |---|---|
-| 3.1 **Job ads** | The advertised text for a job (separate from the internal job order), with publish status |
+| ✅ 3.1 **Job ads** | The advertised text for a job (separate from the internal job order), with publish status, a preview, and ads taken down when the job is filled or closed |
 | 3.2 **Careers page and apply form** | A public page per company listing open ads; applying creates the candidate, attaches the CV (parsed) and puts them in the job's pipeline |
 | 3.3 **Job boards** | Post ads to job boards through their partner programmes (JobStreet, LinkedIn, Indeed) |
 

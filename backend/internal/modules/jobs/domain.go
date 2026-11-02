@@ -148,3 +148,88 @@ func cents(s string) (int64, bool) {
 	n, err := strconv.ParseInt(whole+frac, 10, 64)
 	return n, err == nil
 }
+
+// AdDetails are the editable fields of a job ad.
+type AdDetails struct {
+	Title           string
+	Location        *string
+	WorkType        *string
+	WorkArrangement *string
+	SalaryText      *string // published as written; not the job's private budget
+	Description     *string
+	ClosesOn        *time.Time // a date
+	Status          string     // draft, published, closed
+}
+
+// AdPatch is a partial update of AdDetails.
+type AdPatch struct {
+	Title           apiconv.Change[string]
+	Location        apiconv.Change[*string]
+	WorkType        apiconv.Change[*string]
+	WorkArrangement apiconv.Change[*string]
+	SalaryText      apiconv.Change[*string]
+	Description     apiconv.Change[*string]
+	ClosesOn        apiconv.Change[*time.Time]
+	Status          apiconv.Change[string]
+}
+
+// Apply returns d with the patch's fields replaced.
+func (p AdPatch) Apply(d AdDetails) AdDetails {
+	apiconv.Apply(&d.Title, p.Title)
+	apiconv.Apply(&d.Location, p.Location)
+	apiconv.Apply(&d.WorkType, p.WorkType)
+	apiconv.Apply(&d.WorkArrangement, p.WorkArrangement)
+	apiconv.Apply(&d.SalaryText, p.SalaryText)
+	apiconv.Apply(&d.Description, p.Description)
+	apiconv.Apply(&d.ClosesOn, p.ClosesOn)
+	apiconv.Apply(&d.Status, p.Status)
+	return d
+}
+
+// NormalizeAd tidies an ad: spaces in one-line fields squeezed, the text
+// trimmed (its line breaks kept), empty values cleared, new ads drafts.
+func NormalizeAd(d AdDetails) (AdDetails, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	d.Title = strings.Join(strings.Fields(d.Title), " ")
+	if d.Title == "" {
+		errs.Add("title", "is required")
+	}
+	if d.Status == "" {
+		d.Status = "draft"
+	}
+	d.Location, d.SalaryText = squeezedOrNil(d.Location), squeezedOrNil(d.SalaryText)
+	if d.Description != nil {
+		t := strings.TrimSpace(*d.Description)
+		d.Description = &t
+		if t == "" {
+			d.Description = nil
+		}
+	}
+	return d, errs
+}
+
+func squeezedOrNil(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	t := strings.Join(strings.Fields(*s), " ")
+	if t == "" {
+		return nil
+	}
+	return &t
+}
+
+// PublishProblem says, in words, why an ad cannot be advertised as it is, or
+// "" when it can. becoming is true when the ad is being published now (an ad
+// already published stays up if its job is put on hold, until taken down).
+func PublishProblem(d AdDetails, jobStatus string, today time.Time, becoming bool) string {
+	switch {
+	case becoming && jobStatus != "open":
+		return "Only open jobs can be advertised; this job is " + strings.ReplaceAll(jobStatus, "_", " ") + "."
+	case d.Description == nil:
+		return "Write the ad's text before publishing it."
+	case becoming && d.ClosesOn != nil && d.ClosesOn.Before(today):
+		return "The closing date has passed; change it before publishing."
+	}
+	return ""
+}

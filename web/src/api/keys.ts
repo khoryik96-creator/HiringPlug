@@ -16,3 +16,4 @@ export const notesKey = (subjectType: string, subjectId: string) => ["notes", su
 export const activityKey = (entityType: string, entityId: string) => ["activity", entityType, entityId] as const;
 export const summaryKey = ["pipeline-summary"] as const;
 export const usedValuesKey = ["candidates", "used-values"] as const;
+export const jobAdsKey = (jobId: string) => ["job-ads", jobId] as const;

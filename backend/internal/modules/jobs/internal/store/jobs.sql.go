@@ -8,7 +8,23 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const closeJobAds = `-- name: CloseJobAds :execrows
+UPDATE job_ad SET status = 'closed', version = version + 1, updated_at = now()
+WHERE job_order_id = $1 AND status = 'published'
+`
+
+// A job that is filled or closed takes its published ads down with it.
+func (q *Queries) CloseJobAds(ctx context.Context, jobOrderID string) (int64, error) {
+	result, err := q.db.Exec(ctx, closeJobAds, jobOrderID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const deleteJobSalary = `-- name: DeleteJobSalary :execrows
 DELETE FROM job_order_salary WHERE job_order_id = $1 AND version = $2
@@ -26,6 +42,34 @@ func (q *Queries) DeleteJobSalary(ctx context.Context, arg DeleteJobSalaryParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getJobAd = `-- name: GetJobAd :one
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad WHERE id = $1
+`
+
+func (q *Queries) GetJobAd(ctx context.Context, id string) (JobAd, error) {
+	row := q.db.QueryRow(ctx, getJobAd, id)
+	var i JobAd
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.Title,
+		&i.Location,
+		&i.WorkType,
+		&i.WorkArrangement,
+		&i.SalaryText,
+		&i.Description,
+		&i.ClosesOn,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getJobOrder = `-- name: GetJobOrder :one
@@ -81,6 +125,58 @@ func (q *Queries) GetJobSalary(ctx context.Context, jobOrderID string) (GetJobSa
 		&i.MaxAmount,
 		&i.Currency,
 		&i.Period,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertJobAd = `-- name: InsertJobAd :one
+INSERT INTO job_ad (tenant_id, job_order_id, title, location, work_type, work_arrangement, salary_text, description, closes_on, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5,
+        $6, $7, $8, app_current_user())
+RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at
+`
+
+type InsertJobAdParams struct {
+	JobOrderID      string
+	Title           string
+	Location        *string
+	WorkType        *string
+	WorkArrangement *string
+	SalaryText      *string
+	Description     *string
+	ClosesOn        pgtype.Date
+}
+
+// Job ads.
+func (q *Queries) InsertJobAd(ctx context.Context, arg InsertJobAdParams) (JobAd, error) {
+	row := q.db.QueryRow(ctx, insertJobAd,
+		arg.JobOrderID,
+		arg.Title,
+		arg.Location,
+		arg.WorkType,
+		arg.WorkArrangement,
+		arg.SalaryText,
+		arg.Description,
+		arg.ClosesOn,
+	)
+	var i JobAd
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.Title,
+		&i.Location,
+		&i.WorkType,
+		&i.WorkArrangement,
+		&i.SalaryText,
+		&i.Description,
+		&i.ClosesOn,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
@@ -235,6 +331,47 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 	return items, nil
 }
 
+const listJobAds = `-- name: ListJobAds :many
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad WHERE job_order_id = $1 ORDER BY id DESC LIMIT 100
+`
+
+func (q *Queries) ListJobAds(ctx context.Context, jobOrderID string) ([]JobAd, error) {
+	rows, err := q.db.Query(ctx, listJobAds, jobOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JobAd
+	for rows.Next() {
+		var i JobAd
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.JobOrderID,
+			&i.Version,
+			&i.Title,
+			&i.Location,
+			&i.WorkType,
+			&i.WorkArrangement,
+			&i.SalaryText,
+			&i.Description,
+			&i.ClosesOn,
+			&i.Status,
+			&i.PublishedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJobOrders = `-- name: ListJobOrders :many
 SELECT id, title, company_id, status, location, openings, updated_at
 FROM job_order
@@ -327,6 +464,74 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateJobAd = `-- name: UpdateJobAd :one
+UPDATE job_ad SET
+  title = $1,
+  location = $2,
+  work_type = $3,
+  work_arrangement = $4,
+  salary_text = $5,
+  description = $6,
+  closes_on = $7,
+  status = $8,
+  published_at = $9,
+  version = version + 1,
+  updated_at = now()
+WHERE id = $10 AND version = $11
+RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at
+`
+
+type UpdateJobAdParams struct {
+	Title           string
+	Location        *string
+	WorkType        *string
+	WorkArrangement *string
+	SalaryText      *string
+	Description     *string
+	ClosesOn        pgtype.Date
+	Status          string
+	PublishedAt     *time.Time
+	ID              string
+	ExpectedVersion int32
+}
+
+// Optimistic concurrency: no row returned = stale version (or not found).
+func (q *Queries) UpdateJobAd(ctx context.Context, arg UpdateJobAdParams) (JobAd, error) {
+	row := q.db.QueryRow(ctx, updateJobAd,
+		arg.Title,
+		arg.Location,
+		arg.WorkType,
+		arg.WorkArrangement,
+		arg.SalaryText,
+		arg.Description,
+		arg.ClosesOn,
+		arg.Status,
+		arg.PublishedAt,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i JobAd
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.Title,
+		&i.Location,
+		&i.WorkType,
+		&i.WorkArrangement,
+		&i.SalaryText,
+		&i.Description,
+		&i.ClosesOn,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const updateJobOrder = `-- name: UpdateJobOrder :one

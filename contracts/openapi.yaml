@@ -64,6 +64,10 @@ x-error-codes:
     module: shared
     status: 500
     description: Something went wrong on our side. Quote the requestId when reporting it.
+  JOB_AD_NOT_PUBLISHABLE:
+    module: jobs
+    status: 422
+    description: 'The ad cannot be published as it is: the job is not open, the ad has no text, or its closing date has passed. The message says which.'
   METHOD_NOT_ALLOWED:
     module: shared
     status: 405
@@ -736,6 +740,89 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/jobs/{jobId}/ads:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: listJobAds
+      tags: [jobs]
+      summary: List a job's ads, newest first
+      x-permission: jobs:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobAdList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: createJobAd
+      tags: [jobs]
+      summary: Add an ad for a job (as a draft)
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobAdCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobAd'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/job-ads/{adId}:
+    parameters:
+      - $ref: '#/components/parameters/JobAdIdPath'
+    get:
+      operationId: getJobAd
+      tags: [jobs]
+      summary: Get a job ad
+      x-permission: jobs:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobAd'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateJobAd
+      tags: [jobs]
+      summary: Change an ad, or publish, unpublish or close it
+      description: >
+        Only the fields you send change; send `null` to clear one. `version` must be the version you loaded. Publishing needs an open job, the ad's text, and a closing date that has not passed (JOB_AD_NOT_PUBLISHABLE).
+
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobAdUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobAd'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422':
+          description: The ad cannot be published (JOB_AD_NOT_PUBLISHABLE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/jobs/{jobId}/salary:
     parameters:
       - $ref: '#/components/parameters/JobOrderIdPath'
@@ -1047,6 +1134,7 @@ components:
         - DOCUMENT_HAS_NO_TEXT
         - FORBIDDEN
         - INTERNAL
+        - JOB_AD_NOT_PUBLISHABLE
         - METHOD_NOT_ALLOWED
         - NOT_FOUND
         - PAYLOAD_TOO_LARGE
@@ -1865,6 +1953,83 @@ components:
       properties:
         id: {$ref: '#/components/schemas/TenantId'}
         name: {type: string}
+    JobAdId:
+      type: string
+      pattern: '^ad_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ad_01jbz6w0m0k8q9x2r3s4t5v6w7
+    JobAdStatus:
+      type: string
+      description: draft = not shown anywhere; published = advertised; closed = taken down.
+      enum: [draft, published, closed]
+    JobAd:
+      type: object
+      required: [id, version, jobId, title, location, workType, workArrangement, salaryText, description, closesOn, status, publishedAt, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/JobAdId'}
+        version: {type: integer}
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        title: {type: string}
+        location: {type: string, nullable: true}
+        workType:
+          allOf: [{$ref: '#/components/schemas/WorkType'}]
+          nullable: true
+        workArrangement:
+          allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
+          nullable: true
+        salaryText:
+          type: string
+          nullable: true
+          description: Shown on the ad as written, e.g. "RM 8,000 - 10,000 a month". Separate from the job's private budget.
+        description:
+          type: string
+          nullable: true
+          description: The ad's text. Lines starting with "- " are shown as bullet points.
+        closesOn: {type: string, format: date, nullable: true}
+        status: {$ref: '#/components/schemas/JobAdStatus'}
+        publishedAt: {type: string, format: date-time, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    JobAdList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/JobAd'}
+    JobAdCreate:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: {type: string, minLength: 1, maxLength: 200}
+        location: {type: string, maxLength: 200, nullable: true}
+        workType:
+          allOf: [{$ref: '#/components/schemas/WorkType'}]
+          nullable: true
+        workArrangement:
+          allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
+          nullable: true
+        salaryText: {type: string, maxLength: 100, nullable: true}
+        description: {type: string, maxLength: 20000, nullable: true}
+        closesOn: {type: string, format: date, nullable: true}
+    JobAdUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1, description: The version you loaded.}
+        title: {type: string, minLength: 1, maxLength: 200}
+        location: {type: string, maxLength: 200, nullable: true}
+        workType:
+          allOf: [{$ref: '#/components/schemas/WorkType'}]
+          nullable: true
+        workArrangement:
+          allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
+          nullable: true
+        salaryText: {type: string, maxLength: 100, nullable: true}
+        description: {type: string, maxLength: 20000, nullable: true}
+        closesOn: {type: string, format: date, nullable: true}
+        status: {$ref: '#/components/schemas/JobAdStatus'}
     JobOrderId:
       type: string
       pattern: '^jo_[0-9a-hjkmnp-tv-z]{26}$'
@@ -2203,6 +2368,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/JobOrderId'}
+    JobAdIdPath:
+      name: adId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/JobAdId'}
     ApplicationIdPath:
       name: applicationId
       in: path
