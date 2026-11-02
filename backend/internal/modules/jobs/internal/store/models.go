@@ -90,6 +90,27 @@ type CandidateCompensation struct {
 	UpdatedAt        time.Time
 }
 
+type CandidateEducation struct {
+	TenantID      string
+	CandidateID   string
+	Position      int32
+	Qualification *string
+	Institution   *string
+	EndYear       *int32
+}
+
+type CandidateWork struct {
+	TenantID    string
+	CandidateID string
+	Position    int32
+	Title       *string
+	Company     *string
+	StartDate   *string
+	EndDate     *string
+	IsCurrent   bool
+	Description *string
+}
+
 type Company struct {
 	ID                 string
 	TenantID           string

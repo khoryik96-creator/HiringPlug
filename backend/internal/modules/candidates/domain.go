@@ -66,6 +66,7 @@ type Candidate struct {
 // View is a candidate as one particular user may see it.
 type View struct {
 	Candidate
+	History      History
 	Compensation *Compensation // nil when none is recorded or the user may not see it
 	// CompensationRestricted is true when the user lacks permission to see
 	// salary details; the API then omits them and says so.
@@ -292,4 +293,76 @@ func CleanLabels(labels []string) []string {
 		out = append(out, l)
 	}
 	return out
+}
+
+// Job is one entry of a candidate's work history.
+type Job struct {
+	Title, Company     *string
+	StartDate, EndDate *string // YYYY-MM or YYYY
+	Current            bool
+	Description        *string
+}
+
+// Qualification is one entry of a candidate's education.
+type Qualification struct {
+	Qualification, Institution *string
+	EndYear                    *int
+}
+
+// History is a candidate's work history and education, newest first.
+type History struct {
+	Work      []Job
+	Education []Qualification
+}
+
+// NormalizeHistory tidies text and checks each entry: a job needs a title or
+// a company, dates in order, and no end date while current; a qualification
+// needs a name or an institution.
+func NormalizeHistory(h History) (History, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	out := History{Work: make([]Job, len(h.Work)), Education: make([]Qualification, len(h.Education))}
+	for i, j := range h.Work {
+		at := "experience[" + strconv.Itoa(i) + "]"
+		j.Title, j.Company, j.Description = trimmedOrNil(j.Title), trimmedOrNil(j.Company), trimmedOrNil(j.Description)
+		j.StartDate, j.EndDate = trimmedOrNil(j.StartDate), trimmedOrNil(j.EndDate)
+		if j.Title == nil && j.Company == nil {
+			errs.Add(at+".title", "enter a job title or a company")
+		}
+		for field, d := range map[string]*string{"startDate": j.StartDate, "endDate": j.EndDate} {
+			if d != nil && !validYearMonth(*d) {
+				errs.Add(at+"."+field, "use YYYY-MM or YYYY")
+			}
+		}
+		if j.Current && j.EndDate != nil {
+			errs.Add(at+".endDate", "leave the end date empty for a current job")
+		}
+		if j.StartDate != nil && j.EndDate != nil && (*j.EndDate)[:4] < (*j.StartDate)[:4] ||
+			j.StartDate != nil && j.EndDate != nil && len(*j.StartDate) == 7 && len(*j.EndDate) == 7 && *j.EndDate < *j.StartDate {
+			errs.Add(at+".endDate", "is before the start date")
+		}
+		out.Work[i] = j
+	}
+	for i, q := range h.Education {
+		q.Qualification, q.Institution = trimmedOrNil(q.Qualification), trimmedOrNil(q.Institution)
+		if q.Qualification == nil && q.Institution == nil {
+			errs.Add("education["+strconv.Itoa(i)+"].qualification", "enter a qualification or an institution")
+		}
+		out.Education[i] = q
+	}
+	return out, errs
+}
+
+func validYearMonth(s string) bool {
+	if len(s) != 4 && len(s) != 7 {
+		return false
+	}
+	year, err := strconv.Atoi(s[:4])
+	if err != nil || year < 1950 || year > 2100 {
+		return false
+	}
+	if len(s) == 4 {
+		return true
+	}
+	month, err := strconv.Atoi(s[5:])
+	return err == nil && s[4] == '-' && month >= 1 && month <= 12
 }

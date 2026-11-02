@@ -169,6 +169,7 @@ func candidateToAPI(v View) api.Candidate {
 		CreatedAt:         v.CreatedAt,
 		UpdatedAt:         v.UpdatedAt,
 	}
+	out.Experience, out.Education = historyToAPI(v.History)
 	if wa := p.WorkAuthorization; wa != nil {
 		out.WorkAuthorization = nullable.NewNullableWithValue(api.WorkAuthorization{
 			Status: api.WorkAuthorizationStatus(wa.Status),

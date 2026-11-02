@@ -46,7 +46,7 @@ job. Today the app has candidates but nothing to place them into.
 
 | Step | Delivers |
 |---|---|
-| ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills), each value showing where in the CV it came from; you review and accept. Tuned on 25 real CVs, including two-column and old .doc files. Next: work history and education saved on the profile, and the AI reader. |
+| ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills, work history, education), each value showing where in the CV it came from; you review and accept. Tuned on 25 real CVs, including two-column and old .doc files. Work history and education are saved on the profile. Next: the AI reader. |
 | 2.2 **Duplicates** | ✅ The same email is refused; the same phone or a very similar name is flagged on the candidate's page; merge two candidates with their CVs, jobs, notes and salary |
 | ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | ✅ 2.4 **Tags, skills and lists** | Tags and skills on candidates, suggestions from values already used (also for industry and specialization), and list filters. Saved searches come with reports (6.3). |

@@ -80,3 +80,22 @@ export function applyBody(p: Profile, c: Candidate, ticked: Set<SuggestionKey>, 
   if (skills.length > 0) body.skills = [...c.skills, ...skills].slice(0, 100);
   return body;
 }
+
+/** The CV's work history and education, as the profile stores them. */
+export function historyFromProfile(p: Profile): Pick<Schemas["CandidateHistoryUpdate"], "experience" | "education"> {
+  return {
+    experience: p.experience.slice(0, 50).map((j) => ({
+      title: j.title?.value ?? null,
+      company: j.company?.value ?? null,
+      startDate: j.startDate ?? null,
+      endDate: j.current ? null : (j.endDate ?? null),
+      current: j.current,
+      description: null,
+    })),
+    education: p.education.slice(0, 20).map((e) => ({
+      qualification: e.qualification?.value ?? null,
+      institution: e.institution?.value ?? null,
+      endYear: e.endYear ?? null,
+    })),
+  };
+}

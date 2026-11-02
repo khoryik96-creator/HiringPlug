@@ -8,6 +8,7 @@ import { CandidateForm } from "../components/CandidateForm";
 import { Documents } from "../components/Documents";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { History } from "../components/History";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
@@ -76,6 +77,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </dl>
         </section>
       )}
+      <History candidate={c} canEdit={permissions.includes("candidates:update")} />
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} />

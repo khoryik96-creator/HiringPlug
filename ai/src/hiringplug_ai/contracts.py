@@ -230,7 +230,39 @@ class RestrictedField(StrEnum):
     compensation = "compensation"
 
 
+class WorkEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str | None, Field(max_length=200)]
+    company: Annotated[str | None, Field(max_length=200)]
+    startDate: Annotated[str | None, Field(description="YYYY-MM or YYYY.", pattern="^[0-9]{4}(-[0-9]{2})?$")]
+    endDate: Annotated[str | None, Field(description="YYYY-MM or YYYY.", pattern="^[0-9]{4}(-[0-9]{2})?$")]
+    current: bool
+    description: Annotated[str | None, Field(max_length=4000)]
+
+
+class EducationEntry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    qualification: Annotated[str | None, Field(max_length=200)]
+    institution: Annotated[str | None, Field(max_length=200)]
+    endYear: Annotated[int | None, Field(ge=1950, le=2100)]
+
+
+class CandidateHistoryUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    experience: Annotated[list[WorkEntry], Field(max_length=50)]
+    education: Annotated[list[EducationEntry], Field(max_length=20)]
+
+
 class Candidate(BaseModel):
+    experience: Annotated[list[WorkEntry], Field(description="Work history, newest first.")]
+    education: list[EducationEntry]
     id: CandidateId
     version: Annotated[int, Field(ge=1)]
     firstName: str

@@ -72,7 +72,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 		if err != nil {
 			return err
 		}
-		view, err = withCompensation(ctx, q, p, fromRow(row))
+		view, err = loadView(ctx, q, p, fromRow(row))
 		return err
 	})
 	return view, err
@@ -171,7 +171,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		}); err != nil {
 			return err
 		}
-		view, err = withCompensation(ctx, q, p, fromRow(updated))
+		view, err = loadView(ctx, q, p, fromRow(updated))
 		return err
 	})
 	return view, err
@@ -245,8 +245,14 @@ func canSeeSalary(p authz.Principal) bool {
 // database applies the same rule (row-level security), so this check and the
 // database agree; the check here exists so we can tell the user "restricted"
 // rather than "none recorded".
-func withCompensation(ctx context.Context, q *store.Queries, p authz.Principal, c Candidate) (View, error) {
-	view := View{Candidate: c}
+// loadView reads what the candidate page shows besides the profile: work
+// history, education and (if the user may see it) salary.
+func loadView(ctx context.Context, q *store.Queries, p authz.Principal, c Candidate) (View, error) {
+	history, err := loadHistory(ctx, q, c.ID)
+	if err != nil {
+		return View{}, err
+	}
+	view := View{Candidate: c, History: history}
 	if !canSeeSalary(p) {
 		view.CompensationRestricted = true
 		return view, nil

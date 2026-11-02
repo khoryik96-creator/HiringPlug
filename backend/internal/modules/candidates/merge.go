@@ -94,6 +94,13 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		} else if err != nil {
 			return err
 		}
+		// The duplicate's work history and education, if the kept candidate has none.
+		if err := q.MoveWorkIfNone(ctx, store.MoveWorkIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
+			return err
+		}
+		if err := q.MoveEducationIfNone(ctx, store.MoveEducationIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
+			return err
+		}
 		before := fromRow(keepRow).Profile
 		after, filled := FillFrom(before, fromRow(dupRow).Profile)
 		// The duplicate goes first: its email may be moving to the kept candidate.
@@ -115,7 +122,7 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 				return err
 			}
 		}
-		out, err = withCompensation(ctx, q, p, fromRow(row))
+		out, err = loadView(ctx, q, p, fromRow(row))
 		return err
 	})
 	return out, err

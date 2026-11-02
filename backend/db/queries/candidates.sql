@@ -134,3 +134,44 @@ SELECT kind::text AS kind, value::text AS value, n FROM (
 ) used
 ORDER BY kind, n DESC, value
 LIMIT 2000;
+
+-- Work history and education, newest first.
+-- name: ListWork :many
+SELECT * FROM candidate_work WHERE candidate_id = @candidate_id ORDER BY position;
+
+-- name: ListEducation :many
+SELECT * FROM candidate_education WHERE candidate_id = @candidate_id ORDER BY position;
+
+-- name: DeleteWork :exec
+DELETE FROM candidate_work WHERE candidate_id = @candidate_id;
+
+-- name: DeleteEducation :exec
+DELETE FROM candidate_education WHERE candidate_id = @candidate_id;
+
+-- name: InsertWork :exec
+INSERT INTO candidate_work (tenant_id, candidate_id, position, title, company, start_date, end_date, is_current, description)
+VALUES (app_current_tenant(), @candidate_id, @position, sqlc.narg(title), sqlc.narg(company), sqlc.narg(start_date),
+        sqlc.narg(end_date), @is_current, sqlc.narg(description));
+
+-- name: InsertEducation :exec
+INSERT INTO candidate_education (tenant_id, candidate_id, position, qualification, institution, end_year)
+VALUES (app_current_tenant(), @candidate_id, @position, sqlc.narg(qualification), sqlc.narg(institution), sqlc.narg(end_year));
+
+-- A change to a candidate's own records (history) moves their version on, so
+-- forms opened before it are stale. No row = stale version (or not found).
+-- name: TouchCandidate :one
+UPDATE candidate SET version = version + 1, updated_at = now()
+WHERE id = @id AND version = @expected_version
+RETURNING *;
+
+-- Merging: the duplicate's history moves to the kept candidate only if the
+-- kept one has none (histories are not interleaved).
+-- name: MoveWorkIfNone :exec
+UPDATE candidate_work AS m SET candidate_id = sqlc.arg(to_id)::text
+WHERE m.candidate_id = sqlc.arg(from_id)::text
+  AND NOT EXISTS (SELECT 1 FROM candidate_work w WHERE w.candidate_id = sqlc.arg(to_id)::text);
+
+-- name: MoveEducationIfNone :exec
+UPDATE candidate_education AS m SET candidate_id = sqlc.arg(to_id)::text
+WHERE m.candidate_id = sqlc.arg(from_id)::text
+  AND NOT EXISTS (SELECT 1 FROM candidate_education e WHERE e.candidate_id = sqlc.arg(to_id)::text);

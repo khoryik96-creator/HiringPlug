@@ -50,6 +50,12 @@ separators (`8,500`, `1,00,000`); a decimal comma (`8500,50`) is refused rather
 than guessed. Every change is in the audit log, and search ignores case and
 accents (`jose` finds `José`).
 
+**Work history and education** ✅: jobs (title, company, from/to as month and
+year or year only, current) and qualifications (name, institution, year) on
+the candidate's page, newest first, edited as a whole with the same lost-update
+protection as the profile; filled from a CV in one tick. Merging keeps the
+kept candidate's history, or takes the duplicate's when it has none.
+
 **Possible duplicates** ✅: a candidate's page warns about others with the
 same phone number or a very similar name ("Siti Aisyah" and "Siti Aishah",
 at least 60% alike ignoring case and accents). The same email is refused when
@@ -73,8 +79,10 @@ from this CV** lists each suggestion next to what the profile has now, with
 the CV's wording: empty profile fields are ticked, filled ones never are, and
 **Use ticked details** saves them (with the usual lost-update protection).
 New skills are added to the existing ones. **Read details from this CV**
-parses CVs uploaded earlier. Formatted CVs are not parsed. Work history and
-education are shown for now; saving them on the profile comes next. Design:
+parses CVs uploaded earlier. Formatted CVs are not parsed. The CV's work
+history and education are saved on the profile when ticked (ticked by default
+only if the profile has none; existing history is replaced only when asked).
+Design:
 [ai-worker.md](ai-worker.md#cv-parsing-grounded-in-the-source).
 
 ![Reviewing details read from a CV (an invented CV)](images/cv-review.png)

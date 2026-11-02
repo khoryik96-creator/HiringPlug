@@ -53,6 +53,7 @@ describe("reviewing a CV", () => {
   it("saves the ticked details and new skills with the version it was opened with", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ id: "doc_1", parsedProfile: profile }));
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(testCandidate({ version: 5 })));
     const onDone = vi.fn();
     const candidate = testCandidate({ phone: null, location: null, skills: ["Excel"], version: 3 });
     renderWithClient(<CvReview documentId="doc_1" candidate={candidate} onDone={onDone} />);
@@ -76,5 +77,29 @@ describe("reviewing a CV", () => {
       currentCompany: "Nestlé Malaysia Berhad",
       skills: ["Excel", "SAP FICO"], // Excel was already there
     });
+    // The profile had no history, so the CV's is saved too, on top of the version the first save returned.
+    expect(sentBody(put)).toEqual({
+      version: 4,
+      experience: [
+        { title: "Accountant", company: "Old Co", startDate: "2016", endDate: "2019", current: false, description: null },
+        { title: "Senior Accountant", company: "Nestlé Malaysia Berhad", startDate: "2020-01", endDate: null, current: true, description: null },
+      ],
+      education: [{ qualification: "Bachelor of Accounting", institution: "Universiti Malaya", endYear: 2015 }],
+    });
+  });
+
+  it("never replaces existing work history unless asked", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ id: "doc_1", parsedProfile: profile }));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(testCandidate({ version: 4 })));
+    const history = [{ title: "Clerk", company: "Kept Co", startDate: null, endDate: null, current: true, description: null }];
+    const onDone = vi.fn();
+    renderWithClient(<CvReview documentId="doc_1" candidate={testCandidate({ experience: history })} onDone={onDone} />);
+    const replace = await screen.findByLabelText<HTMLInputElement>(/Replace the profile's work history/);
+    expect(replace.checked).toBe(false);
+    fireEvent.click(replace);
+    for (const box of screen.getAllByRole<HTMLInputElement>("checkbox")) if (box !== replace && box.checked) fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: "Use ticked details" }));
+    await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
+    expect(sentBody(put)).toMatchObject({ version: 3 }); // only the history was saved, at the opened version
   });
 });

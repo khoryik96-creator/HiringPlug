@@ -69,6 +69,24 @@ func (q *Queries) DeleteCandidate(ctx context.Context, id string) (int64, error)
 	return result.RowsAffected(), nil
 }
 
+const deleteEducation = `-- name: DeleteEducation :exec
+DELETE FROM candidate_education WHERE candidate_id = $1
+`
+
+func (q *Queries) DeleteEducation(ctx context.Context, candidateID string) error {
+	_, err := q.db.Exec(ctx, deleteEducation, candidateID)
+	return err
+}
+
+const deleteWork = `-- name: DeleteWork :exec
+DELETE FROM candidate_work WHERE candidate_id = $1
+`
+
+func (q *Queries) DeleteWork(ctx context.Context, candidateID string) error {
+	_, err := q.db.Exec(ctx, deleteWork, candidateID)
+	return err
+}
+
 const findCandidateIDByEmail = `-- name: FindCandidateIDByEmail :one
 SELECT id FROM candidate WHERE email = $1
 `
@@ -288,6 +306,61 @@ func (q *Queries) InsertCompensation(ctx context.Context, arg InsertCompensation
 	return i, err
 }
 
+const insertEducation = `-- name: InsertEducation :exec
+INSERT INTO candidate_education (tenant_id, candidate_id, position, qualification, institution, end_year)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5)
+`
+
+type InsertEducationParams struct {
+	CandidateID   string
+	Position      int32
+	Qualification *string
+	Institution   *string
+	EndYear       *int32
+}
+
+func (q *Queries) InsertEducation(ctx context.Context, arg InsertEducationParams) error {
+	_, err := q.db.Exec(ctx, insertEducation,
+		arg.CandidateID,
+		arg.Position,
+		arg.Qualification,
+		arg.Institution,
+		arg.EndYear,
+	)
+	return err
+}
+
+const insertWork = `-- name: InsertWork :exec
+INSERT INTO candidate_work (tenant_id, candidate_id, position, title, company, start_date, end_date, is_current, description)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5,
+        $6, $7, $8)
+`
+
+type InsertWorkParams struct {
+	CandidateID string
+	Position    int32
+	Title       *string
+	Company     *string
+	StartDate   *string
+	EndDate     *string
+	IsCurrent   bool
+	Description *string
+}
+
+func (q *Queries) InsertWork(ctx context.Context, arg InsertWorkParams) error {
+	_, err := q.db.Exec(ctx, insertWork,
+		arg.CandidateID,
+		arg.Position,
+		arg.Title,
+		arg.Company,
+		arg.StartDate,
+		arg.EndDate,
+		arg.IsCurrent,
+		arg.Description,
+	)
+	return err
+}
+
 const listCandidates = `-- name: ListCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company,
        location, work_authorization, tags, updated_at
@@ -361,6 +434,72 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 	return items, nil
 }
 
+const listEducation = `-- name: ListEducation :many
+SELECT tenant_id, candidate_id, position, qualification, institution, end_year FROM candidate_education WHERE candidate_id = $1 ORDER BY position
+`
+
+func (q *Queries) ListEducation(ctx context.Context, candidateID string) ([]CandidateEducation, error) {
+	rows, err := q.db.Query(ctx, listEducation, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CandidateEducation
+	for rows.Next() {
+		var i CandidateEducation
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.CandidateID,
+			&i.Position,
+			&i.Qualification,
+			&i.Institution,
+			&i.EndYear,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWork = `-- name: ListWork :many
+SELECT tenant_id, candidate_id, position, title, company, start_date, end_date, is_current, description FROM candidate_work WHERE candidate_id = $1 ORDER BY position
+`
+
+// Work history and education, newest first.
+func (q *Queries) ListWork(ctx context.Context, candidateID string) ([]CandidateWork, error) {
+	rows, err := q.db.Query(ctx, listWork, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CandidateWork
+	for rows.Next() {
+		var i CandidateWork
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.CandidateID,
+			&i.Position,
+			&i.Title,
+			&i.Company,
+			&i.StartDate,
+			&i.EndDate,
+			&i.IsCurrent,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveCompensation = `-- name: MoveCompensation :execrows
 UPDATE candidate_compensation SET candidate_id = $1 WHERE candidate_id = $2
 `
@@ -378,6 +517,40 @@ func (q *Queries) MoveCompensation(ctx context.Context, arg MoveCompensationPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const moveEducationIfNone = `-- name: MoveEducationIfNone :exec
+UPDATE candidate_education AS m SET candidate_id = $1::text
+WHERE m.candidate_id = $2::text
+  AND NOT EXISTS (SELECT 1 FROM candidate_education e WHERE e.candidate_id = $1::text)
+`
+
+type MoveEducationIfNoneParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveEducationIfNone(ctx context.Context, arg MoveEducationIfNoneParams) error {
+	_, err := q.db.Exec(ctx, moveEducationIfNone, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveWorkIfNone = `-- name: MoveWorkIfNone :exec
+UPDATE candidate_work AS m SET candidate_id = $1::text
+WHERE m.candidate_id = $2::text
+  AND NOT EXISTS (SELECT 1 FROM candidate_work w WHERE w.candidate_id = $1::text)
+`
+
+type MoveWorkIfNoneParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging: the duplicate's history moves to the kept candidate only if the
+// kept one has none (histories are not interleaved).
+func (q *Queries) MoveWorkIfNone(ctx context.Context, arg MoveWorkIfNoneParams) error {
+	_, err := q.db.Exec(ctx, moveWorkIfNone, arg.ToID, arg.FromID)
+	return err
 }
 
 const similarCandidates = `-- name: SimilarCandidates :many
@@ -446,6 +619,52 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const touchCandidate = `-- name: TouchCandidate :one
+UPDATE candidate SET version = version + 1, updated_at = now()
+WHERE id = $1 AND version = $2
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
+`
+
+type TouchCandidateParams struct {
+	ID              string
+	ExpectedVersion int32
+}
+
+// A change to a candidate's own records (history) moves their version on, so
+// forms opened before it are stale. No row = stale version (or not found).
+func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) (Candidate, error) {
+	row := q.db.QueryRow(ctx, touchCandidate, arg.ID, arg.ExpectedVersion)
+	var i Candidate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Phone,
+		&i.Nationality,
+		&i.WorkAuthorization,
+		&i.WorkAuthorizationBasis,
+		&i.WorkAuthorizationNote,
+		&i.NoticePeriodValue,
+		&i.NoticePeriodUnit,
+		&i.Industry,
+		&i.Specialization,
+		&i.CurrentTitle,
+		&i.CurrentCompany,
+		&i.Location,
+		&i.Source,
+		&i.SearchText,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Tags,
+		&i.Skills,
+	)
+	return i, err
 }
 
 const updateCandidate = `-- name: UpdateCandidate :one

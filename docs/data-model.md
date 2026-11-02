@@ -25,6 +25,8 @@ tenant ─┬─ app_user (role)
 | `job_order_salary` | the salary budget (min, optional max, currency, period, `version`); row-level security needs `jobs.salary:read` to see and `jobs.salary:update` to write; clearing deletes the row |
 | `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, `version` |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
+| `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
+| `candidate_education` | candidate, position, qualification, institution, year finished |
 | `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |
 | `document` | candidate, source (jobstreet/linkedin/original/formatted/other), file name, type, size, SHA-256, storage key, status (queued/extracted/needs_ocr/failed), extracted text, page count, extractor, warnings, error; parse status (queued/parsed/failed), parsed profile (JSON, only values whose quote is in the text), parser |
 | `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |
@@ -42,7 +44,6 @@ candidate belonging to the same company.
 | `candidates` | managed taxonomy lists (industries, specializations), saved searches, consent and retention | M2 |
 | `notes` | note templates per company, notes on an application, editing | Phase 2 |
 | `identity` | custom roles, team, data scope, invites | M2 |
-| `candidates` | work history and education on the profile (accepted from a parsed CV) | Phase 2 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
 | `pipeline` | application (candidate × job, stage, status, rejection reason, `version`), stage templates, stage history | M3 |

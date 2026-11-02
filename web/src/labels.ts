@@ -125,6 +125,21 @@ export function keysOf<K extends string>(labels: Record<K, unknown>): K[] {
   return Object.keys(labels) as K[];
 }
 
+/** "2020-01" -> "Jan 2020"; "2020" stays "2020". */
+export function formatYearMonth(value: string | null | undefined): string {
+  if (!value) return "";
+  const [year, month] = value.split("-");
+  if (!month) return year ?? "";
+  return `${new Date(Date.UTC(Number(year), Number(month) - 1, 1)).toLocaleString("en", { month: "short", timeZone: "UTC" })} ${year ?? ""}`;
+}
+
+/** "Jan 2020 – Present", "2016 – 2019". */
+export function formatPeriod(start: string | null | undefined, end: string | null | undefined, current: boolean): string {
+  const to = current ? "Present" : formatYearMonth(end);
+  const from = formatYearMonth(start);
+  return from && to ? `${from} – ${to}` : from || to;
+}
+
 /** "Immediate", "1 month", "3 weeks", or "—" when not recorded. */
 export function formatNotice(notice: Schemas["NoticePeriod"] | null | undefined): string {
   if (!notice) return "—";

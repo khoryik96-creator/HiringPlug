@@ -71,6 +71,28 @@ export interface paths {
         patch: operations["updateCandidate"];
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace a candidate's work history and education
+         * @description Both lists are replaced as a whole, newest first. `version` is the candidate's: a save based on an older version is a conflict.
+         */
+        put: operations["replaceCandidateHistory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/merge": {
         parameters: {
             query?: never;
@@ -632,7 +654,32 @@ export interface components {
          * @enum {string}
          */
         RestrictedField: "compensation";
+        /** @description One job. A title or a company is required; endDate is null when current. */
+        WorkEntry: {
+            title: string | null;
+            company: string | null;
+            /** @description YYYY-MM or YYYY. */
+            startDate: string | null;
+            /** @description YYYY-MM or YYYY. */
+            endDate: string | null;
+            current: boolean;
+            description: string | null;
+        };
+        /** @description One qualification. A qualification or an institution is required. */
+        EducationEntry: {
+            qualification: string | null;
+            institution: string | null;
+            endYear: number | null;
+        };
+        CandidateHistoryUpdate: {
+            version: number;
+            experience: components["schemas"]["WorkEntry"][];
+            education: components["schemas"]["EducationEntry"][];
+        };
         Candidate: {
+            /** @description Work history, newest first. */
+            experience: components["schemas"]["WorkEntry"][];
+            education: components["schemas"]["EducationEntry"][];
             id: components["schemas"]["CandidateId"];
             version: number;
             firstName: string;
@@ -1469,6 +1516,37 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CandidateUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Candidate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    replaceCandidateHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateHistoryUpdate"];
             };
         };
         responses: {

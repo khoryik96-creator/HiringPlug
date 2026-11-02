@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api, type Candidate, type Schemas, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
-import { applyBody, newSkills, suggestions } from "./cvSuggestions";
+import { applyBody, historyFromProfile, newSkills, suggestions } from "./cvSuggestions";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
 
@@ -37,20 +37,41 @@ function Review({ profile, candidate, onDone }: { profile: Schemas["ParsedProfil
     return next;
   };
 
+  const cvHistory = historyFromProfile(profile);
+  const hasHistory = cvHistory.experience.length + cvHistory.education.length > 0;
+  const profileHasHistory = opened.candidate.experience.length + opened.candidate.education.length > 0;
+  // Ticked by default only when the profile has no history: never replaced unasked.
+  const [useHistory, setUseHistory] = useState(() => hasHistory && !profileHasHistory);
+
   const apply = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.PATCH("/v1/candidates/{candidateId}", {
-          params: { path: { candidateId: candidate.id } },
-          body: applyBody(profile, opened.candidate, ticked, [...skills]),
-        }),
-      ),
+    mutationFn: async () => {
+      let saved = opened.candidate;
+      if (ticked.size > 0 || skills.size > 0) {
+        saved = unwrap(
+          await api.PATCH("/v1/candidates/{candidateId}", {
+            params: { path: { candidateId: candidate.id } },
+            body: applyBody(profile, opened.candidate, ticked, [...skills]),
+          }),
+        );
+      }
+      if (useHistory) {
+        saved = unwrap(
+          await api.PUT("/v1/candidates/{candidateId}/history", {
+            params: { path: { candidateId: candidate.id } },
+            body: { version: saved.version, ...cvHistory },
+          }),
+        );
+      }
+      return saved;
+    },
     onSuccess: (saved) => {
       queryClient.setQueryData(candidateKey(saved.id), saved);
       onDone();
     },
+    // A partial save (details saved, history refused) still changed the profile.
+    onError: () => queryClient.invalidateQueries({ queryKey: candidateKey(candidate.id) }),
   });
-  const nothing = ticked.size === 0 && skills.size === 0;
+  const nothing = ticked.size === 0 && skills.size === 0 && !useHistory;
 
   return (
     <section className="panel" aria-label="Details from this CV">
@@ -96,6 +117,14 @@ function Review({ profile, candidate, onDone }: { profile: Schemas["ParsedProfil
         </fieldset>
       )}
       <History profile={profile} />
+      {hasHistory && (
+        <label className="row">
+          <input type="checkbox" checked={useHistory} onChange={(e) => { setUseHistory(e.target.checked); }} />{" "}
+          {profileHasHistory
+            ? "Replace the profile's work history and education with these"
+            : "Save this work history and education on the profile"}
+        </label>
+      )}
       <div className="row">
         <button type="button" disabled={nothing || apply.isPending} onClick={() => { apply.mutate(); }}>
           Use ticked details
