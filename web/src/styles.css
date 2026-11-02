@@ -14,7 +14,7 @@ dt { color: #6b7280; }
 table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb; }
 input, select, textarea, button { font: inherit; padding: 0.4rem 0.6rem; }
-textarea { width: 100%; }
+textarea { width: 100%; box-sizing: border-box; }
 button.link { background: none; border: none; color: #2563eb; cursor: pointer; padding: 0; }
 .badge { font-size: 0.8rem; padding: 0.1rem 0.4rem; border-radius: 4px; background: #e5e7eb; }
 .badge.extracted { background: #dcfce7; }
@@ -53,3 +53,12 @@ nav strong { margin-right: 1rem; }
 .badge.rejected, .badge.withdrawn { background: #e5e7eb; }
 .close-form { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem; }
 .close-form input, .close-form select { font-size: 0.8rem; padding: 0.2rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0.75rem 1rem; display: flex; flex-direction: column; }
+.stat strong { font-size: 1.75rem; }
+.stat span { color: #6b7280; }
+tr.total td { font-weight: 600; }
+.timeline { list-style: none; padding: 0; }
+.timeline li { border-left: 3px solid #e5e7eb; padding: 0.25rem 0 0.25rem 0.75rem; margin: 0.5rem 0; }
+.timeline li.note { border-left-color: #2563eb; }
+.timeline li p { margin: 0.25rem 0; }

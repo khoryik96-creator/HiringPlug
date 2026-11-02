@@ -7,6 +7,7 @@ import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Timeline } from "../components/Timeline";
 import { COMPANY_SIZE, COMPANY_TYPE, countryName } from "../labels";
 
 /** One company. Render it with key={id} so edit state never carries over. */
@@ -57,6 +58,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       )}
       <CompanyJobs company={c} canCreate={permissions.includes("jobs:create")} />
       <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} />
+      <Timeline subjectType="company" subjectId={c.id} permissions={permissions} />
     </main>
   );
 }

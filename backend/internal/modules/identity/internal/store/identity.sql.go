@@ -53,3 +53,32 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	)
 	return i, err
 }
+
+const userNames = `-- name: UserNames :many
+SELECT id, name FROM app_user WHERE id = ANY($1::text[])
+`
+
+type UserNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) UserNames(ctx context.Context, ids []string) ([]UserNamesRow, error) {
+	rows, err := q.db.Query(ctx, userNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserNamesRow
+	for rows.Next() {
+		var i UserNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

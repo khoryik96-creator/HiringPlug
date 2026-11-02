@@ -37,10 +37,16 @@ type Candidates interface {
 	Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]CandidateInfo, error)
 }
 
+// OpenJob is an open job, for the dashboard.
+type OpenJob struct {
+	ID, Title, CompanyID string
+}
+
 // Jobs is what this module needs from the jobs module.
 type Jobs interface {
 	Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error)
 	Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]JobInfo, error)
+	OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error)
 }
 
 // Companies is what this module needs from the companies module.

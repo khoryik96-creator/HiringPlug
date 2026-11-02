@@ -99,7 +99,7 @@ export const STAGE: Record<Schemas["Stage"], string> = {
   withdrawn: "Withdrawn",
 };
 
-export const OPEN_STAGES: Schemas["Stage"][] = ["applied", "screening", "submitted", "interview", "offer", "placed"];
+export const OPEN_STAGES: (keyof Schemas["StageCounts"])[] = ["applied", "screening", "submitted", "interview", "offer", "placed"];
 
 export const CLOSE_REASON: Record<Schemas["CloseReason"], string> = {
   not_qualified: "Not qualified",
@@ -111,6 +111,13 @@ export const CLOSE_REASON: Record<Schemas["CloseReason"], string> = {
   accepted_other_offer: "Took another offer",
   no_response: "No response",
   other: "Other",
+};
+
+export const NOTE_KIND: Record<Schemas["NoteKind"], string> = {
+  general: "Note",
+  screening: "Screening",
+  interview: "Interview",
+  call: "Call",
 };
 
 /** The values of a label map, in its order: the options of a select. */

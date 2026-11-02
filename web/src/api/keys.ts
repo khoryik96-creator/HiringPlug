@@ -12,3 +12,6 @@ export const jobsKey = ["jobs"] as const;
 export const jobApplicationsKey = (jobId: string) => ["applications", "job", jobId] as const;
 export const candidateApplicationsKey = (candidateId: string) => ["applications", "candidate", candidateId] as const;
 export const applicationsKey = ["applications"] as const;
+export const notesKey = (subjectType: string, subjectId: string) => ["notes", subjectType, subjectId] as const;
+export const activityKey = (entityType: string, entityId: string) => ["activity", entityType, entityId] as const;
+export const summaryKey = ["pipeline-summary"] as const;

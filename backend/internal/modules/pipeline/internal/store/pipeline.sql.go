@@ -206,3 +206,102 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 	)
 	return i, err
 }
+
+const recentResults = `-- name: RecentResults :one
+SELECT
+  count(*) FILTER (WHERE stage = 'placed' AND stage_changed_at > now() - interval '30 days')::integer AS placed_last_30_days,
+  count(*) FILTER (WHERE version > 1 AND stage_changed_at > now() - interval '7 days')::integer AS moved_last_7_days
+FROM application
+`
+
+type RecentResultsRow struct {
+	PlacedLast30Days int32
+	MovedLast7Days   int32
+}
+
+func (q *Queries) RecentResults(ctx context.Context) (RecentResultsRow, error) {
+	row := q.db.QueryRow(ctx, recentResults)
+	var i RecentResultsRow
+	err := row.Scan(&i.PlacedLast30Days, &i.MovedLast7Days)
+	return i, err
+}
+
+const stageCounts = `-- name: StageCounts :many
+SELECT job_order_id, stage, count(*)::integer AS n
+FROM application WHERE job_order_id = ANY($1::text[])
+GROUP BY job_order_id, stage
+`
+
+type StageCountsRow struct {
+	JobOrderID string
+	Stage      string
+	N          int32
+}
+
+// The dashboard. Counts per job and stage for the given (open) jobs.
+func (q *Queries) StageCounts(ctx context.Context, jobIds []string) ([]StageCountsRow, error) {
+	rows, err := q.db.Query(ctx, stageCounts, jobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StageCountsRow
+	for rows.Next() {
+		var i StageCountsRow
+		if err := rows.Scan(&i.JobOrderID, &i.Stage, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const stuckApplications = `-- name: StuckApplications :many
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at FROM application
+WHERE job_order_id = ANY($1::text[])
+  AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
+  AND stage_changed_at < now() - make_interval(days => $2::integer)
+ORDER BY stage_changed_at LIMIT 10
+`
+
+type StuckApplicationsParams struct {
+	JobIds    []string
+	StuckDays int32
+}
+
+// Longest in one open stage (offer and earlier), past the cutoff.
+func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsParams) ([]Application, error) {
+	rows, err := q.db.Query(ctx, stuckApplications, arg.JobIds, arg.StuckDays)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Application
+	for rows.Next() {
+		var i Application
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.JobOrderID,
+			&i.CandidateID,
+			&i.Stage,
+			&i.Reason,
+			&i.ReasonNote,
+			&i.StageChangedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

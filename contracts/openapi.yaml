@@ -621,6 +621,91 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/notes:
+    get:
+      operationId: listNotes
+      tags: [notes]
+      summary: The notes on a record, newest first
+      description: Sensitive notes are left out without notes.sensitive:read; `hiddenSensitive` says how many.
+      x-permission: notes:read
+      parameters:
+        - name: subjectType
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/NoteSubjectType'}
+        - name: subjectId
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 40}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NoteList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createNote
+      tags: [notes]
+      summary: Write a note on a record
+      x-permission: notes:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NoteCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Note'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/notes/{noteId}:
+    parameters:
+      - name: noteId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/NoteId'}
+    delete:
+      operationId: deleteNote
+      tags: [notes]
+      summary: Delete a note (your own, or any with notes:manage)
+      x-permission: notes:create
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/activity:
+    get:
+      operationId: listActivity
+      tags: [notes]
+      summary: What changed on a record, who changed it and when, newest first
+      description: Salary changes say only that they changed, never the amounts.
+      x-permission: notes.activity:read
+      parameters:
+        - name: entityType
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/ActivityEntityType'}
+        - name: entityId
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 40}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ActivityList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/jobs/{jobId}/applications:
     parameters:
       - $ref: '#/components/parameters/JobOrderIdPath'
@@ -708,6 +793,26 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
+  /v1/pipeline/summary:
+    get:
+      operationId: getPipelineSummary
+      tags: [pipeline]
+      summary: 'The dashboard: open jobs and their pipelines, stuck applications, recent results'
+      x-permission: pipeline:read
+      parameters:
+        - name: stuckDays
+          in: query
+          description: An application is stuck after this many days in one open stage (offer and earlier). Default 14.
+          schema: {type: integer, minimum: 1, maximum: 365, default: 14}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PipelineSummary'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
 components:
   securitySchemes:
     bearerAuth:
@@ -781,6 +886,11 @@ components:
         - jobs:create
         - jobs:read
         - jobs:update
+        - notes.activity:read
+        - notes.sensitive:read
+        - notes:create
+        - notes:manage
+        - notes:read
         - pipeline:read
         - pipeline:update
     ErrorCode:
@@ -1557,6 +1667,73 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/JobOrderId'}]
           nullable: true
+    NoteId:
+      type: string
+      pattern: '^note_[0-9a-hjkmnp-tv-z]{26}$'
+      example: note_01jbz6w0m0k8q9x2r3s4t5v6w7
+    NoteSubjectType:
+      type: string
+      enum: [candidate, job, company, contact]
+    NoteKind:
+      type: string
+      enum: [general, screening, interview, call]
+    Note:
+      type: object
+      required: [id, subjectType, subjectId, kind, body, sensitive, authorId, authorName, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/NoteId'}
+        subjectType: {$ref: '#/components/schemas/NoteSubjectType'}
+        subjectId: {type: string}
+        kind: {$ref: '#/components/schemas/NoteKind'}
+        body: {type: string}
+        sensitive: {type: boolean, description: 'Only readable with notes.sensitive:read.'}
+        authorId: {$ref: '#/components/schemas/UserId'}
+        authorName: {type: string}
+        createdAt: {type: string, format: date-time}
+    NoteList:
+      type: object
+      required: [items, hiddenSensitive]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Note'}
+        hiddenSensitive:
+          type: integer
+          description: How many sensitive notes were left out because you may not read them.
+    NoteCreate:
+      type: object
+      additionalProperties: false
+      required: [subjectType, subjectId, body]
+      properties:
+        subjectType: {$ref: '#/components/schemas/NoteSubjectType'}
+        subjectId: {type: string, minLength: 1, maxLength: 40}
+        kind:
+          allOf: [{$ref: '#/components/schemas/NoteKind'}]
+          description: Defaults to general.
+        body: {type: string, minLength: 1, maxLength: 10000}
+        sensitive: {type: boolean, description: 'Needs notes.sensitive:read. Defaults to false.'}
+    ActivityEntityType:
+      type: string
+      enum: [candidate, job, company, contact, application]
+    ActivityEntry:
+      type: object
+      required: [id, action, actorName, changes, at]
+      properties:
+        id: {type: string}
+        action: {type: string, description: 'What happened, e.g. candidate.updated or application.moved.'}
+        actorName: {type: string, description: 'Who did it (a user, or "System" for background work).'}
+        changes:
+          type: object
+          additionalProperties: true
+          description: 'Changed fields as {"field": {"from": old, "to": new}}; sensitive ones as {"changed": true, "redacted": true}.'
+        at: {type: string, format: date-time}
+    ActivityList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ActivityEntry'}
     ApplicationId:
       type: string
       pattern: '^appl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -1620,6 +1797,44 @@ components:
           description: Required for rejected and withdrawn; not allowed otherwise.
           allOf: [{$ref: '#/components/schemas/CloseReason'}]
         reasonNote: {type: string, maxLength: 1000}
+    StageCounts:
+      type: object
+      description: How many applications are in each open stage.
+      required: [applied, screening, submitted, interview, offer, placed]
+      properties:
+        applied: {type: integer}
+        screening: {type: integer}
+        submitted: {type: integer}
+        interview: {type: integer}
+        offer: {type: integer}
+        placed: {type: integer}
+    DashboardJob:
+      type: object
+      required: [jobId, title, companyId, companyName, stageCounts]
+      properties:
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        title: {type: string}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        companyName: {type: string}
+        stageCounts: {$ref: '#/components/schemas/StageCounts'}
+    PipelineSummary:
+      type: object
+      required: [openJobs, stageCounts, jobs, stuck, placedLast30Days, movedLast7Days]
+      properties:
+        openJobs: {type: integer, description: Jobs with status open.}
+        stageCounts:
+          description: Applications on open jobs, per stage.
+          allOf: [{$ref: '#/components/schemas/StageCounts'}]
+        jobs:
+          type: array
+          description: Open jobs (newest first, up to 50) with their pipelines.
+          items: {$ref: '#/components/schemas/DashboardJob'}
+        stuck:
+          type: array
+          description: Applications on open jobs longest in one stage (offer and earlier) past stuckDays, oldest first, up to 10.
+          items: {$ref: '#/components/schemas/Application'}
+        placedLast30Days: {type: integer}
+        movedLast7Days: {type: integer, description: Applications that changed stage in the last 7 days.}
   parameters:
     CandidateIdPath:
       name: candidateId
@@ -1742,6 +1957,31 @@ x-permissions:
     description: Edit jobs and change their status.
     sensitive: false
     roles: [owner, admin, recruiter]
+  notes.activity:read:
+    module: notes
+    description: See the history of changes on a record.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  notes.sensitive:read:
+    module: notes
+    description: Read notes marked sensitive (e.g. salary talks), and mark notes sensitive.
+    sensitive: true
+    roles: [owner, admin, recruiter]
+  notes:create:
+    module: notes
+    description: Write notes, and delete your own.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  notes:manage:
+    module: notes
+    description: Delete anyone's notes.
+    sensitive: false
+    roles: [owner, admin]
+  notes:read:
+    module: notes
+    description: Read notes (sensitive ones need notes.sensitive:read).
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   pipeline:read:
     module: pipeline
     description: See which candidates are on which jobs, and their stages.
@@ -1776,5 +2016,7 @@ x-modules:
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
   - name: jobs
     description: Job orders (agency) or requisitions (in-house), with an optional salary budget.
+  - name: notes
+    description: Notes on records, and what changed on them (activity).
   - name: pipeline
     description: Candidates on jobs (applications) and their stages.

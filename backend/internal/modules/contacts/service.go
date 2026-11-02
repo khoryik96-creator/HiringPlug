@@ -274,12 +274,22 @@ func (s *Service) lookupMailServer(ctx context.Context, domain string) string {
 		return MailServerFailed
 	}
 	if _, err := s.mail.LookupHost(ctx, domain); err != nil {
-		if notFound(err) {
+		if notFound(err) && s.dnsWorks(ctx) {
 			return MailServerNone
 		}
 		return MailServerFailed
 	}
 	return MailServerFound
+}
+
+// controlDomain surely receives mail. If even it "does not exist", DNS itself
+// is broken (offline, no resolver): say "unknown" rather than mark every
+// address as bouncing.
+const controlDomain = "gmail.com"
+
+func (s *Service) dnsWorks(ctx context.Context) bool {
+	mx, err := s.mail.LookupMX(ctx, controlDomain)
+	return err == nil && len(mx) > 0
 }
 
 func notFound(err error) bool {

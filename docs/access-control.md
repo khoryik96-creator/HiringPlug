@@ -38,6 +38,10 @@ details get their own permissions.
 | `jobs.salary:update` (budget) | ✓ | ✓ | ✓ | | | |
 | `pipeline:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `pipeline:update` (add to jobs, move) | ✓ | ✓ | ✓ | ✓ | | |
+| `notes:read`, `notes.activity:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `notes:create` (and delete own) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `notes.sensitive:read` (sensitive notes) | ✓ | ✓ | ✓ | | | |
+| `notes:manage` (delete anyone's) | ✓ | ✓ | | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

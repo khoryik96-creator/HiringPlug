@@ -31,3 +31,23 @@ SELECT * FROM application WHERE job_order_id = @job_order_id ORDER BY id LIMIT 1
 
 -- name: ListCandidateApplications :many
 SELECT * FROM application WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
+
+-- The dashboard. Counts per job and stage for the given (open) jobs.
+-- name: StageCounts :many
+SELECT job_order_id, stage, count(*)::integer AS n
+FROM application WHERE job_order_id = ANY(@job_ids::text[])
+GROUP BY job_order_id, stage;
+
+-- Longest in one open stage (offer and earlier), past the cutoff.
+-- name: StuckApplications :many
+SELECT * FROM application
+WHERE job_order_id = ANY(@job_ids::text[])
+  AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
+  AND stage_changed_at < now() - make_interval(days => @stuck_days::integer)
+ORDER BY stage_changed_at LIMIT 10;
+
+-- name: RecentResults :one
+SELECT
+  count(*) FILTER (WHERE stage = 'placed' AND stage_changed_at > now() - interval '30 days')::integer AS placed_last_30_days,
+  count(*) FILTER (WHERE version > 1 AND stage_changed_at > now() - interval '7 days')::integer AS moved_last_7_days
+FROM application;

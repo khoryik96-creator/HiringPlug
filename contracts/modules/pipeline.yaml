@@ -111,6 +111,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /v1/pipeline/summary:
+    get:
+      operationId: getPipelineSummary
+      tags: [pipeline]
+      summary: 'The dashboard: open jobs and their pipelines, stuck applications, recent results'
+      x-permission: pipeline:read
+      parameters:
+        - name: stuckDays
+          in: query
+          description: An application is stuck after this many days in one open stage (offer and earlier). Default 14.
+          schema: { type: integer, minimum: 1, maximum: 365, default: 14 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PipelineSummary' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   parameters:
     ApplicationIdPath:
@@ -187,3 +208,42 @@ components:
           description: Required for rejected and withdrawn; not allowed otherwise.
           allOf: [{ $ref: '#/components/schemas/CloseReason' }]
         reasonNote: { type: string, maxLength: 1000 }
+
+    StageCounts:
+      type: object
+      description: How many applications are in each open stage.
+      required: [applied, screening, submitted, interview, offer, placed]
+      properties:
+        applied: { type: integer }
+        screening: { type: integer }
+        submitted: { type: integer }
+        interview: { type: integer }
+        offer: { type: integer }
+        placed: { type: integer }
+    DashboardJob:
+      type: object
+      required: [jobId, title, companyId, companyName, stageCounts]
+      properties:
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        title: { type: string }
+        companyId: { $ref: '#/components/schemas/CompanyId' }
+        companyName: { type: string }
+        stageCounts: { $ref: '#/components/schemas/StageCounts' }
+    PipelineSummary:
+      type: object
+      required: [openJobs, stageCounts, jobs, stuck, placedLast30Days, movedLast7Days]
+      properties:
+        openJobs: { type: integer, description: Jobs with status open. }
+        stageCounts:
+          description: Applications on open jobs, per stage.
+          allOf: [{ $ref: '#/components/schemas/StageCounts' }]
+        jobs:
+          type: array
+          description: Open jobs (newest first, up to 50) with their pipelines.
+          items: { $ref: '#/components/schemas/DashboardJob' }
+        stuck:
+          type: array
+          description: Applications on open jobs longest in one stage (offer and earlier) past stuckDays, oldest first, up to 10.
+          items: { $ref: '#/components/schemas/Application' }
+        placedLast30Days: { type: integer }
+        movedLast7Days: { type: integer, description: Applications that changed stage in the last 7 days. }

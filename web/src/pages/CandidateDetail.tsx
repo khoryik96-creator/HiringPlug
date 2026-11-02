@@ -7,6 +7,7 @@ import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
 import { Documents } from "../components/Documents";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { CANDIDATE_SOURCE, countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
@@ -71,6 +72,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       <Documents candidateId={c.id} canUpload={permissions.includes("documents:create")} />
+      <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
     </main>
   );
 }

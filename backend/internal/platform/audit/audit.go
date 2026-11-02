@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -61,4 +62,39 @@ func Diff(before, after map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+// Logged is one entry read back from the audit log.
+type Logged struct {
+	ID        string
+	ActorID   string
+	Action    string
+	Changes   map[string]any
+	CreatedAt time.Time
+}
+
+// List returns the newest entries about one entity (at most limit), in the
+// transaction's tenant.
+func List(ctx context.Context, tx pgx.Tx, entityType, entityID string, limit int) ([]Logged, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT id, actor_id, action, changes, created_at FROM audit_log
+		WHERE entity_type = $1 AND entity_id = $2
+		ORDER BY created_at DESC, id DESC LIMIT $3`, entityType, entityID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("audit: %w", err)
+	}
+	defer rows.Close()
+	var out []Logged
+	for rows.Next() {
+		var l Logged
+		var raw []byte
+		if err := rows.Scan(&l.ID, &l.ActorID, &l.Action, &raw, &l.CreatedAt); err != nil {
+			return nil, fmt.Errorf("audit: %w", err)
+		}
+		if err := json.Unmarshal(raw, &l.Changes); err != nil {
+			return nil, fmt.Errorf("audit: %w", err)
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
 }

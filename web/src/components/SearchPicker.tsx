@@ -44,7 +44,7 @@ export function SearchPicker({ id, value, onChange, search, queryKey, placeholde
       {text !== "" && (
         <div className="picker-results">
           {results.data?.map((r) => (
-            <button key={r.id} type="button" className="link" onClick={() => { onChange({ id: r.id, name: r.name }); }}>
+            <button key={r.id} type="button" className="link" onClick={() => { setQ(""); onChange({ id: r.id, name: r.name }); }}>
               {r.name}{r.detail ? <span className="muted"> · {r.detail}</span> : null}
             </button>
           ))}

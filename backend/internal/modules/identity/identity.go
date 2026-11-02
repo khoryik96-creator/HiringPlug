@@ -71,3 +71,17 @@ func (m *Module) tenantName(ctx context.Context, p authz.Principal) (string, err
 	})
 	return name, err
 }
+
+// UserNames returns the names of the given users (missing ones are left out),
+// for other modules that show who did something.
+func (m *Module) UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	rows, err := store.New(tx).UserNames(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.ID] = r.Name
+	}
+	return out, nil
+}

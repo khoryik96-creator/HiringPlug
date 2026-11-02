@@ -6,6 +6,7 @@ import { contactKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Timeline } from "../components/Timeline";
 import { CONTACT_STATUS } from "../labels";
 
 /** One contact. Render it with key={id} so edit state never carries over. */
@@ -69,6 +70,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
           <ErrorMessage error={recheck.error} />
         </section>
       )}
+      <Timeline subjectType="contact" subjectId={c.id} permissions={permissions} />
     </main>
   );
 }

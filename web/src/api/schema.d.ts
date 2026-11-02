@@ -305,6 +305,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The notes on a record, newest first
+         * @description Sensitive notes are left out without notes.sensitive:read; `hiddenSensitive` says how many.
+         */
+        get: operations["listNotes"];
+        put?: never;
+        /** Write a note on a record */
+        post: operations["createNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notes/{noteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                noteId: components["schemas"]["NoteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a note (your own, or any with notes:manage) */
+        delete: operations["deleteNote"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What changed on a record, who changed it and when, newest first
+         * @description Salary changes say only that they changed, never the amounts.
+         */
+        get: operations["listActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/{jobId}/applications": {
         parameters: {
             query?: never;
@@ -366,6 +426,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pipeline/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The dashboard: open jobs and their pipelines, stuck applications, recent results */
+        get: operations["getPipelineSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -373,7 +450,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "pipeline:read" | "pipeline:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -890,6 +967,57 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["JobOrderId"] | null;
         };
+        /** @example note_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        NoteId: string;
+        /** @enum {string} */
+        NoteSubjectType: "candidate" | "job" | "company" | "contact";
+        /** @enum {string} */
+        NoteKind: "general" | "screening" | "interview" | "call";
+        Note: {
+            id: components["schemas"]["NoteId"];
+            subjectType: components["schemas"]["NoteSubjectType"];
+            subjectId: string;
+            kind: components["schemas"]["NoteKind"];
+            body: string;
+            /** @description Only readable with notes.sensitive:read. */
+            sensitive: boolean;
+            authorId: components["schemas"]["UserId"];
+            authorName: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        NoteList: {
+            items: components["schemas"]["Note"][];
+            /** @description How many sensitive notes were left out because you may not read them. */
+            hiddenSensitive: number;
+        };
+        NoteCreate: {
+            subjectType: components["schemas"]["NoteSubjectType"];
+            subjectId: string;
+            /** @description Defaults to general. */
+            kind?: components["schemas"]["NoteKind"];
+            body: string;
+            /** @description Needs notes.sensitive:read. Defaults to false. */
+            sensitive?: boolean;
+        };
+        /** @enum {string} */
+        ActivityEntityType: "candidate" | "job" | "company" | "contact" | "application";
+        ActivityEntry: {
+            id: string;
+            /** @description What happened, e.g. candidate.updated or application.moved. */
+            action: string;
+            /** @description Who did it (a user, or "System" for background work). */
+            actorName: string;
+            /** @description Changed fields as {"field": {"from": old, "to": new}}; sensitive ones as {"changed": true, "redacted": true}. */
+            changes: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            at: string;
+        };
+        ActivityList: {
+            items: components["schemas"]["ActivityEntry"][];
+        };
         /** @example appl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ApplicationId: string;
         /**
@@ -942,6 +1070,35 @@ export interface components {
             /** @description Required for rejected and withdrawn; not allowed otherwise. */
             reason?: components["schemas"]["CloseReason"];
             reasonNote?: string;
+        };
+        /** @description How many applications are in each open stage. */
+        StageCounts: {
+            applied: number;
+            screening: number;
+            submitted: number;
+            interview: number;
+            offer: number;
+            placed: number;
+        };
+        DashboardJob: {
+            jobId: components["schemas"]["JobOrderId"];
+            title: string;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            stageCounts: components["schemas"]["StageCounts"];
+        };
+        PipelineSummary: {
+            /** @description Jobs with status open. */
+            openJobs: number;
+            /** @description Applications on open jobs, per stage. */
+            stageCounts: components["schemas"]["StageCounts"];
+            /** @description Open jobs (newest first, up to 50) with their pipelines. */
+            jobs: components["schemas"]["DashboardJob"][];
+            /** @description Applications on open jobs longest in one stage (offer and earlier) past stuckDays, oldest first, up to 10. */
+            stuck: components["schemas"]["Application"][];
+            placedLast30Days: number;
+            /** @description Applications that changed stage in the last 7 days. */
+            movedLast7Days: number;
         };
     };
     responses: {
@@ -1674,6 +1831,108 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    listNotes: {
+        parameters: {
+            query: {
+                subjectType: components["schemas"]["NoteSubjectType"];
+                subjectId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                noteId: components["schemas"]["NoteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listActivity: {
+        parameters: {
+            query: {
+                entityType: components["schemas"]["ActivityEntityType"];
+                entityId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listJobApplications: {
         parameters: {
             query?: never;
@@ -1793,6 +2052,32 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getPipelineSummary: {
+        parameters: {
+            query?: {
+                /** @description An application is stuck after this many days in one open stage (offer and earlier). Default 14. */
+                stuckDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineSummary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
 }

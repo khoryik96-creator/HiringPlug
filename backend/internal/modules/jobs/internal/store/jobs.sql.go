@@ -299,6 +299,36 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 	return items, nil
 }
 
+const openJobOrders = `-- name: OpenJobOrders :many
+SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
+`
+
+type OpenJobOrdersRow struct {
+	ID        string
+	Title     string
+	CompanyID string
+}
+
+func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobOrdersRow, error) {
+	rows, err := q.db.Query(ctx, openJobOrders, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OpenJobOrdersRow
+	for rows.Next() {
+		var i OpenJobOrdersRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.CompanyID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateJobOrder = `-- name: UpdateJobOrder :one
 UPDATE job_order SET
   company_id = $1,

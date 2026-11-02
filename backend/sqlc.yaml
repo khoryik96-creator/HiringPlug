@@ -58,3 +58,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/pipeline/internal/store
+  - <<: *module
+    queries: db/queries/notes.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/notes/internal/store

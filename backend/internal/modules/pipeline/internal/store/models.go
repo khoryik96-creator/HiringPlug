@@ -204,6 +204,19 @@ type JobOrderSalary struct {
 	UpdatedAt  time.Time
 }
 
+type Note struct {
+	ID          string
+	TenantID    string
+	SubjectType string
+	SubjectID   string
+	Kind        string
+	Body        string
+	Sensitive   bool
+	AuthorID    string
+	AuthorName  string
+	CreatedAt   time.Time
+}
+
 type Tenant struct {
 	ID        string
 	Name      string

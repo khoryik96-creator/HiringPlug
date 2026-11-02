@@ -215,6 +215,16 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 	return store.New(tx).JobOrderExists(ctx, id)
 }
 
+// Open returns the newest open jobs, at most limit.
+func (s *Service) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error) {
+	rows, err := store.New(tx).OpenJobOrders(ctx, int32(limit)) //nolint:gosec // small constant
+	out := make([]OpenJob, len(rows))
+	for i, r := range rows {
+		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID}
+	}
+	return out, err
+}
+
 // Briefs returns id -> title and company for the jobs that exist.
 func (s *Service) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
 	rows, err := store.New(tx).JobOrderTitles(ctx, ids)

@@ -15,9 +15,9 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 3 | Candidate profile fields | `candidates` | ✅ |
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
 | 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
-| 4 | Pipeline dashboard | `pipeline`, `reporting` | 🧩 M3 |
-| 5 | Jobs ✅; applicants, interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | 🧩 next |
-| 5 | Notes: screening, CV and interview notes | `notes` | 🧩 M2 |
+| 4 | Pipeline dashboard | `pipeline` | ✅ board and dashboard; reports 🧩 |
+| 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline; 🧩 interviews, matching |
+| 5 | Notes: screening, call and interview notes | `notes` | ✅ |
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
 | 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles; custom roles 🧩 M2 |
 
@@ -150,12 +150,23 @@ requirements), de-duplicated, and kept with its source and date.
   quotes the CV and the job ad, so a recruiter can check it. It suggests; the
   recruiter decides.
 
-## 5. Notes
+## 5. Notes and activity
 
-Screening notes, CV notes and interview notes, attached to a candidate and
-optionally a job or application. Templates hold screening questions. Notes can
-be private or shared. A note that records salary is marked sensitive and
-follows the salary permission.
+✅ Notes (general, screening, interview, call) on candidates, jobs, companies
+and contacts, shown with the record's **activity** (who changed what and when,
+from the audit log; salary changes never show amounts) in one timeline. A
+screening note starts with screening questions to fill in. Hiring managers can
+write interview notes. A note can be marked **sensitive** (e.g. salary talks):
+only roles that may see salaries can read or write it, the database enforces
+it, and others see "2 sensitive notes are hidden". You delete your own notes;
+owners and admins any. Next: templates per company and notes on an
+application.
+
+## Dashboard
+
+✅ The home page: open jobs with candidates per stage, totals, candidates
+moved this week, placements in the last 30 days, and who has waited more than
+14 days in one stage.
 
 ## 6. API documentation
 

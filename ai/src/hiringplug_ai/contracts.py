@@ -35,6 +35,11 @@ class Permission(StrEnum):
     jobs_create = "jobs:create"
     jobs_read = "jobs:read"
     jobs_update = "jobs:update"
+    notes_activity_read = "notes.activity:read"
+    notes_sensitive_read = "notes.sensitive:read"
+    notes_create = "notes:create"
+    notes_manage = "notes:manage"
+    notes_read = "notes:read"
     pipeline_read = "pipeline:read"
     pipeline_update = "pipeline:update"
 
@@ -742,6 +747,83 @@ class JobOrderPage(BaseModel):
     ]
 
 
+class NoteId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["note_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^note_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class NoteSubjectType(StrEnum):
+    candidate = "candidate"
+    job = "job"
+    company = "company"
+    contact = "contact"
+
+
+class NoteKind(StrEnum):
+    general = "general"
+    screening = "screening"
+    interview = "interview"
+    call = "call"
+
+
+class Note(BaseModel):
+    id: NoteId
+    subjectType: NoteSubjectType
+    subjectId: str
+    kind: NoteKind
+    body: str
+    sensitive: Annotated[bool, Field(description="Only readable with notes.sensitive:read.")]
+    authorId: UserId
+    authorName: str
+    createdAt: AwareDatetime
+
+
+class NoteList(BaseModel):
+    items: list[Note]
+    hiddenSensitive: Annotated[
+        int, Field(description="How many sensitive notes were left out because you may not read them.")
+    ]
+
+
+class NoteCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    subjectType: NoteSubjectType
+    subjectId: Annotated[str, Field(max_length=40, min_length=1)]
+    kind: Annotated[NoteKind | None, Field(description="Defaults to general.")] = None
+    body: Annotated[str, Field(max_length=10000, min_length=1)]
+    sensitive: Annotated[bool | None, Field(description="Needs notes.sensitive:read. Defaults to false.")] = (
+        None
+    )
+
+
+class ActivityEntityType(StrEnum):
+    candidate = "candidate"
+    job = "job"
+    company = "company"
+    contact = "contact"
+    application = "application"
+
+
+class ActivityEntry(BaseModel):
+    id: str
+    action: Annotated[str, Field(description="What happened, e.g. candidate.updated or application.moved.")]
+    actorName: Annotated[str, Field(description='Who did it (a user, or "System" for background work).')]
+    changes: Annotated[
+        dict[str, Any],
+        Field(
+            description='Changed fields as {"field": {"from": old, "to": new}}; sensitive ones as {"changed": true, "redacted": true}.'
+        ),
+    ]
+    at: AwareDatetime
+
+
+class ActivityList(BaseModel):
+    items: list[ActivityEntry]
+
+
 class ApplicationId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["appl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^appl_[0-9a-hjkmnp-tv-z]{26}$")
@@ -811,6 +893,39 @@ class ApplicationMove(BaseModel):
         CloseReason | None, Field(description="Required for rejected and withdrawn; not allowed otherwise.")
     ] = None
     reasonNote: Annotated[str | None, Field(max_length=1000)] = None
+
+
+class StageCounts(BaseModel):
+    applied: int
+    screening: int
+    submitted: int
+    interview: int
+    offer: int
+    placed: int
+
+
+class DashboardJob(BaseModel):
+    jobId: JobOrderId
+    title: str
+    companyId: CompanyId
+    companyName: str
+    stageCounts: StageCounts
+
+
+class PipelineSummary(BaseModel):
+    openJobs: Annotated[int, Field(description="Jobs with status open.")]
+    stageCounts: Annotated[StageCounts, Field(description="Applications on open jobs, per stage.")]
+    jobs: Annotated[
+        list[DashboardJob], Field(description="Open jobs (newest first, up to 50) with their pipelines.")
+    ]
+    stuck: Annotated[
+        list[Application],
+        Field(
+            description="Applications on open jobs longest in one stage (offer and earlier) past stuckDays, oldest first, up to 10."
+        ),
+    ]
+    placedLast30Days: int
+    movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
 
 
 class Me(BaseModel):

@@ -66,3 +66,14 @@ type Brief struct {
 func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
 	return m.service.Briefs(ctx, tx, ids)
 }
+
+// OpenJob is an open job, for other modules (e.g. the dashboard).
+type OpenJob struct {
+	ID, Title, CompanyID string
+}
+
+// Open returns the newest open jobs, at most limit.
+func (m *Module) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, error) {
+	rows, err := m.service.Open(ctx, tx, limit)
+	return rows, err
+}

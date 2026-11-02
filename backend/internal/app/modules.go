@@ -21,6 +21,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
@@ -35,6 +36,7 @@ type Modules struct {
 	Contacts   *contacts.Module
 	Jobs       *jobs.Module
 	Pipeline   *pipeline.Module
+	Notes      *notes.Module
 	// scaffold:fields
 }
 
@@ -50,6 +52,9 @@ func NewModules(d Deps) *Modules {
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts})
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
+	m.Notes = notes.New(d.Pool, notes.Subjects{
+		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
+	}, m.Identity)
 	// scaffold:constructors
 	return m
 }
@@ -64,6 +69,7 @@ type (
 	contactsHTTP   = contacts.HTTP
 	jobsHTTP       = jobs.HTTP
 	pipelineHTTP   = pipeline.HTTP
+	notesHTTP      = notes.HTTP
 	// scaffold:aliases
 )
 
@@ -78,6 +84,7 @@ type Server struct {
 	*contactsHTTP
 	*jobsHTTP
 	*pipelineHTTP
+	*notesHTTP
 	// scaffold:embeds
 }
 
@@ -93,6 +100,7 @@ func (m *Modules) Server() *Server {
 		contactsHTTP:   m.Contacts.HTTP,
 		jobsHTTP:       m.Jobs.HTTP,
 		pipelineHTTP:   m.Pipeline.HTTP,
+		notesHTTP:      m.Notes.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -141,6 +149,15 @@ func (a pipelineCandidates) Info(ctx context.Context, tx pgx.Tx, ids []string) (
 }
 
 type pipelineJobs struct{ *jobs.Module }
+
+func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]pipeline.OpenJob, error) {
+	open, err := a.Open(ctx, tx, limit)
+	out := make([]pipeline.OpenJob, len(open))
+	for i, j := range open {
+		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID}
+	}
+	return out, err
+}
 
 func (a pipelineJobs) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]pipeline.JobInfo, error) {
 	briefs, err := a.Briefs(ctx, tx, ids)

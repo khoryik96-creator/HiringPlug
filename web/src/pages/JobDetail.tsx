@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, unwrap } from "../api/client";
 import { jobKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { Timeline } from "../components/Timeline";
 import { JobForm } from "../components/JobForm";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { PipelineBoard } from "../components/PipelineBoard";
@@ -53,6 +54,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       )}
       {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} />}
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
+      <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
     </main>
   );
 }

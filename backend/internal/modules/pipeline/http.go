@@ -70,3 +70,30 @@ func toAPI(v View) api.Application {
 		StageChangedAt: v.StageChangedAt, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}
 }
+
+// GetPipelineSummary handles GET /v1/pipeline/summary.
+func (h *HTTP) GetPipelineSummary(ctx context.Context, req api.GetPipelineSummaryRequestObject) (api.GetPipelineSummaryResponseObject, error) {
+	stuckDays := 14
+	if req.Params.StuckDays != nil {
+		stuckDays = *req.Params.StuckDays
+	}
+	sum, err := h.svc.Summary(ctx, authz.MustFromContext(ctx), stuckDays)
+	if err != nil {
+		return nil, err
+	}
+	out := api.GetPipelineSummary200JSONResponse{
+		OpenJobs: sum.OpenJobs, StageCounts: countsToAPI(sum.Counts), Jobs: make([]api.DashboardJob, len(sum.Jobs)),
+		Stuck: toAPIList(sum.Stuck), PlacedLast30Days: sum.PlacedLast30Days, MovedLast7Days: sum.MovedLast7Days,
+	}
+	for i, j := range sum.Jobs {
+		out.Jobs[i] = api.DashboardJob{JobId: j.ID, Title: j.Title, CompanyId: j.CompanyID, CompanyName: j.CompanyName, StageCounts: countsToAPI(j.Counts)}
+	}
+	return out, nil
+}
+
+func countsToAPI(c StageCounts) api.StageCounts {
+	return api.StageCounts{
+		Applied: c[Applied], Screening: c[Screening], Submitted: c[Submitted],
+		Interview: c[Interview], Offer: c[Offer], Placed: c[Placed],
+	}
+}
