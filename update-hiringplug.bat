@@ -10,7 +10,7 @@ if not errorlevel 1 goto docker_ready
 rem Docker is not running: find Docker Desktop (installed for all users, for
 rem this user only, or wherever the docker command lives) and start it.
 set "DD="
-for %%p in ("%ProgramFiles%\Docker\Docker\Docker Desktop.exe" "%ProgramW6432%\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Docker\Docker Desktop.exe") do if not defined DD if exist "%%~p" set "DD=%%~p"
+for %%p in ("%ProgramFiles%\Docker\Docker\Docker Desktop.exe" "%ProgramW6432%\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe" "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Docker\Docker Desktop.exe") do if not defined DD if exist "%%~p" set "DD=%%~p"
 if not defined DD for /f "delims=" %%d in ('where docker 2^>nul') do if not defined DD if exist "%%~dpd..\..\Docker Desktop.exe" set "DD=%%~dpd..\..\Docker Desktop.exe"
 if not defined DD goto ask_user
 echo Starting Docker Desktop...
