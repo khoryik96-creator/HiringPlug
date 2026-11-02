@@ -66,6 +66,27 @@ export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; m
   unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
 };
 
+export const JOB_STATUS: Record<Schemas["JobStatus"], string> = {
+  open: "Open",
+  on_hold: "On hold",
+  filled: "Filled",
+  closed: "Closed",
+};
+
+export const WORK_TYPE: Record<Schemas["WorkType"], string> = {
+  full_time: "Full time",
+  part_time: "Part time",
+  contract: "Contract",
+  temporary: "Temporary",
+  internship: "Internship",
+};
+
+export const WORK_ARRANGEMENT: Record<Schemas["WorkArrangement"], string> = {
+  onsite: "On site",
+  hybrid: "Hybrid",
+  remote: "Remote",
+};
+
 /** The values of a label map, in its order: the options of a select. */
 export function keysOf<K extends string>(labels: Record<K, unknown>): K[] {
   return Object.keys(labels) as K[];

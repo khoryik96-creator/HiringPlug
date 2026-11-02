@@ -17,6 +17,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Roles (owner, admin, recruiter, sourcer, hiring manager, viewer) and an audit log of every change |
 | ✅ | Companies: clients, prospects or your own departments; search, add, edit |
 | ✅ | Contacts at companies with a built-in email check |
+| ✅ | Jobs with a hiring contact, status and a permissioned salary budget |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -30,8 +31,8 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|---|
 | ✅ **1.1 Companies** | Client companies (agency) or departments (in-house): list, search, add, edit; website, industry, size, address, owner recruiter | Auto-fill from a website comes in Phase 5. |
 | ✅ **1.2 Contacts** | People at companies (hiring managers, HR): name, title, email, phones, LinkedIn; built-in email check (format, the domain's mail servers, disposable and role addresses like `hr@`) | Mailbox-level checks later; many networks block them. |
-| 🔜 **1.3 Jobs** | Job orders / requisitions: title, company, contact, location, work type, headcount, salary range (sensitive, like candidate salary), status (open, on hold, filled, closed), owner, description | |
-| ⬜ **1.4 Pipeline** | Add candidates to a job; stages (applied, screened, submitted, interview, offer, placed, plus rejected / withdrawn with a reason); a drag-and-drop board per job; a candidate's jobs on their page | Stages configurable per company; moves checked in one place and tested move by move. |
+| ✅ **1.3 Jobs** | Job orders / requisitions: title, company, contact, location, work type, headcount, salary range (sensitive, like candidate salary), status (open, on hold, filled, closed), owner, description | |
+| 🔜 **1.4 Pipeline** | Add candidates to a job; stages (applied, screened, submitted, interview, offer, placed, plus rejected / withdrawn with a reason); a drag-and-drop board per job; a candidate's jobs on their page | Stages configurable per company; moves checked in one place and tested move by move. |
 | ⬜ **1.5 Notes and timeline** | Screening, CV and interview notes on a candidate, job or application, with templates (screening questions); one timeline per record of notes and changes | Notes that mention salary follow the salary permission. |
 | ⬜ **1.6 Dashboard** | My open jobs, candidates per stage, applications stuck too long, activity this week | |
 | ⬜ **1.7 Sign-in and team** (last, by choice) | Sign in with email and password (or Google / Microsoft); an admin screen to invite users, change roles and deactivate them | Today users paste a token and are created on the command line. Needed before anyone else uses it. |

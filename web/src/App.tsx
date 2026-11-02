@@ -9,6 +9,8 @@ import { CandidateList } from "./pages/CandidateList";
 import { CompanyDetail } from "./pages/CompanyDetail";
 import { ContactDetail } from "./pages/ContactDetail";
 import { ContactList } from "./pages/ContactList";
+import { JobDetail } from "./pages/JobDetail";
+import { JobList } from "./pages/JobList";
 import { CompanyList } from "./pages/CompanyList";
 import { SignIn } from "./pages/SignIn";
 
@@ -36,12 +38,13 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(companies|contacts)/.exec(hash)?.[1] ?? "candidates";
+  const section = /^#\/(jobs|companies|contacts)/.exec(hash)?.[1] ?? "candidates";
   return (
     <>
       <header className="row spread">
         <nav className="row" aria-label="Main">
           <strong>HiringPlug</strong>
+          <a href="#/jobs" aria-current={section === "jobs" ? "page" : undefined}>Jobs</a>
           <a href="#/candidates" aria-current={section === "candidates" ? "page" : undefined}>Candidates</a>
           <a href="#/companies" aria-current={section === "companies" ? "page" : undefined}>Companies</a>
           <a href="#/contacts" aria-current={section === "contacts" ? "page" : undefined}>Contacts</a>
@@ -67,6 +70,9 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   if (candidate) return <CandidateDetail key={candidate} id={candidate} permissions={permissions} />;
   const company = /^#\/companies\/(comp_[0-9a-z]+)$/.exec(hash)?.[1];
   if (company) return <CompanyDetail key={company} id={company} permissions={permissions} />;
+  const job = /^#\/jobs\/(jo_[0-9a-z]+)$/.exec(hash)?.[1];
+  if (job) return <JobDetail key={job} id={job} permissions={permissions} />;
+  if (hash.startsWith("#/jobs")) return <JobList canCreate={permissions.includes("jobs:create")} />;
   const contact = /^#\/contacts\/(cont_[0-9a-z]+)$/.exec(hash)?.[1];
   if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
   if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;

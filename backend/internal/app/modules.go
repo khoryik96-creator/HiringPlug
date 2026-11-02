@@ -9,7 +9,10 @@ package app
 // and the worker refuses to start if a job kind has none.
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
@@ -17,6 +20,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
 )
@@ -28,6 +32,7 @@ type Modules struct {
 	Documents  *documents.Module
 	Companies  *companies.Module
 	Contacts   *contacts.Module
+	Jobs       *jobs.Module
 	// scaffold:fields
 }
 
@@ -41,6 +46,7 @@ func NewModules(d Deps) *Modules {
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool)
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
+	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts})
 	// scaffold:constructors
 	return m
 }
@@ -53,6 +59,7 @@ type (
 	documentsHTTP  = documents.HTTP
 	companiesHTTP  = companies.HTTP
 	contactsHTTP   = contacts.HTTP
+	jobsHTTP       = jobs.HTTP
 	// scaffold:aliases
 )
 
@@ -65,6 +72,7 @@ type Server struct {
 	*documentsHTTP
 	*companiesHTTP
 	*contactsHTTP
+	*jobsHTTP
 	// scaffold:embeds
 }
 
@@ -78,6 +86,7 @@ func (m *Modules) Server() *Server {
 		documentsHTTP:  m.Documents.HTTP,
 		companiesHTTP:  m.Companies.HTTP,
 		contactsHTTP:   m.Contacts.HTTP,
+		jobsHTTP:       m.Jobs.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -97,4 +106,17 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		}
 	}
 	return all, nil
+}
+
+// jobContacts gives the jobs module what it needs from contacts, in its own
+// types, so neither module imports the other.
+type jobContacts struct{ contacts *contacts.Module }
+
+func (a jobContacts) Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]jobs.ContactInfo, error) {
+	briefs, err := a.contacts.Briefs(ctx, tx, ids)
+	out := make(map[string]jobs.ContactInfo, len(briefs))
+	for id, b := range briefs {
+		out[id] = jobs.ContactInfo{Name: b.Name, CompanyID: b.CompanyID}
+	}
+	return out, err
 }

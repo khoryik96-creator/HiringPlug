@@ -290,6 +290,45 @@ func (e JobKind) Valid() bool {
 	}
 }
 
+// Defines values for JobRestrictedField.
+const (
+	JobRestrictedFieldSalary JobRestrictedField = "salary"
+)
+
+// Valid indicates whether the value is a known member of the JobRestrictedField enum.
+func (e JobRestrictedField) Valid() bool {
+	switch e {
+	case JobRestrictedFieldSalary:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for JobStatus.
+const (
+	JobStatusClosed JobStatus = "closed"
+	JobStatusFilled JobStatus = "filled"
+	JobStatusOnHold JobStatus = "on_hold"
+	JobStatusOpen   JobStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the JobStatus enum.
+func (e JobStatus) Valid() bool {
+	switch e {
+	case JobStatusClosed:
+		return true
+	case JobStatusFilled:
+		return true
+	case JobStatusOnHold:
+		return true
+	case JobStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NoticePeriodUnit.
 const (
 	NoticePeriodUnitDay   NoticePeriodUnit = "day"
@@ -350,6 +389,11 @@ const (
 	PermissionContactsUpdate               Permission = "contacts:update"
 	PermissionDocumentsCreate              Permission = "documents:create"
 	PermissionDocumentsRead                Permission = "documents:read"
+	PermissionJobsCreate                   Permission = "jobs:create"
+	PermissionJobsRead                     Permission = "jobs:read"
+	PermissionJobsSalaryRead               Permission = "jobs.salary:read"
+	PermissionJobsSalaryUpdate             Permission = "jobs.salary:update"
+	PermissionJobsUpdate                   Permission = "jobs:update"
 )
 
 // Valid indicates whether the value is a known member of the Permission enum.
@@ -380,6 +424,16 @@ func (e Permission) Valid() bool {
 	case PermissionDocumentsCreate:
 		return true
 	case PermissionDocumentsRead:
+		return true
+	case PermissionJobsCreate:
+		return true
+	case PermissionJobsRead:
+		return true
+	case PermissionJobsSalaryRead:
+		return true
+	case PermissionJobsSalaryUpdate:
+		return true
+	case PermissionJobsUpdate:
 		return true
 	default:
 		return false
@@ -431,6 +485,27 @@ func (e Role) Valid() bool {
 	}
 }
 
+// Defines values for WorkArrangement.
+const (
+	WorkArrangementHybrid WorkArrangement = "hybrid"
+	WorkArrangementOnsite WorkArrangement = "onsite"
+	WorkArrangementRemote WorkArrangement = "remote"
+)
+
+// Valid indicates whether the value is a known member of the WorkArrangement enum.
+func (e WorkArrangement) Valid() bool {
+	switch e {
+	case WorkArrangementHybrid:
+		return true
+	case WorkArrangementOnsite:
+		return true
+	case WorkArrangementRemote:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WorkAuthorizationBasis.
 const (
 	WorkAuthorizationBasisOther             WorkAuthorizationBasis = "other"
@@ -470,6 +545,33 @@ func (e WorkAuthorizationStatus) Valid() bool {
 	case WorkAuthorizationStatusLocal:
 		return true
 	case WorkAuthorizationStatusRequiresVisa:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkType.
+const (
+	WorkTypeContract   WorkType = "contract"
+	WorkTypeFullTime   WorkType = "full_time"
+	WorkTypeInternship WorkType = "internship"
+	WorkTypePartTime   WorkType = "part_time"
+	WorkTypeTemporary  WorkType = "temporary"
+)
+
+// Valid indicates whether the value is a known member of the WorkType enum.
+func (e WorkType) Valid() bool {
+	switch e {
+	case WorkTypeContract:
+		return true
+	case WorkTypeFullTime:
+		return true
+	case WorkTypeInternship:
+		return true
+	case WorkTypePartTime:
+		return true
+	case WorkTypeTemporary:
 		return true
 	default:
 		return false
@@ -922,6 +1024,142 @@ type ExtractionStatus string
 // JobKind defines model for JobKind.
 type JobKind string
 
+// JobOrder defines model for JobOrder.
+type JobOrder struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   CompanyId `json:"companyId"`
+	CompanyName string    `json:"companyName"`
+
+	// ContactId The hiring contact at the company.
+	ContactId   nullable.Nullable[ContactId] `json:"contactId"`
+	ContactName nullable.Nullable[string]    `json:"contactName"`
+	CreatedAt   time.Time                    `json:"createdAt"`
+	Description nullable.Nullable[string]    `json:"description"`
+
+	// Id Example: jo_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id       JobOrderId                `json:"id"`
+	Location nullable.Nullable[string] `json:"location"`
+
+	// Openings How many people to hire.
+	Openings         int                  `json:"openings"`
+	RestrictedFields []JobRestrictedField `json:"restrictedFields"`
+
+	// Salary Left out (and listed in restrictedFields) without jobs.salary:read. null means no budget recorded.
+	Salary nullable.Nullable[JobSalary] `json:"salary,omitempty"`
+
+	// Status open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+	Status          JobStatus                          `json:"status"`
+	Title           string                             `json:"title"`
+	UpdatedAt       time.Time                          `json:"updatedAt"`
+	Version         int                                `json:"version"`
+	WorkArrangement nullable.Nullable[WorkArrangement] `json:"workArrangement"`
+	WorkType        nullable.Nullable[WorkType]        `json:"workType"`
+}
+
+// JobOrderCreate defines model for JobOrderCreate.
+type JobOrderCreate struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   CompanyId                    `json:"companyId"`
+	ContactId   nullable.Nullable[ContactId] `json:"contactId,omitempty"`
+	Description nullable.Nullable[string]    `json:"description,omitempty"`
+	Location    nullable.Nullable[string]    `json:"location,omitempty"`
+
+	// Openings Defaults to 1.
+	Openings *int `json:"openings,omitempty"`
+
+	// Status open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+	Status          *JobStatus                         `json:"status,omitempty"`
+	Title           string                             `json:"title"`
+	WorkArrangement nullable.Nullable[WorkArrangement] `json:"workArrangement,omitempty"`
+	WorkType        nullable.Nullable[WorkType]        `json:"workType,omitempty"`
+}
+
+// JobOrderId Example: jo_01jbz6w0m0k8q9x2r3s4t5v6w7
+type JobOrderId = string
+
+// JobOrderPage defines model for JobOrderPage.
+type JobOrderPage struct {
+	Items []JobOrderSummary `json:"items"`
+
+	// NextCursor Pass as `cursor` to get the next page; null on the last page.
+	NextCursor nullable.Nullable[JobOrderId] `json:"nextCursor"`
+}
+
+// JobOrderSummary defines model for JobOrderSummary.
+type JobOrderSummary struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   CompanyId `json:"companyId"`
+	CompanyName string    `json:"companyName"`
+
+	// Id Example: jo_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id       JobOrderId                `json:"id"`
+	Location nullable.Nullable[string] `json:"location"`
+	Openings int                       `json:"openings"`
+
+	// Status open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+	Status    JobStatus `json:"status"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// JobOrderUpdate defines model for JobOrderUpdate.
+type JobOrderUpdate struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   *CompanyId                   `json:"companyId,omitempty"`
+	ContactId   nullable.Nullable[ContactId] `json:"contactId,omitempty"`
+	Description nullable.Nullable[string]    `json:"description,omitempty"`
+	Location    nullable.Nullable[string]    `json:"location,omitempty"`
+	Openings    *int                         `json:"openings,omitempty"`
+
+	// Status open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+	Status *JobStatus `json:"status,omitempty"`
+	Title  *string    `json:"title,omitempty"`
+
+	// Version The version you loaded.
+	Version         int                                `json:"version"`
+	WorkArrangement nullable.Nullable[WorkArrangement] `json:"workArrangement,omitempty"`
+	WorkType        nullable.Nullable[WorkType]        `json:"workType,omitempty"`
+}
+
+// JobRestrictedField defines model for JobRestrictedField.
+type JobRestrictedField string
+
+// JobSalary defines model for JobSalary.
+type JobSalary struct {
+	Range     nullable.Nullable[JobSalaryRange] `json:"range"`
+	UpdatedAt time.Time                         `json:"updatedAt"`
+	Version   int                               `json:"version"`
+}
+
+// JobSalaryRange defines model for JobSalaryRange.
+type JobSalaryRange struct {
+	// Currency ISO 4217 currency code, e.g. MYR, SGD, USD.
+	//
+	// Example: MYR
+	Currency CurrencyCode `json:"currency"`
+
+	// Max Leave empty for a single figure.
+	Max nullable.Nullable[DecimalAmount] `json:"max,omitempty"`
+
+	// Min A non-negative amount with up to 2 decimal places, as a string so no precision is lost.
+	//
+	// Example: 8500.00
+	Min DecimalAmount `json:"min"`
+
+	// Period What a salary figure is per (shared by candidates and jobs).
+	Period PayPeriod `json:"period"`
+}
+
+// JobSalaryUpdate defines model for JobSalaryUpdate.
+type JobSalaryUpdate struct {
+	// ExpectedVersion 0 if no budget exists yet, otherwise the version you loaded.
+	ExpectedVersion int                               `json:"expectedVersion"`
+	Range           nullable.Nullable[JobSalaryRange] `json:"range"`
+}
+
+// JobStatus open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+type JobStatus string
+
 // Me defines model for Me.
 type Me struct {
 	Permissions []Permission `json:"permissions"`
@@ -939,7 +1177,7 @@ type NoticePeriod struct {
 // NoticePeriodUnit defines model for NoticePeriodUnit.
 type NoticePeriodUnit string
 
-// PayPeriod defines model for PayPeriod.
+// PayPeriod What a salary figure is per (shared by candidates and jobs).
 type PayPeriod string
 
 // Permission defines model for Permission.
@@ -962,7 +1200,9 @@ type SalaryAmount struct {
 	//
 	// Example: MYR
 	Currency CurrencyCode `json:"currency"`
-	Period   PayPeriod    `json:"period"`
+
+	// Period What a salary figure is per (shared by candidates and jobs).
+	Period PayPeriod `json:"period"`
 }
 
 // SalaryRange defines model for SalaryRange.
@@ -978,8 +1218,10 @@ type SalaryRange struct {
 	// Min A non-negative amount with up to 2 decimal places, as a string so no precision is lost.
 	//
 	// Example: 8500.00
-	Min    DecimalAmount `json:"min"`
-	Period PayPeriod     `json:"period"`
+	Min DecimalAmount `json:"min"`
+
+	// Period What a salary figure is per (shared by candidates and jobs).
+	Period PayPeriod `json:"period"`
 }
 
 // Tenant defines model for Tenant.
@@ -1004,6 +1246,9 @@ type User struct {
 // UserId Example: usr_01jbz6w0m0k8q9x2r3s4t5v6w7
 type UserId = string
 
+// WorkArrangement defines model for WorkArrangement.
+type WorkArrangement string
+
 // WorkAuthorization defines model for WorkAuthorization.
 type WorkAuthorization struct {
 	// Basis Required when status is expat_eligible, otherwise must be empty.
@@ -1020,6 +1265,9 @@ type WorkAuthorizationBasis string
 // WorkAuthorizationStatus local = citizen; expat_eligible = expat who can already work here (see `basis`); requires_visa = needs an employment pass.
 type WorkAuthorizationStatus string
 
+// WorkType defines model for WorkType.
+type WorkType string
+
 // CandidateIdPath Example: cand_01jbz6w0m0k8q9x2r3s4t5v6w7
 type CandidateIdPath = CandidateId
 
@@ -1031,6 +1279,9 @@ type ContactIdPath = ContactId
 
 // DocumentIdPath Example: doc_01jbz6w0m0k8q9x2r3s4t5v6w7
 type DocumentIdPath = DocumentId
+
+// JobOrderIdPath Example: jo_01jbz6w0m0k8q9x2r3s4t5v6w7
+type JobOrderIdPath = JobOrderId
 
 // Conflict defines model for Conflict.
 type Conflict = Error
@@ -1095,6 +1346,20 @@ type ListContactsParams struct {
 	Cursor *ContactId `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListJobsParams defines parameters for ListJobs.
+type ListJobsParams struct {
+	// Q Matches the title or location, ignoring case and accents.
+	Q      *string    `form:"q,omitempty" json:"q,omitempty"`
+	Status *JobStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// CompanyId Only this company's jobs.
+	CompanyId *CompanyId `form:"companyId,omitempty" json:"companyId,omitempty"`
+	Limit     *int       `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The `nextCursor` of the previous page.
+	Cursor *JobOrderId `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // CreateCandidateJSONRequestBody defines body for CreateCandidate for application/json ContentType.
 type CreateCandidateJSONRequestBody = CandidateCreate
 
@@ -1118,6 +1383,15 @@ type CreateContactJSONRequestBody = ContactCreate
 
 // UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
 type UpdateContactJSONRequestBody = ContactUpdate
+
+// CreateJobJSONRequestBody defines body for CreateJob for application/json ContentType.
+type CreateJobJSONRequestBody = JobOrderCreate
+
+// UpdateJobJSONRequestBody defines body for UpdateJob for application/json ContentType.
+type UpdateJobJSONRequestBody = JobOrderUpdate
+
+// PutJobSalaryJSONRequestBody defines body for PutJobSalary for application/json ContentType.
+type PutJobSalaryJSONRequestBody = JobSalaryUpdate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -1172,6 +1446,21 @@ type ServerInterface interface {
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(w http.ResponseWriter, r *http.Request, documentId DocumentIdPath)
+	// ListJobs List or search jobs, newest first
+	// (GET /v1/jobs)
+	ListJobs(w http.ResponseWriter, r *http.Request, params ListJobsParams)
+	// CreateJob Add a job
+	// (POST /v1/jobs)
+	CreateJob(w http.ResponseWriter, r *http.Request)
+	// GetJob Get a job
+	// (GET /v1/jobs/{jobId})
+	GetJob(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath)
+	// UpdateJob Change some fields of a job
+	// (PATCH /v1/jobs/{jobId})
+	UpdateJob(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath)
+	// PutJobSalary Set a job's salary budget
+	// (PUT /v1/jobs/{jobId}/salary)
+	PutJobSalary(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath)
 	// GetMe Who is signed in, their tenant, and what they may do
 	// (GET /v1/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -1717,6 +2006,183 @@ func (siw *ServerInterfaceWrapper) GetDocument(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ListJobs operation middleware
+func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListJobsParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "companyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "companyId", r.URL.Query(), &params.CompanyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "companyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "companyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListJobs(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateJob operation middleware
+func (siw *ServerInterfaceWrapper) CreateJob(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateJob(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetJob operation middleware
+func (siw *ServerInterfaceWrapper) GetJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "jobId" -------------
+	var jobId JobOrderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "jobId", r.PathValue("jobId"), &jobId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetJob(w, r, jobId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateJob operation middleware
+func (siw *ServerInterfaceWrapper) UpdateJob(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "jobId" -------------
+	var jobId JobOrderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "jobId", r.PathValue("jobId"), &jobId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateJob(w, r, jobId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutJobSalary operation middleware
+func (siw *ServerInterfaceWrapper) PutJobSalary(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "jobId" -------------
+	var jobId JobOrderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "jobId", r.PathValue("jobId"), &jobId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutJobSalary(w, r, jobId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -1869,6 +2335,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/candidates/{candidateId}/documents", wrapper.UploadCandidateDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/documents/{documentId}", wrapper.GetDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/jobs", wrapper.ListJobs)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/jobs", wrapper.CreateJob)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/jobs/{jobId}", wrapper.GetJob)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/jobs/{jobId}", wrapper.UpdateJob)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/jobs/{jobId}/salary", wrapper.PutJobSalary)
 
 	return m
 }
@@ -3178,6 +3649,384 @@ func (response GetDocument404JSONResponse) VisitGetDocumentResponse(w http.Respo
 	return err
 }
 
+type ListJobsRequestObject struct {
+	Params ListJobsParams
+}
+
+type ListJobsResponseObject interface {
+	VisitListJobsResponse(w http.ResponseWriter) error
+}
+
+type ListJobs200JSONResponse JobOrderPage
+
+func (response ListJobs200JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListJobs400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response ListJobs400JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListJobs401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response ListJobs401JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListJobs403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListJobs403JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateJobRequestObject struct {
+	Body *CreateJobJSONRequestBody
+}
+
+type CreateJobResponseObject interface {
+	VisitCreateJobResponse(w http.ResponseWriter) error
+}
+
+type CreateJob201JSONResponse JobOrder
+
+func (response CreateJob201JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateJob400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response CreateJob400JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateJob401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response CreateJob401JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateJob403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateJob403JSONResponse) VisitCreateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJobRequestObject struct {
+	JobId JobOrderIdPath `json:"jobId"`
+}
+
+type GetJobResponseObject interface {
+	VisitGetJobResponse(w http.ResponseWriter) error
+}
+
+type GetJob200JSONResponse JobOrder
+
+func (response GetJob200JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJob401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response GetJob401JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJob403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetJob403JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetJob404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetJob404JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJobRequestObject struct {
+	JobId JobOrderIdPath `json:"jobId"`
+	Body  *UpdateJobJSONRequestBody
+}
+
+type UpdateJobResponseObject interface {
+	VisitUpdateJobResponse(w http.ResponseWriter) error
+}
+
+type UpdateJob200JSONResponse JobOrder
+
+func (response UpdateJob200JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJob400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response UpdateJob400JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJob401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response UpdateJob401JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJob403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateJob403JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJob404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateJob404JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateJob409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateJob409JSONResponse) VisitUpdateJobResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalaryRequestObject struct {
+	JobId JobOrderIdPath `json:"jobId"`
+	Body  *PutJobSalaryJSONRequestBody
+}
+
+type PutJobSalaryResponseObject interface {
+	VisitPutJobSalaryResponse(w http.ResponseWriter) error
+}
+
+type PutJobSalary200JSONResponse JobSalary
+
+func (response PutJobSalary200JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalary400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response PutJobSalary400JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalary401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response PutJobSalary401JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalary403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response PutJobSalary403JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalary404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response PutJobSalary404JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutJobSalary409JSONResponse struct{ ConflictJSONResponse }
+
+func (response PutJobSalary409JSONResponse) VisitPutJobSalaryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -3266,6 +4115,21 @@ type StrictServerInterface interface {
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(ctx context.Context, request GetDocumentRequestObject) (GetDocumentResponseObject, error)
+	// ListJobs List or search jobs, newest first
+	// (GET /v1/jobs)
+	ListJobs(ctx context.Context, request ListJobsRequestObject) (ListJobsResponseObject, error)
+	// CreateJob Add a job
+	// (POST /v1/jobs)
+	CreateJob(ctx context.Context, request CreateJobRequestObject) (CreateJobResponseObject, error)
+	// GetJob Get a job
+	// (GET /v1/jobs/{jobId})
+	GetJob(ctx context.Context, request GetJobRequestObject) (GetJobResponseObject, error)
+	// UpdateJob Change some fields of a job
+	// (PATCH /v1/jobs/{jobId})
+	UpdateJob(ctx context.Context, request UpdateJobRequestObject) (UpdateJobResponseObject, error)
+	// PutJobSalary Set a job's salary budget
+	// (PUT /v1/jobs/{jobId}/salary)
+	PutJobSalary(ctx context.Context, request PutJobSalaryRequestObject) (PutJobSalaryResponseObject, error)
 	// GetMe Who is signed in, their tenant, and what they may do
 	// (GET /v1/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -3802,6 +4666,155 @@ func (sh *strictHandler) GetDocument(w http.ResponseWriter, r *http.Request, doc
 	}
 }
 
+// ListJobs operation middleware
+func (sh *strictHandler) ListJobs(w http.ResponseWriter, r *http.Request, params ListJobsParams) {
+	var request ListJobsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListJobs(ctx, request.(ListJobsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListJobs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListJobsResponseObject); ok {
+		if err := validResponse.VisitListJobsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateJob operation middleware
+func (sh *strictHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
+	var request CreateJobRequestObject
+
+	var body CreateJobJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateJob(ctx, request.(CreateJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateJobResponseObject); ok {
+		if err := validResponse.VisitCreateJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetJob operation middleware
+func (sh *strictHandler) GetJob(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath) {
+	var request GetJobRequestObject
+
+	request.JobId = jobId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetJob(ctx, request.(GetJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetJobResponseObject); ok {
+		if err := validResponse.VisitGetJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateJob operation middleware
+func (sh *strictHandler) UpdateJob(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath) {
+	var request UpdateJobRequestObject
+
+	request.JobId = jobId
+
+	var body UpdateJobJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateJob(ctx, request.(UpdateJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateJobResponseObject); ok {
+		if err := validResponse.VisitUpdateJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutJobSalary operation middleware
+func (sh *strictHandler) PutJobSalary(w http.ResponseWriter, r *http.Request, jobId JobOrderIdPath) {
+	var request PutJobSalaryRequestObject
+
+	request.JobId = jobId
+
+	var body PutJobSalaryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutJobSalary(ctx, request.(PutJobSalaryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutJobSalary")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutJobSalaryResponseObject); ok {
+		if err := validResponse.VisitPutJobSalaryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -3831,131 +4844,147 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"d8g5kNsthqXjcE3f0zfwN7afzf7/AA==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

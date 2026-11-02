@@ -229,6 +229,19 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 	return store.New(tx).ContactExists(ctx, id)
 }
 
+// Briefs returns id -> name and company for the contacts that exist.
+func (s *Service) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
+	rows, err := store.New(tx).ContactBriefs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]Brief, len(rows))
+	for _, r := range rows {
+		out[r.ID] = Brief{Name: FullName(r.FirstName, r.LastName), CompanyID: r.CompanyID}
+	}
+	return out, nil
+}
+
 // checkEmail runs the email check for an address (nil without one).
 func (s *Service) checkEmail(ctx context.Context, email *string) *EmailCheckResult {
 	if email == nil {

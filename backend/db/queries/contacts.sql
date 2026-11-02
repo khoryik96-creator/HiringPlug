@@ -61,3 +61,6 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
 ORDER BY id DESC
 LIMIT @row_limit;
+
+-- name: ContactBriefs :many
+SELECT id, first_name, last_name, company_id FROM contact WHERE id = ANY(@ids::text[]);

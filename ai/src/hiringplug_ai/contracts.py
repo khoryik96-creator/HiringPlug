@@ -30,6 +30,11 @@ class Permission(StrEnum):
     contacts_update = "contacts:update"
     documents_create = "documents:create"
     documents_read = "documents:read"
+    jobs_salary_read = "jobs.salary:read"
+    jobs_salary_update = "jobs.salary:update"
+    jobs_create = "jobs:create"
+    jobs_read = "jobs:read"
+    jobs_update = "jobs:update"
 
 
 class ErrorCode(StrEnum):
@@ -97,6 +102,13 @@ class CurrencyCode(RootModel[str]):
     ]
 
 
+class PayPeriod(StrEnum):
+    hour = "hour"
+    day = "day"
+    month = "month"
+    year = "year"
+
+
 class DecimalAmount(RootModel[str]):
     root: Annotated[
         str,
@@ -160,13 +172,6 @@ class CandidateSource(StrEnum):
     careers_page = "careers_page"
     direct = "direct"
     other = "other"
-
-
-class PayPeriod(StrEnum):
-    hour = "hour"
-    day = "day"
-    month = "month"
-    year = "year"
 
 
 class SalaryAmount(BaseModel):
@@ -600,6 +605,137 @@ class User(BaseModel):
 class Tenant(BaseModel):
     id: TenantId
     name: str
+
+
+class JobOrderId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["jo_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jo_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class JobStatus(StrEnum):
+    open = "open"
+    on_hold = "on_hold"
+    filled = "filled"
+    closed = "closed"
+
+
+class WorkType(StrEnum):
+    full_time = "full_time"
+    part_time = "part_time"
+    contract = "contract"
+    temporary = "temporary"
+    internship = "internship"
+
+
+class WorkArrangement(StrEnum):
+    onsite = "onsite"
+    hybrid = "hybrid"
+    remote = "remote"
+
+
+class JobRestrictedField(StrEnum):
+    salary = "salary"
+
+
+class JobSalaryRange(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    min: DecimalAmount
+    max: Annotated[DecimalAmount | None, Field(description="Leave empty for a single figure.")] = None
+    currency: CurrencyCode
+    period: PayPeriod
+
+
+class JobSalary(BaseModel):
+    version: int
+    range: Annotated[JobSalaryRange | None, Field(...)]
+    updatedAt: AwareDatetime
+
+
+class JobSalaryUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    expectedVersion: Annotated[
+        int, Field(description="0 if no budget exists yet, otherwise the version you loaded.", ge=0)
+    ]
+    range: Annotated[JobSalaryRange | None, Field(...)]
+
+
+class JobOrder(BaseModel):
+    id: JobOrderId
+    version: int
+    companyId: CompanyId
+    companyName: str
+    contactId: Annotated[ContactId | None, Field(description="The hiring contact at the company.")]
+    contactName: Annotated[str | None, Field(...)]
+    title: str
+    status: JobStatus
+    location: Annotated[str | None, Field(...)]
+    workType: Annotated[WorkType | None, Field(...)]
+    workArrangement: Annotated[WorkArrangement | None, Field(...)]
+    openings: Annotated[int, Field(description="How many people to hire.")]
+    description: Annotated[str | None, Field(...)]
+    salary: Annotated[
+        JobSalary | None,
+        Field(
+            description="Left out (and listed in restrictedFields) without jobs.salary:read. null means no budget recorded."
+        ),
+    ] = None
+    restrictedFields: list[JobRestrictedField]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class JobOrderCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId
+    contactId: ContactId | None = None
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    status: JobStatus | None = None
+    location: Annotated[str | None, Field(max_length=200)] = None
+    workType: WorkType | None = None
+    workArrangement: WorkArrangement | None = None
+    openings: Annotated[int | None, Field(description="Defaults to 1.", ge=1, le=999)] = None
+    description: Annotated[str | None, Field(max_length=20000)] = None
+
+
+class JobOrderUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    companyId: CompanyId | None = None
+    contactId: ContactId | None = None
+    title: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    status: JobStatus | None = None
+    location: Annotated[str | None, Field(max_length=200)] = None
+    workType: WorkType | None = None
+    workArrangement: WorkArrangement | None = None
+    openings: Annotated[int | None, Field(ge=1, le=999)] = None
+    description: Annotated[str | None, Field(max_length=20000)] = None
+
+
+class JobOrderSummary(BaseModel):
+    id: JobOrderId
+    title: str
+    companyId: CompanyId
+    companyName: str
+    status: JobStatus
+    location: Annotated[str | None, Field(...)]
+    openings: int
+    updatedAt: AwareDatetime
+
+
+class JobOrderPage(BaseModel):
+    items: list[JobOrderSummary]
+    nextCursor: Annotated[
+        JobOrderId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
 
 
 class Me(BaseModel):

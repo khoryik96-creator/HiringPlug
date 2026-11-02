@@ -158,6 +158,37 @@ type Job struct {
 	FinishedAt  *time.Time
 }
 
+type JobOrder struct {
+	ID              string
+	TenantID        string
+	Version         int32
+	CompanyID       string
+	ContactID       *string
+	Title           string
+	Status          string
+	Location        *string
+	WorkType        *string
+	WorkArrangement *string
+	Openings        int32
+	Description     *string
+	SearchText      *string
+	CreatedBy       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type JobOrderSalary struct {
+	JobOrderID string
+	TenantID   string
+	Version    int32
+	MinAmount  pgtype.Numeric
+	MaxAmount  pgtype.Numeric
+	Currency   string
+	Period     string
+	UpdatedBy  string
+	UpdatedAt  time.Time
+}
+
 type Tenant struct {
 	ID        string
 	Name      string

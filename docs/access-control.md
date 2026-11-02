@@ -32,6 +32,10 @@ details get their own permissions.
 | `companies:create`, `companies:update` | ✓ | ✓ | ✓ | ✓ | | |
 | `contacts:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `contacts:create`, `contacts:update` | ✓ | ✓ | ✓ | ✓ | | |
+| `jobs:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `jobs:create`, `jobs:update` | ✓ | ✓ | ✓ | | | |
+| `jobs.salary:read` (budget) | ✓ | ✓ | ✓ | | ✓ | |
+| `jobs.salary:update` (budget) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

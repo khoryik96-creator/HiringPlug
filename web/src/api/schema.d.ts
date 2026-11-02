@@ -236,6 +236,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List or search jobs, newest first */
+        get: operations["listJobs"];
+        put?: never;
+        /**
+         * Add a job
+         * @description The salary budget is set separately with PUT /v1/jobs/{jobId}/salary.
+         */
+        post: operations["createJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a job
+         * @description `salary` is only included with jobs.salary:read; otherwise it is left out and listed in `restrictedFields`.
+         */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change some fields of a job
+         * @description Only the fields you send change. Send `null` to clear a field. `version` must be the version you loaded.
+         */
+        patch: operations["updateJob"];
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/salary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a job's salary budget
+         * @description Replaces the budget; send `range: null` to clear it. Send `expectedVersion: 0` the first time, then the `version` you loaded.
+         */
+        put: operations["putJobSalary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -243,7 +312,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update";
         /** @enum {string} */
         ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -276,6 +345,11 @@ export interface components {
          */
         CurrencyCode: string;
         /**
+         * @description What a salary figure is per (shared by candidates and jobs).
+         * @enum {string}
+         */
+        PayPeriod: "hour" | "day" | "month" | "year";
+        /**
          * @description A non-negative amount with up to 2 decimal places, as a string so no precision is lost.
          * @example 8500.00
          */
@@ -307,8 +381,6 @@ export interface components {
         };
         /** @enum {string} */
         CandidateSource: "jobstreet" | "linkedin" | "referral" | "careers_page" | "direct" | "other";
-        /** @enum {string} */
-        PayPeriod: "hour" | "day" | "month" | "year";
         SalaryAmount: {
             amount: components["schemas"]["DecimalAmount"];
             currency: components["schemas"]["CurrencyCode"];
@@ -661,6 +733,102 @@ export interface components {
             id: components["schemas"]["TenantId"];
             name: string;
         };
+        /** @example jo_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        JobOrderId: string;
+        /**
+         * @description open = recruiting; on_hold = paused; filled = all openings filled; closed = cancelled or lost.
+         * @enum {string}
+         */
+        JobStatus: "open" | "on_hold" | "filled" | "closed";
+        /** @enum {string} */
+        WorkType: "full_time" | "part_time" | "contract" | "temporary" | "internship";
+        /** @enum {string} */
+        WorkArrangement: "onsite" | "hybrid" | "remote";
+        /** @enum {string} */
+        JobRestrictedField: "salary";
+        JobSalaryRange: {
+            min: components["schemas"]["DecimalAmount"];
+            /** @description Leave empty for a single figure. */
+            max?: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"];
+            period: components["schemas"]["PayPeriod"];
+        };
+        JobSalary: {
+            version: number;
+            range: components["schemas"]["JobSalaryRange"] | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        JobSalaryUpdate: {
+            /** @description 0 if no budget exists yet, otherwise the version you loaded. */
+            expectedVersion: number;
+            range: components["schemas"]["JobSalaryRange"] | null;
+        };
+        JobOrder: {
+            id: components["schemas"]["JobOrderId"];
+            version: number;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            /** @description The hiring contact at the company. */
+            contactId: components["schemas"]["ContactId"] | null;
+            contactName: string | null;
+            title: string;
+            status: components["schemas"]["JobStatus"];
+            location: string | null;
+            workType: components["schemas"]["WorkType"] | null;
+            workArrangement: components["schemas"]["WorkArrangement"] | null;
+            /** @description How many people to hire. */
+            openings: number;
+            description: string | null;
+            /** @description Left out (and listed in restrictedFields) without jobs.salary:read. null means no budget recorded. */
+            salary?: components["schemas"]["JobSalary"] | null;
+            restrictedFields: components["schemas"]["JobRestrictedField"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        JobOrderCreate: {
+            companyId: components["schemas"]["CompanyId"];
+            contactId?: components["schemas"]["ContactId"] | null;
+            title: string;
+            status?: components["schemas"]["JobStatus"];
+            location?: string | null;
+            workType?: components["schemas"]["WorkType"] | null;
+            workArrangement?: components["schemas"]["WorkArrangement"] | null;
+            /** @description Defaults to 1. */
+            openings?: number;
+            description?: string | null;
+        };
+        JobOrderUpdate: {
+            /** @description The version you loaded. */
+            version: number;
+            companyId?: components["schemas"]["CompanyId"];
+            contactId?: components["schemas"]["ContactId"] | null;
+            title?: string;
+            status?: components["schemas"]["JobStatus"];
+            location?: string | null;
+            workType?: components["schemas"]["WorkType"] | null;
+            workArrangement?: components["schemas"]["WorkArrangement"] | null;
+            openings?: number;
+            description?: string | null;
+        };
+        JobOrderSummary: {
+            id: components["schemas"]["JobOrderId"];
+            title: string;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            status: components["schemas"]["JobStatus"];
+            location: string | null;
+            openings: number;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        JobOrderPage: {
+            items: components["schemas"]["JobOrderSummary"][];
+            /** @description Pass as `cursor` to get the next page; null on the last page. */
+            nextCursor: components["schemas"]["JobOrderId"] | null;
+        };
     };
     responses: {
         /** @description The request is invalid (VALIDATION_FAILED). */
@@ -732,6 +900,7 @@ export interface components {
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
+        JobOrderIdPath: components["schemas"]["JobOrderId"];
     };
     requestBodies: never;
     headers: never;
@@ -1242,6 +1411,152 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+        };
+    };
+    listJobs: {
+        parameters: {
+            query?: {
+                /** @description Matches the title or location, ignoring case and accents. */
+                q?: string;
+                status?: components["schemas"]["JobStatus"];
+                /** @description Only this company's jobs. */
+                companyId?: components["schemas"]["CompanyId"];
+                limit?: number;
+                /** @description The `nextCursor` of the previous page. */
+                cursor?: components["schemas"]["JobOrderId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOrderPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobOrderCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOrder"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOrder"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobOrderUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOrder"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    putJobSalary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobSalaryUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSalary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
 }

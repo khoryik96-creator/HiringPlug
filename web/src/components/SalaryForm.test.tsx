@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Compensation } from "../api/client";
-import { invalidField, ok, renderWithClient, testCandidate } from "../test-utils";
+import { invalidField, ok, renderWithClient, sentBody, testCandidate } from "../test-utils";
 import { SalaryForm } from "./SalaryForm";
 
 afterEach(() => {
@@ -37,7 +37,7 @@ describe("salary form", () => {
     change("Expected salary", "From (or the single figure)", "10000");
     save();
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
-    expect(put.mock.calls[0]?.[1].body.expectedVersion).toBe(1);
+    expect(sentBody(put)).toMatchObject({ expectedVersion: 1 });
   });
 
   it("closes without saving when Add salary is saved empty", async () => {
@@ -92,6 +92,6 @@ describe("salary form", () => {
     change("Current salary", "Amount", "8,500");
     save();
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
-    expect(put.mock.calls[0]?.[1].body.currentSalary).toEqual({ amount: "8500", currency: "MYR", period: "month" });
+    expect(sentBody(put)).toMatchObject({ currentSalary: { amount: "8500", currency: "MYR", period: "month" } });
   });
 });

@@ -10,6 +10,42 @@ import (
 	"time"
 )
 
+const contactBriefs = `-- name: ContactBriefs :many
+SELECT id, first_name, last_name, company_id FROM contact WHERE id = ANY($1::text[])
+`
+
+type ContactBriefsRow struct {
+	ID        string
+	FirstName string
+	LastName  string
+	CompanyID string
+}
+
+func (q *Queries) ContactBriefs(ctx context.Context, ids []string) ([]ContactBriefsRow, error) {
+	rows, err := q.db.Query(ctx, contactBriefs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactBriefsRow
+	for rows.Next() {
+		var i ContactBriefsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.CompanyID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const contactExists = `-- name: ContactExists :one
 SELECT EXISTS (SELECT 1 FROM contact WHERE id = $1)
 `

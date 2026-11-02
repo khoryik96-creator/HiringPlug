@@ -37,3 +37,7 @@ nav strong { margin-right: 1rem; }
 .badge.risky, .badge.unknown { background: #fef3c7; }
 .badge.invalid { background: #fee2e2; }
 .picker-results { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; margin-top: 0.25rem; }
+.badge.open { background: #dcfce7; }
+.badge.on_hold { background: #fef3c7; }
+.badge.filled { background: #dbeafe; }
+.badge.closed { background: #e5e7eb; }

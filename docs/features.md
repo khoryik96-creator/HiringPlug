@@ -16,7 +16,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
 | 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
 | 4 | Pipeline dashboard | `pipeline`, `reporting` | 🧩 M3 |
-| 5 | Job ads: applicants, interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | 🧩 M3–M5 |
+| 5 | Jobs ✅; applicants, interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | 🧩 next |
 | 5 | Notes: screening, CV and interview notes | `notes` | 🧩 M2 |
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
 | 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles; custom roles 🧩 M2 |
@@ -124,8 +124,14 @@ requirements), de-duplicated, and kept with its source and date.
 
 ## 4, 5. Jobs, pipeline, interviews, matching
 
-- **Jobs:** job orders for clients (agency) or requisitions (in-house), each
-  with job ads (the advertised text).
+- **Jobs** ✅: job orders for clients (agency) or requisitions (in-house):
+  company, hiring contact (must work at that company), title, status (open,
+  on hold, filled, closed), location, work type, on site / hybrid / remote,
+  openings and description, listed on the company's page. The **salary
+  budget** follows the salary pattern: its own permissions (hiring managers
+  may see it, sourcers and viewers may not), its own table that the database
+  refuses to others, and no amounts in the audit log. Job ads (the advertised
+  text) come in Phase 3.
 - **Pipeline:** a candidate on a job is an *application* moving through stages
   (e.g. applied → screened → submitted to client → interview → offer →
   placed/hired, or rejected/withdrawn with a reason). Allowed moves are defined

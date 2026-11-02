@@ -205,9 +205,6 @@ components:
       type: string
       enum: [jobstreet, linkedin, referral, careers_page, direct, other]
 
-    PayPeriod:
-      type: string
-      enum: [hour, day, month, year]
     SalaryAmount:
       type: object
       additionalProperties: false
