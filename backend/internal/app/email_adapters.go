@@ -11,6 +11,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -71,13 +72,37 @@ func (a emailApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) 
 	return out, nil
 }
 
-type emailInterviews struct{ interviews *interviews.Module }
+// emailInterviews reads the interviews module when called: the two modules
+// use each other (drafts read interviews; reminders send email), so it is
+// built after this one.
+type emailInterviews struct{ modules *Modules }
 
 func (a emailInterviews) Brief(ctx context.Context, tx pgx.Tx, id string) (emails.Interview, error) {
-	b, err := a.interviews.Brief(ctx, tx, id)
+	b, err := a.modules.Interviews.Brief(ctx, tx, id)
 	d := b.Details
 	return emails.Interview{
 		ApplicationID: b.ApplicationID, Title: d.Title, StartsAt: d.StartsAt, Minutes: d.Duration,
 		Mode: d.Mode, Location: d.Location, Instructions: d.Instructions,
 	}, err
+}
+
+// interviewMailer emails interviewers (reminders): their addresses come from
+// identity, the email from the emails module.
+type interviewMailer struct {
+	identity *identity.Module
+	emails   *emails.Module
+}
+
+func (a interviewMailer) EmailUsers(ctx context.Context, tx pgx.Tx, tenantID string, userIDs []string, m interviews.Message) (int, error) {
+	contacts, err := a.identity.ActiveContacts(ctx, tx, userIDs)
+	if err != nil || len(contacts) == 0 {
+		return 0, err
+	}
+	to := make([]string, 0, len(contacts))
+	for _, id := range userIDs {
+		if c, ok := contacts[id]; ok {
+			to = append(to, c.Email)
+		}
+	}
+	return len(to), a.emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: m.Subject, Body: m.Body, ApplicationID: &m.ApplicationID})
 }

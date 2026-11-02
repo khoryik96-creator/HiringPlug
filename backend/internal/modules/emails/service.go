@@ -299,3 +299,25 @@ func (s *Service) List(ctx context.Context, p authz.Principal, candidateID strin
 	})
 	return out, err
 }
+
+// notify records a notice from the app itself and queues it.
+func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) error {
+	o, errs := NormalizeOutgoing(Outgoing{To: n.To, Subject: n.Subject, Body: n.Body})
+	if err := errs.Err(); err != nil {
+		return err
+	}
+	row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
+		ApplicationID: n.ApplicationID, ToAddresses: o.To, CcAddresses: []string{},
+		Subject: o.Subject, Body: o.Body, SenderName: "HiringPlug", ReplyTo: "",
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{
+		Action: "email.queued", EntityType: "email", EntityID: row.ID,
+		Changes: map[string]any{"to": o.To, "subject": o.Subject, "automatic": true},
+	})
+}

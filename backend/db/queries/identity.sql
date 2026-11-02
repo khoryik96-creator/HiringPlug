@@ -20,3 +20,7 @@ SELECT id, name, role FROM app_user WHERE active ORDER BY name LIMIT 500;
 -- Which of these users are active in the tenant (to check interviewers and owners).
 -- name: ActiveUserRoles :many
 SELECT id, role FROM app_user WHERE active AND id = ANY(@ids::text[]);
+
+-- Active users' names and addresses (to email interviewers).
+-- name: ActiveUserEmails :many
+SELECT id, name, email FROM app_user WHERE active AND id = ANY(@ids::text[]);

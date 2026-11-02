@@ -904,7 +904,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1634,6 +1634,14 @@ export interface components {
         FeedbackInput: {
             recommendation: components["schemas"]["Recommendation"];
             comments?: string | null;
+        };
+        InterviewRemindJob: {
+            interviewId: components["schemas"]["InterviewId"];
+            /**
+             * Format: date-time
+             * @description When the interview was when the reminder was queued; a moved interview has a newer reminder.
+             */
+            startsAt: string;
         };
         /** @example ad_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobAdId: string;

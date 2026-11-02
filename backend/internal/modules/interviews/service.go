@@ -21,6 +21,8 @@ type Service struct {
 	pool         *pgxpool.Pool
 	applications Applications
 	users        Users
+	mailer       Mailer
+	settings     Settings
 }
 
 // Person is a user with their name.
@@ -74,6 +76,9 @@ func (s *Service) Schedule(ctx context.Context, p authz.Principal, appID string,
 			return err
 		}
 		if err := s.applications.ReachInterview(ctx, tx, appID); err != nil {
+			return err
+		}
+		if err := s.queueReminder(ctx, tx, p.TenantID, row.ID, d); err != nil {
 			return err
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{
@@ -228,6 +233,12 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "interview.updated", EntityType: "interview", EntityID: id, Changes: changes}); err != nil {
 			return err
+		}
+		// Moved, or on again: remind of the new time (the old reminder sees the change and does nothing).
+		if !after.StartsAt.Equal(before.StartsAt) || before.Status != "scheduled" {
+			if err := s.queueReminder(ctx, tx, p.TenantID, id, after); err != nil {
+				return err
+			}
 		}
 		out, err = s.one(ctx, tx, p, updated)
 		return err

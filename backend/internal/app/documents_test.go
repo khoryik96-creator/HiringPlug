@@ -203,7 +203,6 @@ func claimAIJobFor(t *testing.T, conn *pgx.Conn, documentID string) claimedJob {
 	return j
 }
 
-// runCoreJobsUntilIdle runs the real Go worker until the core queue is empty.
 // runCoreJobsUntilIdle runs the real Go worker until the tenant's core jobs
 // are done. Tests run in parallel and share the queue, so another test's
 // worker may be running one of them: an empty claim is not enough, the
@@ -220,9 +219,11 @@ func runCoreJobsUntilIdle(t *testing.T, a *testApp, tenantID string) {
 		if found {
 			continue
 		}
+		// Jobs due now (or running); later ones, such as interview
+		// reminders, wait for their time.
 		var open int
-		require.NoError(t, testutil.Current.Admin.QueryRow(ctx,
-			`SELECT count(*) FROM job WHERE queue = 'core' AND tenant_id = $1 AND status IN ('pending', 'running')`, tenantID).Scan(&open))
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM job WHERE queue = 'core' AND tenant_id = $1
+			AND (status = 'running' OR (status = 'pending' AND run_after <= now()))`, tenantID).Scan(&open))
 		if open == 0 {
 			return
 		}

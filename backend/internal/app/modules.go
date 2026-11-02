@@ -65,11 +65,12 @@ func NewModules(d Deps) *Modules {
 		Tenants: m.Identity, Ads: careersAds{m.Jobs}, Candidates: careersCandidates{m.Candidates},
 		CVs: m.Documents, Pipeline: m.Pipeline,
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
-	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity)
 	m.Emails = emails.New(d.Pool, emails.Deps{
 		Candidates: emailCandidates{m.Candidates}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
-		Interviews: emailInterviews{m.Interviews}, Tenants: m.Identity,
+		Interviews: emailInterviews{m}, Tenants: m.Identity,
 	}, d.Mail)
+	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
+		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -137,6 +138,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	for _, handlers := range []jobqueue.Handlers{
 		m.Documents.JobHandlers(),
 		m.Emails.JobHandlers(),
+		m.Interviews.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

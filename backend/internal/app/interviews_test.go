@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/humantime"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -140,4 +142,56 @@ func TestInterviews(t *testing.T) {
 		assert.Equal(t, http.StatusUnprocessableEntity, res.Status)
 		assert.Contains(t, string(res.Body), "reopen it")
 	})
+}
+
+func TestInterviewReminders(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleHiringManager, api.RoleSourcer)
+	recruiter, manager, sourcer := tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleHiringManager], tenant.Users[api.RoleSourcer]
+	managerEmail := "hiring_manager." + tenant.ID + "@test.local"
+	company := a.createCompany(recruiter.Token, map[string]any{"name": "Contoh Berhad"})
+	job := a.createJob(recruiter.Token, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	app := a.addToJob(recruiter.Token, job.Id, a.createCandidate(recruiter.Token, map[string]any{"firstName": "Wei"}).Id)
+	start := time.Now().UTC().Add(72 * time.Hour).Truncate(time.Minute)
+	iv := a.interview(http.MethodPost, "/v1/applications/"+app.Id+"/interviews", recruiter.Token, map[string]any{
+		"title": "First interview", "startsAt": start, "durationMinutes": 60, "mode": "phone", "interviewerIds": []string{manager.ID, sourcer.ID},
+	}, http.StatusCreated)
+
+	ctx := context.Background()
+	var runAfter time.Time
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx,
+		`SELECT run_after FROM job WHERE tenant_id = $1 AND kind = 'interview.remind'`, tenant.ID).Scan(&runAfter))
+	assert.WithinDuration(t, start.Add(-24*time.Hour), runAfter, time.Second, "the reminder waits until the day before")
+
+	moved := start.Add(2 * time.Hour)
+	a.interview(http.MethodPatch, "/v1/interviews/"+iv.Id, recruiter.Token, map[string]any{"version": iv.Version, "startsAt": moved}, http.StatusOK)
+	other := a.addToJob(recruiter.Token, job.Id, a.createCandidate(recruiter.Token, map[string]any{"firstName": "Aina"}).Id)
+	cancelled := a.interview(http.MethodPost, "/v1/applications/"+other.Id+"/interviews", recruiter.Token, map[string]any{
+		"title": "Panel", "startsAt": start.Add(24 * time.Hour), "durationMinutes": 30, "mode": "video", "interviewerIds": []string{manager.ID},
+	}, http.StatusCreated)
+	a.interview(http.MethodPatch, "/v1/interviews/"+cancelled.Id, recruiter.Token, map[string]any{"version": cancelled.Version, "status": "cancelled"}, http.StatusOK)
+
+	// The day before comes: every reminder is due.
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'interview.remind'`, tenant.ID)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	msgs := mailServer.To(managerEmail)
+	require.Len(t, msgs, 1, "one reminder: at the new time only, and none for the cancelled interview")
+	assert.ElementsMatch(t, []string{managerEmail, "sourcer." + tenant.ID + "@test.local"}, msgs[0].To)
+	assert.Contains(t, msgs[0].Data, "You are interviewing Wei for Accountant.")
+	assert.Contains(t, msgs[0].Data, "Test hiring_manager, Test sourcer")
+	assert.Contains(t, msgs[0].Data, humantime.When(moved, kualaLumpur(t)), "in the company's time zone")
+
+	// A second run of the same reminder (a retry) does not send it again.
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'pending', run_after = now() WHERE tenant_id = $1 AND kind = 'interview.remind'`, tenant.ID)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Len(t, mailServer.To(managerEmail), 1)
+}
+
+func kualaLumpur(t *testing.T) *time.Location {
+	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	require.NoError(t, err)
+	return loc
 }

@@ -1556,6 +1556,7 @@ components:
         - document.parse_cv
         - document.text_extracted
         - email.send
+        - interview.remind
     Error:
       type: object
       required: [error]
@@ -2646,6 +2647,13 @@ components:
       properties:
         recommendation: {$ref: '#/components/schemas/Recommendation'}
         comments: {type: string, maxLength: 5000, nullable: true}
+    InterviewRemindJob:
+      type: object
+      additionalProperties: false
+      required: [interviewId, startsAt]
+      properties:
+        interviewId: {$ref: '#/components/schemas/InterviewId'}
+        startsAt: {type: string, format: date-time, description: When the interview was when the reminder was queued; a moved interview has a newer reminder.}
     JobAdId:
       type: string
       pattern: '^ad_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3281,6 +3289,11 @@ x-jobs:
     queue: core
     payload: EmailSendJob
     description: Send one queued email through the mail server (Go worker).
+  interview.remind:
+    module: interviews
+    queue: core
+    payload: InterviewRemindJob
+    description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
 x-modules:
   - name: candidates
     description: Candidate profiles. Salary details are stored and permissioned separately.

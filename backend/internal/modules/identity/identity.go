@@ -117,3 +117,17 @@ func (m *Module) TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (st
 	t, err := store.New(tx).GetTenant(ctx, tenantID)
 	return t.Name, err
 }
+
+// Contact is an active user's name and email address.
+type Contact struct{ Name, Email string }
+
+// ActiveContacts returns the names and addresses of those of the given users
+// who are active (to email interviewers), in the caller's transaction.
+func (m *Module) ActiveContacts(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Contact, error) {
+	rows, err := store.New(tx).ActiveUserEmails(ctx, ids)
+	out := make(map[string]Contact, len(rows))
+	for _, r := range rows {
+		out[r.ID] = Contact{Name: r.Name, Email: r.Email}
+	}
+	return out, err
+}

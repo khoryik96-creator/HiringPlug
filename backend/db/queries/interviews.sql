@@ -54,3 +54,6 @@ INSERT INTO interview_feedback (tenant_id, interview_id, user_id, recommendation
 VALUES (app_current_tenant(), @interview_id, @user_id, @recommendation, sqlc.narg(comments))
 ON CONFLICT (tenant_id, interview_id, user_id)
 DO UPDATE SET recommendation = EXCLUDED.recommendation, comments = EXCLUDED.comments, submitted_at = now();
+
+-- name: MarkReminded :exec
+UPDATE interview SET reminded_for = @starts_at WHERE id = @id;

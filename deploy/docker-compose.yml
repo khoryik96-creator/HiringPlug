@@ -21,6 +21,7 @@ x-backend-env: &backend-env
   HP_INTERNAL_BASE_URL: http://api:8080
   HP_CLIENT_IP_HEADER: X-Real-IP # set by nginx (deploy/nginx.conf)
   HP_PUBLIC_URL: ${HP_PUBLIC_URL:-http://localhost:3000} # where people reach the app
+  HP_TIME_ZONE: ${HP_TIME_ZONE:-Asia/Kuala_Lumpur} # times in reminder emails
   # Email from the app. By default it goes to Mailpit, which catches every
   # message (nothing reaches real inboxes): read it at http://localhost:8025.
   # For real email set these to your mail server (see .env.example).

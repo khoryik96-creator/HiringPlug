@@ -218,7 +218,10 @@ requirements), de-duplicated, and kept with its source and date.
   feedback only after giving their own, so the first opinion does not steer
   the rest; recruiters see it all. The dashboard shows "My upcoming
   interviews" (two weeks) and "Feedback to give"; "Email candidate" writes
-  the invitation.
+  the invitation. The interviewers get an email reminder the day before (when,
+  how, where, who else, and a link to the candidate), with the time in the
+  company's time zone (`HP_TIME_ZONE`); a moved interview is reminded of at
+  its new time only, and a cancelled one not at all.
 - **Email** ✅: write email from a candidate's page (or "Email candidate" on
   an interview). Pick a template, optionally for one of their jobs: it is
   filled from the candidate, the job and its company, the interview (time in
@@ -249,7 +252,7 @@ requirements), de-duplicated, and kept with its source and date.
   reason exactly when closing, reopen before placing, and a placed candidate
   only goes back to offer or is withdrawn. Two people moving the same card:
   the second is told and reloads. Next: dashboard counts and conversion.
-- **Interviews:** Google and Microsoft calendar sync, and reminders (4.3).
+- **Interviews:** Google and Microsoft calendar sync (4.3).
 - **CV vs job match:** the AI worker scores fit and explains it. Every reason
   quotes the CV and the job ad, so a recruiter can check it. It suggests; the
   recruiter decides.

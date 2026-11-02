@@ -23,7 +23,11 @@ x-module:
     INTERVIEW_NOT_ALLOWED:
       status: 422
       description: The interview cannot be scheduled or changed like this (closed application, feedback from someone who is not an interviewer, ...). The message says why.
-  jobs: {}
+  jobs:
+    interview.remind:
+      queue: core
+      payload: InterviewRemindJob
+      description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
 
 paths:
   /v1/applications/{applicationId}/interviews:
@@ -300,3 +304,12 @@ components:
       properties:
         recommendation: { $ref: '#/components/schemas/Recommendation' }
         comments: { type: string, maxLength: 5000, nullable: true }
+
+    # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    InterviewRemindJob:
+      type: object
+      additionalProperties: false
+      required: [interviewId, startsAt]
+      properties:
+        interviewId: { $ref: '#/components/schemas/InterviewId' }
+        startsAt: { type: string, format: date-time, description: When the interview was when the reminder was queued; a moved interview has a newer reminder. }

@@ -12,6 +12,7 @@
 //	interviews.go  the module's public API and what it needs from other modules
 //	domain.go      the rules, as pure functions on plain values (unit tested)
 //	calendar.go    the interview as an .ics calendar file
+//	reminders.go   the interviewers' reminder email the day before (a job)
 //	service.go     use cases: one transaction each
 //	http.go        HTTP handlers: contract types <-> service calls
 //	internal/store generated SQL (db/queries/interviews.sql); private to this module
@@ -19,11 +20,13 @@ package interviews
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Application is what this module needs to know about an application.
@@ -45,6 +48,26 @@ type Users interface {
 	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 }
 
+// Message is an email to some of the company's users.
+type Message struct {
+	Subject, Body string
+	ApplicationID string
+}
+
+// Mailer emails the company's users (identity and emails modules), in the
+// caller's transaction, and says how many it emailed (inactive users are
+// left out).
+type Mailer interface {
+	EmailUsers(ctx context.Context, tx pgx.Tx, tenantID string, userIDs []string, m Message) (int, error)
+}
+
+// Settings are the company's: its time zone (for times in reminders) and
+// where people reach the app (for links).
+type Settings struct {
+	TimeZone  *time.Location
+	PublicURL string
+}
+
 // Module is the interviews module.
 type Module struct {
 	service *Service
@@ -52,9 +75,14 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, applications Applications, users Users) *Module {
-	svc := &Service{pool: pool, applications: applications, users: users}
+func New(pool *pgxpool.Pool, applications Applications, users Users, mailer Mailer, settings Settings) *Module {
+	svc := &Service{pool: pool, applications: applications, users: users, mailer: mailer, settings: settings}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// JobHandlers returns the module's handlers for the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindInterviewRemind: m.service.remind}
 }
 
 // Brief returns one interview for other modules, in the caller's transaction.

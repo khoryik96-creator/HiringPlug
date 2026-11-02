@@ -64,6 +64,12 @@ type Handlers map[api.JobKind]Handler
 // Enqueue queues a job inside tx: it only exists if tx commits. payload must
 // be the generated type for kind (e.g. api.DocumentExtractTextJob).
 func Enqueue(ctx context.Context, tx pgx.Tx, tenantID string, kind api.JobKind, payload any) (string, error) {
+	return EnqueueAt(ctx, tx, tenantID, kind, payload, time.Time{})
+}
+
+// EnqueueAt queues a job inside tx that runs no earlier than runAfter (now
+// when zero), e.g. a reminder the day before an interview.
+func EnqueueAt(ctx context.Context, tx pgx.Tx, tenantID string, kind api.JobKind, payload any, runAfter time.Time) (string, error) {
 	info, ok := Kinds()[kind]
 	if !ok {
 		return "", fmt.Errorf("jobqueue: job kind %q is not declared in the contract (x-jobs)", kind)
@@ -80,8 +86,12 @@ func Enqueue(ctx context.Context, tx pgx.Tx, tenantID string, kind api.JobKind, 
 		reqID = &id
 	}
 	var id string
-	err = tx.QueryRow(ctx, `SELECT job_enqueue($1, $2, $3, $4::jsonb, $5)`,
-		tenantID, info.Queue, string(kind), string(data), reqID).Scan(&id)
+	var after *time.Time
+	if !runAfter.IsZero() {
+		after = &runAfter
+	}
+	err = tx.QueryRow(ctx, `SELECT job_enqueue($1, $2, $3, $4::jsonb, $5, coalesce($6, now()))`,
+		tenantID, info.Queue, string(kind), string(data), reqID, after).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("jobqueue: enqueue %s: %w", kind, err)
 	}

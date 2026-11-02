@@ -229,6 +229,7 @@ type Interview struct {
 	CreatedBy       string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	RemindedFor     *time.Time
 }
 
 type InterviewFeedback struct {

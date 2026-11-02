@@ -99,3 +99,17 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 	_, err := store.New(tx).MoveEmailsToCandidate(ctx, store.MoveEmailsToCandidateParams{FromID: &fromID, ToID: &toID})
 	return err
 }
+
+// Notice is an email the app sends by itself (an interview reminder): from
+// HiringPlug, with no one in particular to reply to.
+type Notice struct {
+	To            []string
+	Subject, Body string
+	ApplicationID *string
+}
+
+// Notify records a notice and queues it for sending, in the caller's
+// transaction (a job's, scoped to tenantID).
+func (m *Module) Notify(ctx context.Context, tx pgx.Tx, tenantID string, n Notice) error {
+	return m.service.notify(ctx, tx, tenantID, n)
+}

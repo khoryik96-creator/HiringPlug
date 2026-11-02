@@ -12,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	// Time zone names work wherever the app runs, even without the
+	// system's time zone files (Windows, minimal images).
+	_ "time/tzdata"
 )
 
 // Environments.
@@ -46,6 +50,9 @@ type Config struct {
 	InternalBaseURL  string // HP_INTERNAL_BASE_URL
 	MaxUploadBytes   int64  // HP_MAX_UPLOAD_BYTES
 	DefaultPhoneArea string // HP_DEFAULT_PHONE_REGION: ISO country used for local phone numbers, e.g. MY
+	// TimeZone is where the company works: times in emails the app sends by
+	// itself (interview reminders) are written in it.
+	TimeZone *time.Location // HP_TIME_ZONE, e.g. Asia/Kuala_Lumpur
 	// ClientIPHeader is the header a reverse proxy names the client in (nginx:
 	// X-Real-IP). Empty when the API is reached directly. Never a header
 	// clients could set themselves.
@@ -92,6 +99,12 @@ func Load(getenv func(string) string) (Config, error) {
 		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
+	zone := r.str("HP_TIME_ZONE", "Asia/Kuala_Lumpur")
+	if loc, err := time.LoadLocation(zone); err != nil || zone == "Local" {
+		r.fail("HP_TIME_ZONE must be a time zone name, e.g. Asia/Kuala_Lumpur")
+	} else {
+		c.TimeZone = loc
+	}
 	c.SMTP = SMTP{
 		Addr: r.str("HP_SMTP_HOST", ""), Username: r.str("HP_SMTP_USERNAME", ""), Password: r.str("HP_SMTP_PASSWORD", ""),
 		From: r.str("HP_SMTP_FROM", ""), TLS: r.oneOf("HP_SMTP_TLS", "starttls", "starttls", "tls", "none"),

@@ -26,7 +26,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Work history and education on profiles; CV versions compared side by side |
 | ✅ | Job ads with publishing rules; a public careers page with an apply form; job board links, feed and Google for Jobs |
 | ✅ | Interviews with clash checks, calendar files and interviewer feedback |
-| ✅ | Email from the app with templates, sent through your mail server |
+| ✅ | Email from the app with templates, sent through your mail server; interview reminders |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -70,7 +70,7 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|
 | ✅ 4.1 **Interviews** | Schedule interviews for an application (interviewers, time, place or link, clash check), calendar files, a feedback form per interviewer (hidden from colleagues until they give theirs), and the dashboard's upcoming interviews and feedback to give. Reminders come with calendar sync (4.3). |
 | ✅ 4.2 **Email** | Send email from a candidate's page or an interview with templates (interview invitation, submit to client, application received, unsuccessful) filled from the candidate, job, interview and sender; sent in the background through the company's mail server, with replies to the sender; every email listed on the candidate's page with its state. Needs your mail server's SMTP settings for real sending. |
-| 4.3 **Calendar and inbox sync** | Google / Microsoft calendar sync for interviews; two-way email sync so replies show on the timeline |
+| 🔜 4.3 **Reminders, calendar and inbox sync** | ✅ Interviewers emailed a reminder the day before (moved interviews at their new time, cancelled ones not at all). Waiting on you: Google / Microsoft calendar sync for interviews; replies coming back into the app |
 
 ### Phase 5: AI and formatted CVs ⬜
 
@@ -114,4 +114,11 @@ sign-in (1.7).
 - **Your existing data**, if any, as Excel/CSV exports (step 2.3).
 - **Your branded CV template** in Word (step 5.1).
 - **The AI provider and hosting region** for DeepSeek (step 5.3).
+- **Calendar sync** (step 4.3): a Google Cloud OAuth app and/or a Microsoft
+  Entra app registration (client ID and secret), and the address people reach
+  HiringPlug at (for the sign-in redirect).
+- **Replies in the app** (step 4.3): either each user connects their mailbox
+  (Google / Microsoft sign-in), or replies go to one shared inbox the app reads
+  (its IMAP settings).
+- **Your mail server's SMTP settings** (step 4.2) to send real email.
 - **Job board partner accounts** (SEEK/JobStreet, LinkedIn, Indeed) to post ads directly (step 3.3); until then, ads are posted with their tracked links or picked up from the feed.

@@ -9,6 +9,37 @@ import (
 	"context"
 )
 
+const activeUserEmails = `-- name: ActiveUserEmails :many
+SELECT id, name, email FROM app_user WHERE active AND id = ANY($1::text[])
+`
+
+type ActiveUserEmailsRow struct {
+	ID    string
+	Name  string
+	Email string
+}
+
+// Active users' names and addresses (to email interviewers).
+func (q *Queries) ActiveUserEmails(ctx context.Context, ids []string) ([]ActiveUserEmailsRow, error) {
+	rows, err := q.db.Query(ctx, activeUserEmails, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActiveUserEmailsRow
+	for rows.Next() {
+		var i ActiveUserEmailsRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const activeUserRoles = `-- name: ActiveUserRoles :many
 SELECT id, role FROM app_user WHERE active AND id = ANY($1::text[])
 `

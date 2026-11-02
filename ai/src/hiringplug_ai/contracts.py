@@ -82,6 +82,7 @@ class JobKind(StrEnum):
     document_parse_cv = "document.parse_cv"
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
+    interview_remind = "interview.remind"
 
 
 class Error1(BaseModel):
@@ -949,6 +950,19 @@ class FeedbackInput(BaseModel):
     )
     recommendation: Recommendation
     comments: Annotated[str | None, Field(max_length=5000)] = None
+
+
+class InterviewRemindJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    interviewId: InterviewId
+    startsAt: Annotated[
+        AwareDatetime,
+        Field(
+            description="When the interview was when the reminder was queued; a moved interview has a newer reminder."
+        ),
+    ]
 
 
 class JobAdId(RootModel[str]):
