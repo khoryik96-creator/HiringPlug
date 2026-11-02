@@ -11,7 +11,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 |---|---|---|---|
 | 1 | Contacts with built-in email verifier | `companies`, `contacts` | 🧩 M3 |
 | 1.5 | Job ads puller | `job_leads` | 🧩 M6 |
-| 2 | Company: auto-fill details | `companies` | 🧩 M3 |
+| 2 | Companies | `companies` | ✅ records; auto-fill 🧩 |
 | 3 | Candidate profile fields | `candidates` | ✅ |
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
 | 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
@@ -81,8 +81,12 @@ this candidate fit this job?", and free questions.
 
 ## 1, 2. Companies and contacts
 
-- **Companies:** clients and prospects (agency) or your own company and its
-  departments (in-house). **Auto-fill** from a company name or website: a job
+- **Companies** ✅: clients and prospects (agency) or your own organisation's
+  departments (in-house): name, type, website, industry, size, phone, address,
+  city, country, registration number (e.g. SSM) and notes. Search by name or
+  website (ignoring case and accents), filter by type. Names are unique per
+  company (`Nestlé Malaysia` and `nestle malaysia` are the same), and edits use
+  the same lost-update protection as candidates. **Auto-fill** (next) from a company name or website: a job
   reads the website (structured data first, then AI extraction), optional data
   providers (Apollo, Google Places), and the business registry where available.
   Results are **suggestions with their source**; a person accepts them, and

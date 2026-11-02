@@ -56,3 +56,9 @@ export function renderWithClient(ui: ReactElement) {
   const result = render(wrap(ui));
   return { client, rerender: (next: ReactElement) => { result.rerender(wrap(next)); } };
 }
+
+/** The body of a mocked API call (calls[n][1].body), whatever the endpoint. */
+export function sentBody(mock: { mock: { calls: unknown[][] } }, call = 0): unknown {
+  const init = mock.mock.calls[call]?.[1] as { body?: unknown } | undefined;
+  return init?.body;
+}

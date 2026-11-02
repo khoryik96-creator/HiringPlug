@@ -15,6 +15,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Salary (current and expected) that only permitted roles see or edit, enforced by the database too |
 | ✅ | CV upload (PDF, Word) with text extraction and OCR for scanned pages |
 | ✅ | Roles (owner, admin, recruiter, sourcer, hiring manager, viewer) and an audit log of every change |
+| ✅ | Companies: clients, prospects or your own departments; search, add, edit |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -26,13 +27,13 @@ job. Today the app has candidates but nothing to place them into.
 
 | Step | Delivers | Notes |
 |---|---|---|
-| 🔜 **1.1 Sign-in and team** | Sign in with email and password (or Google / Microsoft); an admin screen to invite users, change roles and deactivate them | Today users paste a token and are created on the command line. Needed before anyone else uses it. |
-| ⬜ **1.2 Companies** | Client companies (agency) or departments (in-house): list, search, add, edit; website, industry, size, address, owner recruiter | Auto-fill from a website comes in Phase 5. |
-| ⬜ **1.3 Contacts** | People at companies (hiring managers, HR): name, title, email, phones, LinkedIn; built-in email check (format, the domain's mail servers, disposable and role addresses like `hr@`) | Mailbox-level checks later; many networks block them. |
-| ⬜ **1.4 Jobs** | Job orders / requisitions: title, company, contact, location, work type, headcount, salary range (sensitive, like candidate salary), status (open, on hold, filled, closed), owner, description | |
-| ⬜ **1.5 Pipeline** | Add candidates to a job; stages (applied, screened, submitted, interview, offer, placed, plus rejected / withdrawn with a reason); a drag-and-drop board per job; a candidate's jobs on their page | Stages configurable per company; moves checked in one place and tested move by move. |
-| ⬜ **1.6 Notes and timeline** | Screening, CV and interview notes on a candidate, job or application, with templates (screening questions); one timeline per record of notes and changes | Notes that mention salary follow the salary permission. |
-| ⬜ **1.7 Dashboard** | My open jobs, candidates per stage, applications stuck too long, activity this week | |
+| ✅ **1.1 Companies** | Client companies (agency) or departments (in-house): list, search, add, edit; website, industry, size, address, owner recruiter | Auto-fill from a website comes in Phase 5. |
+| 🔜 **1.2 Contacts** | People at companies (hiring managers, HR): name, title, email, phones, LinkedIn; built-in email check (format, the domain's mail servers, disposable and role addresses like `hr@`) | Mailbox-level checks later; many networks block them. |
+| ⬜ **1.3 Jobs** | Job orders / requisitions: title, company, contact, location, work type, headcount, salary range (sensitive, like candidate salary), status (open, on hold, filled, closed), owner, description | |
+| ⬜ **1.4 Pipeline** | Add candidates to a job; stages (applied, screened, submitted, interview, offer, placed, plus rejected / withdrawn with a reason); a drag-and-drop board per job; a candidate's jobs on their page | Stages configurable per company; moves checked in one place and tested move by move. |
+| ⬜ **1.5 Notes and timeline** | Screening, CV and interview notes on a candidate, job or application, with templates (screening questions); one timeline per record of notes and changes | Notes that mention salary follow the salary permission. |
+| ⬜ **1.6 Dashboard** | My open jobs, candidates per stage, applications stuck too long, activity this week | |
+| ⬜ **1.7 Sign-in and team** (last, by choice) | Sign in with email and password (or Google / Microsoft); an admin screen to invite users, change roles and deactivate them | Today users paste a token and are created on the command line. Needed before anyone else uses it. |
 
 ### Phase 2: getting candidates in faster ⬜
 
@@ -89,19 +90,16 @@ custom roles and "own / team / all" data scope per recruiter.
 ## Older milestone names
 
 Other documents still use the first plan's milestone names. They map to the
-phases above like this: **M2** (candidate depth) → Phase 2, plus notes (1.6)
-and team / custom roles (1.1, 7); **M3** (clients and pipeline) → Phase 1;
+phases above like this: **M2** (candidate depth) → Phase 2, plus notes (1.5)
+and team / custom roles (1.7, 7); **M3** (clients and pipeline) → Phase 1;
 **M4** (AI and formatting) → Phase 5; **M5** (communication) → Phases 3, 4 and
 6.1–6.2; **M6** (reach) → 3.3 and 6.3–6.5; **M7** (cloud) → Phase 7 and
-sign-in (1.1).
+sign-in (1.7).
 
 ## Waiting on you
 
-- **What to build first.** The plan starts with sign-in and the team screen,
-  then companies → contacts → jobs → pipeline. Say if another order suits you
-  better (for example jobs and pipeline before contacts).
 - **Your stages.** The pipeline stages you use today and the rejection reasons
-  (step 1.5).
+  (step 1.4).
 - **Anonymised sample CVs** (10–30, including two-column and scanned ones) for
   CV parsing quality tests (step 2.1).
 - **Your existing data**, if any, as Excel/CSV exports (step 2.3).

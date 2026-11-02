@@ -19,6 +19,7 @@ tenant ─┬─ app_user (role)
 | `tenant` | name |
 | `app_user` | email, name, role, active |
 | `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, `version`, search text |
+| `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text |
 | `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |
 | `document` | candidate, source (jobstreet/linkedin/original/formatted/other), file name, type, size, SHA-256, storage key, status (queued/extracted/needs_ocr/failed), extracted text, page count, extractor, warnings, error |
 | `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |
@@ -37,7 +38,7 @@ candidate belonging to the same company.
 | `notes` | note (type: screening/cv/interview/general; candidate, optional job or application; visibility; sensitive flag), note templates | M2 |
 | `identity` | custom roles, team, data scope, invites | M2 |
 | `parsing` | parsed profile (experience, education, skills) with source quotes | M2 |
-| `companies` | company (client/prospect), domain, industry, size, address, enrichment suggestions with source | M3 |
+| `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `contacts` | contact (company, role), email verification result + evidence + date | M3 |
 | `jobs` | job (client company or department, owner, status, salary range, location), job ad (text, channels) | M3 |
 | `pipeline` | application (candidate × job, stage, status, rejection reason, `version`), stage templates, stage history | M3 |

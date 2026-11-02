@@ -28,6 +28,8 @@ details get their own permissions.
 | `candidates.compensation:update` (salary) | ✓ | ✓ | ✓ | | | |
 | `documents:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `documents:create` | ✓ | ✓ | ✓ | ✓ | | |
+| `companies:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `companies:create`, `companies:update` | ✓ | ✓ | ✓ | ✓ | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

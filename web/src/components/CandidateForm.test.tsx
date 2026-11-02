@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { failure, invalidField, ok, renderWithClient, testCandidate } from "../test-utils";
+import { failure, invalidField, ok, renderWithClient, sentBody, testCandidate } from "../test-utils";
 import { CandidateForm } from "./CandidateForm";
 
 afterEach(() => {
@@ -28,7 +28,7 @@ describe("candidate form", () => {
     save();
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     // Version 3 makes the API answer CONFLICT_STALE_VERSION instead of wiping their phone number.
-    expect(patch.mock.calls[0]?.[1].body).toMatchObject({ version: 3, currentTitle: "Senior Accountant" });
+    expect(sentBody(patch)).toMatchObject({ version: 3, currentTitle: "Senior Accountant" });
   });
 
   it("closes without saving when nothing changed", async () => {

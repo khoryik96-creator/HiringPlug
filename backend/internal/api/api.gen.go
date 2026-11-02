@@ -56,6 +56,54 @@ func (e CandidateSource) Valid() bool {
 	}
 }
 
+// Defines values for CompanySize.
+const (
+	CompanySizeEnterprise CompanySize = "enterprise"
+	CompanySizeLarge      CompanySize = "large"
+	CompanySizeMedium     CompanySize = "medium"
+	CompanySizeMicro      CompanySize = "micro"
+	CompanySizeSmall      CompanySize = "small"
+)
+
+// Valid indicates whether the value is a known member of the CompanySize enum.
+func (e CompanySize) Valid() bool {
+	switch e {
+	case CompanySizeEnterprise:
+		return true
+	case CompanySizeLarge:
+		return true
+	case CompanySizeMedium:
+		return true
+	case CompanySizeMicro:
+		return true
+	case CompanySizeSmall:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CompanyType.
+const (
+	CompanyTypeClient   CompanyType = "client"
+	CompanyTypeInternal CompanyType = "internal"
+	CompanyTypeProspect CompanyType = "prospect"
+)
+
+// Valid indicates whether the value is a known member of the CompanyType enum.
+func (e CompanyType) Valid() bool {
+	switch e {
+	case CompanyTypeClient:
+		return true
+	case CompanyTypeInternal:
+		return true
+	case CompanyTypeProspect:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DocumentSource.
 const (
 	DocumentSourceFormatted DocumentSource = "formatted"
@@ -110,6 +158,7 @@ func (e DocumentStatus) Valid() bool {
 // Defines values for ErrorCode.
 const (
 	ErrorCodeCANDIDATEDUPLICATEEMAIL ErrorCode = "CANDIDATE_DUPLICATE_EMAIL"
+	ErrorCodeCOMPANYDUPLICATENAME    ErrorCode = "COMPANY_DUPLICATE_NAME"
 	ErrorCodeCONFLICTSTALEVERSION    ErrorCode = "CONFLICT_STALE_VERSION"
 	ErrorCodeFORBIDDEN               ErrorCode = "FORBIDDEN"
 	ErrorCodeINTERNAL                ErrorCode = "INTERNAL"
@@ -127,6 +176,8 @@ const (
 func (e ErrorCode) Valid() bool {
 	switch e {
 	case ErrorCodeCANDIDATEDUPLICATEEMAIL:
+		return true
+	case ErrorCodeCOMPANYDUPLICATENAME:
 		return true
 	case ErrorCodeCONFLICTSTALEVERSION:
 		return true
@@ -246,6 +297,9 @@ const (
 	PermissionCandidatesCreate             Permission = "candidates:create"
 	PermissionCandidatesRead               Permission = "candidates:read"
 	PermissionCandidatesUpdate             Permission = "candidates:update"
+	PermissionCompaniesCreate              Permission = "companies:create"
+	PermissionCompaniesRead                Permission = "companies:read"
+	PermissionCompaniesUpdate              Permission = "companies:update"
 	PermissionDocumentsCreate              Permission = "documents:create"
 	PermissionDocumentsRead                Permission = "documents:read"
 )
@@ -262,6 +316,12 @@ func (e Permission) Valid() bool {
 	case PermissionCandidatesRead:
 		return true
 	case PermissionCandidatesUpdate:
+		return true
+	case PermissionCompaniesCreate:
+		return true
+	case PermissionCompaniesRead:
+		return true
+	case PermissionCompaniesUpdate:
 		return true
 	case PermissionDocumentsCreate:
 		return true
@@ -457,6 +517,106 @@ type CandidateUpdate struct {
 	// Version The version you loaded.
 	Version           int                                  `json:"version"`
 	WorkAuthorization nullable.Nullable[WorkAuthorization] `json:"workAuthorization,omitempty"`
+}
+
+// Company defines model for Company.
+type Company struct {
+	About     nullable.Nullable[string]      `json:"about"`
+	Address   nullable.Nullable[string]      `json:"address"`
+	City      nullable.Nullable[string]      `json:"city"`
+	Country   nullable.Nullable[CountryCode] `json:"country"`
+	CreatedAt time.Time                      `json:"createdAt"`
+
+	// Id Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id       CompanyId                 `json:"id"`
+	Industry nullable.Nullable[string] `json:"industry"`
+	Name     string                    `json:"name"`
+	Phone    nullable.Nullable[string] `json:"phone"`
+
+	// RegistrationNumber Business registration number, e.g. SSM in Malaysia or UEN in Singapore.
+	RegistrationNumber nullable.Nullable[string]      `json:"registrationNumber"`
+	Size               nullable.Nullable[CompanySize] `json:"size"`
+
+	// Type client = you recruit for them; prospect = you want them as a client; internal = a part of your own organisation (in-house hiring).
+	Type      CompanyType `json:"type"`
+	UpdatedAt time.Time   `json:"updatedAt"`
+
+	// Version Send it back when you update.
+	Version int `json:"version"`
+
+	// Website Always with https://, e.g. https://example.com.
+	Website nullable.Nullable[string] `json:"website"`
+}
+
+// CompanyCreate defines model for CompanyCreate.
+type CompanyCreate struct {
+	About              nullable.Nullable[string]      `json:"about,omitempty"`
+	Address            nullable.Nullable[string]      `json:"address,omitempty"`
+	City               nullable.Nullable[string]      `json:"city,omitempty"`
+	Country            nullable.Nullable[CountryCode] `json:"country,omitempty"`
+	Industry           nullable.Nullable[string]      `json:"industry,omitempty"`
+	Name               string                         `json:"name"`
+	Phone              nullable.Nullable[string]      `json:"phone,omitempty"`
+	RegistrationNumber nullable.Nullable[string]      `json:"registrationNumber,omitempty"`
+	Size               nullable.Nullable[CompanySize] `json:"size,omitempty"`
+
+	// Type Defaults to client.
+	Type *CompanyType `json:"type,omitempty"`
+
+	// Website example.com or a full address; https:// is added if missing.
+	Website nullable.Nullable[string] `json:"website,omitempty"`
+}
+
+// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+type CompanyId = string
+
+// CompanyPage defines model for CompanyPage.
+type CompanyPage struct {
+	Items []CompanySummary `json:"items"`
+
+	// NextCursor Pass as `cursor` to get the next page; null on the last page.
+	NextCursor nullable.Nullable[CompanyId] `json:"nextCursor"`
+}
+
+// CompanySize Employees. micro 1–10, small 11–50, medium 51–200, large 201–1000, enterprise over 1000.
+type CompanySize string
+
+// CompanySummary defines model for CompanySummary.
+type CompanySummary struct {
+	City nullable.Nullable[string] `json:"city"`
+
+	// Id Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id       CompanyId                 `json:"id"`
+	Industry nullable.Nullable[string] `json:"industry"`
+	Name     string                    `json:"name"`
+
+	// Type client = you recruit for them; prospect = you want them as a client; internal = a part of your own organisation (in-house hiring).
+	Type      CompanyType               `json:"type"`
+	UpdatedAt time.Time                 `json:"updatedAt"`
+	Website   nullable.Nullable[string] `json:"website"`
+}
+
+// CompanyType client = you recruit for them; prospect = you want them as a client; internal = a part of your own organisation (in-house hiring).
+type CompanyType string
+
+// CompanyUpdate defines model for CompanyUpdate.
+type CompanyUpdate struct {
+	About              nullable.Nullable[string]      `json:"about,omitempty"`
+	Address            nullable.Nullable[string]      `json:"address,omitempty"`
+	City               nullable.Nullable[string]      `json:"city,omitempty"`
+	Country            nullable.Nullable[CountryCode] `json:"country,omitempty"`
+	Industry           nullable.Nullable[string]      `json:"industry,omitempty"`
+	Name               *string                        `json:"name,omitempty"`
+	Phone              nullable.Nullable[string]      `json:"phone,omitempty"`
+	RegistrationNumber nullable.Nullable[string]      `json:"registrationNumber,omitempty"`
+	Size               nullable.Nullable[CompanySize] `json:"size,omitempty"`
+
+	// Type client = you recruit for them; prospect = you want them as a client; internal = a part of your own organisation (in-house hiring).
+	Type *CompanyType `json:"type,omitempty"`
+
+	// Version The version you loaded.
+	Version int                       `json:"version"`
+	Website nullable.Nullable[string] `json:"website,omitempty"`
 }
 
 // Compensation defines model for Compensation.
@@ -694,6 +854,9 @@ type WorkAuthorizationStatus string
 // CandidateIdPath Example: cand_01jbz6w0m0k8q9x2r3s4t5v6w7
 type CandidateIdPath = CandidateId
 
+// CompanyIdPath Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+type CompanyIdPath = CompanyId
+
 // DocumentIdPath Example: doc_01jbz6w0m0k8q9x2r3s4t5v6w7
 type DocumentIdPath = DocumentId
 
@@ -736,6 +899,17 @@ type UploadCandidateDocumentMultipartBody struct {
 	Source DocumentSource `json:"source"`
 }
 
+// ListCompaniesParams defines parameters for ListCompanies.
+type ListCompaniesParams struct {
+	// Q Matches name or website, ignoring case and accents.
+	Q     *string      `form:"q,omitempty" json:"q,omitempty"`
+	Type  *CompanyType `form:"type,omitempty" json:"type,omitempty"`
+	Limit *int         `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The `nextCursor` of the previous page.
+	Cursor *CompanyId `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // CreateCandidateJSONRequestBody defines body for CreateCandidate for application/json ContentType.
 type CreateCandidateJSONRequestBody = CandidateCreate
 
@@ -747,6 +921,12 @@ type PutCandidateCompensationJSONRequestBody = CompensationUpdate
 
 // UploadCandidateDocumentMultipartRequestBody defines body for UploadCandidateDocument for multipart/form-data ContentType.
 type UploadCandidateDocumentMultipartRequestBody UploadCandidateDocumentMultipartBody
+
+// CreateCompanyJSONRequestBody defines body for CreateCompany for application/json ContentType.
+type CreateCompanyJSONRequestBody = CompanyCreate
+
+// UpdateCompanyJSONRequestBody defines body for UpdateCompany for application/json ContentType.
+type UpdateCompanyJSONRequestBody = CompanyUpdate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -771,6 +951,18 @@ type ServerInterface interface {
 	// UploadCandidateDocument Upload a CV or other document (PDF or DOCX, up to 10 MB)
 	// (POST /v1/candidates/{candidateId}/documents)
 	UploadCandidateDocument(w http.ResponseWriter, r *http.Request, candidateId CandidateIdPath)
+	// ListCompanies List or search companies, newest first
+	// (GET /v1/companies)
+	ListCompanies(w http.ResponseWriter, r *http.Request, params ListCompaniesParams)
+	// CreateCompany Add a company
+	// (POST /v1/companies)
+	CreateCompany(w http.ResponseWriter, r *http.Request)
+	// GetCompany Get a company
+	// (GET /v1/companies/{companyId})
+	GetCompany(w http.ResponseWriter, r *http.Request, companyId CompanyIdPath)
+	// UpdateCompany Change some fields of a company
+	// (PATCH /v1/companies/{companyId})
+	UpdateCompany(w http.ResponseWriter, r *http.Request, companyId CompanyIdPath)
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(w http.ResponseWriter, r *http.Request, documentId DocumentIdPath)
@@ -991,6 +1183,144 @@ func (siw *ServerInterfaceWrapper) UploadCandidateDocument(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
+// ListCompanies operation middleware
+func (siw *ServerInterfaceWrapper) ListCompanies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCompaniesParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", r.URL.Query(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCompanies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCompany operation middleware
+func (siw *ServerInterfaceWrapper) CreateCompany(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCompany(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCompany operation middleware
+func (siw *ServerInterfaceWrapper) GetCompany(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "companyId" -------------
+	var companyId CompanyIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "companyId", r.PathValue("companyId"), &companyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "companyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCompany(w, r, companyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCompany operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCompany(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "companyId" -------------
+	var companyId CompanyIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "companyId", r.PathValue("companyId"), &companyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "companyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCompany(w, r, companyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDocument operation middleware
 func (siw *ServerInterfaceWrapper) GetDocument(w http.ResponseWriter, r *http.Request) {
 
@@ -1156,6 +1486,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/candidates/{candidateId}", wrapper.GetCandidate)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/candidates/{candidateId}", wrapper.UpdateCandidate)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/candidates/{candidateId}/compensation", wrapper.PutCandidateCompensation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/companies", wrapper.ListCompanies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/companies", wrapper.CreateCompany)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/companies/{companyId}", wrapper.GetCompany)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/companies/{companyId}", wrapper.UpdateCompany)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/candidates/{candidateId}/documents", wrapper.ListCandidateDocuments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/candidates/{candidateId}/documents", wrapper.UploadCandidateDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/documents/{documentId}", wrapper.GetDocument)
@@ -1743,6 +2077,305 @@ func (response UploadCandidateDocument415JSONResponse) VisitUploadCandidateDocum
 	return err
 }
 
+type ListCompaniesRequestObject struct {
+	Params ListCompaniesParams
+}
+
+type ListCompaniesResponseObject interface {
+	VisitListCompaniesResponse(w http.ResponseWriter) error
+}
+
+type ListCompanies200JSONResponse CompanyPage
+
+func (response ListCompanies200JSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response ListCompanies400JSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response ListCompanies401JSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCompanies403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListCompanies403JSONResponse) VisitListCompaniesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCompanyRequestObject struct {
+	Body *CreateCompanyJSONRequestBody
+}
+
+type CreateCompanyResponseObject interface {
+	VisitCreateCompanyResponse(w http.ResponseWriter) error
+}
+
+type CreateCompany201JSONResponse Company
+
+func (response CreateCompany201JSONResponse) VisitCreateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCompany400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response CreateCompany400JSONResponse) VisitCreateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCompany401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response CreateCompany401JSONResponse) VisitCreateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCompany403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateCompany403JSONResponse) VisitCreateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCompany409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateCompany409JSONResponse) VisitCreateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompanyRequestObject struct {
+	CompanyId CompanyIdPath `json:"companyId"`
+}
+
+type GetCompanyResponseObject interface {
+	VisitGetCompanyResponse(w http.ResponseWriter) error
+}
+
+type GetCompany200JSONResponse Company
+
+func (response GetCompany200JSONResponse) VisitGetCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompany401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response GetCompany401JSONResponse) VisitGetCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompany403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetCompany403JSONResponse) VisitGetCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCompany404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetCompany404JSONResponse) VisitGetCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompanyRequestObject struct {
+	CompanyId CompanyIdPath `json:"companyId"`
+	Body      *UpdateCompanyJSONRequestBody
+}
+
+type UpdateCompanyResponseObject interface {
+	VisitUpdateCompanyResponse(w http.ResponseWriter) error
+}
+
+type UpdateCompany200JSONResponse Company
+
+func (response UpdateCompany200JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompany400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response UpdateCompany400JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompany401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response UpdateCompany401JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompany403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateCompany403JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompany404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateCompany404JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCompany409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateCompany409JSONResponse) VisitUpdateCompanyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDocumentRequestObject struct {
 	DocumentId DocumentIdPath `json:"documentId"`
 }
@@ -1865,6 +2498,18 @@ type StrictServerInterface interface {
 	// UploadCandidateDocument Upload a CV or other document (PDF or DOCX, up to 10 MB)
 	// (POST /v1/candidates/{candidateId}/documents)
 	UploadCandidateDocument(ctx context.Context, request UploadCandidateDocumentRequestObject) (UploadCandidateDocumentResponseObject, error)
+	// ListCompanies List or search companies, newest first
+	// (GET /v1/companies)
+	ListCompanies(ctx context.Context, request ListCompaniesRequestObject) (ListCompaniesResponseObject, error)
+	// CreateCompany Add a company
+	// (POST /v1/companies)
+	CreateCompany(ctx context.Context, request CreateCompanyRequestObject) (CreateCompanyResponseObject, error)
+	// GetCompany Get a company
+	// (GET /v1/companies/{companyId})
+	GetCompany(ctx context.Context, request GetCompanyRequestObject) (GetCompanyResponseObject, error)
+	// UpdateCompany Change some fields of a company
+	// (PATCH /v1/companies/{companyId})
+	UpdateCompany(ctx context.Context, request UpdateCompanyRequestObject) (UpdateCompanyResponseObject, error)
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(ctx context.Context, request GetDocumentRequestObject) (GetDocumentResponseObject, error)
@@ -2120,6 +2765,122 @@ func (sh *strictHandler) UploadCandidateDocument(w http.ResponseWriter, r *http.
 	}
 }
 
+// ListCompanies operation middleware
+func (sh *strictHandler) ListCompanies(w http.ResponseWriter, r *http.Request, params ListCompaniesParams) {
+	var request ListCompaniesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCompanies(ctx, request.(ListCompaniesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCompanies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCompaniesResponseObject); ok {
+		if err := validResponse.VisitListCompaniesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCompany operation middleware
+func (sh *strictHandler) CreateCompany(w http.ResponseWriter, r *http.Request) {
+	var request CreateCompanyRequestObject
+
+	var body CreateCompanyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCompany(ctx, request.(CreateCompanyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCompany")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCompanyResponseObject); ok {
+		if err := validResponse.VisitCreateCompanyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCompany operation middleware
+func (sh *strictHandler) GetCompany(w http.ResponseWriter, r *http.Request, companyId CompanyIdPath) {
+	var request GetCompanyRequestObject
+
+	request.CompanyId = companyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCompany(ctx, request.(GetCompanyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCompany")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCompanyResponseObject); ok {
+		if err := validResponse.VisitGetCompanyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCompany operation middleware
+func (sh *strictHandler) UpdateCompany(w http.ResponseWriter, r *http.Request, companyId CompanyIdPath) {
+	var request UpdateCompanyRequestObject
+
+	request.CompanyId = companyId
+
+	var body UpdateCompanyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCompany(ctx, request.(UpdateCompanyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCompany")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCompanyResponseObject); ok {
+		if err := validResponse.VisitUpdateCompanyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDocument operation middleware
 func (sh *strictHandler) GetDocument(w http.ResponseWriter, r *http.Request, documentId DocumentIdPath) {
 	var request GetDocumentRequestObject
@@ -2175,100 +2936,115 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"CuXZFOPQabhqouUt/c7yk8n/DgA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

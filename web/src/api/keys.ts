@@ -3,3 +3,5 @@
 // from updating after a save; using these avoids that.
 export const candidateKey = (id: string) => ["candidate", id] as const;
 export const candidatesKey = ["candidates"] as const;
+export const companyKey = (id: string) => ["company", id] as const;
+export const companiesKey = ["companies"] as const;

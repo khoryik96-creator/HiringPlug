@@ -39,6 +39,20 @@ export const PAY_PERIOD: Record<Schemas["PayPeriod"], string> = {
   hour: "hour",
 };
 
+export const COMPANY_TYPE: Record<Schemas["CompanyType"], string> = {
+  client: "Client",
+  prospect: "Prospect",
+  internal: "Our organisation",
+};
+
+export const COMPANY_SIZE: Record<Schemas["CompanySize"], string> = {
+  micro: "1–10 people",
+  small: "11–50 people",
+  medium: "51–200 people",
+  large: "201–1,000 people",
+  enterprise: "Over 1,000 people",
+};
+
 /** The values of a label map, in its order: the options of a select. */
 export function keysOf<K extends string>(labels: Record<K, unknown>): K[] {
   return Object.keys(labels) as K[];

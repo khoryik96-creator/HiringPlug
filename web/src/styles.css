@@ -29,3 +29,7 @@ fieldset.form-grid { border: 0; margin: 0; padding: 0; min-width: 0; }
 fieldset > legend { font-weight: 600; padding: 0; margin-bottom: 0.5rem; }
 [role="alert"] ul { margin: 0.25rem 0; padding-left: 1.25rem; }
 input.code { text-transform: uppercase; }
+nav a { color: inherit; text-decoration: none; padding: 0.25rem 0.5rem; border-radius: 4px; }
+nav a[aria-current="page"] { background: #e5e7eb; }
+nav strong { margin-right: 1rem; }
+.pre { white-space: pre-wrap; }

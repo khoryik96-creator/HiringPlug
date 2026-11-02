@@ -34,3 +34,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/documents/internal/store
+  - <<: *module
+    queries: db/queries/companies.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/companies/internal/store

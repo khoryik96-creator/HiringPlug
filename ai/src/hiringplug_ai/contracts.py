@@ -22,12 +22,16 @@ class Permission(StrEnum):
     candidates_create = "candidates:create"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
+    companies_create = "companies:create"
+    companies_read = "companies:read"
+    companies_update = "companies:update"
     documents_create = "documents:create"
     documents_read = "documents:read"
 
 
 class ErrorCode(StrEnum):
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
+    COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
@@ -289,6 +293,102 @@ class CandidatePage(BaseModel):
     items: list[CandidateSummary]
     nextCursor: Annotated[
         CandidateId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
+
+
+class CompanyId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["comp_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^comp_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class CompanyType(StrEnum):
+    client = "client"
+    prospect = "prospect"
+    internal = "internal"
+
+
+class CompanySize(StrEnum):
+    micro = "micro"
+    small = "small"
+    medium = "medium"
+    large = "large"
+    enterprise = "enterprise"
+
+
+class Company(BaseModel):
+    id: CompanyId
+    version: Annotated[int, Field(description="Send it back when you update.")]
+    name: str
+    type: CompanyType
+    website: Annotated[str | None, Field(description="Always with https://, e.g. https://example.com.")]
+    industry: Annotated[str | None, Field(...)]
+    size: Annotated[CompanySize | None, Field(...)]
+    phone: Annotated[str | None, Field(...)]
+    address: Annotated[str | None, Field(...)]
+    city: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
+    registrationNumber: Annotated[
+        str | None,
+        Field(description="Business registration number, e.g. SSM in Malaysia or UEN in Singapore."),
+    ]
+    about: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class CompanyCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    type: Annotated[CompanyType | None, Field(description="Defaults to client.")] = None
+    website: Annotated[
+        str | None,
+        Field(description="example.com or a full address; https:// is added if missing.", max_length=300),
+    ] = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    size: CompanySize | None = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    address: Annotated[str | None, Field(max_length=500)] = None
+    city: Annotated[str | None, Field(max_length=100)] = None
+    country: CountryCode | None = None
+    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
+    about: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class CompanyUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    type: CompanyType | None = None
+    website: Annotated[str | None, Field(max_length=300)] = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    size: CompanySize | None = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    address: Annotated[str | None, Field(max_length=500)] = None
+    city: Annotated[str | None, Field(max_length=100)] = None
+    country: CountryCode | None = None
+    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
+    about: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class CompanySummary(BaseModel):
+    id: CompanyId
+    name: str
+    type: CompanyType
+    industry: Annotated[str | None, Field(...)]
+    city: Annotated[str | None, Field(...)]
+    website: Annotated[str | None, Field(...)]
+    updatedAt: AwareDatetime
+
+
+class CompanyPage(BaseModel):
+    items: list[CompanySummary]
+    nextCursor: Annotated[
+        CompanyId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
     ]
 
 

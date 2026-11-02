@@ -9,6 +9,7 @@ machine first and is built to move to the cloud later.
 
 ## What is here today (milestone 1: the foundation)
 
+- **Companies** (clients, prospects or your own departments) with search.
 - **Candidates** with the profile fields recruiters need: name, email, phone,
   nationality, work authorization (local / expat with RP-T, PR or spouse visa /
   needs a visa), notice period, industry, specialization, source.

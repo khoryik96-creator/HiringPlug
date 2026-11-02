@@ -73,6 +73,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List or search companies, newest first */
+        get: operations["listCompanies"];
+        put?: never;
+        /** Add a company */
+        post: operations["createCompany"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Get a company */
+        get: operations["getCompany"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change some fields of a company
+         * @description Only the fields you send change. Send `null` to clear a field. `version` must be the version you loaded.
+         */
+        patch: operations["updateCompany"];
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/documents": {
         parameters: {
             query?: never;
@@ -139,9 +180,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "documents:create" | "documents:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "documents:create" | "documents:read";
         /** @enum {string} */
-        ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "CONFLICT_STALE_VERSION" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.extract_text" | "document.text_extracted";
         Error: {
@@ -314,6 +355,85 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["CandidateId"] | null;
         };
+        /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        CompanyId: string;
+        /**
+         * @description client = you recruit for them; prospect = you want them as a client; internal = a part of your own organisation (in-house hiring).
+         * @enum {string}
+         */
+        CompanyType: "client" | "prospect" | "internal";
+        /**
+         * @description Employees. micro 1–10, small 11–50, medium 51–200, large 201–1000, enterprise over 1000.
+         * @enum {string}
+         */
+        CompanySize: "micro" | "small" | "medium" | "large" | "enterprise";
+        Company: {
+            id: components["schemas"]["CompanyId"];
+            /** @description Send it back when you update. */
+            version: number;
+            name: string;
+            type: components["schemas"]["CompanyType"];
+            /** @description Always with https://, e.g. https://example.com. */
+            website: string | null;
+            industry: string | null;
+            size: components["schemas"]["CompanySize"] | null;
+            phone: string | null;
+            address: string | null;
+            city: string | null;
+            country: components["schemas"]["CountryCode"] | null;
+            /** @description Business registration number, e.g. SSM in Malaysia or UEN in Singapore. */
+            registrationNumber: string | null;
+            about: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CompanyCreate: {
+            name: string;
+            /** @description Defaults to client. */
+            type?: components["schemas"]["CompanyType"];
+            /** @description example.com or a full address; https:// is added if missing. */
+            website?: string | null;
+            industry?: string | null;
+            size?: components["schemas"]["CompanySize"] | null;
+            phone?: string | null;
+            address?: string | null;
+            city?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
+            registrationNumber?: string | null;
+            about?: string | null;
+        };
+        CompanyUpdate: {
+            /** @description The version you loaded. */
+            version: number;
+            name?: string;
+            type?: components["schemas"]["CompanyType"];
+            website?: string | null;
+            industry?: string | null;
+            size?: components["schemas"]["CompanySize"] | null;
+            phone?: string | null;
+            address?: string | null;
+            city?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
+            registrationNumber?: string | null;
+            about?: string | null;
+        };
+        CompanySummary: {
+            id: components["schemas"]["CompanyId"];
+            name: string;
+            type: components["schemas"]["CompanyType"];
+            industry: string | null;
+            city: string | null;
+            website: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CompanyPage: {
+            items: components["schemas"]["CompanySummary"][];
+            /** @description Pass as `cursor` to get the next page; null on the last page. */
+            nextCursor: components["schemas"]["CompanyId"] | null;
+        };
         /** @example doc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         DocumentId: string;
         /**
@@ -459,6 +579,7 @@ export interface components {
     };
     parameters: {
         CandidateIdPath: components["schemas"]["CandidateId"];
+        CompanyIdPath: components["schemas"]["CompanyId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
     };
     requestBodies: never;
@@ -602,6 +723,120 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Compensation"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listCompanies: {
+        parameters: {
+            query?: {
+                /** @description Matches name or website, ignoring case and accents. */
+                q?: string;
+                type?: components["schemas"]["CompanyType"];
+                limit?: number;
+                /** @description The `nextCursor` of the previous page. */
+                cursor?: components["schemas"]["CompanyId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCompany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Company"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

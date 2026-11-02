@@ -73,6 +73,28 @@ type CandidateCompensation struct {
 	UpdatedAt        time.Time
 }
 
+type Company struct {
+	ID                 string
+	TenantID           string
+	Version            int32
+	Name               string
+	Type               string
+	Website            *string
+	Industry           *string
+	Size               *string
+	Phone              *string
+	Address            *string
+	City               *string
+	Country            *string
+	RegistrationNumber *string
+	About              *string
+	SearchText         *string
+	NameKey            *string
+	CreatedBy          string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
 type Document struct {
 	ID                 string
 	TenantID           string

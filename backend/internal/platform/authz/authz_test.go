@@ -1,6 +1,8 @@
 package authz
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +34,17 @@ func TestSalaryPermissionsAreMarkedSensitive(t *testing.T) {
 	assert.False(t, IsSensitive(api.PermissionCandidatesRead))
 }
 
+// The CSV goes into the database session (row-level security), so it must be
+// the same for the same permissions every time. Checked without listing the
+// viewer's permissions, which grow with every module.
 func TestPermissionCSVIsSortedAndStable(t *testing.T) {
 	p := NewPrincipal("tnt_x", "usr_x", "", "", api.RoleViewer)
-	assert.Equal(t, "candidates:read,documents:read", p.PermissionCSV())
+	csv := p.PermissionCSV()
+	parts := strings.Split(csv, ",")
+	assert.True(t, slices.IsSorted(parts), csv)
+	assert.Contains(t, parts, string(api.PermissionCandidatesRead))
+	assert.NotContains(t, parts, string(api.PermissionCandidatesUpdate))
+	for range 5 {
+		assert.Equal(t, csv, NewPrincipal("tnt_x", "usr_x", "", "", api.RoleViewer).PermissionCSV())
+	}
 }
