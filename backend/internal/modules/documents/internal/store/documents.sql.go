@@ -11,7 +11,7 @@ import (
 )
 
 const getDocument = `-- name: GetDocument :one
-SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at FROM document WHERE id = $1
+SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser FROM document WHERE id = $1
 `
 
 func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) {
@@ -36,6 +36,9 @@ func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
 	)
 	return i, err
 }
@@ -43,7 +46,7 @@ func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) 
 const insertDocument = `-- name: InsertDocument :one
 INSERT INTO document (id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, created_by)
 VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, $7, $8, app_current_user())
-RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
 `
 
 type InsertDocumentParams struct {
@@ -88,13 +91,17 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
 	)
 	return i, err
 }
 
 const listDocumentsForCandidate = `-- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
-       status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at
+       status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,
+       parse_status, NULL::jsonb AS parsed_profile, parser
 FROM document WHERE candidate_id = $1
 ORDER BY id DESC
 `
@@ -118,6 +125,9 @@ type ListDocumentsForCandidateRow struct {
 	CreatedBy          string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	ParseStatus        *string
+	ParsedProfile      []byte
+	Parser             *string
 }
 
 func (q *Queries) ListDocumentsForCandidate(ctx context.Context, candidateID string) ([]ListDocumentsForCandidateRow, error) {
@@ -148,6 +158,9 @@ func (q *Queries) ListDocumentsForCandidate(ctx context.Context, candidateID str
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParseStatus,
+			&i.ParsedProfile,
+			&i.Parser,
 		); err != nil {
 			return nil, err
 		}
@@ -189,6 +202,39 @@ func (q *Queries) NewDocumentID(ctx context.Context) (string, error) {
 	return id, err
 }
 
+const queueParse = `-- name: QueueParse :one
+UPDATE document SET parse_status = 'queued', updated_at = now() WHERE id = $1 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+`
+
+func (q *Queries) QueueParse(ctx context.Context, id string) (Document, error) {
+	row := q.db.QueryRow(ctx, queueParse, id)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.Source,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.StorageKey,
+		&i.Status,
+		&i.ExtractedText,
+		&i.PageCount,
+		&i.Extractor,
+		&i.ErrorMessage,
+		&i.ExtractionWarnings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
+	)
+	return i, err
+}
+
 const saveExtraction = `-- name: SaveExtraction :one
 UPDATE document SET
   status = $1,
@@ -199,7 +245,7 @@ UPDATE document SET
   extraction_warnings = $6,
   updated_at = now()
 WHERE id = $7
-RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
 `
 
 type SaveExtractionParams struct {
@@ -242,6 +288,60 @@ func (q *Queries) SaveExtraction(ctx context.Context, arg SaveExtractionParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
+	)
+	return i, err
+}
+
+const saveParse = `-- name: SaveParse :one
+UPDATE document SET
+  parse_status = $1,
+  parsed_profile = $2,
+  parser = $3,
+  updated_at = now()
+WHERE id = $4
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+`
+
+type SaveParseParams struct {
+	ParseStatus   *string
+	ParsedProfile []byte
+	Parser        *string
+	ID            string
+}
+
+func (q *Queries) SaveParse(ctx context.Context, arg SaveParseParams) (Document, error) {
+	row := q.db.QueryRow(ctx, saveParse,
+		arg.ParseStatus,
+		arg.ParsedProfile,
+		arg.Parser,
+		arg.ID,
+	)
+	var i Document
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.Source,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.Sha256,
+		&i.StorageKey,
+		&i.Status,
+		&i.ExtractedText,
+		&i.PageCount,
+		&i.Extractor,
+		&i.ErrorMessage,
+		&i.ExtractionWarnings,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ParseStatus,
+		&i.ParsedProfile,
+		&i.Parser,
 	)
 	return i, err
 }

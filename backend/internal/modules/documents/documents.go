@@ -50,5 +50,6 @@ func New(pool *pgxpool.Pool, files *blob.Store, candidates Candidates, maxUpload
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{
 		api.JobKindDocumentTextExtracted: m.service.saveExtraction,
+		api.JobKindDocumentCvParsed:      m.service.saveParse,
 	}
 }

@@ -37,6 +37,16 @@ def wait_for_extraction(api: httpx.Client, document_id: str, timeout: float = 90
     pytest.fail(f"document {document_id} was still queued after {timeout}s")
 
 
+def wait_for_parsing(api: httpx.Client, document_id: str, timeout: float = 30) -> dict[str, object]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        doc: dict[str, object] = api.get(f"/v1/documents/{document_id}").json()
+        if doc["parseStatus"] not in (None, "queued"):
+            return doc
+        time.sleep(0.5)
+    pytest.fail(f"document {document_id} was not parsed after {timeout}s")
+
+
 def test_a_cv_is_uploaded_read_and_returned(api: httpx.Client) -> None:
     created = api.post("/v1/candidates", json={"firstName": "E2E", "lastName": f"Test {time.time_ns()}"})
     assert created.status_code == 201, created.text
@@ -59,3 +69,11 @@ def test_a_cv_is_uploaded_read_and_returned(api: httpx.Client) -> None:
     assert "Deloitte" in text  # from OCR
     assert "tesseract" in str(doc["extractor"])
     assert doc["pageCount"] == 2
+
+    # Then parsed, with every kept value quoting the saved text.
+    parsed = wait_for_parsing(api, str(upload.json()["id"]))
+    assert parsed["parseStatus"] == "parsed", parsed
+    profile = parsed["parsedProfile"]
+    assert isinstance(profile, dict)
+    assert profile["fullName"]["value"] == "Nur Aisyah binti Rahman"
+    assert profile["fullName"]["quote"] in text

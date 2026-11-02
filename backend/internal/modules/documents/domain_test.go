@@ -50,3 +50,33 @@ func TestCleanFileName(t *testing.T) {
 func TestCleanExtractedTextRemovesNUL(t *testing.T) {
 	assert.Equal(t, "ab", CleanExtractedText("a\x00b"))
 }
+
+func TestQuotesMustBeCVText(t *testing.T) {
+	text := ForQuotes("SITI  AISYAH\nSenior   Accountant | ABC Sdn Bhd")
+	assert.True(t, Quotes(text, "Siti Aisyah"), "case and spacing may differ")
+	assert.True(t, Quotes(text, "Senior Accountant | ABC"))
+	assert.False(t, Quotes(text, "Big Bank"))
+	assert.False(t, Quotes(text, "   "))
+}
+
+func TestValuesMustBeReadableFromTheirQuote(t *testing.T) {
+	for _, c := range []struct {
+		kind, value, quote string
+		ok                 bool
+	}{
+		{FieldText, "Siti Aisyah", "SITI AISYAH", true},
+		{FieldText, "Siti Binti Ahmad", "SITI BINT] AHMAD", true}, // OCR's "]" for a final I
+		{FieldText, "Excel", "Excel (Advanced)", true},
+		{FieldText, "+60 12-345 6789", "+60 12-345 6789", true},
+		{FieldText, "Python", "SAP", false},
+		{FieldText, "", "SAP", false},
+		{FieldURL, "https://www.linkedin.com/in/siti", "linkedin.com/in/siti", true},
+		{FieldURL, "https://evil.example/siti", "linkedin.com/in/siti", false},
+		{FieldCountry, "MY", "Nationality: Malaysian", true},
+		{FieldCountry, "Malaysia", "Nationality: Malaysian", false},
+		{FieldNoticePeriod, "1 month", "Notice period: one month", true},
+		{FieldNoticePeriod, "forever", "Notice period: forever", false},
+	} {
+		assert.Equal(t, c.ok, ValueFromQuote(c.kind, c.value, c.quote), "%s %q from %q", c.kind, c.value, c.quote)
+	}
+}

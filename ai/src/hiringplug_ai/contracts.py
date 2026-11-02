@@ -51,6 +51,7 @@ class ErrorCode(StrEnum):
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
+    DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
@@ -65,7 +66,9 @@ class ErrorCode(StrEnum):
 
 
 class JobKind(StrEnum):
+    document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
+    document_parse_cv = "document.parse_cv"
     document_text_extracted = "document.text_extracted"
 
 
@@ -588,36 +591,63 @@ class DocumentStatus(StrEnum):
     failed = "failed"
 
 
-class Document(BaseModel):
-    id: DocumentId
-    candidateId: CandidateId
-    source: DocumentSource
-    fileName: str
-    contentType: str
-    sizeBytes: int
-    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
-    status: DocumentStatus
-    pageCount: Annotated[int | None, Field(...)]
-    extractor: Annotated[
-        str | None,
-        Field(description="Which extractor produced the text, e.g. pdfplumber@0.11+tesseract@5.3."),
-    ]
-    errorMessage: Annotated[str | None, Field(...)]
-    extractionWarnings: Annotated[
-        list[str],
-        Field(
-            description='Problems a recruiter should know about, e.g. "OCR could not read page 3; this document may be incomplete." Empty when extraction was clean.\n'
-        ),
-    ]
-    extractedText: Annotated[
-        str | None, Field(description="Only included when fetching a single document.")
-    ] = None
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
+class DocumentParseStatus(StrEnum):
+    queued = "queued"
+    parsed = "parsed"
+    failed = "failed"
 
 
-class DocumentList(BaseModel):
-    items: list[Document]
+class SourcedText(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    value: Annotated[str, Field(max_length=300, min_length=1)]
+    quote: Annotated[str, Field(max_length=1000, min_length=1)]
+
+
+class ParsedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[SourcedText | None, Field(...)]
+    company: Annotated[SourcedText | None, Field(...)]
+    dates: Annotated[SourcedText | None, Field(...)]
+    startDate: Annotated[str | None, Field(description="YYYY-MM or YYYY.", pattern="^[0-9]{4}(-[0-9]{2})?$")]
+    endDate: Annotated[
+        str | None, Field(description="YYYY-MM or YYYY; null when current.", pattern="^[0-9]{4}(-[0-9]{2})?$")
+    ]
+    current: bool
+
+
+class ParsedEducation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    qualification: Annotated[SourcedText | None, Field(...)]
+    institution: Annotated[SourcedText | None, Field(...)]
+    dates: Annotated[SourcedText | None, Field(...)]
+    endYear: Annotated[int | None, Field(ge=1950, le=2100)]
+
+
+class ParsedProfile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    parser: Annotated[str, Field(description="name@version of the parser(s), e.g. rules@1.")]
+    fullName: Annotated[SourcedText | None, Field(...)]
+    email: Annotated[SourcedText | None, Field(...)]
+    phone: Annotated[SourcedText | None, Field(...)]
+    linkedinUrl: Annotated[SourcedText | None, Field(...)]
+    location: Annotated[SourcedText | None, Field(...)]
+    nationality: Annotated[SourcedText | None, Field(...)]
+    noticePeriod: Annotated[SourcedText | None, Field(...)]
+    skills: Annotated[list[SourcedText], Field(max_length=100)]
+    experience: Annotated[list[ParsedJob], Field(max_length=30)]
+    education: Annotated[list[ParsedEducation], Field(max_length=15)]
+    dropped: Annotated[
+        int,
+        Field(description="How many values were dropped because their quote was not found in the CV.", ge=0),
+    ]
 
 
 class DocumentExtractTextJob(BaseModel):
@@ -660,6 +690,26 @@ class DocumentTextExtractedJob(BaseModel):
         list[Warning],
         Field(description="Problems found while reading, e.g. pages OCR could not read.", max_length=20),
     ]
+
+
+class DocumentParseCvJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: DocumentId
+    text: Annotated[
+        str,
+        Field(description="The document's saved text, so quotes match it exactly.", pattern="^[^\\x00]*$"),
+    ]
+
+
+class DocumentCvParsedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: DocumentId
+    profile: Annotated[ParsedProfile | None, Field(...)]
+    errorMessage: Annotated[str | None, Field(...)]
 
 
 class User(BaseModel):
@@ -983,6 +1033,47 @@ class PipelineSummary(BaseModel):
     ]
     placedLast30Days: int
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
+
+
+class Document(BaseModel):
+    id: DocumentId
+    candidateId: CandidateId
+    source: DocumentSource
+    fileName: str
+    contentType: str
+    sizeBytes: int
+    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    status: DocumentStatus
+    pageCount: Annotated[int | None, Field(...)]
+    extractor: Annotated[
+        str | None,
+        Field(description="Which extractor produced the text, e.g. pdfplumber@0.11+tesseract@5.3."),
+    ]
+    errorMessage: Annotated[str | None, Field(...)]
+    extractionWarnings: Annotated[
+        list[str],
+        Field(
+            description='Problems a recruiter should know about, e.g. "OCR could not read page 3; this document may be incomplete." Empty when extraction was clean.\n'
+        ),
+    ]
+    extractedText: Annotated[
+        str | None, Field(description="Only included when fetching a single document.")
+    ] = None
+    parseStatus: Annotated[
+        DocumentParseStatus | None,
+        Field(
+            description="Null when the document was never parsed (formatted CVs, or uploaded before parsing existed)."
+        ),
+    ]
+    parsedProfile: Annotated[
+        ParsedProfile | None, Field(description="Only included when fetching a single document.")
+    ] = None
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class DocumentList(BaseModel):
+    items: list[Document]
 
 
 class Me(BaseModel):

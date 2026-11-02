@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from hiringplug_ai.contracts import DocumentTextExtractedJob, JobKind
+from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps
 from hiringplug_ai.queue import ClaimedJob, FollowUp, LeaseLostError
@@ -85,6 +85,21 @@ def test_an_unreadable_document_is_a_result_not_a_retry() -> None:
     assert isinstance(result, DocumentTextExtractedJob)
     assert result.status.value == "failed"
     assert result.errorMessage == "Only PDF and Word (.docx) files can be read."
+
+
+def test_parse_cv_sends_the_profile_back_to_the_go_worker() -> None:
+    queue = FakeQueue()
+    text = "Nur Aisyah binti Rahman\nnur@example.com\nSKILLS\nExcel, SAP\n"
+    process(queue, job("document.parse_cv", {"documentId": DOC_ID, "text": text}), deps())  # type: ignore[arg-type]
+    assert queue.failed == []
+    [[follow_up]] = queue.completed
+    assert (follow_up.queue, follow_up.kind) == ("core", JobKind.document_cv_parsed)
+    result = follow_up.payload
+    assert isinstance(result, DocumentCvParsedJob)
+    assert result.profile is not None
+    assert result.profile.email
+    assert result.profile.email.value == "nur@example.com"
+    DocumentCvParsedJob.model_validate(result.model_dump(mode="json"))
 
 
 @pytest.mark.parametrize(

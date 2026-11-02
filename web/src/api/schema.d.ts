@@ -261,6 +261,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/documents/{documentId}/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the profile details out of a CV again
+         * @description CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer parser. Returns the document with parseStatus `queued`.
+         */
+        post: operations["parseDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/documents/{documentId}": {
         parameters: {
             query?: never;
@@ -513,9 +535,9 @@ export interface components {
         /** @enum {string} */
         Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.extract_text" | "document.text_extracted";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -896,6 +918,11 @@ export interface components {
          * @enum {string}
          */
         DocumentStatus: "queued" | "extracted" | "needs_ocr" | "failed";
+        /**
+         * @description queued = being parsed; parsed = details ready to review; failed = the parser could not read it.
+         * @enum {string}
+         */
+        DocumentParseStatus: "queued" | "parsed" | "failed";
         Document: {
             id: components["schemas"]["DocumentId"];
             candidateId: components["schemas"]["CandidateId"];
@@ -914,6 +941,10 @@ export interface components {
             extractionWarnings: string[];
             /** @description Only included when fetching a single document. */
             extractedText?: string | null;
+            /** @description Null when the document was never parsed (formatted CVs, or uploaded before parsing existed). */
+            parseStatus: components["schemas"]["DocumentParseStatus"] | null;
+            /** @description Only included when fetching a single document. */
+            parsedProfile?: components["schemas"]["ParsedProfile"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -921,6 +952,44 @@ export interface components {
         };
         DocumentList: {
             items: components["schemas"]["Document"][];
+        };
+        /** @description A value read from a CV and the exact CV text it came from. Values whose quote is not in the CV are dropped before saving. */
+        SourcedText: {
+            value: string;
+            quote: string;
+        };
+        ParsedJob: {
+            title: components["schemas"]["SourcedText"] | null;
+            company: components["schemas"]["SourcedText"] | null;
+            dates: components["schemas"]["SourcedText"] | null;
+            /** @description YYYY-MM or YYYY. */
+            startDate: string | null;
+            /** @description YYYY-MM or YYYY; null when current. */
+            endDate: string | null;
+            current: boolean;
+        };
+        ParsedEducation: {
+            qualification: components["schemas"]["SourcedText"] | null;
+            institution: components["schemas"]["SourcedText"] | null;
+            dates: components["schemas"]["SourcedText"] | null;
+            endYear: number | null;
+        };
+        /** @description Details read from a CV, as suggestions to review. nationality is an ISO country code; noticePeriod is "<number> day|week|month". */
+        ParsedProfile: {
+            /** @description name@version of the parser(s), e.g. rules@1. */
+            parser: string;
+            fullName: components["schemas"]["SourcedText"] | null;
+            email: components["schemas"]["SourcedText"] | null;
+            phone: components["schemas"]["SourcedText"] | null;
+            linkedinUrl: components["schemas"]["SourcedText"] | null;
+            location: components["schemas"]["SourcedText"] | null;
+            nationality: components["schemas"]["SourcedText"] | null;
+            noticePeriod: components["schemas"]["SourcedText"] | null;
+            skills: components["schemas"]["SourcedText"][];
+            experience: components["schemas"]["ParsedJob"][];
+            education: components["schemas"]["ParsedEducation"][];
+            /** @description How many values were dropped because their quote was not found in the CV. */
+            dropped: number;
         };
         DocumentExtractTextJob: {
             documentId: components["schemas"]["DocumentId"];
@@ -944,6 +1013,16 @@ export interface components {
             errorMessage: string | null;
             /** @description Problems found while reading, e.g. pages OCR could not read. */
             warnings: string[];
+        };
+        DocumentParseCvJob: {
+            documentId: components["schemas"]["DocumentId"];
+            /** @description The document's saved text, so quotes match it exactly. */
+            text: string;
+        };
+        DocumentCvParsedJob: {
+            documentId: components["schemas"]["DocumentId"];
+            profile: components["schemas"]["ParsedProfile"] | null;
+            errorMessage: string | null;
         };
         Me: {
             user: components["schemas"]["User"];
@@ -1809,6 +1888,32 @@ export interface operations {
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
             415: components["responses"]["UnsupportedMediaType"];
+        };
+    };
+    parseDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getDocument: {

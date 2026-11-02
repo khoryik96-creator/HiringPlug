@@ -2,6 +2,8 @@ package documents
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -34,7 +36,7 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	if m, err := result.ErrorMessage.Get(); err == nil {
 		errMsg = &m
 	}
-	_, err := store.New(tx).SaveExtraction(ctx, store.SaveExtractionParams{
+	row, err := store.New(tx).SaveExtraction(ctx, store.SaveExtractionParams{
 		ID: result.DocumentId, Status: string(result.Status), ExtractedText: text,
 		PageCount: pages, Extractor: &result.Extractor, ErrorMessage: errMsg,
 		ExtractionWarnings: nonNil(result.Warnings),
@@ -46,10 +48,72 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	if err != nil {
 		return err
 	}
+	// CVs are parsed as soon as their text is saved; formatted CVs are our own output.
+	if row.Status == string(api.DocumentStatusExtracted) && row.Source != string(api.DocumentSourceFormatted) && hasText(row.ExtractedText) {
+		if err := queueParse(ctx, tx, job.TenantID, row); err != nil {
+			return err
+		}
+	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "document.text_extracted", EntityType: "document", EntityID: result.DocumentId,
 		Changes: map[string]any{"status": result.Status, "extractor": result.Extractor, "warnings": len(result.Warnings)},
 	})
+}
+
+// queueParse asks the AI worker to parse a document's saved text.
+func queueParse(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
+	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentParseCv, api.DocumentParseCvJob{
+		DocumentId: row.ID, Text: *row.ExtractedText,
+	}); err != nil {
+		return err
+	}
+	_, err := store.New(tx).QueueParse(ctx, row.ID)
+	return err
+}
+
+// saveParse handles document.cv_parsed: the parser's result. Only values
+// whose quote is in the saved CV text are kept (groundProfile).
+func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var result api.DocumentCvParsedJob
+	if err := job.Decode(&result); err != nil {
+		return err
+	}
+	q := store.New(tx)
+	row, err := q.GetDocument(ctx, result.DocumentId)
+	if database.IsNoRows(err) {
+		logx.From(ctx).Info("document no longer exists; dropping its parse result", "document_id", result.DocumentId)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	status := string(api.DocumentParseStatusFailed)
+	params := store.SaveParseParams{ID: row.ID, ParseStatus: &status}
+	changes := map[string]any{"status": status}
+	if profile, err := result.Profile.Get(); err == nil && hasText(row.ExtractedText) {
+		grounded := groundProfile(*row.ExtractedText, profile)
+		data, err := json.Marshal(grounded)
+		if err != nil {
+			return err
+		}
+		status = string(api.DocumentParseStatusParsed)
+		params.ParsedProfile, params.Parser = data, &grounded.Parser
+		// Counts only: CV contents never go in the audit log.
+		changes = map[string]any{
+			"status": status, "parser": grounded.Parser, "jobs": len(grounded.Experience),
+			"skills": len(grounded.Skills), "dropped": grounded.Dropped,
+		}
+	}
+	if _, err := q.SaveParse(ctx, params); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{
+		Action: "document.cv_parsed", EntityType: "document", EntityID: row.ID, Changes: changes,
+	})
+}
+
+func hasText(t *string) bool {
+	return t != nil && strings.TrimSpace(*t) != ""
 }
 
 func nonNil(s []string) []string {

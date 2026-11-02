@@ -2,6 +2,7 @@ package documents
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -93,6 +94,15 @@ func (h *HTTP) GetDocument(ctx context.Context, req api.GetDocumentRequestObject
 	return api.GetDocument200JSONResponse(documentToAPI(doc, true)), nil
 }
 
+// ParseDocument handles POST /v1/documents/{documentId}/parse.
+func (h *HTTP) ParseDocument(ctx context.Context, req api.ParseDocumentRequestObject) (api.ParseDocumentResponseObject, error) {
+	doc, err := h.svc.Parse(ctx, authz.MustFromContext(ctx), req.DocumentId)
+	if err != nil {
+		return nil, err
+	}
+	return api.ParseDocument202JSONResponse(documentToAPI(doc, false)), nil
+}
+
 func documentToAPI(d Document, withText bool) api.Document {
 	out := api.Document{
 		Id: d.ID, CandidateId: d.CandidateID, Source: api.DocumentSource(d.Source),
@@ -104,8 +114,18 @@ func documentToAPI(d Document, withText bool) api.Document {
 		ExtractionWarnings: d.Warnings,
 		CreatedAt:          d.CreatedAt, UpdatedAt: d.UpdatedAt,
 	}
+	if d.ParseStatus != nil {
+		out.ParseStatus = nullable.NewNullableWithValue(api.DocumentParseStatus(*d.ParseStatus))
+	} else {
+		out.ParseStatus = nullable.NewNullNullable[api.DocumentParseStatus]()
+	}
 	if withText {
 		out.ExtractedText = orNull(d.ExtractedText)
+		out.ParsedProfile = nullable.NewNullNullable[api.ParsedProfile]()
+		var profile api.ParsedProfile
+		if len(d.ParsedProfile) > 0 && json.Unmarshal(d.ParsedProfile, &profile) == nil {
+			out.ParsedProfile = nullable.NewNullableWithValue(profile)
+		}
 	}
 	return out
 }

@@ -22,6 +22,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Notes (sensitive ones protected) and an activity timeline on every record; a dashboard |
 | ✅ | Import candidates, companies and contacts from CSV, with a report of rows to fix |
 | ✅ | Duplicates flagged and merged; tags and skills with filters |
+| ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -45,7 +46,7 @@ job. Today the app has candidates but nothing to place them into.
 
 | Step | Delivers |
 |---|---|
-| 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, work history, education, skills), each value showing where in the CV it came from; you review and accept |
+| ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills), each value showing where in the CV it came from; you review and accept. Next: work history and education saved on the profile, the AI reader, two-column CVs and a quality set (needs your sample CVs). |
 | 2.2 **Duplicates** | ✅ The same email is refused; the same phone or a very similar name is flagged on the candidate's page; merge two candidates with their CVs, jobs, notes and salary |
 | ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | ✅ 2.4 **Tags, skills and lists** | Tags and skills on candidates, suggestions from values already used (also for industry and specialization), and list filters. Saved searches come with reports (6.3). |

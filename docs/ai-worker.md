@@ -1,6 +1,6 @@
 # The AI worker (Python)
 
-`ai/` processes jobs on the `ai` queue. It reads CVs today; parsing,
+`ai/` processes jobs on the `ai` queue. It reads and parses CVs today;
 formatting, blind CVs, matching and the assistant are designed below. It never
 touches business tables: it receives a job, does the work, and returns a result
 job that the Go worker saves.
@@ -9,8 +9,9 @@ job that the Go worker saves.
 ai/src/hiringplug_ai/
   worker.py          the loop: claim → validate payload → handler → complete (or fail)
   queue.py           calls the shared SQL job functions; this role can do nothing else
-  jobs/              one module per job kind (extract_text.py today)
+  jobs/              one module per job kind (extract_text.py, parse_cv.py)
   extraction/        reading documents: sniff, pdf, ocr, docx_reader, zipsafety, text, limits
+  parsing/           reading profile details out of CV text: layout, dates, contacts, history, skills
   contracts.py       GENERATED models from contracts/openapi.yaml
 ```
 
@@ -63,35 +64,63 @@ Tests build every document in code (text PDFs, scans, sideways scans, mixed
 PDFs, Word files with headers, tables and text boxes), so no real CV with
 personal data is ever committed.
 
-## CV parsing (M2): grounded in the source
+## CV parsing: grounded in the source
 
-The AI turns the text into a structured profile: contact details, work history
-(company, title, dates, duties), education, certifications, skills, languages,
-and current/expected salary and notice period when stated.
+**Built (rules@1).** When Go saves a CV's text it queues `document.parse_cv`
+with that saved text (formatted CVs are skipped). The worker returns
+`document.cv_parsed`: contact details, nationality, notice period, skills,
+work history (title, company, dates, current or not) and education.
 
-The difference from CV Studio: CV Studio fixes AI mistakes with a long chain of
-special-case rules, each patched after a real CV broke it. HiringPlug uses one
-general rule instead:
+**One rule for every reader: values must quote the CV.** Each value is a
+`{value, quote}` pair. Before saving, Go (`documents/grounding.go`, rules in
+`domain.go`) keeps a value only if
 
-- **Every extracted value must carry the exact text it came from** (a quote
-  from the CV), using the model's structured-output mode with a schema.
-- **A deterministic checker** confirms each quote exists in the CV text. Values
-  without a matching quote are dropped or flagged for review. This catches
-  invented employers, wrong dates and mixed-up sections in one place.
-- Values are **suggestions**: the recruiter accepts them into the profile.
-  Nothing silently overwrites what a person entered.
-- Each result records the model and prompt version, so it can be re-run when
-  models improve.
+- its quote is in the CV text (ignoring case and spacing), and
+- the value can be read from the quote: the same letters and digits in order
+  ("Siti Aisyah" from "SITI AISYAH", "Excel" from "Excel (Advanced)"), or a
+  fixed format for coded fields (country code, "1 month").
 
-**Quality has its own regression test:** a set of anonymised sample CVs with
-expected results runs in CI. Ordinary tests catch crashes; this catches "the
-parser got worse". It replaces CV Studio's written QA reports with automatic
-checks.
+Everything else is dropped and counted (`dropped`), so invented employers,
+wrong dates or values from the wrong line never reach a recruiter. The check
+does not care who produced the value, so the AI model added later (DeepSeek,
+once its host and region are chosen) goes through the same gate: rules
+handle what patterns read best (emails, phones, links, dates), the model
+fills what they miss (messy work history), and both are checked. Values are
+**suggestions**: the recruiter reviews them next to the profile and ticks
+what to use; nothing a person entered is replaced unless they tick it.
 
-**Two-column CVs** (a sidebar next to the main column) are the cause of many
-CV Studio bugs, because PDF text comes out with the columns interleaved. M2
-adds column-aware reading order (detecting the gap between columns from word
-positions). It needs a set of anonymised sample CVs to validate against.
+**The rules** (`parsing/`) come from Kano's CV scanner, rebuilt as small
+tested modules:
+
+- `layout.py`: lines and sections (English and Malay headings, headings with
+  content on the same line such as "Skills: Excel, SAP").
+- `contacts.py`: email; phone (labelled numbers first; never a year range such
+  as 1999-2001; never joined across lines; bare 8-digit runs only when they look
+  like Singapore mobiles); LinkedIn; name ("Name:" labels, JobStreet exports,
+  a name sharing the first line with a phone, ALL CAPS to Title Case, OCR's
+  "BINT]" for "BINTI"); location; nationality; notice period.
+- `dates.py`: "Jan 2020 – Present", "03/2019 - 12/2021", "2015 to 2018",
+  Malay month names.
+- `history.py`: a job is anchored on its date range; title and company come
+  from the same line ("Title | Company | dates", "Title at Company") or the
+  short lines around it, told apart by company words (Sdn Bhd, Pte Ltd,
+  Berhad, ...) and role words. Education by qualification and institution
+  words.
+- `skills.py`: items of the skills section only (never guessed from prose),
+  without levels ("Excel (Advanced)" → Excel), languages or personal facts.
+
+Each result records the parser version (`rules@1`), and **Read details
+again** re-runs it, so CVs can be re-parsed when the parser improves.
+
+**Next:**
+
+- **A quality set**: anonymised sample CVs with expected results, run in CI,
+  so a rule change that makes parsing worse fails the build. This needs real
+  CVs (10–30, including two-column and scanned ones).
+- **Two-column CVs** (a sidebar next to the main column) come out of PDFs with
+  the columns interleaved. Column-aware reading order (finding the gap
+  between columns from word positions) needs the same sample set to validate.
+- **The AI reader**, behind the same quote check.
 
 ## CV formatting and blind CVs (M4)
 

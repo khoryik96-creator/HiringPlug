@@ -52,6 +52,10 @@ x-error-codes:
     module: contacts
     status: 409
     description: Another contact already has this email. `details.existingContactId` points to them.
+  DOCUMENT_HAS_NO_TEXT:
+    module: documents
+    status: 409
+    description: The document has no extracted text yet (still being read, scanned without OCR, or unreadable), so there is nothing to parse.
   FORBIDDEN:
     module: shared
     status: 403
@@ -533,6 +537,27 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+  /v1/documents/{documentId}/parse:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    post:
+      operationId: parseDocument
+      tags: [documents]
+      summary: Read the profile details out of a CV again
+      description: >
+        CVs are parsed automatically after their text is read. Use this for CVs uploaded before parsing existed, or to re-run a newer parser. Returns the document with parseStatus `queued`.
+
+      x-permission: documents:create
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Document'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/documents/{documentId}:
     parameters:
       - $ref: '#/components/parameters/DocumentIdPath'
@@ -969,6 +994,7 @@ components:
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
         - CONTACT_DUPLICATE_EMAIL
+        - DOCUMENT_HAS_NO_TEXT
         - FORBIDDEN
         - INTERNAL
         - METHOD_NOT_ALLOWED
@@ -983,7 +1009,9 @@ components:
     JobKind:
       type: string
       enum:
+        - document.cv_parsed
         - document.extract_text
+        - document.parse_cv
         - document.text_extracted
     Error:
       type: object
@@ -1552,9 +1580,15 @@ components:
         queued = waiting for text extraction; extracted = text available; needs_ocr = scanned document, no text layer yet; failed = could not be read.
 
       enum: [queued, extracted, needs_ocr, failed]
+    DocumentParseStatus:
+      type: string
+      description: >
+        queued = being parsed; parsed = details ready to review; failed = the parser could not read it.
+
+      enum: [queued, parsed, failed]
     Document:
       type: object
-      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, createdAt, updatedAt]
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/DocumentId'}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
@@ -1580,6 +1614,14 @@ components:
           type: string
           nullable: true
           description: Only included when fetching a single document.
+        parseStatus:
+          allOf: [{$ref: '#/components/schemas/DocumentParseStatus'}]
+          nullable: true
+          description: Null when the document was never parsed (formatted CVs, or uploaded before parsing existed).
+        parsedProfile:
+          allOf: [{$ref: '#/components/schemas/ParsedProfile'}]
+          nullable: true
+          description: Only included when fetching a single document.
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     DocumentList:
@@ -1589,6 +1631,68 @@ components:
         items:
           type: array
           items: {$ref: '#/components/schemas/Document'}
+    SourcedText:
+      type: object
+      additionalProperties: false
+      required: [value, quote]
+      description: >
+        A value read from a CV and the exact CV text it came from. Values whose quote is not in the CV are dropped before saving.
+
+      properties:
+        value: {type: string, minLength: 1, maxLength: 300}
+        quote: {type: string, minLength: 1, maxLength: 1000}
+    ParsedJob:
+      type: object
+      additionalProperties: false
+      required: [title, company, dates, startDate, endDate, current]
+      properties:
+        title: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        company: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        dates: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        startDate: {type: string, nullable: true, pattern: '^[0-9]{4}(-[0-9]{2})?$', description: YYYY-MM or YYYY.}
+        endDate: {type: string, nullable: true, pattern: '^[0-9]{4}(-[0-9]{2})?$', description: YYYY-MM or YYYY; null when current.}
+        current: {type: boolean}
+    ParsedEducation:
+      type: object
+      additionalProperties: false
+      required: [qualification, institution, dates, endYear]
+      properties:
+        qualification: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        institution: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        dates: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        endYear: {type: integer, nullable: true, minimum: 1950, maximum: 2100}
+    ParsedProfile:
+      type: object
+      additionalProperties: false
+      required: [parser, fullName, email, phone, linkedinUrl, location, nationality, noticePeriod, skills, experience, education, dropped]
+      description: >
+        Details read from a CV, as suggestions to review. nationality is an ISO country code; noticePeriod is "<number> day|week|month".
+
+      properties:
+        parser: {type: string, description: 'name@version of the parser(s), e.g. rules@1.'}
+        fullName: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        email: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        phone: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        linkedinUrl: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        location: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        nationality: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        noticePeriod: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
+        skills:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/SourcedText'}
+        experience:
+          type: array
+          maxItems: 30
+          items: {$ref: '#/components/schemas/ParsedJob'}
+        education:
+          type: array
+          maxItems: 15
+          items: {$ref: '#/components/schemas/ParsedEducation'}
+        dropped:
+          type: integer
+          minimum: 0
+          description: How many values were dropped because their quote was not found in the CV.
     DocumentExtractTextJob:
       type: object
       additionalProperties: false
@@ -1626,6 +1730,24 @@ components:
           maxItems: 20
           items: {type: string, maxLength: 500}
           description: Problems found while reading, e.g. pages OCR could not read.
+    DocumentParseCvJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, text]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        text:
+          type: string
+          pattern: '^[^\x00]*$'
+          description: The document's saved text, so quotes match it exactly.
+    DocumentCvParsedJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, profile, errorMessage]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        profile: {allOf: [{$ref: '#/components/schemas/ParsedProfile'}], nullable: true}
+        errorMessage: {type: string, nullable: true}
     Me:
       type: object
       required: [user, tenant, role, permissions]
@@ -2124,11 +2246,21 @@ x-permissions:
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
 x-jobs:
+  document.cv_parsed:
+    module: documents
+    queue: core
+    payload: DocumentCvParsedJob
+    description: Save parsed CV details on the document, keeping only values whose quote is found in the CV (Go worker).
   document.extract_text:
     module: documents
     queue: ai
     payload: DocumentExtractTextJob
     description: Extract plain text from an uploaded document (Python AI worker).
+  document.parse_cv:
+    module: documents
+    queue: ai
+    payload: DocumentParseCvJob
+    description: Read profile details out of a CV's extracted text (Python AI worker).
   document.text_extracted:
     module: documents
     queue: core

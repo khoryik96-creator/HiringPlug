@@ -64,6 +64,21 @@ on the same job, the kept candidate's application stays.
 extracted text and any extraction warnings, so the web app can show the
 JobStreet, original and formatted versions side by side.
 
+**CV parsing** ✅: after a CV's text is read (with OCR for scans), the AI
+worker reads the profile details out of it: name, email, phone, LinkedIn,
+location, nationality, notice period, skills, work history and education.
+Every value carries the exact CV text it came from, and the server keeps only
+values whose quote is in the CV. On the candidate's page, **Review details
+from this CV** lists each suggestion next to what the profile has now, with
+the CV's wording: empty profile fields are ticked, filled ones never are, and
+**Use ticked details** saves them (with the usual lost-update protection).
+New skills are added to the existing ones. **Read details from this CV**
+parses CVs uploaded earlier. Formatted CVs are not parsed. Work history and
+education are shown for now; saving them on the profile comes next. Design:
+[ai-worker.md](ai-worker.md#cv-parsing-grounded-in-the-source).
+
+![Reviewing details read from a CV (an invented CV)](images/cv-review.png)
+
 **CV formatting (M4).** A formatted CV is generated from the candidate's
 structured profile (from CV parsing, M2) into your branded Word template,
 then saved as a `formatted` document. Templates are Word files with

@@ -1,24 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Document, unwrap } from "../api/client";
+import { api, type Candidate, type Document, unwrap } from "../api/client";
 import { getToken } from "../auth";
+import { CvReview } from "./CvReview";
 import { ErrorMessage } from "./ErrorMessage";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
 
-/** A candidate's CVs: upload, extraction status (polled while queued) and text. */
-export function Documents({ candidateId, canUpload }: { candidateId: string; canUpload: boolean }) {
+/**
+ * A candidate's CVs: upload, reading status (polled while the AI worker reads
+ * or parses them), the text, and the details parsed from it for review.
+ */
+export function Documents({ candidate, canUpload, canEdit }: { candidate: Candidate; canUpload: boolean; canEdit: boolean }) {
+  const candidateId = candidate.id;
   const queryClient = useQueryClient();
   const [source, setSource] = useState<(typeof SOURCES)[number]>("original");
   const [open, setOpen] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
 
   const docs = useQuery({
     queryKey: ["documents", candidateId],
     queryFn: async () =>
       unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
     // Keep checking while any CV is still being read by the AI worker.
-    refetchInterval: (query) => (query.state.data?.some((d) => d.status === "queued") ? 2000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued") ? 2000 : false,
+  });
+
+  const parse = useMutation({
+    mutationFn: async (documentId: string) =>
+      unwrap(await api.POST("/v1/documents/{documentId}/parse", { params: { path: { documentId } } })),
+    onSuccess: (d) => {
+      void queryClient.invalidateQueries({ queryKey: ["document", d.id] });
+      return queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
+    },
   });
 
   const upload = useMutation({
@@ -56,7 +72,7 @@ export function Documents({ candidateId, canUpload }: { candidateId: string; can
           />
         </div>
       )}
-      <ErrorMessage error={upload.error ?? docs.error} />
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error} />
       <ul>
         {docs.data?.map((d: Document) => (
           <li key={d.id}>
@@ -64,10 +80,23 @@ export function Documents({ candidateId, canUpload }: { candidateId: string; can
               {d.fileName}
             </button>{" "}
             <span className={`badge ${d.status}`}>{d.status}</span> <span className="muted">{d.source}</span>
+            {d.parseStatus === "queued" && <span className="muted"> reading details…</span>}
+            {d.parseStatus === "failed" && <span className="muted"> details could not be read</span>}
+            {canEdit && d.parseStatus === "parsed" && (
+              <button type="button" className="link" onClick={() => { setReviewing(reviewing === d.id ? null : d.id); }}>
+                Review details from this CV
+              </button>
+            )}
+            {canUpload && d.status === "extracted" && d.source !== "formatted" && d.parseStatus !== "queued" && (
+              <button type="button" className="link" disabled={parse.isPending} onClick={() => { parse.mutate(d.id); }}>
+                {d.parseStatus ? "Read details again" : "Read details from this CV"}
+              </button>
+            )}
             {d.extractionWarnings.map((w) => (
               <p key={w} className="warning">{w}</p>
             ))}
             {open === d.id && <DocumentText id={d.id} />}
+            {reviewing === d.id && <CvReview documentId={d.id} candidate={candidate} onDone={() => { setReviewing(null); }} />}
           </li>
         ))}
       </ul>

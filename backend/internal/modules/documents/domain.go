@@ -3,6 +3,7 @@ package documents
 import (
 	"archive/zip"
 	"bytes"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -37,6 +38,8 @@ type Document struct {
 	ErrorMessage  *string
 	Warnings      []string // e.g. pages OCR could not read
 	ExtractedText *string  // only loaded for single-document reads
+	ParseStatus   *string  // queued, parsed, failed; nil when never parsed
+	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -92,4 +95,66 @@ func CleanFileName(name string) string {
 // CleanExtractedText removes characters PostgreSQL cannot store in text.
 func CleanExtractedText(s string) string {
 	return strings.ReplaceAll(s, "\x00", "")
+}
+
+// These rules decide which parsed CV values are kept. They hold for any
+// reader (rules today, an AI model later): a value is kept only if its quote
+// is text from the CV and the value can be read from that quote.
+
+// Quotes reports whether quote appears in the CV text, ignoring case and
+// differences in spacing. Prepare the text once with ForQuotes.
+func Quotes(preparedText, quote string) bool {
+	q := ForQuotes(quote)
+	return q != "" && strings.Contains(preparedText, q)
+}
+
+// ForQuotes lower-cases s and collapses whitespace, for Quotes.
+func ForQuotes(s string) string {
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
+}
+
+// squash keeps only letters and digits, lower-cased: "+60 12-345" -> "6012345".
+// "]" and "!" count as "i": OCR often reads a final I that way ("BINT]"), and
+// the parser reads it back as a letter.
+func squash(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+		case r == ']' || r == '!':
+			b.WriteRune('i')
+		}
+	}
+	return b.String()
+}
+
+var (
+	urlScheme    = regexp.MustCompile(`(?i)^https?://(www\.)?`)
+	countryCode  = regexp.MustCompile(`^[A-Z]{2}$`)
+	noticePeriod = regexp.MustCompile(`^\d{1,3} (day|week|month)$`)
+)
+
+// Field kinds with their own value rules.
+const (
+	FieldText         = ""
+	FieldURL          = "url"
+	FieldCountry      = "country"
+	FieldNoticePeriod = "notice"
+)
+
+// ValueFromQuote reports whether value can be read from quote: the same
+// letters and digits in order (a tidied "Siti Aisyah" from "SITI AISYAH",
+// "Excel" from "Excel (Advanced)"), or a fixed format for coded fields.
+func ValueFromQuote(kind, value, quote string) bool {
+	switch kind {
+	case FieldCountry:
+		return countryCode.MatchString(value)
+	case FieldNoticePeriod:
+		return noticePeriod.MatchString(value)
+	case FieldURL:
+		value = urlScheme.ReplaceAllString(value, "")
+	}
+	v := squash(value)
+	return v != "" && strings.Contains(squash(quote), v)
 }

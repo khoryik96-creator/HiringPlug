@@ -154,6 +154,9 @@ type Document struct {
 	CreatedBy          string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	ParseStatus        *string
+	ParsedProfile      []byte
+	Parser             *string
 }
 
 type Job struct {

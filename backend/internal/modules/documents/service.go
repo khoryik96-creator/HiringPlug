@@ -129,7 +129,34 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Docume
 		}
 		doc = fromRow(row)
 		doc.ExtractedText = row.ExtractedText
+		doc.ParsedProfile = row.ParsedProfile
 		return nil
+	})
+	return doc, err
+}
+
+// Parse queues parsing of a document's text again (for CVs uploaded before
+// parsing existed, or after the parser improved).
+func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Document, error) {
+	var doc Document
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		row, err := store.New(tx).GetDocument(ctx, id)
+		if database.IsNoRows(err) {
+			return apperr.NotFound("document")
+		}
+		if err != nil {
+			return err
+		}
+		if !hasText(row.ExtractedText) {
+			return apperr.New(api.ErrorCodeDOCUMENTHASNOTEXT, "This document has no text to read yet.")
+		}
+		if err := queueParse(ctx, tx, p.TenantID, row); err != nil {
+			return err
+		}
+		queued := string(api.DocumentParseStatusQueued)
+		doc = fromRow(row)
+		doc.ParseStatus = &queued
+		return audit.Record(ctx, tx, audit.Entry{Action: "document.parse_requested", EntityType: "document", EntityID: id})
 	})
 	return doc, err
 }
@@ -139,7 +166,7 @@ func fromRow(r store.Document) Document {
 		ID: r.ID, CandidateID: r.CandidateID, Source: r.Source, FileName: r.FileName,
 		ContentType: r.ContentType, SizeBytes: r.SizeBytes, SHA256: r.Sha256, Status: r.Status,
 		Extractor: r.Extractor, ErrorMessage: r.ErrorMessage, Warnings: r.ExtractionWarnings,
-		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		ParseStatus: r.ParseStatus, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 	if d.Warnings == nil {
 		d.Warnings = []string{}
