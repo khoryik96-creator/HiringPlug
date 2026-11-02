@@ -114,6 +114,69 @@ export interface paths {
         patch: operations["updateCompany"];
         trace?: never;
     };
+    "/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List or search contacts, newest first */
+        get: operations["listContacts"];
+        put?: never;
+        /** Add a contact (their email is checked) */
+        post: operations["createContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Get a contact */
+        get: operations["getContact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change some fields of a contact
+         * @description Only the fields you send change. Send `null` to clear a field. `version` must be the version you loaded. A changed email is checked again.
+         */
+        patch: operations["updateContact"];
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/email-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check the contact's email again
+         * @description Re-runs the email check (for example after "unknown" because the mail server lookup timed out).
+         */
+        post: operations["checkContactEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/documents": {
         parameters: {
             query?: never;
@@ -180,9 +243,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "documents:create" | "documents:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read";
         /** @enum {string} */
-        ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.extract_text" | "document.text_extracted";
         Error: {
@@ -434,6 +497,93 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["CompanyId"] | null;
         };
+        /** @example cont_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        ContactId: string;
+        /**
+         * @description active = works there; left = has left the company.
+         * @enum {string}
+         */
+        ContactStatus: "active" | "left";
+        /**
+         * @description valid = well formed and the domain receives mail; risky = deliverable but a shared (hr@), disposable or catch-all address; invalid = will bounce (bad format, or the domain has no mail server); unknown = the mail server lookup failed, check again later.
+         * @enum {string}
+         */
+        EmailCheckStatus: "valid" | "risky" | "invalid" | "unknown";
+        EmailCheck: {
+            status: components["schemas"]["EmailCheckStatus"];
+            /** @description Why, in words (empty when valid). */
+            reasons: string[];
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        Contact: {
+            id: components["schemas"]["ContactId"];
+            version: number;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            firstName: string;
+            lastName: string;
+            fullName: string;
+            /** @description Job title, e.g. HR Manager. */
+            title: string | null;
+            email: string | null;
+            /** @description The latest check of `email`; null without an email. */
+            emailCheck: components["schemas"]["EmailCheck"] | null;
+            phone: string | null;
+            mobile: string | null;
+            linkedinUrl: string | null;
+            status: components["schemas"]["ContactStatus"];
+            notes: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ContactCreate: {
+            companyId: components["schemas"]["CompanyId"];
+            firstName: string;
+            lastName?: string;
+            title?: string | null;
+            email?: string | null;
+            phone?: string | null;
+            mobile?: string | null;
+            linkedinUrl?: string | null;
+            status?: components["schemas"]["ContactStatus"];
+            notes?: string | null;
+        };
+        ContactUpdate: {
+            /** @description The version you loaded. */
+            version: number;
+            companyId?: components["schemas"]["CompanyId"];
+            firstName?: string;
+            lastName?: string;
+            title?: string | null;
+            email?: string | null;
+            phone?: string | null;
+            mobile?: string | null;
+            linkedinUrl?: string | null;
+            status?: components["schemas"]["ContactStatus"];
+            notes?: string | null;
+        };
+        ContactSummary: {
+            id: components["schemas"]["ContactId"];
+            fullName: string;
+            title: string | null;
+            companyId: components["schemas"]["CompanyId"];
+            companyName: string;
+            email: string | null;
+            emailCheckStatus: components["schemas"]["EmailCheckStatus"] | null;
+            phone: string | null;
+            mobile: string | null;
+            status: components["schemas"]["ContactStatus"];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ContactPage: {
+            items: components["schemas"]["ContactSummary"][];
+            /** @description Pass as `cursor` to get the next page; null on the last page. */
+            nextCursor: components["schemas"]["ContactId"] | null;
+        };
         /** @example doc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         DocumentId: string;
         /**
@@ -580,6 +730,7 @@ export interface components {
     parameters: {
         CandidateIdPath: components["schemas"]["CandidateId"];
         CompanyIdPath: components["schemas"]["CompanyId"];
+        ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
     };
     requestBodies: never;
@@ -844,6 +995,146 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listContacts: {
+        parameters: {
+            query?: {
+                /** @description Matches name, email or job title, ignoring case and accents. */
+                q?: string;
+                /** @description Only this company's contacts. */
+                companyId?: components["schemas"]["CompanyId"];
+                limit?: number;
+                /** @description The `nextCursor` of the previous page. */
+                cursor?: components["schemas"]["ContactId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    checkContactEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Contact"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listCandidateDocuments: {

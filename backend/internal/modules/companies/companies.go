@@ -34,3 +34,9 @@ func New(pool *pgxpool.Pool) *Module {
 func (m *Module) Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool, error) {
 	return m.service.Exists(ctx, tx, companyID)
 }
+
+// Names returns the names of the given companies (missing ones are left out),
+// for other modules that show a company next to their records.
+func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	return m.service.Names(ctx, tx, ids)
+}

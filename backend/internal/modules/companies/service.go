@@ -156,6 +156,19 @@ func (s *Service) Exists(ctx context.Context, tx pgx.Tx, id string) (bool, error
 	return store.New(tx).CompanyExists(ctx, id)
 }
 
+// Names returns id -> name for the companies that exist.
+func (s *Service) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	rows, err := store.New(tx).CompanyNames(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.ID] = r.Name
+	}
+	return out, nil
+}
+
 func checkNameFree(ctx context.Context, q *store.Queries, name, selfID string) error {
 	existing, err := q.FindCompanyIDByName(ctx, name)
 	if database.IsNoRows(err) || (err == nil && existing == selfID) {

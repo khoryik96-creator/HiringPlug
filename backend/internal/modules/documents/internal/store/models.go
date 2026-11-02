@@ -95,6 +95,29 @@ type Company struct {
 	UpdatedAt          time.Time
 }
 
+type Contact struct {
+	ID                string
+	TenantID          string
+	Version           int32
+	CompanyID         string
+	FirstName         string
+	LastName          string
+	Title             *string
+	Email             *string
+	EmailCheckStatus  *string
+	EmailCheckReasons []string
+	EmailCheckedAt    *time.Time
+	Phone             *string
+	Mobile            *string
+	LinkedinUrl       *string
+	Status            string
+	Notes             *string
+	SearchText        *string
+	CreatedBy         string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
 type Document struct {
 	ID                 string
 	TenantID           string

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -57,6 +58,7 @@ func newTestApp(t *testing.T) *testApp {
 	deps, closeDeps, err := app.NewDeps(context.Background(), cfg, logger)
 	require.NoError(t, err)
 	t.Cleanup(closeDeps)
+	deps.MailServers = fakeMailServers{}
 	modules := app.NewModules(deps)
 	handler, err := app.NewHTTPHandler(deps, modules)
 	require.NoError(t, err)
@@ -199,4 +201,23 @@ func fieldNames(t *testing.T, e api.Error) []string {
 		names = append(names, f.(map[string]any)["field"].(string))
 	}
 	return names
+}
+
+// fakeMailServers answers mail server lookups without the network: every
+// domain receives mail except *.nomail.test (no such domain) and
+// *.dnsdown.test (the lookup fails).
+type fakeMailServers struct{}
+
+func (fakeMailServers) LookupMX(_ context.Context, name string) ([]*net.MX, error) {
+	switch {
+	case strings.HasSuffix(name, "nomail.test"):
+		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+	case strings.HasSuffix(name, "dnsdown.test"):
+		return nil, &net.DNSError{Err: "i/o timeout", Name: name, IsTimeout: true}
+	}
+	return []*net.MX{{Host: "mx." + name + ".", Pref: 10}}, nil
+}
+
+func (fakeMailServers) LookupHost(_ context.Context, host string) ([]string, error) {
+	return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
 }

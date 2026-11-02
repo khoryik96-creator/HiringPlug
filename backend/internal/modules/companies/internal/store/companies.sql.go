@@ -21,6 +21,35 @@ func (q *Queries) CompanyExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const companyNames = `-- name: CompanyNames :many
+SELECT id, name FROM company WHERE id = ANY($1::text[])
+`
+
+type CompanyNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) CompanyNames(ctx context.Context, ids []string) ([]CompanyNamesRow, error) {
+	rows, err := q.db.Query(ctx, companyNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanyNamesRow
+	for rows.Next() {
+		var i CompanyNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findCompanyIDByName = `-- name: FindCompanyIDByName :one
 SELECT id FROM company WHERE name_key = app_normalize_text($1::text)
 `

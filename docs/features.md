@@ -9,7 +9,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 
 | # | Feature | Module(s) | Status |
 |---|---|---|---|
-| 1 | Contacts with built-in email verifier | `companies`, `contacts` | 🧩 M3 |
+| 1 | Contacts with built-in email verifier | `companies`, `contacts` | ✅ |
 | 1.5 | Job ads puller | `job_leads` | 🧩 M6 |
 | 2 | Companies | `companies` | ✅ records; auto-fill 🧩 |
 | 3 | Candidate profile fields | `candidates` | ✅ |
@@ -91,9 +91,14 @@ this candidate fit this job?", and free questions.
   providers (Apollo, Google Places), and the business registry where available.
   Results are **suggestions with their source**; a person accepts them, and
   nothing overwrites data you entered.
-- **Contacts:** people at companies (hiring managers, HR). The **email
-  verifier** checks syntax, the domain's mail servers (MX), disposable and
-  role addresses (`hr@`), and optionally the mailbox itself. Each result is
+- **Contacts** ✅: people at companies (hiring managers, HR) with job title,
+  email, office phone, mobile, LinkedIn, status (works there / has left) and
+  notes; listed on their company's page. The **email check** runs whenever an
+  email is added or changed: the format, whether the domain receives mail (its
+  MX records, looked up with a 3-second limit outside any database
+  transaction), and shared (`hr@`) or disposable addresses. The result is
+  **valid**, **risky**, **invalid** or **unknown** (lookup failed: "Check
+  again"), with the reasons in words. Next: optionally the mailbox itself. Each result is
   stored with its evidence and date: valid, risky (catch-all, role, disposable),
   invalid or unknown. Mailbox checks need outbound port 25, which home ISPs and
   cloud providers often block, so a paid verification service can be plugged

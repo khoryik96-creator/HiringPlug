@@ -40,3 +40,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/companies/internal/store
+  - <<: *module
+    queries: db/queries/contacts.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/contacts/internal/store

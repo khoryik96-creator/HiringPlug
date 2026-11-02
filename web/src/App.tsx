@@ -7,6 +7,8 @@ import { ErrorMessage } from "./components/ErrorMessage";
 import { CandidateDetail } from "./pages/CandidateDetail";
 import { CandidateList } from "./pages/CandidateList";
 import { CompanyDetail } from "./pages/CompanyDetail";
+import { ContactDetail } from "./pages/ContactDetail";
+import { ContactList } from "./pages/ContactList";
 import { CompanyList } from "./pages/CompanyList";
 import { SignIn } from "./pages/SignIn";
 
@@ -34,7 +36,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = hash.startsWith("#/companies") ? "companies" : "candidates";
+  const section = /^#\/(companies|contacts)/.exec(hash)?.[1] ?? "candidates";
   return (
     <>
       <header className="row spread">
@@ -42,6 +44,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           <strong>HiringPlug</strong>
           <a href="#/candidates" aria-current={section === "candidates" ? "page" : undefined}>Candidates</a>
           <a href="#/companies" aria-current={section === "companies" ? "page" : undefined}>Companies</a>
+          <a href="#/contacts" aria-current={section === "contacts" ? "page" : undefined}>Contacts</a>
         </nav>
         <span className="muted">
           {me.data.user.name} · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
@@ -64,6 +67,9 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   if (candidate) return <CandidateDetail key={candidate} id={candidate} permissions={permissions} />;
   const company = /^#\/companies\/(comp_[0-9a-z]+)$/.exec(hash)?.[1];
   if (company) return <CompanyDetail key={company} id={company} permissions={permissions} />;
+  const contact = /^#\/contacts\/(cont_[0-9a-z]+)$/.exec(hash)?.[1];
+  if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
+  if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
   return <CandidateList canCreate={permissions.includes("candidates:create")} />;
 }

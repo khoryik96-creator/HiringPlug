@@ -53,6 +53,19 @@ export const COMPANY_SIZE: Record<Schemas["CompanySize"], string> = {
   enterprise: "Over 1,000 people",
 };
 
+export const CONTACT_STATUS: Record<Schemas["ContactStatus"], string> = {
+  active: "Works there",
+  left: "Has left",
+};
+
+/** The email check, as a short badge and what it means. */
+export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; meaning: string }> = {
+  valid: { badge: "✓ Email OK", meaning: "Well formed and the domain receives email." },
+  risky: { badge: "⚠ Risky", meaning: "Reaches a mailbox, but not a person's own." },
+  invalid: { badge: "✗ Will bounce", meaning: "This address cannot receive email." },
+  unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
+};
+
 /** The values of a label map, in its order: the options of a select. */
 export function keysOf<K extends string>(labels: Record<K, unknown>): K[] {
   return Object.keys(labels) as K[];

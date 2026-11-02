@@ -44,6 +44,10 @@ x-error-codes:
     module: shared
     status: 409
     description: Someone changed the record since you loaded it. Reload and try again.
+  CONTACT_DUPLICATE_EMAIL:
+    module: contacts
+    status: 409
+    description: Another contact already has this email. `details.existingContactId` points to them.
   FORBIDDEN:
     module: shared
     status: 403
@@ -295,6 +299,116 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List or search contacts, newest first
+      x-permission: contacts:read
+      parameters:
+        - name: q
+          in: query
+          description: Matches name, email or job title, ignoring case and accents.
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - name: companyId
+          in: query
+          description: Only this company's contacts.
+          schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 25}
+        - name: cursor
+          in: query
+          description: The `nextCursor` of the previous page.
+          schema: {$ref: '#/components/schemas/ContactId'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContactPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Add a contact (their email is checked)
+      x-permission: contacts:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ContactCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Contact'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/contacts/{contactId}:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    get:
+      operationId: getContact
+      tags: [contacts]
+      summary: Get a contact
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Contact'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      summary: Change some fields of a contact
+      description: >
+        Only the fields you send change. Send `null` to clear a field. `version` must be the version you loaded. A changed email is checked again.
+
+      x-permission: contacts:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ContactUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Contact'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/contacts/{contactId}/email-check:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    post:
+      operationId: checkContactEmail
+      tags: [contacts]
+      summary: Check the contact's email again
+      description: Re-runs the email check (for example after "unknown" because the mail server lookup timed out).
+      x-permission: contacts:update
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Contact'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/candidates/{candidateId}/documents:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -437,6 +551,9 @@ components:
         - companies:create
         - companies:read
         - companies:update
+        - contacts:create
+        - contacts:read
+        - contacts:update
         - documents:create
         - documents:read
     ErrorCode:
@@ -445,6 +562,7 @@ components:
         - CANDIDATE_DUPLICATE_EMAIL
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
+        - CONTACT_DUPLICATE_EMAIL
         - FORBIDDEN
         - INTERNAL
         - METHOD_NOT_ALLOWED
@@ -845,6 +963,113 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/CompanyId'}]
           nullable: true
+    ContactId:
+      type: string
+      pattern: '^cont_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ContactStatus:
+      type: string
+      description: active = works there; left = has left the company.
+      enum: [active, left]
+    EmailCheckStatus:
+      type: string
+      description: >
+        valid = well formed and the domain receives mail; risky = deliverable but a shared (hr@), disposable or catch-all address; invalid = will bounce (bad format, or the domain has no mail server); unknown = the mail server lookup failed, check again later.
+
+      enum: [valid, risky, invalid, unknown]
+    EmailCheck:
+      type: object
+      required: [status, reasons, checkedAt]
+      properties:
+        status: {$ref: '#/components/schemas/EmailCheckStatus'}
+        reasons:
+          type: array
+          description: Why, in words (empty when valid).
+          items: {type: string}
+        checkedAt: {type: string, format: date-time}
+    Contact:
+      type: object
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, notes, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ContactId'}
+        version: {type: integer}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        companyName: {type: string}
+        firstName: {type: string}
+        lastName: {type: string}
+        fullName: {type: string}
+        title: {type: string, nullable: true, description: 'Job title, e.g. HR Manager.'}
+        email: {type: string, nullable: true}
+        emailCheck:
+          description: The latest check of `email`; null without an email.
+          allOf: [{$ref: '#/components/schemas/EmailCheck'}]
+          nullable: true
+        phone: {type: string, nullable: true}
+        mobile: {type: string, nullable: true}
+        linkedinUrl: {type: string, nullable: true}
+        status: {$ref: '#/components/schemas/ContactStatus'}
+        notes: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    ContactCreate:
+      type: object
+      additionalProperties: false
+      required: [companyId, firstName]
+      properties:
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        firstName: {type: string, minLength: 1, maxLength: 100}
+        lastName: {type: string, maxLength: 100}
+        title: {type: string, maxLength: 200, nullable: true}
+        email: {type: string, maxLength: 254, nullable: true}
+        phone: {type: string, maxLength: 40, nullable: true}
+        mobile: {type: string, maxLength: 40, nullable: true}
+        linkedinUrl: {type: string, maxLength: 300, nullable: true}
+        status: {$ref: '#/components/schemas/ContactStatus'}
+        notes: {type: string, maxLength: 4000, nullable: true}
+    ContactUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1, description: The version you loaded.}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        firstName: {type: string, minLength: 1, maxLength: 100}
+        lastName: {type: string, maxLength: 100}
+        title: {type: string, maxLength: 200, nullable: true}
+        email: {type: string, maxLength: 254, nullable: true}
+        phone: {type: string, maxLength: 40, nullable: true}
+        mobile: {type: string, maxLength: 40, nullable: true}
+        linkedinUrl: {type: string, maxLength: 300, nullable: true}
+        status: {$ref: '#/components/schemas/ContactStatus'}
+        notes: {type: string, maxLength: 4000, nullable: true}
+    ContactSummary:
+      type: object
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ContactId'}
+        fullName: {type: string}
+        title: {type: string, nullable: true}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        companyName: {type: string}
+        email: {type: string, nullable: true}
+        emailCheckStatus:
+          allOf: [{$ref: '#/components/schemas/EmailCheckStatus'}]
+          nullable: true
+        phone: {type: string, nullable: true}
+        mobile: {type: string, nullable: true}
+        status: {$ref: '#/components/schemas/ContactStatus'}
+        updatedAt: {type: string, format: date-time}
+    ContactPage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ContactSummary'}
+        nextCursor:
+          description: Pass as `cursor` to get the next page; null on the last page.
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
+          nullable: true
     DocumentId:
       type: string
       pattern: '^doc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -969,6 +1194,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/CompanyId'}
+    ContactIdPath:
+      name: contactId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ContactId'}
     DocumentIdPath:
       name: documentId
       in: path
@@ -1015,6 +1245,21 @@ x-permissions:
     description: Edit companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts:create:
+    module: contacts
+    description: Add contacts.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  contacts:read:
+    module: contacts
+    description: View contacts.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  contacts:update:
+    module: contacts
+    description: Edit contacts and re-check their email.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   documents:create:
     module: documents
     description: Upload candidate documents.
@@ -1041,6 +1286,8 @@ x-modules:
     description: Candidate profiles. Salary details are stored and permissioned separately.
   - name: companies
     description: Companies you recruit for or want to win as clients, and their details.
+  - name: contacts
+    description: People at companies, each with a checked email address.
   - name: documents
     description: 'Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and formatted CVs. Uploading a CV queues text extraction in the Python AI worker.'
   - name: identity

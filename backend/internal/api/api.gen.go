@@ -104,6 +104,24 @@ func (e CompanyType) Valid() bool {
 	}
 }
 
+// Defines values for ContactStatus.
+const (
+	ContactStatusActive ContactStatus = "active"
+	ContactStatusLeft   ContactStatus = "left"
+)
+
+// Valid indicates whether the value is a known member of the ContactStatus enum.
+func (e ContactStatus) Valid() bool {
+	switch e {
+	case ContactStatusActive:
+		return true
+	case ContactStatusLeft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DocumentSource.
 const (
 	DocumentSourceFormatted DocumentSource = "formatted"
@@ -155,11 +173,36 @@ func (e DocumentStatus) Valid() bool {
 	}
 }
 
+// Defines values for EmailCheckStatus.
+const (
+	EmailCheckStatusInvalid EmailCheckStatus = "invalid"
+	EmailCheckStatusRisky   EmailCheckStatus = "risky"
+	EmailCheckStatusUnknown EmailCheckStatus = "unknown"
+	EmailCheckStatusValid   EmailCheckStatus = "valid"
+)
+
+// Valid indicates whether the value is a known member of the EmailCheckStatus enum.
+func (e EmailCheckStatus) Valid() bool {
+	switch e {
+	case EmailCheckStatusInvalid:
+		return true
+	case EmailCheckStatusRisky:
+		return true
+	case EmailCheckStatusUnknown:
+		return true
+	case EmailCheckStatusValid:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
 	ErrorCodeCANDIDATEDUPLICATEEMAIL ErrorCode = "CANDIDATE_DUPLICATE_EMAIL"
 	ErrorCodeCOMPANYDUPLICATENAME    ErrorCode = "COMPANY_DUPLICATE_NAME"
 	ErrorCodeCONFLICTSTALEVERSION    ErrorCode = "CONFLICT_STALE_VERSION"
+	ErrorCodeCONTACTDUPLICATEEMAIL   ErrorCode = "CONTACT_DUPLICATE_EMAIL"
 	ErrorCodeFORBIDDEN               ErrorCode = "FORBIDDEN"
 	ErrorCodeINTERNAL                ErrorCode = "INTERNAL"
 	ErrorCodeMETHODNOTALLOWED        ErrorCode = "METHOD_NOT_ALLOWED"
@@ -180,6 +223,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeCOMPANYDUPLICATENAME:
 		return true
 	case ErrorCodeCONFLICTSTALEVERSION:
+		return true
+	case ErrorCodeCONTACTDUPLICATEEMAIL:
 		return true
 	case ErrorCodeFORBIDDEN:
 		return true
@@ -300,6 +345,9 @@ const (
 	PermissionCompaniesCreate              Permission = "companies:create"
 	PermissionCompaniesRead                Permission = "companies:read"
 	PermissionCompaniesUpdate              Permission = "companies:update"
+	PermissionContactsCreate               Permission = "contacts:create"
+	PermissionContactsRead                 Permission = "contacts:read"
+	PermissionContactsUpdate               Permission = "contacts:update"
 	PermissionDocumentsCreate              Permission = "documents:create"
 	PermissionDocumentsRead                Permission = "documents:read"
 )
@@ -322,6 +370,12 @@ func (e Permission) Valid() bool {
 	case PermissionCompaniesRead:
 		return true
 	case PermissionCompaniesUpdate:
+		return true
+	case PermissionContactsCreate:
+		return true
+	case PermissionContactsRead:
+		return true
+	case PermissionContactsUpdate:
 		return true
 	case PermissionDocumentsCreate:
 		return true
@@ -636,6 +690,107 @@ type CompensationUpdate struct {
 	ExpectedVersion int `json:"expectedVersion"`
 }
 
+// Contact defines model for Contact.
+type Contact struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   CompanyId                 `json:"companyId"`
+	CompanyName string                    `json:"companyName"`
+	CreatedAt   time.Time                 `json:"createdAt"`
+	Email       nullable.Nullable[string] `json:"email"`
+
+	// EmailCheck The latest check of `email`; null without an email.
+	EmailCheck nullable.Nullable[EmailCheck] `json:"emailCheck"`
+	FirstName  string                        `json:"firstName"`
+	FullName   string                        `json:"fullName"`
+
+	// Id Example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id          ContactId                 `json:"id"`
+	LastName    string                    `json:"lastName"`
+	LinkedinUrl nullable.Nullable[string] `json:"linkedinUrl"`
+	Mobile      nullable.Nullable[string] `json:"mobile"`
+	Notes       nullable.Nullable[string] `json:"notes"`
+	Phone       nullable.Nullable[string] `json:"phone"`
+
+	// Status active = works there; left = has left the company.
+	Status ContactStatus `json:"status"`
+
+	// Title Job title, e.g. HR Manager.
+	Title     nullable.Nullable[string] `json:"title"`
+	UpdatedAt time.Time                 `json:"updatedAt"`
+	Version   int                       `json:"version"`
+}
+
+// ContactCreate defines model for ContactCreate.
+type ContactCreate struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   CompanyId                 `json:"companyId"`
+	Email       nullable.Nullable[string] `json:"email,omitempty"`
+	FirstName   string                    `json:"firstName"`
+	LastName    *string                   `json:"lastName,omitempty"`
+	LinkedinUrl nullable.Nullable[string] `json:"linkedinUrl,omitempty"`
+	Mobile      nullable.Nullable[string] `json:"mobile,omitempty"`
+	Notes       nullable.Nullable[string] `json:"notes,omitempty"`
+	Phone       nullable.Nullable[string] `json:"phone,omitempty"`
+
+	// Status active = works there; left = has left the company.
+	Status *ContactStatus            `json:"status,omitempty"`
+	Title  nullable.Nullable[string] `json:"title,omitempty"`
+}
+
+// ContactId Example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+type ContactId = string
+
+// ContactPage defines model for ContactPage.
+type ContactPage struct {
+	Items []ContactSummary `json:"items"`
+
+	// NextCursor Pass as `cursor` to get the next page; null on the last page.
+	NextCursor nullable.Nullable[ContactId] `json:"nextCursor"`
+}
+
+// ContactStatus active = works there; left = has left the company.
+type ContactStatus string
+
+// ContactSummary defines model for ContactSummary.
+type ContactSummary struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId        CompanyId                           `json:"companyId"`
+	CompanyName      string                              `json:"companyName"`
+	Email            nullable.Nullable[string]           `json:"email"`
+	EmailCheckStatus nullable.Nullable[EmailCheckStatus] `json:"emailCheckStatus"`
+	FullName         string                              `json:"fullName"`
+
+	// Id Example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+	Id     ContactId                 `json:"id"`
+	Mobile nullable.Nullable[string] `json:"mobile"`
+	Phone  nullable.Nullable[string] `json:"phone"`
+
+	// Status active = works there; left = has left the company.
+	Status    ContactStatus             `json:"status"`
+	Title     nullable.Nullable[string] `json:"title"`
+	UpdatedAt time.Time                 `json:"updatedAt"`
+}
+
+// ContactUpdate defines model for ContactUpdate.
+type ContactUpdate struct {
+	// CompanyId Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
+	CompanyId   *CompanyId                `json:"companyId,omitempty"`
+	Email       nullable.Nullable[string] `json:"email,omitempty"`
+	FirstName   *string                   `json:"firstName,omitempty"`
+	LastName    *string                   `json:"lastName,omitempty"`
+	LinkedinUrl nullable.Nullable[string] `json:"linkedinUrl,omitempty"`
+	Mobile      nullable.Nullable[string] `json:"mobile,omitempty"`
+	Notes       nullable.Nullable[string] `json:"notes,omitempty"`
+	Phone       nullable.Nullable[string] `json:"phone,omitempty"`
+
+	// Status active = works there; left = has left the company.
+	Status *ContactStatus            `json:"status,omitempty"`
+	Title  nullable.Nullable[string] `json:"title,omitempty"`
+
+	// Version The version you loaded.
+	Version int `json:"version"`
+}
+
 // CountryCode ISO 3166-1 alpha-2 country code, e.g. MY, SG.
 //
 // Example: MY
@@ -727,6 +882,20 @@ type DocumentTextExtractedJob struct {
 	// Warnings Problems found while reading, e.g. pages OCR could not read.
 	Warnings []string `json:"warnings"`
 }
+
+// EmailCheck defines model for EmailCheck.
+type EmailCheck struct {
+	CheckedAt time.Time `json:"checkedAt"`
+
+	// Reasons Why, in words (empty when valid).
+	Reasons []string `json:"reasons"`
+
+	// Status valid = well formed and the domain receives mail; risky = deliverable but a shared (hr@), disposable or catch-all address; invalid = will bounce (bad format, or the domain has no mail server); unknown = the mail server lookup failed, check again later.
+	Status EmailCheckStatus `json:"status"`
+}
+
+// EmailCheckStatus valid = well formed and the domain receives mail; risky = deliverable but a shared (hr@), disposable or catch-all address; invalid = will bounce (bad format, or the domain has no mail server); unknown = the mail server lookup failed, check again later.
+type EmailCheckStatus string
 
 // Error defines model for Error.
 type Error struct {
@@ -857,6 +1026,9 @@ type CandidateIdPath = CandidateId
 // CompanyIdPath Example: comp_01jbz6w0m0k8q9x2r3s4t5v6w7
 type CompanyIdPath = CompanyId
 
+// ContactIdPath Example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+type ContactIdPath = ContactId
+
 // DocumentIdPath Example: doc_01jbz6w0m0k8q9x2r3s4t5v6w7
 type DocumentIdPath = DocumentId
 
@@ -910,6 +1082,19 @@ type ListCompaniesParams struct {
 	Cursor *CompanyId `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// ListContactsParams defines parameters for ListContacts.
+type ListContactsParams struct {
+	// Q Matches name, email or job title, ignoring case and accents.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// CompanyId Only this company's contacts.
+	CompanyId *CompanyId `form:"companyId,omitempty" json:"companyId,omitempty"`
+	Limit     *int       `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The `nextCursor` of the previous page.
+	Cursor *ContactId `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
 // CreateCandidateJSONRequestBody defines body for CreateCandidate for application/json ContentType.
 type CreateCandidateJSONRequestBody = CandidateCreate
 
@@ -927,6 +1112,12 @@ type CreateCompanyJSONRequestBody = CompanyCreate
 
 // UpdateCompanyJSONRequestBody defines body for UpdateCompany for application/json ContentType.
 type UpdateCompanyJSONRequestBody = CompanyUpdate
+
+// CreateContactJSONRequestBody defines body for CreateContact for application/json ContentType.
+type CreateContactJSONRequestBody = ContactCreate
+
+// UpdateContactJSONRequestBody defines body for UpdateContact for application/json ContentType.
+type UpdateContactJSONRequestBody = ContactUpdate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -963,6 +1154,21 @@ type ServerInterface interface {
 	// UpdateCompany Change some fields of a company
 	// (PATCH /v1/companies/{companyId})
 	UpdateCompany(w http.ResponseWriter, r *http.Request, companyId CompanyIdPath)
+	// ListContacts List or search contacts, newest first
+	// (GET /v1/contacts)
+	ListContacts(w http.ResponseWriter, r *http.Request, params ListContactsParams)
+	// CreateContact Add a contact (their email is checked)
+	// (POST /v1/contacts)
+	CreateContact(w http.ResponseWriter, r *http.Request)
+	// GetContact Get a contact
+	// (GET /v1/contacts/{contactId})
+	GetContact(w http.ResponseWriter, r *http.Request, contactId ContactIdPath)
+	// UpdateContact Change some fields of a contact
+	// (PATCH /v1/contacts/{contactId})
+	UpdateContact(w http.ResponseWriter, r *http.Request, contactId ContactIdPath)
+	// CheckContactEmail Check the contact's email again
+	// (POST /v1/contacts/{contactId}/email-check)
+	CheckContactEmail(w http.ResponseWriter, r *http.Request, contactId ContactIdPath)
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(w http.ResponseWriter, r *http.Request, documentId DocumentIdPath)
@@ -1321,6 +1527,170 @@ func (siw *ServerInterfaceWrapper) UpdateCompany(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListContacts operation middleware
+func (siw *ServerInterfaceWrapper) ListContacts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListContactsParams
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "companyId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "companyId", r.URL.Query(), &params.CompanyId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "companyId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "companyId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListContacts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateContact operation middleware
+func (siw *ServerInterfaceWrapper) CreateContact(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateContact(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetContact operation middleware
+func (siw *ServerInterfaceWrapper) GetContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "contactId" -------------
+	var contactId ContactIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "contactId", r.PathValue("contactId"), &contactId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "contactId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetContact(w, r, contactId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateContact operation middleware
+func (siw *ServerInterfaceWrapper) UpdateContact(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "contactId" -------------
+	var contactId ContactIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "contactId", r.PathValue("contactId"), &contactId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "contactId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateContact(w, r, contactId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CheckContactEmail operation middleware
+func (siw *ServerInterfaceWrapper) CheckContactEmail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "contactId" -------------
+	var contactId ContactIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "contactId", r.PathValue("contactId"), &contactId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "contactId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckContactEmail(w, r, contactId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDocument operation middleware
 func (siw *ServerInterfaceWrapper) GetDocument(w http.ResponseWriter, r *http.Request) {
 
@@ -1490,6 +1860,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/companies", wrapper.CreateCompany)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/companies/{companyId}", wrapper.GetCompany)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/companies/{companyId}", wrapper.UpdateCompany)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/contacts", wrapper.ListContacts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/contacts", wrapper.CreateContact)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/contacts/{contactId}", wrapper.GetContact)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/contacts/{contactId}", wrapper.UpdateContact)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/contacts/{contactId}/email-check", wrapper.CheckContactEmail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/candidates/{candidateId}/documents", wrapper.ListCandidateDocuments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/candidates/{candidateId}/documents", wrapper.UploadCandidateDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/documents/{documentId}", wrapper.GetDocument)
@@ -2376,6 +2751,369 @@ func (response UpdateCompany409JSONResponse) VisitUpdateCompanyResponse(w http.R
 	return err
 }
 
+type ListContactsRequestObject struct {
+	Params ListContactsParams
+}
+
+type ListContactsResponseObject interface {
+	VisitListContactsResponse(w http.ResponseWriter) error
+}
+
+type ListContacts200JSONResponse ContactPage
+
+func (response ListContacts200JSONResponse) VisitListContactsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContacts400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response ListContacts400JSONResponse) VisitListContactsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContacts401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response ListContacts401JSONResponse) VisitListContactsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContacts403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListContacts403JSONResponse) VisitListContactsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactRequestObject struct {
+	Body *CreateContactJSONRequestBody
+}
+
+type CreateContactResponseObject interface {
+	VisitCreateContactResponse(w http.ResponseWriter) error
+}
+
+type CreateContact201JSONResponse Contact
+
+func (response CreateContact201JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContact400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response CreateContact400JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContact401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response CreateContact401JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContact403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateContact403JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContact409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateContact409JSONResponse) VisitCreateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContactRequestObject struct {
+	ContactId ContactIdPath `json:"contactId"`
+}
+
+type GetContactResponseObject interface {
+	VisitGetContactResponse(w http.ResponseWriter) error
+}
+
+type GetContact200JSONResponse Contact
+
+func (response GetContact200JSONResponse) VisitGetContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContact401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response GetContact401JSONResponse) VisitGetContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContact403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetContact403JSONResponse) VisitGetContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContact404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetContact404JSONResponse) VisitGetContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContactRequestObject struct {
+	ContactId ContactIdPath `json:"contactId"`
+	Body      *UpdateContactJSONRequestBody
+}
+
+type UpdateContactResponseObject interface {
+	VisitUpdateContactResponse(w http.ResponseWriter) error
+}
+
+type UpdateContact200JSONResponse Contact
+
+func (response UpdateContact200JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact400JSONResponse struct{ ValidationFailedJSONResponse }
+
+func (response UpdateContact400JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response UpdateContact401JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response UpdateContact403JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateContact404JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContact409JSONResponse struct{ ConflictJSONResponse }
+
+func (response UpdateContact409JSONResponse) VisitUpdateContactResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckContactEmailRequestObject struct {
+	ContactId ContactIdPath `json:"contactId"`
+}
+
+type CheckContactEmailResponseObject interface {
+	VisitCheckContactEmailResponse(w http.ResponseWriter) error
+}
+
+type CheckContactEmail200JSONResponse Contact
+
+func (response CheckContactEmail200JSONResponse) VisitCheckContactEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckContactEmail401JSONResponse struct{ UnauthenticatedJSONResponse }
+
+func (response CheckContactEmail401JSONResponse) VisitCheckContactEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckContactEmail403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CheckContactEmail403JSONResponse) VisitCheckContactEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckContactEmail404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CheckContactEmail404JSONResponse) VisitCheckContactEmailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetDocumentRequestObject struct {
 	DocumentId DocumentIdPath `json:"documentId"`
 }
@@ -2510,6 +3248,21 @@ type StrictServerInterface interface {
 	// UpdateCompany Change some fields of a company
 	// (PATCH /v1/companies/{companyId})
 	UpdateCompany(ctx context.Context, request UpdateCompanyRequestObject) (UpdateCompanyResponseObject, error)
+	// ListContacts List or search contacts, newest first
+	// (GET /v1/contacts)
+	ListContacts(ctx context.Context, request ListContactsRequestObject) (ListContactsResponseObject, error)
+	// CreateContact Add a contact (their email is checked)
+	// (POST /v1/contacts)
+	CreateContact(ctx context.Context, request CreateContactRequestObject) (CreateContactResponseObject, error)
+	// GetContact Get a contact
+	// (GET /v1/contacts/{contactId})
+	GetContact(ctx context.Context, request GetContactRequestObject) (GetContactResponseObject, error)
+	// UpdateContact Change some fields of a contact
+	// (PATCH /v1/contacts/{contactId})
+	UpdateContact(ctx context.Context, request UpdateContactRequestObject) (UpdateContactResponseObject, error)
+	// CheckContactEmail Check the contact's email again
+	// (POST /v1/contacts/{contactId}/email-check)
+	CheckContactEmail(ctx context.Context, request CheckContactEmailRequestObject) (CheckContactEmailResponseObject, error)
 	// GetDocument Get a document, including its extracted text
 	// (GET /v1/documents/{documentId})
 	GetDocument(ctx context.Context, request GetDocumentRequestObject) (GetDocumentResponseObject, error)
@@ -2881,6 +3634,148 @@ func (sh *strictHandler) UpdateCompany(w http.ResponseWriter, r *http.Request, c
 	}
 }
 
+// ListContacts operation middleware
+func (sh *strictHandler) ListContacts(w http.ResponseWriter, r *http.Request, params ListContactsParams) {
+	var request ListContactsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListContacts(ctx, request.(ListContactsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListContacts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListContactsResponseObject); ok {
+		if err := validResponse.VisitListContactsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateContact operation middleware
+func (sh *strictHandler) CreateContact(w http.ResponseWriter, r *http.Request) {
+	var request CreateContactRequestObject
+
+	var body CreateContactJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateContact(ctx, request.(CreateContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateContactResponseObject); ok {
+		if err := validResponse.VisitCreateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetContact operation middleware
+func (sh *strictHandler) GetContact(w http.ResponseWriter, r *http.Request, contactId ContactIdPath) {
+	var request GetContactRequestObject
+
+	request.ContactId = contactId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetContact(ctx, request.(GetContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetContactResponseObject); ok {
+		if err := validResponse.VisitGetContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateContact operation middleware
+func (sh *strictHandler) UpdateContact(w http.ResponseWriter, r *http.Request, contactId ContactIdPath) {
+	var request UpdateContactRequestObject
+
+	request.ContactId = contactId
+
+	var body UpdateContactJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateContact(ctx, request.(UpdateContactRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateContact")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateContactResponseObject); ok {
+		if err := validResponse.VisitUpdateContactResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CheckContactEmail operation middleware
+func (sh *strictHandler) CheckContactEmail(w http.ResponseWriter, r *http.Request, contactId ContactIdPath) {
+	var request CheckContactEmailRequestObject
+
+	request.ContactId = contactId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckContactEmail(ctx, request.(CheckContactEmailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckContactEmail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CheckContactEmailResponseObject); ok {
+		if err := validResponse.VisitCheckContactEmailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDocument operation middleware
 func (sh *strictHandler) GetDocument(w http.ResponseWriter, r *http.Request, documentId DocumentIdPath) {
 	var request GetDocumentRequestObject
@@ -2936,115 +3831,131 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"CuXZFOPQabhqouUt/c7yk8n/DgA=",
+	"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",
+	"d8g5kNsthqXjcE3f0zfwN7afzf7/AA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

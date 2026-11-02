@@ -25,6 +25,9 @@ class Permission(StrEnum):
     companies_create = "companies:create"
     companies_read = "companies:read"
     companies_update = "companies:update"
+    contacts_create = "contacts:create"
+    contacts_read = "contacts:read"
+    contacts_update = "contacts:update"
     documents_create = "documents:create"
     documents_read = "documents:read"
 
@@ -33,6 +36,7 @@ class ErrorCode(StrEnum):
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
+    CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
@@ -389,6 +393,106 @@ class CompanyPage(BaseModel):
     items: list[CompanySummary]
     nextCursor: Annotated[
         CompanyId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
+
+
+class ContactId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cont_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cont_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class ContactStatus(StrEnum):
+    active = "active"
+    left = "left"
+
+
+class EmailCheckStatus(StrEnum):
+    valid = "valid"
+    risky = "risky"
+    invalid = "invalid"
+    unknown = "unknown"
+
+
+class EmailCheck(BaseModel):
+    status: EmailCheckStatus
+    reasons: Annotated[list[str], Field(description="Why, in words (empty when valid).")]
+    checkedAt: AwareDatetime
+
+
+class Contact(BaseModel):
+    id: ContactId
+    version: int
+    companyId: CompanyId
+    companyName: str
+    firstName: str
+    lastName: str
+    fullName: str
+    title: Annotated[str | None, Field(description="Job title, e.g. HR Manager.")]
+    email: Annotated[str | None, Field(...)]
+    emailCheck: Annotated[
+        EmailCheck | None, Field(description="The latest check of `email`; null without an email.")
+    ]
+    phone: Annotated[str | None, Field(...)]
+    mobile: Annotated[str | None, Field(...)]
+    linkedinUrl: Annotated[str | None, Field(...)]
+    status: ContactStatus
+    notes: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class ContactCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId
+    firstName: Annotated[str, Field(max_length=100, min_length=1)]
+    lastName: Annotated[str | None, Field(max_length=100)] = None
+    title: Annotated[str | None, Field(max_length=200)] = None
+    email: Annotated[str | None, Field(max_length=254)] = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    mobile: Annotated[str | None, Field(max_length=40)] = None
+    linkedinUrl: Annotated[str | None, Field(max_length=300)] = None
+    status: ContactStatus | None = None
+    notes: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class ContactUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    companyId: CompanyId | None = None
+    firstName: Annotated[str | None, Field(max_length=100, min_length=1)] = None
+    lastName: Annotated[str | None, Field(max_length=100)] = None
+    title: Annotated[str | None, Field(max_length=200)] = None
+    email: Annotated[str | None, Field(max_length=254)] = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    mobile: Annotated[str | None, Field(max_length=40)] = None
+    linkedinUrl: Annotated[str | None, Field(max_length=300)] = None
+    status: ContactStatus | None = None
+    notes: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class ContactSummary(BaseModel):
+    id: ContactId
+    fullName: str
+    title: Annotated[str | None, Field(...)]
+    companyId: CompanyId
+    companyName: str
+    email: Annotated[str | None, Field(...)]
+    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
+    phone: Annotated[str | None, Field(...)]
+    mobile: Annotated[str | None, Field(...)]
+    status: ContactStatus
+    updatedAt: AwareDatetime
+
+
+class ContactPage(BaseModel):
+    items: list[ContactSummary]
+    nextCursor: Annotated[
+        ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
     ]
 
 

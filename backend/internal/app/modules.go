@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
@@ -26,6 +27,7 @@ type Modules struct {
 	Candidates *candidates.Module
 	Documents  *documents.Module
 	Companies  *companies.Module
+	Contacts   *contacts.Module
 	// scaffold:fields
 }
 
@@ -38,6 +40,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool)
+	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
 	// scaffold:constructors
 	return m
 }
@@ -49,6 +52,7 @@ type (
 	candidatesHTTP = candidates.HTTP
 	documentsHTTP  = documents.HTTP
 	companiesHTTP  = companies.HTTP
+	contactsHTTP   = contacts.HTTP
 	// scaffold:aliases
 )
 
@@ -60,6 +64,7 @@ type Server struct {
 	*candidatesHTTP
 	*documentsHTTP
 	*companiesHTTP
+	*contactsHTTP
 	// scaffold:embeds
 }
 
@@ -72,6 +77,7 @@ func (m *Modules) Server() *Server {
 		candidatesHTTP: m.Candidates.HTTP,
 		documentsHTTP:  m.Documents.HTTP,
 		companiesHTTP:  m.Companies.HTTP,
+		contactsHTTP:   m.Contacts.HTTP,
 		// scaffold:server-fields
 	}
 }

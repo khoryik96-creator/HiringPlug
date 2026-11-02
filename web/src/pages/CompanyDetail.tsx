@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
+import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { COMPANY_SIZE, COMPANY_TYPE, countryName } from "../labels";
@@ -53,6 +54,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           </dl>
         </section>
       )}
+      <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} />
     </main>
   );
 }

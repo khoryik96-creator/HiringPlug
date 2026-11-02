@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/db"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
@@ -34,6 +36,9 @@ type Deps struct {
 	Pool     *pgxpool.Pool
 	Verifier *authn.Verifier
 	Files    *blob.Store
+	// MailServers looks up where email domains receive mail (contacts' email
+	// check). Tests replace it with a fake that needs no network.
+	MailServers contacts.MailServers
 }
 
 // NewDeps connects to the database and refuses to continue if it is unsafe or
@@ -68,6 +73,8 @@ func NewDeps(ctx context.Context, cfg config.Config, logger *slog.Logger) (Deps,
 		Pool:     pool,
 		Verifier: authn.NewVerifier(cfg.AuthJWTSecret, cfg.AuthIssuer, cfg.AuthAudience),
 		Files:    files,
+
+		MailServers: net.DefaultResolver,
 	}, pool.Close, nil
 }
 
