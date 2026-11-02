@@ -1,6 +1,9 @@
 # Local-first deployment: the whole system on one machine.
 #   docker compose -f deploy/docker-compose.yml up -d --build
+# (or double-click update-hiringplug.command / update-hiringplug.bat)
 # then open http://localhost:3000 (web) and http://localhost:8080/docs (API docs).
+# Services restart on their own whenever Docker starts, so this is only needed
+# after pulling new code.
 # For development you usually start only PostgreSQL: `task db:up`.
 #
 # Before running this anywhere but your own laptop, replace every *_dev
@@ -20,6 +23,7 @@ x-backend-env: &backend-env
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: hiringplug
@@ -41,6 +45,7 @@ services:
   api:
     build: { context: .., dockerfile: deploy/backend.Dockerfile }
     command: ["/app/api"]
+    restart: unless-stopped
     environment: *backend-env
     ports: ["8080:8080"]
     volumes: [files:/data/files]
@@ -50,6 +55,7 @@ services:
   worker:
     build: { context: .., dockerfile: deploy/backend.Dockerfile }
     command: ["/app/worker"]
+    restart: unless-stopped
     environment: *backend-env
     volumes: [files:/data/files]
     depends_on:
@@ -57,6 +63,7 @@ services:
 
   ai-worker:
     build: { context: .., dockerfile: deploy/ai.Dockerfile }
+    restart: unless-stopped
     environment:
       HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
       HP_AI_OCR_LANGUAGES: eng
@@ -65,6 +72,7 @@ services:
 
   web:
     build: { context: .., dockerfile: deploy/web.Dockerfile }
+    restart: unless-stopped
     ports: ["3000:80"]
     depends_on: [api]
 

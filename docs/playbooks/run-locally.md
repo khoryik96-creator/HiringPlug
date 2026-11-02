@@ -2,9 +2,18 @@
 
 ## With Docker (everything)
 
+Double-click `update-hiringplug.command` (macOS) or `update-hiringplug.bat`
+(Windows) in the project folder. It starts Docker Desktop if needed, pulls the
+latest code (when `git` is installed; otherwise pull in GitHub Desktop first),
+rebuilds what changed, and opens the web app. It runs:
+
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
+
+Every service has `restart: unless-stopped`, so after that the app comes back
+by itself whenever Docker Desktop starts (turn on "Start Docker Desktop when
+you sign in" in its settings). Run the script again only after updating.
 
 - Web app: http://localhost:3000
 - API docs: http://localhost:8080/docs
@@ -34,8 +43,9 @@ Also back up the `files` volume (the CVs). Test a restore regularly.
 
 ## Upgrading
 
-Pull the new code and run the `up` command again. Migrations run automatically,
-and the API refuses to start if the database is behind.
+Pull the new code and double-click the update script again (or run the `up`
+command). Data is kept. Migrations run automatically, and the API refuses to
+start if the database is behind.
 
 ## For development
 

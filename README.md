@@ -61,8 +61,14 @@ task dev         # API on :8080, both workers, web app on http://localhost:5173
 Sign in to the web app with the `recruiter` token printed by `task db:setup`,
 and with the `sourcer` token to see salary hidden. API docs: http://localhost:8080/docs.
 
-To run everything in Docker instead (local-first deployment):
-`docker compose -f deploy/docker-compose.yml up -d --build`, then open http://localhost:3000.
+To run everything in Docker instead (local-first deployment), with
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) installed:
+**double-click `update-hiringplug.command` (macOS) or `update-hiringplug.bat`
+(Windows)**. It gets the latest code, rebuilds what changed and opens
+http://localhost:3000. Run it again after each update (e.g. after pulling in
+GitHub Desktop). In between you need nothing: the app starts by itself whenever
+Docker Desktop is running. (The command it runs:
+`docker compose -f deploy/docker-compose.yml up -d --build`.)
 
 ## Everyday commands
 
