@@ -141,7 +141,7 @@ func TestCVParsingKeepsOnlyValuesFoundInTheCV(t *testing.T) {
 	})
 }
 
-func TestFormattedCVsAreNotParsed(t *testing.T) {
+func TestFormattedCVsAreParsedForComparison(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	ctx := context.Background()
@@ -155,7 +155,9 @@ func TestFormattedCVsAreNotParsed(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = aiConn.Close(ctx) }()
 	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, parsedCV))
-	assert.True(t, a.getDocument(token, doc.Id).ParseStatus.IsNull())
+	// Parsed like any CV, so the compare page can show what formatting changed.
+	assert.Equal(t, api.DocumentParseStatusQueued, a.getDocument(token, doc.Id).ParseStatus.MustGet())
+	assert.Equal(t, "document.parse_cv", claimAIJobFor(t, aiConn, doc.Id).Kind)
 }
 
 func (a *testApp) getDocument(token, id string) api.Document {

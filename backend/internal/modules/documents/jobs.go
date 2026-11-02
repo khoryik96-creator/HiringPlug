@@ -48,8 +48,9 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	if err != nil {
 		return err
 	}
-	// CVs are parsed as soon as their text is saved; formatted CVs are our own output.
-	if row.Status == string(api.DocumentStatusExtracted) && row.Source != string(api.DocumentSourceFormatted) && hasText(row.ExtractedText) {
+	// Every CV is parsed as soon as its text is saved: candidates' CVs for
+	// review, formatted ones (our own output) for comparing with the original.
+	if row.Status == string(api.DocumentStatusExtracted) && hasText(row.ExtractedText) {
 		if err := queueParse(ctx, tx, job.TenantID, row); err != nil {
 			return err
 		}

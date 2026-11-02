@@ -70,7 +70,7 @@ personal data is ever committed.
 ## CV parsing: grounded in the source
 
 **Built (rules@1).** When Go saves a CV's text it queues `document.parse_cv`
-with that saved text (formatted CVs are skipped). The worker returns
+with that saved text (formatted CVs too, for comparing with the original). The worker returns
 `document.cv_parsed`: contact details, nationality, notice period, skills,
 work history (title, company, dates, current or not) and education.
 

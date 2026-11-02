@@ -65,10 +65,14 @@ and notes move over, empty fields are filled from it (and its salary, if the
 kept candidate has none), and it is deleted, in one transaction. If both were
 on the same job, the kept candidate's application stays.
 
-**CV versions.** A candidate has documents, each with a `source`: `jobstreet`,
+**CV versions** ✅. A candidate has documents, each with a `source`: `jobstreet`,
 `linkedin`, `original`, `formatted` or `other`. Each upload keeps its file, its
-extracted text and any extraction warnings, so the web app can show the
-JobStreet, original and formatted versions side by side.
+extracted text and any extraction warnings; files can be downloaded under their
+original name. **Compare CVs side by side** (on the candidate's CV list) shows
+two versions next to each other, PDFs as they look and Word files as text, with
+the differences read from them on top: fields that disagree, jobs whose title
+or dates changed (matched by employer), jobs and skills only one version has.
+That is the check before sending a formatted CV to a client.
 
 **CV parsing** ✅: after a CV's text is read (with OCR for scans), the AI
 worker reads the profile details out of it: name, email, phone, LinkedIn,
@@ -79,7 +83,7 @@ from this CV** lists each suggestion next to what the profile has now, with
 the CV's wording: empty profile fields are ticked, filled ones never are, and
 **Use ticked details** saves them (with the usual lost-update protection).
 New skills are added to the existing ones. **Read details from this CV**
-parses CVs uploaded earlier. Formatted CVs are not parsed. The CV's work
+parses CVs uploaded earlier. Formatted CVs are parsed too, for comparing, but not offered for review. The CV's work
 history and education are saved on the profile when ticked (ticked by default
 only if the profile has none; existing history is replaced only when asked).
 Design:

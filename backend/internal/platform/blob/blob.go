@@ -94,6 +94,15 @@ func (s *Store) SignedURL(key string, ttl time.Duration) string {
 	return s.baseURL + PathPrefix + key + "?" + q.Encode()
 }
 
+// Open returns the stored file for reading; the caller closes it.
+func (s *Store) Open(key string) (*os.File, error) {
+	path, err := s.path(key)
+	if err != nil {
+		return nil, err
+	}
+	return os.Open(path) //nolint:gosec // path is validated against keyRe and joined under s.dir
+}
+
 // ServeHTTP serves GET /internal/files/{key}?exp=...&sig=... for workers.
 func (s *Store) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, PathPrefix)

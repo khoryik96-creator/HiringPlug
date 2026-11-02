@@ -108,6 +108,30 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/documents/{documentId}/file:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: getDocumentFile
+      tags: [documents]
+      summary: Download the document's file as uploaded
+      description: >
+        The bytes as uploaded; the document's contentType says what they are.
+        Content-Disposition carries the original file name.
+      x-permission: documents:read
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/documents/{documentId}:
     parameters:
       - $ref: '#/components/parameters/DocumentIdPath'

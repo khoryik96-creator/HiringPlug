@@ -6,6 +6,7 @@ import { clearToken, getToken } from "./auth";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CandidateDetail } from "./pages/CandidateDetail";
 import { CandidateList } from "./pages/CandidateList";
+import { CompareCvs } from "./pages/CompareCvs";
 import { CompanyDetail } from "./pages/CompanyDetail";
 import { ContactDetail } from "./pages/ContactDetail";
 import { ContactList } from "./pages/ContactList";
@@ -70,6 +71,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
  * a fresh page, so no edit state carries over.
  */
 function Page({ hash, permissions }: { hash: string; permissions: Permission[] }) {
+  const compare = /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/.exec(hash)?.[1];
+  if (compare) return <CompareCvs key={compare} candidateId={compare} />;
   const candidate = /^#\/candidates\/(cand_[0-9a-z]+)$/.exec(hash)?.[1];
   if (candidate) return <CandidateDetail key={candidate} id={candidate} permissions={permissions} />;
   const company = /^#\/companies\/(comp_[0-9a-z]+)$/.exec(hash)?.[1];

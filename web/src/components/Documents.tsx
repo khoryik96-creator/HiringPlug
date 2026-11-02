@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Candidate, type Document, unwrap } from "../api/client";
+import { downloadDocument } from "../api/files";
 import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
 import { ErrorMessage } from "./ErrorMessage";
@@ -73,21 +74,24 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
         </div>
       )}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error} />
+      {(docs.data?.length ?? 0) >= 2 && <a href={`#/candidates/${candidateId}/compare`}>Compare CVs side by side</a>}
       <ul>
         {docs.data?.map((d: Document) => (
           <li key={d.id}>
             <button type="button" className="link" onClick={() => { setOpen(open === d.id ? null : d.id); }}>
               {d.fileName}
             </button>{" "}
-            <span className={`badge ${d.status}`}>{d.status}</span> <span className="muted">{d.source}</span>
+            <span className={`badge ${d.status}`}>{d.status}</span> <span className="muted">{d.source}</span>{" "}
+            <button type="button" className="link" onClick={() => { void downloadDocument(d); }}>Download</button>
             {d.parseStatus === "queued" && <span className="muted"> reading details…</span>}
             {d.parseStatus === "failed" && <span className="muted"> details could not be read</span>}
-            {canEdit && d.parseStatus === "parsed" && (
+            {/* Formatted CVs are our own output: parsed for comparing, not for filling the profile. */}
+            {canEdit && d.parseStatus === "parsed" && d.source !== "formatted" && (
               <button type="button" className="link" onClick={() => { setReviewing(reviewing === d.id ? null : d.id); }}>
                 Review details from this CV
               </button>
             )}
-            {canUpload && d.status === "extracted" && d.source !== "formatted" && d.parseStatus !== "queued" && (
+            {canUpload && d.status === "extracted" && d.parseStatus !== "queued" && (
               <button type="button" className="link" disabled={parse.isPending} onClick={() => { parse.mutate(d.id); }}>
                 {d.parseStatus ? "Read details again" : "Read details from this CV"}
               </button>

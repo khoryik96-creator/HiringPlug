@@ -209,3 +209,25 @@ func runCoreJobsUntilIdle(t *testing.T, a *testApp) {
 	}
 	t.Fatal("core queue did not drain")
 }
+
+func TestDownloadingADocumentFile(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleViewer)
+	token := tenant.Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "José"})
+	res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "José CV.pdf", minimalPDF)
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var doc api.Document
+	res.JSON(&doc)
+
+	got := a.request(http.MethodGet, "/v1/documents/"+doc.Id+"/file", tenant.Users[api.RoleViewer].Token, nil)
+	require.Equal(t, http.StatusOK, got.Status)
+	assert.Equal(t, minimalPDF, got.Body, "the bytes as uploaded")
+	assert.Equal(t, `attachment; filename*=utf-8''Jos%C3%A9%20CV.pdf`, got.Header.Get("Content-Disposition"))
+
+	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+doc.Id+"/file", other, nil).Status,
+		"another company's document does not exist for them")
+	assert.Equal(t, http.StatusUnauthorized, a.request(http.MethodGet, "/v1/documents/"+doc.Id+"/file", "", nil).Status)
+}

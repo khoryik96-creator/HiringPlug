@@ -23,6 +23,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Import candidates, companies and contacts from CSV, with a report of rows to fix |
 | ✅ | Duplicates flagged and merged; tags and skills with filters |
 | ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |
+| ✅ | Work history and education on profiles; CV versions compared side by side |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -42,15 +43,15 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ **1.6 Dashboard** | My open jobs, candidates per stage, applications stuck too long, activity this week | |
 | ⬜ **1.7 Sign-in and team** (last, by choice) | Sign in with email and password (or Google / Microsoft); an admin screen to invite users, change roles and deactivate them | Today users paste a token and are created on the command line. Needed before anyone else uses it. |
 
-### Phase 2: getting candidates in faster ⬜
+### Phase 2: getting candidates in faster ✅
 
 | Step | Delivers |
 |---|---|
 | ✅ 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, nationality, notice period, current job, skills, work history, education), each value showing where in the CV it came from; you review and accept. Tuned on 25 real CVs, including two-column and old .doc files. Work history and education are saved on the profile. Next: the AI reader. |
-| 2.2 **Duplicates** | ✅ The same email is refused; the same phone or a very similar name is flagged on the candidate's page; merge two candidates with their CVs, jobs, notes and salary |
+| ✅ 2.2 **Duplicates** | The same email is refused; the same phone or a very similar name is flagged on the candidate's page; merge two candidates with their CVs, jobs, notes and salary |
 | ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | ✅ 2.4 **Tags, skills and lists** | Tags and skills on candidates, suggestions from values already used (also for industry and specialization), and list filters. Saved searches come with reports (6.3). |
-| 2.5 **CV versions side by side** | Original, JobStreet, LinkedIn and formatted CVs of one candidate compared side by side |
+| ✅ 2.5 **CV versions side by side** | Original, JobStreet, LinkedIn and formatted CVs of one candidate compared side by side, with the differences in their details (changed dates, missing jobs) listed |
 
 ### Phase 3: job ads and applicants ⬜
 
