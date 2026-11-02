@@ -15,6 +15,7 @@ type Applicant struct {
 	FirstName, LastName string
 	Email               string
 	Phone               *string
+	Source              string // a candidate source (careers_page, jobstreet, linkedin, referral)
 }
 
 // FindOrCreateApplicant returns the candidate with the applicant's email, or
@@ -22,7 +23,10 @@ type Applicant struct {
 // candidate is left unchanged: a public form must not overwrite what the
 // team recorded. created says which happened.
 func (m *Module) FindOrCreateApplicant(ctx context.Context, tx pgx.Tx, a Applicant) (id string, created bool, err error) {
-	source := "careers_page"
+	source := a.Source
+	if source == "" {
+		source = "careers_page"
+	}
 	profile, errs := NormalizeProfile(Profile{
 		FirstName: a.FirstName, LastName: a.LastName, Email: &a.Email, Phone: a.Phone, Source: &source,
 	}, m.service.phoneRegion)
@@ -42,7 +46,7 @@ func (m *Module) FindOrCreateApplicant(ctx context.Context, tx pgx.Tx, a Applica
 		return "", false, err
 	}
 	err = audit.Record(ctx, tx, audit.Entry{
-		Action: "candidate.created", EntityType: "candidate", EntityID: row.ID, Changes: map[string]any{"via": "careers page"},
+		Action: "candidate.created", EntityType: "candidate", EntityID: row.ID, Changes: map[string]any{"via": "careers page", "source": source},
 	})
 	return row.ID, true, err
 }

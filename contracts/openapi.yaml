@@ -339,6 +339,25 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/CareersPage'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/careers/{slug}/jobs.xml:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+    get:
+      operationId: getCareersFeed
+      tags: [careers]
+      summary: The careers page's open ads as an XML job feed
+      description: >
+        For job boards and aggregators that read feeds (the widely used source/job format). Each job links to its ad on the careers page with ?via=indeed, so applicants from feeds are counted as such.
+
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/xml:
+              schema: {type: string}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/public/careers/{slug}/ads/{adId}:
     parameters:
       - $ref: '#/components/parameters/CareersSlugPath'
@@ -386,6 +405,9 @@ paths:
                   enum: ['yes']
                   description: The applicant agrees that the company keeps their details to handle the application.
                 website: {type: string, maxLength: 0}
+                via:
+                  allOf: [{$ref: '#/components/schemas/ApplicationChannel'}]
+                  description: The channel of the link the applicant came from (?via=linkedin); careers_page when absent.
                 file:
                   type: string
                   format: binary
@@ -2376,10 +2398,18 @@ components:
       type: string
       description: Why an application was rejected or withdrawn.
       enum: [not_qualified, salary_mismatch, client_rejected, failed_interview, position_filled, candidate_declined, accepted_other_offer, no_response, other]
+    ApplicationChannel:
+      type: string
+      description: Where an application came from, e.g. the job board whose link the candidate used to apply.
+      enum: [careers_page, jobstreet, linkedin, indeed, facebook, referral, other]
     Application:
       type: object
-      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, stageChangedAt, createdAt, updatedAt]
+      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
       properties:
+        channel:
+          allOf: [{$ref: '#/components/schemas/ApplicationChannel'}]
+          nullable: true
+          description: Null when a recruiter added the candidate.
         id: {$ref: '#/components/schemas/ApplicationId'}
         version: {type: integer}
         jobId: {$ref: '#/components/schemas/JobOrderId'}

@@ -191,6 +191,17 @@ requirements), de-duplicated, and kept with its source and date.
   answer is the same whether the email was known, so the form reveals nothing.
   Robots are kept out by a hidden field people never fill in and a limit per
   connection (5 applications in 10 minutes, 20 a day).
+- **Job boards** ✅ (without partner accounts): each published ad has a link
+  per board (JobStreet, LinkedIn, Indeed, Facebook; "Links for job boards" on
+  the ad). Post the ad on the board with its link; applicants who come
+  through it are recorded on the application ("Applied via LinkedIn" on the
+  pipeline card) and, for new candidates, as their source. The careers page
+  has real addresses (`/careers/<company>/<ad>`, which search engines and
+  boards can link to; the `#/` ones keep working), describes each ad for
+  Google for Jobs (schema.org JobPosting), and publishes an XML job feed of
+  its open ads (`/v1/public/careers/<company>/jobs.xml`, the source/job
+  format Indeed and aggregators read). Posting through the boards' partner
+  programmes comes once those accounts exist.
 - **Pipeline** ✅: a candidate on a job is an *application* moving through
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not

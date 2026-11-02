@@ -157,10 +157,18 @@ components:
       description: Why an application was rejected or withdrawn.
       enum: [not_qualified, salary_mismatch, client_rejected, failed_interview, position_filled, candidate_declined, accepted_other_offer, no_response, other]
 
+    ApplicationChannel:
+      type: string
+      description: Where an application came from, e.g. the job board whose link the candidate used to apply.
+      enum: [careers_page, jobstreet, linkedin, indeed, facebook, referral, other]
     Application:
       type: object
-      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, stageChangedAt, createdAt, updatedAt]
+      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
       properties:
+        channel:
+          allOf: [{ $ref: '#/components/schemas/ApplicationChannel' }]
+          nullable: true
+          description: Null when a recruiter added the candidate.
         id: { $ref: '#/components/schemas/ApplicationId' }
         version: { type: integer }
         jobId: { $ref: '#/components/schemas/JobOrderId' }

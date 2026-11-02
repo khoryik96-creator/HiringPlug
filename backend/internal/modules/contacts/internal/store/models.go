@@ -33,6 +33,8 @@ type Application struct {
 	CreatedBy      string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	// NULL when a recruiter added the candidate
+	Channel *string
 }
 
 type AuditLog struct {

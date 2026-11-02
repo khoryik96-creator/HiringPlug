@@ -13,6 +13,7 @@
 //	careers.go   the module's public API and what it needs from other modules
 //	domain.go    the rules, as pure functions on plain values (unit tested)
 //	limiter.go   how many applications one address may send
+//	feed.go      the open ads as an XML job feed
 //	service.go   use cases: one transaction each
 //	http.go      HTTP handlers: contract types <-> service calls
 package careers
@@ -41,6 +42,7 @@ type Ad struct {
 type Applicant struct {
 	FirstName, LastName, Email string
 	Phone                      *string
+	Channel                    string // the link they came from: careers_page, jobstreet, linkedin, ...
 }
 
 // Tenants finds the company behind a careers page address (identity module).
@@ -66,7 +68,7 @@ type CVs interface {
 
 // Pipeline puts the applicant on the job (pipeline module).
 type Pipeline interface {
-	AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID string) (added bool, err error)
+	AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID, channel string) (added bool, err error)
 }
 
 // Deps are what the module uses from the others.
@@ -84,7 +86,8 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, deps Deps, maxUploadBytes int64) *Module {
-	svc := &Service{pool: pool, deps: deps, limiter: newLimiter(time.Now)}
+// publicURL is where people reach the web app (links in the job feed).
+func New(pool *pgxpool.Pool, deps Deps, maxUploadBytes int64, publicURL string) *Module {
+	svc := &Service{pool: pool, deps: deps, limiter: newLimiter(time.Now), publicURL: publicURL}
 	return &Module{HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }

@@ -6,6 +6,7 @@ import { clearToken, getToken } from "./auth";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CandidateDetail } from "./pages/CandidateDetail";
 import { CandidateList } from "./pages/CandidateList";
+import { careersRoute } from "./careersRoute";
 import { Careers } from "./pages/Careers";
 import { CompareCvs } from "./pages/CompareCvs";
 import { CompanyDetail } from "./pages/CompanyDetail";
@@ -92,9 +93,10 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
 }
 
 export function App() {
-  const hash = useHash();
+  useHash(); // re-render on navigation
   const [signedIn, setSignedIn] = useState(getToken() !== null);
-  const careers = /^#\/careers\/([a-z0-9-]+)(?:\/(ad_[0-9a-z]+))?$/.exec(hash);
+  // The public careers page: never behind sign-in. (hash re-renders on change.)
+  const careers = careersRoute(window.location);
   const signOut = () => {
     clearToken();
     queryClient.clear();
@@ -104,7 +106,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       {careers ? (
         // Public: candidates are never asked to sign in.
-        <Careers key={careers[1]} slug={careers[1] ?? ""} adId={careers[2]} />
+        <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />
       ) : signedIn ? (
         <Shell onSignOut={signOut} />
       ) : (

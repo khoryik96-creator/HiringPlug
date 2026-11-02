@@ -43,3 +43,28 @@ func TestLimiterAllowsAFewApplicationsPerAddress(t *testing.T) {
 	now = now.Add(dayWindow)
 	assert.True(t, l.Allow("203.0.113.7"), "and resets after a day")
 }
+
+func TestChannels(t *testing.T) {
+	a, _ := Form{FirstName: "Li", Email: "li@example.com", Consent: "yes", Via: " LinkedIn "}.Validate()
+	assert.Equal(t, "linkedin", a.Channel)
+	a, _ = Form{FirstName: "Li", Email: "li@example.com", Consent: "yes", Via: "made-up"}.Validate()
+	assert.Equal(t, "careers_page", a.Channel, "unknown or missing links count as the careers page")
+	assert.Equal(t, "jobstreet", CandidateSource("jobstreet"))
+	assert.Equal(t, "careers_page", CandidateSource("indeed"), "boards that are not candidate sources")
+}
+
+func TestFeed(t *testing.T) {
+	loc, salary, typ := "Kuala Lumpur", "RM 8,000", "full_time"
+	closes := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	out, err := Feed("Contoh & Co", "contoh-co", "https://hire.example", []Ad{{
+		ID: "ad_1", Title: "Senior <Accountant>", Location: &loc, SalaryText: &salary, WorkType: &typ,
+		Description: "Join us.\n- SAP", ClosesOn: &closes, PublishedAt: time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC),
+	}}, time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC))
+	assert.NoError(t, err)
+	xml := string(out)
+	assert.Contains(t, xml, "<publisher>Contoh &amp; Co</publisher>")
+	assert.Contains(t, xml, "<title>Senior &lt;Accountant&gt;</title>", "text is escaped")
+	assert.Contains(t, xml, "<url>https://hire.example/careers/contoh-co/ad_1?via=indeed</url>")
+	assert.Contains(t, xml, "<jobtype>fulltime</jobtype>")
+	assert.Contains(t, xml, "<expirationdate>2026-12-31</expirationdate>")
+}

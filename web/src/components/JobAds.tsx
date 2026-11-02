@@ -3,7 +3,8 @@ import { useState } from "react";
 
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobAdsKey } from "../api/keys";
-import { WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
+import { careersUrl } from "../careersRoute";
+import { CHANNEL, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 import { AdText } from "./AdText";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
@@ -36,9 +37,11 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
       {me.data && (
         <p className="muted">
           Published ads appear on your careers page:{" "}
-          <a href={`#/careers/${me.data.tenant.careersSlug}`} target="_blank" rel="noreferrer">
-            {`${window.location.origin}/#/careers/${me.data.tenant.careersSlug}`}
+          <a href={careersUrl(window.location.origin, me.data.tenant.careersSlug)} target="_blank" rel="noreferrer">
+            {careersUrl(window.location.origin, me.data.tenant.careersSlug)}
           </a>
+          {" "}· job feed for boards that read one:{" "}
+          <code>{`${window.location.origin}/v1/public/careers/${me.data.tenant.careersSlug}/jobs.xml`}</code>
         </p>
       )}
       <ErrorMessage error={ads.error ?? setStatus.error} />
@@ -69,6 +72,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
             {ad.closesOn && ` · closes ${ad.closesOn}`}
           </p>
           {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
+          {ad.status === "published" && me.data && <ShareLinks slug={me.data.tenant.careersSlug} adId={ad.id} />}
         </article>
       ))}
     </section>
@@ -145,5 +149,38 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
       </div>
       <SaveError error={save.error} shown={[]} onReload={() => { void queryClient.invalidateQueries({ queryKey: jobAdsKey(job.id) }); onDone(); }} />
     </form>
+  );
+}
+
+const BOARDS = ["jobstreet", "linkedin", "indeed", "facebook"] as const;
+
+/**
+ * Links to this ad for each job board: post the ad there with its link, and
+ * applicants who come through it are recorded as coming from that board.
+ */
+function ShareLinks({ slug, adId }: { slug: string; adId: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <details className="share">
+      <summary>Links for job boards</summary>
+      <table>
+        <tbody>
+          {BOARDS.map((board) => {
+            const url = careersUrl(window.location.origin, slug, adId, board);
+            return (
+              <tr key={board}>
+                <td>{CHANNEL[board]}</td>
+                <td><code>{url}</code></td>
+                <td>
+                  <button type="button" className="link" onClick={() => {
+                    void navigator.clipboard.writeText(url).then(() => { setCopied(board); });
+                  }}>{copied === board ? "Copied" : "Copy"}</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </details>
   );
 }

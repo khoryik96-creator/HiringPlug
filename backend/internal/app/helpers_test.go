@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/legacy"
@@ -139,6 +140,15 @@ func (a *testApp) request(method, path, token string, body any, headers ...strin
 	res := &response{t: a.t, Status: rec.Code, Header: rec.Header(), Body: rec.Body.Bytes()}
 	a.checkAgainstContract(req, res)
 	return res
+}
+
+// The job feed is XML; the contract declares it a string, so it is checked as one.
+func init() {
+	openapi3filter.RegisterBodyDecoder("application/xml",
+		func(body io.Reader, _ http.Header, _ *openapi3.SchemaRef, _ openapi3filter.EncodingFn) (any, error) {
+			b, err := io.ReadAll(body)
+			return string(b), err
+		})
 }
 
 // checkAgainstContract fails the test if a response does not match what the

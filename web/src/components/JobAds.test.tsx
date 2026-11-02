@@ -68,7 +68,21 @@ describe("job ads", () => {
     reads([draft]);
     renderWithClient(<JobAds job={job} canEdit={false} />);
     await screen.findByRole("article", { name: "Senior Auditor" });
-    expect((await screen.findByRole("link", { name: /#\/careers\/demo-company$/ })).getAttribute("href")).toBe("#/careers/demo-company");
+    expect((await screen.findByRole("link", { name: /\/careers\/demo-company$/ })).getAttribute("href")).toBe(`${window.location.origin}/careers/demo-company`);
     expect(screen.queryAllByRole("button")).toEqual([]);
+  });
+
+  it("gives published ads a link per job board", async () => {
+    reads([{ ...draft, status: "published", publishedAt: "2026-11-01T00:00:00Z", description: "Text." }]);
+    const copy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { clipboard: { writeText: copy } });
+    renderWithClient(<JobAds job={job} canEdit />);
+    const links = await screen.findByText("Links for job boards");
+    fireEvent.click(links);
+    const row = screen.getByText("LinkedIn").closest("tr");
+    expect(row?.textContent).toContain(`/careers/demo-company/${draft.id}?via=linkedin`);
+    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "Copy" }));
+    await waitFor(() => { expect(copy).toHaveBeenCalledWith(`${window.location.origin}/careers/demo-company/${draft.id}?via=linkedin`); });
+    vi.unstubAllGlobals();
   });
 });

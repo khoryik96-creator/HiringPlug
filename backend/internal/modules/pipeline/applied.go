@@ -13,8 +13,11 @@ import (
 // AddApplied puts a candidate on a job at "applied", in the caller's
 // transaction (the careers page's apply form). A candidate already on the job
 // stays where they are: added is false.
-func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID string) (added bool, err error) {
-	row, err := store.New(tx).InsertApplication(ctx, store.InsertApplicationParams{JobOrderID: jobID, CandidateID: candidateID, Stage: Applied})
+// channel is where they came from (careers_page, linkedin, ...).
+func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID, channel string) (added bool, err error) {
+	row, err := store.New(tx).InsertApplication(ctx, store.InsertApplicationParams{
+		JobOrderID: jobID, CandidateID: candidateID, Stage: Applied, Channel: &channel,
+	})
 	if database.IsNoRows(err) {
 		return false, nil
 	}
@@ -23,6 +26,6 @@ func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID s
 	}
 	return true, audit.Record(ctx, tx, audit.Entry{
 		Action: "application.created", EntityType: "application", EntityID: row.ID,
-		Changes: map[string]any{"jobId": jobID, "candidateId": candidateID, "stage": Applied, "via": "careers page"},
+		Changes: map[string]any{"jobId": jobID, "candidateId": candidateID, "stage": Applied, "channel": channel},
 	})
 }

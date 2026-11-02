@@ -24,7 +24,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Duplicates flagged and merged; tags and skills with filters |
 | ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |
 | ✅ | Work history and education on profiles; CV versions compared side by side |
-| ✅ | Job ads with publishing rules; a public careers page with an apply form |
+| ✅ | Job ads with publishing rules; a public careers page with an apply form; job board links, feed and Google for Jobs |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -60,7 +60,7 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|
 | ✅ 3.1 **Job ads** | The advertised text for a job (separate from the internal job order), with publish status, a preview, and ads taken down when the job is filled or closed |
 | ✅ 3.2 **Careers page and apply form** | A public page per company listing open ads; applying creates the candidate (or finds them by email), attaches the CV (read and parsed) and puts them in the job's pipeline, with consent, a robot trap and a per-address limit. Choosing your own page address comes with the admin screen (1.7). |
-| 3.3 **Job boards** | Post ads to job boards through their partner programmes (JobStreet, LinkedIn, Indeed) |
+| 🔜 3.3 **Job boards** | ✅ Done without partner accounts: links per board for each ad (applicants are counted by board), real careers page addresses, Google for Jobs data on every ad, and an XML job feed for boards and aggregators that read one. Next, with your partner accounts: posting directly through the boards' partner programmes (SEEK/JobStreet, LinkedIn, Indeed). |
 
 ### Phase 4: interviews and email ⬜
 
@@ -112,3 +112,4 @@ sign-in (1.7).
 - **Your existing data**, if any, as Excel/CSV exports (step 2.3).
 - **Your branded CV template** in Word (step 5.1).
 - **The AI provider and hosting region** for DeepSeek (step 5.3).
+- **Job board partner accounts** (SEEK/JobStreet, LinkedIn, Indeed) to post ads directly (step 3.3); until then, ads are posted with their tracked links or picked up from the feed.

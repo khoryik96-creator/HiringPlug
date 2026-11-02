@@ -60,7 +60,7 @@ func NewModules(d Deps) *Modules {
 	m.Careers = careers.New(d.Pool, careers.Deps{
 		Tenants: m.Identity, Ads: careersAds{m.Jobs}, Candidates: careersCandidates{m.Candidates},
 		CVs: m.Documents, Pipeline: m.Pipeline,
-	}, d.Config.MaxUploadBytes)
+	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs and notes follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes)

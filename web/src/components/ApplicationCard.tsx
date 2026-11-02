@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { Application, Schemas } from "../api/client";
-import { CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
+import { CHANNEL, CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
@@ -77,6 +77,7 @@ export function ApplicationCard({ app, canMove, onMove, busy, onDragStart }: {
       <a href={`#/candidates/${app.candidateId}`}>{app.candidateName}</a>
       {app.candidateTitle && <div className="muted">{app.candidateTitle}</div>}
       <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}</div>
+      {app.channel && <div className="muted">Applied via {CHANNEL[app.channel]}</div>}
       {canMove && <MoveMenu app={app} onMove={onMove} busy={busy} />}
     </div>
   );

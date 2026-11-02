@@ -178,6 +178,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/careers/{slug}/jobs.xml": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The careers page's open ads as an XML job feed
+         * @description For job boards and aggregators that read feeds (the widely used source/job format). Each job links to its ad on the careers page with ?via=indeed, so applicants from feeds are counted as such.
+         */
+        get: operations["getCareersFeed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/careers/{slug}/ads/{adId}": {
         parameters: {
             query?: never;
@@ -1454,7 +1476,14 @@ export interface components {
          * @enum {string}
          */
         CloseReason: "not_qualified" | "salary_mismatch" | "client_rejected" | "failed_interview" | "position_filled" | "candidate_declined" | "accepted_other_offer" | "no_response" | "other";
+        /**
+         * @description Where an application came from, e.g. the job board whose link the candidate used to apply.
+         * @enum {string}
+         */
+        ApplicationChannel: "careers_page" | "jobstreet" | "linkedin" | "indeed" | "facebook" | "referral" | "other";
         Application: {
+            /** @description Null when a recruiter added the candidate. */
+            channel: components["schemas"]["ApplicationChannel"] | null;
             id: components["schemas"]["ApplicationId"];
             version: number;
             jobId: components["schemas"]["JobOrderId"];
@@ -1886,6 +1915,29 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getCareersFeed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     getCareersAd: {
         parameters: {
             query?: never;
@@ -1934,6 +1986,8 @@ export interface operations {
                      */
                     consent: "yes";
                     website?: string;
+                    /** @description The channel of the link the applicant came from (?via=linkedin); careers_page when absent. */
+                    via?: components["schemas"]["ApplicationChannel"];
                     /** Format: binary */
                     file: string;
                 };

@@ -24,7 +24,7 @@ tenant ─┬─ app_user (role)
 | `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, `version`, search text. (Not `job`: that is the background job queue.) |
 | `job_ad` | job, title, location, work type/arrangement, salary text (published as written), text, closes on, status (draft/published/closed; published needs text), published at, `version` |
 | `job_order_salary` | the salary budget (min, optional max, currency, period, `version`); row-level security needs `jobs.salary:read` to see and `jobs.salary:update` to write; clearing deletes the row |
-| `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, `version` |
+| `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, channel (where it came from: careers page, JobStreet, LinkedIn, Indeed, ...; empty when a recruiter added it), `version` |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
 | `candidate_education` | candidate, position, qualification, institution, year finished |

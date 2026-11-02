@@ -70,6 +70,13 @@ func TestCareersPageAndApplying(t *testing.T) {
 	assert.NotContains(t, string(res.Body), job.Id, "no internal ids or fields")
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/public/careers/no-such-company", "", nil).Status)
 
+	feed := a.request(http.MethodGet, page+"/jobs.xml", "", nil)
+	require.Equal(t, http.StatusOK, feed.Status, "%s", feed.Body)
+	assert.Contains(t, feed.Header.Get("Content-Type"), "application/xml")
+	assert.Contains(t, string(feed.Body), "<title>Senior Accountant</title>")
+	assert.Contains(t, string(feed.Body), "/careers/"+me.Tenant.CareersSlug+"/"+live.Id+"?via=indeed")
+	assert.NotContains(t, string(feed.Body), "Draft only")
+
 	t.Run("another company's ad is not found under this address", func(t *testing.T) {
 		other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 		var otherMe api.Me
@@ -125,6 +132,25 @@ func TestCareersPageAndApplying(t *testing.T) {
 		bad := map[string]string{"firstName": "Wei", "email": "wei@example.com", "consent": "yes"}
 		assert.Equal(t, http.StatusUnsupportedMediaType, a.apply(applyPath, bad, "cv.exe", []byte("MZ not a cv")).Status)
 		assert.Empty(t, a.request(http.MethodGet, "/v1/candidates?q=wei@example.com", token, nil).Map()["items"], "no candidate without their CV")
+	})
+
+	t.Run("the link's channel is recorded on the application and a new candidate", func(t *testing.T) {
+		other := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Clerk"})
+		ad := a.adRequest(http.MethodPost, "/v1/jobs/"+other.Id+"/ads", token, map[string]any{"title": "Clerk", "description": "Join us."}, http.StatusCreated)
+		publish(ad)
+		viaLinkedIn := map[string]string{"firstName": "Li", "email": "li@example.com", "consent": "yes", "via": "linkedin"}
+		require.Equal(t, http.StatusAccepted, a.apply(page+"/ads/"+ad.Id+"/applications", viaLinkedIn, "cv.pdf", minimalPDF).Status)
+		apps := a.request(http.MethodGet, "/v1/jobs/"+other.Id+"/applications", token, nil).Map()["items"].([]any)
+		require.Len(t, apps, 1)
+		assert.Equal(t, "linkedin", apps[0].(map[string]any)["channel"])
+		id := apps[0].(map[string]any)["candidateId"].(string)
+		var li api.Candidate
+		a.request(http.MethodGet, "/v1/candidates/"+id, token, nil).JSON(&li)
+		assert.Equal(t, api.CandidateSourceLinkedin, li.Source.MustGet())
+
+		// The first application above came without a link: the careers page.
+		first := a.request(http.MethodGet, "/v1/jobs/"+job.Id+"/applications", token, nil).Map()["items"].([]any)
+		assert.Equal(t, "careers_page", first[0].(map[string]any)["channel"])
 	})
 
 	t.Run("too many applications from one address are refused", func(t *testing.T) {

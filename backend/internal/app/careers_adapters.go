@@ -49,5 +49,6 @@ type careersCandidates struct{ candidates *candidates.Module }
 func (c careersCandidates) FindOrCreateApplicant(ctx context.Context, tx pgx.Tx, a careers.Applicant) (string, bool, error) {
 	return c.candidates.FindOrCreateApplicant(ctx, tx, candidates.Applicant{
 		FirstName: a.FirstName, LastName: a.LastName, Email: a.Email, Phone: a.Phone,
+		Source: careers.CandidateSource(a.Channel),
 	})
 }

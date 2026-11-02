@@ -2,8 +2,8 @@
 -- transaction: row-level security limits every query to the current tenant.
 
 -- name: InsertApplication :one
-INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, created_by)
-VALUES (app_current_tenant(), @job_order_id, @candidate_id, @stage, app_current_user())
+INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
+VALUES (app_current_tenant(), @job_order_id, @candidate_id, @stage, sqlc.narg(channel), app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
 RETURNING *;
 

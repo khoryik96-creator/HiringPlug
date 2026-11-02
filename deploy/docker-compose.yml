@@ -20,6 +20,7 @@ x-backend-env: &backend-env
   HP_FILES_DIR: /data/files
   HP_INTERNAL_BASE_URL: http://api:8080
   HP_CLIENT_IP_HEADER: X-Real-IP # set by nginx (deploy/nginx.conf)
+  HP_PUBLIC_URL: ${HP_PUBLIC_URL:-http://localhost:3000} # where people reach the app
 
 services:
   postgres:

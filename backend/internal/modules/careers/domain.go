@@ -14,6 +14,22 @@ type Form struct {
 	FirstName, LastName, Email, Phone string
 	Consent                           string // "yes"
 	Website                           string // a trap for robots: people never see it, so it stays empty
+	Via                               string // the channel of the link they came from (?via=linkedin)
+}
+
+// Channels an application can come from (the contract's ApplicationChannel).
+var channels = map[string]bool{
+	"careers_page": true, "jobstreet": true, "linkedin": true, "indeed": true, "facebook": true, "referral": true, "other": true,
+}
+
+// CandidateSource is the source recorded on a new candidate for a channel:
+// the boards candidates already know as sources, else the careers page.
+func CandidateSource(channel string) string {
+	switch channel {
+	case "jobstreet", "linkedin", "referral":
+		return channel
+	}
+	return "careers_page"
 }
 
 // IsRobot reports a form that filled in the hidden field. It is answered as if
@@ -38,6 +54,10 @@ func (f Form) Validate() (Applicant, apperr.FieldErrors) {
 	}
 	if addr, err := mail.ParseAddress(a.Email); err != nil || addr.Address != a.Email || !strings.Contains(a.Email[strings.LastIndex(a.Email, "@")+1:], ".") {
 		errs.Add("email", "is not a valid email address")
+	}
+	a.Channel = strings.ToLower(strings.TrimSpace(f.Via))
+	if !channels[a.Channel] {
+		a.Channel = "careers_page" // no link, or one we do not know: still a careers page application
 	}
 	if phone := strings.TrimSpace(f.Phone); phone != "" {
 		a.Phone = &phone

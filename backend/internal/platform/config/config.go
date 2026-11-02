@@ -48,6 +48,9 @@ type Config struct {
 	// X-Real-IP). Empty when the API is reached directly. Never a header
 	// clients could set themselves.
 	ClientIPHeader string // HP_CLIENT_IP_HEADER
+	// PublicURL is where people reach the web app, e.g. https://hire.example.com:
+	// links in job feeds (and later emails) point there.
+	PublicURL string // HP_PUBLIC_URL
 }
 
 // devSecret is only accepted outside production.
@@ -72,6 +75,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxUploadBytes:   r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
 		DefaultPhoneArea: strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),
 		ClientIPHeader:   r.str("HP_CLIENT_IP_HEADER", ""),
+		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
 

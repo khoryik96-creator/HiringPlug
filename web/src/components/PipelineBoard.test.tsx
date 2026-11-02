@@ -12,7 +12,7 @@ afterEach(() => {
 
 const base: Omit<Application, "id" | "candidateId" | "candidateName" | "stage"> = {
   version: 3, jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", jobTitle: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
-  companyName: "Maybank", candidateTitle: "Accountant", reason: null, reasonNote: null,
+  companyName: "Maybank", candidateTitle: "Accountant", reason: null, reasonNote: null, channel: null,
   stageChangedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 const siti: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w1", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w1", candidateName: "Siti Aisyah", stage: "screening" };

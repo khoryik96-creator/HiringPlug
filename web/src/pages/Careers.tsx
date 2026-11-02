@@ -1,10 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { AdText } from "../components/AdText";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
+import type { CareersRoute } from "../careersRoute";
 import { WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 
 type Ad = Schemas["PublicJobAd"];
@@ -16,9 +17,13 @@ const meta = (ad: Ad) =>
 
 /**
  * A company's public careers page (signed out): its open ads, one ad with the
- * apply form. Reached at #/careers/<address> and #/careers/<address>/<ad>.
+ * apply form. Reached at /careers/<address>[/<ad>] (or the #/ form); a
+ * ?via=<board> is kept while browsing and sent with the application.
  */
-export function Careers({ slug, adId }: { slug: string; adId: string | undefined }) {
+export function Careers({ route, pathStyle }: { route: CareersRoute; pathStyle: boolean }) {
+  const { slug, adId, via } = route;
+  const href = (ad?: string) =>
+    `${pathStyle ? "" : "#"}/careers/${slug}${ad ? `/${ad}` : ""}${via ? `?via=${encodeURIComponent(via)}` : ""}`;
   const page = useQuery({
     queryKey: ["careers", slug],
     queryFn: async () => unwrap(await api.GET("/v1/public/careers/{slug}", { params: { path: { slug } } })),
@@ -29,18 +34,18 @@ export function Careers({ slug, adId }: { slug: string; adId: string | undefined
   return (
     <main className="careers">
       <header>
-        <h1><a href={`#/careers/${slug}`}>{page.data.companyName}</a></h1>
+        <h1><a href={href()}>{page.data.companyName}</a></h1>
         <p className="muted">Careers</p>
       </header>
       {adId ? (
-        ad ? <AdPage slug={slug} ad={ad} company={page.data.companyName} /> : <p>This job is no longer open. <a href={`#/careers/${slug}`}>See open jobs</a></p>
+        ad ? <AdPage slug={slug} ad={ad} company={page.data.companyName} via={via} back={href()} /> : <p>This job is no longer open. <a href={href()}>See open jobs</a></p>
       ) : page.data.ads.length === 0 ? (
         <p>There are no open jobs right now. Please check back later.</p>
       ) : (
         <ul className="careers-list">
           {page.data.ads.map((a) => (
             <li key={a.id}>
-              <a href={`#/careers/${slug}/${a.id}`}><strong>{a.title}</strong></a>
+              <a href={href(a.id)}><strong>{a.title}</strong></a>
               <div className="muted">{meta(a)}</div>
             </li>
           ))}
@@ -50,19 +55,20 @@ export function Careers({ slug, adId }: { slug: string; adId: string | undefined
   );
 }
 
-function AdPage({ slug, ad, company }: { slug: string; ad: Ad; company: string }) {
+function AdPage({ slug, ad, company, via, back }: { slug: string; ad: Ad; company: string; via: string | undefined; back: string }) {
+  useJobPostingData(ad, company);
   return (
     <article aria-label={ad.title}>
-      <a href={`#/careers/${slug}`}>← All jobs</a>
+      <a href={back}>← All jobs</a>
       <h2>{ad.title}</h2>
       <p className="muted">{meta(ad)}{ad.closesOn && ` · apply by ${ad.closesOn}`}</p>
       <AdText text={ad.description} />
-      <ApplyForm slug={slug} adId={ad.id} company={company} />
+      <ApplyForm slug={slug} adId={ad.id} company={company} via={via} />
     </article>
   );
 }
 
-function ApplyForm({ slug, adId, company }: { slug: string; adId: string; company: string }) {
+function ApplyForm({ slug, adId, company, via }: { slug: string; adId: string; company: string; via: string | undefined }) {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", consent: false, website: "" });
   const [file, setFile] = useState<File | null>(null);
   const apply = useMutation({
@@ -74,6 +80,7 @@ function ApplyForm({ slug, adId, company }: { slug: string; adId: string; compan
       body.append("phone", form.phone);
       if (form.consent) body.append("consent", "yes");
       body.append("website", form.website);
+      if (via) body.append("via", via);
       if (file) body.append("file", file);
       const res = await fetch(`/v1/public/careers/${slug}/ads/${adId}/applications`, { method: "POST", body });
       if (!res.ok) unwrap({ error: await res.json(), response: res }); // throws the API's error
@@ -112,4 +119,44 @@ function ApplyForm({ slug, adId, company }: { slug: string; adId: string; compan
       <SaveError error={apply.error} shown={[]} onReload={() => { apply.reset(); }} />
     </form>
   );
+}
+
+const EMPLOYMENT: Record<NonNullable<Ad["workType"]>, string> = {
+  full_time: "FULL_TIME", part_time: "PART_TIME", contract: "CONTRACTOR", temporary: "TEMPORARY", internship: "INTERN",
+};
+
+/**
+ * Google for Jobs reads schema.org JobPosting data from the page. It is
+ * added to <head> while the ad is shown (as JSON in a script tag, which
+ * browsers never run), and removed when the visitor leaves the ad.
+ */
+export function jobPostingData(ad: Ad, company: string): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    title: ad.title,
+    description: ad.description,
+    datePosted: ad.publishedAt.slice(0, 10),
+    ...(ad.closesOn ? { validThrough: ad.closesOn } : {}),
+    ...(ad.workType ? { employmentType: EMPLOYMENT[ad.workType] } : {}),
+    hiringOrganization: { "@type": "Organization", name: company },
+    ...(ad.location ? { jobLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: ad.location } } } : {}),
+    ...(ad.workArrangement === "remote" ? { jobLocationType: "TELECOMMUTE" } : {}),
+  };
+}
+
+function useJobPostingData(ad: Ad, company: string) {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    // JSON.stringify cannot end the script element early: "<" is escaped.
+    script.textContent = JSON.stringify(jobPostingData(ad, company)).replace(/</g, "\\u003c");
+    document.head.appendChild(script);
+    const title = document.title;
+    document.title = `${ad.title} · ${company}`;
+    return () => {
+      script.remove();
+      document.title = title;
+    };
+  }, [ad, company]);
 }

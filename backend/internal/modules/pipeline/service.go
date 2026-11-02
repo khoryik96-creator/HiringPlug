@@ -214,6 +214,6 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, rows []store.Application
 func fromRow(r store.Application) Application {
 	return Application{
 		ID: r.ID, Version: int(r.Version), JobID: r.JobOrderID, CandidateID: r.CandidateID, Stage: r.Stage,
-		Reason: r.Reason, ReasonNote: r.ReasonNote, StageChangedAt: r.StageChangedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		Reason: r.Reason, ReasonNote: r.ReasonNote, Channel: r.Channel, StageChangedAt: r.StageChangedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }

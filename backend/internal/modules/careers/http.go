@@ -1,6 +1,7 @@
 package careers
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -34,6 +35,15 @@ func (h *HTTP) GetCareersPage(ctx context.Context, req api.GetCareersPageRequest
 	return out, nil
 }
 
+// GetCareersFeed handles GET /v1/public/careers/{slug}/jobs.xml.
+func (h *HTTP) GetCareersFeed(ctx context.Context, req api.GetCareersFeedRequestObject) (api.GetCareersFeedResponseObject, error) {
+	out, err := h.svc.Feed(ctx, req.Slug)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetCareersFeed200ApplicationxmlResponse{Body: bytes.NewReader(out), ContentLength: int64(len(out))}, nil
+}
+
 // GetCareersAd handles GET /v1/public/careers/{slug}/ads/{adId}.
 func (h *HTTP) GetCareersAd(ctx context.Context, req api.GetCareersAdRequestObject) (api.GetCareersAdResponseObject, error) {
 	ad, err := h.svc.Ad(ctx, req.Slug, req.AdId)
@@ -51,7 +61,7 @@ func (h *HTTP) ApplyToJobAd(ctx context.Context, req api.ApplyToJobAdRequestObje
 	var cv []byte
 	text := map[string]*string{
 		"firstName": &form.FirstName, "lastName": &form.LastName, "email": &form.Email,
-		"phone": &form.Phone, "consent": &form.Consent, "website": &form.Website,
+		"phone": &form.Phone, "consent": &form.Consent, "website": &form.Website, "via": &form.Via,
 	}
 	for {
 		part, err := req.Body.NextPart()

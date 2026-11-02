@@ -47,7 +47,7 @@ func (q *Queries) FindApplication(ctx context.Context, arg FindApplicationParams
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at FROM application WHERE id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id string) (Application, error) {
@@ -66,28 +66,35 @@ func (q *Queries) GetApplication(ctx context.Context, id string) (Application, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Channel,
 	)
 	return i, err
 }
 
 const insertApplication = `-- name: InsertApplication :one
 
-INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
+INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel
 `
 
 type InsertApplicationParams struct {
 	JobOrderID  string
 	CandidateID string
 	Stage       string
+	Channel     *string
 }
 
 // Queries owned by the pipeline module. Run inside a tenant-scoped
 // transaction: row-level security limits every query to the current tenant.
 func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationParams) (Application, error) {
-	row := q.db.QueryRow(ctx, insertApplication, arg.JobOrderID, arg.CandidateID, arg.Stage)
+	row := q.db.QueryRow(ctx, insertApplication,
+		arg.JobOrderID,
+		arg.CandidateID,
+		arg.Stage,
+		arg.Channel,
+	)
 	var i Application
 	err := row.Scan(
 		&i.ID,
@@ -102,12 +109,13 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Channel,
 	)
 	return i, err
 }
 
 const listCandidateApplications = `-- name: ListCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID string) ([]Application, error) {
@@ -132,6 +140,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Channel,
 		); err != nil {
 			return nil, err
 		}
@@ -144,7 +153,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 }
 
 const listJobApplications = `-- name: ListJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
 `
 
 // A job's pipeline, oldest first (the order cards were added).
@@ -170,6 +179,7 @@ func (q *Queries) ListJobApplications(ctx context.Context, jobOrderID string) ([
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Channel,
 		); err != nil {
 			return nil, err
 		}
@@ -190,7 +200,7 @@ UPDATE application SET
   version = version + 1,
   updated_at = now()
 WHERE id = $4 AND version = $5
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel
 `
 
 type MoveApplicationParams struct {
@@ -224,6 +234,7 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Channel,
 	)
 	return i, err
 }
@@ -298,7 +309,7 @@ func (q *Queries) StageCounts(ctx context.Context, jobIds []string) ([]StageCoun
 }
 
 const stuckApplications = `-- name: StuckApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at FROM application
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application
 WHERE job_order_id = ANY($1::text[])
   AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
   AND stage_changed_at < now() - make_interval(days => $2::integer)
@@ -333,6 +344,7 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Channel,
 		); err != nil {
 			return nil, err
 		}

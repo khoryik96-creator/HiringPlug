@@ -37,6 +37,7 @@ type Application struct {
 	Stage          string
 	Reason         *string
 	ReasonNote     *string
+	Channel        *string // where the application came from; nil when a recruiter added it
 	StageChangedAt time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time

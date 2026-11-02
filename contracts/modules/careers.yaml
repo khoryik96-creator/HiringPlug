@@ -32,6 +32,27 @@ paths:
               schema: { $ref: '#/components/schemas/CareersPage' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/public/careers/{slug}/jobs.xml:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+    get:
+      operationId: getCareersFeed
+      tags: [careers]
+      summary: The careers page's open ads as an XML job feed
+      description: >
+        For job boards and aggregators that read feeds (the widely used
+        source/job format). Each job links to its ad on the careers page with
+        ?via=indeed, so applicants from feeds are counted as such.
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/xml:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/public/careers/{slug}/ads/{adId}:
     parameters:
       - $ref: '#/components/parameters/CareersSlugPath'
@@ -83,6 +104,9 @@ paths:
                   enum: ['yes']
                   description: The applicant agrees that the company keeps their details to handle the application.
                 website: { type: string, maxLength: 0 }
+                via:
+                  allOf: [{ $ref: '#/components/schemas/ApplicationChannel' }]
+                  description: The channel of the link the applicant came from (?via=linkedin); careers_page when absent.
                 file:
                   type: string
                   format: binary

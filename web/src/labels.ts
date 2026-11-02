@@ -17,6 +17,16 @@ export const WORK_AUTH_BASIS: Record<Schemas["WorkAuthorizationBasis"], string> 
   other: "Other pass",
 };
 
+export const CHANNEL: Record<Schemas["ApplicationChannel"], string> = {
+  careers_page: "Careers page",
+  jobstreet: "JobStreet",
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+  facebook: "Facebook",
+  referral: "Referral",
+  other: "Other",
+};
+
 export const CANDIDATE_SOURCE: Record<Schemas["CandidateSource"], string> = {
   jobstreet: "JobStreet",
   linkedin: "LinkedIn",

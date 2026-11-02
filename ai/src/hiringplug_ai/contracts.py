@@ -1017,7 +1017,20 @@ class CloseReason(StrEnum):
     other = "other"
 
 
+class ApplicationChannel(StrEnum):
+    careers_page = "careers_page"
+    jobstreet = "jobstreet"
+    linkedin = "linkedin"
+    indeed = "indeed"
+    facebook = "facebook"
+    referral = "referral"
+    other = "other"
+
+
 class Application(BaseModel):
+    channel: Annotated[
+        ApplicationChannel | None, Field(description="Null when a recruiter added the candidate.")
+    ]
     id: ApplicationId
     version: int
     jobId: JobOrderId

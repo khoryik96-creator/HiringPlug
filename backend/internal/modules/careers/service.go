@@ -2,6 +2,7 @@ package careers
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,9 +17,19 @@ import (
 
 // Service holds the careers use cases.
 type Service struct {
-	pool    *pgxpool.Pool
-	deps    Deps
-	limiter *limiter
+	pool      *pgxpool.Pool
+	deps      Deps
+	limiter   *limiter
+	publicURL string
+}
+
+// Feed returns the careers page's open ads as an XML job feed.
+func (s *Service) Feed(ctx context.Context, slug string) ([]byte, error) {
+	name, ads, err := s.Page(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+	return Feed(name, slug, s.publicURL, ads, time.Now())
 }
 
 // tenant turns a page address into the company's tenant scope.
@@ -94,7 +105,7 @@ func (s *Service) Apply(ctx context.Context, slug, adID, clientAddr string, f Fo
 		if err != nil {
 			return err
 		}
-		added, err := s.deps.Pipeline.AddApplied(ctx, tx, ad.JobID, candidateID)
+		added, err := s.deps.Pipeline.AddApplied(ctx, tx, ad.JobID, candidateID, applicant.Channel)
 		if err != nil {
 			return err
 		}
@@ -103,7 +114,7 @@ func (s *Service) Apply(ctx context.Context, slug, adID, clientAddr string, f Fo
 			Action: "careers.applied", EntityType: "candidate", EntityID: candidateID,
 			Changes: map[string]any{
 				"adId": adID, "jobId": ad.JobID, "documentId": documentID, "newCandidate": created,
-				"addedToJob": added, "consent": true,
+				"addedToJob": added, "channel": applicant.Channel, "consent": true,
 			},
 		})
 	})
