@@ -134,8 +134,8 @@ tasks:
   # --- Local development ---
 
   db:up:
-    desc: Start PostgreSQL in Docker
-    cmds: [docker compose -f deploy/docker-compose.yml up -d --wait postgres]
+    desc: Start PostgreSQL and Mailpit (catches the app's email, http://localhost:8025) in Docker
+    cmds: [docker compose -f deploy/docker-compose.yml up -d --wait postgres mailpit]
 
   db:setup:
     desc: Migrate, create the database roles, and create demo users (prints sign-in tokens)

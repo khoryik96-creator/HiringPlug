@@ -20,3 +20,5 @@ export const jobAdsKey = (jobId: string) => ["job-ads", jobId] as const;
 export const interviewsKey = ["interviews"] as const;
 export const applicationInterviewsKey = (applicationId: string) => ["interviews", "application", applicationId] as const;
 export const usersKey = ["users"] as const;
+export const emailTemplatesKey = ["email-templates"] as const;
+export const candidateEmailsKey = (candidateId: string) => ["emails", candidateId] as const;

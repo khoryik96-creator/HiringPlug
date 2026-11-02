@@ -26,6 +26,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Work history and education on profiles; CV versions compared side by side |
 | ✅ | Job ads with publishing rules; a public careers page with an apply form; job board links, feed and Google for Jobs |
 | ✅ | Interviews with clash checks, calendar files and interviewer feedback |
+| ✅ | Email from the app with templates, sent through your mail server |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -67,8 +68,8 @@ job. Today the app has candidates but nothing to place them into.
 
 | Step | Delivers |
 |---|---|
-| ✅ 4.1 **Interviews** | Schedule interviews for an application (interviewers, time, place or link, clash check), calendar files, a feedback form per interviewer (hidden from colleagues until they give theirs), and the dashboard's upcoming interviews and feedback to give. Email reminders come with 4.2. |
-| 4.2 **Email** | Send email from the app with templates (submit a candidate to a client, invite to interview, rejection), logged on the timeline |
+| ✅ 4.1 **Interviews** | Schedule interviews for an application (interviewers, time, place or link, clash check), calendar files, a feedback form per interviewer (hidden from colleagues until they give theirs), and the dashboard's upcoming interviews and feedback to give. Reminders come with calendar sync (4.3). |
+| ✅ 4.2 **Email** | Send email from a candidate's page or an interview with templates (interview invitation, submit to client, application received, unsuccessful) filled from the candidate, job, interview and sender; sent in the background through the company's mail server, with replies to the sender; every email listed on the candidate's page with its state. Needs your mail server's SMTP settings for real sending. |
 | 4.3 **Calendar and inbox sync** | Google / Microsoft calendar sync for interviews; two-way email sync so replies show on the timeline |
 
 ### Phase 5: AI and formatted CVs ⬜

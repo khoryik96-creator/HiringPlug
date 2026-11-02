@@ -433,6 +433,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's email templates (starter templates are added the first time) */
+        get: operations["listEmailTemplates"];
+        put?: never;
+        /** Add a template */
+        post: operations["createEmailTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-templates/{templateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["EmailTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a template */
+        put: operations["updateEmailTemplate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fill a template for a candidate (and a job or interview) to review before sending
+         * @description Placeholders without a value are left in brackets and listed in `missing`, so they are fixed before sending. Times are written in `timeZone` (the sender's, e.g. Asia/Kuala_Lumpur).
+         */
+        post: operations["draftEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Emails sent about a candidate, newest first */
+        get: operations["listEmails"];
+        put?: never;
+        /** Send an email (it is queued and sent in the background) */
+        post: operations["sendEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -825,11 +900,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1362,6 +1437,90 @@ export interface components {
             profile: components["schemas"]["ParsedProfile"] | null;
             errorMessage: string | null;
         };
+        /** @example etpl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        EmailTemplateId: string;
+        /** @example eml_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        EmailId: string;
+        EmailTemplate: {
+            id: components["schemas"]["EmailTemplateId"];
+            version: number;
+            name: string;
+            subject: string;
+            /** @description Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`. */
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        EmailTemplateList: {
+            items: components["schemas"]["EmailTemplate"][];
+            /** @description The placeholders templates may use. */
+            placeholders: string[];
+        };
+        EmailTemplateInput: {
+            name: string;
+            subject: string;
+            body: string;
+        };
+        EmailTemplateUpdate: {
+            version: number;
+            name: string;
+            subject: string;
+            body: string;
+        };
+        EmailDraftRequest: {
+            templateId: components["schemas"]["EmailTemplateId"];
+            candidateId: components["schemas"]["CandidateId"];
+            applicationId?: components["schemas"]["ApplicationId"];
+            interviewId?: components["schemas"]["InterviewId"];
+            /** @example Asia/Kuala_Lumpur */
+            timeZone: string;
+        };
+        EmailDraft: {
+            /** @description Suggested recipients (the candidate, or the job's hiring contact for templates addressed to the client). */
+            to: string[];
+            subject: string;
+            body: string;
+            /** @description Placeholders that had no value (left as [placeholder] in the text). */
+            missing: string[];
+        };
+        /**
+         * @description queued = waiting to be sent; sent = accepted by the mail server; failed = could not be sent (see error).
+         * @enum {string}
+         */
+        EmailStatus: "queued" | "sent" | "failed";
+        Email: {
+            id: components["schemas"]["EmailId"];
+            candidateId: components["schemas"]["CandidateId"] | null;
+            applicationId: components["schemas"]["ApplicationId"] | null;
+            to: string[];
+            cc: string[];
+            subject: string;
+            body: string;
+            status: components["schemas"]["EmailStatus"];
+            error: string | null;
+            sentBy: components["schemas"]["UserId"];
+            sentByName: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+        };
+        EmailList: {
+            items: components["schemas"]["Email"][];
+        };
+        EmailSend: {
+            to: string[];
+            cc?: string[];
+            subject: string;
+            body: string;
+            candidateId?: components["schemas"]["CandidateId"];
+            applicationId?: components["schemas"]["ApplicationId"];
+        };
+        EmailSendJob: {
+            emailId: components["schemas"]["EmailId"];
+        };
         UserList: {
             items: components["schemas"]["UserSummary"][];
         };
@@ -1848,6 +2007,7 @@ export interface components {
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
+        EmailTemplateIdPath: components["schemas"]["EmailTemplateId"];
         InterviewIdPath: components["schemas"]["InterviewId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
@@ -2629,6 +2789,167 @@ export interface operations {
                     "application/json": components["schemas"]["Document"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listEmailTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createEmailTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateEmailTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["EmailTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    draftEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailDraft"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listEmails: {
+        parameters: {
+            query: {
+                candidateId: components["schemas"]["CandidateId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    sendEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailSend"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Email"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

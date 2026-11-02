@@ -331,13 +331,14 @@ func (q *Queries) JobOrderExists(ctx context.Context, id string) (bool, error) {
 }
 
 const jobOrderTitles = `-- name: JobOrderTitles :many
-SELECT id, title, company_id FROM job_order WHERE id = ANY($1::text[])
+SELECT id, title, company_id, contact_id FROM job_order WHERE id = ANY($1::text[])
 `
 
 type JobOrderTitlesRow struct {
 	ID        string
 	Title     string
 	CompanyID string
+	ContactID *string
 }
 
 func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderTitlesRow, error) {
@@ -349,7 +350,12 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 	var items []JobOrderTitlesRow
 	for rows.Next() {
 		var i JobOrderTitlesRow
-		if err := rows.Scan(&i.ID, &i.Title, &i.CompanyID); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CompanyID,
+			&i.ContactID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

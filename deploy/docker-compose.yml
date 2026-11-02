@@ -4,7 +4,7 @@
 # then open http://localhost:3000 (web) and http://localhost:8080/docs (API docs).
 # Services restart on their own whenever Docker starts, so this is only needed
 # after pulling new code.
-# For development you usually start only PostgreSQL: `task db:up`.
+# For development you usually start only PostgreSQL and Mailpit: `task db:up`.
 #
 # Before running this anywhere but your own laptop, replace every *_dev
 # password and secret below (see .env.example).
@@ -21,6 +21,14 @@ x-backend-env: &backend-env
   HP_INTERNAL_BASE_URL: http://api:8080
   HP_CLIENT_IP_HEADER: X-Real-IP # set by nginx (deploy/nginx.conf)
   HP_PUBLIC_URL: ${HP_PUBLIC_URL:-http://localhost:3000} # where people reach the app
+  # Email from the app. By default it goes to Mailpit, which catches every
+  # message (nothing reaches real inboxes): read it at http://localhost:8025.
+  # For real email set these to your mail server (see .env.example).
+  HP_SMTP_HOST: ${HP_SMTP_HOST:-mailpit:1025}
+  HP_SMTP_USERNAME: ${HP_SMTP_USERNAME:-}
+  HP_SMTP_PASSWORD: ${HP_SMTP_PASSWORD:-}
+  HP_SMTP_FROM: ${HP_SMTP_FROM:-no-reply@hiringplug.local}
+  HP_SMTP_TLS: ${HP_SMTP_TLS:-none}
 
 services:
   postgres:
@@ -71,6 +79,12 @@ services:
       HP_AI_OCR_LANGUAGES: eng
     depends_on:
       bootstrap: { condition: service_completed_successfully }
+
+  # Catches email sent from the app (development): http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    ports: ["1025:1025", "8025:8025"]
 
   web:
     build: { context: .., dockerfile: deploy/web.Dockerfile }

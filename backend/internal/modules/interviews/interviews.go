@@ -47,11 +47,17 @@ type Users interface {
 
 // Module is the interviews module.
 type Module struct {
-	HTTP *HTTP
+	service *Service
+	HTTP    *HTTP
 }
 
 // New wires the module.
 func New(pool *pgxpool.Pool, applications Applications, users Users) *Module {
 	svc := &Service{pool: pool, applications: applications, users: users}
-	return &Module{HTTP: &HTTP{svc: svc}}
+	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// Brief returns one interview for other modules, in the caller's transaction.
+func (m *Module) Brief(ctx context.Context, tx pgx.Tx, id string) (Brief, error) {
+	return m.service.BriefOf(ctx, tx, id)
 }

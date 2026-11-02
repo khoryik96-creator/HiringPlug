@@ -59,6 +59,7 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, err
 type Brief struct {
 	Title     string
 	CompanyID string
+	ContactID *string // the hiring contact
 }
 
 // Briefs returns title and company of the given jobs (missing ones are left

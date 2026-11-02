@@ -745,6 +745,124 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/email-templates:
+    get:
+      operationId: listEmailTemplates
+      tags: [emails]
+      summary: The company's email templates (starter templates are added the first time)
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailTemplateList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createEmailTemplate
+      tags: [emails]
+      summary: Add a template
+      x-permission: emails.templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailTemplateInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/email-templates/{templateId}:
+    parameters:
+      - $ref: '#/components/parameters/EmailTemplateIdPath'
+    put:
+      operationId: updateEmailTemplate
+      tags: [emails]
+      summary: Change a template
+      x-permission: emails.templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailTemplateUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/email-drafts:
+    post:
+      operationId: draftEmail
+      tags: [emails]
+      summary: Fill a template for a candidate (and a job or interview) to review before sending
+      description: >
+        Placeholders without a value are left in brackets and listed in `missing`, so they are fixed before sending. Times are written in `timeZone` (the sender's, e.g. Asia/Kuala_Lumpur).
+
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailDraftRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/emails:
+    get:
+      operationId: listEmails
+      tags: [emails]
+      summary: Emails sent about a candidate, newest first
+      x-permission: emails:read
+      parameters:
+        - {name: candidateId, in: query, required: true, schema: {$ref: '#/components/schemas/CandidateId'}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: sendEmail
+      tags: [emails]
+      summary: Send an email (it is queued and sent in the background)
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailSend'}
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Email'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/me:
     get:
       operationId: getMe
@@ -1388,6 +1506,9 @@ components:
         - contacts:update
         - documents:create
         - documents:read
+        - emails.templates:manage
+        - emails:read
+        - emails:send
         - interviews:feedback
         - interviews:read
         - interviews:schedule
@@ -1434,6 +1555,7 @@ components:
         - document.extract_text
         - document.parse_cv
         - document.text_extracted
+        - email.send
     Error:
       type: object
       required: [error]
@@ -2244,6 +2366,135 @@ components:
         documentId: {$ref: '#/components/schemas/DocumentId'}
         profile: {allOf: [{$ref: '#/components/schemas/ParsedProfile'}], nullable: true}
         errorMessage: {type: string, nullable: true}
+    EmailTemplateId:
+      type: string
+      pattern: '^etpl_[0-9a-hjkmnp-tv-z]{26}$'
+      example: etpl_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailId:
+      type: string
+      pattern: '^eml_[0-9a-hjkmnp-tv-z]{26}$'
+      example: eml_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailTemplate:
+      type: object
+      required: [id, version, name, subject, body, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/EmailTemplateId'}
+        version: {type: integer}
+        name: {type: string}
+        subject: {type: string}
+        body:
+          type: string
+          description: "Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`."
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    EmailTemplateList:
+      type: object
+      required: [items, placeholders]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/EmailTemplate'}
+        placeholders:
+          type: array
+          description: The placeholders templates may use.
+          items: {type: string}
+    EmailTemplateInput:
+      type: object
+      additionalProperties: false
+      required: [name, subject, body]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        subject: {type: string, minLength: 1, maxLength: 200}
+        body: {type: string, minLength: 1, maxLength: 20000}
+    EmailTemplateUpdate:
+      type: object
+      additionalProperties: false
+      required: [version, name, subject, body]
+      properties:
+        version: {type: integer, minimum: 1}
+        name: {type: string, minLength: 1, maxLength: 100}
+        subject: {type: string, minLength: 1, maxLength: 200}
+        body: {type: string, minLength: 1, maxLength: 20000}
+    EmailDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [templateId, candidateId, timeZone]
+      properties:
+        templateId: {$ref: '#/components/schemas/EmailTemplateId'}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        interviewId: {$ref: '#/components/schemas/InterviewId'}
+        timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
+    EmailDraft:
+      type: object
+      required: [to, subject, body, missing]
+      properties:
+        to:
+          type: array
+          description: Suggested recipients (the candidate, or the job's hiring contact for templates addressed to the client).
+          items: {type: string, format: email}
+        subject: {type: string}
+        body: {type: string}
+        missing:
+          type: array
+          description: Placeholders that had no value (left as [placeholder] in the text).
+          items: {type: string}
+    EmailStatus:
+      type: string
+      description: queued = waiting to be sent; sent = accepted by the mail server; failed = could not be sent (see error).
+      enum: [queued, sent, failed]
+    Email:
+      type: object
+      required: [id, candidateId, applicationId, to, cc, subject, body, status, error, sentBy, sentByName, createdAt, sentAt]
+      properties:
+        id: {$ref: '#/components/schemas/EmailId'}
+        candidateId:
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        applicationId:
+          allOf: [{$ref: '#/components/schemas/ApplicationId'}]
+          nullable: true
+        to: {type: array, items: {type: string}}
+        cc: {type: array, items: {type: string}}
+        subject: {type: string}
+        body: {type: string}
+        status: {$ref: '#/components/schemas/EmailStatus'}
+        error: {type: string, nullable: true}
+        sentBy: {$ref: '#/components/schemas/UserId'}
+        sentByName: {type: string}
+        createdAt: {type: string, format: date-time}
+        sentAt: {type: string, format: date-time, nullable: true}
+    EmailList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Email'}
+    EmailSend:
+      type: object
+      additionalProperties: false
+      required: [to, subject, body]
+      properties:
+        to:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: {type: string, format: email, maxLength: 254}
+        cc:
+          type: array
+          maxItems: 10
+          items: {type: string, format: email, maxLength: 254}
+        subject: {type: string, minLength: 1, maxLength: 200}
+        body: {type: string, minLength: 1, maxLength: 20000}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+    EmailSendJob:
+      type: object
+      additionalProperties: false
+      required: [emailId]
+      properties:
+        emailId: {$ref: '#/components/schemas/EmailId'}
     UserList:
       type: object
       required: [items]
@@ -2818,6 +3069,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/DocumentId'}
+    EmailTemplateIdPath:
+      name: templateId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/EmailTemplateId'}
     InterviewIdPath:
       name: interviewId
       in: path
@@ -2909,6 +3165,21 @@ x-permissions:
     description: View and download candidate documents, including extracted text.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  emails.templates:manage:
+    module: emails
+    description: Add and change the company's email templates.
+    sensitive: false
+    roles: [owner, admin, recruiter]
+  emails:read:
+    module: emails
+    description: See emails sent from the app.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  emails:send:
+    module: emails
+    description: Send email from the app.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   interviews:feedback:
     module: interviews
     description: Give feedback on interviews you are an interviewer on.
@@ -3005,6 +3276,11 @@ x-jobs:
     queue: core
     payload: DocumentTextExtractedJob
     description: Save the result of text extraction on the document (Go worker).
+  email.send:
+    module: emails
+    queue: core
+    payload: EmailSendJob
+    description: Send one queued email through the mail server (Go worker).
 x-modules:
   - name: candidates
     description: Candidate profiles. Salary details are stored and permissioned separately.
@@ -3016,6 +3292,8 @@ x-modules:
     description: People at companies, each with a checked email address.
   - name: documents
     description: 'Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and formatted CVs. Uploading a CV queues text extraction in the Python AI worker.'
+  - name: emails
+    description: 'Email from the app: templates with placeholders filled from the candidate, job, interview and sender; messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it.'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
   - name: interviews

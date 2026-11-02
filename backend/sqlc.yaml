@@ -70,3 +70,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/interviews/internal/store
+  - <<: *module
+    queries: db/queries/emails.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/emails/internal/store

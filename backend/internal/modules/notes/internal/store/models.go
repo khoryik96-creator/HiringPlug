@@ -182,6 +182,36 @@ type Document struct {
 	Parser             *string
 }
 
+type Email struct {
+	ID            string
+	TenantID      string
+	CandidateID   *string
+	ApplicationID *string
+	ToAddresses   []string
+	CcAddresses   []string
+	Subject       string
+	Body          string
+	SentBy        string
+	SenderName    string
+	ReplyTo       string
+	Status        string
+	Error         *string
+	CreatedAt     time.Time
+	SentAt        *time.Time
+}
+
+type EmailTemplate struct {
+	ID        string
+	TenantID  string
+	Version   int32
+	Name      string
+	Subject   string
+	Body      string
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Interview struct {
 	ID              string
 	TenantID        string

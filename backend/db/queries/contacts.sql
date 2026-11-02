@@ -63,4 +63,4 @@ ORDER BY id DESC
 LIMIT @row_limit;
 
 -- name: ContactBriefs :many
-SELECT id, first_name, last_name, company_id FROM contact WHERE id = ANY(@ids::text[]);
+SELECT id, first_name, last_name, company_id, email FROM contact WHERE id = ANY(@ids::text[]);

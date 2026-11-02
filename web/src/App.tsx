@@ -13,6 +13,7 @@ import { CompanyDetail } from "./pages/CompanyDetail";
 import { ContactDetail } from "./pages/ContactDetail";
 import { ContactList } from "./pages/ContactList";
 import { Dashboard } from "./pages/Dashboard";
+import { EmailTemplates } from "./pages/EmailTemplates";
 import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
 import { JobList } from "./pages/JobList";
@@ -86,6 +87,9 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
   if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
+  if (hash.startsWith("#/email-templates") && permissions.includes("emails:send")) {
+    return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
+  }
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;

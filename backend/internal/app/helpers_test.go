@@ -23,10 +23,25 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/app"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
-func TestMain(m *testing.M) { os.Exit(testutil.Main(m)) }
+func TestMain(m *testing.M) {
+	server, err := testutil.StartSMTPServer()
+	if err != nil {
+		panic(err)
+	}
+	mailServer = server
+	code := testutil.Main(m)
+	server.Close()
+	os.Exit(code)
+}
+
+// mailServer receives the email every test app sends. It is one server for
+// all of them: a worker in one test may run another test's jobs, so every
+// test app must send the same way (tests tell their mail apart by address).
+var mailServer *testutil.SMTPServer
 
 // testMaxUpload keeps upload tests small.
 const testMaxUpload = 256 << 10
@@ -60,6 +75,7 @@ func newTestApp(t *testing.T) *testApp {
 	require.NoError(t, err)
 	t.Cleanup(closeDeps)
 	deps.MailServers = fakeMailServers{}
+	deps.Mail = mail.NewSMTP(mail.Config{Addr: mailServer.Addr, From: "no-reply@agency.test", TLS: "none"})
 	modules := app.NewModules(deps)
 	handler, err := app.NewHTTPHandler(deps, modules)
 	require.NoError(t, err)

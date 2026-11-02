@@ -59,6 +59,9 @@ details get their own permissions.
 | `interviews:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `interviews:schedule` (and see all feedback) | ✓ | ✓ | ✓ | | | |
 | `interviews:feedback` (on interviews you are on) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `emails:read` (emails sent about a candidate) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `emails:send` | ✓ | ✓ | ✓ | ✓ | | |
+| `emails.templates:manage` | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

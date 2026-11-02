@@ -42,6 +42,8 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, candidateID string) (boo
 // Brief is what other modules need to show a candidate.
 type Brief struct {
 	Name         string
+	FirstName    string
+	Email        *string
 	CurrentTitle *string
 }
 

@@ -5,6 +5,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
 import { applicationInterviewsKey, interviewsKey } from "../api/keys";
 import { INTERVIEW_MODE, INTERVIEW_STATUS, RECOMMENDATION, formatWhen } from "../labels";
+import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 import { InterviewForm } from "./InterviewForm";
 
@@ -34,6 +35,7 @@ export function ApplicationInterviews({ applicationId, closed, permissions }: { 
 export function InterviewItem({ interview: iv, permissions, showCandidate = false }: { interview: Interview; permissions: Permission[]; showCandidate?: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [emailing, setEmailing] = useState(false);
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: interviewsKey });
@@ -68,6 +70,9 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
           {canSchedule && iv.status === "scheduled" && (
             <>
               <button type="button" className="link" onClick={() => { setEditing(true); }}>Change</button>
+              {permissions.includes("emails:send") && (
+                <button type="button" className="link" onClick={() => { setEmailing(true); }}>Email candidate</button>
+              )}
               <button type="button" className="link" onClick={() => { setStatus.mutate("completed"); }}>Done</button>
               <button type="button" className="link" onClick={() => { setStatus.mutate("no_show"); }}>Did not come</button>
               <button type="button" className="link" onClick={() => { setStatus.mutate("cancelled"); }}>Cancel</button>
@@ -76,6 +81,10 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
         </div>
       </div>
       <ErrorMessage error={setStatus.error} />
+      {emailing && (
+        <EmailComposer candidateId={iv.candidateId} applicationId={iv.applicationId} interviewId={iv.id} template="Interview invitation"
+          canManageTemplates={permissions.includes("emails.templates:manage")} onDone={() => { setEmailing(false); }} />
+      )}
       {iv.instructions && <p className="muted">For the candidate: {iv.instructions}</p>}
       {iv.feedback.map((f) => (
         <p key={f.userId}><strong>{f.name}:</strong> {RECOMMENDATION[f.recommendation]}{f.comments && <>: {f.comments}</>}</p>

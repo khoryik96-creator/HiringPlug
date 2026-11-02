@@ -20,6 +20,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
@@ -41,6 +42,7 @@ type Modules struct {
 	Notes      *notes.Module
 	Careers    *careers.Module
 	Interviews *interviews.Module
+	Emails     *emails.Module
 	// scaffold:fields
 }
 
@@ -64,9 +66,13 @@ func NewModules(d Deps) *Modules {
 		CVs: m.Documents, Pipeline: m.Pipeline,
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity)
+	m.Emails = emails.New(d.Pool, emails.Deps{
+		Candidates: emailCandidates{m.Candidates}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
+		Interviews: emailInterviews{m.Interviews}, Tenants: m.Identity,
+	}, d.Mail)
 	// scaffold:constructors
-	// A merged duplicate's CVs, jobs and notes follow it.
-	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes)
+	// A merged duplicate's CVs, jobs, notes and emails follow it.
+	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
 	return m
 }
 
@@ -83,6 +89,7 @@ type (
 	notesHTTP      = notes.HTTP
 	careersHTTP    = careers.HTTP
 	interviewsHTTP = interviews.HTTP
+	emailsHTTP     = emails.HTTP
 	// scaffold:aliases
 )
 
@@ -100,6 +107,7 @@ type Server struct {
 	*notesHTTP
 	*careersHTTP
 	*interviewsHTTP
+	*emailsHTTP
 	// scaffold:embeds
 }
 
@@ -118,6 +126,7 @@ func (m *Modules) Server() *Server {
 		notesHTTP:      m.Notes.HTTP,
 		careersHTTP:    m.Careers.HTTP,
 		interviewsHTTP: m.Interviews.HTTP,
+		emailsHTTP:     m.Emails.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -127,6 +136,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	all := jobqueue.Handlers{}
 	for _, handlers := range []jobqueue.Handlers{
 		m.Documents.JobHandlers(),
+		m.Emails.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

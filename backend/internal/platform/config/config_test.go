@@ -42,3 +42,20 @@ func TestPasswordsNeverAppearInErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "hunter2")
 }
+
+func TestMailServerSettings(t *testing.T) {
+	c, err := Load(env(map[string]string{"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp"}))
+	require.NoError(t, err)
+	assert.Empty(t, c.SMTP.Addr, "no mail server unless one is set")
+	assert.Equal(t, "starttls", c.SMTP.TLS, "encrypted by default")
+
+	_, err = Load(env(map[string]string{
+		"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_SMTP_HOST": "smtp.example.com",
+		"HP_SMTP_FROM": "HiringPlug <x@example.com>", "HP_SMTP_TLS": "maybe", "HP_SMTP_PASSWORD": "hunter2",
+	}))
+	require.Error(t, err)
+	for _, want := range []string{"HP_SMTP_HOST must be host:port", "HP_SMTP_FROM must be an email address", "HP_SMTP_TLS"} {
+		assert.Contains(t, err.Error(), want)
+	}
+	assert.NotContains(t, err.Error(), "hunter2")
+}

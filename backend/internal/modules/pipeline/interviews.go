@@ -16,6 +16,7 @@ import (
 type Brief struct {
 	ID, Stage                  string
 	JobID, JobTitle            string
+	CompanyName                string
 	CandidateID, CandidateName string
 }
 
@@ -44,7 +45,7 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 		return nil, err
 	}
 	for _, v := range views {
-		out[v.ID] = Brief{ID: v.ID, Stage: v.Stage, JobID: v.JobID, JobTitle: v.JobTitle, CandidateID: v.CandidateID, CandidateName: v.CandidateName}
+		out[v.ID] = Brief{ID: v.ID, Stage: v.Stage, JobID: v.JobID, JobTitle: v.JobTitle, CompanyName: v.CompanyName, CandidateID: v.CandidateID, CandidateName: v.CandidateName}
 	}
 	return out, nil
 }

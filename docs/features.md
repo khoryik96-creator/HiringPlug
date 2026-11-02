@@ -16,7 +16,8 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
 | 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
 | 4 | Pipeline dashboard | `pipeline` | ✅ board and dashboard; reports 🧩 |
-| 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline; 🧩 interviews, matching |
+| 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline, interviews; 🧩 matching |
+| 5 | Email with templates | `emails` | ✅ sending; inbox sync 🧩 4.3 |
 | 5 | Notes: screening, call and interview notes | `notes` | ✅ |
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
 | 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles; custom roles 🧩 M2 |
@@ -216,8 +217,26 @@ requirements), de-duplicated, and kept with its source and date.
   comments) once the interview has taken place, and see their colleagues'
   feedback only after giving their own, so the first opinion does not steer
   the rest; recruiters see it all. The dashboard shows "My upcoming
-  interviews" (two weeks) and "Feedback to give". Email reminders come with
-  email (4.2).
+  interviews" (two weeks) and "Feedback to give"; "Email candidate" writes
+  the invitation.
+- **Email** ✅: write email from a candidate's page (or "Email candidate" on
+  an interview). Pick a template, optionally for one of their jobs: it is
+  filled from the candidate, the job and its company, the interview (time in
+  the sender's time zone, length, how, where, instructions) and the sender.
+  A placeholder without a value stays visible as `[job.title]` and sending
+  waits until it is filled in. Templates with "client" or "submit" in their
+  name go to the job's hiring contact; others to the candidate. Every company
+  starts with four templates (interview invitation, submit candidate to
+  client, application received, unsuccessful application), changed or added
+  to on the templates page (`#/email-templates`). Salary is never a
+  placeholder. Sending is queued with the email's record and delivered in the
+  background by the worker through your mail server (`HP_SMTP_*`): from your
+  sending address, shown as "Sender (Company)", with replies going to the
+  person who sent it. The candidate's page lists every email with its state
+  (sending / sent / not sent, and why: a refused address, no mail server set
+  up); a server that is down for a moment is tried again. Locally, Mailpit
+  catches all mail at http://localhost:8025. Replies coming back into the app
+  arrive with inbox sync (4.3).
 - **Pipeline** ✅: a candidate on a job is an *application* moving through
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not
@@ -230,8 +249,7 @@ requirements), de-duplicated, and kept with its source and date.
   reason exactly when closing, reopen before placing, and a placed candidate
   only goes back to offer or is withdrawn. Two people moving the same card:
   the second is told and reloads. Next: dashboard counts and conversion.
-- **Interviews:** scheduling with interviewers, Google and Microsoft calendar
-  sync, reminders, and feedback forms.
+- **Interviews:** Google and Microsoft calendar sync, and reminders (4.3).
 - **CV vs job match:** the AI worker scores fit and explains it. Every reason
   quotes the CV and the job ad, so a recruiter can check it. It suggests; the
   recruiter decides.

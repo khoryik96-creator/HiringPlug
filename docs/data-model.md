@@ -27,6 +27,8 @@ tenant ─┬─ app_user (role)
 | `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, channel (where it came from: careers page, JobStreet, LinkedIn, Indeed, ...; empty when a recruiter added it), `version` |
 | `interview` | application, title, starts/ends at, length, mode (in person/video/phone), location or link, instructions, interviewers (user ids), status (scheduled/completed/cancelled/no show), `version` |
 | `interview_feedback` | interview, interviewer, recommendation (strong yes/yes/no/strong no), comments, when; one per interviewer |
+| `email_template` | name (unique per company, any case), subject, body with placeholders (`{{candidate.firstName}}`, ...; never salary), `version`; four starters added the first time a company opens its templates |
+| `email` | candidate (moves with a merge; deleted with them), application id (kept as written), to, cc, subject (no line breaks), body, sender (user id, name and reply-to address), status (queued/sent/failed), error, sent at |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
 | `candidate_education` | candidate, position, qualification, institution, year finished |
@@ -54,7 +56,7 @@ candidate belonging to the same company.
 | `documents` | formatted CV (template, options), templates per company | M4 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
-| `communications` | email message, thread, template, sequence | M5 |
+| `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
 | `placements` | placement (agency: fee, start date, guarantee period); offer (in-house) | M5 |
 | `job_leads` | job lead (source, URL, company, parsed fields, status) | M6 |
 | `integrations` | API key, webhook subscription and delivery | M6 |

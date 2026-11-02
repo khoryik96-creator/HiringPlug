@@ -356,3 +356,15 @@ func fields(d Details) map[string]any {
 		"location": d.Location, "instructionsLength": n, "interviewers": d.Interviewers, "status": d.Status,
 	}
 }
+
+// Brief is an interview as other modules use it (e.g. an invitation email).
+type Brief struct {
+	ApplicationID string
+	Details       Details
+}
+
+// BriefOf returns one interview, in the caller's transaction.
+func (s *Service) BriefOf(ctx context.Context, tx pgx.Tx, id string) (Brief, error) {
+	row, err := getRow(ctx, store.New(tx), id)
+	return Brief{ApplicationID: row.ApplicationID, Details: detailsOf(row)}, err
+}

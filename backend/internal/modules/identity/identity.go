@@ -111,3 +111,9 @@ func (m *Module) ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[
 	}
 	return out, err
 }
+
+// TenantName returns the company's name, in the caller's transaction.
+func (m *Module) TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error) {
+	t, err := store.New(tx).GetTenant(ctx, tenantID)
+	return t.Name, err
+}

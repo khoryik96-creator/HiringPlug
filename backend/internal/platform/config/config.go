@@ -6,6 +6,8 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net"
+	"net/mail"
 	"net/url"
 	"strconv"
 	"strings"
@@ -51,6 +53,18 @@ type Config struct {
 	// PublicURL is where people reach the web app, e.g. https://hire.example.com:
 	// links in job feeds (and later emails) point there.
 	PublicURL string // HP_PUBLIC_URL
+	// SMTP is the mail server email from the app is sent through. Without a
+	// host, emails are recorded but fail with "no mail server is set up".
+	SMTP SMTP
+}
+
+// SMTP is how to reach the mail server.
+type SMTP struct {
+	Addr     string // HP_SMTP_HOST: host:port, e.g. smtp.example.com:587
+	Username string // HP_SMTP_USERNAME
+	Password string // HP_SMTP_PASSWORD
+	From     string // HP_SMTP_FROM: the address mail is sent from, e.g. no-reply@example.com
+	TLS      string // HP_SMTP_TLS: starttls (default), tls (port 465) or none (local mail catchers only)
 }
 
 // devSecret is only accepted outside production.
@@ -78,6 +92,18 @@ func Load(getenv func(string) string) (Config, error) {
 		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
+	c.SMTP = SMTP{
+		Addr: r.str("HP_SMTP_HOST", ""), Username: r.str("HP_SMTP_USERNAME", ""), Password: r.str("HP_SMTP_PASSWORD", ""),
+		From: r.str("HP_SMTP_FROM", ""), TLS: r.oneOf("HP_SMTP_TLS", "starttls", "starttls", "tls", "none"),
+	}
+	if c.SMTP.Addr != "" {
+		if _, _, err := net.SplitHostPort(c.SMTP.Addr); err != nil {
+			r.fail("HP_SMTP_HOST must be host:port, e.g. smtp.example.com:587")
+		}
+		if a, err := mail.ParseAddress(c.SMTP.From); err != nil || a.Address != c.SMTP.From {
+			r.fail("HP_SMTP_FROM must be an email address, e.g. no-reply@example.com")
+		}
+	}
 
 	if c.DatabaseURL == "" {
 		r.fail("HP_DATABASE_URL is required (the restricted application role, not the admin)")

@@ -5,6 +5,7 @@ import { api, type Candidate, type Permission, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
+import { CandidateEmails } from "../components/CandidateEmails";
 import { Documents } from "../components/Documents";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -80,6 +81,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       <History candidate={c} canEdit={permissions.includes("candidates:update")} />
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
+      {permissions.includes("emails:read") && <CandidateEmails candidateId={c.id} permissions={permissions} />}
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} />
       <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
     </main>

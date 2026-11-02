@@ -19,6 +19,11 @@ you sign in" in its settings). Run the script again only after updating.
 - API docs: http://localhost:8080/docs
 - The `bootstrap` service applies migrations and creates the database roles
   each time it starts.
+- Email from the app goes to **Mailpit**, which catches it (nothing reaches
+  real inboxes): read it at http://localhost:8025. To send for real, set
+  `HP_SMTP_HOST` (host:port), `HP_SMTP_USERNAME`, `HP_SMTP_PASSWORD`,
+  `HP_SMTP_FROM` and `HP_SMTP_TLS` (`starttls` for port 587, `tls` for 465)
+  before starting, e.g. in a `.env` file next to `deploy/docker-compose.yml`.
 
 First company and owner:
 

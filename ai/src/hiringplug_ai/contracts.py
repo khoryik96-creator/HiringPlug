@@ -32,6 +32,9 @@ class Permission(StrEnum):
     contacts_update = "contacts:update"
     documents_create = "documents:create"
     documents_read = "documents:read"
+    emails_templates_manage = "emails.templates:manage"
+    emails_read = "emails:read"
+    emails_send = "emails:send"
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
     interviews_schedule = "interviews:schedule"
@@ -78,6 +81,7 @@ class JobKind(StrEnum):
     document_extract_text = "document.extract_text"
     document_parse_cv = "document.parse_cv"
     document_text_extracted = "document.text_extracted"
+    email_send = "email.send"
 
 
 class Error1(BaseModel):
@@ -756,6 +760,92 @@ class DocumentCvParsedJob(BaseModel):
     errorMessage: Annotated[str | None, Field(...)]
 
 
+class EmailTemplateId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["etpl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^etpl_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class EmailId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["eml_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^eml_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class EmailTemplate(BaseModel):
+    id: EmailTemplateId
+    version: int
+    name: str
+    subject: str
+    body: Annotated[
+        str,
+        Field(
+            description="Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`."
+        ),
+    ]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class EmailTemplateList(BaseModel):
+    items: list[EmailTemplate]
+    placeholders: Annotated[list[str], Field(description="The placeholders templates may use.")]
+
+
+class EmailTemplateInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    subject: Annotated[str, Field(max_length=200, min_length=1)]
+    body: Annotated[str, Field(max_length=20000, min_length=1)]
+
+
+class EmailTemplateUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    subject: Annotated[str, Field(max_length=200, min_length=1)]
+    body: Annotated[str, Field(max_length=20000, min_length=1)]
+
+
+class EmailDraft(BaseModel):
+    to: Annotated[
+        list[EmailStr],
+        Field(
+            description="Suggested recipients (the candidate, or the job's hiring contact for templates addressed to the client)."
+        ),
+    ]
+    subject: str
+    body: str
+    missing: Annotated[
+        list[str], Field(description="Placeholders that had no value (left as [placeholder] in the text).")
+    ]
+
+
+class EmailStatus(StrEnum):
+    queued = "queued"
+    sent = "sent"
+    failed = "failed"
+
+
+class ToItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class CcItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class EmailSendJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emailId: EmailId
+
+
 class UserSummary(BaseModel):
     canInterview: Annotated[
         bool, Field(description="Their role may give interview feedback, so they can be an interviewer.")
@@ -1249,6 +1339,49 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class EmailDraftRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    templateId: EmailTemplateId
+    candidateId: CandidateId
+    applicationId: ApplicationId | None = None
+    interviewId: InterviewId | None = None
+    timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+
+
+class Email(BaseModel):
+    id: EmailId
+    candidateId: Annotated[CandidateId | None, Field(...)]
+    applicationId: Annotated[ApplicationId | None, Field(...)]
+    to: list[str]
+    cc: list[str]
+    subject: str
+    body: str
+    status: EmailStatus
+    error: Annotated[str | None, Field(...)]
+    sentBy: UserId
+    sentByName: str
+    createdAt: AwareDatetime
+    sentAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class EmailList(BaseModel):
+    items: list[Email]
+
+
+class EmailSend(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    to: Annotated[list[ToItem], Field(max_length=10, min_length=1)]
+    cc: Annotated[list[CcItem] | None, Field(max_length=10)] = None
+    subject: Annotated[str, Field(max_length=200, min_length=1)]
+    body: Annotated[str, Field(max_length=20000, min_length=1)]
+    candidateId: CandidateId | None = None
+    applicationId: ApplicationId | None = None
 
 
 class UserList(BaseModel):

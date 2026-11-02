@@ -11,7 +11,7 @@ import (
 )
 
 const candidateBriefs = `-- name: CandidateBriefs :many
-SELECT id, first_name, last_name, current_title FROM candidate WHERE id = ANY($1::text[])
+SELECT id, first_name, last_name, current_title, email FROM candidate WHERE id = ANY($1::text[])
 `
 
 type CandidateBriefsRow struct {
@@ -19,6 +19,7 @@ type CandidateBriefsRow struct {
 	FirstName    string
 	LastName     string
 	CurrentTitle *string
+	Email        *string
 }
 
 func (q *Queries) CandidateBriefs(ctx context.Context, ids []string) ([]CandidateBriefsRow, error) {
@@ -35,6 +36,7 @@ func (q *Queries) CandidateBriefs(ctx context.Context, ids []string) ([]Candidat
 			&i.FirstName,
 			&i.LastName,
 			&i.CurrentTitle,
+			&i.Email,
 		); err != nil {
 			return nil, err
 		}

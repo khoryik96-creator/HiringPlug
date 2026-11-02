@@ -54,6 +54,7 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, contactID string) (bool,
 type Brief struct {
 	Name      string
 	CompanyID string
+	Email     *string
 }
 
 // Briefs returns name and company of the given contacts (missing ones are

@@ -187,3 +187,5 @@ export function countryName(code: string): string {
   const name = regionName(code);
   return name ? `${name} (${code})` : code;
 }
+
+export const EMAIL_STATUS: Record<Schemas["EmailStatus"], string> = { queued: "Sending", sent: "Sent", failed: "Not sent" };

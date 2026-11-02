@@ -1,0 +1,142 @@
+package emails
+
+// The email rules, as plain functions on plain values: no database, no HTTP.
+
+import (
+	"net/mail"
+	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+)
+
+// Placeholders templates may use. Salary is deliberately not one of them.
+var Placeholders = []string{
+	"candidate.firstName", "candidate.fullName",
+	"job.title", "company.name",
+	"interview.title", "interview.when", "interview.length", "interview.how", "interview.where", "interview.instructions",
+	"sender.name", "agency.name",
+}
+
+var placeholderRe = regexp.MustCompile(`\{\{\s*([a-zA-Z.]+)\s*\}\}`)
+
+// Template is a reusable email.
+type Template struct{ Name, Subject, Body string }
+
+// NormalizeTemplate tidies a template and refuses placeholders that do not exist.
+func NormalizeTemplate(t Template) (Template, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	t.Name = strings.Join(strings.Fields(t.Name), " ")
+	t.Subject = strings.Join(strings.Fields(t.Subject), " ")
+	t.Body = strings.TrimSpace(t.Body)
+	if t.Name == "" {
+		errs.Add("name", "is required")
+	}
+	for field, text := range map[string]string{"subject": t.Subject, "body": t.Body} {
+		for _, m := range placeholderRe.FindAllStringSubmatch(text, -1) {
+			if !slices.Contains(Placeholders, m[1]) {
+				errs.Add(field, "{{"+m[1]+"}} is not a placeholder; use one of: "+strings.Join(Placeholders, ", "))
+				break
+			}
+		}
+	}
+	return t, errs
+}
+
+var extraBlankLines = regexp.MustCompile(`\n{3,}`)
+
+// Fill replaces placeholders with values. Those without a value (not in
+// values) stay visible as [placeholder] and are listed, so they are fixed
+// before sending; those whose value is empty on purpose (an interview without
+// instructions) are left out, with the blank lines they leave.
+func Fill(text string, values map[string]string) (string, []string) {
+	var missing []string
+	out := placeholderRe.ReplaceAllStringFunc(text, func(m string) string {
+		key := placeholderRe.FindStringSubmatch(m)[1]
+		if v, ok := values[key]; ok {
+			return v
+		}
+		if !slices.Contains(missing, key) {
+			missing = append(missing, key)
+		}
+		return "[" + key + "]"
+	})
+	return extraBlankLines.ReplaceAllString(out, "\n\n"), missing
+}
+
+// ForClient reports whether a template is written to the client (its hiring
+// contact) rather than to the candidate, by its name.
+func ForClient(name string) bool {
+	n := strings.ToLower(name)
+	return strings.Contains(n, "client") || strings.Contains(n, "submit")
+}
+
+// Starters are the templates every company begins with.
+var Starters = []Template{
+	{
+		Name:    "Interview invitation",
+		Subject: "Interview for {{job.title}} on {{interview.when}}",
+		Body: "Dear {{candidate.firstName}},\n\nThank you for your interest in the {{job.title}} role. We would like to invite you to an interview:\n\n" +
+			"When: {{interview.when}} ({{interview.length}})\nHow: {{interview.how}}\nWhere: {{interview.where}}\n\n{{interview.instructions}}\n\n" +
+			"Please reply to confirm.\n\nBest regards,\n{{sender.name}}\n{{agency.name}}",
+	},
+	{
+		Name:    "Submit candidate to client",
+		Subject: "Candidate for {{job.title}}: {{candidate.fullName}}",
+		Body: "Dear Hiring Manager,\n\nPlease find {{candidate.fullName}} for the {{job.title}} role at {{company.name}}. " +
+			"Their CV is attached in our system; I am happy to arrange an interview.\n\nBest regards,\n{{sender.name}}\n{{agency.name}}",
+	},
+	{
+		Name:    "Application received",
+		Subject: "Your application for {{job.title}}",
+		Body: "Dear {{candidate.firstName}},\n\nThank you for applying for {{job.title}}. We have received your application and will be in touch " +
+			"if your profile matches the role.\n\nBest regards,\n{{sender.name}}\n{{agency.name}}",
+	},
+	{
+		Name:    "Unsuccessful application",
+		Subject: "Your application for {{job.title}}",
+		Body: "Dear {{candidate.firstName}},\n\nThank you for your time and interest in the {{job.title}} role. After careful consideration, " +
+			"we will not be moving forward with your application this time. We will keep your details for future roles that fit.\n\n" +
+			"Best regards,\n{{sender.name}}\n{{agency.name}}",
+	},
+}
+
+// Outgoing is an email to send.
+type Outgoing struct {
+	To, Cc        []string
+	Subject, Body string
+}
+
+// NormalizeOutgoing tidies an email and checks its addresses.
+func NormalizeOutgoing(o Outgoing) (Outgoing, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	clean := func(field string, list []string) []string {
+		out := []string{}
+		for _, a := range list {
+			a = strings.ToLower(strings.TrimSpace(a))
+			if a == "" || slices.Contains(out, a) {
+				continue
+			}
+			if p, err := mail.ParseAddress(a); err != nil || p.Address != a {
+				errs.Add(field, a+" is not a valid email address")
+				continue
+			}
+			out = append(out, a)
+		}
+		return out
+	}
+	o.To, o.Cc = clean("to", o.To), clean("cc", o.Cc)
+	if len(o.To) == 0 {
+		errs.Add("to", "add at least one recipient")
+	}
+	o.Subject = strings.Join(strings.Fields(o.Subject), " ") // no line breaks in a subject
+	o.Body = strings.TrimSpace(o.Body)
+	if o.Subject == "" {
+		errs.Add("subject", "is required")
+	}
+	if o.Body == "" {
+		errs.Add("body", "is required")
+	}
+	return o, errs
+}
