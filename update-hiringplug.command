@@ -6,11 +6,11 @@ cd "$(dirname "$0")" || exit 1
 
 fail() { echo; echo "Problem: $1"; read -r -p "Press Enter to close." _; exit 1; }
 
-if ! docker info >/dev/null 2>&1; then
+if ! docker ps >/dev/null 2>&1; then
   open -a Docker 2>/dev/null
   echo "Starting Docker Desktop..."
-  for _ in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 2; done
-  docker info >/dev/null 2>&1 || fail "Docker Desktop is not running. Start it and try again."
+  for _ in $(seq 1 60); do docker ps >/dev/null 2>&1 && break; sleep 2; done
+  docker ps >/dev/null 2>&1 || fail "Docker Desktop is not running. Start it and try again."
 fi
 
 if command -v git >/dev/null 2>&1 && [ -d .git ]; then

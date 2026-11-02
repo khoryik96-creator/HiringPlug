@@ -3,8 +3,10 @@ rem Double-click (Windows) to update and start HiringPlug: gets the latest code 
 rem git is installed; otherwise pull in GitHub Desktop first), rebuilds what
 rem changed, and opens the app. Your data is kept. Needs Docker Desktop.
 cd /d "%~dp0"
+rem "docker ps" only succeeds when the Docker engine answers ("docker info" can
+rem succeed while it is still stopped).
 
-docker info >/dev/null 2>&1
+docker ps >nul 2>&1
 if not errorlevel 1 goto docker_ready
 
 rem Docker is not running: find Docker Desktop (installed for all users, for
@@ -13,7 +15,7 @@ set "DD="
 for %%p in ("%ProgramFiles%\Docker\Docker\Docker Desktop.exe" "%ProgramW6432%\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Programs\DockerDesktop\Docker Desktop.exe" "%LOCALAPPDATA%\Programs\Docker\Docker\Docker Desktop.exe" "%LOCALAPPDATA%\Docker\Docker Desktop.exe") do if not defined DD if exist "%%~p" set "DD=%%~p"
 if not defined DD for /f "delims=" %%d in ('where docker 2^>nul') do if not defined DD if exist "%%~dpd..\..\Docker Desktop.exe" set "DD=%%~dpd..\..\Docker Desktop.exe"
 if not defined DD goto ask_user
-echo Starting Docker Desktop...
+echo Starting Docker Desktop (%DD%)...
 start "" "%DD%"
 goto wait_docker
 :ask_user
@@ -21,7 +23,7 @@ echo Docker is not running. Please start Docker Desktop now; this window will wa
 :wait_docker
 for /l %%i in (1,1,90) do (
   timeout /t 2 /nobreak >nul
-  docker info >/dev/null 2>&1 && goto docker_ready
+  docker ps >nul 2>&1 && goto docker_ready
 )
 echo Problem: Docker is still not running after 3 minutes.
 echo Start Docker Desktop, wait until it says "Engine running", then double-click this file again.
@@ -29,7 +31,7 @@ pause
 exit /b 1
 :docker_ready
 
-where git >/dev/null 2>&1
+where git >nul 2>&1
 if errorlevel 1 goto build
 if not exist .git goto build
 echo Getting the latest version...
@@ -41,13 +43,14 @@ echo Building and starting HiringPlug (the first time takes a few minutes)...
 docker compose -f deploy/docker-compose.yml up -d --build --remove-orphans
 if not errorlevel 1 goto wait_app
 echo Problem: Docker could not start HiringPlug (see the messages above).
+echo If it mentions dockerDesktopLinuxEngine: open Docker Desktop, wait for "Engine running", and run this again.
 pause
 exit /b 1
 
 :wait_app
 echo Waiting for the app...
 for /l %%i in (1,1,60) do (
-  curl -sf http://localhost:3000 >/dev/null 2>&1 && goto app_ready
+  curl -sf http://localhost:3000 >nul 2>&1 && goto app_ready
   timeout /t 2 /nobreak >nul
 )
 :app_ready
