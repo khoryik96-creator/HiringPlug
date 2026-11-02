@@ -179,3 +179,15 @@ def test_nothing_to_read_gives_an_empty_profile() -> None:
     assert p.fullName is None
     assert p.experience == []
     assert p.parser == "rules@1"
+
+
+def test_a_referees_labelled_phone_does_not_beat_the_candidates_own() -> None:
+    text = "Siti Aisyah | 012-345 6789 | siti@example.com\nEXPERIENCE\nAccountant\n" + "Duties.\n" * 50
+    text += "REFERENCES\nMr Tan, Phone: 019-888 7777\n"
+    assert v(parse_cv(text).phone) == "012-345 6789"
+
+
+def test_name_particles_are_not_email_support() -> None:
+    # "bin" is in "robinson", but that says nothing about who the CV belongs to.
+    p = parse_cv("SKILLS\nAhmad Bin Ali\nEMAIL\nrobinson@example.com\n")
+    assert p.fullName is None

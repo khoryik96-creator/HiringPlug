@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from ..contracts import DocumentCvParsedJob, DocumentParseCvJob, JobKind
+from ..contracts import DocumentCvParsedJob, DocumentParseCvJob, JobKind, ParsedProfile
 from ..parsing import parse_cv
 from ..queue import FollowUp
 
@@ -18,7 +18,13 @@ RESULT_QUEUE = "core"  # checked against the contract by tests/test_contract_wir
 
 
 def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
-    profile = parse_cv(payload.text)
+    try:
+        profile = parse_cv(payload.text)
+    except Exception:  # a rule bug must not leave the CV "being read" forever
+        # Retrying cannot change the outcome for the same text: report the
+        # failure, so the document shows "details could not be read".
+        log.warning("cv could not be parsed", exc_info=True, extra={"document_id": payload.documentId.root})
+        return [_result(payload, None, "The details could not be read from this CV.")]
     # Counts only: CV contents (names, emails) never go in logs.
     log.info(
         "cv parsed",
@@ -30,10 +36,12 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
             "skills": len(profile.skills),
         },
     )
-    return [
-        FollowUp(
-            queue=RESULT_QUEUE,
-            kind=JobKind.document_cv_parsed,
-            payload=DocumentCvParsedJob(documentId=payload.documentId, profile=profile, errorMessage=None),
-        )
-    ]
+    return [_result(payload, profile, None)]
+
+
+def _result(payload: DocumentParseCvJob, profile: ParsedProfile | None, error: str | None) -> FollowUp:
+    return FollowUp(
+        queue=RESULT_QUEUE,
+        kind=JobKind.document_cv_parsed,
+        payload=DocumentCvParsedJob(documentId=payload.documentId, profile=profile, errorMessage=error),
+    )

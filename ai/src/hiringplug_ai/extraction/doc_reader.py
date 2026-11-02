@@ -9,10 +9,12 @@ runs in its own temporary folder with a time limit; missing tools are skipped.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 from dataclasses import replace
@@ -72,26 +74,28 @@ def _libreoffice_to_docx(path: Path, tmp: Path) -> bytes | None:
     # A private profile per run, so conversions can run side by side and never
     # depend on (or change) a shared LibreOffice profile.
     profile = (tmp / "profile").as_uri()
-    try:
-        subprocess.run(  # noqa: S603 - fixed program and arguments, our own temporary files
-            [
-                exe,
-                "--headless",
-                "--norestore",
-                f"-env:UserInstallation={profile}",
-                "--convert-to",
-                "docx",
-                "--outdir",
-                str(out),
-                str(path),
-            ],
-            capture_output=True,
-            timeout=LIBREOFFICE_TIMEOUT_SECONDS,
-            check=False,
-            env={**os.environ, "HOME": str(tmp)},
-        )
-    except subprocess.TimeoutExpired:
-        log.warning("libreoffice timed out")
-        return None
+    args = [exe, "--headless", "--norestore", f"-env:UserInstallation={profile}"]
+    args += ["--convert-to", "docx", "--outdir", str(out), str(path)]
+    # Its own process group: `soffice` is a wrapper around soffice.bin, and a
+    # time-out must stop both, or a hung conversion keeps running in the worker.
+    with subprocess.Popen(  # noqa: S603 - fixed program and arguments, our own temporary files
+        args,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env={**os.environ, "HOME": str(tmp)},
+        start_new_session=True,
+    ) as proc:
+        try:
+            proc.wait(timeout=LIBREOFFICE_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            log.warning("libreoffice timed out")
+            _kill_group(proc)
+            return None
     result = out / "cv.docx"
     return result.read_bytes() if result.exists() else None
+
+
+def _kill_group(proc: subprocess.Popen[bytes]) -> None:
+    with contextlib.suppress(ProcessLookupError):  # already gone
+        os.killpg(proc.pid, signal.SIGKILL)
+    proc.wait()

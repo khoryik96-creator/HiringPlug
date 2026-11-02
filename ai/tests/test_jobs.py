@@ -8,6 +8,7 @@ import pytest
 from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps
+from hiringplug_ai.jobs import parse_cv as parse_job
 from hiringplug_ai.queue import ClaimedJob, FollowUp, LeaseLostError
 from hiringplug_ai.worker import process
 
@@ -122,3 +123,17 @@ def test_a_lost_lease_discards_the_result_without_recording_a_failure() -> None:
     queue = FakeQueue(lose_lease=True)
     process(queue, job(), deps(text_pdf(CV_LINES)))  # type: ignore[arg-type]
     assert queue.failed == []
+
+
+def test_a_parser_crash_is_reported_as_a_failed_parse(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(text: str) -> None:
+        raise ValueError("a rule broke")
+
+    monkeypatch.setattr(parse_job, "parse_cv", broken)
+    queue = FakeQueue()
+    process(queue, job("document.parse_cv", {"documentId": DOC_ID, "text": "x"}), deps())  # type: ignore[arg-type]
+    assert queue.failed == [], "retrying the same text cannot help"
+    result = queue.completed[0][0].payload
+    assert isinstance(result, DocumentCvParsedJob)
+    assert result.profile is None
+    assert result.errorMessage == "The details could not be read from this CV."

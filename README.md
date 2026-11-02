@@ -55,7 +55,8 @@ reading order.
 
 You need [Go](https://go.dev/dl/), [uv](https://docs.astral.sh/uv/) (Python),
 [Node 22+ with pnpm](https://pnpm.io/installation), [Task](https://taskfile.dev),
-Docker (for PostgreSQL) and [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (OCR).
+Docker (for PostgreSQL), [Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) (OCR),
+antiword and LibreOffice (old Word .doc files; `apt install antiword libreoffice-writer-nogui`).
 On Windows, use WSL2 or install the same tools natively; every command is `task ...`.
 
 ```bash

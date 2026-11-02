@@ -6,7 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/oapi-codegen/nullable"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 )
 
 func zipWith(t *testing.T, name string) []byte {
@@ -83,4 +86,11 @@ func TestValuesMustBeReadableFromTheirQuote(t *testing.T) {
 	} {
 		assert.Equal(t, c.ok, ValueFromQuote(c.kind, c.value, c.quote), "%s %q from %q", c.kind, c.value, c.quote)
 	}
+}
+
+func TestLengthLimitsCountCharactersNotBytes(t *testing.T) {
+	name := strings.Repeat("陈", 200) // 200 characters, 600 bytes: within the 300-character limit
+	got := groundProfile(name, api.ParsedProfile{FullName: nullable.NewNullableWithValue(api.SourcedText{Value: name, Quote: name})})
+	assert.Equal(t, 0, got.Dropped)
+	assert.Equal(t, name, got.FullName.MustGet().Value)
 }

@@ -1,6 +1,8 @@
 package documents
 
 import (
+	"unicode/utf8"
+
 	"github.com/oapi-codegen/nullable"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
@@ -57,7 +59,9 @@ type grounder struct {
 }
 
 func (g *grounder) ok(s api.SourcedText, kind string) bool {
-	keep := len(s.Value) <= 300 && len(s.Quote) <= 1000 && Quotes(g.text, s.Quote) && ValueFromQuote(kind, s.Value, s.Quote)
+	// Limits in characters, as the contract counts them (not bytes: Chinese or accented text is longer in bytes).
+	keep := utf8.RuneCountInString(s.Value) <= 300 && utf8.RuneCountInString(s.Quote) <= 1000 &&
+		Quotes(g.text, s.Quote) && ValueFromQuote(kind, s.Value, s.Quote)
 	if !keep {
 		g.dropped++
 	}

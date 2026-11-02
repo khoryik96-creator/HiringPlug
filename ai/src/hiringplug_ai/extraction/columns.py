@@ -123,15 +123,21 @@ def page_text(page: Any) -> str:
         if block_top is None:
             return
         top, bottom = max(0.0, block_top - 1), min(float(page.height), block_bottom + 1)
-        sides = [
-            page.within_bbox((x0, top, x1, bottom)) for x0, x1 in ((0.0, gutter), (gutter, float(page.width)))
-        ]
+        bounds = [(0.0, gutter), (gutter, float(page.width))]
+
+        def first_top(side: tuple[float, float]) -> float:
+            # From the page's words, already extracted: no second pass over the column.
+            tops = [
+                w["top"]
+                for w in words
+                if top <= w["top"] <= bottom and side[0] <= w["x0"] and w["x1"] <= side[1]
+            ]
+            return min(tops, default=bottom)
+
         # The column that starts higher first (it usually holds the name), else the wider one.
-        sides.sort(
-            key=lambda c: (round(min((w["top"] for w in c.extract_words()), default=bottom) / 6), -c.width)
-        )
-        for side in sides:
-            text = side.extract_text()
+        bounds.sort(key=lambda side: (round(first_top(side) / 6), -(side[1] - side[0])))
+        for x0, x1 in bounds:
+            text = page.within_bbox((x0, top, x1, bottom)).extract_text()
             if text and text.strip():
                 parts.append(text)
 

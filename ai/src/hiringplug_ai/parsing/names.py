@@ -95,7 +95,8 @@ def _hints(email: str | None, linkedin: str | None) -> str:
 
 
 def _overlap(value: str, hints: str) -> int:
-    return sum(1 for w in value.lower().split() if len(w) >= 3 and re.sub(r"[^a-z]", "", w) in hints)
+    words = [re.sub(r"[^a-z]", "", w) for w in value.lower().split() if w not in _PARTICLES]
+    return sum(1 for w in words if len(w) >= 3 and w in hints)
 
 
 def _shapes(text: str) -> list[str]:

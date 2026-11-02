@@ -62,10 +62,13 @@ _LABEL_ONLY = re.compile(rf"^{PHONE_LABEL_RE.pattern}\s*[:：]?\s*$", re.IGNOREC
 
 
 def phone(lines: list[Line]) -> tuple[str, str] | None:
-    """A labelled number anywhere ("Mobile: ...", or "Mobile" on the line above,
-    as sidebars put it); else the first plausible number near the top; else
-    the first international (+) number."""
+    """In order: a labelled number near the top ("Mobile: ...", or "Mobile" on
+    the line above, as sidebars put it); any number near the top; a labelled
+    number further down (a sidebar read after the main column); the first
+    international (+) number. Near-top numbers come first so a referee's
+    "Phone: ..." at the end never wins over the candidate's own."""
     near: tuple[str, str] | None = None
+    labelled_later: tuple[str, str] | None = None
     plus: tuple[str, str] | None = None
     for n, line in enumerate(lines):
         text = mask(mask(mask(line.text, EMAIL_RE), LINKEDIN_RE), URL_RE)
@@ -74,13 +77,18 @@ def phone(lines: list[Line]) -> tuple[str, str] | None:
             quote = line.text[m.start() : m.end()].strip(" .-(")
             if not _phone_ok(quote):
                 continue
-            if PHONE_LABEL_RE.search(text[: m.start()][-30:]) or (label_above and m.start() == 0):
+            labelled = bool(PHONE_LABEL_RE.search(text[: m.start()][-30:])) or (
+                label_above and m.start() == 0
+            )
+            if n < 40 and labelled:
                 return quote, quote
             if n < 40:
                 near = near or (quote, quote)
+            elif labelled:
+                labelled_later = labelled_later or (quote, quote)
             elif quote.startswith("+"):
                 plus = plus or (quote, quote)
-    return near or plus
+    return near or labelled_later or plus
 
 
 LOCATION_LABEL_RE = re.compile(

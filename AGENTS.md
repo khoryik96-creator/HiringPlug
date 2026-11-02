@@ -9,7 +9,8 @@ checked in review.
 - `task verify` before every push. It must pass. Commit any files it regenerates.
 - `task gen` after editing anything in `contracts/` or `backend/db/`.
 - `task new:module -- name=<plural> entity=<singular>` to start a module.
-- `task test` needs PostgreSQL (`task db:up`) and Tesseract. Tests never skip silently.
+- `task test` needs PostgreSQL (`task db:up`), Tesseract, antiword and LibreOffice (old .doc files).
+  Tests never skip silently.
 
 ## Where things go
 
