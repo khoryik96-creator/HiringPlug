@@ -18,3 +18,6 @@ SELECT * FROM note WHERE id = @id;
 
 -- name: DeleteNote :execrows
 DELETE FROM note WHERE id = @id;
+
+-- name: MoveCandidateNotes :execrows
+UPDATE note SET subject_id = @to_id WHERE subject_type = 'candidate' AND subject_id = @from_id;

@@ -57,6 +57,18 @@ func (q *Queries) CandidateExists(ctx context.Context, id string) (bool, error) 
 	return exists, err
 }
 
+const deleteCandidate = `-- name: DeleteCandidate :execrows
+DELETE FROM candidate WHERE id = $1
+`
+
+func (q *Queries) DeleteCandidate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCandidate, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findCandidateIDByEmail = `-- name: FindCandidateIDByEmail :one
 SELECT id FROM candidate WHERE email = $1
 `
@@ -327,6 +339,25 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const moveCompensation = `-- name: MoveCompensation :execrows
+UPDATE candidate_compensation SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveCompensationParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging: the duplicate's salary moves to the kept candidate (only when it
+// has none), then the duplicate is deleted.
+func (q *Queries) MoveCompensation(ctx context.Context, arg MoveCompensationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveCompensation, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const similarCandidates = `-- name: SimilarCandidates :many

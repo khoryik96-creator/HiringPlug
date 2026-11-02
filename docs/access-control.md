@@ -24,6 +24,7 @@ details get their own permissions.
 | `candidates:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `candidates:create` | ✓ | ✓ | ✓ | ✓ | | |
 | `candidates:update` | ✓ | ✓ | ✓ | ✓ | | |
+| `candidates:merge` (duplicates) | ✓ | ✓ | ✓ | | | |
 | `candidates.compensation:read` (salary) | ✓ | ✓ | ✓ | | | |
 | `candidates.compensation:update` (salary) | ✓ | ✓ | ✓ | | | |
 | `documents:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

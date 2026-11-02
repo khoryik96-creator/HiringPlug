@@ -52,7 +52,11 @@ accents (`jose` finds `José`).
 **Possible duplicates** ✅: a candidate's page warns about others with the
 same phone number or a very similar name ("Siti Aisyah" and "Siti Aishah",
 at least 60% alike ignoring case and accents). The same email is refused when
-adding. Merging two records comes next.
+adding. **Merge** a duplicate into the candidate you keep (owners, admins and
+recruiters, who can see salaries, so nothing is lost unseen): its CVs, jobs
+and notes move over, empty fields are filled from it (and its salary, if the
+kept candidate has none), and it is deleted, in one transaction. If both were
+on the same job, the kept candidate's application stays.
 
 **CV versions.** A candidate has documents, each with a `source`: `jobstreet`,
 `linkedin`, `original`, `formatted` or `other`. Each upload keeps its file, its

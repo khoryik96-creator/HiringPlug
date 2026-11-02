@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Candidate, type Permission } from "../api/client";
 import { candidateKey } from "../api/keys";
-import { failure, ok, RECRUITER, renderWithClient, testCandidate } from "../test-utils";
+import { failure, ok, RECRUITER, renderWithClient, sentBody, testCandidate } from "../test-utils";
 import { CandidateDetail } from "./CandidateDetail";
 
 afterEach(() => {
@@ -87,5 +87,20 @@ describe("possible duplicates", () => {
     const warning = await screen.findByRole("region", { name: "Possible duplicates" });
     expect(warning.textContent).toContain("Siti Aishah");
     expect(warning.textContent).toContain("similar name; Accountant");
+  });
+
+  it("merges a duplicate into this candidate after confirming", async () => {
+    const similar = { items: [{ candidate: { id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Siti Aishah", email: null, phone: null, currentTitle: null, currentCompany: null, location: null, workAuthorizationStatus: null, updatedAt: "2026-11-01T00:00:00Z" }, reasons: ["same_phone"] }] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => {
+      if (path === "/v1/candidates/{candidateId}/similar") return Promise.resolve(ok(similar));
+      if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(testCandidate()));
+      return Promise.resolve(ok({ items: [] }));
+    }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(testCandidate({ version: 4 })));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<CandidateDetail id={testCandidate().id} permissions={[...RECRUITER, "candidates:merge"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Merge into this one" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ duplicateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", version: 3 });
   });
 });

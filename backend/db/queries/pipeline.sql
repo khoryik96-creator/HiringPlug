@@ -51,3 +51,13 @@ SELECT
   count(*) FILTER (WHERE stage = 'placed' AND stage_changed_at > now() - interval '30 days')::integer AS placed_last_30_days,
   count(*) FILTER (WHERE version > 1 AND stage_changed_at > now() - interval '7 days')::integer AS moved_last_7_days
 FROM application;
+
+-- Merging candidates: drop the duplicate's applications to jobs the kept
+-- candidate is already on, then move the rest.
+-- name: DropOverlappingApplications :execrows
+DELETE FROM application a
+WHERE a.candidate_id = @from_id
+  AND EXISTS (SELECT 1 FROM application k WHERE k.candidate_id = @to_id AND k.job_order_id = a.job_order_id);
+
+-- name: MoveApplicationsToCandidate :execrows
+UPDATE application SET candidate_id = @to_id, updated_at = now() WHERE candidate_id = @from_id;

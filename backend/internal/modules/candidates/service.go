@@ -27,6 +27,7 @@ const emailUniqueIndex = "candidate_tenant_email_uq"
 type Service struct {
 	pool        *pgxpool.Pool
 	phoneRegion string
+	movers      []RecordMover
 }
 
 // Create adds a candidate.

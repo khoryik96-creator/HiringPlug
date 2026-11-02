@@ -48,7 +48,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         )}
       </div>
       <p className="muted">{[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}</p>
-      <SimilarCandidates candidateId={c.id} />
+      <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
       ) : (

@@ -13,6 +13,9 @@ x-module:
     candidates:update:
       description: Edit candidate profiles.
       roles: [owner, admin, recruiter, sourcer]
+    candidates:merge:
+      description: Merge a duplicate candidate into another (needs to see salaries, so nothing is lost unseen).
+      roles: [owner, admin, recruiter]
     candidates.compensation:read:
       description: See current and expected salary.
       sensitive: true
@@ -110,6 +113,36 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CandidateUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidate' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/candidates/{candidateId}/merge:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    post:
+      operationId: mergeCandidate
+      tags: [candidates]
+      summary: Merge a duplicate into this candidate
+      description: >
+        The duplicate's CVs, jobs and notes move to this candidate; this
+        candidate's empty fields (and salary, if none) are filled from the
+        duplicate; then the duplicate is deleted. If both are on the same job,
+        this candidate's application is kept. `version` is this candidate's.
+      x-permission: candidates:merge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CandidateMerge' }
       responses:
         '200':
           description: OK
@@ -442,3 +475,12 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/SimilarCandidate' }
+    CandidateMerge:
+      type: object
+      additionalProperties: false
+      required: [duplicateId, version]
+      properties:
+        duplicateId:
+          description: The candidate to merge in (and delete).
+          allOf: [{ $ref: '#/components/schemas/CandidateId' }]
+        version: { type: integer, minimum: 1, description: The version of the candidate you keep. }

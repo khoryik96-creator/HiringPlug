@@ -9,6 +9,27 @@ import (
 	"context"
 )
 
+const dropOverlappingApplications = `-- name: DropOverlappingApplications :execrows
+DELETE FROM application a
+WHERE a.candidate_id = $1
+  AND EXISTS (SELECT 1 FROM application k WHERE k.candidate_id = $2 AND k.job_order_id = a.job_order_id)
+`
+
+type DropOverlappingApplicationsParams struct {
+	FromID string
+	ToID   string
+}
+
+// Merging candidates: drop the duplicate's applications to jobs the kept
+// candidate is already on, then move the rest.
+func (q *Queries) DropOverlappingApplications(ctx context.Context, arg DropOverlappingApplicationsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, dropOverlappingApplications, arg.FromID, arg.ToID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findApplication = `-- name: FindApplication :one
 SELECT id FROM application WHERE job_order_id = $1 AND candidate_id = $2
 `
@@ -205,6 +226,23 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const moveApplicationsToCandidate = `-- name: MoveApplicationsToCandidate :execrows
+UPDATE application SET candidate_id = $1, updated_at = now() WHERE candidate_id = $2
+`
+
+type MoveApplicationsToCandidateParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveApplicationsToCandidateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveApplicationsToCandidate, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const recentResults = `-- name: RecentResults :one

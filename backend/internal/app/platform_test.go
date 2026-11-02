@@ -96,6 +96,35 @@ func TestRequestIDsAndUnknownRoutes(t *testing.T) {
 
 // TestEveryTenantTableHasRowLevelSecurity is the guard that stops a new table
 // from accidentally being shared between tenants.
+// A table with row-level security but no policy for a command silently
+// changes nothing for it (no error): e.g. moving notes when merging
+// candidates. Every command must be covered, or the gap listed here with why.
+func TestRowLevelSecurityCoversEveryCommand(t *testing.T) {
+	t.Parallel()
+	exempt := map[string]string{} // "table:COMMAND": why it needs no policy
+	rows, err := testutil.Current.Admin.Query(context.Background(), `
+		SELECT c.relname, cmd
+		FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE')) AS cmds(cmd)
+		WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity
+		  AND NOT EXISTS (SELECT 1 FROM pg_policies p WHERE p.tablename = c.relname AND p.cmd IN (cmds.cmd, 'ALL'))
+		ORDER BY 1, 2`)
+	require.NoError(t, err)
+	missing, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (string, error) {
+		var table, cmd string
+		return table + ":" + cmd, r.Scan(&table, &cmd)
+	})
+	require.NoError(t, err)
+	var unexplained []string
+	for _, m := range missing {
+		if exempt[m] == "" {
+			unexplained = append(unexplained, m)
+		}
+	}
+	assert.Empty(t, unexplained, "add a policy for these commands (table:command)")
+}
+
 func TestEveryTenantTableHasRowLevelSecurity(t *testing.T) {
 	t.Parallel()
 	// Tables without RLS on purpose, and why.

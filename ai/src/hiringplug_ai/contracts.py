@@ -20,6 +20,7 @@ class Permission(StrEnum):
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
     candidates_create = "candidates:create"
+    candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
     companies_create = "companies:create"
@@ -326,6 +327,14 @@ class SimilarCandidate(BaseModel):
 
 class SimilarCandidateList(BaseModel):
     items: list[SimilarCandidate]
+
+
+class CandidateMerge(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    duplicateId: Annotated[CandidateId, Field(description="The candidate to merge in (and delete).")]
+    version: Annotated[int, Field(description="The version of the candidate you keep.", ge=1)]
 
 
 class CompanyId(RootModel[str]):

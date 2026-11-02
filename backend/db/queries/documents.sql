@@ -28,3 +28,6 @@ UPDATE document SET
   updated_at = now()
 WHERE id = @id
 RETURNING *;
+
+-- name: MoveDocumentsToCandidate :execrows
+UPDATE document SET candidate_id = @to_id WHERE candidate_id = @from_id;

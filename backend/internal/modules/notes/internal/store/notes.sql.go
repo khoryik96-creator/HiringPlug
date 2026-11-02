@@ -142,3 +142,20 @@ func (q *Queries) ListNotes(ctx context.Context, arg ListNotesParams) ([]Note, e
 	}
 	return items, nil
 }
+
+const moveCandidateNotes = `-- name: MoveCandidateNotes :execrows
+UPDATE note SET subject_id = $1 WHERE subject_type = 'candidate' AND subject_id = $2
+`
+
+type MoveCandidateNotesParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveCandidateNotes(ctx context.Context, arg MoveCandidateNotesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveCandidateNotes, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

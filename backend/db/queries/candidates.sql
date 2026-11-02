@@ -107,3 +107,11 @@ WHERE id <> @id
        OR similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text(@full_name::text)) >= 0.6)
 ORDER BY similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text(@full_name::text)) DESC, id DESC
 LIMIT 10;
+
+-- Merging: the duplicate's salary moves to the kept candidate (only when it
+-- has none), then the duplicate is deleted.
+-- name: MoveCompensation :execrows
+UPDATE candidate_compensation SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- name: DeleteCandidate :execrows
+DELETE FROM candidate WHERE id = @id;

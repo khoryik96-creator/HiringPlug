@@ -51,6 +51,28 @@ export interface paths {
         patch: operations["updateCandidate"];
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge a duplicate into this candidate
+         * @description The duplicate's CVs, jobs and notes move to this candidate; this candidate's empty fields (and salary, if none) are filled from the duplicate; then the duplicate is deleted. If both are on the same job, this candidate's application is kept. `version` is this candidate's.
+         */
+        post: operations["mergeCandidate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/similar": {
         parameters: {
             query?: never;
@@ -469,7 +491,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "FORBIDDEN" | "INTERNAL" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -654,6 +676,12 @@ export interface components {
         };
         SimilarCandidateList: {
             items: components["schemas"]["SimilarCandidate"][];
+        };
+        CandidateMerge: {
+            /** @description The candidate to merge in (and delete). */
+            duplicateId: components["schemas"]["CandidateId"];
+            /** @description The version of the candidate you keep. */
+            version: number;
         };
         /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyId: string;
@@ -1301,6 +1329,37 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CandidateUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Candidate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    mergeCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateMerge"];
             };
         };
         responses: {

@@ -56,6 +56,8 @@ func NewModules(d Deps) *Modules {
 		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
 	}, m.Identity)
 	// scaffold:constructors
+	// A merged duplicate's CVs, jobs and notes follow it.
+	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes)
 	return m
 }
 

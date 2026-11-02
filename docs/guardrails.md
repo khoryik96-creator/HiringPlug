@@ -20,6 +20,7 @@ and pull request (`.github/workflows/ci.yml`).
 | Bad input reaching the code | Every request is checked against the contract (types, formats, lengths, unknown fields) before handlers run | `httpserver/contract.go` |
 | Bad data in the database | Constraints mirror the rules (checks, foreign keys including the tenant, unique email per company) | migrations |
 | Company A sees company B's data | Row-level security in PostgreSQL; a test fails if any tenant table lacks it; another proves raw SQL cannot cross over | `TestEveryTenantTableHasRowLevelSecurity`, `TestTheDatabaseEnforcesIsolationEvenForRawSQL` |
+| A table where updates silently change nothing (row-level security without a policy for a command) | A test lists every table and command without a policy | `TestRowLevelSecurityCoversEveryCommand` |
 | Salary shown to the wrong role | Permission check in the service **and** a database policy on the salary table | `TestSalaryIsOnlyVisibleWithPermission` |
 | The app running as a database superuser (bypassing isolation) | The API and worker refuse to start | `database.CheckRestrictedRole` |
 | Two people editing the same record | Version numbers: the second save gets `409 CONFLICT_STALE_VERSION` | `TestUpdateCandidate` |

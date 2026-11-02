@@ -159,6 +159,23 @@ func (q *Queries) ListDocumentsForCandidate(ctx context.Context, candidateID str
 	return items, nil
 }
 
+const moveDocumentsToCandidate = `-- name: MoveDocumentsToCandidate :execrows
+UPDATE document SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveDocumentsToCandidateParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveDocumentsToCandidate(ctx context.Context, arg MoveDocumentsToCandidateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveDocumentsToCandidate, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const newDocumentID = `-- name: NewDocumentID :one
 
 SELECT new_id('doc')::text AS id
