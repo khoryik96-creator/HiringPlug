@@ -10,6 +10,16 @@ export async function fetchDocumentFile(doc: Pick<Document, "id" | "contentType"
   return new Blob([await res.arrayBuffer()], { type: doc.contentType });
 }
 
+/** Saves a file the API serves (e.g. an interview's calendar entry) under the given name. */
+export async function downloadFrom(path: string, fileName: string, type: string): Promise<void> {
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+  if (!res.ok) unwrap({ error: await res.json(), response: res });
+  const url = URL.createObjectURL(new Blob([await res.arrayBuffer()], { type }));
+  const a = Object.assign(window.document.createElement("a"), { href: url, download: fileName });
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
+}
+
 /** Saves the document's file under its original name. */
 export async function downloadDocument(doc: Pick<Document, "id" | "contentType" | "fileName">): Promise<void> {
   const url = URL.createObjectURL(await fetchDocumentFile(doc));

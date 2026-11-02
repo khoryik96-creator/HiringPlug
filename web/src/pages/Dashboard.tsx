@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { api, type Schemas, unwrap } from "../api/client";
+import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
 import { timeInStage } from "../components/ApplicationCard";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { MyInterviews } from "../components/Interviews";
 import { OPEN_STAGES, STAGE } from "../labels";
 
 type Counts = Schemas["StageCounts"];
@@ -11,7 +12,7 @@ type Counts = Schemas["StageCounts"];
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
 
 /** The home page: open jobs and their pipelines, who is stuck, recent results. */
-export function Dashboard() {
+export function Dashboard({ permissions }: { permissions: Permission[] }) {
   const summary = useQuery({
     queryKey: summaryKey,
     queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary")),
@@ -28,6 +29,8 @@ export function Dashboard() {
         <div className="stat"><strong>{s.movedLast7Days}</strong><span>moved this week</span></div>
         <div className="stat"><strong>{s.placedLast30Days}</strong><span>placed in 30 days</span></div>
       </div>
+
+      {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
 
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>

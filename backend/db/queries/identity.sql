@@ -13,3 +13,10 @@ SELECT id, name FROM app_user WHERE id = ANY(@ids::text[]);
 -- app_careers_tenant returns only the company's id and name).
 -- name: CareersTenant :one
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_careers_tenant(@slug::text);
+
+-- name: ListActiveUsers :many
+SELECT id, name, role FROM app_user WHERE active ORDER BY name LIMIT 500;
+
+-- Which of these users are active in the tenant (to check interviewers and owners).
+-- name: ActiveUserRoles :many
+SELECT id, role FROM app_user WHERE active AND id = ANY(@ids::text[]);

@@ -83,3 +83,7 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .share summary { cursor: pointer; color: #2563eb; }
 .share code { font-size: 0.8rem; word-break: break-all; }
+.interviews { margin: 0.25rem 0 0.75rem 1rem; }
+.interview { border-left: 3px solid #e5e7eb; padding: 0.25rem 0.75rem; margin: 0.5rem 0; }
+.badge.scheduled { background: #dbeafe; } .badge.completed { background: #dcfce7; } .badge.cancelled, .badge.no_show { background: #fee2e2; }
+.feedback { display: grid; gap: 0.5rem; max-width: 40rem; }

@@ -22,8 +22,37 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  /v1/users:
+    get:
+      operationId: listUsers
+      tags: [identity]
+      summary: The company's active users (to pick interviewers, owners, ...)
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
 components:
   schemas:
+    UserList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/UserSummary' }
+    UserSummary:
+      type: object
+      required: [id, name, role, canInterview]
+      properties:
+        canInterview: { type: boolean, description: "Their role may give interview feedback, so they can be an interviewer." }
+        id: { $ref: '#/components/schemas/UserId' }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
     Me:
       type: object
       required: [user, tenant, role, permissions]

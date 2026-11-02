@@ -182,6 +182,34 @@ type Document struct {
 	Parser             *string
 }
 
+type Interview struct {
+	ID              string
+	TenantID        string
+	ApplicationID   string
+	Version         int32
+	Title           string
+	StartsAt        time.Time
+	DurationMinutes int32
+	EndsAt          time.Time
+	Mode            string
+	Location        *string
+	Instructions    *string
+	Status          string
+	InterviewerIds  []string
+	CreatedBy       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type InterviewFeedback struct {
+	TenantID       string
+	InterviewID    string
+	UserID         string
+	Recommendation string
+	Comments       *string
+	SubmittedAt    time.Time
+}
+
 type Job struct {
 	ID          string
 	TenantID    string

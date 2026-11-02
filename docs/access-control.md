@@ -56,6 +56,9 @@ details get their own permissions.
 | `notes:create` (and delete own) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | `notes.sensitive:read` (sensitive notes) | ✓ | ✓ | ✓ | | | |
 | `notes:manage` (delete anyone's) | ✓ | ✓ | | | | |
+| `interviews:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `interviews:schedule` (and see all feedback) | ✓ | ✓ | ✓ | | | |
+| `interviews:feedback` (on interviews you are on) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

@@ -202,6 +202,22 @@ requirements), de-duplicated, and kept with its source and date.
   its open ads (`/v1/public/careers/<company>/jobs.xml`, the source/job
   format Indeed and aggregators read). Posting through the boards' partner
   programmes comes once those accounts exist.
+- **Interviews** ✅: on each of a candidate's jobs (candidate page), recruiters
+  schedule interviews: title, date and time, length, in person / video /
+  phone, the address or meeting link, the interviewers (any of the company's
+  users) and instructions for the candidate. Scheduling moves the application
+  to the interview stage if it is at an earlier one; closed or placed
+  applications get no new interviews. An interviewer already booked at that
+  time is a clash, shown with the other interview, and "Schedule anyway"
+  overrides it. Interviews are changed, marked done, "did not come" or
+  cancelled, and every one has "Add to calendar" (an .ics file for Outlook,
+  Google or Apple Calendar; importing it again after a change updates the
+  event). Interviewers give feedback (strong yes / yes / no / strong no, and
+  comments) once the interview has taken place, and see their colleagues'
+  feedback only after giving their own, so the first opinion does not steer
+  the rest; recruiters see it all. The dashboard shows "My upcoming
+  interviews" (two weeks) and "Feedback to give". Email reminders come with
+  email (4.2).
 - **Pipeline** ✅: a candidate on a job is an *application* moving through
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not

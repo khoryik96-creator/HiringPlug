@@ -1,0 +1,302 @@
+# Module contract: interviews (scheduling and feedback for an application).
+# See contracts/README.md for the format.
+x-module:
+  name: interviews
+  description: >
+    Interviews for an application: when, how and where, who interviews, and
+    each interviewer's feedback. Scheduling moves the application to the
+    interview stage if it is at an earlier one.
+  permissions:
+    interviews:read:
+      description: View interviews (other interviewers' feedback once you have given yours, or always when you schedule).
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+    interviews:schedule:
+      description: Schedule, reschedule, cancel and complete interviews; see all feedback.
+      roles: [owner, admin, recruiter]
+    interviews:feedback:
+      description: Give feedback on interviews you are an interviewer on.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  errorCodes:
+    INTERVIEW_CLASH:
+      status: 409
+      description: "An interviewer already has an interview at that time. `details.clashes` lists them; send ignoreClashes: true to schedule anyway."
+    INTERVIEW_NOT_ALLOWED:
+      status: 422
+      description: The interview cannot be scheduled or changed like this (closed application, feedback from someone who is not an interviewer, ...). The message says why.
+  jobs: {}
+
+paths:
+  /v1/applications/{applicationId}/interviews:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationIdPath'
+    get:
+      operationId: listApplicationInterviews
+      tags: [interviews]
+      summary: An application's interviews, soonest first
+      x-permission: interviews:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: scheduleInterview
+      tags: [interviews]
+      summary: Schedule an interview
+      x-permission: interviews:schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Interview' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+
+  /v1/interviews:
+    get:
+      operationId: listInterviews
+      tags: [interviews]
+      summary: Interviews in a time range, e.g. my upcoming ones
+      description: >
+        `mine=true` keeps the ones you interview on. `feedbackDue=true` keeps
+        past, not cancelled interviews you have not given feedback on yet.
+      x-permission: interviews:read
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: mine, in: query, schema: { type: boolean } }
+        - { name: feedbackDue, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/interviews/{interviewId}:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    get:
+      operationId: getInterview
+      tags: [interviews]
+      summary: Get an interview
+      x-permission: interviews:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Interview' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateInterview
+      tags: [interviews]
+      summary: Reschedule, change, cancel or complete an interview
+      description: Only the fields you send change. `version` must be the version you loaded.
+      x-permission: interviews:schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Interview' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+
+  /v1/interviews/{interviewId}/feedback:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    put:
+      operationId: putInterviewFeedback
+      tags: [interviews]
+      summary: Give or change your feedback (interviewers only)
+      x-permission: interviews:feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FeedbackInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Interview' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+
+  /v1/interviews/{interviewId}/calendar.ics:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    get:
+      operationId: getInterviewCalendar
+      tags: [interviews]
+      summary: The interview as a calendar file (Outlook, Google Calendar, Apple Calendar)
+      x-permission: interviews:read
+      responses:
+        '200':
+          description: OK
+          content:
+            text/calendar:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    InterviewIdPath:
+      name: interviewId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/InterviewId' }
+
+  responses:
+    InterviewNotAllowed:
+      description: Not allowed (INTERVIEW_NOT_ALLOWED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    InterviewId:
+      type: string
+      pattern: '^intv_[0-9a-hjkmnp-tv-z]{26}$'
+      example: intv_01jbz6w0m0k8q9x2r3s4t5v6w7
+    InterviewMode:
+      type: string
+      enum: [in_person, video, phone]
+    InterviewStatus:
+      type: string
+      description: scheduled, completed, cancelled, or no_show (the candidate did not come).
+      enum: [scheduled, completed, cancelled, no_show]
+    Recommendation:
+      type: string
+      enum: [strong_yes, 'yes', 'no', strong_no]
+    Interviewer:
+      type: object
+      required: [userId, name]
+      properties:
+        userId: { $ref: '#/components/schemas/UserId' }
+        name: { type: string }
+    Feedback:
+      type: object
+      required: [userId, name, recommendation, comments, submittedAt]
+      properties:
+        userId: { $ref: '#/components/schemas/UserId' }
+        name: { type: string }
+        recommendation: { $ref: '#/components/schemas/Recommendation' }
+        comments: { type: string, nullable: true }
+        submittedAt: { type: string, format: date-time }
+    Interview:
+      type: object
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, title, startsAt, durationMinutes, mode, location, instructions, status, interviewers, feedback, feedbackHidden, myFeedbackDue, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/InterviewId' }
+        version: { type: integer }
+        applicationId: { $ref: '#/components/schemas/ApplicationId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        candidateName: { type: string }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        jobTitle: { type: string }
+        title: { type: string, description: 'e.g. First interview, Technical test.' }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        mode: { $ref: '#/components/schemas/InterviewMode' }
+        location: { type: string, nullable: true, description: 'An address, or the meeting link for video.' }
+        instructions: { type: string, nullable: true, description: 'What the candidate should know or bring.' }
+        status: { $ref: '#/components/schemas/InterviewStatus' }
+        interviewers:
+          type: array
+          items: { $ref: '#/components/schemas/Interviewer' }
+        feedback:
+          type: array
+          description: Feedback you may see (see feedbackHidden).
+          items: { $ref: '#/components/schemas/Feedback' }
+        feedbackHidden:
+          type: integer
+          description: How many interviewers' feedback is hidden from you until you give your own.
+        myFeedbackDue: { type: boolean, description: 'You interview on it, it has taken place, and you have not given feedback.' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    InterviewList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Interview' }
+    InterviewCreate:
+      type: object
+      additionalProperties: false
+      required: [title, startsAt, durationMinutes, mode, interviewerIds]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 5, maximum: 480 }
+        mode: { $ref: '#/components/schemas/InterviewMode' }
+        location: { type: string, maxLength: 500, nullable: true }
+        instructions: { type: string, maxLength: 2000, nullable: true }
+        interviewerIds:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/UserId' }
+        ignoreClashes: { type: boolean, description: 'Schedule even if an interviewer is busy then.' }
+    InterviewUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 5, maximum: 480 }
+        mode: { $ref: '#/components/schemas/InterviewMode' }
+        location: { type: string, maxLength: 500, nullable: true }
+        instructions: { type: string, maxLength: 2000, nullable: true }
+        interviewerIds:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items: { $ref: '#/components/schemas/UserId' }
+        status: { $ref: '#/components/schemas/InterviewStatus' }
+        ignoreClashes: { type: boolean }
+    FeedbackInput:
+      type: object
+      additionalProperties: false
+      required: [recommendation]
+      properties:
+        recommendation: { $ref: '#/components/schemas/Recommendation' }
+        comments: { type: string, maxLength: 5000, nullable: true }

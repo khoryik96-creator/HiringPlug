@@ -99,3 +99,15 @@ func (m *Module) UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[st
 	}
 	return out, nil
 }
+
+// ActiveUsers returns, for those of the given users who are active in the
+// caller's tenant, what their role may do (to check interviewers), in the
+// caller's transaction.
+func (m *Module) ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]api.Permission, error) {
+	found, err := store.New(tx).ActiveUserRoles(ctx, ids)
+	out := make(map[string][]api.Permission, len(found))
+	for _, u := range found {
+		out[u.ID] = authz.PermissionsForRole(api.Role(u.Role))
+	}
+	return out, err
+}

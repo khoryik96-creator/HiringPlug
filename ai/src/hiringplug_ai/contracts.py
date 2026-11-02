@@ -32,6 +32,9 @@ class Permission(StrEnum):
     contacts_update = "contacts:update"
     documents_create = "documents:create"
     documents_read = "documents:read"
+    interviews_feedback = "interviews:feedback"
+    interviews_read = "interviews:read"
+    interviews_schedule = "interviews:schedule"
     jobs_salary_read = "jobs.salary:read"
     jobs_salary_update = "jobs.salary:update"
     jobs_create = "jobs:create"
@@ -56,6 +59,8 @@ class ErrorCode(StrEnum):
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
+    INTERVIEW_CLASH = "INTERVIEW_CLASH"
+    INTERVIEW_NOT_ALLOWED = "INTERVIEW_NOT_ALLOWED"
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
@@ -751,6 +756,15 @@ class DocumentCvParsedJob(BaseModel):
     errorMessage: Annotated[str | None, Field(...)]
 
 
+class UserSummary(BaseModel):
+    canInterview: Annotated[
+        bool, Field(description="Their role may give interview feedback, so they can be an interviewer.")
+    ]
+    id: UserId
+    name: str
+    role: Role
+
+
 class User(BaseModel):
     id: UserId
     email: EmailStr
@@ -766,6 +780,85 @@ class Tenant(BaseModel):
     ]
     id: TenantId
     name: str
+
+
+class InterviewId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["intv_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^intv_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class InterviewMode(StrEnum):
+    in_person = "in_person"
+    video = "video"
+    phone = "phone"
+
+
+class InterviewStatus(StrEnum):
+    scheduled = "scheduled"
+    completed = "completed"
+    cancelled = "cancelled"
+    no_show = "no_show"
+
+
+class Recommendation(StrEnum):
+    strong_yes = "strong_yes"
+    yes = "yes"
+    no = "no"
+    strong_no = "strong_no"
+
+
+class Interviewer(BaseModel):
+    userId: UserId
+    name: str
+
+
+class Feedback(BaseModel):
+    userId: UserId
+    name: str
+    recommendation: Recommendation
+    comments: Annotated[str | None, Field(...)]
+    submittedAt: AwareDatetime
+
+
+class InterviewCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(max_length=100, min_length=1)]
+    startsAt: AwareDatetime
+    durationMinutes: Annotated[int, Field(ge=5, le=480)]
+    mode: InterviewMode
+    location: Annotated[str | None, Field(max_length=500)] = None
+    instructions: Annotated[str | None, Field(max_length=2000)] = None
+    interviewerIds: Annotated[list[UserId], Field(max_length=10, min_length=1)]
+    ignoreClashes: Annotated[
+        bool | None, Field(description="Schedule even if an interviewer is busy then.")
+    ] = None
+
+
+class InterviewUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    title: Annotated[str | None, Field(max_length=100, min_length=1)] = None
+    startsAt: AwareDatetime | None = None
+    durationMinutes: Annotated[int | None, Field(ge=5, le=480)] = None
+    mode: InterviewMode | None = None
+    location: Annotated[str | None, Field(max_length=500)] = None
+    instructions: Annotated[str | None, Field(max_length=2000)] = None
+    interviewerIds: Annotated[list[UserId] | None, Field(max_length=10, min_length=1)] = None
+    status: InterviewStatus | None = None
+    ignoreClashes: bool | None = None
+
+
+class FeedbackInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    recommendation: Recommendation
+    comments: Annotated[str | None, Field(max_length=5000)] = None
 
 
 class JobAdId(RootModel[str]):
@@ -1158,11 +1251,46 @@ class DocumentList(BaseModel):
     items: list[Document]
 
 
+class UserList(BaseModel):
+    items: list[UserSummary]
+
+
 class Me(BaseModel):
     user: User
     tenant: Tenant
     role: Role
     permissions: list[Permission]
+
+
+class Interview(BaseModel):
+    id: InterviewId
+    version: int
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    jobId: JobOrderId
+    jobTitle: str
+    title: Annotated[str, Field(description="e.g. First interview, Technical test.")]
+    startsAt: AwareDatetime
+    durationMinutes: int
+    mode: InterviewMode
+    location: Annotated[str | None, Field(description="An address, or the meeting link for video.")]
+    instructions: Annotated[str | None, Field(description="What the candidate should know or bring.")]
+    status: InterviewStatus
+    interviewers: list[Interviewer]
+    feedback: Annotated[list[Feedback], Field(description="Feedback you may see (see feedbackHidden).")]
+    feedbackHidden: Annotated[
+        int, Field(description="How many interviewers' feedback is hidden from you until you give your own.")
+    ]
+    myFeedbackDue: Annotated[
+        bool, Field(description="You interview on it, it has taken place, and you have not given feedback.")
+    ]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class InterviewList(BaseModel):
+    items: list[Interview]
 
 
 class JobAd(BaseModel):

@@ -450,6 +450,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's active users (to pick interviewers, owners, ...) */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/applications/{applicationId}/interviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        /** An application's interviews, soonest first */
+        get: operations["listApplicationInterviews"];
+        put?: never;
+        /** Schedule an interview */
+        post: operations["scheduleInterview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/interviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interviews in a time range, e.g. my upcoming ones
+         * @description `mine=true` keeps the ones you interview on. `feedbackDue=true` keeps past, not cancelled interviews you have not given feedback on yet.
+         */
+        get: operations["listInterviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/interviews/{interviewId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Get an interview */
+        get: operations["getInterview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Reschedule, change, cancel or complete an interview
+         * @description Only the fields you send change. `version` must be the version you loaded.
+         */
+        patch: operations["updateInterview"];
+        trace?: never;
+    };
+    "/v1/interviews/{interviewId}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Give or change your feedback (interviewers only) */
+        put: operations["putInterviewFeedback"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/interviews/{interviewId}/calendar.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The interview as a calendar file (Outlook, Google Calendar, Apple Calendar) */
+        get: operations["getInterviewCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs": {
         parameters: {
             query?: never;
@@ -707,9 +825,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted";
         Error: {
@@ -1244,6 +1362,16 @@ export interface components {
             profile: components["schemas"]["ParsedProfile"] | null;
             errorMessage: string | null;
         };
+        UserList: {
+            items: components["schemas"]["UserSummary"][];
+        };
+        UserSummary: {
+            /** @description Their role may give interview feedback, so they can be an interviewer. */
+            canInterview: boolean;
+            id: components["schemas"]["UserId"];
+            name: string;
+            role: components["schemas"]["Role"];
+        };
         Me: {
             user: components["schemas"]["User"];
             tenant: components["schemas"]["Tenant"];
@@ -1261,6 +1389,92 @@ export interface components {
             careersSlug: string;
             id: components["schemas"]["TenantId"];
             name: string;
+        };
+        /** @example intv_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        InterviewId: string;
+        /** @enum {string} */
+        InterviewMode: "in_person" | "video" | "phone";
+        /**
+         * @description scheduled, completed, cancelled, or no_show (the candidate did not come).
+         * @enum {string}
+         */
+        InterviewStatus: "scheduled" | "completed" | "cancelled" | "no_show";
+        /** @enum {string} */
+        Recommendation: "strong_yes" | "yes" | "no" | "strong_no";
+        Interviewer: {
+            userId: components["schemas"]["UserId"];
+            name: string;
+        };
+        Feedback: {
+            userId: components["schemas"]["UserId"];
+            name: string;
+            recommendation: components["schemas"]["Recommendation"];
+            comments: string | null;
+            /** Format: date-time */
+            submittedAt: string;
+        };
+        Interview: {
+            id: components["schemas"]["InterviewId"];
+            version: number;
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            /** @description e.g. First interview, Technical test. */
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            durationMinutes: number;
+            mode: components["schemas"]["InterviewMode"];
+            /** @description An address, or the meeting link for video. */
+            location: string | null;
+            /** @description What the candidate should know or bring. */
+            instructions: string | null;
+            status: components["schemas"]["InterviewStatus"];
+            interviewers: components["schemas"]["Interviewer"][];
+            /** @description Feedback you may see (see feedbackHidden). */
+            feedback: components["schemas"]["Feedback"][];
+            /** @description How many interviewers' feedback is hidden from you until you give your own. */
+            feedbackHidden: number;
+            /** @description You interview on it, it has taken place, and you have not given feedback. */
+            myFeedbackDue: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        InterviewList: {
+            items: components["schemas"]["Interview"][];
+        };
+        InterviewCreate: {
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            durationMinutes: number;
+            mode: components["schemas"]["InterviewMode"];
+            location?: string | null;
+            instructions?: string | null;
+            interviewerIds: components["schemas"]["UserId"][];
+            /** @description Schedule even if an interviewer is busy then. */
+            ignoreClashes?: boolean;
+        };
+        InterviewUpdate: {
+            version: number;
+            title?: string;
+            /** Format: date-time */
+            startsAt?: string;
+            durationMinutes?: number;
+            mode?: components["schemas"]["InterviewMode"];
+            location?: string | null;
+            instructions?: string | null;
+            interviewerIds?: components["schemas"]["UserId"][];
+            status?: components["schemas"]["InterviewStatus"];
+            ignoreClashes?: boolean;
+        };
+        FeedbackInput: {
+            recommendation: components["schemas"]["Recommendation"];
+            comments?: string | null;
         };
         /** @example ad_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobAdId: string;
@@ -1618,6 +1832,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not allowed (INTERVIEW_NOT_ALLOWED). */
+        InterviewNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         CandidateIdPath: components["schemas"]["CandidateId"];
@@ -1625,6 +1848,7 @@ export interface components {
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
+        InterviewIdPath: components["schemas"]["InterviewId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
@@ -2429,6 +2653,225 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    listApplicationInterviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    scheduleInterview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Interview"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InterviewNotAllowed"];
+        };
+    };
+    listInterviews: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                mine?: boolean;
+                feedbackDue?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getInterview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Interview"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateInterview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Interview"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["InterviewNotAllowed"];
+        };
+    };
+    putInterviewFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Interview"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["InterviewNotAllowed"];
+        };
+    };
+    getInterviewCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listJobs: {

@@ -64,3 +64,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/notes/internal/store
+  - <<: *module
+    queries: db/queries/interviews.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/interviews/internal/store

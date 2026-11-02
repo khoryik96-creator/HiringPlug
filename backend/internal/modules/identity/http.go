@@ -2,11 +2,16 @@ package identity
 
 import (
 	"context"
+	"slices"
+
+	"github.com/jackc/pgx/v5"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 // HTTP implements the identity operations of the contract.
@@ -26,4 +31,23 @@ func (h *HTTP) GetMe(ctx context.Context, _ api.GetMeRequestObject) (api.GetMeRe
 		Role:        p.Role,
 		Permissions: p.Permissions(),
 	}, nil
+}
+
+// ListUsers handles GET /v1/users: the company's active users.
+func (h *HTTP) ListUsers(ctx context.Context, _ api.ListUsersRequestObject) (api.ListUsersResponseObject, error) {
+	var rows []store.ListActiveUsersRow
+	err := database.InTx(ctx, h.m.pool, authz.MustFromContext(ctx), func(tx pgx.Tx) error {
+		var err error
+		rows, err = store.New(tx).ListActiveUsers(ctx)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListUsers200JSONResponse{Items: make([]api.UserSummary, len(rows))}
+	for i, r := range rows {
+		perms := authz.PermissionsForRole(api.Role(r.Role))
+		out.Items[i] = api.UserSummary{Id: r.ID, Name: r.Name, Role: api.Role(r.Role), CanInterview: slices.Contains(perms, "interviews:feedback")}
+	}
+	return out, nil
 }

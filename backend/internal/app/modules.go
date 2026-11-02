@@ -21,6 +21,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -39,6 +40,7 @@ type Modules struct {
 	Pipeline   *pipeline.Module
 	Notes      *notes.Module
 	Careers    *careers.Module
+	Interviews *interviews.Module
 	// scaffold:fields
 }
 
@@ -61,6 +63,7 @@ func NewModules(d Deps) *Modules {
 		Tenants: m.Identity, Ads: careersAds{m.Jobs}, Candidates: careersCandidates{m.Candidates},
 		CVs: m.Documents, Pipeline: m.Pipeline,
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
+	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs and notes follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes)
@@ -79,6 +82,7 @@ type (
 	pipelineHTTP   = pipeline.HTTP
 	notesHTTP      = notes.HTTP
 	careersHTTP    = careers.HTTP
+	interviewsHTTP = interviews.HTTP
 	// scaffold:aliases
 )
 
@@ -95,6 +99,7 @@ type Server struct {
 	*pipelineHTTP
 	*notesHTTP
 	*careersHTTP
+	*interviewsHTTP
 	// scaffold:embeds
 }
 
@@ -112,6 +117,7 @@ func (m *Modules) Server() *Server {
 		pipelineHTTP:   m.Pipeline.HTTP,
 		notesHTTP:      m.Notes.HTTP,
 		careersHTTP:    m.Careers.HTTP,
+		interviewsHTTP: m.Interviews.HTTP,
 		// scaffold:server-fields
 	}
 }

@@ -91,7 +91,7 @@ Some use cases span modules. Applying through the careers page adds a
 candidate, their CV and their application **in one transaction**: the
 `careers` module declares what it needs (`FindOrCreateApplicant`, `AddFile`,
 `AddApplied`, `PublishedAd`), each module offers that function taking the
-caller's transaction, and `internal/app` adapts them (`careers_adapters.go`).
+caller's transaction, and `internal/app` adapts them (`adapters.go`).
 Nothing is half-done if one step fails, and no module imports another.
 
 **Adding a module** is one command (`task new:module`): it creates the contract

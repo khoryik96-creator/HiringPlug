@@ -78,7 +78,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         </section>
       )}
       <History candidate={c} canEdit={permissions.includes("candidates:update")} />
-      {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} />}
+      {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} />
       <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />

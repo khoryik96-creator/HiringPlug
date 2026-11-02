@@ -74,7 +74,7 @@ describe("dashboard", () => {
       jobs: [{ jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", title: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank", stageCounts: counts }],
       stuck: [],
     }));
-    renderWithClient(<Dashboard />);
+    renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
     await screen.findByRole("link", { name: "Auditor" });
     expect(screen.getByText("candidates in progress").previousSibling?.textContent).toBe("4");
     expect(screen.getByText("moved this week").previousSibling?.textContent).toBe("3");

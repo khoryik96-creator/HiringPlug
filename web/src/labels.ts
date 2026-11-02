@@ -17,6 +17,19 @@ export const WORK_AUTH_BASIS: Record<Schemas["WorkAuthorizationBasis"], string> 
   other: "Other pass",
 };
 
+export const INTERVIEW_MODE: Record<Schemas["InterviewMode"], string> = { in_person: "In person", video: "Video", phone: "Phone" };
+export const INTERVIEW_STATUS: Record<Schemas["InterviewStatus"], string> = {
+  scheduled: "Scheduled", completed: "Completed", cancelled: "Cancelled", no_show: "Did not come",
+};
+export const RECOMMENDATION: Record<Schemas["Recommendation"], string> = {
+  strong_yes: "Strong yes", yes: "Yes", no: "No", strong_no: "Strong no",
+};
+
+/** "Tue 10 Nov 2026, 10:00" in the viewer's time zone. */
+export function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 export const CHANNEL: Record<Schemas["ApplicationChannel"], string> = {
   careers_page: "Careers page",
   jobstreet: "JobStreet",

@@ -25,6 +25,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |
 | ✅ | Work history and education on profiles; CV versions compared side by side |
 | ✅ | Job ads with publishing rules; a public careers page with an apply form; job board links, feed and Google for Jobs |
+| ✅ | Interviews with clash checks, calendar files and interviewer feedback |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -62,11 +63,11 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ 3.2 **Careers page and apply form** | A public page per company listing open ads; applying creates the candidate (or finds them by email), attaches the CV (read and parsed) and puts them in the job's pipeline, with consent, a robot trap and a per-address limit. Choosing your own page address comes with the admin screen (1.7). |
 | 🔜 3.3 **Job boards** | ✅ Done without partner accounts: links per board for each ad (applicants are counted by board), real careers page addresses, Google for Jobs data on every ad, and an XML job feed for boards and aggregators that read one. Next, with your partner accounts: posting directly through the boards' partner programmes (SEEK/JobStreet, LinkedIn, Indeed). |
 
-### Phase 4: interviews and email ⬜
+### Phase 4: interviews and email 🔜
 
 | Step | Delivers |
 |---|---|
-| 4.1 **Interviews** | Schedule interviews for an application (interviewers, time, place or link), reminders, and a feedback form per interviewer |
+| ✅ 4.1 **Interviews** | Schedule interviews for an application (interviewers, time, place or link, clash check), calendar files, a feedback form per interviewer (hidden from colleagues until they give theirs), and the dashboard's upcoming interviews and feedback to give. Email reminders come with 4.2. |
 | 4.2 **Email** | Send email from the app with templates (submit a candidate to a client, invite to interview, rejection), logged on the timeline |
 | 4.3 **Calendar and inbox sync** | Google / Microsoft calendar sync for interviews; two-way email sync so replies show on the timeline |
 

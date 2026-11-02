@@ -25,6 +25,8 @@ tenant ─┬─ app_user (role)
 | `job_ad` | job, title, location, work type/arrangement, salary text (published as written), text, closes on, status (draft/published/closed; published needs text), published at, `version` |
 | `job_order_salary` | the salary budget (min, optional max, currency, period, `version`); row-level security needs `jobs.salary:read` to see and `jobs.salary:update` to write; clearing deletes the row |
 | `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, channel (where it came from: careers page, JobStreet, LinkedIn, Indeed, ...; empty when a recruiter added it), `version` |
+| `interview` | application, title, starts/ends at, length, mode (in person/video/phone), location or link, instructions, interviewers (user ids), status (scheduled/completed/cancelled/no show), `version` |
+| `interview_feedback` | interview, interviewer, recommendation (strong yes/yes/no/strong no), comments, when; one per interviewer |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
 | `candidate_education` | candidate, position, qualification, institution, year finished |

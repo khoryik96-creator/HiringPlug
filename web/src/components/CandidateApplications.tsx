@@ -1,16 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, unwrap } from "../api/client";
+import { api, type Permission, unwrap } from "../api/client";
 import { applicationsKey, candidateApplicationsKey, jobsKey } from "../api/keys";
 import { CLOSE_REASON, STAGE } from "../labels";
 import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ErrorMessage } from "./ErrorMessage";
+import { ApplicationInterviews } from "./Interviews";
 import { type Picked, SearchPicker } from "./SearchPicker";
 import { useMoveApplication } from "./useMoveApplication";
 
 /** The jobs a candidate is on, with their stage; add them to another job. */
-export function CandidateApplications({ candidateId, canUpdate }: { candidateId: string; canUpdate: boolean }) {
+export function CandidateApplications({ candidateId, canUpdate, permissions }: { candidateId: string; canUpdate: boolean; permissions: Permission[] }) {
   const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
@@ -41,6 +42,9 @@ export function CandidateApplications({ candidateId, canUpdate }: { candidateId:
               {a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}
             </span>{" "}
             {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+            {permissions.includes("interviews:read") && (
+              <ApplicationInterviews applicationId={a.id} closed={["rejected", "withdrawn", "placed"].includes(a.stage)} permissions={permissions} />
+            )}
           </li>
         ))}
       </ul>

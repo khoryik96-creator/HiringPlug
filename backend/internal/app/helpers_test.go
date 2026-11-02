@@ -142,13 +142,15 @@ func (a *testApp) request(method, path, token string, body any, headers ...strin
 	return res
 }
 
-// The job feed is XML; the contract declares it a string, so it is checked as one.
+// The job feed (XML) and calendar files are declared as strings in the
+// contract, so they are checked as such.
 func init() {
-	openapi3filter.RegisterBodyDecoder("application/xml",
-		func(body io.Reader, _ http.Header, _ *openapi3.SchemaRef, _ openapi3filter.EncodingFn) (any, error) {
-			b, err := io.ReadAll(body)
-			return string(b), err
-		})
+	asText := func(body io.Reader, _ http.Header, _ *openapi3.SchemaRef, _ openapi3filter.EncodingFn) (any, error) {
+		b, err := io.ReadAll(body)
+		return string(b), err
+	}
+	openapi3filter.RegisterBodyDecoder("application/xml", asText)
+	openapi3filter.RegisterBodyDecoder("text/calendar", asText)
 }
 
 // checkAgainstContract fails the test if a response does not match what the

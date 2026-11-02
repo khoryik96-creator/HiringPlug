@@ -9,6 +9,36 @@ import (
 	"context"
 )
 
+const activeUserRoles = `-- name: ActiveUserRoles :many
+SELECT id, role FROM app_user WHERE active AND id = ANY($1::text[])
+`
+
+type ActiveUserRolesRow struct {
+	ID   string
+	Role string
+}
+
+// Which of these users are active in the tenant (to check interviewers and owners).
+func (q *Queries) ActiveUserRoles(ctx context.Context, ids []string) ([]ActiveUserRolesRow, error) {
+	rows, err := q.db.Query(ctx, activeUserRoles, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActiveUserRolesRow
+	for rows.Next() {
+		var i ActiveUserRolesRow
+		if err := rows.Scan(&i.ID, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const careersTenant = `-- name: CareersTenant :one
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_careers_tenant($1::text)
 `
@@ -71,6 +101,36 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 		&i.Active,
 	)
 	return i, err
+}
+
+const listActiveUsers = `-- name: ListActiveUsers :many
+SELECT id, name, role FROM app_user WHERE active ORDER BY name LIMIT 500
+`
+
+type ListActiveUsersRow struct {
+	ID   string
+	Name string
+	Role string
+}
+
+func (q *Queries) ListActiveUsers(ctx context.Context) ([]ListActiveUsersRow, error) {
+	rows, err := q.db.Query(ctx, listActiveUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveUsersRow
+	for rows.Next() {
+		var i ListActiveUsersRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userNames = `-- name: UserNames :many

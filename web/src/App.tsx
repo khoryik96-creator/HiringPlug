@@ -88,7 +88,7 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
-  if (permissions.includes("pipeline:read")) return <Dashboard />;
+  if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;
   return <CandidateList canCreate={permissions.includes("candidates:create")} />;
 }
 
