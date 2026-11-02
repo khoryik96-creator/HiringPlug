@@ -2,13 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, unwrap } from "../api/client";
+import { candidatesKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { WORK_AUTH_STATUS } from "../labels";
 
 /** Search and add candidates. */
 export function CandidateList({ canCreate }: { canCreate: boolean }) {
   const [q, setQ] = useState("");
   const list = useQuery({
-    queryKey: ["candidates", q],
+    queryKey: [...candidatesKey, q],
     queryFn: async () =>
       unwrap(await api.GET("/v1/candidates", { params: { query: q.trim() ? { q: q.trim() } : {} } })),
   });
@@ -38,7 +40,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
               </td>
               <td>{[c.currentTitle, c.currentCompany].filter(Boolean).join(", ")}</td>
               <td>{c.email}</td>
-              <td>{c.workAuthorizationStatus?.replace("_", " ")}</td>
+              <td>{c.workAuthorizationStatus ? WORK_AUTH_STATUS[c.workAuthorizationStatus] : ""}</td>
             </tr>
           ))}
         </tbody>
@@ -63,7 +65,7 @@ function AddCandidate() {
         }),
       ),
     onSuccess: (c) => {
-      void queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      void queryClient.invalidateQueries({ queryKey: candidatesKey });
       window.location.hash = `#/candidates/${c.id}`;
     },
   });

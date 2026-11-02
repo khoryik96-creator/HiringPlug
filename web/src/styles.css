@@ -25,3 +25,7 @@ pre.extracted { white-space: pre-wrap; background: #f1f5f9; padding: 0.75rem; ma
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
 .field > label { color: #6b7280; font-size: 0.85rem; }
 .field input, .field select { width: 100%; box-sizing: border-box; }
+fieldset.form-grid { border: 0; margin: 0; padding: 0; min-width: 0; }
+fieldset > legend { font-weight: 600; padding: 0; margin-bottom: 0.5rem; }
+[role="alert"] ul { margin: 0.25rem 0; padding-left: 1.25rem; }
+input.code { text-transform: uppercase; }

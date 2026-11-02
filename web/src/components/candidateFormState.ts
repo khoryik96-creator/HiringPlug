@@ -1,4 +1,4 @@
-// The candidate edit form's state, and its conversion to the API request.
+// The candidate edit form's state, its checks, and its conversion to the API request.
 import type { Candidate, Schemas } from "../api/client";
 import { orNull } from "./forms";
 
@@ -21,6 +21,26 @@ export interface CandidateFormState {
   source: "" | Schemas["CandidateSource"];
 }
 
+/** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
+export const FIELD_PATHS: Record<keyof CandidateFormState, string> = {
+  firstName: "firstName",
+  lastName: "lastName",
+  email: "email",
+  phone: "phone",
+  nationality: "nationality",
+  waStatus: "workAuthorization.status",
+  waBasis: "workAuthorization.basis",
+  waNote: "workAuthorization.note",
+  noticeValue: "noticePeriod.value",
+  noticeUnit: "noticePeriod.unit",
+  industry: "industry",
+  specialization: "specialization",
+  currentTitle: "currentTitle",
+  currentCompany: "currentCompany",
+  location: "location",
+  source: "source",
+};
+
 export function formFromCandidate(c: Candidate): CandidateFormState {
   return {
     firstName: c.firstName,
@@ -40,6 +60,19 @@ export function formFromCandidate(c: Candidate): CandidateFormState {
     location: c.location ?? "",
     source: c.source ?? "",
   };
+}
+
+/**
+ * Mistakes worth catching before sending, keyed like the API's field errors.
+ * The API checks everything again; this only gives clearer messages.
+ */
+export function candidateProblems(f: CandidateFormState): Record<string, string> {
+  const problems: Record<string, string> = {};
+  const nationality = f.nationality.trim();
+  if (nationality !== "" && !/^[A-Za-z]{2}$/.test(nationality)) {
+    problems[FIELD_PATHS.nationality] = "Use the 2-letter country code, e.g. MY for Malaysia.";
+  }
+  return problems;
 }
 
 /** The PATCH body: every field is sent; empty inputs clear the field. */

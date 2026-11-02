@@ -206,7 +206,12 @@ func collectSchemaErrors(err error, prefix []string, fields *apperr.FieldErrors,
 	if m := unsupportedProperty.FindStringSubmatch(schemaErr.Reason); m != nil {
 		path = append(path, m[1])
 	}
-	fields.Add(fieldPath(path), schemaErr.Reason)
+	message := schemaErr.Reason
+	var friendly fieldMessage
+	if errors.As(schemaErr.Origin, &friendly) {
+		message = string(friendly) // from one of our format checks (formats.go)
+	}
+	fields.Add(fieldPath(path), message)
 }
 
 var unsupportedProperty = regexp.MustCompile(`^property "([^"]+)" is unsupported$`)

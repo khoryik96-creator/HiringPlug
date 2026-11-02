@@ -1,0 +1,5 @@
+// Query keys shared by the screens that read data and the forms that change
+// it. Keys are plain arrays, so a typo would compile and silently stop a page
+// from updating after a save; using these avoids that.
+export const candidateKey = (id: string) => ["candidate", id] as const;
+export const candidatesKey = ["candidates"] as const;

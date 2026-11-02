@@ -1,20 +1,19 @@
 import { useState } from "react";
 
 import type { Candidate, Compensation } from "../api/client";
+import { PAY_PERIOD } from "../labels";
 import { SalaryForm } from "./SalaryForm";
 
 type Salary = NonNullable<Compensation["currentSalary"]>;
 type Range = NonNullable<Compensation["expectedSalary"]>;
 
-const PERIOD: Record<Salary["period"], string> = { hour: "hour", day: "day", month: "month", year: "year" };
-
 function formatSalary(s: Salary): string {
-  return `${s.currency} ${s.amount} / ${PERIOD[s.period]}`;
+  return `${s.currency} ${s.amount} / ${PAY_PERIOD[s.period]}`;
 }
 
 function formatRange(r: Range): string {
   const amount = r.max ? `${r.min} – ${r.max}` : r.min;
-  return `${r.currency} ${amount} / ${PERIOD[r.period]}`;
+  return `${r.currency} ${amount} / ${PAY_PERIOD[r.period]}`;
 }
 
 /** Salary details, or a clear "restricted" notice for roles that may not see them. */

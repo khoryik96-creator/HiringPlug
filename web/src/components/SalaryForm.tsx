@@ -1,26 +1,46 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, ApiError, type Candidate, unwrap } from "../api/client";
-import { ErrorMessage } from "./ErrorMessage";
+import { api, type Candidate, unwrap } from "../api/client";
+import { candidateKey } from "../api/keys";
+import { keysOf, PAY_PERIOD } from "../labels";
 import { Field } from "./Field";
-import { CURRENCIES, fieldErrors, PERIODS } from "./forms";
-import { formFromCompensation, type SalaryFormState, toCompensationBody } from "./salaryForm";
+import { CURRENCIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import {
+  formFromCompensation,
+  SALARY_PATHS,
+  salaryProblems,
+  type SalaryFormState,
+  toCompensationBody,
+} from "./salaryFormState";
+import { SaveError } from "./SaveError";
 
 /** Edit current and expected salary (needs candidates.compensation:update). */
 export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<SalaryFormState>(() => formFromCompensation(candidate.compensation));
+  // What the user started from; the version is kept for the same reason as in CandidateForm.
+  const [opened] = useState(() => ({
+    id: candidate.id,
+    version: candidate.compensation?.version ?? 0,
+    form: formFromCompensation(candidate.compensation),
+  }));
+  const [form, setForm] = useState(opened.form);
   const save = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.PUT("/v1/candidates/{candidateId}/compensation", {
-          params: { path: { candidateId: candidate.id } },
-          body: toCompensationBody(form, candidate.compensation?.version ?? 0),
-        }),
-      ),
+    mutationFn: async () => {
+      // Checked first: the body leaves out what it cannot express (a "To" without "From").
+      const problems = salaryProblems(form);
+      if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
+      const body = toCompensationBody(form, opened.version);
+      // Nothing changed (including "Add salary" saved empty): don't write anything.
+      if (sameBody(body, toCompensationBody(opened.form, opened.version))) return null;
+      return unwrap(
+        await api.PUT("/v1/candidates/{candidateId}/compensation", { params: { path: { candidateId: opened.id } }, body }),
+      );
+    },
     onSuccess: (compensation) => {
-      queryClient.setQueryData<Candidate>(["candidate", candidate.id], (c) => (c ? { ...c, compensation } : c));
+      if (compensation) {
+        queryClient.setQueryData<Candidate>(candidateKey(opened.id), (c) => (c ? { ...c, compensation } : c));
+      }
       onDone();
     },
   });
@@ -28,24 +48,25 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
   const set = <K extends keyof SalaryFormState>(key: K, value: SalaryFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
-  const amount = (key: "currentAmount" | "expectedMin" | "expectedMax", label: string, error?: string) => (
-    <Field label={label} error={error}>
-      <input inputMode="decimal" placeholder="e.g. 8500" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
+  const amount = (key: "currentAmount" | "expectedMin" | "expectedMax", label: string) => (
+    <Field label={label} error={errors[SALARY_PATHS[key]]}>
+      <input inputMode="decimal" placeholder="e.g. 8,500" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
     </Field>
   );
   const currency = (key: "currentCurrency" | "expectedCurrency") => (
-    <Field label="Currency">
-      <input list="currencies" maxLength={3} value={form[key]} onChange={(e) => { set(key, e.target.value.toUpperCase()); }} />
+    <Field label="Currency" error={errors[SALARY_PATHS[key]]}>
+      {/* Shown in capitals by CSS and upper-cased when sent: rewriting the value
+          on each key press garbles input on some phone keyboards. */}
+      <input list="currencies" className="code" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
     </Field>
   );
   const period = (key: "currentPeriod" | "expectedPeriod") => (
-    <Field label="Per">
+    <Field label="Per" error={errors[SALARY_PATHS[key]]}>
       <select value={form[key]} onChange={(e) => { set(key, e.target.value as SalaryFormState[typeof key]); }}>
-        {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+        {keysOf(PAY_PERIOD).map((p) => <option key={p} value={p}>{PAY_PERIOD[p]}</option>)}
       </select>
     </Field>
   );
-  const stale = save.error instanceof ApiError && save.error.code === "CONFLICT_STALE_VERSION";
 
   return (
     <form
@@ -59,29 +80,28 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
       <datalist id="currencies">
         {CURRENCIES.map((c) => <option key={c} value={c} />)}
       </datalist>
-      <strong className="full">Current salary</strong>
-      {amount("currentAmount", "Amount", errors["currentSalary.amount"])}
-      {currency("currentCurrency")}
-      {period("currentPeriod")}
-      <strong className="full">Expected salary (leave "to" empty for one figure)</strong>
-      {amount("expectedMin", "From", errors["expectedSalary.min"])}
-      {amount("expectedMax", "To", errors["expectedSalary.max"])}
-      {currency("expectedCurrency")}
-      {period("expectedPeriod")}
+      <fieldset className="form-grid full">
+        <legend>Current salary</legend>
+        {amount("currentAmount", "Amount")}
+        {currency("currentCurrency")}
+        {period("currentPeriod")}
+      </fieldset>
+      <fieldset className="form-grid full">
+        <legend>Expected salary</legend>
+        {amount("expectedMin", "From (or the single figure)")}
+        {amount("expectedMax", "To (optional)")}
+        {currency("expectedCurrency")}
+        {period("expectedPeriod")}
+      </fieldset>
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save salary</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
-      {stale ? (
-        <p className="error full">
-          Someone else changed the salary while you were editing.{" "}
-          <button type="button" className="link" onClick={() => { void queryClient.invalidateQueries({ queryKey: ["candidate", candidate.id] }); onDone(); }}>
-            Reload their version
-          </button>
-        </p>
-      ) : (
-        Object.keys(errors).length === 0 && <div className="full"><ErrorMessage error={save.error} /></div>
-      )}
+      <SaveError
+        error={save.error}
+        shown={Object.values(SALARY_PATHS)}
+        onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(opened.id) }); onDone(); }}
+      />
     </form>
   );
 }

@@ -39,11 +39,15 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
-are protected against lost updates (`version`): if someone else saved first,
-the form says so and offers to reload. Validation messages appear next to the
-field (e.g. "Pass held" is required for an expat who can work here). Every
-change is in the audit log, and search ignores case and accents (`jose` finds
-`José`).
+are protected against lost updates (`version`): a form saves with the version
+it was opened with, so if someone else saved first (even if the page has
+refreshed since), the form says so and offers to reload. Validation messages
+appear next to the field (e.g. "Pass held" is required for an expat who can
+work here); any the form cannot place are listed under it, so a failed save is
+never silent. Saving without changes writes nothing. Amounts accept thousands
+separators (`8,500`, `1,00,000`); a decimal comma (`8500,50`) is refused rather
+than guessed. Every change is in the audit log, and search ignores case and
+accents (`jose` finds `José`).
 
 **CV versions.** A candidate has documents, each with a `source`: `jobstreet`,
 `linkedin`, `original`, `formatted` or `other`. Each upload keeps its file, its

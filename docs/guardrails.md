@@ -26,6 +26,8 @@ and pull request (`.github/workflows/ci.yml`).
 | A lost or duplicated background job | Jobs are queued in the same transaction as the data; leases, retries, dead jobs | `jobqueue` tests |
 | A job payload in the wrong shape | Checked against the contract when queued (Go) and read (Python) | `TestPayloadsAreCheckedAgainstTheContract` |
 | Modules tangling together | Modules may not import each other; platform may not import modules; domain rules may not touch the database or HTTP | `architecture_test.go` |
+| File names that differ only in case (`Form.tsx` / `form.ts`): imports break on macOS and Windows while Linux CI passes | A web test fails | `web/src/files.test.ts` |
+| Enum labels drifting between forms and pages, or a new enum value missing from a form | One label map per enum, typed by the contract | `web/src/labels.ts` |
 | Giant files that nobody can safely change | At most 500 lines per Go file, 300 per web file | `TestFilesStaySmall`, ESLint `max-lines` |
 | A new enum value not handled everywhere | Exhaustiveness checks (Go `exhaustive`, TS `switch-exhaustiveness-check`) | linters |
 | Forgotten `await` / unhandled errors | `errcheck`, `errorlint` (Go); strict TypeScript ESLint rules; mypy strict (Python) | linters |

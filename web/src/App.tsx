@@ -27,8 +27,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     onSignOut();
     return null;
   }
-  if (me.error) return <ErrorMessage error={me.error} />;
-  if (!me.data) return <p className="muted">Loading…</p>;
+  // Only without data: a failed background refresh must not unmount the page
+  // (and any form being filled in) for the last loaded profile.
+  if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const detail = /^#\/candidates\/(cand_[0-9a-z]+)$/.exec(hash);
   return (
@@ -43,7 +44,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         </span>
       </header>
       {detail?.[1] ? (
-        <CandidateDetail id={detail[1]} permissions={me.data.permissions} />
+        // key: a different candidate gets a fresh page, so no edit state carries over.
+        <CandidateDetail key={detail[1]} id={detail[1]} permissions={me.data.permissions} />
       ) : (
         <CandidateList canCreate={me.data.permissions.includes("candidates:create")} />
       )}

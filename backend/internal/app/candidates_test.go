@@ -57,6 +57,10 @@ func TestCandidateValidationReportsEveryField(t *testing.T) {
 		{"unknown field (typo)", map[string]any{"firstName": "Wei", "fristName": "Wei"}, []string{"fristName"}},
 		{"lower-case country", map[string]any{"firstName": "Wei", "nationality": "my"}, []string{"nationality"}},
 		{"bad phone", map[string]any{"firstName": "Wei", "phone": "12"}, []string{"phone"}},
+		// Browsers accept these; the API cannot read them as addresses. The
+		// error names the field (it used to say only "body").
+		{"double dot in email", map[string]any{"firstName": "Wei", "email": "siti..aisyah@example.com"}, []string{"email"}},
+		{"trailing dot in email", map[string]any{"firstName": "Wei", "email": "siti.@example.com"}, []string{"email"}},
 		{
 			"expat without basis",
 			map[string]any{"firstName": "Wei", "workAuthorization": map[string]any{"status": "expat_eligible"}},
