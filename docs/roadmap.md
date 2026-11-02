@@ -20,6 +20,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Jobs with a hiring contact, status and a permissioned salary budget |
 | ✅ | Pipeline: candidates on jobs, a drag-and-drop board per job, reasons for rejections |
 | ✅ | Notes (sensitive ones protected) and an activity timeline on every record; a dashboard |
+| ✅ | Import candidates, companies and contacts from CSV, with a report of rows to fix |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -45,7 +46,7 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|
 | 2.1 **CV parsing** | Upload a CV and get the profile filled in (name, contacts, work history, education, skills), each value showing where in the CV it came from; you review and accept |
 | 2.2 **Duplicates** | Warn on the same email, phone or a very similar name; merge two candidates with their CVs, notes and applications |
-| 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
+| ✅ 2.3 **Import** | Bring in existing candidates, companies and contacts from Excel/CSV, with a preview and a report of rows that need fixing |
 | 2.4 **Tags, skills and lists** | Tags, skills, and shared industry / specialization lists; filters and saved searches |
 | 2.5 **CV versions side by side** | Original, JobStreet, LinkedIn and formatted CVs of one candidate compared side by side |
 

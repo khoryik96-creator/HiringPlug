@@ -162,6 +162,19 @@ it, and others see "2 sensitive notes are hidden". You delete your own notes;
 owners and admins any. Next: templates per company and notes on an
 application.
 
+## Import
+
+✅ **Import** (menu: Import) candidates, companies or contacts from a CSV file
+(in Excel: Save As, CSV). Columns are matched to fields by their names
+(`Full Name`, `E-mail`, `Mobile Number`, `Designation`, ...) and can be
+changed; the first rows are shown. Each row goes through the same API as the
+forms, so every check applies: duplicates are reported as "already there" with
+a link, invalid values as "to fix" with the reason, and the rows to fix can be
+downloaded as a CSV to correct and import again. Country names and
+nationalities become codes (`Malaysian` → `MY`); sources like `Job Street`
+become `jobstreet`. Contacts find their company by name (ignoring case and
+accents), or add it. Excel files (.xlsx) directly: later.
+
 ## Dashboard
 
 ✅ The home page: open jobs with candidates per stage, totals, candidates

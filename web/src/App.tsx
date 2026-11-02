@@ -10,6 +10,7 @@ import { CompanyDetail } from "./pages/CompanyDetail";
 import { ContactDetail } from "./pages/ContactDetail";
 import { ContactList } from "./pages/ContactList";
 import { Dashboard } from "./pages/Dashboard";
+import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
 import { JobList } from "./pages/JobList";
 import { CompanyList } from "./pages/CompanyList";
@@ -39,7 +40,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|import)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -50,6 +51,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           <a href="#/candidates" aria-current={section === "candidates" ? "page" : undefined}>Candidates</a>
           <a href="#/companies" aria-current={section === "companies" ? "page" : undefined}>Companies</a>
           <a href="#/contacts" aria-current={section === "contacts" ? "page" : undefined}>Contacts</a>
+          <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
         </nav>
         <span className="muted">
           {me.data.user.name} · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
@@ -79,6 +81,7 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
   if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
+  if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard />;
   return <CandidateList canCreate={permissions.includes("candidates:create")} />;
