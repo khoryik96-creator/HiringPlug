@@ -117,3 +117,13 @@ RETURNING *;
 -- name: CloseJobAds :execrows
 UPDATE job_ad SET status = 'closed', version = version + 1, updated_at = now()
 WHERE job_order_id = @job_order_id AND status = 'published';
+
+-- The careers page: published ads still open (no closing date, or not past it).
+-- name: ListPublishedAds :many
+SELECT * FROM job_ad
+WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+ORDER BY published_at DESC LIMIT 200;
+
+-- name: GetPublishedAd :one
+SELECT * FROM job_ad
+WHERE id = @id AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date);

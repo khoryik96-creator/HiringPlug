@@ -6,6 +6,7 @@ import { clearToken, getToken } from "./auth";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CandidateDetail } from "./pages/CandidateDetail";
 import { CandidateList } from "./pages/CandidateList";
+import { Careers } from "./pages/Careers";
 import { CompareCvs } from "./pages/CompareCvs";
 import { CompanyDetail } from "./pages/CompanyDetail";
 import { ContactDetail } from "./pages/ContactDetail";
@@ -91,7 +92,9 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
 }
 
 export function App() {
+  const hash = useHash();
   const [signedIn, setSignedIn] = useState(getToken() !== null);
+  const careers = /^#\/careers\/([a-z0-9-]+)(?:\/(ad_[0-9a-z]+))?$/.exec(hash);
   const signOut = () => {
     clearToken();
     queryClient.clear();
@@ -99,7 +102,14 @@ export function App() {
   };
   return (
     <QueryClientProvider client={queryClient}>
-      {signedIn ? <Shell onSignOut={signOut} /> : <SignIn onSignedIn={() => { setSignedIn(true); }} />}
+      {careers ? (
+        // Public: candidates are never asked to sign in.
+        <Careers key={careers[1]} slug={careers[1] ?? ""} adId={careers[2]} />
+      ) : signedIn ? (
+        <Shell onSignOut={signOut} />
+      ) : (
+        <SignIn onSignedIn={() => { setSignedIn(true); }} />
+      )}
     </QueryClientProvider>
   );
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/oapi-codegen/nullable"
@@ -125,7 +126,7 @@ func TestCVUploadToExtractedText(t *testing.T) {
 	require.NoError(t, tx.Commit(ctx))
 
 	// The Go worker saves the result.
-	runCoreJobsUntilIdle(t, a)
+	runCoreJobsUntilIdle(t, a, job.TenantID)
 
 	got := a.request(http.MethodGet, "/v1/documents/"+doc.Id, token, nil)
 	require.Equal(t, http.StatusOK, got.Status)
@@ -203,16 +204,29 @@ func claimAIJobFor(t *testing.T, conn *pgx.Conn, documentID string) claimedJob {
 }
 
 // runCoreJobsUntilIdle runs the real Go worker until the core queue is empty.
-func runCoreJobsUntilIdle(t *testing.T, a *testApp) {
+// runCoreJobsUntilIdle runs the real Go worker until the tenant's core jobs
+// are done. Tests run in parallel and share the queue, so another test's
+// worker may be running one of them: an empty claim is not enough, the
+// tenant's jobs must be finished.
+func runCoreJobsUntilIdle(t *testing.T, a *testApp, tenantID string) {
 	t.Helper()
+	ctx := context.Background()
 	w, err := app.NewWorker(a.deps, a.modules)
 	require.NoError(t, err)
-	for range 100 {
-		found, err := w.RunOnce(context.Background())
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		found, err := w.RunOnce(ctx)
 		require.NoError(t, err)
-		if !found {
+		if found {
+			continue
+		}
+		var open int
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx,
+			`SELECT count(*) FROM job WHERE queue = 'core' AND tenant_id = $1 AND status IN ('pending', 'running')`, tenantID).Scan(&open))
+		if open == 0 {
 			return
 		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("core queue did not drain")
 }

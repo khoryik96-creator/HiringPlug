@@ -19,6 +19,7 @@ x-backend-env: &backend-env
   HP_FILES_URL_SECRET: dev-only-secret-change-me-0123456789abcdef
   HP_FILES_DIR: /data/files
   HP_INTERNAL_BASE_URL: http://api:8080
+  HP_CLIENT_IP_HEADER: X-Real-IP # set by nginx (deploy/nginx.conf)
 
 services:
   postgres:

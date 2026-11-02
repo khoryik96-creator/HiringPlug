@@ -39,57 +39,64 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 	if !ok {
 		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx or .doc) file.")
 	}
-	sum := sha256.Sum256(data)
 	var doc Document
 	var storedKey string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		exists, err := s.candidates.Exists(ctx, tx, candidateID)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return apperr.NotFound("candidate")
-		}
-		q := store.New(tx)
-		id, err := q.NewDocumentID(ctx)
-		if err != nil {
-			return err
-		}
-		key := p.TenantID + "/" + id
-		if err := s.files.Put(key, data); err != nil {
-			return err
-		}
-		storedKey = key
-		row, err := q.InsertDocument(ctx, store.InsertDocumentParams{
-			ID: id, CandidateID: candidateID, Source: source, FileName: CleanFileName(fileName),
-			ContentType: contentType, SizeBytes: int64(len(data)), Sha256: hex.EncodeToString(sum[:]), StorageKey: key,
-		})
-		if err != nil {
-			return err
-		}
-		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
-			DocumentId:  id,
-			DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
-			ContentType: contentType,
-			FileName:    row.FileName,
-			SizeBytes:   row.SizeBytes,
-		}); err != nil {
-			return err
-		}
-		if err := audit.Record(ctx, tx, audit.Entry{
-			Action: "document.uploaded", EntityType: "document", EntityID: id,
-			Changes: map[string]any{"candidateId": candidateID, "source": source, "fileName": row.FileName},
-		}); err != nil {
-			return err
-		}
-		doc = fromRow(row)
-		return nil
+		var err error
+		doc, storedKey, err = s.add(ctx, tx, p.TenantID, candidateID, source, fileName, contentType, data)
+		return err
 	})
 	if err != nil && storedKey != "" {
 		// The transaction rolled back, so nothing refers to the file.
 		err = errors.Join(err, s.files.Delete(storedKey))
 	}
 	return doc, err
+}
+
+// add stores a file for a candidate, records it and queues its text
+// extraction, in the caller's transaction. storedKey is set once the file is
+// written, so the caller can remove it if the transaction rolls back.
+func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName, contentType string, data []byte) (doc Document, storedKey string, err error) {
+	exists, err := s.candidates.Exists(ctx, tx, candidateID)
+	if err != nil {
+		return Document{}, "", err
+	}
+	if !exists {
+		return Document{}, "", apperr.NotFound("candidate")
+	}
+	q := store.New(tx)
+	id, err := q.NewDocumentID(ctx)
+	if err != nil {
+		return Document{}, "", err
+	}
+	key := tenantID + "/" + id
+	if err := s.files.Put(key, data); err != nil {
+		return Document{}, "", err
+	}
+	sum := sha256.Sum256(data)
+	row, err := q.InsertDocument(ctx, store.InsertDocumentParams{
+		ID: id, CandidateID: candidateID, Source: source, FileName: CleanFileName(fileName),
+		ContentType: contentType, SizeBytes: int64(len(data)), Sha256: hex.EncodeToString(sum[:]), StorageKey: key,
+	})
+	if err != nil {
+		return Document{}, key, err
+	}
+	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
+		DocumentId:  id,
+		DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
+		ContentType: contentType,
+		FileName:    row.FileName,
+		SizeBytes:   row.SizeBytes,
+	}); err != nil {
+		return Document{}, key, err
+	}
+	if err := audit.Record(ctx, tx, audit.Entry{
+		Action: "document.uploaded", EntityType: "document", EntityID: id,
+		Changes: map[string]any{"candidateId": candidateID, "source": source, "fileName": row.FileName},
+	}); err != nil {
+		return Document{}, key, err
+	}
+	return fromRow(row), key, nil
 }
 
 // List returns a candidate's documents, newest first, without their text.

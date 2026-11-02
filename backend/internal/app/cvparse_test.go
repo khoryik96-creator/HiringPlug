@@ -31,7 +31,7 @@ func answerAIJob(t *testing.T, a *testApp, conn *pgx.Conn, job claimedJob, kind 
 	var completed bool
 	require.NoError(t, tx.QueryRow(ctx, `SELECT job_complete($1, 'python-test')`, job.ID).Scan(&completed))
 	require.NoError(t, tx.Commit(ctx))
-	runCoreJobsUntilIdle(t, a)
+	runCoreJobsUntilIdle(t, a, job.TenantID)
 }
 
 func extractedText(id, text string) api.DocumentTextExtractedJob {

@@ -1,0 +1,144 @@
+# Module contract: careers (the public careers page and apply form).
+# See contracts/README.md for the format.
+x-module:
+  name: careers
+  description: >
+    A company's public careers page: its published job ads, and applying to
+    one with a CV. Signed-out visitors; the page address picks the company,
+    and everything after runs in that company's scope.
+  permissions: {}
+  errorCodes:
+    CAREERS_TOO_MANY_APPLICATIONS:
+      status: 429
+      description: Too many applications from one place in a short time. Try again later.
+  jobs: {}
+
+paths:
+  /v1/public/careers/{slug}:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+    get:
+      operationId: getCareersPage
+      tags: [careers]
+      summary: A company's careers page with its published ads
+      description: Ads past their closing date are left out.
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CareersPage' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/public/careers/{slug}/ads/{adId}:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+      - $ref: '#/components/parameters/JobAdIdPath'
+    get:
+      operationId: getCareersAd
+      tags: [careers]
+      summary: One published ad
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicJobAd' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/public/careers/{slug}/ads/{adId}/applications:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+      - $ref: '#/components/parameters/JobAdIdPath'
+    post:
+      operationId: applyToJobAd
+      tags: [careers]
+      summary: Apply to a published ad with a CV (PDF or Word, up to 10 MB)
+      description: >
+        The applicant becomes a candidate (or, with an email already on file,
+        the existing candidate is used, unchanged), the CV is attached and
+        read, and they join the job's pipeline as applied. The answer is the
+        same whether or not the email was known, so the form reveals nothing.
+        `website` must be left empty: it is a trap for robots.
+      x-permission: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [firstName, email, consent, file]
+              properties:
+                firstName: { type: string, maxLength: 100 }
+                lastName: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 254 }
+                phone: { type: string, maxLength: 30 }
+                consent:
+                  type: string
+                  enum: ['yes']
+                  description: The applicant agrees that the company keeps their details to handle the application.
+                website: { type: string, maxLength: 0 }
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: Received
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationReceived' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '429':
+          description: Too many applications (CAREERS_TOO_MANY_APPLICATIONS).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  parameters:
+    CareersSlugPath:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', minLength: 3, maxLength: 60 }
+
+  schemas:
+    CareersPage:
+      type: object
+      required: [companyName, ads]
+      properties:
+        companyName: { type: string }
+        ads:
+          type: array
+          items: { $ref: '#/components/schemas/PublicJobAd' }
+    PublicJobAd:
+      type: object
+      description: A published ad as visitors see it (no internal fields).
+      required: [id, title, location, workType, workArrangement, salaryText, description, closesOn, publishedAt]
+      properties:
+        id: { $ref: '#/components/schemas/JobAdId' }
+        title: { type: string }
+        location: { type: string, nullable: true }
+        workType:
+          allOf: [{ $ref: '#/components/schemas/WorkType' }]
+          nullable: true
+        workArrangement:
+          allOf: [{ $ref: '#/components/schemas/WorkArrangement' }]
+          nullable: true
+        salaryText: { type: string, nullable: true }
+        description: { type: string }
+        closesOn: { type: string, format: date, nullable: true }
+        publishedAt: { type: string, format: date-time }
+    ApplicationReceived:
+      type: object
+      required: [received]
+      properties:
+        received: { type: boolean }

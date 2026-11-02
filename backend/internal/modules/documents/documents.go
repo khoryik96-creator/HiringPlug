@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -44,6 +45,24 @@ type Module struct {
 func New(pool *pgxpool.Pool, files *blob.Store, candidates Candidates, maxUploadBytes int64) *Module {
 	svc := &Service{pool: pool, files: files, candidates: candidates}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
+}
+
+// AddFile stores a CV for a candidate and queues reading it, in the caller's
+// transaction (the careers page's apply form). The file type is checked from
+// its bytes. undo removes the stored file; call it if the transaction rolls
+// back.
+func (m *Module) AddFile(ctx context.Context, tx pgx.Tx, tenantID, candidateID, fileName string, data []byte) (documentID string, undo func(), err error) {
+	contentType, ok := DetectContentType(data)
+	if !ok {
+		return "", func() {}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx or .doc) file.")
+	}
+	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, "original", fileName, contentType, data)
+	undo = func() {
+		if key != "" {
+			_ = m.service.files.Delete(key)
+		}
+	}
+	return doc.ID, undo, err
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.

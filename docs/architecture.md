@@ -87,6 +87,13 @@ modules meet, passes the candidates module in. Adding or changing a module
 therefore cannot reach into another module's internals; Go's `internal`
 directories and an architecture test enforce it.
 
+Some use cases span modules. Applying through the careers page adds a
+candidate, their CV and their application **in one transaction**: the
+`careers` module declares what it needs (`FindOrCreateApplicant`, `AddFile`,
+`AddApplied`, `PublishedAd`), each module offers that function taking the
+caller's transaction, and `internal/app` adapts them (`careers_adapters.go`).
+Nothing is half-done if one step fails, and no module imports another.
+
 **Adding a module** is one command (`task new:module`): it creates the contract
 file, a migration with row-level security, the SQL, the Go code in this layout,
 unit and integration tests, and the wiring. See

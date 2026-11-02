@@ -20,7 +20,7 @@ export function testCandidate(overrides: Partial<Candidate> = {}): Candidate {
 export function testMe(permissions: Permission[]): Me {
   return {
     user: { id: "usr_01jbz6w0m0k8q9x2r3s4t5v6w7", email: "demo@example.com", name: "Demo" },
-    tenant: { id: "ten_01jbz6w0m0k8q9x2r3s4t5v6w7", name: "Demo company" },
+    tenant: { id: "ten_01jbz6w0m0k8q9x2r3s4t5v6w7", name: "Demo company", careersSlug: "demo-company" },
     role: "recruiter",
     permissions,
   };

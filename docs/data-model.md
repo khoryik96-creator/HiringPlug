@@ -16,7 +16,7 @@ tenant ─┬─ app_user (role)
 
 | Table | Key fields |
 |---|---|
-| `tenant` | name |
+| `tenant` | name, careers page address (`careers_slug`: unique, made from the name when the company is created) |
 | `app_user` | email, name, role, active |
 | `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, tags and skills (text arrays, indexed for case-insensitive filters), `version`, search text |
 | `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text |

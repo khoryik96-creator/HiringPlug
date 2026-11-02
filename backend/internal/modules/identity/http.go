@@ -16,13 +16,13 @@ type HTTP struct{ m *Module }
 // the web app can show or hide features.
 func (h *HTTP) GetMe(ctx context.Context, _ api.GetMeRequestObject) (api.GetMeResponseObject, error) {
 	p := authz.MustFromContext(ctx)
-	tenantName, err := h.m.tenantName(ctx, p)
+	tenant, err := h.m.tenant(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	return api.GetMe200JSONResponse{
 		User:        api.User{Id: p.UserID, Email: openapi_types.Email(p.Email), Name: p.Name},
-		Tenant:      api.Tenant{Id: p.TenantID, Name: tenantName},
+		Tenant:      api.Tenant{Id: p.TenantID, Name: tenant.Name, CareersSlug: tenant.CareersSlug},
 		Role:        p.Role,
 		Permissions: p.Permissions(),
 	}, nil

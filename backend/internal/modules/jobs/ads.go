@@ -203,3 +203,27 @@ func today() time.Time {
 	y, m, d := time.Now().UTC().Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
+
+// PublishedAds returns the ads on the careers page: published and not past
+// their closing date, newest first, in the caller's transaction.
+func (m *Module) PublishedAds(ctx context.Context, tx pgx.Tx) ([]Ad, error) {
+	rows, err := store.New(tx).ListPublishedAds(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ads := make([]Ad, len(rows))
+	for i, r := range rows {
+		ads[i] = adFromRow(r)
+	}
+	return ads, nil
+}
+
+// PublishedAd returns one ad on the careers page; anything else (a draft, a
+// closed or expired ad) is not found.
+func (m *Module) PublishedAd(ctx context.Context, tx pgx.Tx, id string) (Ad, error) {
+	row, err := store.New(tx).GetPublishedAd(ctx, id)
+	if database.IsNoRows(err) {
+		return Ad{}, apperr.NotFound("job ad")
+	}
+	return adFromRow(row), err
+}

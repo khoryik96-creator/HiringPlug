@@ -29,6 +29,7 @@ type Options struct {
 	Ready          func(ctx context.Context) error // readiness: can we serve traffic?
 	MaxBodyBytes   int64                           // JSON request limit
 	MaxUploadBytes int64                           // file upload limit
+	ClientIPHeader string                          // header the reverse proxy names the client in, or "" (see clientip)
 }
 
 // New returns the complete HTTP handler.
@@ -78,7 +79,7 @@ func New(o Options) (http.Handler, error) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, r, apperr.New(api.ErrorCodeROUTENOTFOUND, "No such endpoint."))
 	})
-	return observe(o.Logger, mux), nil
+	return observe(o.Logger, o.ClientIPHeader, mux), nil
 }
 
 func serveContract(w http.ResponseWriter, r *http.Request) {

@@ -263,7 +263,8 @@ type Note struct {
 }
 
 type Tenant struct {
-	ID        string
-	Name      string
-	CreatedAt time.Time
+	ID          string
+	Name        string
+	CreatedAt   time.Time
+	CareersSlug *string
 }

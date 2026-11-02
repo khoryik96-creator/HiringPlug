@@ -156,6 +156,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/careers/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A company's careers page with its published ads
+         * @description Ads past their closing date are left out.
+         */
+        get: operations["getCareersPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/careers/{slug}/ads/{adId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        /** One published ad */
+        get: operations["getCareersAd"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/careers/{slug}/ads/{adId}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply to a published ad with a CV (PDF or Word, up to 10 MB)
+         * @description The applicant becomes a candidate (or, with an email already on file, the existing candidate is used, unchanged), the CV is attached and read, and they join the job's pipeline as applied. The answer is the same whether or not the email was known, so the form reveals nothing. `website` must be left empty: it is a trap for robots.
+         */
+        post: operations["applyToJobAd"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/companies": {
         parameters: {
             query?: never;
@@ -622,7 +687,7 @@ export interface components {
         /** @enum {string} */
         Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted";
         Error: {
@@ -851,6 +916,27 @@ export interface components {
             skills: string[];
             industries: string[];
             specializations: string[];
+        };
+        CareersPage: {
+            companyName: string;
+            ads: components["schemas"]["PublicJobAd"][];
+        };
+        /** @description A published ad as visitors see it (no internal fields). */
+        PublicJobAd: {
+            id: components["schemas"]["JobAdId"];
+            title: string;
+            location: string | null;
+            workType: components["schemas"]["WorkType"] | null;
+            workArrangement: components["schemas"]["WorkArrangement"] | null;
+            salaryText: string | null;
+            description: string;
+            /** Format: date */
+            closesOn: string | null;
+            /** Format: date-time */
+            publishedAt: string;
+        };
+        ApplicationReceived: {
+            received: boolean;
         };
         /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyId: string;
@@ -1149,6 +1235,8 @@ export interface components {
             name: string;
         };
         Tenant: {
+            /** @description The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment). */
+            careersSlug: string;
             id: components["schemas"]["TenantId"];
             name: string;
         };
@@ -1504,6 +1592,7 @@ export interface components {
     };
     parameters: {
         CandidateIdPath: components["schemas"]["CandidateId"];
+        CareersSlugPath: string;
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
@@ -1772,6 +1861,107 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getCareersPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CareersPage"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getCareersAd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicJobAd"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyToJobAd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: components["parameters"]["CareersSlugPath"];
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    firstName: string;
+                    lastName?: string;
+                    /** Format: email */
+                    email: string;
+                    phone?: string;
+                    /**
+                     * @description The applicant agrees that the company keeps their details to handle the application.
+                     * @enum {string}
+                     */
+                    consent: "yes";
+                    website?: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Received */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationReceived"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+            /** @description Too many applications (CAREERS_TOO_MANY_APPLICATIONS). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listCompanies: {

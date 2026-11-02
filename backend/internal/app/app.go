@@ -88,6 +88,7 @@ func NewHTTPHandler(d Deps, m *Modules) (http.Handler, error) {
 		Ready:          func(ctx context.Context) error { return d.Pool.Ping(ctx) },
 		MaxBodyBytes:   maxJSONBodyBytes,
 		MaxUploadBytes: d.Config.MaxUploadBytes,
+		ClientIPHeader: d.Config.ClientIPHeader,
 	})
 }
 

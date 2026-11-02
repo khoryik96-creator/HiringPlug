@@ -20,6 +20,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
     queryKey: jobAdsKey(job.id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } } })).items,
   });
+  const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   const setStatus = useMutation({
     mutationFn: async ({ ad, status }: { ad: Ad; status: Ad["status"] }) =>
       unwrap(await api.PATCH("/v1/job-ads/{adId}", { params: { path: { adId: ad.id } }, body: { version: ad.version, status } })),
@@ -32,6 +33,14 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
         <h3>Job ads</h3>
         {canEdit && !editing && <button type="button" onClick={() => { setEditing("new"); }}>Write an ad</button>}
       </div>
+      {me.data && (
+        <p className="muted">
+          Published ads appear on your careers page:{" "}
+          <a href={`#/careers/${me.data.tenant.careersSlug}`} target="_blank" rel="noreferrer">
+            {`${window.location.origin}/#/careers/${me.data.tenant.careersSlug}`}
+          </a>
+        </p>
+      )}
       <ErrorMessage error={ads.error ?? setStatus.error} />
       {editing && <AdForm job={job} ad={editing === "new" ? null : editing} onDone={() => { setEditing(null); }} />}
       {ads.data?.length === 0 && !editing && <p className="muted">No ads yet.</p>}

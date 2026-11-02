@@ -61,15 +61,29 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 	return principal, err
 }
 
-// tenantName returns the display name of the principal's tenant.
-func (m *Module) tenantName(ctx context.Context, p authz.Principal) (string, error) {
-	var name string
+// tenant returns the principal's tenant: its name and careers page address.
+func (m *Module) tenant(ctx context.Context, p authz.Principal) (store.GetTenantRow, error) {
+	var t store.GetTenantRow
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
-		t, err := store.New(tx).GetTenant(ctx, p.TenantID)
-		name = t.Name
+		var err error
+		t, err = store.New(tx).GetTenant(ctx, p.TenantID)
 		return err
 	})
-	return name, err
+	return t, err
+}
+
+// CareersTenant finds the company behind a public careers page address. It
+// runs outside any tenant scope: the database function returns only the
+// company's id and name. ok is false for an unknown address.
+func (m *Module) CareersTenant(ctx context.Context, slug string) (tenantID, name string, ok bool, err error) {
+	row, err := store.New(m.pool).CareersTenant(ctx, slug)
+	if database.IsNoRows(err) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	return row.TenantID, row.TenantName, true, nil
 }
 
 // UserNames returns the names of the given users (missing ones are left out),

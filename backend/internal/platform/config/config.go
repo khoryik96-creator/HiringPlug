@@ -44,6 +44,10 @@ type Config struct {
 	InternalBaseURL  string // HP_INTERNAL_BASE_URL
 	MaxUploadBytes   int64  // HP_MAX_UPLOAD_BYTES
 	DefaultPhoneArea string // HP_DEFAULT_PHONE_REGION: ISO country used for local phone numbers, e.g. MY
+	// ClientIPHeader is the header a reverse proxy names the client in (nginx:
+	// X-Real-IP). Empty when the API is reached directly. Never a header
+	// clients could set themselves.
+	ClientIPHeader string // HP_CLIENT_IP_HEADER
 }
 
 // devSecret is only accepted outside production.
@@ -67,6 +71,7 @@ func Load(getenv func(string) string) (Config, error) {
 		InternalBaseURL:  strings.TrimRight(r.url("HP_INTERNAL_BASE_URL", "http://localhost:8080"), "/"),
 		MaxUploadBytes:   r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
 		DefaultPhoneArea: strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),
+		ClientIPHeader:   r.str("HP_CLIENT_IP_HEADER", ""),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
 

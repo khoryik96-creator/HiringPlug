@@ -75,3 +75,9 @@ tr.total td { font-weight: 600; }
 .ad-text p { margin: 0.4rem 0; }
 .badge.draft { background: #f3f4f6; } .badge.published { background: #dcfce7; } .badge.closed { background: #fee2e2; }
 textarea { width: 100%; box-sizing: border-box; font: inherit; }
+.careers { max-width: 46rem; margin: 0 auto; }
+.careers h1 a { color: inherit; text-decoration: none; }
+.careers-list { list-style: none; padding: 0; }
+.careers-list li { padding: 0.75rem 0; border-bottom: 1px solid #e5e7eb; }
+/* The robots' trap: off screen for people, still in the form for robots. */
+.trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

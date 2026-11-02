@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/clientip"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/requestid"
 )
@@ -18,7 +19,7 @@ import (
 //   - puts a logger carrying that ID into the context;
 //   - turns a panic into a 500 response with the ID, logging the stack;
 //   - writes one access-log line with status, duration, tenant and user.
-func observe(logger *slog.Logger, next http.Handler) http.Handler {
+func observe(logger *slog.Logger, clientIPHeader string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		id := requestid.Sanitize(r.Header.Get(requestid.Header))
@@ -29,6 +30,7 @@ func observe(logger *slog.Logger, next http.Handler) http.Handler {
 
 		info := &requestInfo{}
 		ctx := requestid.With(r.Context(), id)
+		ctx = clientip.With(ctx, clientip.Of(r, clientIPHeader))
 		ctx = context.WithValue(ctx, requestInfoKey{}, info)
 		ctx = logx.Into(ctx, logger.With("request_id", id))
 		r = r.WithContext(ctx)

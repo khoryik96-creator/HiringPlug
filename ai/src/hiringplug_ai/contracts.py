@@ -49,6 +49,7 @@ class Permission(StrEnum):
 class ErrorCode(StrEnum):
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
+    CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
@@ -408,6 +409,10 @@ class UsedValues(BaseModel):
     specializations: list[str]
 
 
+class ApplicationReceived(BaseModel):
+    received: bool
+
+
 class CompanyId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["comp_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^comp_[0-9a-hjkmnp-tv-z]{26}$")
@@ -753,6 +758,12 @@ class User(BaseModel):
 
 
 class Tenant(BaseModel):
+    careersSlug: Annotated[
+        str,
+        Field(
+            description="The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment)."
+        ),
+    ]
     id: TenantId
     name: str
 
@@ -1081,6 +1092,18 @@ class PipelineSummary(BaseModel):
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
 
 
+class PublicJobAd(BaseModel):
+    id: JobAdId
+    title: str
+    location: Annotated[str | None, Field(...)]
+    workType: Annotated[WorkType | None, Field(...)]
+    workArrangement: Annotated[WorkArrangement | None, Field(...)]
+    salaryText: Annotated[str | None, Field(...)]
+    description: str
+    closesOn: Annotated[date | None, Field(...)]
+    publishedAt: AwareDatetime
+
+
 class Document(BaseModel):
     id: DocumentId
     candidateId: CandidateId
@@ -1183,3 +1206,8 @@ class JobAdUpdate(BaseModel):
     description: Annotated[str | None, Field(max_length=20000)] = None
     closesOn: date | None = None
     status: JobAdStatus | None = None
+
+
+class CareersPage(BaseModel):
+    companyName: str
+    ads: list[PublicJobAd]

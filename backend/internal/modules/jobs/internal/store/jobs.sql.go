@@ -130,6 +130,35 @@ func (q *Queries) GetJobSalary(ctx context.Context, jobOrderID string) (GetJobSa
 	return i, err
 }
 
+const getPublishedAd = `-- name: GetPublishedAd :one
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad
+WHERE id = $1 AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+`
+
+func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) {
+	row := q.db.QueryRow(ctx, getPublishedAd, id)
+	var i JobAd
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.Title,
+		&i.Location,
+		&i.WorkType,
+		&i.WorkArrangement,
+		&i.SalaryText,
+		&i.Description,
+		&i.ClosesOn,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertJobAd = `-- name: InsertJobAd :one
 INSERT INTO job_ad (tenant_id, job_order_id, title, location, work_type, work_arrangement, salary_text, description, closes_on, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5,
@@ -424,6 +453,50 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 			&i.Status,
 			&i.Location,
 			&i.Openings,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublishedAds = `-- name: ListPublishedAds :many
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad
+WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+ORDER BY published_at DESC LIMIT 200
+`
+
+// The careers page: published ads still open (no closing date, or not past it).
+func (q *Queries) ListPublishedAds(ctx context.Context) ([]JobAd, error) {
+	rows, err := q.db.Query(ctx, listPublishedAds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JobAd
+	for rows.Next() {
+		var i JobAd
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.JobOrderID,
+			&i.Version,
+			&i.Title,
+			&i.Location,
+			&i.WorkType,
+			&i.WorkArrangement,
+			&i.SalaryText,
+			&i.Description,
+			&i.ClosesOn,
+			&i.Status,
+			&i.PublishedAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err

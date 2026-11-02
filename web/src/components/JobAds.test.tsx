@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type JobOrder, type Schemas } from "../api/client";
-import { failure, ok, renderWithClient, sentBody } from "../test-utils";
+import { failure, ok, RECRUITER, renderWithClient, sentBody, testMe } from "../test-utils";
 import { AdText } from "./AdText";
 import { JobAds } from "./JobAds";
 
@@ -17,6 +17,11 @@ const job: JobOrder = {
   workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.",
   restrictedFields: ["salary"], createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
+/** Answers the panel's reads: who is signed in (for the careers link), and the ads. */
+const reads = (ads: Schemas["JobAd"][]) =>
+  vi.spyOn(api, "GET").mockImplementation(((path: string) =>
+    Promise.resolve(path === "/v1/me" ? ok(testMe(RECRUITER)) : ok({ items: ads }))) as never);
+
 const draft: Schemas["JobAd"] = {
   id: "ad_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, jobId: job.id, title: "Senior Auditor", location: "Kuala Lumpur",
   workType: "full_time", workArrangement: null, salaryText: "RM 9,000", description: null, closesOn: null, status: "draft",
@@ -34,7 +39,7 @@ describe("ad text", () => {
 
 describe("job ads", () => {
   it("starts a new ad from the job's own details", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [] }));
+    reads([]);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(draft));
     renderWithClient(<JobAds job={job} canEdit />);
     fireEvent.click(await screen.findByRole("button", { name: "Write an ad" }));
@@ -48,7 +53,7 @@ describe("job ads", () => {
   });
 
   it("publishes with the ad's version and says why when it cannot", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [draft] }));
+    reads([draft]);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(
       failure("JOB_AD_NOT_PUBLISHABLE", "Write the ad's text before publishing it.", undefined, 422),
     );
@@ -60,9 +65,10 @@ describe("job ads", () => {
   });
 
   it("gives viewers no buttons", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [draft] }));
+    reads([draft]);
     renderWithClient(<JobAds job={job} canEdit={false} />);
     await screen.findByRole("article", { name: "Senior Auditor" });
+    expect((await screen.findByRole("link", { name: /#\/careers\/demo-company$/ })).getAttribute("href")).toBe("#/careers/demo-company");
     expect(screen.queryAllByRole("button")).toEqual([]);
   });
 });

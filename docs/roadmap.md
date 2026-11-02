@@ -24,6 +24,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Duplicates flagged and merged; tags and skills with filters |
 | ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |
 | ✅ | Work history and education on profiles; CV versions compared side by side |
+| ✅ | Job ads with publishing rules; a public careers page with an apply form |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -58,7 +59,7 @@ job. Today the app has candidates but nothing to place them into.
 | Step | Delivers |
 |---|---|
 | ✅ 3.1 **Job ads** | The advertised text for a job (separate from the internal job order), with publish status, a preview, and ads taken down when the job is filled or closed |
-| 3.2 **Careers page and apply form** | A public page per company listing open ads; applying creates the candidate, attaches the CV (parsed) and puts them in the job's pipeline |
+| ✅ 3.2 **Careers page and apply form** | A public page per company listing open ads; applying creates the candidate (or finds them by email), attaches the CV (read and parsed) and puts them in the job's pipeline, with consent, a robot trap and a per-address limit. Choosing your own page address comes with the admin screen (1.7). |
 | 3.3 **Job boards** | Post ads to job boards through their partner programmes (JobStreet, LinkedIn, Indeed) |
 
 ### Phase 4: interviews and email ⬜

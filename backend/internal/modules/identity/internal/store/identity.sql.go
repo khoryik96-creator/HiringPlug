@@ -9,19 +9,38 @@ import (
 	"context"
 )
 
+const careersTenant = `-- name: CareersTenant :one
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_careers_tenant($1::text)
+`
+
+type CareersTenantRow struct {
+	TenantID   string
+	TenantName string
+}
+
+// The company behind a public careers page address (no tenant scope yet:
+// app_careers_tenant returns only the company's id and name).
+func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenantRow, error) {
+	row := q.db.QueryRow(ctx, careersTenant, slug)
+	var i CareersTenantRow
+	err := row.Scan(&i.TenantID, &i.TenantName)
+	return i, err
+}
+
 const getTenant = `-- name: GetTenant :one
-SELECT id, name FROM tenant WHERE id = $1
+SELECT id, name, careers_slug::text AS careers_slug FROM tenant WHERE id = $1
 `
 
 type GetTenantRow struct {
-	ID   string
-	Name string
+	ID          string
+	Name        string
+	CareersSlug string
 }
 
 func (q *Queries) GetTenant(ctx context.Context, id string) (GetTenantRow, error) {
 	row := q.db.QueryRow(ctx, getTenant, id)
 	var i GetTenantRow
-	err := row.Scan(&i.ID, &i.Name)
+	err := row.Scan(&i.ID, &i.Name, &i.CareersSlug)
 	return i, err
 }
 

@@ -40,6 +40,10 @@ x-error-codes:
     module: candidates
     status: 409
     description: Another candidate already has this email. `details.existingCandidateId` points to them when known.
+  CAREERS_TOO_MANY_APPLICATIONS:
+    module: careers
+    status: 429
+    description: Too many applications from one place in a short time. Try again later.
   COMPANY_DUPLICATE_NAME:
     module: companies
     status: 409
@@ -318,6 +322,88 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/public/careers/{slug}:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+    get:
+      operationId: getCareersPage
+      tags: [careers]
+      summary: A company's careers page with its published ads
+      description: Ads past their closing date are left out.
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CareersPage'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/careers/{slug}/ads/{adId}:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+      - $ref: '#/components/parameters/JobAdIdPath'
+    get:
+      operationId: getCareersAd
+      tags: [careers]
+      summary: One published ad
+      x-permission: public
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicJobAd'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/careers/{slug}/ads/{adId}/applications:
+    parameters:
+      - $ref: '#/components/parameters/CareersSlugPath'
+      - $ref: '#/components/parameters/JobAdIdPath'
+    post:
+      operationId: applyToJobAd
+      tags: [careers]
+      summary: Apply to a published ad with a CV (PDF or Word, up to 10 MB)
+      description: >
+        The applicant becomes a candidate (or, with an email already on file, the existing candidate is used, unchanged), the CV is attached and read, and they join the job's pipeline as applied. The answer is the same whether or not the email was known, so the form reveals nothing. `website` must be left empty: it is a trap for robots.
+
+      x-permission: public
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [firstName, email, consent, file]
+              properties:
+                firstName: {type: string, maxLength: 100}
+                lastName: {type: string, maxLength: 100}
+                email: {type: string, format: email, maxLength: 254}
+                phone: {type: string, maxLength: 30}
+                consent:
+                  type: string
+                  enum: ['yes']
+                  description: The applicant agrees that the company keeps their details to handle the application.
+                website: {type: string, maxLength: 0}
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: Received
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApplicationReceived'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+        '429':
+          description: Too many applications (CAREERS_TOO_MANY_APPLICATIONS).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/companies:
     get:
       operationId: listCompanies
@@ -1128,6 +1214,7 @@ components:
       enum:
         - APPLICATION_EXISTS
         - CANDIDATE_DUPLICATE_EMAIL
+        - CAREERS_TOO_MANY_APPLICATIONS
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
         - CONTACT_DUPLICATE_EMAIL
@@ -1537,6 +1624,37 @@ components:
         skills: {type: array, items: {type: string}}
         industries: {type: array, items: {type: string}}
         specializations: {type: array, items: {type: string}}
+    CareersPage:
+      type: object
+      required: [companyName, ads]
+      properties:
+        companyName: {type: string}
+        ads:
+          type: array
+          items: {$ref: '#/components/schemas/PublicJobAd'}
+    PublicJobAd:
+      type: object
+      description: A published ad as visitors see it (no internal fields).
+      required: [id, title, location, workType, workArrangement, salaryText, description, closesOn, publishedAt]
+      properties:
+        id: {$ref: '#/components/schemas/JobAdId'}
+        title: {type: string}
+        location: {type: string, nullable: true}
+        workType:
+          allOf: [{$ref: '#/components/schemas/WorkType'}]
+          nullable: true
+        workArrangement:
+          allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
+          nullable: true
+        salaryText: {type: string, nullable: true}
+        description: {type: string}
+        closesOn: {type: string, format: date, nullable: true}
+        publishedAt: {type: string, format: date-time}
+    ApplicationReceived:
+      type: object
+      required: [received]
+      properties:
+        received: {type: boolean}
     CompanyId:
       type: string
       pattern: '^comp_[0-9a-hjkmnp-tv-z]{26}$'
@@ -1949,8 +2067,11 @@ components:
         name: {type: string}
     Tenant:
       type: object
-      required: [id, name]
+      required: [id, name, careersSlug]
       properties:
+        careersSlug:
+          type: string
+          description: The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment).
         id: {$ref: '#/components/schemas/TenantId'}
         name: {type: string}
     JobAdId:
@@ -2348,6 +2469,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/CandidateId'}
+    CareersSlugPath:
+      name: slug
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', minLength: 3, maxLength: 60}
     CompanyIdPath:
       name: companyId
       in: path
@@ -2533,6 +2659,8 @@ x-jobs:
 x-modules:
   - name: candidates
     description: Candidate profiles. Salary details are stored and permissioned separately.
+  - name: careers
+    description: 'A company''s public careers page: its published job ads, and applying to one with a CV. Signed-out visitors; the page address picks the company, and everything after runs in that company''s scope.'
   - name: companies
     description: Companies you recruit for or want to win as clients, and their details.
   - name: contacts

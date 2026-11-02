@@ -180,6 +180,17 @@ requirements), de-duplicated, and kept with its source and date.
   ad stays up while its job is on hold; a job that is filled or closed takes
   its published ads down in the same change. The careers page (3.2) shows
   published ads.
+- **Careers page** ✅: every company has a public page (`/#/careers/<address>`,
+  linked from each job's ads panel) listing its published ads that have not
+  passed their closing date, each with its text and an apply form: name,
+  email, phone, CV (PDF or Word) and a consent tick box ("I agree that
+  <company> keeps my details to handle my application"). Applying adds the
+  candidate (source: careers page), or uses the existing candidate with that
+  email without changing their profile; the CV is attached, read and parsed;
+  and they join the job's pipeline at "applied", all in one transaction. The
+  answer is the same whether the email was known, so the form reveals nothing.
+  Robots are kept out by a hidden field people never fill in and a limit per
+  connection (5 applications in 10 minutes, 20 a day).
 - **Pipeline** ✅: a candidate on a job is an *application* moving through
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not

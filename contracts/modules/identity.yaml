@@ -43,7 +43,10 @@ components:
         name: { type: string }
     Tenant:
       type: object
-      required: [id, name]
+      required: [id, name, careersSlug]
       properties:
+        careersSlug:
+          type: string
+          description: The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment).
         id: { $ref: '#/components/schemas/TenantId' }
         name: { type: string }

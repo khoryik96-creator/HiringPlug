@@ -9,6 +9,19 @@ a shared secret (`hp dev-setup`, `hp token`). Production will use single
 sign-on (Google, Microsoft) through an OpenID Connect provider; only the token
 check changes.
 
+**Public endpoints** (`x-permission: public`, under `/v1/public/`) are the only
+exception: the careers page and its apply form, for signed-out candidates. The
+page address (`/v1/public/careers/<address>`) is turned into the company by a
+database function that returns only the company's id and name
+(`app_careers_tenant`); everything after runs in that company's tenant scope
+as the system user, so row-level security still applies. They show published
+ads only (no internal fields), never reveal whether an email is already on file
+(applying answers the same either way, and never changes an existing profile),
+and are limited per client address (5 applications in 10 minutes, 20 a day).
+The client address is the connection's, or, behind the reverse proxy, the one
+the proxy names in `HP_CLIENT_IP_HEADER` (nginx sets `X-Real-IP`; clients cannot
+set it).
+
 ## What they may do
 
 **Roles** hold **permissions**. Each module declares its permissions, and which
