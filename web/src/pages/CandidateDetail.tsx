@@ -82,7 +82,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       {permissions.includes("emails:read") && <CandidateEmails candidateId={c.id} permissions={permissions} />}
-      <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} />
+      <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} permissions={permissions} />
       <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
     </main>
   );

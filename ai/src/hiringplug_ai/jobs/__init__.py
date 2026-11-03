@@ -14,10 +14,10 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from ..contracts import DocumentExtractTextJob, DocumentParseCvJob, JobKind
+from ..contracts import DocumentExtractTextJob, DocumentParseCvJob, DocumentRenderPdfJob, JobKind
 from ..extraction import Limits, OcrEngine
 from ..queue import FollowUp
-from . import extract_text, parse_cv
+from . import extract_text, parse_cv, render_pdf
 
 
 @dataclass(frozen=True)
@@ -39,4 +39,5 @@ class Handler:
 HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_extract_text: Handler(DocumentExtractTextJob, extract_text.run),
     JobKind.document_parse_cv: Handler(DocumentParseCvJob, parse_cv.run),
+    JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
 }

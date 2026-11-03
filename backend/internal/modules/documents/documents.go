@@ -65,10 +65,29 @@ func (m *Module) AddFile(ctx context.Context, tx pgx.Tx, tenantID, candidateID, 
 	return doc.ID, undo, err
 }
 
+// AddFormatted stores a formatted CV made by the app (a .docx) for a
+// candidate, in the caller's transaction; it is read and parsed like any CV,
+// so it can be compared with the original, and turned into a PDF. undo removes the stored file;
+// call it if the transaction rolls back.
+func (m *Module) AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, candidateID, fileName string, data []byte) (documentID string, undo func(), err error) {
+	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, "formatted", fileName,
+		ContentTypeDOCX, data)
+	undo = func() {
+		if key != "" {
+			_ = m.service.files.Delete(key)
+		}
+	}
+	if err == nil {
+		err = m.service.queuePdf(ctx, tx, tenantID, doc, key) // and as a PDF
+	}
+	return doc.ID, undo, err
+}
+
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{
 		api.JobKindDocumentTextExtracted: m.service.saveExtraction,
 		api.JobKindDocumentCvParsed:      m.service.saveParse,
+		api.JobKindDocumentPdfRendered:   m.service.savePdf,
 	}
 }

@@ -663,6 +663,104 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/cv-templates:
+    get:
+      operationId: listCvTemplates
+      tags: [cvformats]
+      summary: The CV templates (the built-in standard one first), and the placeholders templates may use
+      x-permission: cvformats:create
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvTemplateList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: uploadCvTemplate
+      tags: [cvformats]
+      summary: Upload a Word (.docx) CV template with placeholders
+      x-permission: cvformats.templates:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, file]
+              properties:
+                name: {type: string, maxLength: 100}
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+  /v1/cv-templates/{cvTemplateId}:
+    parameters:
+      - $ref: '#/components/parameters/CvTemplateIdPath'
+    delete:
+      operationId: deleteCvTemplate
+      tags: [cvformats]
+      summary: Remove an uploaded template
+      x-permission: cvformats.templates:manage
+      responses:
+        '204': {description: Removed}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/cv-templates/{cvTemplateId}/file:
+    parameters:
+      - $ref: '#/components/parameters/CvTemplateIdPath'
+    get:
+      operationId: downloadCvTemplate
+      tags: [cvformats]
+      summary: "Download a template (.docx): the standard one is the place to start your own"
+      x-permission: cvformats:create
+      responses:
+        '200':
+          description: The template
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/candidates/{candidateId}/formatted-cvs:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    post:
+      operationId: formatCv
+      tags: [cvformats]
+      summary: Make a formatted CV for a candidate (saved with their documents)
+      description: "`includeSalary` needs candidates.compensation:read."
+      x-permission: cvformats:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FormatCvInput'}
+      responses:
+        '201':
+          description: Saved as the candidate's formatted CV
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FormattedCv'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/candidates/{candidateId}/documents:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -743,6 +841,26 @@ paths:
       description: >
         The bytes as uploaded; the document's contentType says what they are. Content-Disposition carries the original file name.
 
+      x-permission: documents:read
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/documents/{documentId}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: getDocumentPdf
+      tags: [documents]
+      summary: Download a formatted CV as PDF
       x-permission: documents:read
       responses:
         '200':
@@ -2241,6 +2359,8 @@ components:
         - contacts:create
         - contacts:read
         - contacts:update
+        - cvformats.templates:manage
+        - cvformats:create
         - documents:create
         - documents:read
         - emails.templates:manage
@@ -2312,6 +2432,8 @@ components:
         - document.cv_parsed
         - document.extract_text
         - document.parse_cv
+        - document.pdf_rendered
+        - document.render_pdf
         - document.text_extracted
         - email.send
         - interview.remind
@@ -2943,6 +3065,52 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/ContactId'}]
           nullable: true
+    CvTemplateId:
+      type: string
+      description: standard = the built-in template.
+      pattern: '^(standard|ctpl_[0-9a-hjkmnp-tv-z]{26})$'
+      example: standard
+    CvTemplate:
+      type: object
+      required: [id, name, builtIn, uploadedByName, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/CvTemplateId'}
+        name: {type: string}
+        builtIn: {type: boolean}
+        uploadedByName: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time, nullable: true}
+    CvTemplateList:
+      type: object
+      required: [items, placeholders, blocks]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CvTemplate'}
+        placeholders:
+          type: array
+          description: "Placeholders a template may use, written {{name}}; one with no value removes its whole paragraph (so a label like Email: goes too)."
+          items: {type: string}
+        blocks:
+          type: array
+          description: "Repeating blocks: paragraphs between {{#experience}} and {{/experience}} (each on its own line) repeat for each job; inside, {{title}}, {{company}}, {{dates}}, {{description}}. Likewise {{#education}} with {{qualification}}, {{institution}}, {{year}}."
+          items: {type: string}
+    FormatCvInput:
+      type: object
+      additionalProperties: false
+      properties:
+        templateId: {$ref: '#/components/schemas/CvTemplateId'}
+        applicationId:
+          description: The job the CV is for (its title and company can appear in the CV).
+          allOf: [{$ref: '#/components/schemas/ApplicationId'}]
+        showContact: {type: boolean, description: "Include the candidate's email and phone (left out unless asked, so the client goes through you)."}
+        includeSalary: {type: boolean, description: "Include current and expected salary (needs candidates.compensation:read)."}
+        summary: {type: string, maxLength: 3000, description: Your summary of the candidate for the client.}
+    FormattedCv:
+      type: object
+      required: [documentId, fileName]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        fileName: {type: string}
     DocumentId:
       type: string
       pattern: '^doc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -2967,8 +3135,12 @@ components:
       enum: [queued, parsed, failed]
     Document:
       type: object
-      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, createdAt, updatedAt]
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, pdfStatus, createdAt, updatedAt]
       properties:
+        pdfStatus:
+          description: "Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents."
+          allOf: [{$ref: '#/components/schemas/PdfStatus'}]
+          nullable: true
         id: {$ref: '#/components/schemas/DocumentId'}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         source: {$ref: '#/components/schemas/DocumentSource'}
@@ -3087,6 +3259,24 @@ components:
     ExtractionStatus:
       type: string
       enum: [extracted, needs_ocr, failed]
+    PdfStatus:
+      type: string
+      enum: [queued, ready, failed]
+    DocumentRenderPdfJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, downloadUrl]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        downloadUrl: {type: string, description: A short-lived link to the .docx.}
+    DocumentPdfRenderedJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, pdfBase64, error]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        pdfBase64: {type: string, nullable: true, maxLength: 28000000, description: The PDF (base64); null when it failed.}
+        error: {type: string, nullable: true, maxLength: 1000}
     DocumentTextExtractedJob:
       type: object
       additionalProperties: false
@@ -4512,6 +4702,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/ContactId'}
+    CvTemplateIdPath:
+      name: cvTemplateId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/CvTemplateId'}
     DocumentIdPath:
       name: documentId
       in: path
@@ -4631,6 +4826,16 @@ x-permissions:
   contacts:update:
     module: contacts
     description: Edit contacts and re-check their email.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  cvformats.templates:manage:
+    module: cvformats
+    description: Upload and remove the company's CV templates.
+    sensitive: false
+    roles: [owner, admin, recruiter]
+  cvformats:create:
+    module: cvformats
+    description: Make formatted CVs.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
   documents:create:
@@ -4819,6 +5024,16 @@ x-jobs:
     queue: ai
     payload: DocumentParseCvJob
     description: Read profile details out of a CV's extracted text (Python AI worker).
+  document.pdf_rendered:
+    module: documents
+    queue: core
+    payload: DocumentPdfRenderedJob
+    description: Save a formatted CV's PDF with it (Go worker).
+  document.render_pdf:
+    module: documents
+    queue: ai
+    payload: DocumentRenderPdfJob
+    description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
   document.text_extracted:
     module: documents
     queue: core
@@ -4853,6 +5068,8 @@ x-modules:
     description: Companies you recruit for or want to win as clients, and their details.
   - name: contacts
     description: People at companies, each with a checked email address.
+  - name: cvformats
+    description: 'Formatted CVs: the candidate''s profile, work history and education filled into a Word template (the built-in standard one, or the company''s own), with contact details hidden unless asked and salary only when asked by someone who may see it. The result is saved as the candidate''s formatted CV (and compared with the original like any formatted CV).'
   - name: documents
     description: 'Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and formatted CVs. Uploading a CV queues text extraction in the Python AI worker.'
   - name: emails

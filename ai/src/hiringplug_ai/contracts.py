@@ -30,6 +30,8 @@ class Permission(StrEnum):
     contacts_create = "contacts:create"
     contacts_read = "contacts:read"
     contacts_update = "contacts:update"
+    cvformats_templates_manage = "cvformats.templates:manage"
+    cvformats_create = "cvformats:create"
     documents_create = "documents:create"
     documents_read = "documents:read"
     emails_templates_manage = "emails.templates:manage"
@@ -101,6 +103,8 @@ class JobKind(StrEnum):
     document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
     document_parse_cv = "document.parse_cv"
+    document_pdf_rendered = "document.pdf_rendered"
+    document_render_pdf = "document.render_pdf"
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
     interview_remind = "interview.remind"
@@ -642,6 +646,41 @@ class ContactPage(BaseModel):
     ]
 
 
+class CvTemplateId(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="standard = the built-in template.",
+            examples=["standard"],
+            pattern="^(standard|ctpl_[0-9a-hjkmnp-tv-z]{26})$",
+        ),
+    ]
+
+
+class CvTemplate(BaseModel):
+    id: CvTemplateId
+    name: str
+    builtIn: bool
+    uploadedByName: Annotated[str | None, Field(...)]
+    createdAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class CvTemplateList(BaseModel):
+    items: list[CvTemplate]
+    placeholders: Annotated[
+        list[str],
+        Field(
+            description="Placeholders a template may use, written {{name}}; one with no value removes its whole paragraph (so a label like Email: goes too)."
+        ),
+    ]
+    blocks: Annotated[
+        list[str],
+        Field(
+            description="Repeating blocks: paragraphs between {{#experience}} and {{/experience}} (each on its own line) repeat for each job; inside, {{title}}, {{company}}, {{dates}}, {{description}}. Likewise {{#education}} with {{qualification}}, {{institution}}, {{year}}."
+        ),
+    ]
+
+
 class DocumentId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["doc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^doc_[0-9a-hjkmnp-tv-z]{26}$")
@@ -737,6 +776,31 @@ class ExtractionStatus(StrEnum):
     extracted = "extracted"
     needs_ocr = "needs_ocr"
     failed = "failed"
+
+
+class PdfStatus(StrEnum):
+    queued = "queued"
+    ready = "ready"
+    failed = "failed"
+
+
+class DocumentRenderPdfJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: DocumentId
+    downloadUrl: Annotated[str, Field(description="A short-lived link to the .docx.")]
+
+
+class DocumentPdfRenderedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: DocumentId
+    pdfBase64: Annotated[
+        str | None, Field(description="The PDF (base64); null when it failed.", max_length=28000000)
+    ]
+    error: Annotated[str | None, Field(max_length=1000)]
 
 
 class Warning(RootModel[str]):
@@ -1966,7 +2030,42 @@ class PublicJobAd(BaseModel):
     publishedAt: AwareDatetime
 
 
+class FormatCvInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    templateId: CvTemplateId | None = None
+    applicationId: Annotated[
+        ApplicationId | None,
+        Field(description="The job the CV is for (its title and company can appear in the CV)."),
+    ] = None
+    showContact: Annotated[
+        bool | None,
+        Field(
+            description="Include the candidate's email and phone (left out unless asked, so the client goes through you)."
+        ),
+    ] = None
+    includeSalary: Annotated[
+        bool | None,
+        Field(description="Include current and expected salary (needs candidates.compensation:read)."),
+    ] = None
+    summary: Annotated[
+        str | None, Field(description="Your summary of the candidate for the client.", max_length=3000)
+    ] = None
+
+
+class FormattedCv(BaseModel):
+    documentId: DocumentId
+    fileName: str
+
+
 class Document(BaseModel):
+    pdfStatus: Annotated[
+        PdfStatus | None,
+        Field(
+            description="Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents."
+        ),
+    ]
     id: DocumentId
     candidateId: CandidateId
     source: DocumentSource

@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from hiringplug_ai.extraction import doc_reader, extract
+from hiringplug_ai import office
+from hiringplug_ai.extraction import extract
 
 DOC = (Path(__file__).parent / "fixtures" / "old-word.doc").read_bytes()
 
@@ -51,7 +52,7 @@ def test_a_hung_libreoffice_is_stopped_with_its_children(
     marker = tmp_path / "child.pid"
     fake.write_text(f"#!/bin/sh\nsleep 300 &\necho $! > {marker}\nwait\n")
     fake.chmod(0o755)
-    monkeypatch.setattr(doc_reader, "LIBREOFFICE_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr(office, "TIMEOUT_SECONDS", 1)
     monkeypatch.setattr(shutil, "which", lambda name: str(fake) if name == "soffice" else None)
     result = extract(DOC, ocr=None)
     assert result.status == "failed"

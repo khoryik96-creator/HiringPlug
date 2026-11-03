@@ -14,7 +14,7 @@ SELECT * FROM document WHERE id = @id;
 -- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
        status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,
-       parse_status, NULL::jsonb AS parsed_profile, parser
+       parse_status, NULL::jsonb AS parsed_profile, parser, pdf_status, pdf_key, pdf_error
 FROM document WHERE candidate_id = @candidate_id
 ORDER BY id DESC;
 
@@ -44,3 +44,11 @@ RETURNING *;
 
 -- name: MoveDocumentsToCandidate :execrows
 UPDATE document SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- name: QueuePdf :exec
+UPDATE document SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = @id;
+
+-- name: SavePdf :one
+UPDATE document SET pdf_status = @pdf_status, pdf_key = sqlc.narg(pdf_key), pdf_error = sqlc.narg(pdf_error)
+WHERE id = @id AND pdf_status = 'queued'
+RETURNING id;

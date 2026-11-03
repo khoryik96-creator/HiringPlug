@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Document, unwrap } from "../api/client";
-import { downloadDocument } from "../api/files";
+import { api, type Candidate, type Document, type Permission, unwrap } from "../api/client";
+import { downloadDocument, downloadFrom } from "../api/files";
 import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
 import { ErrorMessage } from "./ErrorMessage";
+import { FormatCv } from "./FormatCv";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
 
@@ -13,7 +14,8 @@ const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as c
  * A candidate's CVs: upload, reading status (polled while the AI worker reads
  * or parses them), the text, and the details parsed from it for review.
  */
-export function Documents({ candidate, canUpload, canEdit }: { candidate: Candidate; canUpload: boolean; canEdit: boolean }) {
+export function Documents({ candidate, canUpload, canEdit, permissions = [] }: { candidate: Candidate; canUpload: boolean; canEdit: boolean; permissions?: Permission[] }) {
+  const [formatting, setFormatting] = useState(false);
   const candidateId = candidate.id;
   const queryClient = useQueryClient();
   const [source, setSource] = useState<(typeof SOURCES)[number]>("original");
@@ -26,7 +28,7 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
       unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
     // Keep checking while any CV is still being read by the AI worker.
     refetchInterval: (query) =>
-      query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued") ? 2000 : false,
+      query.state.data?.some((d) => d.status === "queued" || d.parseStatus === "queued" || d.pdfStatus === "queued") ? 2000 : false,
   });
 
   const parse = useMutation({
@@ -36,6 +38,10 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
       void queryClient.invalidateQueries({ queryKey: ["document", d.id] });
       return queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
     },
+  });
+
+  const pdf = useMutation({
+    mutationFn: async (d: Document) => { await downloadFrom(`/v1/documents/${d.id}/pdf`, d.fileName.replace(/\.docx$/, "") + ".pdf", "application/pdf"); },
   });
 
   const upload = useMutation({
@@ -73,7 +79,11 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
           />
         </div>
       )}
-      <ErrorMessage error={upload.error ?? parse.error ?? docs.error} />
+      {permissions.includes("cvformats:create") && !formatting && (
+        <button type="button" onClick={() => { setFormatting(true); }}>Make formatted CV</button>
+      )}
+      {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error} />
       {(docs.data?.length ?? 0) >= 2 && <a href={`#/candidates/${candidateId}/compare`}>Compare CVs side by side</a>}
       <ul>
         {docs.data?.map((d: Document) => (
@@ -83,6 +93,9 @@ export function Documents({ candidate, canUpload, canEdit }: { candidate: Candid
             </button>{" "}
             <span className={`badge ${d.status}`}>{d.status}</span> <span className="muted">{d.source}</span>{" "}
             <button type="button" className="link" onClick={() => { void downloadDocument(d); }}>Download</button>
+            {d.pdfStatus === "ready" && <button type="button" className="link" onClick={() => { pdf.mutate(d); }}>PDF</button>}
+            {d.pdfStatus === "queued" && <span className="muted"> making the PDF…</span>}
+            {d.pdfStatus === "failed" && <span className="muted"> no PDF (the Word file is fine)</span>}
             {d.parseStatus === "queued" && <span className="muted"> reading details…</span>}
             {d.parseStatus === "failed" && <span className="muted"> details could not be read</span>}
             {/* Formatted CVs are our own output: parsed for comparing, not for filling the profile. */}

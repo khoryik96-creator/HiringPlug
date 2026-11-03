@@ -123,3 +123,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/leads/internal/store
+  - <<: *module
+    queries: db/queries/cvformats.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/cvformats/internal/store

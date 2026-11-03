@@ -41,6 +41,7 @@ type Document struct {
 	ExtractedText *string  // only loaded for single-document reads
 	ParseStatus   *string  // queued, parsed, failed; nil when never parsed
 	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
+	PdfStatus     *string  // formatted CVs made by the app: queued, ready, failed
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

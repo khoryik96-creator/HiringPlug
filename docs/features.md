@@ -13,7 +13,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 1.5 | Job ads puller | `leads` | ✅ job board feeds, careers pages, saved ads |
 | 2 | Companies | `companies` | ✅ records; auto-fill 🧩 |
 | 3 | Candidate profile fields | `candidates` | ✅ |
-| 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
+| 3 | JobStreet / LinkedIn / original / formatted CVs | `documents`, `cvformats` | ✅ upload, text, formatted CVs in your Word template, PDF |
 | 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
 | 4 | Pipeline dashboard | `pipeline` | ✅ board and dashboard; reports 🧩 |
 | 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline, interviews; 🧩 matching |
@@ -92,12 +92,21 @@ Design:
 
 ![Reviewing details read from a CV (an invented CV)](images/cv-review.png)
 
-**CV formatting (M4).** A formatted CV is generated from the candidate's
-structured profile (from CV parsing, M2) into your branded Word template,
-then saved as a `formatted` document. Templates are Word files with
-placeholders (docxtpl), so each agency edits its own template in Word without
-code changes. Options: hide contact details, hide salary, blind CV. PDFs are
-made with LibreOffice. Design: [ai-worker.md](ai-worker.md#cv-formatting-and-blind-cvs-m4).
+**Formatted CVs ✅.** "Make formatted CV" (candidate page, CVs and documents)
+fills the candidate's profile, work history and education into a Word
+template and saves it as their `formatted` CV (read and compared with the
+original like any formatted CV); a PDF follows a moment later (made by the AI
+worker with LibreOffice). Options: which template, which of their jobs it is
+for (its title and client appear), show email and phone (off by default, so
+the client goes through you), include current and expected salary (only for
+those who may see salary; never written to the audit log), and your summary.
+Templates are ordinary Word files with `{{placeholders}}`: download the
+built-in standard template from the **CV templates** page, restyle it in Word
+(logo, fonts, layout), and upload it; a template using unknown placeholders is
+refused, naming them. Paragraphs between `{{#experience}}` and
+`{{/experience}}` repeat for each job (likewise education), `{{#experience?}}`
+keeps a heading only when there is something under it, and a line whose
+placeholders are all empty is left out. Next: blind CVs (5.2).
 
 ## 3.5 AI interpretation sidebar (DeepSeek)
 

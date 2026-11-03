@@ -39,6 +39,8 @@ tenant ─┬─ app_user (role)
 | `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
 | `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
 | `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
+| `cv_template` | the company's Word CV templates: name, stored file, uploaded by (the built-in standard one is not stored) |
+| `document` (PDF) | for formatted CVs made by the app: PDF status (queued/ready/failed), stored PDF, error |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
@@ -65,7 +67,7 @@ candidate belonging to the same company.
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
 | `pipeline` | stage templates per company | M3 |
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
-| `documents` | formatted CV (template, options), templates per company | M4 |
+| `documents` | blind CVs | 5.2 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |

@@ -16,6 +16,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { EmailTemplates } from "./pages/EmailTemplates";
 import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
+import { CvTemplates } from "./pages/CvTemplates";
 import { Integrations } from "./pages/Integrations";
 import { JobList } from "./pages/JobList";
 import { Leads } from "./pages/Leads";
@@ -110,6 +111,9 @@ function Page({ hash, permissions, me }: { hash: string; permissions: Permission
   if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
   if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
+  if (hash.startsWith("#/cv-templates") && permissions.includes("cvformats:create")) {
+    return <CvTemplates canManage={permissions.includes("cvformats.templates:manage")} />;
+  }
   if (hash.startsWith("#/email-templates") && permissions.includes("emails:send")) {
     return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
   }

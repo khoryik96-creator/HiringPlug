@@ -33,6 +33,14 @@ x-module:
       queue: core
       payload: DocumentCvParsedJob
       description: "Save parsed CV details on the document, keeping only values whose quote is found in the CV (Go worker)."
+    document.render_pdf:
+      queue: ai
+      payload: DocumentRenderPdfJob
+      description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
+    document.pdf_rendered:
+      queue: core
+      payload: DocumentPdfRenderedJob
+      description: Save a formatted CV's PDF with it (Go worker).
 
 paths:
   /v1/candidates/{candidateId}/documents:
@@ -132,6 +140,27 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/documents/{documentId}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: getDocumentPdf
+      tags: [documents]
+      summary: Download a formatted CV as PDF
+      x-permission: documents:read
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/documents/{documentId}:
     parameters:
       - $ref: '#/components/parameters/DocumentIdPath'
@@ -186,8 +215,12 @@ components:
 
     Document:
       type: object
-      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, createdAt, updatedAt]
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, pdfStatus, createdAt, updatedAt]
       properties:
+        pdfStatus:
+          description: "Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents."
+          allOf: [{ $ref: '#/components/schemas/PdfStatus' }]
+          nullable: true
         id: { $ref: '#/components/schemas/DocumentId' }
         candidateId: { $ref: '#/components/schemas/CandidateId' }
         source: { $ref: '#/components/schemas/DocumentSource' }
@@ -309,6 +342,24 @@ components:
     ExtractionStatus:
       type: string
       enum: [extracted, needs_ocr, failed]
+    PdfStatus:
+      type: string
+      enum: [queued, ready, failed]
+    DocumentRenderPdfJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, downloadUrl]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        downloadUrl: { type: string, description: A short-lived link to the .docx. }
+    DocumentPdfRenderedJob:
+      type: object
+      additionalProperties: false
+      required: [documentId, pdfBase64, error]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        pdfBase64: { type: string, nullable: true, maxLength: 28000000, description: The PDF (base64); null when it failed. }
+        error: { type: string, nullable: true, maxLength: 1000 }
     DocumentTextExtractedJob:
       type: object
       additionalProperties: false

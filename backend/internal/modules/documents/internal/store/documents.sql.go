@@ -11,7 +11,7 @@ import (
 )
 
 const getDocument = `-- name: GetDocument :one
-SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser FROM document WHERE id = $1
+SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error FROM document WHERE id = $1
 `
 
 func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) {
@@ -39,6 +39,9 @@ func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) 
 		&i.ParseStatus,
 		&i.ParsedProfile,
 		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
 	)
 	return i, err
 }
@@ -46,7 +49,7 @@ func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) 
 const insertDocument = `-- name: InsertDocument :one
 INSERT INTO document (id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, created_by)
 VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, $7, $8, app_current_user())
-RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error
 `
 
 type InsertDocumentParams struct {
@@ -94,6 +97,9 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 		&i.ParseStatus,
 		&i.ParsedProfile,
 		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
 	)
 	return i, err
 }
@@ -101,7 +107,7 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 const listDocumentsForCandidate = `-- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
        status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,
-       parse_status, NULL::jsonb AS parsed_profile, parser
+       parse_status, NULL::jsonb AS parsed_profile, parser, pdf_status, pdf_key, pdf_error
 FROM document WHERE candidate_id = $1
 ORDER BY id DESC
 `
@@ -128,6 +134,9 @@ type ListDocumentsForCandidateRow struct {
 	ParseStatus        *string
 	ParsedProfile      []byte
 	Parser             *string
+	PdfStatus          *string
+	PdfKey             *string
+	PdfError           *string
 }
 
 func (q *Queries) ListDocumentsForCandidate(ctx context.Context, candidateID string) ([]ListDocumentsForCandidateRow, error) {
@@ -161,6 +170,9 @@ func (q *Queries) ListDocumentsForCandidate(ctx context.Context, candidateID str
 			&i.ParseStatus,
 			&i.ParsedProfile,
 			&i.Parser,
+			&i.PdfStatus,
+			&i.PdfKey,
+			&i.PdfError,
 		); err != nil {
 			return nil, err
 		}
@@ -203,7 +215,7 @@ func (q *Queries) NewDocumentID(ctx context.Context) (string, error) {
 }
 
 const queueParse = `-- name: QueueParse :one
-UPDATE document SET parse_status = 'queued', updated_at = now() WHERE id = $1 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+UPDATE document SET parse_status = 'queued', updated_at = now() WHERE id = $1 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error
 `
 
 func (q *Queries) QueueParse(ctx context.Context, id string) (Document, error) {
@@ -231,8 +243,20 @@ func (q *Queries) QueueParse(ctx context.Context, id string) (Document, error) {
 		&i.ParseStatus,
 		&i.ParsedProfile,
 		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
 	)
 	return i, err
+}
+
+const queuePdf = `-- name: QueuePdf :exec
+UPDATE document SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = $1
+`
+
+func (q *Queries) QueuePdf(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, queuePdf, id)
+	return err
 }
 
 const saveExtraction = `-- name: SaveExtraction :one
@@ -245,7 +269,7 @@ UPDATE document SET
   extraction_warnings = $6,
   updated_at = now()
 WHERE id = $7
-RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error
 `
 
 type SaveExtractionParams struct {
@@ -291,6 +315,9 @@ func (q *Queries) SaveExtraction(ctx context.Context, arg SaveExtractionParams) 
 		&i.ParseStatus,
 		&i.ParsedProfile,
 		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
 	)
 	return i, err
 }
@@ -302,7 +329,7 @@ UPDATE document SET
   parser = $3,
   updated_at = now()
 WHERE id = $4
-RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser
+RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error
 `
 
 type SaveParseParams struct {
@@ -342,6 +369,34 @@ func (q *Queries) SaveParse(ctx context.Context, arg SaveParseParams) (Document,
 		&i.ParseStatus,
 		&i.ParsedProfile,
 		&i.Parser,
+		&i.PdfStatus,
+		&i.PdfKey,
+		&i.PdfError,
 	)
 	return i, err
+}
+
+const savePdf = `-- name: SavePdf :one
+UPDATE document SET pdf_status = $1, pdf_key = $2, pdf_error = $3
+WHERE id = $4 AND pdf_status = 'queued'
+RETURNING id
+`
+
+type SavePdfParams struct {
+	PdfStatus *string
+	PdfKey    *string
+	PdfError  *string
+	ID        string
+}
+
+func (q *Queries) SavePdf(ctx context.Context, arg SavePdfParams) (string, error) {
+	row := q.db.QueryRow(ctx, savePdf,
+		arg.PdfStatus,
+		arg.PdfKey,
+		arg.PdfError,
+		arg.ID,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }

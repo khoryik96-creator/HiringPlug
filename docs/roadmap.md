@@ -78,11 +78,11 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ 4.2 **Email** | Send email from a candidate's page or an interview with templates (interview invitation, submit to client, application received, unsuccessful) filled from the candidate, job, interview and sender; sent in the background through the company's mail server, with replies to the sender; every email listed on the candidate's page with its state. Needs your mail server's SMTP settings for real sending. |
 | 🔜 4.3 **Reminders, calendar and inbox sync** | ✅ Interviewers emailed a reminder the day before (moved interviews at their new time, cancelled ones not at all). Waiting on you: Google / Microsoft calendar sync for interviews; replies coming back into the app |
 
-### Phase 5: AI and formatted CVs ⬜
+### Phase 5: AI and formatted CVs 🔜
 
 | Step | Delivers |
 |---|---|
-| 5.1 **Formatted CVs** | Your branded Word template filled from the profile; options to hide contact details or salary; PDF export |
+| ✅ 5.1 **Formatted CVs** | The profile filled into a Word template (built-in standard, or your own uploaded one with placeholders); contact details hidden unless asked, salary only when asked by those who may see it, a summary, for a particular job; saved as the formatted CV, with a PDF |
 | 5.2 **Blind CVs** | Names, photos and identifying details removed, with an automatic check that nothing leaked |
 | 5.3 **AI sidebar (DeepSeek)** | On candidate and job pages: summary, gaps and red flags, "how well does this candidate fit this job?", free questions; it only sees what the user may see |
 | 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
@@ -118,7 +118,9 @@ sign-in (1.7).
 - **Your stages.** The pipeline stages you use today and the rejection reasons
   (step 1.4).
 - **Your existing data**, if any, as Excel/CSV exports (step 2.3).
-- **Your branded CV template** in Word (step 5.1).
+- **Your branded CV template** in Word (step 5.1): download the standard one
+  from the CV templates page, restyle it, and upload it (the built-in one works
+  meanwhile).
 - **The AI provider and hosting region** for DeepSeek (step 5.3).
 - **Calendar sync** (step 4.3): a Google Cloud OAuth app and/or a Microsoft
   Entra app registration (client ID and secret), and the address people reach

@@ -19,6 +19,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
@@ -53,6 +54,7 @@ type Modules struct {
 	Offers       *offers.Module
 	Integrations *integrations.Module
 	Leads        *leads.Module
+	Cvformats    *cvformats.Module
 	// scaffold:fields
 }
 
@@ -89,6 +91,10 @@ func NewModules(d Deps) *Modules {
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
 	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks)
 	m.Leads = leads.New(d.Pool, m.Companies, d.Config.AllowPrivateNetworks)
+	m.Cvformats = cvformats.New(d.Pool, cvformats.Deps{
+		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
+		Tenants: m.Identity, Users: m.Identity,
+	}, d.Files, d.Config.MaxUploadBytes)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -114,6 +120,7 @@ type (
 	offersHTTP       = offers.HTTP
 	integrationsHTTP = integrations.HTTP
 	leadsHTTP        = leads.HTTP
+	cvformatsHTTP    = cvformats.HTTP
 	// scaffold:aliases
 )
 
@@ -137,6 +144,7 @@ type Server struct {
 	*offersHTTP
 	*integrationsHTTP
 	*leadsHTTP
+	*cvformatsHTTP
 	// scaffold:embeds
 }
 
@@ -161,6 +169,7 @@ func (m *Modules) Server() *Server {
 		offersHTTP:       m.Offers.HTTP,
 		integrationsHTTP: m.Integrations.HTTP,
 		leadsHTTP:        m.Leads.HTTP,
+		cvformatsHTTP:    m.Cvformats.HTTP,
 		// scaffold:server-fields
 	}
 }

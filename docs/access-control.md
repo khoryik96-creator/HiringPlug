@@ -93,6 +93,8 @@ details get their own permissions.
 | `integrations:manage` (API keys and webhooks; never with an API key) | ✓ | ✓ | | | | |
 | `leads:read`, `leads:manage` (hiring leads and their sources) | ✓ | ✓ | ✓ | ✓ | | |
 | `identity.team:manage` (invite, change roles, deactivate) | ✓ | ✓ | | | | |
+| `cvformats:create` (formatted CVs) | ✓ | ✓ | ✓ | ✓ | | |
+| `cvformats.templates:manage` (upload and remove CV templates) | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
 

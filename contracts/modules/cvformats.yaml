@@ -1,0 +1,179 @@
+# Module contract: cvformats (formatted CVs: the candidate's profile in the
+# company's Word template).
+# See contracts/README.md for the format.
+x-module:
+  name: cvformats
+  description: >
+    Formatted CVs: the candidate's profile, work history and education filled
+    into a Word template (the built-in standard one, or the company's own),
+    with contact details hidden unless asked and salary only when asked by
+    someone who may see it. The result is saved as the candidate's formatted
+    CV (and compared with the original like any formatted CV).
+  permissions:
+    cvformats:create:
+      description: Make formatted CVs.
+      roles: [owner, admin, recruiter, sourcer]
+    cvformats.templates:manage:
+      description: Upload and remove the company's CV templates.
+      roles: [owner, admin, recruiter]
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/cv-templates:
+    get:
+      operationId: listCvTemplates
+      tags: [cvformats]
+      summary: The CV templates (the built-in standard one first), and the placeholders templates may use
+      x-permission: cvformats:create
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CvTemplateList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: uploadCvTemplate
+      tags: [cvformats]
+      summary: Upload a Word (.docx) CV template with placeholders
+      x-permission: cvformats.templates:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, file]
+              properties:
+                name: { type: string, maxLength: 100 }
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CvTemplate' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /v1/cv-templates/{cvTemplateId}:
+    parameters:
+      - $ref: '#/components/parameters/CvTemplateIdPath'
+    delete:
+      operationId: deleteCvTemplate
+      tags: [cvformats]
+      summary: Remove an uploaded template
+      x-permission: cvformats.templates:manage
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/cv-templates/{cvTemplateId}/file:
+    parameters:
+      - $ref: '#/components/parameters/CvTemplateIdPath'
+    get:
+      operationId: downloadCvTemplate
+      tags: [cvformats]
+      summary: "Download a template (.docx): the standard one is the place to start your own"
+      x-permission: cvformats:create
+      responses:
+        '200':
+          description: The template
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/candidates/{candidateId}/formatted-cvs:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    post:
+      operationId: formatCv
+      tags: [cvformats]
+      summary: Make a formatted CV for a candidate (saved with their documents)
+      description: "`includeSalary` needs candidates.compensation:read."
+      x-permission: cvformats:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FormatCvInput' }
+      responses:
+        '201':
+          description: Saved as the candidate's formatted CV
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormattedCv' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    CvTemplateIdPath:
+      name: cvTemplateId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/CvTemplateId' }
+
+  schemas:
+    CvTemplateId:
+      type: string
+      description: standard = the built-in template.
+      pattern: '^(standard|ctpl_[0-9a-hjkmnp-tv-z]{26})$'
+      example: standard
+    CvTemplate:
+      type: object
+      required: [id, name, builtIn, uploadedByName, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/CvTemplateId' }
+        name: { type: string }
+        builtIn: { type: boolean }
+        uploadedByName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time, nullable: true }
+    CvTemplateList:
+      type: object
+      required: [items, placeholders, blocks]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CvTemplate' }
+        placeholders:
+          type: array
+          description: "Placeholders a template may use, written {{name}}; one with no value removes its whole paragraph (so a label like Email: goes too)."
+          items: { type: string }
+        blocks:
+          type: array
+          description: "Repeating blocks: paragraphs between {{#experience}} and {{/experience}} (each on its own line) repeat for each job; inside, {{title}}, {{company}}, {{dates}}, {{description}}. Likewise {{#education}} with {{qualification}}, {{institution}}, {{year}}."
+          items: { type: string }
+    FormatCvInput:
+      type: object
+      additionalProperties: false
+      properties:
+        templateId: { $ref: '#/components/schemas/CvTemplateId' }
+        applicationId:
+          description: The job the CV is for (its title and company can appear in the CV).
+          allOf: [{ $ref: '#/components/schemas/ApplicationId' }]
+        showContact: { type: boolean, description: "Include the candidate's email and phone (left out unless asked, so the client goes through you)." }
+        includeSalary: { type: boolean, description: "Include current and expected salary (needs candidates.compensation:read)." }
+        summary: { type: string, maxLength: 3000, description: Your summary of the candidate for the client. }
+    FormattedCv:
+      type: object
+      required: [documentId, fileName]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        fileName: { type: string }

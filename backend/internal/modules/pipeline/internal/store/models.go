@@ -184,6 +184,15 @@ type Contact struct {
 	UpdatedAt         time.Time
 }
 
+type CvTemplate struct {
+	ID         string
+	TenantID   string
+	Name       string
+	StorageKey string
+	UploadedBy string
+	CreatedAt  time.Time
+}
+
 type Document struct {
 	ID                 string
 	TenantID           string
@@ -206,6 +215,9 @@ type Document struct {
 	ParseStatus        *string
 	ParsedProfile      []byte
 	Parser             *string
+	PdfStatus          *string
+	PdfKey             *string
+	PdfError           *string
 }
 
 type Email struct {

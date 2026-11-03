@@ -119,6 +119,10 @@ func documentToAPI(d Document, withText bool) api.Document {
 	} else {
 		out.ParseStatus = nullable.NewNullNullable[api.DocumentParseStatus]()
 	}
+	out.PdfStatus = nullable.NewNullNullable[api.PdfStatus]()
+	if d.PdfStatus != nil {
+		out.PdfStatus = nullable.NewNullableWithValue(api.PdfStatus(*d.PdfStatus))
+	}
 	if withText {
 		out.ExtractedText = orNull(d.ExtractedText)
 		out.ParsedProfile = nullable.NewNullNullable[api.ParsedProfile]()

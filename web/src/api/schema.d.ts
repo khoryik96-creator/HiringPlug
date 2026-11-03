@@ -347,6 +347,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cv-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The CV templates (the built-in standard one first), and the placeholders templates may use */
+        get: operations["listCvTemplates"];
+        put?: never;
+        /** Upload a Word (.docx) CV template with placeholders */
+        post: operations["uploadCvTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cv-templates/{cvTemplateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvTemplateId: components["parameters"]["CvTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an uploaded template */
+        delete: operations["deleteCvTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cv-templates/{cvTemplateId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvTemplateId: components["parameters"]["CvTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Download a template (.docx): the standard one is the place to start your own */
+        get: operations["downloadCvTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/formatted-cvs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a formatted CV for a candidate (saved with their documents)
+         * @description `includeSalary` needs candidates.compensation:read.
+         */
+        post: operations["formatCv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/documents": {
         parameters: {
             query?: never;
@@ -406,6 +484,25 @@ export interface paths {
          * @description The bytes as uploaded; the document's contentType says what they are. Content-Disposition carries the original file name.
          */
         get: operations["getDocumentFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{documentId}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Download a formatted CV as PDF */
+        get: operations["getDocumentPdf"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1421,11 +1518,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1840,6 +1937,41 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["ContactId"] | null;
         };
+        /**
+         * @description standard = the built-in template.
+         * @example standard
+         */
+        CvTemplateId: string;
+        CvTemplate: {
+            id: components["schemas"]["CvTemplateId"];
+            name: string;
+            builtIn: boolean;
+            uploadedByName: string | null;
+            /** Format: date-time */
+            createdAt: string | null;
+        };
+        CvTemplateList: {
+            items: components["schemas"]["CvTemplate"][];
+            /** @description Placeholders a template may use, written {{name}}; one with no value removes its whole paragraph (so a label like Email: goes too). */
+            placeholders: string[];
+            /** @description Repeating blocks: paragraphs between {{#experience}} and {{/experience}} (each on its own line) repeat for each job; inside, {{title}}, {{company}}, {{dates}}, {{description}}. Likewise {{#education}} with {{qualification}}, {{institution}}, {{year}}. */
+            blocks: string[];
+        };
+        FormatCvInput: {
+            templateId?: components["schemas"]["CvTemplateId"];
+            /** @description The job the CV is for (its title and company can appear in the CV). */
+            applicationId?: components["schemas"]["ApplicationId"];
+            /** @description Include the candidate's email and phone (left out unless asked, so the client goes through you). */
+            showContact?: boolean;
+            /** @description Include current and expected salary (needs candidates.compensation:read). */
+            includeSalary?: boolean;
+            /** @description Your summary of the candidate for the client. */
+            summary?: string;
+        };
+        FormattedCv: {
+            documentId: components["schemas"]["DocumentId"];
+            fileName: string;
+        };
         /** @example doc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         DocumentId: string;
         /**
@@ -1858,6 +1990,8 @@ export interface components {
          */
         DocumentParseStatus: "queued" | "parsed" | "failed";
         Document: {
+            /** @description Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents. */
+            pdfStatus: components["schemas"]["PdfStatus"] | null;
             id: components["schemas"]["DocumentId"];
             candidateId: components["schemas"]["CandidateId"];
             source: components["schemas"]["DocumentSource"];
@@ -1936,6 +2070,19 @@ export interface components {
         };
         /** @enum {string} */
         ExtractionStatus: "extracted" | "needs_ocr" | "failed";
+        /** @enum {string} */
+        PdfStatus: "queued" | "ready" | "failed";
+        DocumentRenderPdfJob: {
+            documentId: components["schemas"]["DocumentId"];
+            /** @description A short-lived link to the .docx. */
+            downloadUrl: string;
+        };
+        DocumentPdfRenderedJob: {
+            documentId: components["schemas"]["DocumentId"];
+            /** @description The PDF (base64); null when it failed. */
+            pdfBase64: string | null;
+            error: string | null;
+        };
         DocumentTextExtractedJob: {
             documentId: components["schemas"]["DocumentId"];
             status: components["schemas"]["ExtractionStatus"];
@@ -3137,6 +3284,7 @@ export interface components {
         CareersSlugPath: string;
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
+        CvTemplateIdPath: components["schemas"]["CvTemplateId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
         EmailTemplateIdPath: components["schemas"]["EmailTemplateId"];
         ApiKeyIdPath: components["schemas"]["ApiKeyId"];
@@ -3793,6 +3941,141 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listCvTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    uploadCvTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    name: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+        };
+    };
+    deleteCvTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvTemplateId: components["parameters"]["CvTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadCvTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvTemplateId: components["parameters"]["CvTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The template */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    formatCv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormatCvInput"];
+            };
+        };
+        responses: {
+            /** @description Saved as the candidate's formatted CV */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormattedCv"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listCandidateDocuments: {
         parameters: {
             query?: never;
@@ -3881,6 +4164,32 @@ export interface operations {
         };
     };
     getDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDocumentPdf: {
         parameters: {
             query?: never;
             header?: never;
