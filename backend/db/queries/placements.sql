@@ -45,3 +45,12 @@ ON CONFLICT (placement_id) DO UPDATE SET
 
 -- name: DeletePlacementMoney :exec
 DELETE FROM placement_money WHERE placement_id = @placement_id;
+
+-- Placements starting in a period, with their fee when the user may see it
+-- (row-level security leaves the money out otherwise) (reports).
+-- name: PlacementFacts :many
+SELECT p.id, p.recruiter_id, p.status, p.start_date, m.fee_amount, m.fee_currency
+FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.start_date >= @from_day AND p.start_date <= @to_day
+ORDER BY p.start_date
+LIMIT 20000;

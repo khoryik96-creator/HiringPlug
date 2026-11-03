@@ -14,6 +14,8 @@
 package jobs
 
 import (
+	"time"
+
 	"context"
 
 	"github.com/jackc/pgx/v5"
@@ -60,6 +62,7 @@ type Brief struct {
 	Title     string
 	CompanyID string
 	ContactID *string // the hiring contact
+	CreatedAt time.Time
 }
 
 // Briefs returns title and company of the given jobs (missing ones are left

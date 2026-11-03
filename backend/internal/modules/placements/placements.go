@@ -19,11 +19,14 @@ package placements
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 // Application is what this module needs to know about an application.
@@ -56,4 +59,30 @@ type Module struct {
 func New(pool *pgxpool.Pool, applications Applications, users Users) *Module {
 	svc := &Service{pool: pool, applications: applications, users: users}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// Fact is a placement as reports count it. FeeAmount is nil when none is
+// recorded or the user may not see fees (the database leaves them out).
+type Fact struct {
+	RecruiterID            *string
+	Status                 string
+	FeeAmount, FeeCurrency *string
+}
+
+// Facts returns the placements starting between two days (inclusive), in the
+// caller's transaction.
+func (m *Module) Facts(ctx context.Context, tx pgx.Tx, fromDay, toDay time.Time) ([]Fact, error) {
+	rows, err := store.New(tx).PlacementFacts(ctx, store.PlacementFactsParams{FromDay: fromDay, ToDay: toDay})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Fact, len(rows))
+	for i, r := range rows {
+		fee, err := database.DecimalString(r.FeeAmount)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = Fact{RecruiterID: r.RecruiterID, Status: r.Status, FeeAmount: fee, FeeCurrency: r.FeeCurrency}
+	}
+	return out, nil
 }

@@ -37,6 +37,15 @@ type Application struct {
 	Channel *string
 }
 
+type ApplicationStageChange struct {
+	ID            string
+	TenantID      string
+	ApplicationID string
+	FromStage     *string
+	ToStage       string
+	ChangedAt     time.Time
+}
+
 type AuditLog struct {
 	ID         string
 	TenantID   string

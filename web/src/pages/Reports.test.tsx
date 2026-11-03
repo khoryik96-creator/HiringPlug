@@ -1,0 +1,56 @@
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { api, type Schemas } from "../api/client";
+import { sourceLabel } from "../labels";
+import { ok, renderWithClient } from "../test-utils";
+import { Reports } from "./Reports";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const report = (over: Partial<Schemas["Report"]> = {}): Schemas["Report"] => ({
+  from: "2026-08-06", to: "2026-11-03", feesHidden: false,
+  funnel: [
+    { stage: "applied", reached: 4, percentOfPrevious: null }, { stage: "screening", reached: 3, percentOfPrevious: 75 },
+    { stage: "submitted", reached: 3, percentOfPrevious: 100 }, { stage: "interview", reached: 3, percentOfPrevious: 100 },
+    { stage: "offer", reached: 2, percentOfPrevious: 67 }, { stage: "placed", reached: 2, percentOfPrevious: 100 },
+  ],
+  sources: [{ source: "jobstreet", applications: 4, interviewed: 2, placed: 1 }, { source: "unknown", applications: 1, interviewed: 0, placed: 0 }],
+  recruiters: [{ recruiterId: "usr_1", recruiterName: "Aina", placements: 2, fellThrough: 1, fees: [{ currency: "MYR", amount: "35400.00" }] }],
+  timeToFill: { medianDaysToFill: 30, medianDaysToPlace: 21, jobs: [{ jobId: "jo_1", jobTitle: "Accountant", daysToFill: 30, placements: 2 }] },
+  ...over,
+});
+
+describe("reports", () => {
+  it("shows conversion, sources, recruiters' fees and time to fill", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(report()));
+    renderWithClient(<Reports />);
+    const funnel = await screen.findByRole("region", { name: "Pipeline conversion" });
+    expect(within(funnel).getByText("67%")).toBeTruthy();
+    const sources = screen.getByRole("region", { name: "Sources" });
+    expect(within(sources).getByText("JobStreet")).toBeTruthy();
+    expect(within(sources).getByText("Not recorded")).toBeTruthy();
+    expect(within(sources).getByText("25%")).toBeTruthy(); // 1 placed of 4
+    expect(screen.getByText("MYR 35,400.00")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Accountant" }).getAttribute("href")).toBe("#/jobs/jo_1");
+  });
+
+  it("asks for the chosen period, and says when fees are hidden", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok(report({ feesHidden: true, recruiters: [] })));
+    renderWithClient(<Reports />);
+    expect(await screen.findByText(/Fees are not shown to your role/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    await waitFor(() => {
+      expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: "2026-01-01", to: undefined } } });
+    });
+  });
+
+  it("names sources from either list", () => {
+    expect(sourceLabel("careers_page")).toBe("Careers page");
+    expect(sourceLabel("direct")).toBe("Direct");
+    expect(sourceLabel("something_new")).toBe("something_new");
+  });
+});

@@ -29,6 +29,7 @@ tenant ─┬─ app_user (role)
 | `interview_feedback` | interview, interviewer, recommendation (strong yes/yes/no/strong no), comments, when; one per interviewer |
 | `email_template` | name (unique per company, any case), subject, body with placeholders (`{{candidate.firstName}}`, ...; never salary), `version`; four starters added the first time a company opens its templates |
 | `email` | candidate (moves with a merge; deleted with them), application id (kept as written), to, cc, subject (no line breaks), body, sender (user id, name and reply-to address), status (queued/sent/failed), error, sent at |
+| `application_stage_change` | application, from stage, to stage, when; written by a database trigger on every stage change (history before it rebuilt from the audit log) |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
@@ -53,7 +54,7 @@ candidate belonging to the same company.
 | `identity` | custom roles, team, data scope, invites | M2 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
-| `pipeline` | application (candidate × job, stage, status, rejection reason, `version`), stage templates, stage history | M3 |
+| `pipeline` | stage templates per company | M3 |
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
 | `documents` | formatted CV (template, options), templates per company | M4 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |

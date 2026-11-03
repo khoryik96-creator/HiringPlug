@@ -6,6 +6,7 @@ package pipeline
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -102,4 +103,41 @@ func (m *Module) Place(ctx context.Context, tx pgx.Tx, id string) error {
 		Action: "application.moved", EntityType: "application", EntityID: id,
 		Changes: map[string]any{"stage": map[string]string{"from": row.Stage, "to": Placed}, "via": "placement recorded"},
 	})
+}
+
+// Fact is an application as reports count it: every stage it has been at, in
+// order, and where it came from.
+type Fact struct {
+	ID, JobID, CandidateID string
+	Channel                *string
+	CreatedAt              time.Time
+	Stages                 []string
+}
+
+// Facts returns the applications created in [from, to), in the caller's
+// transaction.
+func (m *Module) Facts(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]Fact, error) {
+	rows, err := store.New(tx).ApplicationFacts(ctx, store.ApplicationFactsParams{FromTime: from, ToTime: to})
+	out := make([]Fact, len(rows))
+	for i, r := range rows {
+		out[i] = Fact{ID: r.ID, JobID: r.JobOrderID, CandidateID: r.CandidateID, Channel: r.Channel, CreatedAt: r.CreatedAt, Stages: r.Stages}
+	}
+	return out, err
+}
+
+// PlacedFact is an application's first move to placed.
+type PlacedFact struct {
+	ID, JobID           string
+	CreatedAt, PlacedAt time.Time
+}
+
+// FirstPlaced returns the applications first placed in [from, to), in the
+// caller's transaction.
+func (m *Module) FirstPlaced(ctx context.Context, tx pgx.Tx, from, to time.Time) ([]PlacedFact, error) {
+	rows, err := store.New(tx).FirstPlacedBetween(ctx, store.FirstPlacedBetweenParams{FromTime: from, ToTime: to})
+	out := make([]PlacedFact, len(rows))
+	for i, r := range rows {
+		out[i] = PlacedFact{ID: r.ID, JobID: r.JobOrderID, CreatedAt: r.CreatedAt, PlacedAt: r.PlacedAt}
+	}
+	return out, err
 }

@@ -957,6 +957,23 @@ export interface paths {
         patch: operations["updatePlacement"];
         trace?: never;
     };
+    "/v1/reports/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The reports for a period (the last 90 days unless given) */
+        get: operations["getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -964,7 +981,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -2108,6 +2125,65 @@ export interface components {
             paidOn?: string | null;
             /** @description The whole of the salary and fee (null clears them). */
             money?: components["schemas"]["PlacementMoneyInput"] | null;
+        };
+        Report: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @description Applications made in the period, by the furthest stage they reached (a rejected candidate who was interviewed counts as reaching interview), in pipeline order. */
+            funnel: components["schemas"]["FunnelStage"][];
+            /** @description Applications made in the period by where they came from (the application's channel, else the candidate's source), most first. */
+            sources: components["schemas"]["SourceRow"][];
+            /** @description Placements starting in the period per recruiter credited, most first. */
+            recruiters: components["schemas"]["RecruiterRow"][];
+            timeToFill: components["schemas"]["TimeToFill"];
+            /** @description Fees are left out (placements.fees:read is needed). */
+            feesHidden: boolean;
+        };
+        FunnelStage: {
+            stage: components["schemas"]["Stage"];
+            reached: number;
+            /** @description Of those who reached the stage before, how many reached this one (rounded); null for the first stage or when none reached the one before. */
+            percentOfPrevious: number | null;
+        };
+        SourceRow: {
+            /** @description e.g. jobstreet, linkedin, careers_page, referral; unknown when not recorded. */
+            source: string;
+            applications: number;
+            /** @description Reached the interview stage. */
+            interviewed: number;
+            placed: number;
+        };
+        RecruiterRow: {
+            recruiterId: components["schemas"]["UserId"] | null;
+            /** @description null when no recruiter is credited. */
+            recruiterName: string | null;
+            /** @description Placements that stand (not fallen through or cancelled). */
+            placements: number;
+            fellThrough: number;
+            /** @description Fees of the placements that stand, per currency (empty when fees are hidden). */
+            fees: components["schemas"]["MoneyTotal"][];
+        };
+        MoneyTotal: {
+            currency: components["schemas"]["CurrencyCode"];
+            amount: components["schemas"]["DecimalAmount"];
+        };
+        /** @description For candidates first placed in the period. */
+        TimeToFill: {
+            /** @description From a job being opened to its first placement. */
+            medianDaysToFill: number | null;
+            /** @description From a candidate being added to the job to being placed. */
+            medianDaysToPlace: number | null;
+            /** @description Jobs with a placement in the period, slowest first. */
+            jobs: components["schemas"]["JobFill"][];
+        };
+        JobFill: {
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            /** @description From the job being opened to its first placement in the period. */
+            daysToFill: number;
+            placements: number;
         };
     };
     responses: {
@@ -3995,6 +4071,34 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["PlacementNotAllowed"];
+        };
+    };
+    getReport: {
+        parameters: {
+            query?: {
+                /** @description First day of the period. */
+                from?: string;
+                /** @description Last day of the period (today unless given). */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
 }

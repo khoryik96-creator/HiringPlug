@@ -1,0 +1,118 @@
+# Module contract: reports (figures across the pipeline and placements).
+# See contracts/README.md for the format.
+x-module:
+  name: reports
+  description: >
+    How the business is doing over a period: how far candidates get (pipeline
+    conversion), which sources bring candidates who get hired, placements and
+    fees per recruiter, and how long jobs take to fill. Reports keep no data
+    of their own: they read other modules' records.
+  permissions:
+    reports:read:
+      description: See the reports (fees in them need placements.fees:read).
+      roles: [owner, admin, recruiter]
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/reports/summary:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: The reports for a period (the last 90 days unless given)
+      x-permission: reports:read
+      parameters:
+        - { name: from, in: query, required: false, description: First day of the period., schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, description: Last day of the period (today unless given)., schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  schemas:
+    Report:
+      type: object
+      required: [from, to, funnel, sources, recruiters, timeToFill, feesHidden]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        funnel:
+          type: array
+          description: >
+            Applications made in the period, by the furthest stage they reached
+            (a rejected candidate who was interviewed counts as reaching
+            interview), in pipeline order.
+          items: { $ref: '#/components/schemas/FunnelStage' }
+        sources:
+          type: array
+          description: "Applications made in the period by where they came from (the application's channel, else the candidate's source), most first."
+          items: { $ref: '#/components/schemas/SourceRow' }
+        recruiters:
+          type: array
+          description: Placements starting in the period per recruiter credited, most first.
+          items: { $ref: '#/components/schemas/RecruiterRow' }
+        timeToFill: { $ref: '#/components/schemas/TimeToFill' }
+        feesHidden: { type: boolean, description: "Fees are left out (placements.fees:read is needed)." }
+    FunnelStage:
+      type: object
+      required: [stage, reached, percentOfPrevious]
+      properties:
+        stage: { $ref: '#/components/schemas/Stage' }
+        reached: { type: integer }
+        percentOfPrevious:
+          type: integer
+          nullable: true
+          description: Of those who reached the stage before, how many reached this one (rounded); null for the first stage or when none reached the one before.
+    SourceRow:
+      type: object
+      required: [source, applications, interviewed, placed]
+      properties:
+        source: { type: string, description: "e.g. jobstreet, linkedin, careers_page, referral; unknown when not recorded." }
+        applications: { type: integer }
+        interviewed: { type: integer, description: Reached the interview stage. }
+        placed: { type: integer }
+    RecruiterRow:
+      type: object
+      required: [recruiterId, recruiterName, placements, fellThrough, fees]
+      properties:
+        recruiterId:
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+          nullable: true
+        recruiterName: { type: string, nullable: true, description: null when no recruiter is credited. }
+        placements: { type: integer, description: Placements that stand (not fallen through or cancelled). }
+        fellThrough: { type: integer }
+        fees:
+          type: array
+          description: Fees of the placements that stand, per currency (empty when fees are hidden).
+          items: { $ref: '#/components/schemas/MoneyTotal' }
+    MoneyTotal:
+      type: object
+      required: [currency, amount]
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        amount: { $ref: '#/components/schemas/DecimalAmount' }
+    TimeToFill:
+      type: object
+      required: [medianDaysToFill, medianDaysToPlace, jobs]
+      description: For candidates first placed in the period.
+      properties:
+        medianDaysToFill: { type: integer, nullable: true, description: From a job being opened to its first placement. }
+        medianDaysToPlace: { type: integer, nullable: true, description: From a candidate being added to the job to being placed. }
+        jobs:
+          type: array
+          description: Jobs with a placement in the period, slowest first.
+          items: { $ref: '#/components/schemas/JobFill' }
+    JobFill:
+      type: object
+      required: [jobId, jobTitle, daysToFill, placements]
+      properties:
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        jobTitle: { type: string }
+        daysToFill: { type: integer, description: From the job being opened to its first placement in the period. }
+        placements: { type: integer }

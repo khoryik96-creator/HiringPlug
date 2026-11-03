@@ -97,7 +97,7 @@ WHERE candidate_id = @candidate_id AND version = @expected_version
 RETURNING *;
 
 -- name: CandidateBriefs :many
-SELECT id, first_name, last_name, current_title, email FROM candidate WHERE id = ANY(@ids::text[]);
+SELECT id, first_name, last_name, current_title, email, source FROM candidate WHERE id = ANY(@ids::text[]);
 
 -- Possible duplicates: the same phone, or a name at least 60% alike
 -- (trigram similarity, ignoring case and accents). Best matches first.

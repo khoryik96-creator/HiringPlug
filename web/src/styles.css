@@ -91,3 +91,4 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .interview { border-left: 3px solid #e5e7eb; padding: 0.25rem 0.75rem; margin: 0.5rem 0; }
 .badge.scheduled { background: #dbeafe; } .badge.completed { background: #dcfce7; } .badge.cancelled, .badge.no_show { background: #fee2e2; }
 .feedback { display: grid; gap: 0.5rem; max-width: 40rem; }
+.bar { display: inline-block; height: 0.75rem; min-width: 2px; background: #2563eb; border-radius: 2px; }

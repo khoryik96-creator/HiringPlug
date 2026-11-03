@@ -45,6 +45,7 @@ type Brief struct {
 	FirstName    string
 	Email        *string
 	CurrentTitle *string
+	Source       *string // where the candidate came from (jobstreet, linkedin, ...)
 }
 
 // Briefs returns name and current title of the given candidates (missing ones

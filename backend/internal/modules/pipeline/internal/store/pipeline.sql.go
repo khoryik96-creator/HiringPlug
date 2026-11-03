@@ -7,7 +7,60 @@ package store
 
 import (
 	"context"
+	"time"
 )
+
+const applicationFacts = `-- name: ApplicationFacts :many
+SELECT a.id, a.job_order_id, a.candidate_id, a.channel, a.created_at,
+  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id
+WHERE a.created_at >= $1 AND a.created_at < $2
+GROUP BY a.id
+LIMIT 20000
+`
+
+type ApplicationFactsParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type ApplicationFactsRow struct {
+	ID          string
+	JobOrderID  string
+	CandidateID string
+	Channel     *string
+	CreatedAt   time.Time
+	Stages      []string
+}
+
+// Applications created in a period, with every stage they have been at (in
+// order) and when they were first placed (reports).
+func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsParams) ([]ApplicationFactsRow, error) {
+	rows, err := q.db.Query(ctx, applicationFacts, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApplicationFactsRow
+	for rows.Next() {
+		var i ApplicationFactsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobOrderID,
+			&i.CandidateID,
+			&i.Channel,
+			&i.CreatedAt,
+			&i.Stages,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const dropOverlappingApplications = `-- name: DropOverlappingApplications :execrows
 DELETE FROM application a
@@ -44,6 +97,52 @@ func (q *Queries) FindApplication(ctx context.Context, arg FindApplicationParams
 	var id string
 	err := row.Scan(&id)
 	return id, err
+}
+
+const firstPlacedBetween = `-- name: FirstPlacedBetween :many
+SELECT a.id, a.job_order_id, a.created_at, min(c.changed_at)::timestamptz AS placed_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'
+GROUP BY a.id
+HAVING min(c.changed_at) >= $1 AND min(c.changed_at) < $2
+LIMIT 20000
+`
+
+type FirstPlacedBetweenParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type FirstPlacedBetweenRow struct {
+	ID         string
+	JobOrderID string
+	CreatedAt  time.Time
+	PlacedAt   time.Time
+}
+
+// Applications first placed in a period (reports: time to fill).
+func (q *Queries) FirstPlacedBetween(ctx context.Context, arg FirstPlacedBetweenParams) ([]FirstPlacedBetweenRow, error) {
+	rows, err := q.db.Query(ctx, firstPlacedBetween, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FirstPlacedBetweenRow
+	for rows.Next() {
+		var i FirstPlacedBetweenRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobOrderID,
+			&i.CreatedAt,
+			&i.PlacedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getApplication = `-- name: GetApplication :one

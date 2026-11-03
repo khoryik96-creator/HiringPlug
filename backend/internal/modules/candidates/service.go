@@ -230,7 +230,7 @@ func (s *Service) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[stri
 	}
 	out := make(map[string]Brief, len(rows))
 	for _, r := range rows {
-		out[r.ID] = Brief{Name: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}), FirstName: r.FirstName, Email: r.Email, CurrentTitle: r.CurrentTitle}
+		out[r.ID] = Brief{Name: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}), FirstName: r.FirstName, Email: r.Email, CurrentTitle: r.CurrentTitle, Source: r.Source}
 	}
 	return out, nil
 }

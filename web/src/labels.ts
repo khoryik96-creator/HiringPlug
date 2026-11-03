@@ -204,3 +204,9 @@ export function formatMoney(amount: string, currency: string): string {
 export function formatDay(day: string): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
+
+/** Where applications came from, in reports: an application channel or a candidate source. */
+export function sourceLabel(source: string): string {
+  const labels: Record<string, string> = { ...CANDIDATE_SOURCE, ...CHANNEL, unknown: "Not recorded" };
+  return labels[source] ?? source;
+}

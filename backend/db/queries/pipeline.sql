@@ -61,3 +61,21 @@ WHERE a.candidate_id = @from_id
 
 -- name: MoveApplicationsToCandidate :execrows
 UPDATE application SET candidate_id = @to_id, updated_at = now() WHERE candidate_id = @from_id;
+
+-- Applications created in a period, with every stage they have been at (in
+-- order) and when they were first placed (reports).
+-- name: ApplicationFacts :many
+SELECT a.id, a.job_order_id, a.candidate_id, a.channel, a.created_at,
+  array_agg(c.to_stage ORDER BY c.changed_at, c.id)::text[] AS stages
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id
+WHERE a.created_at >= @from_time AND a.created_at < @to_time
+GROUP BY a.id
+LIMIT 20000;
+
+-- Applications first placed in a period (reports: time to fill).
+-- name: FirstPlacedBetween :many
+SELECT a.id, a.job_order_id, a.created_at, min(c.changed_at)::timestamptz AS placed_at
+FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'
+GROUP BY a.id
+HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
+LIMIT 20000;

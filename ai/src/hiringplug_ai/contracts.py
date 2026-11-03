@@ -54,6 +54,7 @@ class Permission(StrEnum):
     placements_fees_update = "placements.fees:update"
     placements_manage = "placements:manage"
     placements_read = "placements:read"
+    reports_read = "reports:read"
 
 
 class ErrorCode(StrEnum):
@@ -1431,6 +1432,40 @@ class PlacementUpdate(BaseModel):
     ] = None
 
 
+class FunnelStage(BaseModel):
+    stage: Stage
+    reached: int
+    percentOfPrevious: Annotated[
+        int | None,
+        Field(
+            description="Of those who reached the stage before, how many reached this one (rounded); null for the first stage or when none reached the one before."
+        ),
+    ]
+
+
+class SourceRow(BaseModel):
+    source: Annotated[
+        str, Field(description="e.g. jobstreet, linkedin, careers_page, referral; unknown when not recorded.")
+    ]
+    applications: int
+    interviewed: Annotated[int, Field(description="Reached the interview stage.")]
+    placed: int
+
+
+class MoneyTotal(BaseModel):
+    currency: CurrencyCode
+    amount: DecimalAmount
+
+
+class JobFill(BaseModel):
+    jobId: JobOrderId
+    jobTitle: str
+    daysToFill: Annotated[
+        int, Field(description="From the job being opened to its first placement in the period.")
+    ]
+    placements: int
+
+
 class PublicJobAd(BaseModel):
     id: JobAdId
     title: str
@@ -1625,6 +1660,50 @@ class JobAdUpdate(BaseModel):
     status: JobAdStatus | None = None
 
 
+class RecruiterRow(BaseModel):
+    recruiterId: Annotated[UserId | None, Field(...)]
+    recruiterName: Annotated[str | None, Field(description="null when no recruiter is credited.")]
+    placements: Annotated[int, Field(description="Placements that stand (not fallen through or cancelled).")]
+    fellThrough: int
+    fees: Annotated[
+        list[MoneyTotal],
+        Field(description="Fees of the placements that stand, per currency (empty when fees are hidden)."),
+    ]
+
+
+class TimeToFill(BaseModel):
+    medianDaysToFill: Annotated[
+        int | None, Field(description="From a job being opened to its first placement.")
+    ]
+    medianDaysToPlace: Annotated[
+        int | None, Field(description="From a candidate being added to the job to being placed.")
+    ]
+    jobs: Annotated[list[JobFill], Field(description="Jobs with a placement in the period, slowest first.")]
+
+
 class CareersPage(BaseModel):
     companyName: str
     ads: list[PublicJobAd]
+
+
+class Report(BaseModel):
+    from_: Annotated[date, Field(alias="from")]
+    to: date
+    funnel: Annotated[
+        list[FunnelStage],
+        Field(
+            description="Applications made in the period, by the furthest stage they reached (a rejected candidate who was interviewed counts as reaching interview), in pipeline order.\n"
+        ),
+    ]
+    sources: Annotated[
+        list[SourceRow],
+        Field(
+            description="Applications made in the period by where they came from (the application's channel, else the candidate's source), most first."
+        ),
+    ]
+    recruiters: Annotated[
+        list[RecruiterRow],
+        Field(description="Placements starting in the period per recruiter credited, most first."),
+    ]
+    timeToFill: TimeToFill
+    feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]

@@ -307,6 +307,27 @@ accents), or add it. Excel files (.xlsx) directly: later.
 moved this week, placements in the last 30 days, and who has waited more than
 14 days in one stage.
 
+## Reports ✅
+
+The **Reports** page (owners, admins and recruiters), for a period (the last
+90 days unless chosen; days in the company's time zone):
+
+- **Pipeline conversion:** applications made in the period by the furthest
+  stage they reached, and what share of those at the stage before got there.
+  A candidate rejected after an interview counts as reaching interview.
+- **Sources:** applications, interviews and placements per source (the
+  channel they applied through, else the candidate's source), with placements
+  per application.
+- **Placements per recruiter:** placements starting in the period, fall-throughs
+  and fees per currency (fees only for those who may see them).
+- **Time to fill:** median days from a job opening to its first placement, and
+  from a candidate being added to the job to being placed, with the jobs placed
+  in the period, slowest first.
+
+Every stage change is recorded (by the database, whatever made it), so these
+figures come from what happened, not from where applications are now; the
+history before this was rebuilt from the audit log.
+
 ## 6. API documentation
 
 `/docs` renders the contract (endpoints, fields, permissions, error codes) and

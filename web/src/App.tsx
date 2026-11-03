@@ -18,6 +18,7 @@ import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
 import { JobList } from "./pages/JobList";
 import { Placements } from "./pages/Placements";
+import { Reports } from "./pages/Reports";
 import { CompanyList } from "./pages/CompanyList";
 import { SignIn } from "./pages/SignIn";
 
@@ -45,7 +46,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|import)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|import)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -58,6 +59,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           <a href="#/contacts" aria-current={section === "contacts" ? "page" : undefined}>Contacts</a>
           {permissions.includes("placements:read") && (
             <a href="#/placements" aria-current={section === "placements" ? "page" : undefined}>Placements</a>
+          )}
+          {permissions.includes("reports:read") && (
+            <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
         </nav>
@@ -95,6 +99,7 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
     return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
   }
   if (hash.startsWith("#/placements") && permissions.includes("placements:read")) return <Placements permissions={permissions} />;
+  if (hash.startsWith("#/reports") && permissions.includes("reports:read")) return <Reports />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;

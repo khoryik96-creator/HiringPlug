@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const deletePlacementMoney = `-- name: DeletePlacementMoney :exec
@@ -145,6 +147,57 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const placementFacts = `-- name: PlacementFacts :many
+SELECT p.id, p.recruiter_id, p.status, p.start_date, m.fee_amount, m.fee_currency
+FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.start_date >= $1 AND p.start_date <= $2
+ORDER BY p.start_date
+LIMIT 20000
+`
+
+type PlacementFactsParams struct {
+	FromDay time.Time
+	ToDay   time.Time
+}
+
+type PlacementFactsRow struct {
+	ID          string
+	RecruiterID *string
+	Status      string
+	StartDate   time.Time
+	FeeAmount   pgtype.Numeric
+	FeeCurrency *string
+}
+
+// Placements starting in a period, with their fee when the user may see it
+// (row-level security leaves the money out otherwise) (reports).
+func (q *Queries) PlacementFacts(ctx context.Context, arg PlacementFactsParams) ([]PlacementFactsRow, error) {
+	rows, err := q.db.Query(ctx, placementFacts, arg.FromDay, arg.ToDay)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlacementFactsRow
+	for rows.Next() {
+		var i PlacementFactsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RecruiterID,
+			&i.Status,
+			&i.StartDate,
+			&i.FeeAmount,
+			&i.FeeCurrency,
 		); err != nil {
 			return nil, err
 		}

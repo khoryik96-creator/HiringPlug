@@ -65,6 +65,7 @@ details get their own permissions.
 | `placements:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `placements:manage` (record and change) | ✓ | ✓ | ✓ | | | |
 | `placements.fees:read`, `placements.fees:update` (salary and fee) | ✓ | ✓ | ✓ | | | |
+| `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

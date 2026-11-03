@@ -28,6 +28,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Interviews with clash checks, calendar files and interviewer feedback |
 | ✅ | Email from the app with templates, sent through your mail server; interview reminders |
 | ✅ | Placements with guarantee periods, invoices and protected salary and fee |
+| ✅ | Reports: conversion, sources, recruiters, time to fill |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -89,7 +90,7 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|
 | ✅ 6.1 **Placements and fees** (agency) | Placement per application (moves it to placed) with start date, guarantee period and fall-throughs, recruiter credited, invoice and payment; agreed salary and fee (a percentage of the yearly salary or fixed) visible only to those allowed; a Placements page with fee totals and guarantees ending soon |
 | 6.2 **Offers** (in-house) | Offer details and approvals |
-| 6.3 **Reports** | Pipeline conversion, time to fill, placements and fees per recruiter, source effectiveness |
+| ✅ 6.3 **Reports** | Pipeline conversion by furthest stage reached, sources (applications, interviews, placements), placements and fees per recruiter, time to fill and to place, for any period |
 | 6.4 **Job ads puller** | Collect hiring signals from allowed sources (careers pages, public ATS feeds, ads you save) as business development leads |
 | 6.5 **Integrations** | API keys per company and webhooks |
 
