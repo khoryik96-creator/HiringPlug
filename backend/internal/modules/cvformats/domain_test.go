@@ -133,5 +133,5 @@ func TestValues(t *testing.T) {
 	assert.Equal(t, "Local", v["candidate.workAuthorization"])
 	assert.Equal(t, "MYR 1,234,567.50 a year", Money(&Salary{Min: "1234567.50", Currency: "MYR", Period: "year"}))
 	assert.Equal(t, "From Jan 2020", Dates(Job{StartDate: ptr("2020-01")}))
-	assert.Equal(t, "Siti Aisyah - CV (Contoh).docx", FileName(siti, "Contoh"))
+	assert.Equal(t, "Siti Aisyah - CV (Contoh).docx", FileName(siti, "Contoh", false))
 }

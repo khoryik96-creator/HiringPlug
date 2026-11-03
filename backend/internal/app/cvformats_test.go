@@ -153,6 +153,24 @@ func TestFormattedCvs(t *testing.T) {
 		a.formatCv(recruiter, c.Id, map[string]any{"applicationId": other.Id}, http.StatusBadRequest)
 	})
 
+	t.Run("blind: no name, contact or nationality, and checked before saving", func(t *testing.T) {
+		out, text := a.formatCv(recruiter, c.Id, map[string]any{"blind": true, "showContact": true, "summary": "Siti is strong in IFRS."}, http.StatusCreated)
+		assert.NotContains(t, out.FileName, "Siti")
+		assert.Contains(t, out.FileName, "Blind CV")
+		assert.Contains(t, text, "Candidate C-")
+		assert.NotContains(t, text, "Siti")
+		assert.NotContains(t, text, "Aisyah")
+		assert.NotContains(t, text, "siti@example.com", "blind wins over show contact")
+		assert.Contains(t, text, "the candidate is strong in IFRS.")
+
+		res := a.uploadTemplate(recruiter, "Named", simpleDocx(t, "CV of Siti Aisyah: {{candidate.fullName}}"))
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var named api.CvTemplate
+		res.JSON(&named)
+		res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/formatted-cvs", recruiter, map[string]any{"templateId": named.Id, "blind": true})
+		assert.Equal(t, api.ErrorCodeCVNOTBLIND, res.Error().Error.Code, "the template's own text gives the name away: not saved")
+	})
+
 	t.Run("the company's own template", func(t *testing.T) {
 		res := a.uploadTemplate(recruiter, "Branded", simpleDocx(t, "CONTOH CV: {{candidate.fullName}} / {{candidate.salary}}"))
 		assert.Equal(t, []string{"file"}, fieldNames(t, res.Error()), "unknown placeholders are refused")

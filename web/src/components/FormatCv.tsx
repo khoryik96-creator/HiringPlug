@@ -20,12 +20,12 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
     enabled: permissions.includes("pipeline:read"),
   });
-  const [form, setForm] = useState({ templateId: "standard", applicationId: "", showContact: false, includeSalary: false, summary: "" });
+  const [form, setForm] = useState({ templateId: "standard", applicationId: "", blind: false, showContact: false, includeSalary: false, summary: "" });
   const make = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/formatted-cvs", {
       params: { path: { candidateId } },
       body: {
-        templateId: form.templateId, showContact: form.showContact, includeSalary: form.includeSalary,
+        templateId: form.templateId, blind: form.blind, showContact: form.showContact && !form.blind, includeSalary: form.includeSalary,
         ...(form.applicationId ? { applicationId: form.applicationId } : {}), ...(form.summary.trim() ? { summary: form.summary.trim() } : {}),
       },
     })),
@@ -50,7 +50,13 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
           </select>
         </label>
       )}
-      <label className="row full"><input type="checkbox" checked={form.showContact} onChange={(e) => { setForm({ ...form, showContact: e.target.checked }); }} /> Show email and phone</label>
+      <label className="row full">
+        <input type="checkbox" checked={form.blind} onChange={(e) => { setForm({ ...form, blind: e.target.checked }); }} />{" "}
+        Blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and links taken out of the text (checked before saving)
+      </label>
+      {!form.blind && (
+        <label className="row full"><input type="checkbox" checked={form.showContact} onChange={(e) => { setForm({ ...form, showContact: e.target.checked }); }} /> Show email and phone</label>
+      )}
       {permissions.includes("candidates.compensation:read") && (
         <label className="row full"><input type="checkbox" checked={form.includeSalary} onChange={(e) => { setForm({ ...form, includeSalary: e.target.checked }); }} /> Include current and expected salary</label>
       )}

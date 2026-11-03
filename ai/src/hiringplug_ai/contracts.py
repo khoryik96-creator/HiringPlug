@@ -75,6 +75,7 @@ class ErrorCode(StrEnum):
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
+    CV_NOT_BLIND = "CV_NOT_BLIND"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
@@ -2051,6 +2052,12 @@ class FormatCvInput(BaseModel):
     ] = None
     summary: Annotated[
         str | None, Field(description="Your summary of the candidate for the client.", max_length=3000)
+    ] = None
+    blind: Annotated[
+        bool | None,
+        Field(
+            description="A blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and profile links removed from free text; checked before it is saved that none of them is left."
+        ),
     ] = None
 
 

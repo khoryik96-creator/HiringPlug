@@ -67,7 +67,6 @@ candidate belonging to the same company.
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
 | `pipeline` | stage templates per company | M3 |
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
-| `documents` | blind CVs | 5.2 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |

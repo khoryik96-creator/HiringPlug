@@ -13,7 +13,7 @@ import (
 
 // Placeholders are the values a template may use.
 var Placeholders = []string{
-	"candidate.fullName", "candidate.firstName", "candidate.lastName", "candidate.initials",
+	"candidate.fullName", "candidate.firstName", "candidate.lastName", "candidate.initials", "candidate.reference",
 	"candidate.currentTitle", "candidate.currentCompany", "candidate.location", "candidate.nationality",
 	"candidate.workAuthorization", "candidate.noticePeriod", "candidate.email", "candidate.phone", "candidate.skills",
 	"salary.current", "salary.expected", "summary", "job.title", "company.name",
@@ -82,6 +82,7 @@ type Salary struct {
 
 // Candidate is what a CV shows about a candidate.
 type Candidate struct {
+	ID                                        string
 	FirstName, LastName                       string
 	Email, Phone, Nationality, Location       *string
 	CurrentTitle, CurrentCompany              *string
@@ -191,7 +192,7 @@ func Values(c Candidate, x Context) Data {
 	}
 	v := map[string]string{
 		"candidate.fullName": full, "candidate.firstName": c.FirstName, "candidate.lastName": c.LastName,
-		"candidate.initials": initials, "candidate.currentTitle": val(c.CurrentTitle), "candidate.currentCompany": val(c.CurrentCompany),
+		"candidate.initials": initials, "candidate.reference": Reference(c.ID), "candidate.currentTitle": val(c.CurrentTitle), "candidate.currentCompany": val(c.CurrentCompany),
 		"candidate.location": val(c.Location), "candidate.nationality": val(c.Nationality),
 		"candidate.skills": strings.Join(c.Skills, ", "), "summary": strings.TrimSpace(x.Summary),
 		"job.title": x.JobTitle, "company.name": x.CompanyName, "agency.name": x.AgencyName,
@@ -237,11 +238,15 @@ func Values(c Candidate, x Context) Data {
 	return Data{Values: v, Lists: lists}
 }
 
-// FileName names a formatted CV: "Siti Aisyah - CV (Contoh Recruitment).docx".
-func FileName(c Candidate, agency string) string {
-	name := strings.TrimSpace(c.FirstName + " " + c.LastName)
-	if agency == "" {
-		return name + " - CV.docx"
+// FileName names a formatted CV: "Siti Aisyah - CV (Contoh Recruitment).docx",
+// or for a blind one "Candidate C-4F2K9Q - Blind CV (Contoh Recruitment).docx".
+func FileName(c Candidate, agency string, blind bool) string {
+	name, kind := strings.TrimSpace(c.FirstName+" "+c.LastName), "CV"
+	if blind {
+		name, kind = "Candidate "+Reference(c.ID), "Blind CV"
 	}
-	return name + " - CV (" + agency + ").docx"
+	if agency == "" {
+		return name + " - " + kind + ".docx"
+	}
+	return name + " - " + kind + " (" + agency + ").docx"
 }

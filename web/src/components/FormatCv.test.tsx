@@ -26,12 +26,24 @@ describe("formatted CVs", () => {
     expect(screen.queryByLabelText(/Include current and expected salary/)).toBeNull(); // only with salary permission
     fireEvent.click(screen.getByRole("button", { name: "Make formatted CV" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
-    expect(sentBody(post)).toEqual({ templateId: "ctpl_1", showContact: false, includeSalary: false, applicationId: "appl_1" });
+    expect(sentBody(post)).toEqual({ templateId: "ctpl_1", blind: false, showContact: false, includeSalary: false, applicationId: "appl_1" });
   });
 
   it("offers salary to those who may see it", async () => {
     reads();
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create", "candidates.compensation:read"]} onDone={vi.fn()} />);
     expect(await screen.findByLabelText(/Include current and expected salary/)).toBeTruthy();
+  });
+
+  it("a blind CV never shows contact details", async () => {
+    reads();
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ documentId: "doc_2", fileName: "Candidate C-1 - Blind CV.docx" }));
+    renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
+    fireEvent.click(await screen.findByLabelText("Show email and phone"));
+    fireEvent.click(screen.getByLabelText(/Blind CV/));
+    expect(screen.queryByLabelText("Show email and phone")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Make formatted CV" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ blind: true, showContact: false });
   });
 });

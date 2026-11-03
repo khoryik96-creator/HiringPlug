@@ -165,6 +165,7 @@ type Options struct {
 	TemplateID                 string
 	ApplicationID              *string
 	ShowContact, IncludeSalary bool
+	Blind                      bool
 	Summary                    string
 }
 
@@ -173,6 +174,9 @@ type Options struct {
 func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID string, o Options) (string, string, error) {
 	if o.IncludeSalary && !p.Can(api.PermissionCandidatesCompensationRead) {
 		return "", "", apperr.New(api.ErrorCodeFORBIDDEN, "You cannot include salary: you may not see it.")
+	}
+	if o.Blind {
+		o.ShowContact = false
 	}
 	if o.TemplateID == "" {
 		o.TemplateID = StandardID
@@ -207,18 +211,32 @@ func (s *Service) Format(ctx context.Context, p authz.Principal, candidateID str
 			}
 			x.JobTitle, x.CompanyName = app.JobTitle, app.CompanyName
 		}
-		out, err := Render(tpl, Values(cand, x))
+		data := Values(cand, x)
+		if o.Blind {
+			data = Blind(data, cand, Reference(cand.ID))
+		}
+		out, err := Render(tpl, data)
 		if err != nil {
 			return invalidFile("the template could not be filled: " + err.Error())
 		}
-		fileName = FileName(cand, agency)
+		if o.Blind {
+			leaks, err := Leaks(out, IdentityOf(cand))
+			if err != nil {
+				return err
+			}
+			if len(leaks) > 0 { // never save it: the template's own text gives them away
+				return apperr.New(api.ErrorCodeCVNOTBLIND, "This blind CV would still show the candidate's "+strings.Join(leaks, " and ")+
+					", probably written in the template itself, so it was not saved. Check the template, or the candidate's work history.")
+			}
+		}
+		fileName = FileName(cand, agency, o.Blind)
 		docID, undo, err = s.deps.Documents.AddFormatted(ctx, tx, p.TenantID, candidateID, fileName, out)
 		if err != nil {
 			return err
 		}
 		// What was chosen, never the values (salary stays out of the log).
 		return audit.Record(ctx, tx, audit.Entry{Action: "cv.formatted", EntityType: "candidate", EntityID: candidateID, Changes: map[string]any{
-			"documentId": docID, "templateId": o.TemplateID, "showContact": o.ShowContact, "includeSalary": o.IncludeSalary,
+			"documentId": docID, "templateId": o.TemplateID, "showContact": o.ShowContact, "includeSalary": o.IncludeSalary, "blind": o.Blind,
 		}})
 	})
 	if err != nil && undo != nil {

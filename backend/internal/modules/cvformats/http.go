@@ -105,7 +105,10 @@ func (h *HTTP) DownloadCvTemplate(ctx context.Context, req api.DownloadCvTemplat
 // FormatCv handles POST /v1/candidates/{candidateId}/formatted-cvs.
 func (h *HTTP) FormatCv(ctx context.Context, req api.FormatCvRequestObject) (api.FormatCvResponseObject, error) {
 	b := req.Body
-	o := Options{ApplicationID: b.ApplicationId, ShowContact: b.ShowContact != nil && *b.ShowContact, IncludeSalary: b.IncludeSalary != nil && *b.IncludeSalary}
+	o := Options{
+		ApplicationID: b.ApplicationId, ShowContact: b.ShowContact != nil && *b.ShowContact,
+		IncludeSalary: b.IncludeSalary != nil && *b.IncludeSalary, Blind: b.Blind != nil && *b.Blind,
+	}
 	if b.TemplateId != nil {
 		o.TemplateID = *b.TemplateId
 	}

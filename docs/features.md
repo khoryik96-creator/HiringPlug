@@ -106,7 +106,17 @@ built-in standard template from the **CV templates** page, restyle it in Word
 refused, naming them. Paragraphs between `{{#experience}}` and
 `{{/experience}}` repeat for each job (likewise education), `{{#experience?}}`
 keeps a heading only when there is something under it, and a line whose
-placeholders are all empty is left out. Next: blind CVs (5.2).
+placeholders are all empty is left out.
+
+**Blind CVs ✅.** The "Blind CV" option shows a reference (e.g. "Candidate
+C-4F2K9Q", also `{{candidate.reference}}` in any template) instead of the
+name, leaves out email, phone, nationality and work authorization, and takes
+the candidate's names, email addresses, phone numbers and profile links out
+of every other text (job descriptions, your summary), while keeping years and
+amounts. Before saving, the finished file (every part, headers and footers
+too) is checked for the name, email or phone: if one is still there, usually
+written in a template's own text, nothing is saved and you are told what
+kind of detail it was. The file name carries the reference, not the name.
 
 ## 3.5 AI interpretation sidebar (DeepSeek)
 

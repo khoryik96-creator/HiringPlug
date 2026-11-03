@@ -56,6 +56,10 @@ x-error-codes:
     module: contacts
     status: 409
     description: Another contact already has this email. `details.existingContactId` points to them.
+  CV_NOT_BLIND:
+    module: cvformats
+    status: 422
+    description: A blind CV would still show something that identifies the candidate (usually text in the template itself); nothing was saved. The message says what kind of detail.
   DOCUMENT_HAS_NO_TEXT:
     module: documents
     status: 409
@@ -761,6 +765,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/CvNotBlind'}
   /v1/candidates/{candidateId}/documents:
     parameters:
       - $ref: '#/components/parameters/CandidateIdPath'
@@ -2294,6 +2299,11 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    CvNotBlind:
+      description: Not blind (CV_NOT_BLIND).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     SignInFailed:
       description: Wrong email or password (SIGN_IN_FAILED).
       content:
@@ -2404,6 +2414,7 @@ components:
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
         - CONTACT_DUPLICATE_EMAIL
+        - CV_NOT_BLIND
         - DOCUMENT_HAS_NO_TEXT
         - FORBIDDEN
         - INTERNAL
@@ -3105,6 +3116,9 @@ components:
         showContact: {type: boolean, description: "Include the candidate's email and phone (left out unless asked, so the client goes through you)."}
         includeSalary: {type: boolean, description: "Include current and expected salary (needs candidates.compensation:read)."}
         summary: {type: string, maxLength: 3000, description: Your summary of the candidate for the client.}
+        blind:
+          type: boolean
+          description: "A blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and profile links removed from free text; checked before it is saved that none of them is left."
     FormattedCv:
       type: object
       required: [documentId, fileName]

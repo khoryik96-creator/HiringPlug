@@ -83,7 +83,7 @@ job. Today the app has candidates but nothing to place them into.
 | Step | Delivers |
 |---|---|
 | ✅ 5.1 **Formatted CVs** | The profile filled into a Word template (built-in standard, or your own uploaded one with placeholders); contact details hidden unless asked, salary only when asked by those who may see it, a summary, for a particular job; saved as the formatted CV, with a PDF |
-| 5.2 **Blind CVs** | Names, photos and identifying details removed, with an automatic check that nothing leaked |
+| ✅ 5.2 **Blind CVs** | A reference instead of the name; no contact details, nationality or work authorization; names, emails, phones and links scrubbed from text; the finished file checked for leaks before it is saved |
 | 5.3 **AI sidebar (DeepSeek)** | On candidate and job pages: summary, gaps and red flags, "how well does this candidate fit this job?", free questions; it only sees what the user may see |
 | 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
 | 5.5 **Company auto-fill** | Fill company details from the website name or address, as suggestions you accept |

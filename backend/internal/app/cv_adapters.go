@@ -23,7 +23,7 @@ func (a cvCandidates) ForCV(ctx context.Context, tx pgx.Tx, p authz.Principal, i
 	}
 	pr := v.Profile
 	c := cvformats.Candidate{
-		FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Phone: pr.Phone, Nationality: pr.Nationality,
+		ID: v.ID, FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Phone: pr.Phone, Nationality: pr.Nationality,
 		Location: pr.Location, CurrentTitle: pr.CurrentTitle, CurrentCompany: pr.CurrentCompany, Skills: pr.Skills,
 	}
 	if n := pr.NoticePeriod; n != nil {
