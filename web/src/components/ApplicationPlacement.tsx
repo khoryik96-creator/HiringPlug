@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationPlacementKey } from "../api/keys";
-import { INVOICE_STATUS, PLACEMENT_STATUS, formatDay, formatMoney } from "../labels";
+import { INVOICE_STATUS, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMoney } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { PlacementForm } from "./PlacementForm";
 
@@ -18,6 +18,7 @@ export function PlacementSummary({ p }: { p: Placement }) {
       <span className="muted">
         starts {formatDay(p.startDate)} · guarantee to {formatDay(p.guaranteeEndsOn)}
         {p.leftOn && <> · left {formatDay(p.leftOn)}</>}
+        {p.replacement !== "none" && <> · <strong>{REPLACEMENT[p.replacement]}</strong></>}
         {fee && <> · fee {fee}</>} · {INVOICE_STATUS[p.invoiceStatus]}
         {p.recruiterName && <> · {p.recruiterName}</>}
       </span>

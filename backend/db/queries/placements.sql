@@ -21,7 +21,7 @@ LIMIT 500;
 -- Optimistic concurrency: no row returned = stale version (or not found).
 -- name: UpdatePlacement :one
 UPDATE placement SET recruiter_id = sqlc.narg(recruiter_id), start_date = @start_date, guarantee_days = @guarantee_days,
-  status = @status, left_on = sqlc.narg(left_on), status_note = sqlc.narg(status_note),
+  status = @status, left_on = sqlc.narg(left_on), status_note = sqlc.narg(status_note), replacement = @replacement,
   invoice_status = @invoice_status, invoice_number = sqlc.narg(invoice_number),
   invoiced_on = sqlc.narg(invoiced_on), paid_on = sqlc.narg(paid_on),
   version = version + 1, updated_at = now()

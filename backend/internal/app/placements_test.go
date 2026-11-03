@@ -107,8 +107,11 @@ func TestPlacements(t *testing.T) {
 		p = a.placement(http.MethodPatch, "/v1/placements/"+p.Id, recruiter.Token, map[string]any{
 			"version": p.Version, "status": "fell_through", "leftOn": "2027-01-15", "statusNote": "Went back to their old employer",
 		}, http.StatusOK)
+		assert.Equal(t, api.ReplacementStatusOwed, p.Replacement, "the client is owed a replacement")
 		totals := *a.placements(recruiter.Token, "").FeeTotals
 		assert.Empty(t, totals, "a fee that falls through is not counted")
+		p = a.placement(http.MethodPatch, "/v1/placements/"+p.Id, recruiter.Token, map[string]any{"version": p.Version, "replacement": "provided"}, http.StatusOK)
+		assert.Equal(t, api.ReplacementStatusProvided, p.Replacement)
 		assert.Len(t, a.placements(manager.Token, "?status=fell_through&applicationId="+app.Id).Items, 1)
 	})
 

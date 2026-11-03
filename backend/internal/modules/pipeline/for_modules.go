@@ -1,7 +1,8 @@
 package pipeline
 
 // What other modules use: application briefs, and the stage moves that
-// follow from their records (an interview scheduled, a placement recorded).
+// follow from their records (an interview scheduled, an offer made, a
+// placement recorded).
 
 import (
 	"context"
@@ -58,6 +59,18 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 // earlier one (applied, screening, submitted), in the caller's transaction:
 // scheduling an interview means the candidate got that far.
 func (m *Module) ReachInterview(ctx context.Context, tx pgx.Tx, id string) error {
+	return reach(ctx, tx, id, Interview, "interview scheduled")
+}
+
+// ReachOffer moves an application to the offer stage when it is at an earlier
+// one, in the caller's transaction: making an offer means the candidate got
+// that far.
+func (m *Module) ReachOffer(ctx context.Context, tx pgx.Tx, id string) error {
+	return reach(ctx, tx, id, Offer, "offer made")
+}
+
+// reach moves an application forward to stage if it is at an earlier open stage.
+func reach(ctx context.Context, tx pgx.Tx, id, stage, via string) error {
 	q := store.New(tx)
 	row, err := q.GetApplication(ctx, id)
 	if database.IsNoRows(err) {
@@ -66,15 +79,15 @@ func (m *Module) ReachInterview(ctx context.Context, tx pgx.Tx, id string) error
 	if err != nil {
 		return err
 	}
-	if !slices.Contains([]string{Applied, Screening, Submitted}, row.Stage) {
+	if !slices.Contains(OpenStages[:slices.Index(OpenStages, stage)], row.Stage) {
 		return nil
 	}
-	if _, err := q.MoveApplication(ctx, store.MoveApplicationParams{ID: id, ExpectedVersion: row.Version, Stage: Interview}); err != nil {
+	if _, err := q.MoveApplication(ctx, store.MoveApplicationParams{ID: id, ExpectedVersion: row.Version, Stage: stage}); err != nil {
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "application.moved", EntityType: "application", EntityID: id,
-		Changes: map[string]any{"stage": map[string]string{"from": row.Stage, "to": Interview}, "via": "interview scheduled"},
+		Changes: map[string]any{"stage": map[string]string{"from": row.Stage, "to": stage}, "via": via},
 	})
 }
 

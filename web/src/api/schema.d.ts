@@ -815,6 +815,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Offers, newest first */
+        get: operations["listOffers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/applications/{applicationId}/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draft an offer for an application (moves it to the offer stage)
+         * @description `salary` needs offers.salary:update.
+         */
+        post: operations["createOffer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers/{offerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change an offer's terms (an offer waiting for approval or approved goes back to draft)
+         * @description Fields left out stay as they are. `salary` needs offers.salary:update.
+         */
+        patch: operations["updateOffer"];
+        trace?: never;
+    };
+    "/v1/offers/{offerId}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move an offer on (ask for approval, send, record the answer, withdraw)
+         * @description Sending without approval needs offers:approve.
+         */
+        post: operations["stepOffer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers/{offerId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an offer waiting for approval, or send it back to draft
+         * @description You cannot decide on an offer you asked approval for.
+         */
+        post: operations["decideOffer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/{jobId}/applications": {
         parameters: {
             query?: never;
@@ -981,9 +1086,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind";
         Error: {
@@ -1926,6 +2031,90 @@ export interface components {
         ActivityList: {
             items: components["schemas"]["ActivityEntry"][];
         };
+        /** @example ofr_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        OfferId: string;
+        /**
+         * @description draft → pending_approval → approved → sent → accepted or declined; approvers send a draft straight away; withdrawn at any point before the answer.
+         * @enum {string}
+         */
+        OfferStatus: "draft" | "pending_approval" | "approved" | "sent" | "accepted" | "declined" | "withdrawn";
+        /**
+         * @description A field left out because you lack the permission to see it.
+         * @enum {string}
+         */
+        OfferRestrictedField: "salary";
+        Offer: {
+            id: components["schemas"]["OfferId"];
+            version: number;
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            companyName: string;
+            status: components["schemas"]["OfferStatus"];
+            /** @description Left out (and listed in restrictedFields) without offers.salary:read. null means none set. */
+            salary?: components["schemas"]["SalaryAmount"] | null;
+            /** Format: date */
+            startDate: string | null;
+            /**
+             * Format: date
+             * @description The day the offer lapses if not answered.
+             */
+            expiresOn: string | null;
+            /** @description Anything else offered: benefits, probation, notice, ... */
+            terms: string | null;
+            /** @description Who asked for approval. */
+            requestedBy: components["schemas"]["UserId"] | null;
+            requestedByName: string | null;
+            /** @description Who approved it (or sent it back last); the sender when an approver sent it without asking. */
+            decidedBy: components["schemas"]["UserId"] | null;
+            decidedByName: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+            decisionNote: string | null;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** Format: date-time */
+            answeredAt: string | null;
+            restrictedFields: components["schemas"]["OfferRestrictedField"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        OfferList: {
+            items: components["schemas"]["Offer"][];
+        };
+        OfferInput: {
+            salary?: components["schemas"]["SalaryAmount"];
+            /** Format: date */
+            startDate?: string;
+            /** Format: date */
+            expiresOn?: string;
+            terms?: string;
+        };
+        OfferUpdate: {
+            version: number;
+            salary?: components["schemas"]["SalaryAmount"] | null;
+            /** Format: date */
+            startDate?: string | null;
+            /** Format: date */
+            expiresOn?: string | null;
+            terms?: string | null;
+        };
+        /** @enum {string} */
+        OfferStep: "request_approval" | "send" | "accept" | "decline" | "withdraw";
+        OfferStepInput: {
+            version: number;
+            step: components["schemas"]["OfferStep"];
+        };
+        OfferDecisionInput: {
+            version: number;
+            approve: boolean;
+            /** @description Why it was sent back (or a remark on the approval). */
+            note?: string;
+        };
         /** @example appl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ApplicationId: string;
         /**
@@ -2022,6 +2211,11 @@ export interface components {
          * @enum {string}
          */
         PlacementStatus: "active" | "fell_through" | "cancelled";
+        /**
+         * @description After a fall-through: owed = the client is owed a replacement candidate (or a refund); provided; refunded. none otherwise.
+         * @enum {string}
+         */
+        ReplacementStatus: "none" | "owed" | "provided" | "refunded";
         /** @enum {string} */
         InvoiceStatus: "not_invoiced" | "invoiced" | "paid";
         /**
@@ -2063,6 +2257,7 @@ export interface components {
              */
             leftOn: string | null;
             statusNote: string | null;
+            replacement: components["schemas"]["ReplacementStatus"];
             invoiceStatus: components["schemas"]["InvoiceStatus"];
             invoiceNumber: string | null;
             /** Format: date */
@@ -2117,6 +2312,8 @@ export interface components {
             /** Format: date */
             leftOn?: string | null;
             statusNote?: string | null;
+            /** @description Only for a fall-through (it becomes owed when the placement falls through). */
+            replacement?: components["schemas"]["ReplacementStatus"];
             invoiceStatus?: components["schemas"]["InvoiceStatus"];
             invoiceNumber?: string | null;
             /** Format: date */
@@ -2259,6 +2456,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not allowed (OFFER_NOT_ALLOWED). */
+        OfferNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Not allowed (PLACEMENT_NOT_ALLOWED). */
         PlacementNotAllowed: {
             headers: {
@@ -2279,6 +2485,7 @@ export interface components {
         InterviewIdPath: components["schemas"]["InterviewId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
+        OfferIdPath: components["schemas"]["OfferId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
         PlacementIdPath: components["schemas"]["PlacementId"];
     };
@@ -3830,6 +4037,159 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listOffers: {
+        parameters: {
+            query?: {
+                applicationId?: components["schemas"]["ApplicationId"];
+                status?: components["schemas"]["OfferStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createOffer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["OfferNotAllowed"];
+        };
+    };
+    updateOffer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["OfferNotAllowed"];
+        };
+    };
+    stepOffer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferStepInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["OfferNotAllowed"];
+        };
+    };
+    decideOffer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                offerId: components["parameters"]["OfferIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Offer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["OfferNotAllowed"];
         };
     };
     listJobApplications: {

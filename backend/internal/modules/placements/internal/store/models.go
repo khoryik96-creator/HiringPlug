@@ -332,6 +332,36 @@ type Note struct {
 	CreatedAt   time.Time
 }
 
+type Offer struct {
+	ID            string
+	TenantID      string
+	Version       int32
+	ApplicationID string
+	Status        string
+	StartDate     *time.Time
+	ExpiresOn     *time.Time
+	Terms         *string
+	RequestedBy   *string
+	DecidedBy     *string
+	DecidedAt     *time.Time
+	DecisionNote  *string
+	SentAt        *time.Time
+	AnsweredAt    *time.Time
+	CreatedBy     string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type OfferSalary struct {
+	OfferID   string
+	TenantID  string
+	Amount    pgtype.Numeric
+	Currency  string
+	Period    string
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
 type Placement struct {
 	ID            string
 	TenantID      string
@@ -350,6 +380,7 @@ type Placement struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Replacement   string
 }
 
 type PlacementMoney struct {

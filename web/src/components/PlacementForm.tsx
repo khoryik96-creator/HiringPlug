@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey, usersKey } from "../api/keys";
-import { INVOICE_STATUS, keysOf, PAY_PERIOD, PLACEMENT_STATUS, formatMoney } from "../labels";
+import { INVOICE_STATUS, keysOf, PAY_PERIOD, PLACEMENT_STATUS, REPLACEMENT, formatMoney } from "../labels";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors } from "./forms";
 import { createBody, feePreview, formFromPlacement, type PlacementFormState, updateBody } from "./placementFormState";
@@ -70,6 +70,13 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
           </Field>
           {form.status === "fell_through" && (
             <Field label="Left on" error={errors.leftOn}><input type="date" value={form.leftOn} onChange={set("leftOn")} /></Field>
+          )}
+          {form.status === "fell_through" && placement.status === "fell_through" && (
+            <Field label="Replacement">
+              <select value={form.replacement} onChange={set("replacement")}>
+                {(["owed", "provided", "refunded"] as const).map((r) => <option key={r} value={r}>{REPLACEMENT[r]}</option>)}
+              </select>
+            </Field>
           )}
           {form.status !== "active" && (
             <Field label="Why"><input value={form.statusNote} onChange={set("statusNote")} /></Field>

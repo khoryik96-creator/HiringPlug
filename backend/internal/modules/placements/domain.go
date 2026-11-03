@@ -18,6 +18,9 @@ const (
 	FellThrough = "fell_through"
 	Cancelled   = "cancelled"
 
+	NoReplacement   = "none"
+	ReplacementOwed = "owed"
+
 	NotInvoiced = "not_invoiced"
 	Invoiced    = "invoiced"
 	Paid        = "paid"
@@ -34,6 +37,7 @@ type Details struct {
 	Status        string
 	LeftOn        *time.Time
 	StatusNote    *string
+	Replacement   string // after a fall-through: owed, provided or refunded; none otherwise
 	InvoiceStatus string
 	InvoiceNumber *string
 	InvoicedOn    *time.Time
@@ -51,6 +55,7 @@ type Patch struct {
 	Status        apiconv.Change[string]
 	LeftOn        apiconv.Change[*time.Time]
 	StatusNote    apiconv.Change[*string]
+	Replacement   apiconv.Change[string]
 	InvoiceStatus apiconv.Change[string]
 	InvoiceNumber apiconv.Change[*string]
 	InvoicedOn    apiconv.Change[*time.Time]
@@ -65,6 +70,7 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.Status, p.Status)
 	apiconv.Apply(&d.LeftOn, p.LeftOn)
 	apiconv.Apply(&d.StatusNote, p.StatusNote)
+	apiconv.Apply(&d.Replacement, p.Replacement)
 	apiconv.Apply(&d.InvoiceStatus, p.InvoiceStatus)
 	apiconv.Apply(&d.InvoiceNumber, p.InvoiceNumber)
 	apiconv.Apply(&d.InvoicedOn, p.InvoicedOn)
@@ -76,7 +82,8 @@ func (p Patch) Apply(d Details) Details {
 // field errors; a fall-through after the guarantee ended comes back as
 // problem (the placement stands: it is not a fall-through). Invoice dates
 // default to today.
-//   - only a fall-through has the day the candidate left, within the guarantee;
+//   - only a fall-through has the day the candidate left, within the guarantee,
+//     and a replacement (owed until provided or refunded);
 //   - not invoiced has no invoice number or dates; invoiced has the day it was
 //     invoiced; paid also has the day it was paid, not before the invoice.
 func Normalize(d Details, today time.Time) (Details, apperr.FieldErrors, string) {
@@ -93,8 +100,11 @@ func Normalize(d Details, today time.Time) (Details, apperr.FieldErrors, string)
 	}
 	problem := ""
 	if d.Status != FellThrough {
-		d.LeftOn = nil
+		d.LeftOn, d.Replacement = nil, NoReplacement
 	} else {
+		if d.Replacement == "" || d.Replacement == NoReplacement {
+			d.Replacement = ReplacementOwed // a fall-through within the guarantee: the client is owed one
+		}
 		switch {
 		case d.LeftOn == nil:
 			errs.Add("leftOn", "enter the day the candidate left")

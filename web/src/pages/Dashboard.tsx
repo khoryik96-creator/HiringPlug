@@ -5,6 +5,7 @@ import { summaryKey } from "../api/keys";
 import { timeInStage } from "../components/ApplicationCard";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
+import { OffersToApprove } from "../components/Offers";
 import { OPEN_STAGES, STAGE } from "../labels";
 
 type Counts = Schemas["StageCounts"];
@@ -30,6 +31,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
         <div className="stat"><strong>{s.placedLast30Days}</strong><span>placed in 30 days</span></div>
       </div>
 
+      {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
       {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
 
       <section className="panel" aria-label="Open jobs">

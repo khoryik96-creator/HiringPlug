@@ -10,6 +10,7 @@ export type PlacementFormState = {
   status: Schemas["PlacementStatus"];
   leftOn: string;
   statusNote: string;
+  replacement: Schemas["ReplacementStatus"];
   invoiceStatus: Schemas["InvoiceStatus"];
   invoiceNumber: string;
   invoicedOn: string;
@@ -32,6 +33,7 @@ export function formFromPlacement(p: Placement | undefined, recruiterId: string)
     status: p?.status ?? "active",
     leftOn: p?.leftOn ?? "",
     statusNote: p?.statusNote ?? "",
+    replacement: p?.replacement ?? "none",
     invoiceStatus: p?.invoiceStatus ?? "not_invoiced",
     invoiceNumber: p?.invoiceNumber ?? "",
     invoicedOn: p?.invoicedOn ?? "",
@@ -93,6 +95,7 @@ export function updateBody(f: PlacementFormState, version: number, withMoney: bo
     status: f.status,
     leftOn: f.status === "fell_through" ? orNull(f.leftOn) : null,
     statusNote: orNull(f.statusNote),
+    ...(f.status === "fell_through" && f.replacement !== "none" ? { replacement: f.replacement } : {}),
     invoiceStatus: f.invoiceStatus,
     invoiceNumber: f.invoiceStatus === "not_invoiced" ? null : orNull(f.invoiceNumber),
     invoicedOn: f.invoiceStatus === "not_invoiced" ? null : orNull(f.invoicedOn),

@@ -27,6 +27,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
     })),
   });
   const ending = list.data?.items.filter((p) => p.status === "active" && daysUntil(p.guaranteeEndsOn) >= 0 && daysUntil(p.guaranteeEndsOn) <= 14) ?? [];
+  const owed = list.data?.items.filter((p) => p.replacement === "owed") ?? [];
   return (
     <>
       <h2>Placements</h2>
@@ -61,6 +62,9 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
           </table>
           <p className="muted">Placements that fell through or did not start are not counted.</p>
         </section>
+      )}
+      {owed.length > 0 && (
+        <p className="warning" role="status">Replacement owed to the client: {owed.map((p) => `${p.candidateName} (${p.jobTitle})`).join(", ")}</p>
       )}
       {ending.length > 0 && (
         <p className="warning" role="status">

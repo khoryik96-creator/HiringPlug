@@ -132,6 +132,10 @@ components:
       type: string
       description: active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start.
       enum: [active, fell_through, cancelled]
+    ReplacementStatus:
+      type: string
+      description: "After a fall-through: owed = the client is owed a replacement candidate (or a refund); provided; refunded. none otherwise."
+      enum: [none, owed, provided, refunded]
     InvoiceStatus:
       type: string
       enum: [not_invoiced, invoiced, paid]
@@ -165,7 +169,7 @@ components:
     Placement:
       type: object
       required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, recruiterId, recruiterName,
-        startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, invoiceStatus, invoiceNumber, invoicedOn, paidOn,
+        startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn,
         restrictedFields, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/PlacementId' }
@@ -187,6 +191,7 @@ components:
         status: { $ref: '#/components/schemas/PlacementStatus' }
         leftOn: { type: string, format: date, nullable: true, description: When the candidate left (fell_through only). }
         statusNote: { type: string, nullable: true }
+        replacement: { $ref: '#/components/schemas/ReplacementStatus' }
         invoiceStatus: { $ref: '#/components/schemas/InvoiceStatus' }
         invoiceNumber: { type: string, nullable: true }
         invoicedOn: { type: string, format: date, nullable: true }
@@ -263,6 +268,9 @@ components:
         status: { $ref: '#/components/schemas/PlacementStatus' }
         leftOn: { type: string, format: date, nullable: true }
         statusNote: { type: string, maxLength: 1000, nullable: true }
+        replacement:
+          description: Only for a fall-through (it becomes owed when the placement falls through).
+          allOf: [{ $ref: '#/components/schemas/ReplacementStatus' }]
         invoiceStatus: { $ref: '#/components/schemas/InvoiceStatus' }
         invoiceNumber: { type: string, maxLength: 100, nullable: true }
         invoicedOn: { type: string, format: date, nullable: true }

@@ -30,7 +30,9 @@ tenant ─┬─ app_user (role)
 | `email_template` | name (unique per company, any case), subject, body with placeholders (`{{candidate.firstName}}`, ...; never salary), `version`; four starters added the first time a company opens its templates |
 | `email` | candidate (moves with a merge; deleted with them), application id (kept as written), to, cc, subject (no line breaks), body, sender (user id, name and reply-to address), status (queued/sent/failed), error, sent at |
 | `application_stage_change` | application, from stage, to stage, when; written by a database trigger on every stage change (history before it rebuilt from the audit log) |
-| `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
+| `offer` | application (one open offer each), status (draft/pending approval/approved/sent/accepted/declined/withdrawn), start date, answer-by date, other terms, who asked for approval, who approved (or sent back) and when with a note, sent and answered times, `version` |
+| `offer_salary` | offer, amount/currency/period; row-level security: only with `offers.salary:read` (write: `:update`) |
+| `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
@@ -60,7 +62,6 @@ candidate belonging to the same company.
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
-| `placements` | offer (in-house), replacements owed after a fall-through | 6.2 |
 | `job_leads` | job lead (source, URL, company, parsed fields, status) | M6 |
 | `integrations` | API key, webhook subscription and delivery | M6 |
 

@@ -88,6 +88,10 @@ x-error-codes:
     module: shared
     status: 404
     description: The record does not exist
+  OFFER_NOT_ALLOWED:
+    module: offers
+    status: 422
+    description: The offer cannot be made or changed like this (the application is closed or has an open offer, an approval of your own request, a step out of order, ...). The message says why.
   PAYLOAD_TOO_LARGE:
     module: shared
     status: 413
@@ -1329,6 +1333,127 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/offers:
+    get:
+      operationId: listOffers
+      tags: [offers]
+      summary: Offers, newest first
+      x-permission: offers:read
+      parameters:
+        - {name: applicationId, in: query, required: false, schema: {$ref: '#/components/schemas/ApplicationId'}}
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/OfferStatus'}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OfferList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/applications/{applicationId}/offers:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationIdPath'
+    post:
+      operationId: createOffer
+      tags: [offers]
+      summary: Draft an offer for an application (moves it to the offer stage)
+      description: "`salary` needs offers.salary:update."
+      x-permission: offers:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OfferInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Offer'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/OfferNotAllowed'}
+  /v1/offers/{offerId}:
+    parameters:
+      - $ref: '#/components/parameters/OfferIdPath'
+    patch:
+      operationId: updateOffer
+      tags: [offers]
+      summary: Change an offer's terms (an offer waiting for approval or approved goes back to draft)
+      description: "Fields left out stay as they are. `salary` needs offers.salary:update."
+      x-permission: offers:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OfferUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Offer'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/OfferNotAllowed'}
+  /v1/offers/{offerId}/steps:
+    parameters:
+      - $ref: '#/components/parameters/OfferIdPath'
+    post:
+      operationId: stepOffer
+      tags: [offers]
+      summary: Move an offer on (ask for approval, send, record the answer, withdraw)
+      description: Sending without approval needs offers:approve.
+      x-permission: offers:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OfferStepInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Offer'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/OfferNotAllowed'}
+  /v1/offers/{offerId}/decision:
+    parameters:
+      - $ref: '#/components/parameters/OfferIdPath'
+    post:
+      operationId: decideOffer
+      tags: [offers]
+      summary: Approve an offer waiting for approval, or send it back to draft
+      description: You cannot decide on an offer you asked approval for.
+      x-permission: offers:approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OfferDecisionInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Offer'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/OfferNotAllowed'}
   /v1/jobs/{jobId}/applications:
     parameters:
       - $ref: '#/components/parameters/JobOrderIdPath'
@@ -1576,6 +1701,11 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    OfferNotAllowed:
+      description: Not allowed (OFFER_NOT_ALLOWED).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     PlacementNotAllowed:
       description: Not allowed (PLACEMENT_NOT_ALLOWED).
       content:
@@ -1624,6 +1754,11 @@ components:
         - notes:create
         - notes:manage
         - notes:read
+        - offers.salary:read
+        - offers.salary:update
+        - offers:approve
+        - offers:manage
+        - offers:read
         - pipeline:read
         - pipeline:update
         - placements.fees:read
@@ -1648,6 +1783,7 @@ components:
         - JOB_AD_NOT_PUBLISHABLE
         - METHOD_NOT_ALLOWED
         - NOT_FOUND
+        - OFFER_NOT_ALLOWED
         - PAYLOAD_TOO_LARGE
         - PLACEMENT_NOT_ALLOWED
         - ROUTE_NOT_FOUND
@@ -3050,6 +3186,104 @@ components:
         items:
           type: array
           items: {$ref: '#/components/schemas/ActivityEntry'}
+    OfferId:
+      type: string
+      pattern: '^ofr_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ofr_01jbz6w0m0k8q9x2r3s4t5v6w7
+    OfferStatus:
+      type: string
+      description: >
+        draft → pending_approval → approved → sent → accepted or declined; approvers send a draft straight away; withdrawn at any point before the answer.
+
+      enum: [draft, pending_approval, approved, sent, accepted, declined, withdrawn]
+    OfferRestrictedField:
+      type: string
+      description: A field left out because you lack the permission to see it.
+      enum: [salary]
+    Offer:
+      type: object
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, status, startDate, expiresOn, terms, requestedBy, requestedByName, decidedBy, decidedByName, decidedAt, decisionNote, sentAt, answeredAt, restrictedFields, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/OfferId'}
+        version: {type: integer}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        jobTitle: {type: string}
+        companyName: {type: string}
+        status: {$ref: '#/components/schemas/OfferStatus'}
+        salary:
+          description: Left out (and listed in restrictedFields) without offers.salary:read. null means none set.
+          allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
+          nullable: true
+        startDate: {type: string, format: date, nullable: true}
+        expiresOn: {type: string, format: date, nullable: true, description: The day the offer lapses if not answered.}
+        terms: {type: string, nullable: true, description: "Anything else offered: benefits, probation, notice, ..."}
+        requestedBy:
+          description: Who asked for approval.
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+          nullable: true
+        requestedByName: {type: string, nullable: true}
+        decidedBy:
+          description: Who approved it (or sent it back last); the sender when an approver sent it without asking.
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+          nullable: true
+        decidedByName: {type: string, nullable: true}
+        decidedAt: {type: string, format: date-time, nullable: true}
+        decisionNote: {type: string, nullable: true}
+        sentAt: {type: string, format: date-time, nullable: true}
+        answeredAt: {type: string, format: date-time, nullable: true}
+        restrictedFields:
+          type: array
+          items: {$ref: '#/components/schemas/OfferRestrictedField'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    OfferList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Offer'}
+    OfferInput:
+      type: object
+      additionalProperties: false
+      properties:
+        salary: {$ref: '#/components/schemas/SalaryAmount'}
+        startDate: {type: string, format: date}
+        expiresOn: {type: string, format: date}
+        terms: {type: string, maxLength: 5000}
+    OfferUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        salary:
+          allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
+          nullable: true
+        startDate: {type: string, format: date, nullable: true}
+        expiresOn: {type: string, format: date, nullable: true}
+        terms: {type: string, maxLength: 5000, nullable: true}
+    OfferStep:
+      type: string
+      enum: [request_approval, send, accept, decline, withdraw]
+    OfferStepInput:
+      type: object
+      additionalProperties: false
+      required: [version, step]
+      properties:
+        version: {type: integer, minimum: 1}
+        step: {$ref: '#/components/schemas/OfferStep'}
+    OfferDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [version, approve]
+      properties:
+        version: {type: integer, minimum: 1}
+        approve: {type: boolean}
+        note: {type: string, maxLength: 1000, description: Why it was sent back (or a remark on the approval).}
     ApplicationId:
       type: string
       pattern: '^appl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3167,6 +3401,10 @@ components:
       type: string
       description: active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start.
       enum: [active, fell_through, cancelled]
+    ReplacementStatus:
+      type: string
+      description: "After a fall-through: owed = the client is owed a replacement candidate (or a refund); provided; refunded. none otherwise."
+      enum: [none, owed, provided, refunded]
     InvoiceStatus:
       type: string
       enum: [not_invoiced, invoiced, paid]
@@ -3198,7 +3436,7 @@ components:
           nullable: true
     Placement:
       type: object
-      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, invoiceStatus, invoiceNumber, invoicedOn, paidOn, restrictedFields, createdAt, updatedAt]
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn, restrictedFields, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/PlacementId'}
         version: {type: integer}
@@ -3219,6 +3457,7 @@ components:
         status: {$ref: '#/components/schemas/PlacementStatus'}
         leftOn: {type: string, format: date, nullable: true, description: When the candidate left (fell_through only).}
         statusNote: {type: string, nullable: true}
+        replacement: {$ref: '#/components/schemas/ReplacementStatus'}
         invoiceStatus: {$ref: '#/components/schemas/InvoiceStatus'}
         invoiceNumber: {type: string, nullable: true}
         invoicedOn: {type: string, format: date, nullable: true}
@@ -3295,6 +3534,9 @@ components:
         status: {$ref: '#/components/schemas/PlacementStatus'}
         leftOn: {type: string, format: date, nullable: true}
         statusNote: {type: string, maxLength: 1000, nullable: true}
+        replacement:
+          description: Only for a fall-through (it becomes owed when the placement falls through).
+          allOf: [{$ref: '#/components/schemas/ReplacementStatus'}]
         invoiceStatus: {$ref: '#/components/schemas/InvoiceStatus'}
         invoiceNumber: {type: string, maxLength: 100, nullable: true}
         invoicedOn: {type: string, format: date, nullable: true}
@@ -3428,6 +3670,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/JobAdId'}
+    OfferIdPath:
+      name: offerId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/OfferId'}
     ApplicationIdPath:
       name: applicationId
       in: path
@@ -3589,6 +3836,31 @@ x-permissions:
     description: Read notes (sensitive ones need notes.sensitive:read).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  offers.salary:read:
+    module: offers
+    description: See the salary offered.
+    sensitive: false
+    roles: [owner, admin, recruiter, hiring_manager]
+  offers.salary:update:
+    module: offers
+    description: Set the salary offered.
+    sensitive: false
+    roles: [owner, admin, recruiter]
+  offers:approve:
+    module: offers
+    description: Approve offers (or send them back), and send offers without asking.
+    sensitive: false
+    roles: [owner, admin, hiring_manager]
+  offers:manage:
+    module: offers
+    description: Make and change offers, ask for approval, send them and record the answer.
+    sensitive: false
+    roles: [owner, admin, recruiter]
+  offers:read:
+    module: offers
+    description: View offers (the salary needs offers.salary:read).
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   pipeline:read:
     module: pipeline
     description: See which candidates are on which jobs, and their stages.
@@ -3676,6 +3948,8 @@ x-modules:
     description: Job orders (agency) or requisitions (in-house), with an optional salary budget.
   - name: notes
     description: Notes on records, and what changed on them (activity).
+  - name: offers
+    description: 'An offer on an application: salary, start date, when it expires and other terms. Those who may approve offers send them straight away; others ask for approval first, and someone else approves (or sends it back). Then the offer is sent and the candidate accepts or declines. Making an offer moves the application to the offer stage.'
   - name: pipeline
     description: Candidates on jobs (applications) and their stages.
   - name: placements

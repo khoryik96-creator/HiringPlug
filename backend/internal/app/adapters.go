@@ -12,6 +12,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
 )
@@ -95,4 +96,23 @@ func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []stri
 
 func (a placementApplications) Place(ctx context.Context, tx pgx.Tx, id string) error {
 	return a.pipeline.Place(ctx, tx, id)
+}
+
+// offerApplications gives the offers module the pipeline's applications, in
+// its own type.
+type offerApplications struct{ pipeline *pipeline.Module }
+
+func (a offerApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]offers.Application, error) {
+	briefs, err := a.pipeline.Briefs(ctx, tx, ids)
+	out := make(map[string]offers.Application, len(briefs))
+	for id, b := range briefs {
+		out[id] = offers.Application{
+			Stage: b.Stage, CandidateID: b.CandidateID, CandidateName: b.CandidateName, JobID: b.JobID, JobTitle: b.JobTitle, CompanyName: b.CompanyName,
+		}
+	}
+	return out, err
+}
+
+func (a offerApplications) ReachOffer(ctx context.Context, tx pgx.Tx, id string) error {
+	return a.pipeline.ReachOffer(ctx, tx, id)
 }

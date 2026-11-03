@@ -257,6 +257,21 @@ requirements), de-duplicated, and kept with its source and date.
   quotes the CV and the job ad, so a recruiter can check it. It suggests; the
   recruiter decides.
 
+## Offers ✅
+
+On a candidate's job (from submitted on), **Make offer** drafts an offer:
+salary, start date, the day to answer by, and other terms (benefits,
+probation, notice). It moves the application to the offer stage. Recruiters
+**ask for approval**; owners, admins and hiring managers approve it or send it
+back with a note, but never their own request, and see the salary to do so.
+Approvers can also send a draft straight away (sending is their approval).
+Changing an offer waiting for approval or approved sends it back to draft.
+Then the offer is marked sent, and accepted or declined; any offer not yet
+answered can be withdrawn, and a declined or withdrawn one can be followed by a
+new one (one open offer per application). The salary is protected like other
+salaries (`offers.salary:read` / `:update`, enforced by the database too, never
+in the audit log). Approvers see **Offers to approve** on their dashboard.
+
 ## Placements and fees ✅
 
 Recording a placement (on a candidate's job at the offer stage, "Record
@@ -274,7 +289,9 @@ out to the cent on the server, with a preview in the form) or a fixed amount.
 The **Placements** page lists them all, filtered by what happened or the
 invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
 paid; fall-throughs and no-starts not counted) and the placements whose
-guarantee ends within two weeks.
+guarantee ends within two weeks. A fall-through means the client is owed a
+**replacement**: the placement shows "Replacement owed" (listed at the top of
+the Placements page) until it is marked provided or refunded.
 
 ## 5. Notes and activity
 

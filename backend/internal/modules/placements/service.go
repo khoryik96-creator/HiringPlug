@@ -161,7 +161,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 		updated, err := q.UpdatePlacement(ctx, store.UpdatePlacementParams{
 			ID: id, ExpectedVersion: int32(version), //nolint:gosec // versions are small
 			RecruiterID: after.RecruiterID, StartDate: after.StartDate, GuaranteeDays: int32(after.GuaranteeDays), //nolint:gosec // 0..365
-			Status: after.Status, LeftOn: after.LeftOn, StatusNote: after.StatusNote,
+			Status: after.Status, LeftOn: after.LeftOn, StatusNote: after.StatusNote, Replacement: after.Replacement,
 			InvoiceStatus: after.InvoiceStatus, InvoiceNumber: after.InvoiceNumber, InvoicedOn: after.InvoicedOn, PaidOn: after.PaidOn,
 		})
 		if database.IsNoRows(err) {
@@ -255,7 +255,7 @@ func putMoney(ctx context.Context, q *store.Queries, id string, m *Money) error 
 func detailsOf(r store.Placement) Details {
 	return Details{
 		RecruiterID: r.RecruiterID, StartDate: r.StartDate, GuaranteeDays: int(r.GuaranteeDays),
-		Status: r.Status, LeftOn: r.LeftOn, StatusNote: r.StatusNote,
+		Status: r.Status, LeftOn: r.LeftOn, StatusNote: r.StatusNote, Replacement: r.Replacement,
 		InvoiceStatus: r.InvoiceStatus, InvoiceNumber: r.InvoiceNumber, InvoicedOn: r.InvoicedOn, PaidOn: r.PaidOn,
 	}
 }
@@ -269,7 +269,7 @@ func auditFields(d Details) map[string]any {
 	}
 	return map[string]any{
 		"recruiterId": d.RecruiterID, "startDate": d.StartDate.Format(time.DateOnly), "guaranteeDays": d.GuaranteeDays,
-		"status": d.Status, "leftOn": day(d.LeftOn), "statusNote": d.StatusNote,
+		"status": d.Status, "leftOn": day(d.LeftOn), "statusNote": d.StatusNote, "replacement": d.Replacement,
 		"invoiceStatus": d.InvoiceStatus, "invoiceNumber": d.InvoiceNumber, "invoicedOn": day(d.InvoicedOn), "paidOn": day(d.PaidOn),
 	}
 }

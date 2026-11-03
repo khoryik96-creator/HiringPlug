@@ -65,6 +65,11 @@ details get their own permissions.
 | `placements:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `placements:manage` (record and change) | ✓ | ✓ | ✓ | | | |
 | `placements.fees:read`, `placements.fees:update` (salary and fee) | ✓ | ✓ | ✓ | | | |
+| `offers:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `offers:manage` (make, change, ask for approval, send, record the answer) | ✓ | ✓ | ✓ | | | |
+| `offers:approve` (approve others' requests; send without asking) | ✓ | ✓ | | | ✓ | |
+| `offers.salary:read` | ✓ | ✓ | ✓ | | ✓ | |
+| `offers.salary:update` | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick

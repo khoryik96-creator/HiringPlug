@@ -24,3 +24,5 @@ export const emailTemplatesKey = ["email-templates"] as const;
 export const candidateEmailsKey = (candidateId: string) => ["emails", candidateId] as const;
 export const placementsKey = ["placements"] as const;
 export const applicationPlacementKey = (applicationId: string) => ["placements", "application", applicationId] as const;
+export const offersKey = ["offers"] as const;
+export const applicationOffersKey = (applicationId: string) => ["offers", "application", applicationId] as const;

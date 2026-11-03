@@ -48,6 +48,11 @@ class Permission(StrEnum):
     notes_create = "notes:create"
     notes_manage = "notes:manage"
     notes_read = "notes:read"
+    offers_salary_read = "offers.salary:read"
+    offers_salary_update = "offers.salary:update"
+    offers_approve = "offers:approve"
+    offers_manage = "offers:manage"
+    offers_read = "offers:read"
     pipeline_read = "pipeline:read"
     pipeline_update = "pipeline:update"
     placements_fees_read = "placements.fees:read"
@@ -72,6 +77,7 @@ class ErrorCode(StrEnum):
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
+    OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
@@ -1191,6 +1197,74 @@ class ActivityList(BaseModel):
     items: list[ActivityEntry]
 
 
+class OfferId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ofr_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ofr_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class OfferStatus(StrEnum):
+    draft = "draft"
+    pending_approval = "pending_approval"
+    approved = "approved"
+    sent = "sent"
+    accepted = "accepted"
+    declined = "declined"
+    withdrawn = "withdrawn"
+
+
+class OfferRestrictedField(StrEnum):
+    salary = "salary"
+
+
+class OfferInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    salary: SalaryAmount | None = None
+    startDate: date | None = None
+    expiresOn: date | None = None
+    terms: Annotated[str | None, Field(max_length=5000)] = None
+
+
+class OfferUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    salary: SalaryAmount | None = None
+    startDate: date | None = None
+    expiresOn: date | None = None
+    terms: Annotated[str | None, Field(max_length=5000)] = None
+
+
+class OfferStep(StrEnum):
+    request_approval = "request_approval"
+    send = "send"
+    accept = "accept"
+    decline = "decline"
+    withdraw = "withdraw"
+
+
+class OfferStepInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    step: OfferStep
+
+
+class OfferDecisionInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    approve: bool
+    note: Annotated[
+        str | None, Field(description="Why it was sent back (or a remark on the approval).", max_length=1000)
+    ] = None
+
+
 class ApplicationId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["appl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^appl_[0-9a-hjkmnp-tv-z]{26}$")
@@ -1320,6 +1394,13 @@ class PlacementStatus(StrEnum):
     cancelled = "cancelled"
 
 
+class ReplacementStatus(StrEnum):
+    none = "none"
+    owed = "owed"
+    provided = "provided"
+    refunded = "refunded"
+
+
 class InvoiceStatus(StrEnum):
     not_invoiced = "not_invoiced"
     invoiced = "invoiced"
@@ -1362,6 +1443,7 @@ class Placement(BaseModel):
     status: PlacementStatus
     leftOn: Annotated[date | None, Field(description="When the candidate left (fell_through only).")]
     statusNote: Annotated[str | None, Field(...)]
+    replacement: ReplacementStatus
     invoiceStatus: InvoiceStatus
     invoiceNumber: Annotated[str | None, Field(...)]
     invoicedOn: Annotated[date | None, Field(...)]
@@ -1423,6 +1505,10 @@ class PlacementUpdate(BaseModel):
     status: PlacementStatus | None = None
     leftOn: date | None = None
     statusNote: Annotated[str | None, Field(max_length=1000)] = None
+    replacement: Annotated[
+        ReplacementStatus | None,
+        Field(description="Only for a fall-through (it becomes owed when the placement falls through)."),
+    ] = None
     invoiceStatus: InvoiceStatus | None = None
     invoiceNumber: Annotated[str | None, Field(max_length=100)] = None
     invoicedOn: date | None = None
@@ -1658,6 +1744,47 @@ class JobAdUpdate(BaseModel):
     description: Annotated[str | None, Field(max_length=20000)] = None
     closesOn: date | None = None
     status: JobAdStatus | None = None
+
+
+class Offer(BaseModel):
+    id: OfferId
+    version: int
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    jobId: JobOrderId
+    jobTitle: str
+    companyName: str
+    status: OfferStatus
+    salary: Annotated[
+        SalaryAmount | None,
+        Field(
+            description="Left out (and listed in restrictedFields) without offers.salary:read. null means none set."
+        ),
+    ] = None
+    startDate: Annotated[date | None, Field(...)]
+    expiresOn: Annotated[date | None, Field(description="The day the offer lapses if not answered.")]
+    terms: Annotated[str | None, Field(description="Anything else offered: benefits, probation, notice, ...")]
+    requestedBy: Annotated[UserId | None, Field(description="Who asked for approval.")]
+    requestedByName: Annotated[str | None, Field(...)]
+    decidedBy: Annotated[
+        UserId | None,
+        Field(
+            description="Who approved it (or sent it back last); the sender when an approver sent it without asking."
+        ),
+    ]
+    decidedByName: Annotated[str | None, Field(...)]
+    decidedAt: Annotated[AwareDatetime | None, Field(...)]
+    decisionNote: Annotated[str | None, Field(...)]
+    sentAt: Annotated[AwareDatetime | None, Field(...)]
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
+    restrictedFields: list[OfferRestrictedField]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class OfferList(BaseModel):
+    items: list[Offer]
 
 
 class RecruiterRow(BaseModel):

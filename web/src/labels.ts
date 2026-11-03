@@ -210,3 +210,11 @@ export function sourceLabel(source: string): string {
   const labels: Record<string, string> = { ...CANDIDATE_SOURCE, ...CHANNEL, unknown: "Not recorded" };
   return labels[source] ?? source;
 }
+
+export const OFFER_STATUS: Record<Schemas["OfferStatus"], string> = {
+  draft: "Draft", pending_approval: "Waiting for approval", approved: "Approved", sent: "Sent",
+  accepted: "Accepted", declined: "Declined", withdrawn: "Withdrawn",
+};
+export const REPLACEMENT: Record<Schemas["ReplacementStatus"], string> = {
+  none: "", owed: "Replacement owed", provided: "Replacement provided", refunded: "Refunded",
+};

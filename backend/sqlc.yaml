@@ -94,3 +94,20 @@ sql:
           - db_type: date
             nullable: true
             go_type: { type: time.Time, pointer: true }
+  - <<: *module
+    queries: db/queries/offers.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/offers/internal/store
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type: { type: time.Time, pointer: true }
+          - db_type: date
+            go_type: time.Time
+          - db_type: date
+            nullable: true
+            go_type: { type: time.Time, pointer: true }

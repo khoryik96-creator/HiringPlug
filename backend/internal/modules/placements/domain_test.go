@@ -110,3 +110,15 @@ func TestTotals(t *testing.T) {
 		{Currency: "SGD", Total: "8000.00", NotInvoiced: "8000.00", Invoiced: "0.00", Paid: "0.00"},
 	}, totals, "fallen-through placements do not count")
 }
+
+func TestReplacementOwedAfterAFallThrough(t *testing.T) {
+	today := day("2026-11-03")
+	d, _, _ := Normalize(Details{StartDate: day("2026-12-01"), GuaranteeDays: 90, Status: FellThrough, LeftOn: ptr(day("2027-01-15"))}, today)
+	assert.Equal(t, ReplacementOwed, d.Replacement, "the client is owed a replacement")
+	d.Replacement = "provided"
+	d, _, _ = Normalize(d, today)
+	assert.Equal(t, "provided", d.Replacement)
+	d.Status = Active
+	d, _, _ = Normalize(d, today)
+	assert.Equal(t, NoReplacement, d.Replacement, "back on: nothing owed")
+}
