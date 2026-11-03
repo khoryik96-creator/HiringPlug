@@ -850,6 +850,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/lead-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where leads come from, and how their last check went */
+        get: operations["listLeadSources"];
+        put?: never;
+        /** Add a source (it is checked straight away, then every day) */
+        post: operations["createLeadSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/lead-sources/{leadSourceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadSourceId: components["parameters"]["LeadSourceIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a source (its leads stay) */
+        delete: operations["deleteLeadSource"];
+        options?: never;
+        head?: never;
+        /** Rename a source, link it to a company, or turn its checks off or on */
+        patch: operations["updateLeadSource"];
+        trace?: never;
+    };
+    "/v1/lead-sources/{leadSourceId}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadSourceId: components["parameters"]["LeadSourceIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a source now */
+        post: operations["checkLeadSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/job-leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hiring leads, newest first */
+        get: operations["listJobLeads"];
+        put?: never;
+        /** Save a job ad you found as a lead */
+        post: operations["createJobLead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/job-leads/{jobLeadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a lead's status, notes or company */
+        patch: operations["updateJobLead"];
+        trace?: never;
+    };
     "/v1/notes": {
         parameters: {
             query?: never;
@@ -1181,11 +1275,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind" | "webhook.deliver";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2179,6 +2273,107 @@ export interface components {
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["JobOrderId"] | null;
         };
+        /** @example lsrc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        LeadSourceId: string;
+        /** @example lead_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        JobLeadId: string;
+        /**
+         * @description greenhouse, lever, ashby, smartrecruiters = the company's public job board on that system (identifier: its board name, e.g. "acme" from boards.greenhouse.io/acme); careers_page = a careers page address whose jobs carry schema.org JobPosting markup.
+         * @enum {string}
+         */
+        LeadSourceKind: "greenhouse" | "lever" | "ashby" | "smartrecruiters" | "careers_page";
+        /**
+         * @description new = not looked at; contacted = the company was approached; client = it became a client; ignored = not worth pursuing.
+         * @enum {string}
+         */
+        LeadStatus: "new" | "contacted" | "client" | "ignored";
+        LeadSource: {
+            id: components["schemas"]["LeadSourceId"];
+            version: number;
+            kind: components["schemas"]["LeadSourceKind"];
+            identifier: string;
+            /** @description The company's name, as shown on its leads. */
+            name: string;
+            companyId: components["schemas"]["CompanyId"] | null;
+            active: boolean;
+            /** @description Openings listed at the last check. */
+            openLeads: number;
+            /** Format: date-time */
+            lastCheckedAt: string | null;
+            /** @description Why the last check failed (null when it worked). */
+            lastError: string | null;
+            /** Format: date-time */
+            nextCheckAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        LeadSourceList: {
+            items: components["schemas"]["LeadSource"][];
+        };
+        LeadSourceInput: {
+            kind: components["schemas"]["LeadSourceKind"];
+            /** @description The board name, or the careers page address. */
+            identifier: string;
+            /** @description The company's name (required for job board feeds; a careers page's markup may name it). */
+            name?: string;
+            companyId?: components["schemas"]["CompanyId"];
+        };
+        LeadSourceUpdate: {
+            version: number;
+            name?: string;
+            companyId?: components["schemas"]["CompanyId"] | null;
+            active?: boolean;
+        };
+        JobLead: {
+            id: components["schemas"]["JobLeadId"];
+            version: number;
+            /** @description null for an ad saved by hand. */
+            sourceId: components["schemas"]["LeadSourceId"] | null;
+            sourceKind: components["schemas"]["LeadSourceKind"] | null;
+            companyName: string;
+            companyId: components["schemas"]["CompanyId"] | null;
+            title: string;
+            location: string | null;
+            url: string | null;
+            /** Format: date-time */
+            postedAt: string | null;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            /**
+             * Format: date-time
+             * @description When the opening stopped being listed.
+             */
+            closedAt: string | null;
+            status: components["schemas"]["LeadStatus"];
+            notes: string | null;
+        };
+        JobLeadList: {
+            items: components["schemas"]["JobLead"][];
+        };
+        JobLeadInput: {
+            companyName: string;
+            title: string;
+            location?: string;
+            url?: string;
+            notes?: string;
+            companyId?: components["schemas"]["CompanyId"];
+        };
+        JobLeadUpdate: {
+            version: number;
+            status?: components["schemas"]["LeadStatus"];
+            notes?: string | null;
+            companyId?: components["schemas"]["CompanyId"] | null;
+        };
+        LeadSourceCheckJob: {
+            sourceId: components["schemas"]["LeadSourceId"];
+            /**
+             * Format: date-time
+             * @description The check this job is for; an older one (replaced by a "check now") does nothing.
+             */
+            runAt: string;
+        };
         /** @example note_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         NoteId: string;
         /** @enum {string} */
@@ -2686,6 +2881,8 @@ export interface components {
         InterviewIdPath: components["schemas"]["InterviewId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
+        LeadSourceIdPath: components["schemas"]["LeadSourceId"];
+        JobLeadIdPath: components["schemas"]["JobLeadId"];
         OfferIdPath: components["schemas"]["OfferId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
         PlacementIdPath: components["schemas"]["PlacementId"];
@@ -4354,6 +4551,222 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSalary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listLeadSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSourceList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createLeadSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadSourceInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSource"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteLeadSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadSourceId: components["parameters"]["LeadSourceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateLeadSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadSourceId: components["parameters"]["LeadSourceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadSourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSource"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    checkLeadSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                leadSourceId: components["parameters"]["LeadSourceIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadSource"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listJobLeads: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["LeadStatus"];
+                sourceId?: components["schemas"]["LeadSourceId"];
+                /** @description Only openings still listed (true) or closed (false). */
+                open?: boolean;
+                /** @description Words in the company or title. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLeadList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createJobLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobLeadInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLead"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateJobLead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobLeadId: components["parameters"]["JobLeadIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobLeadUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLead"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

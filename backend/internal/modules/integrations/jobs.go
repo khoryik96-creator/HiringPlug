@@ -3,12 +3,9 @@ package integrations
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/safehttp"
 )
 
 // deliver handles webhook.deliver: it posts one delivery and records the
@@ -64,27 +62,10 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	return err
 }
 
-var errRedirect = errors.New("the receiver redirected (redirects are not followed)")
-
 // post sends a delivery, signed, and returns the HTTP status (0 when there
 // was none) and an error unless the receiver answered 2xx.
 func (s *Service) post(ctx context.Context, d store.GetDeliveryToSendRow, now time.Time) (int, error) {
-	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
-		host, _, err := net.SplitHostPort(address)
-		if err != nil {
-			return err
-		}
-		if Blocked(net.ParseIP(host), s.allowPrivate) {
-			return fmt.Errorf("%s is a private or local network address", host)
-		}
-		return nil
-	}}
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		// No proxy: the address check must see where the request really goes.
-		Transport:     &http.Transport{Proxy: nil, DialContext: dialer.DialContext, TLSHandshakeTimeout: 5 * time.Second},
-		CheckRedirect: func(*http.Request, []*http.Request) error { return errRedirect },
-	}
+	client := safehttp.Client(safehttp.Options{AllowPrivate: s.allowPrivate, Timeout: 10 * time.Second})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.Url, bytes.NewReader(d.Payload))
 	if err != nil {
 		return 0, err
@@ -102,7 +83,7 @@ func (s *Service) post(ctx context.Context, d store.GetDeliveryToSendRow, now ti
 	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 64<<10))
 	if res.StatusCode/100 != 2 {
 		if res.StatusCode/100 == 3 {
-			return res.StatusCode, errRedirect
+			return res.StatusCode, safehttp.ErrRedirect
 		}
 		return res.StatusCode, fmt.Errorf("the receiver answered HTTP %d", res.StatusCode)
 	}

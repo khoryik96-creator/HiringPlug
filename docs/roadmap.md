@@ -31,6 +31,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Reports: conversion, sources, recruiters, time to fill |
 | ✅ | Offers with approvals; replacements owed after a fall-through |
 | ✅ | API keys and signed webhooks for your other systems |
+| ✅ | Hiring leads from public job boards, careers pages and saved ads |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -86,14 +87,14 @@ job. Today the app has candidates but nothing to place them into.
 | 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
 | 5.5 **Company auto-fill** | Fill company details from the website name or address, as suggestions you accept |
 
-### Phase 6: agency business and reports 🔜
+### Phase 6: agency business and reports ✅
 
 | Step | Delivers |
 |---|---|
 | ✅ 6.1 **Placements and fees** (agency) | Placement per application (moves it to placed) with start date, guarantee period and fall-throughs, recruiter credited, invoice and payment; agreed salary and fee (a percentage of the yearly salary or fixed) visible only to those allowed; a Placements page with fee totals and guarantees ending soon |
 | ✅ 6.2 **Offers** | Offer terms (protected salary, start, answer-by date, other terms) on an application; approval by someone other than who asked (approvers may send straight away); sent, accepted, declined or withdrawn; offers to approve on the dashboard; a replacement owed after a fall-through |
 | ✅ 6.3 **Reports** | Pipeline conversion by furthest stage reached, sources (applications, interviews, placements), placements and fees per recruiter, time to fill and to place, for any period |
-| 6.4 **Job ads puller** | Collect hiring signals from allowed sources (careers pages, public ATS feeds, ads you save) as business development leads |
+| ✅ 6.4 **Job ads puller** | Leads from companies' public job boards (Greenhouse, Lever, Ashby, SmartRecruiters) and careers pages with job markup (robots.txt respected), checked daily, openings closed when no longer listed; ads saved by hand; statuses and links to companies |
 | ✅ 6.5 **Integrations** | API keys acting as a role (hashed, shown once, revocable); signed webhooks for chosen events, queued with the change, retried, never to private networks; an Integrations page |
 
 ### Phase 7: cloud and selling it ⬜

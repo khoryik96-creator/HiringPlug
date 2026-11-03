@@ -7,8 +7,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"net"
-	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
@@ -120,20 +118,4 @@ func NextAttempt(n int, now time.Time) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return now.Add(retryAfter[n-1]), true
-}
-
-// Blocked reports whether a webhook may not be delivered to an address: the
-// server's own and private networks, unless allowed (local testing).
-func Blocked(ip net.IP, allowPrivate bool) bool {
-	if allowPrivate {
-		return false
-	}
-	addr, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return true
-	}
-	addr = addr.Unmap()
-	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() ||
-		addr.IsUnspecified() || addr.IsMulticast() || addr.IsInterfaceLocalMulticast() ||
-		netip.MustParsePrefix("100.64.0.0/10").Contains(addr) // carrier-grade NAT
 }

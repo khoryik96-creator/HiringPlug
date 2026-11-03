@@ -44,6 +44,8 @@ class Permission(StrEnum):
     jobs_create = "jobs:create"
     jobs_read = "jobs:read"
     jobs_update = "jobs:update"
+    leads_manage = "leads:manage"
+    leads_read = "leads:read"
     notes_activity_read = "notes.activity:read"
     notes_sensitive_read = "notes.sensitive:read"
     notes_create = "notes:create"
@@ -96,6 +98,7 @@ class JobKind(StrEnum):
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
     interview_remind = "interview.remind"
+    lead_source_check = "lead_source.check"
     webhook_deliver = "webhook.deliver"
 
 
@@ -1273,6 +1276,137 @@ class JobOrderPage(BaseModel):
     items: list[JobOrderSummary]
     nextCursor: Annotated[
         JobOrderId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
+
+
+class LeadSourceId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["lsrc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^lsrc_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class JobLeadId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["lead_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^lead_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class LeadSourceKind(StrEnum):
+    greenhouse = "greenhouse"
+    lever = "lever"
+    ashby = "ashby"
+    smartrecruiters = "smartrecruiters"
+    careers_page = "careers_page"
+
+
+class LeadStatus(StrEnum):
+    new = "new"
+    contacted = "contacted"
+    client = "client"
+    ignored = "ignored"
+
+
+class LeadSource(BaseModel):
+    id: LeadSourceId
+    version: int
+    kind: LeadSourceKind
+    identifier: str
+    name: Annotated[str, Field(description="The company's name, as shown on its leads.")]
+    companyId: Annotated[CompanyId | None, Field(...)]
+    active: bool
+    openLeads: Annotated[int, Field(description="Openings listed at the last check.")]
+    lastCheckedAt: Annotated[AwareDatetime | None, Field(...)]
+    lastError: Annotated[str | None, Field(description="Why the last check failed (null when it worked).")]
+    nextCheckAt: Annotated[AwareDatetime | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class LeadSourceList(BaseModel):
+    items: list[LeadSource]
+
+
+class LeadSourceInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: LeadSourceKind
+    identifier: Annotated[
+        str, Field(description="The board name, or the careers page address.", max_length=500, min_length=1)
+    ]
+    name: Annotated[
+        str | None,
+        Field(
+            description="The company's name (required for job board feeds; a careers page's markup may name it).",
+            max_length=200,
+        ),
+    ] = None
+    companyId: CompanyId | None = None
+
+
+class LeadSourceUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    companyId: CompanyId | None = None
+    active: bool | None = None
+
+
+class JobLead(BaseModel):
+    id: JobLeadId
+    version: int
+    sourceId: Annotated[LeadSourceId | None, Field(description="null for an ad saved by hand.")]
+    sourceKind: Annotated[LeadSourceKind | None, Field(...)]
+    companyName: str
+    companyId: Annotated[CompanyId | None, Field(...)]
+    title: str
+    location: Annotated[str | None, Field(...)]
+    url: Annotated[str | None, Field(...)]
+    postedAt: Annotated[AwareDatetime | None, Field(...)]
+    firstSeenAt: AwareDatetime
+    lastSeenAt: AwareDatetime
+    closedAt: Annotated[AwareDatetime | None, Field(description="When the opening stopped being listed.")]
+    status: LeadStatus
+    notes: Annotated[str | None, Field(...)]
+
+
+class JobLeadList(BaseModel):
+    items: list[JobLead]
+
+
+class JobLeadInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyName: Annotated[str, Field(max_length=200, min_length=1)]
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    location: Annotated[str | None, Field(max_length=200)] = None
+    url: Annotated[str | None, Field(max_length=1000)] = None
+    notes: Annotated[str | None, Field(max_length=2000)] = None
+    companyId: CompanyId | None = None
+
+
+class JobLeadUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    status: LeadStatus | None = None
+    notes: Annotated[str | None, Field(max_length=2000)] = None
+    companyId: CompanyId | None = None
+
+
+class LeadSourceCheckJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    sourceId: LeadSourceId
+    runAt: Annotated[
+        AwareDatetime,
+        Field(
+            description='The check this job is for; an older one (replaced by a "check now") does nothing.'
+        ),
     ]
 
 

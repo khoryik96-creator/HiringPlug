@@ -25,6 +25,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -51,6 +52,7 @@ type Modules struct {
 	Reports      *reports.Module
 	Offers       *offers.Module
 	Integrations *integrations.Module
+	Leads        *leads.Module
 	// scaffold:fields
 }
 
@@ -85,7 +87,8 @@ func NewModules(d Deps) *Modules {
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
 	}, d.Config.TimeZone)
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
-	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.WebhooksAllowPrivate)
+	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks)
+	m.Leads = leads.New(d.Pool, m.Companies, d.Config.AllowPrivateNetworks)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -110,6 +113,7 @@ type (
 	reportsHTTP      = reports.HTTP
 	offersHTTP       = offers.HTTP
 	integrationsHTTP = integrations.HTTP
+	leadsHTTP        = leads.HTTP
 	// scaffold:aliases
 )
 
@@ -132,6 +136,7 @@ type Server struct {
 	*reportsHTTP
 	*offersHTTP
 	*integrationsHTTP
+	*leadsHTTP
 	// scaffold:embeds
 }
 
@@ -155,6 +160,7 @@ func (m *Modules) Server() *Server {
 		reportsHTTP:      m.Reports.HTTP,
 		offersHTTP:       m.Offers.HTTP,
 		integrationsHTTP: m.Integrations.HTTP,
+		leadsHTTP:        m.Leads.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -167,6 +173,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Emails.JobHandlers(),
 		m.Interviews.JobHandlers(),
 		m.Integrations.JobHandlers(),
+		m.Leads.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

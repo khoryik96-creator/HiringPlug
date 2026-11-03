@@ -1392,6 +1392,153 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/lead-sources:
+    get:
+      operationId: listLeadSources
+      tags: [leads]
+      summary: Where leads come from, and how their last check went
+      x-permission: leads:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeadSourceList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createLeadSource
+      tags: [leads]
+      summary: Add a source (it is checked straight away, then every day)
+      x-permission: leads:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LeadSourceInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeadSource'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/lead-sources/{leadSourceId}:
+    parameters:
+      - $ref: '#/components/parameters/LeadSourceIdPath'
+    patch:
+      operationId: updateLeadSource
+      tags: [leads]
+      summary: Rename a source, link it to a company, or turn its checks off or on
+      x-permission: leads:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LeadSourceUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeadSource'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteLeadSource
+      tags: [leads]
+      summary: Remove a source (its leads stay)
+      x-permission: leads:manage
+      responses:
+        '204': {description: Removed}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/lead-sources/{leadSourceId}/checks:
+    parameters:
+      - $ref: '#/components/parameters/LeadSourceIdPath'
+    post:
+      operationId: checkLeadSource
+      tags: [leads]
+      summary: Check a source now
+      x-permission: leads:manage
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LeadSource'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/job-leads:
+    get:
+      operationId: listJobLeads
+      tags: [leads]
+      summary: Hiring leads, newest first
+      x-permission: leads:read
+      parameters:
+        - {name: status, in: query, required: false, schema: {$ref: '#/components/schemas/LeadStatus'}}
+        - {name: sourceId, in: query, required: false, schema: {$ref: '#/components/schemas/LeadSourceId'}}
+        - {name: open, in: query, required: false, description: Only openings still listed (true) or closed (false)., schema: {type: boolean}}
+        - {name: q, in: query, required: false, description: Words in the company or title., schema: {type: string, maxLength: 100}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobLeadList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createJobLead
+      tags: [leads]
+      summary: Save a job ad you found as a lead
+      x-permission: leads:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobLeadInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobLead'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/job-leads/{jobLeadId}:
+    parameters:
+      - $ref: '#/components/parameters/JobLeadIdPath'
+    patch:
+      operationId: updateJobLead
+      tags: [leads]
+      summary: Change a lead's status, notes or company
+      x-permission: leads:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobLeadUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobLead'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/notes:
     get:
       operationId: listNotes
@@ -1894,6 +2041,8 @@ components:
         - jobs:create
         - jobs:read
         - jobs:update
+        - leads:manage
+        - leads:read
         - notes.activity:read
         - notes.sensitive:read
         - notes:create
@@ -1946,6 +2095,7 @@ components:
         - document.text_extracted
         - email.send
         - interview.remind
+        - lead_source.check
         - webhook.deliver
     Error:
       type: object
@@ -3405,6 +3555,131 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/JobOrderId'}]
           nullable: true
+    LeadSourceId:
+      type: string
+      pattern: '^lsrc_[0-9a-hjkmnp-tv-z]{26}$'
+      example: lsrc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    JobLeadId:
+      type: string
+      pattern: '^lead_[0-9a-hjkmnp-tv-z]{26}$'
+      example: lead_01jbz6w0m0k8q9x2r3s4t5v6w7
+    LeadSourceKind:
+      type: string
+      description: >
+        greenhouse, lever, ashby, smartrecruiters = the company's public job board on that system (identifier: its board name, e.g. "acme" from boards.greenhouse.io/acme); careers_page = a careers page address whose jobs carry schema.org JobPosting markup.
+
+      enum: [greenhouse, lever, ashby, smartrecruiters, careers_page]
+    LeadStatus:
+      type: string
+      description: new = not looked at; contacted = the company was approached; client = it became a client; ignored = not worth pursuing.
+      enum: [new, contacted, client, ignored]
+    LeadSource:
+      type: object
+      required: [id, version, kind, identifier, name, companyId, active, openLeads, lastCheckedAt, lastError, nextCheckAt, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/LeadSourceId'}
+        version: {type: integer}
+        kind: {$ref: '#/components/schemas/LeadSourceKind'}
+        identifier: {type: string}
+        name: {type: string, description: "The company's name, as shown on its leads."}
+        companyId:
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+          nullable: true
+        active: {type: boolean}
+        openLeads: {type: integer, description: Openings listed at the last check.}
+        lastCheckedAt: {type: string, format: date-time, nullable: true}
+        lastError: {type: string, nullable: true, description: Why the last check failed (null when it worked).}
+        nextCheckAt: {type: string, format: date-time, nullable: true}
+        createdAt: {type: string, format: date-time}
+    LeadSourceList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/LeadSource'}
+    LeadSourceInput:
+      type: object
+      additionalProperties: false
+      required: [kind, identifier]
+      properties:
+        kind: {$ref: '#/components/schemas/LeadSourceKind'}
+        identifier: {type: string, minLength: 1, maxLength: 500, description: "The board name, or the careers page address."}
+        name: {type: string, maxLength: 200, description: "The company's name (required for job board feeds; a careers page's markup may name it)."}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+    LeadSourceUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        name: {type: string, minLength: 1, maxLength: 200}
+        companyId:
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+          nullable: true
+        active: {type: boolean}
+    JobLead:
+      type: object
+      required: [id, version, sourceId, sourceKind, companyName, companyId, title, location, url, postedAt, firstSeenAt, lastSeenAt, closedAt, status, notes]
+      properties:
+        id: {$ref: '#/components/schemas/JobLeadId'}
+        version: {type: integer}
+        sourceId:
+          description: null for an ad saved by hand.
+          allOf: [{$ref: '#/components/schemas/LeadSourceId'}]
+          nullable: true
+        sourceKind:
+          allOf: [{$ref: '#/components/schemas/LeadSourceKind'}]
+          nullable: true
+        companyName: {type: string}
+        companyId:
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+          nullable: true
+        title: {type: string}
+        location: {type: string, nullable: true}
+        url: {type: string, nullable: true}
+        postedAt: {type: string, format: date-time, nullable: true}
+        firstSeenAt: {type: string, format: date-time}
+        lastSeenAt: {type: string, format: date-time}
+        closedAt: {type: string, format: date-time, nullable: true, description: When the opening stopped being listed.}
+        status: {$ref: '#/components/schemas/LeadStatus'}
+        notes: {type: string, nullable: true}
+    JobLeadList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/JobLead'}
+    JobLeadInput:
+      type: object
+      additionalProperties: false
+      required: [companyName, title]
+      properties:
+        companyName: {type: string, minLength: 1, maxLength: 200}
+        title: {type: string, minLength: 1, maxLength: 200}
+        location: {type: string, maxLength: 200}
+        url: {type: string, maxLength: 1000}
+        notes: {type: string, maxLength: 2000}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+    JobLeadUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/LeadStatus'}
+        notes: {type: string, maxLength: 2000, nullable: true}
+        companyId:
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+          nullable: true
+    LeadSourceCheckJob:
+      type: object
+      additionalProperties: false
+      required: [sourceId, runAt]
+      properties:
+        sourceId: {$ref: '#/components/schemas/LeadSourceId'}
+        runAt: {type: string, format: date-time, description: The check this job is for; an older one (replaced by a "check now") does nothing.}
     NoteId:
       type: string
       pattern: '^note_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3966,6 +4241,16 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/JobAdId'}
+    LeadSourceIdPath:
+      name: leadSourceId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/LeadSourceId'}
+    JobLeadIdPath:
+      name: jobLeadId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/JobLeadId'}
     OfferIdPath:
       name: offerId
       in: path
@@ -4112,6 +4397,16 @@ x-permissions:
     description: Edit jobs and change their status.
     sensitive: false
     roles: [owner, admin, recruiter]
+  leads:manage:
+    module: leads
+    description: Add and change sources and leads.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  leads:read:
+    module: leads
+    description: View hiring leads and their sources.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   notes.activity:read:
     module: notes
     description: See the history of changes on a record.
@@ -4228,6 +4523,11 @@ x-jobs:
     queue: core
     payload: InterviewRemindJob
     description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
+  lead_source.check:
+    module: leads
+    queue: core
+    payload: LeadSourceCheckJob
+    description: Fetch a source's openings and update its leads (Go worker); queues the next check a day later.
   webhook.deliver:
     module: integrations
     queue: core
@@ -4254,6 +4554,8 @@ x-modules:
     description: 'Interviews for an application: when, how and where, who interviews, and each interviewer''s feedback. Scheduling moves the application to the interview stage if it is at an earlier one.'
   - name: jobs
     description: Job orders (agency) or requisitions (in-house), with an optional salary budget.
+  - name: leads
+    description: 'Hiring signals as leads. A source is a company''s public job board feed (Greenhouse, Lever, Ashby, SmartRecruiters) or a careers page with job markup (schema.org JobPosting, as for Google for Jobs; robots.txt is respected). Sources are checked every day: each opening becomes a lead, and one no longer listed is marked closed. Ads can also be saved by hand. No scraping of sites whose terms forbid it (LinkedIn, JobStreet).'
   - name: notes
     description: Notes on records, and what changed on them (activity).
   - name: offers

@@ -18,6 +18,7 @@ import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
 import { Integrations } from "./pages/Integrations";
 import { JobList } from "./pages/JobList";
+import { Leads } from "./pages/Leads";
 import { Placements } from "./pages/Placements";
 import { Reports } from "./pages/Reports";
 import { CompanyList } from "./pages/CompanyList";
@@ -47,7 +48,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|import|integrations)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -60,6 +61,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           <a href="#/contacts" aria-current={section === "contacts" ? "page" : undefined}>Contacts</a>
           {permissions.includes("placements:read") && (
             <a href="#/placements" aria-current={section === "placements" ? "page" : undefined}>Placements</a>
+          )}
+          {permissions.includes("leads:read") && (
+            <a href="#/leads" aria-current={section === "leads" ? "page" : undefined}>Leads</a>
           )}
           {permissions.includes("reports:read") && (
             <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
@@ -103,6 +107,7 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
     return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
   }
   if (hash.startsWith("#/placements") && permissions.includes("placements:read")) return <Placements permissions={permissions} />;
+  if (hash.startsWith("#/leads") && permissions.includes("leads:read")) return <Leads permissions={permissions} />;
   if (hash.startsWith("#/reports") && permissions.includes("reports:read")) return <Reports />;
   if (hash.startsWith("#/integrations") && permissions.includes("integrations:manage")) return <Integrations />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;

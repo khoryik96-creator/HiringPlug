@@ -71,6 +71,7 @@ details get their own permissions.
 | `offers.salary:read` | ✓ | ✓ | ✓ | | ✓ | |
 | `offers.salary:update` | ✓ | ✓ | ✓ | | | |
 | `integrations:manage` (API keys and webhooks; never with an API key) | ✓ | ✓ | | | | |
+| `leads:read`, `leads:manage` (hiring leads and their sources) | ✓ | ✓ | ✓ | ✓ | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick

@@ -301,6 +301,28 @@ type JobAd struct {
 	UpdatedAt       time.Time
 }
 
+type JobLead struct {
+	ID          string
+	TenantID    string
+	Version     int32
+	SourceID    *string
+	SourceKind  *string
+	ExternalID  *string
+	CompanyName string
+	CompanyID   *string
+	Title       string
+	Location    *string
+	Url         *string
+	PostedAt    *time.Time
+	FirstSeenAt time.Time
+	LastSeenAt  time.Time
+	ClosedAt    *time.Time
+	Status      string
+	Notes       *string
+	CreatedBy   string
+	UpdatedAt   time.Time
+}
+
 type JobOrder struct {
 	ID              string
 	TenantID        string
@@ -330,6 +352,24 @@ type JobOrderSalary struct {
 	Period     string
 	UpdatedBy  string
 	UpdatedAt  time.Time
+}
+
+type LeadSource struct {
+	ID            string
+	TenantID      string
+	Version       int32
+	Kind          string
+	Identifier    string
+	Name          string
+	CompanyID     *string
+	Active        bool
+	OpenLeads     int32
+	LastCheckedAt *time.Time
+	LastError     *string
+	NextCheckAt   *time.Time
+	CreatedBy     string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Note struct {

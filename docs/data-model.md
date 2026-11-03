@@ -35,6 +35,8 @@ tenant ─┬─ app_user (role)
 | `api_key` | name, role (never owner), SHA-256 of the key, its first characters, created by, last used (to the minute), revoked at; looked up before any company is known by `app_api_key` |
 | `webhook` | address, events, signing secret, on/off, description, `version` |
 | `webhook_delivery` | webhook, event, payload (as sent), status (pending/delivered/failed), attempts, last answer or error, next attempt; written by a trigger on `audit_log` |
+| `lead_source` | kind (greenhouse/lever/ashby/smartrecruiters/careers_page), board name or page address (once each), company name and record, on/off, open openings, last check and its error, next check, `version` |
+| `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
@@ -65,7 +67,7 @@ candidate belonging to the same company.
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | match (candidate × job, score, reasons with quotes, model version) | M4 |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
-| `job_leads` | job lead (source, URL, company, parsed fields, status) | M6 |
+| `leads` | licensed job-data providers; contacts found for a lead's company | later |
 | `integrations` | API key, webhook subscription and delivery | M6 |
 
 Each planned module gets its own contract file, migration, queries and code via

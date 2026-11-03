@@ -10,7 +10,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | # | Feature | Module(s) | Status |
 |---|---|---|---|
 | 1 | Contacts with built-in email verifier | `companies`, `contacts` | ✅ |
-| 1.5 | Job ads puller | `job_leads` | 🧩 M6 |
+| 1.5 | Job ads puller | `leads` | ✅ job board feeds, careers pages, saved ads |
 | 2 | Companies | `companies` | ✅ records; auto-fill 🧩 |
 | 3 | Candidate profile fields | `candidates` | ✅ |
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents` | ✅ upload + text; formatting 🧩 M4 |
@@ -142,23 +142,33 @@ this candidate fit this job?", and free questions.
   cloud providers often block, so a paid verification service can be plugged
   in instead. CV Studio's email verifier notes will be reused.
 
-## 1.5 Job ads puller
+## 1.5 Job ads puller ✅
 
-Collects job ads to find companies that are hiring (business development
-leads), then links them to companies (auto-fill) and contacts (verified emails).
+Finds companies that are hiring, as business development leads (the
+**Leads** page; owners, admins, recruiters and sourcers).
 
 **Legal note:** automatically scraping LinkedIn or JobStreet breaks their terms
-of use, and LinkedIn takes scrapers to court. The puller uses sources that are
-allowed:
+of use, and LinkedIn takes scrapers to court. The puller only uses sources that
+are allowed:
 
-1. **A recruiter saves an ad** they are viewing: paste a link, or a browser
-   extension button ("save this ad").
-2. **Company careers pages and public job feeds**: many ATSs (Greenhouse,
-   Lever, Workable, SmartRecruiters) publish open roles as public feeds.
-3. **Licensed job-data providers** and official partner programmes.
+1. **Public job board feeds** that companies publish for their own sites:
+   Greenhouse, Lever, Ashby and SmartRecruiters (enter the board name, or
+   paste the board's address).
+2. **Careers pages** whose jobs carry schema.org JobPosting markup (the markup
+   companies add for Google for Jobs). The site's robots.txt is respected
+   (`HiringPlugBot`), and a page without markup is reported, not guessed at.
+3. **Ads saved by hand**, from anywhere (LinkedIn, JobStreet, a newspaper):
+   company, job, where, the ad's address and notes.
 
-Each ad is parsed by the AI worker (title, company, location, salary,
-requirements), de-duplicated, and kept with its source and date.
+Sources are checked when added and then every day (or "Check now"). Each
+opening becomes a lead with its company, title, location, link and posting
+date; one listed again is updated, and one no longer listed is marked closed
+(and reopened if it comes back). Each source shows its open openings, when it
+was last checked and why a check failed. Leads are filtered by status (new,
+contacted, became a client, ignored), still listed or closed, and words, and
+can be linked to a company record. Fetches never reach the server's own or
+private networks. Next: licensed job-data providers, and contacts found for a
+lead's company (with the built-in email check).
 
 ## 4, 5. Jobs, pipeline, interviews, matching
 

@@ -117,3 +117,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/integrations/internal/store
+  - <<: *module
+    queries: db/queries/leads.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/leads/internal/store

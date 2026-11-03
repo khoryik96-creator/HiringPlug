@@ -223,3 +223,9 @@ export const API_KEY_ROLE: Record<Schemas["ApiKeyRole"], string> = {
   admin: "Admin", recruiter: "Recruiter", sourcer: "Sourcer", hiring_manager: "Hiring manager", viewer: "Viewer",
 };
 export const DELIVERY_STATUS: Record<Schemas["WebhookDeliveryStatus"], string> = { pending: "Waiting", delivered: "Delivered", failed: "Failed" };
+
+export const LEAD_SOURCE_KIND: Record<Schemas["LeadSourceKind"], string> = {
+  greenhouse: "Greenhouse job board", lever: "Lever job board", ashby: "Ashby job board",
+  smartrecruiters: "SmartRecruiters job board", careers_page: "Careers page",
+};
+export const LEAD_STATUS: Record<Schemas["LeadStatus"], string> = { new: "New", contacted: "Contacted", client: "Became a client", ignored: "Ignored" };

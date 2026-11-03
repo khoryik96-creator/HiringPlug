@@ -63,10 +63,11 @@ type Config struct {
 	// SMTP is the mail server email from the app is sent through. Without a
 	// host, emails are recorded but fail with "no mail server is set up".
 	SMTP SMTP
-	// WebhooksAllowPrivate lets webhooks go to private and local network
-	// addresses, and over plain HTTP. Off by default: a webhook address must
-	// not reach into the server's own network. For local testing only.
-	WebhooksAllowPrivate bool // HP_WEBHOOKS_ALLOW_PRIVATE
+	// AllowPrivateNetworks lets the server fetch from and post to private and
+	// local network addresses users typed (webhooks, careers pages), and
+	// webhooks use plain HTTP. Off by default: such an address must not reach
+	// into the server's own network. For local testing only.
+	AllowPrivateNetworks bool // HP_ALLOW_PRIVATE_NETWORKS
 }
 
 // SMTP is how to reach the mail server.
@@ -103,9 +104,9 @@ func Load(getenv func(string) string) (Config, error) {
 		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
-	c.WebhooksAllowPrivate = r.oneOf("HP_WEBHOOKS_ALLOW_PRIVATE", "false", "false", "true") == "true"
-	if c.WebhooksAllowPrivate && c.Env == EnvProduction {
-		r.fail("HP_WEBHOOKS_ALLOW_PRIVATE must be false in production")
+	c.AllowPrivateNetworks = r.oneOf("HP_ALLOW_PRIVATE_NETWORKS", "false", "false", "true") == "true"
+	if c.AllowPrivateNetworks && c.Env == EnvProduction {
+		r.fail("HP_ALLOW_PRIVATE_NETWORKS must be false in production")
 	}
 	zone := r.str("HP_TIME_ZONE", "Asia/Kuala_Lumpur")
 	if loc, err := time.LoadLocation(zone); err != nil || zone == "Local" {

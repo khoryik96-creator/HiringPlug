@@ -19,7 +19,7 @@ cannot take the core down:
 | Calendars | Interview scheduling | Google and Microsoft 365 (OAuth per user); free/busy and invites | M3–M5 |
 | Email | Send, templates, two-way sync | Outbound via SMTP or a provider; inbox sync with Gmail / Microsoft Graph; messages linked to candidates and contacts | M5 |
 | Careers page | Public job list and apply form | A small public site per company, served from the API under `public` permissions; applications enter the pipeline | M5 |
-| Job ads puller | Find companies that are hiring | Recruiter-saved ads, careers pages and public ATS feeds, licensed data. No automated scraping of LinkedIn or JobStreet (their terms forbid it). | M6 |
+| Job ads puller ✅ | Find companies that are hiring | Public ATS feeds (Greenhouse, Lever, Ashby, SmartRecruiters), careers pages with JobPosting markup (robots.txt respected), ads saved by hand; licensed data later. No automated scraping of LinkedIn or JobStreet (their terms forbid it). | 6.4 |
 | Job boards | Post ads, receive applicants | Official partner APIs (e.g. SEEK/JobStreet, LinkedIn Jobs) or a multiposting service | M6 |
 | Data import | Move from your current ATS | CSV import with a preview and mapping; API importers where the old system allows | M2 |
 | Public API and webhooks ✅ | Let other systems integrate | API keys per company acting as a role; webhooks from the same events that write the audit log; documented at `/docs` (see below) | 6.5 |
@@ -71,6 +71,7 @@ delivery fails; each webhook's latest deliveries, with the answer or error,
 are on the Integrations page, and "Send test" sends a `webhook.ping`.
 Addresses must be HTTPS. Deliveries never go to the server's own or private
 networks (checked on the address actually connected to) and never follow
-redirects; `HP_WEBHOOKS_ALLOW_PRIVATE=true` lifts both for trying webhooks on
+redirects (the same protection covers careers pages read for leads);
+`HP_ALLOW_PRIVATE_NETWORKS=true` lifts both for trying webhooks on
 your own machine (refused in production).
 
