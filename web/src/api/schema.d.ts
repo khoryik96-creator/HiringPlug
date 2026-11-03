@@ -284,6 +284,49 @@ export interface paths {
         patch: operations["updateCompany"];
         trace?: never;
     };
+    "/v1/companies/{companyId}/autofill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Details suggested from the company's website, and how the last reading went */
+        get: operations["getCompanyAutofill"];
+        put?: never;
+        /**
+         * Read the company's website (in the background) for details to suggest
+         * @description Needs the company's website. Its own pages only: the home page and its contact page, as robots.txt allows.
+         */
+        post: operations["startCompanyAutofill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/autofill/{suggestionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+                suggestionId: components["schemas"]["CompanySuggestionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a suggestion (the company's detail is set) or dismiss it */
+        post: operations["decideCompanySuggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts": {
         parameters: {
             query?: never;
@@ -1522,7 +1565,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
+        JobKind: "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1849,6 +1892,39 @@ export interface components {
             items: components["schemas"]["CompanySummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["CompanyId"] | null;
+        };
+        /** @example csug_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        CompanySuggestionId: string;
+        /** @enum {string} */
+        CompanySuggestionField: "name" | "phone" | "address" | "city" | "country" | "registrationNumber" | "size" | "about";
+        CompanySuggestion: {
+            id: components["schemas"]["CompanySuggestionId"];
+            field: components["schemas"]["CompanySuggestionField"];
+            /** @description As it would be saved (size: micro, small, medium, large or enterprise; country: a two-letter code). */
+            value: string;
+            /** @description The company's value now. */
+            current: string | null;
+            /** @description Where it was found, e.g. "schema.org data on https://contoh.com.my/". */
+            source: string;
+        };
+        /**
+         * @description idle = never read; queued = being read; done; failed (see error).
+         * @enum {string}
+         */
+        CompanyAutofillStatus: "idle" | "queued" | "done" | "failed";
+        CompanyAutofill: {
+            status: components["schemas"]["CompanyAutofillStatus"];
+            /** Format: date-time */
+            checkedAt: string | null;
+            error: string | null;
+            /** @description Waiting for a decision. */
+            suggestions: components["schemas"]["CompanySuggestion"][];
+        };
+        SuggestionDecision: {
+            accept: boolean;
+        };
+        CompanyAutofillJob: {
+            companyId: components["schemas"]["CompanyId"];
         };
         /** @example cont_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactId: string;
@@ -3803,6 +3879,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Company"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getCompanyAutofill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyAutofill"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startCompanyAutofill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyAutofill"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideCompanySuggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+                suggestionId: components["schemas"]["CompanySuggestionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyAutofill"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
+import { CompanyAutofill } from "../components/CompanyAutofill";
 import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
@@ -56,6 +57,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           </dl>
         </section>
       )}
+      {permissions.includes("companies:update") && !editing && <CompanyAutofill companyId={c.id} website={c.website} />}
       <CompanyJobs company={c} canCreate={permissions.includes("jobs:create")} />
       <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} />
       <Timeline subjectType="company" subjectId={c.id} permissions={permissions} />

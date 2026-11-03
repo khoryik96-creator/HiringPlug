@@ -19,7 +19,8 @@ tenant ─┬─ app_user (role)
 | `tenant` | name, careers page address (`careers_slug`: unique, made from the name when the company is created) |
 | `app_user` | email, name, role, active |
 | `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, tags and skills (text arrays, indexed for case-insensitive filters), `version`, search text |
-| `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text |
+| `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text; how the last website reading went (`autofill_status` idle/queued/done/failed, error, when) |
+| `company_suggestion` | a detail read from the company's website: company, field, value, source (what and which page), status (pending/accepted/dismissed; who decided is in the audit log) |
 | `contact` | company (same tenant, foreign key), names, job title, email (unique per company) with check status + reasons + date, office phone, mobile, LinkedIn, status (active/left), notes, `version`, search text |
 | `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, `version`, search text. (Not `job`: that is the background job queue.) |
 | `job_ad` | job, title, location, work type/arrangement, salary text (published as written), text, closes on, status (draft/published/closed; published needs text), published at, `version` |

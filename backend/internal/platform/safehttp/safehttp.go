@@ -6,8 +6,10 @@
 package safehttp
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -66,4 +68,34 @@ func Client(o Options) *http.Client {
 			return nil // the next connection is checked by the dialer again
 		},
 	}
+}
+
+// StatusError is an answer other than 2xx.
+type StatusError int
+
+func (e StatusError) Error() string {
+	if e == http.StatusNotFound {
+		return "not found (HTTP 404): check the address"
+	}
+	return fmt.Sprintf("the site answered HTTP %d", int(e))
+}
+
+// Get fetches an address (at most max bytes), as userAgent; an answer other
+// than 2xx is a StatusError.
+func Get(ctx context.Context, client *http.Client, address, userAgent, accept string, maxBytes int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", accept)
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode/100 != 2 {
+		return nil, StatusError(res.StatusCode)
+	}
+	return io.ReadAll(io.LimitReader(res.Body, maxBytes))
 }

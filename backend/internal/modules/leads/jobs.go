@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -16,12 +15,13 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/robots"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/safehttp"
 )
 
 // userAgent names us to the sites we read (robots.txt rules for
 // "HiringPlugBot" apply).
-const userAgent = "HiringPlugBot/1.0 (job leads; respects robots.txt)"
+const userAgent = robots.UserAgent
 
 // feeds are the public job board APIs, by kind (%s: the board name).
 var feeds = map[string]string{
@@ -152,23 +152,11 @@ func (s *Service) fetch(ctx context.Context, src store.LeadSource) ([]Posting, e
 			return ParseSmartRecruiters(body, src.Identifier)
 		}
 	}
-	page, err := url.Parse(src.Identifier)
+	site, err := robots.Read(ctx, client, src.Identifier)
 	if err != nil {
-		return nil, err
-	}
-	robots, err := get(ctx, client, page.Scheme+"://"+page.Host+"/robots.txt")
-	var status statusError
-	switch {
-	case errors.As(err, &status) && status >= 400 && status < 500:
-		robots = nil // no robots.txt: nothing asked
-	case err != nil:
 		return nil, fmt.Errorf("reading robots.txt: %w", err)
 	}
-	path := page.EscapedPath()
-	if path == "" {
-		path = "/"
-	}
-	if !RobotsAllows(string(robots), path) {
+	if !site.Allows(src.Identifier) {
 		return nil, errors.New("the site's robots.txt asks robots not to read this page, so it is not read")
 	}
 	body, err := get(ctx, client, src.Identifier)
@@ -183,29 +171,6 @@ func (s *Service) fetch(ctx context.Context, src store.LeadSource) ([]Posting, e
 	return postings, nil
 }
 
-type statusError int
-
-func (e statusError) Error() string {
-	if e == http.StatusNotFound {
-		return "not found (HTTP 404): check the board name or address"
-	}
-	return fmt.Sprintf("the site answered HTTP %d", int(e))
-}
-
 func get(ctx context.Context, client *http.Client, address string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json, text/html;q=0.9, */*;q=0.5")
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = res.Body.Close() }()
-	if res.StatusCode/100 != 2 {
-		return nil, statusError(res.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(res.Body, maxBody))
+	return safehttp.Get(ctx, client, address, userAgent, "application/json, text/html;q=0.9, */*;q=0.5", maxBody)
 }

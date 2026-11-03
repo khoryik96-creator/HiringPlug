@@ -40,17 +40,6 @@ func TestDiff(t *testing.T) {
 	assert.Equal(t, []string{"lead_b"}, sync.Closed, "no longer listed")
 }
 
-func TestRobots(t *testing.T) {
-	robots := "User-agent: *\nDisallow: /careers/private\nAllow: /careers/private/open\n\nUser-agent: BadBot\nDisallow: /\n"
-	assert.True(t, RobotsAllows(robots, "/careers"))
-	assert.False(t, RobotsAllows(robots, "/careers/private/x"))
-	assert.True(t, RobotsAllows(robots, "/careers/private/open/1"), "the longest rule wins")
-	assert.False(t, RobotsAllows("User-agent: *\nDisallow: /\n", "/careers"))
-	assert.False(t, RobotsAllows("User-agent: *\nAllow: /\nUser-agent: HiringPlugBot\nDisallow: /careers", "/careers"), "rules for us by name come first")
-	assert.True(t, RobotsAllows("User-agent: *\nDisallow:\n", "/careers"))
-	assert.True(t, RobotsAllows("", "/careers"))
-}
-
 func TestFeeds(t *testing.T) {
 	gh, err := ParseGreenhouse([]byte(`{"jobs":[{"id":4012345,"title":" Accountant ","location":{"name":"Kuala Lumpur"},"absolute_url":"https://boards.greenhouse.io/acme/jobs/4012345","first_published":"2026-10-01T10:00:00-04:00"}]}`))
 	require.NoError(t, err)

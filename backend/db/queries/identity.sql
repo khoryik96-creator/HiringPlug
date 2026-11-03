@@ -67,10 +67,11 @@ RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at;
 -- name: TeamMember :one
 SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
 
--- Deactivating signs the user out (their tokens stop working).
+-- Deactivating signs the user out: tokens issued up to the end of this second
+-- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
 -- name: UpdateMember :one
 UPDATE app_user SET role = @role, active = @active,
-  tokens_valid_after = CASE WHEN active AND NOT @active THEN date_trunc('second', now()) ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT @active THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
 WHERE id = @id
 RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at;
 

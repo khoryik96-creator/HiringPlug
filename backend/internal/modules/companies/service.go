@@ -18,7 +18,8 @@ const nameUniqueIndex = "company_tenant_name_uq"
 
 // Service holds the companies use cases.
 type Service struct {
-	pool *pgxpool.Pool
+	pool         *pgxpool.Pool
+	allowPrivate bool // company websites on private networks (local testing only)
 }
 
 // Create adds a company.
@@ -87,37 +88,47 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if int(row.Version) != expectedVersion {
 			return apperr.StaleVersion("company").WithDetail("currentVersion", row.Version)
 		}
-		before := fromRow(row).Details
-		after, errs := Normalize(patch.Apply(before))
-		if err := errs.Err(); err != nil {
-			return err
-		}
-		changes := audit.Diff(fields(before), fields(after))
-		if len(changes) == 0 {
-			out = fromRow(row)
-			return nil
-		}
-		if err := checkNameFree(ctx, q, after.Name, id); err != nil {
-			return err
-		}
-		updated, err := q.UpdateCompany(ctx, store.UpdateCompanyParams{
-			ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
-			Name: after.Name, Type: after.Type, Website: after.Website, Industry: after.Industry, Size: after.Size,
-			Phone: after.Phone, Address: after.Address, City: after.City, Country: after.Country,
-			RegistrationNumber: after.RegistrationNumber, About: after.About,
-		})
-		switch {
-		case database.IsNoRows(err):
-			return apperr.StaleVersion("company") // changed between our read and our write
-		case database.IsUniqueViolation(err, nameUniqueIndex):
-			return duplicateName("")
-		case err != nil:
-			return err
-		}
-		out = fromRow(updated)
-		return audit.Record(ctx, tx, audit.Entry{Action: "company.updated", EntityType: "company", EntityID: id, Changes: changes})
+		out, err = update(ctx, tx, q, row, patch, nil)
+		return err
 	})
 	return out, err
+}
+
+// update changes a company in the caller's transaction: the rules, the
+// unique name, the audit entry (with extra changes, e.g. where a value came
+// from).
+func update(ctx context.Context, tx pgx.Tx, q *store.Queries, row store.Company, patch Patch, extra map[string]any) (Company, error) {
+	id := row.ID
+	before := fromRow(row).Details
+	after, errs := Normalize(patch.Apply(before))
+	if err := errs.Err(); err != nil {
+		return Company{}, err
+	}
+	changes := audit.Diff(fields(before), fields(after))
+	if len(changes) == 0 {
+		return fromRow(row), nil
+	}
+	if err := checkNameFree(ctx, q, after.Name, id); err != nil {
+		return Company{}, err
+	}
+	updated, err := q.UpdateCompany(ctx, store.UpdateCompanyParams{
+		ID: id, ExpectedVersion: row.Version,
+		Name: after.Name, Type: after.Type, Website: after.Website, Industry: after.Industry, Size: after.Size,
+		Phone: after.Phone, Address: after.Address, City: after.City, Country: after.Country,
+		RegistrationNumber: after.RegistrationNumber, About: after.About,
+	})
+	switch {
+	case database.IsNoRows(err):
+		return Company{}, apperr.StaleVersion("company") // changed between our read and our write
+	case database.IsUniqueViolation(err, nameUniqueIndex):
+		return Company{}, duplicateName("")
+	case err != nil:
+		return Company{}, err
+	}
+	for k, v := range extra {
+		changes[k] = v
+	}
+	return fromRow(updated), audit.Record(ctx, tx, audit.Entry{Action: "company.updated", EntityType: "company", EntityID: id, Changes: changes})
 }
 
 // Page is one page of a list, newest first.

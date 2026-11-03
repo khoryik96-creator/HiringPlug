@@ -66,7 +66,7 @@ func NewModules(d Deps) *Modules {
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
-	m.Companies = companies.New(d.Pool)
+	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks)
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts})
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
@@ -183,6 +183,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Interviews.JobHandlers(),
 		m.Integrations.JobHandlers(),
 		m.Leads.JobHandlers(),
+		m.Companies.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

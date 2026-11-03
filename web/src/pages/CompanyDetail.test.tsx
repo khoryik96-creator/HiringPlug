@@ -20,12 +20,15 @@ const company: Company = {
 
 describe("company pages", () => {
   it("shows a company in words, with an edit button for those who may edit", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(company));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies/{companyId}/autofill"
+      ? { status: "idle", checkedAt: null, error: null, suggestions: [] }
+      : path === "/v1/companies/{companyId}" ? company : { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("companies:update")} />);
     await screen.findByRole("heading", { name: "Grab" });
     expect(screen.getByText("Prospect · Technology · Singapore, Singapore (SG)")).toBeTruthy();
     expect(screen.getByText("201–1,000 people")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit company" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Fill in from website" })).toBeTruthy();
   });
 
   it("gives viewers no edit or add buttons", async () => {
@@ -33,6 +36,7 @@ describe("company pages", () => {
     renderWithClient(<CompanyDetail id={company.id} permissions={["companies:read"]} />);
     await screen.findByRole("heading", { name: "Grab" });
     expect(screen.queryByRole("button", { name: "Edit company" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "From the website" })).toBeNull();
     cleanup();
 
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [company], nextCursor: null }));

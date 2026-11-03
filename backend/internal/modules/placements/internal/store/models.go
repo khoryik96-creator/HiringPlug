@@ -159,6 +159,20 @@ type Company struct {
 	CreatedBy          string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
+	AutofillStatus     string
+	AutofillError      *string
+	AutofillCheckedAt  *time.Time
+}
+
+type CompanySuggestion struct {
+	ID        string
+	TenantID  string
+	CompanyID string
+	Field     string
+	Value     string
+	Source    string
+	Status    string
+	CreatedAt time.Time
 }
 
 type Contact struct {

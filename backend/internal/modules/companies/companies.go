@@ -3,11 +3,14 @@
 //
 // Layout (the same in every module):
 //
-//	companies.go     the module's public API: what internal/app and other modules may use
-//	domain.go     the rules, as pure functions on plain values (unit tested)
-//	service.go    use cases: one transaction each, rules + storage + audit
-//	http.go       HTTP handlers: contract types <-> service calls; no business rules
-//	internal/store  generated SQL (db/queries/companies.sql); private to this module
+//	companies.go         the module's public API: what internal/app and other modules may use
+//	domain.go            the rules, as pure functions on plain values (unit tested)
+//	service.go           use cases: one transaction each, rules + storage + audit
+//	autofill.go          reading a company's website for details to suggest (unit tested)
+//	autofill_service.go  suggestions: reading in the background, accepting, dismissing
+//	http.go              HTTP handlers: contract types <-> service calls; no business rules
+//	autofill_http.go     HTTP handlers for suggestions
+//	internal/store       generated SQL (db/queries/companies.sql); private to this module
 package companies
 
 import (
@@ -15,6 +18,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Module is the companies module.
@@ -24,8 +30,8 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool) *Module {
-	svc := &Service{pool: pool}
+func New(pool *pgxpool.Pool, allowPrivate bool) *Module {
+	svc := &Service{pool: pool, allowPrivate: allowPrivate}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
@@ -39,4 +45,9 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool,
 // for other modules that show a company next to their records.
 func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
 	return m.service.Names(ctx, tx, ids)
+}
+
+// JobHandlers returns the module's handlers for the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindCompanyAutofill: m.service.autofill}
 }

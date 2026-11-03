@@ -76,6 +76,17 @@ export const COMPANY_SIZE: Record<Schemas["CompanySize"], string> = {
   enterprise: "Over 1,000 people",
 };
 
+export const SUGGESTION_FIELD: Record<Schemas["CompanySuggestionField"], string> = {
+  name: "Name",
+  phone: "Phone",
+  address: "Address",
+  city: "City",
+  country: "Country",
+  registrationNumber: "Registration no.",
+  size: "Size",
+  about: "About",
+};
+
 export const CONTACT_STATUS: Record<Schemas["ContactStatus"], string> = {
   active: "Works there",
   left: "Has left",

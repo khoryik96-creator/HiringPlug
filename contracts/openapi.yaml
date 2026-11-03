@@ -557,6 +557,64 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/companies/{companyId}/autofill:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: getCompanyAutofill
+      tags: [companies]
+      summary: Details suggested from the company's website, and how the last reading went
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyAutofill'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: startCompanyAutofill
+      tags: [companies]
+      summary: Read the company's website (in the background) for details to suggest
+      description: "Needs the company's website. Its own pages only: the home page and its contact page, as robots.txt allows."
+      x-permission: companies:update
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyAutofill'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/companies/{companyId}/autofill/{suggestionId}:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+      - {name: suggestionId, in: path, required: true, schema: {$ref: '#/components/schemas/CompanySuggestionId'}}
+    post:
+      operationId: decideCompanySuggestion
+      tags: [companies]
+      summary: Accept a suggestion (the company's detail is set) or dismiss it
+      x-permission: companies:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SuggestionDecision'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyAutofill'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/contacts:
     get:
       operationId: listContacts
@@ -2440,6 +2498,7 @@ components:
     JobKind:
       type: string
       enum:
+        - company.autofill
         - document.cv_parsed
         - document.extract_text
         - document.parse_cv
@@ -2969,6 +3028,49 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/CompanyId'}]
           nullable: true
+    CompanySuggestionId:
+      type: string
+      pattern: '^csug_[0-9a-hjkmnp-tv-z]{26}$'
+      example: csug_01jbz6w0m0k8q9x2r3s4t5v6w7
+    CompanySuggestionField:
+      type: string
+      enum: [name, phone, address, city, country, registrationNumber, size, about]
+    CompanySuggestion:
+      type: object
+      required: [id, field, value, current, source]
+      properties:
+        id: {$ref: '#/components/schemas/CompanySuggestionId'}
+        field: {$ref: '#/components/schemas/CompanySuggestionField'}
+        value: {type: string, description: "As it would be saved (size: micro, small, medium, large or enterprise; country: a two-letter code)."}
+        current: {type: string, nullable: true, description: The company's value now.}
+        source: {type: string, description: "Where it was found, e.g. \"schema.org data on https://contoh.com.my/\"."}
+    CompanyAutofillStatus:
+      type: string
+      description: idle = never read; queued = being read; done; failed (see error).
+      enum: [idle, queued, done, failed]
+    CompanyAutofill:
+      type: object
+      required: [status, checkedAt, error, suggestions]
+      properties:
+        status: {$ref: '#/components/schemas/CompanyAutofillStatus'}
+        checkedAt: {type: string, format: date-time, nullable: true}
+        error: {type: string, nullable: true}
+        suggestions:
+          type: array
+          description: Waiting for a decision.
+          items: {$ref: '#/components/schemas/CompanySuggestion'}
+    SuggestionDecision:
+      type: object
+      additionalProperties: false
+      required: [accept]
+      properties:
+        accept: {type: boolean}
+    CompanyAutofillJob:
+      type: object
+      additionalProperties: false
+      required: [companyId]
+      properties:
+        companyId: {$ref: '#/components/schemas/CompanyId'}
     ContactId:
       type: string
       pattern: '^cont_[0-9a-hjkmnp-tv-z]{26}$'
@@ -5023,6 +5125,11 @@ x-permissions:
     sensitive: false
     roles: [owner, admin, recruiter]
 x-jobs:
+  company.autofill:
+    module: companies
+    queue: core
+    payload: CompanyAutofillJob
+    description: Read a company's own website for details to suggest (Go worker).
   document.cv_parsed:
     module: documents
     queue: core

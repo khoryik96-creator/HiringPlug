@@ -52,3 +52,28 @@ LIMIT @row_limit;
 
 -- name: CompanyNames :many
 SELECT id, name FROM company WHERE id = ANY(@ids::text[]);
+
+-- name: AutofillState :one
+SELECT autofill_status, autofill_error, autofill_checked_at, website FROM company WHERE id = @id;
+
+-- name: SetAutofill :exec
+UPDATE company SET autofill_status = @autofill_status, autofill_error = sqlc.narg(autofill_error),
+  autofill_checked_at = CASE WHEN @autofill_status IN ('done', 'failed') THEN now() ELSE autofill_checked_at END
+WHERE id = @id;
+
+-- A new reading replaces the suggestions still waiting.
+-- name: ClearSuggestions :exec
+DELETE FROM company_suggestion WHERE company_id = @company_id AND status = 'pending';
+
+-- name: InsertSuggestion :exec
+INSERT INTO company_suggestion (tenant_id, company_id, field, value, source)
+VALUES (app_current_tenant(), @company_id, @field, @value, @source);
+
+-- name: PendingSuggestions :many
+SELECT * FROM company_suggestion WHERE company_id = @company_id AND status = 'pending' ORDER BY id;
+
+-- name: GetSuggestion :one
+SELECT * FROM company_suggestion WHERE id = @id AND company_id = @company_id;
+
+-- name: DecideSuggestion :exec
+UPDATE company_suggestion SET status = @status WHERE id = @id;

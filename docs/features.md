@@ -143,11 +143,22 @@ this candidate fit this job?", and free questions.
   city, country, registration number (e.g. SSM) and notes. Search by name or
   website (ignoring case and accents), filter by type. Names are unique per
   company (`Nestlé Malaysia` and `nestle malaysia` are the same), and edits use
-  the same lost-update protection as candidates. **Auto-fill** (next) from a company name or website: a job
-  reads the website (structured data first, then AI extraction), optional data
-  providers (Apollo, Google Places), and the business registry where available.
-  Results are **suggestions with their source**; a person accepts them, and
-  nothing overwrites data you entered.
+  the same lost-update protection as candidates.
+- **Auto-fill from the website** ✅: "Fill in from website" on a company's
+  page queues a job that reads its home page and its contact page (a link
+  with "contact" or "hubungi"), only where robots.txt allows, through the
+  same guarded HTTP client as webhooks (no private addresses in production,
+  size and time limits). It reads schema.org Organization data (legal name,
+  phone, address with postcode, city, country, number of employees as a size,
+  description), the page's own description, `tel:` links, and a Malaysian
+  registration number (labelled, or in brackets after "Sdn Bhd"/"Berhad").
+  Details already recorded the same way are left out. Each one is a
+  **suggestion with its source**, shown next to the current value; a person
+  accepts it (the company is changed by the usual rules and the audit entry
+  names the source) or dismisses it. Reading again replaces the suggestions
+  still waiting. Why a reading failed (site down, robots.txt) is shown. Later:
+  AI extraction from the page text (with 5.3), data providers (Apollo, Google
+  Places) and the business registry, as more sources of suggestions.
 - **Contacts** ✅: people at companies (hiring managers, HR) with job title,
   email, office phone, mobile, LinkedIn, status (works there / has left) and
   notes; listed on their company's page. The **email check** runs whenever an

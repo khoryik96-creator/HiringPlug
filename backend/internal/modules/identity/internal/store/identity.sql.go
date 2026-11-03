@@ -434,7 +434,7 @@ func (q *Queries) TeamMember(ctx context.Context, id string) (TeamMemberRow, err
 
 const updateMember = `-- name: UpdateMember :one
 UPDATE app_user SET role = $1, active = $2,
-  tokens_valid_after = CASE WHEN active AND NOT $2 THEN date_trunc('second', now()) ELSE tokens_valid_after END
+  tokens_valid_after = CASE WHEN active AND NOT $2 THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
 WHERE id = $3
 RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at
 `
@@ -456,7 +456,8 @@ type UpdateMemberRow struct {
 	CreatedAt    time.Time
 }
 
-// Deactivating signs the user out (their tokens stop working).
+// Deactivating signs the user out: tokens issued up to the end of this second
+// stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
 func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (UpdateMemberRow, error) {
 	row := q.db.QueryRow(ctx, updateMember, arg.Role, arg.Active, arg.ID)
 	var i UpdateMemberRow

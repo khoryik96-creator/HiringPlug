@@ -10,6 +10,39 @@ import (
 	"time"
 )
 
+const autofillState = `-- name: AutofillState :one
+SELECT autofill_status, autofill_error, autofill_checked_at, website FROM company WHERE id = $1
+`
+
+type AutofillStateRow struct {
+	AutofillStatus    string
+	AutofillError     *string
+	AutofillCheckedAt *time.Time
+	Website           *string
+}
+
+func (q *Queries) AutofillState(ctx context.Context, id string) (AutofillStateRow, error) {
+	row := q.db.QueryRow(ctx, autofillState, id)
+	var i AutofillStateRow
+	err := row.Scan(
+		&i.AutofillStatus,
+		&i.AutofillError,
+		&i.AutofillCheckedAt,
+		&i.Website,
+	)
+	return i, err
+}
+
+const clearSuggestions = `-- name: ClearSuggestions :exec
+DELETE FROM company_suggestion WHERE company_id = $1 AND status = 'pending'
+`
+
+// A new reading replaces the suggestions still waiting.
+func (q *Queries) ClearSuggestions(ctx context.Context, companyID string) error {
+	_, err := q.db.Exec(ctx, clearSuggestions, companyID)
+	return err
+}
+
 const companyExists = `-- name: CompanyExists :one
 SELECT EXISTS (SELECT 1 FROM company WHERE id = $1)
 `
@@ -50,6 +83,20 @@ func (q *Queries) CompanyNames(ctx context.Context, ids []string) ([]CompanyName
 	return items, nil
 }
 
+const decideSuggestion = `-- name: DecideSuggestion :exec
+UPDATE company_suggestion SET status = $1 WHERE id = $2
+`
+
+type DecideSuggestionParams struct {
+	Status string
+	ID     string
+}
+
+func (q *Queries) DecideSuggestion(ctx context.Context, arg DecideSuggestionParams) error {
+	_, err := q.db.Exec(ctx, decideSuggestion, arg.Status, arg.ID)
+	return err
+}
+
 const findCompanyIDByName = `-- name: FindCompanyIDByName :one
 SELECT id FROM company WHERE name_key = app_normalize_text($1::text)
 `
@@ -62,7 +109,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -88,6 +135,34 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AutofillStatus,
+		&i.AutofillError,
+		&i.AutofillCheckedAt,
+	)
+	return i, err
+}
+
+const getSuggestion = `-- name: GetSuggestion :one
+SELECT id, tenant_id, company_id, field, value, source, status, created_at FROM company_suggestion WHERE id = $1 AND company_id = $2
+`
+
+type GetSuggestionParams struct {
+	ID        string
+	CompanyID string
+}
+
+func (q *Queries) GetSuggestion(ctx context.Context, arg GetSuggestionParams) (CompanySuggestion, error) {
+	row := q.db.QueryRow(ctx, getSuggestion, arg.ID, arg.CompanyID)
+	var i CompanySuggestion
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CompanyID,
+		&i.Field,
+		&i.Value,
+		&i.Source,
+		&i.Status,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -102,7 +177,7 @@ INSERT INTO company (
   $6, $7, $8, $9,
   $10, $11, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at
 `
 
 type InsertCompanyParams struct {
@@ -156,8 +231,33 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AutofillStatus,
+		&i.AutofillError,
+		&i.AutofillCheckedAt,
 	)
 	return i, err
+}
+
+const insertSuggestion = `-- name: InsertSuggestion :exec
+INSERT INTO company_suggestion (tenant_id, company_id, field, value, source)
+VALUES (app_current_tenant(), $1, $2, $3, $4)
+`
+
+type InsertSuggestionParams struct {
+	CompanyID string
+	Field     string
+	Value     string
+	Source    string
+}
+
+func (q *Queries) InsertSuggestion(ctx context.Context, arg InsertSuggestionParams) error {
+	_, err := q.db.Exec(ctx, insertSuggestion,
+		arg.CompanyID,
+		arg.Field,
+		arg.Value,
+		arg.Source,
+	)
+	return err
 }
 
 const listCompanies = `-- name: ListCompanies :many
@@ -221,6 +321,56 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 	return items, nil
 }
 
+const pendingSuggestions = `-- name: PendingSuggestions :many
+SELECT id, tenant_id, company_id, field, value, source, status, created_at FROM company_suggestion WHERE company_id = $1 AND status = 'pending' ORDER BY id
+`
+
+func (q *Queries) PendingSuggestions(ctx context.Context, companyID string) ([]CompanySuggestion, error) {
+	rows, err := q.db.Query(ctx, pendingSuggestions, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanySuggestion
+	for rows.Next() {
+		var i CompanySuggestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CompanyID,
+			&i.Field,
+			&i.Value,
+			&i.Source,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setAutofill = `-- name: SetAutofill :exec
+UPDATE company SET autofill_status = $1, autofill_error = $2,
+  autofill_checked_at = CASE WHEN $1 IN ('done', 'failed') THEN now() ELSE autofill_checked_at END
+WHERE id = $3
+`
+
+type SetAutofillParams struct {
+	AutofillStatus string
+	AutofillError  *string
+	ID             string
+}
+
+func (q *Queries) SetAutofill(ctx context.Context, arg SetAutofillParams) error {
+	_, err := q.db.Exec(ctx, setAutofill, arg.AutofillStatus, arg.AutofillError, arg.ID)
+	return err
+}
+
 const updateCompany = `-- name: UpdateCompany :one
 UPDATE company SET
   name = $1,
@@ -237,7 +387,7 @@ UPDATE company SET
   version = version + 1,
   updated_at = now()
 WHERE id = $12 AND version = $13
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at
 `
 
 type UpdateCompanyParams struct {
@@ -294,6 +444,9 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AutofillStatus,
+		&i.AutofillError,
+		&i.AutofillCheckedAt,
 	)
 	return i, err
 }

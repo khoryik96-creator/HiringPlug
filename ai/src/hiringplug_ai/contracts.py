@@ -101,6 +101,7 @@ class ErrorCode(StrEnum):
 
 
 class JobKind(StrEnum):
+    company_autofill = "company.autofill"
     document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
     document_parse_cv = "document.parse_cv"
@@ -545,6 +546,66 @@ class CompanyPage(BaseModel):
     nextCursor: Annotated[
         CompanyId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
     ]
+
+
+class CompanySuggestionId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["csug_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^csug_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class CompanySuggestionField(StrEnum):
+    name = "name"
+    phone = "phone"
+    address = "address"
+    city = "city"
+    country = "country"
+    registrationNumber = "registrationNumber"
+    size = "size"
+    about = "about"
+
+
+class CompanySuggestion(BaseModel):
+    id: CompanySuggestionId
+    field: CompanySuggestionField
+    value: Annotated[
+        str,
+        Field(
+            description="As it would be saved (size: micro, small, medium, large or enterprise; country: a two-letter code)."
+        ),
+    ]
+    current: Annotated[str | None, Field(description="The company's value now.")]
+    source: Annotated[
+        str, Field(description='Where it was found, e.g. "schema.org data on https://contoh.com.my/".')
+    ]
+
+
+class CompanyAutofillStatus(StrEnum):
+    idle = "idle"
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class CompanyAutofill(BaseModel):
+    status: CompanyAutofillStatus
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    suggestions: Annotated[list[CompanySuggestion], Field(description="Waiting for a decision.")]
+
+
+class SuggestionDecision(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    accept: bool
+
+
+class CompanyAutofillJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId
 
 
 class ContactId(RootModel[str]):
