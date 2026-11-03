@@ -1,0 +1,273 @@
+# Module contract: placements (a candidate placed in a job, the fee, the
+# invoice and the guarantee period).
+# See contracts/README.md for the format.
+# Salary and fee are sensitive: their own permissions, and the database
+# (row-level security) hides them from everyone else.
+x-module:
+  name: placements
+  description: >
+    A placement records a candidate starting a job: the start date, the
+    guarantee period (if they leave within it, the placement fell through),
+    the recruiter credited, the agreed salary and the fee, and whether it has
+    been invoiced and paid. Recording one moves the application to placed.
+  permissions:
+    placements:read:
+      description: View placements (salary and fee need placements.fees:read).
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+    placements:manage:
+      description: Record placements and change them (start date, guarantee, status, invoice).
+      roles: [owner, admin, recruiter]
+    placements.fees:read:
+      description: See a placement's agreed salary and fee.
+      roles: [owner, admin, recruiter]
+    placements.fees:update:
+      description: Set or change a placement's agreed salary and fee.
+      roles: [owner, admin, recruiter]
+  errorCodes:
+    PLACEMENT_NOT_ALLOWED:
+      status: 422
+      description: The placement cannot be recorded or changed like this (the application is closed or already has one, a fall-through after the guarantee ended, ...). The message says why.
+  jobs: {}
+
+paths:
+  /v1/placements:
+    get:
+      operationId: listPlacements
+      tags: [placements]
+      summary: Placements, newest start date first, with fee totals
+      description: >
+        `money` is only included with placements.fees:read, and so are the
+        fee totals.
+      x-permission: placements:read
+      parameters:
+        - { name: applicationId, in: query, required: false, schema: { $ref: '#/components/schemas/ApplicationId' } }
+        - { name: status, in: query, required: false, schema: { $ref: '#/components/schemas/PlacementStatus' } }
+        - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
+        - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
+        - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlacementList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/applications/{applicationId}/placement:
+    parameters:
+      - $ref: '#/components/parameters/ApplicationIdPath'
+    post:
+      operationId: createPlacement
+      tags: [placements]
+      summary: Record a placement for an application (moves it to placed)
+      description: "`money` needs placements.fees:update."
+      x-permission: placements:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlacementInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Placement' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/PlacementNotAllowed' }
+
+  /v1/placements/{placementId}:
+    parameters:
+      - $ref: '#/components/parameters/PlacementIdPath'
+    patch:
+      operationId: updatePlacement
+      tags: [placements]
+      summary: Change a placement (start, guarantee, status, invoice, money)
+      description: "Fields left out stay as they are. `money` needs placements.fees:update."
+      x-permission: placements:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PlacementUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Placement' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/PlacementNotAllowed' }
+
+components:
+  responses:
+    PlacementNotAllowed:
+      description: Not allowed (PLACEMENT_NOT_ALLOWED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  parameters:
+    PlacementIdPath:
+      name: placementId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/PlacementId' }
+
+  schemas:
+    PlacementId:
+      type: string
+      pattern: '^plc_[0-9a-hjkmnp-tv-z]{26}$'
+      example: plc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    PlacementStatus:
+      type: string
+      description: active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start.
+      enum: [active, fell_through, cancelled]
+    InvoiceStatus:
+      type: string
+      enum: [not_invoiced, invoiced, paid]
+    PlacementRestrictedField:
+      type: string
+      description: A field left out because you lack the permission to see it.
+      enum: [money]
+    PlacementMoney:
+      type: object
+      additionalProperties: false
+      required: [salary, feePercent, feeAmount, feeCurrency]
+      description: >
+        The fee is either a percentage of the yearly salary (a monthly salary
+        counts 12 times; feeAmount is then worked out) or a fixed amount
+        (feePercent null).
+      properties:
+        salary:
+          description: The agreed salary.
+          allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
+          nullable: true
+        feePercent:
+          description: e.g. "20" for 20% of the yearly salary.
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        feeAmount:
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        feeCurrency:
+          allOf: [{ $ref: '#/components/schemas/CurrencyCode' }]
+          nullable: true
+    Placement:
+      type: object
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, recruiterId, recruiterName,
+        startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, invoiceStatus, invoiceNumber, invoicedOn, paidOn,
+        restrictedFields, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/PlacementId' }
+        version: { type: integer }
+        applicationId: { $ref: '#/components/schemas/ApplicationId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        candidateName: { type: string }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        jobTitle: { type: string }
+        companyName: { type: string }
+        recruiterId:
+          description: The recruiter credited with the placement.
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+          nullable: true
+        recruiterName: { type: string, nullable: true }
+        startDate: { type: string, format: date }
+        guaranteeDays: { type: integer, description: "How long after the start the candidate is guaranteed: if they leave within it, the placement fell through." }
+        guaranteeEndsOn: { type: string, format: date }
+        status: { $ref: '#/components/schemas/PlacementStatus' }
+        leftOn: { type: string, format: date, nullable: true, description: When the candidate left (fell_through only). }
+        statusNote: { type: string, nullable: true }
+        invoiceStatus: { $ref: '#/components/schemas/InvoiceStatus' }
+        invoiceNumber: { type: string, nullable: true }
+        invoicedOn: { type: string, format: date, nullable: true }
+        paidOn: { type: string, format: date, nullable: true }
+        money:
+          description: Left out (and listed in restrictedFields) without placements.fees:read. null means none recorded.
+          allOf: [{ $ref: '#/components/schemas/PlacementMoney' }]
+          nullable: true
+        restrictedFields:
+          type: array
+          items: { $ref: '#/components/schemas/PlacementRestrictedField' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FeeTotal:
+      type: object
+      required: [currency, total, notInvoiced, invoiced, paid]
+      description: Fees of the listed placements that did not fall through or get cancelled, in one currency.
+      properties:
+        currency: { $ref: '#/components/schemas/CurrencyCode' }
+        total: { $ref: '#/components/schemas/DecimalAmount' }
+        notInvoiced: { $ref: '#/components/schemas/DecimalAmount' }
+        invoiced: { $ref: '#/components/schemas/DecimalAmount', description: Invoiced and not yet paid. }
+        paid: { $ref: '#/components/schemas/DecimalAmount' }
+    PlacementList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Placement' }
+        feeTotals:
+          description: Left out without placements.fees:read.
+          type: array
+          items: { $ref: '#/components/schemas/FeeTotal' }
+    PlacementMoneyInput:
+      type: object
+      additionalProperties: false
+      description: "Either feePercent (with a monthly or yearly salary) or feeAmount and feeCurrency; or neither."
+      properties:
+        salary:
+          allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
+          nullable: true
+        feePercent:
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        feeAmount:
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        feeCurrency:
+          allOf: [{ $ref: '#/components/schemas/CurrencyCode' }]
+          nullable: true
+    PlacementInput:
+      type: object
+      additionalProperties: false
+      required: [startDate]
+      properties:
+        startDate: { type: string, format: date }
+        guaranteeDays: { type: integer, minimum: 0, maximum: 365, description: Defaults to 90. }
+        recruiterId:
+          description: Defaults to you.
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+        money: { $ref: '#/components/schemas/PlacementMoneyInput' }
+    PlacementUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        startDate: { type: string, format: date }
+        guaranteeDays: { type: integer, minimum: 0, maximum: 365 }
+        recruiterId:
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+          nullable: true
+        status: { $ref: '#/components/schemas/PlacementStatus' }
+        leftOn: { type: string, format: date, nullable: true }
+        statusNote: { type: string, maxLength: 1000, nullable: true }
+        invoiceStatus: { $ref: '#/components/schemas/InvoiceStatus' }
+        invoiceNumber: { type: string, maxLength: 100, nullable: true }
+        invoicedOn: { type: string, format: date, nullable: true }
+        paidOn: { type: string, format: date, nullable: true }
+        money:
+          description: The whole of the salary and fee (null clears them).
+          allOf: [{ $ref: '#/components/schemas/PlacementMoneyInput' }]
+          nullable: true

@@ -21,6 +21,7 @@ button.link { background: none; border: none; color: #2563eb; cursor: pointer; p
 .badge.failed, .badge.needs_ocr { background: #fee2e2; }
 .badge.queued { background: #fef3c7; }
 .badge.sent { background: #dcfce7; }
+.badge.fell_through { background: #fee2e2; }
 .email-body { white-space: pre-wrap; }
 pre.extracted { white-space: pre-wrap; background: #f1f5f9; padding: 0.75rem; max-height: 24rem; overflow: auto; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem 1rem; align-items: start; }

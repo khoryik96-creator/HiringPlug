@@ -76,3 +76,21 @@ sql:
       go:
         <<: *go
         out: internal/modules/emails/internal/store
+  - <<: *module
+    queries: db/queries/placements.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/placements/internal/store
+        # Dates as time.Time (midnight UTC), like timestamps.
+        overrides:
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type: { type: time.Time, pointer: true }
+          - db_type: date
+            go_type: time.Time
+          - db_type: date
+            nullable: true
+            go_type: { type: time.Time, pointer: true }

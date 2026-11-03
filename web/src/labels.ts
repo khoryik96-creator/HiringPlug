@@ -189,3 +189,18 @@ export function countryName(code: string): string {
 }
 
 export const EMAIL_STATUS: Record<Schemas["EmailStatus"], string> = { queued: "Sending", sent: "Sent", failed: "Not sent" };
+
+export const PLACEMENT_STATUS: Record<Schemas["PlacementStatus"], string> = {
+  active: "Placed", fell_through: "Fell through", cancelled: "Did not start",
+};
+export const INVOICE_STATUS: Record<Schemas["InvoiceStatus"], string> = { not_invoiced: "Not invoiced", invoiced: "Invoiced", paid: "Paid" };
+
+/** "MYR 20,400.00" */
+export function formatMoney(amount: string, currency: string): string {
+  return `${currency} ${Number(amount).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** "1 Dec 2026" for a date (YYYY-MM-DD), whatever the viewer's time zone. */
+export function formatDay(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}

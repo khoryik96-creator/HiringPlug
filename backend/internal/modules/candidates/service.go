@@ -6,11 +6,9 @@ package candidates
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
@@ -363,18 +361,18 @@ func profileFields(p Profile) map[string]any {
 
 func fromCompensationRow(r store.CandidateCompensation) (Compensation, error) {
 	c := Compensation{Version: int(r.Version), UpdatedAt: r.UpdatedAt}
-	current, err := decimalString(r.CurrentAmount)
+	current, err := database.DecimalString(r.CurrentAmount)
 	if err != nil {
 		return Compensation{}, err
 	}
 	if current != nil && r.CurrentCurrency != nil && r.CurrentPeriod != nil {
 		c.Current = &SalaryAmount{Amount: *current, Currency: *r.CurrentCurrency, Period: *r.CurrentPeriod}
 	}
-	lo, err := decimalString(r.ExpectedMin)
+	lo, err := database.DecimalString(r.ExpectedMin)
 	if err != nil {
 		return Compensation{}, err
 	}
-	hi, err := decimalString(r.ExpectedMax)
+	hi, err := database.DecimalString(r.ExpectedMax)
 	if err != nil {
 		return Compensation{}, err
 	}
@@ -402,22 +400,6 @@ func updateCompensationParams(candidateID string, expectedVersion int, current *
 		u.ExpectedMin, u.ExpectedMax, u.ExpectedCurrency, u.ExpectedPeriod = &expected.Min, expected.Max, &expected.Currency, &expected.Period
 	}
 	return u
-}
-
-// decimalString renders a numeric column exactly, e.g. "8500.00".
-func decimalString(n pgtype.Numeric) (*string, error) {
-	if !n.Valid {
-		return nil, nil //nolint:nilnil // a NULL column is not an error
-	}
-	v, err := n.Value()
-	if err != nil {
-		return nil, err
-	}
-	s, ok := v.(string)
-	if !ok {
-		return nil, fmt.Errorf("numeric value has unexpected type %T", v)
-	}
-	return &s, nil
 }
 
 // UsedValues are tags, skills, industries and specializations already used in

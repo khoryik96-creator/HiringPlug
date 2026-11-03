@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
 )
 
 // careersAds gives the careers module the jobs module's published ads, in
@@ -75,4 +76,23 @@ func (a interviewApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []stri
 
 func (a interviewApplications) ReachInterview(ctx context.Context, tx pgx.Tx, id string) error {
 	return a.pipeline.ReachInterview(ctx, tx, id)
+}
+
+// placementApplications gives the placements module the pipeline's
+// applications, in its own type.
+type placementApplications struct{ pipeline *pipeline.Module }
+
+func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]placements.Application, error) {
+	briefs, err := a.pipeline.Briefs(ctx, tx, ids)
+	out := make(map[string]placements.Application, len(briefs))
+	for id, b := range briefs {
+		out[id] = placements.Application{
+			Stage: b.Stage, CandidateID: b.CandidateID, CandidateName: b.CandidateName, JobID: b.JobID, JobTitle: b.JobTitle, CompanyName: b.CompanyName,
+		}
+	}
+	return out, err
+}
+
+func (a placementApplications) Place(ctx context.Context, tx pgx.Tx, id string) error {
+	return a.pipeline.Place(ctx, tx, id)
 }

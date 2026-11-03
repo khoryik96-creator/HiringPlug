@@ -50,6 +50,10 @@ class Permission(StrEnum):
     notes_read = "notes:read"
     pipeline_read = "pipeline:read"
     pipeline_update = "pipeline:update"
+    placements_fees_read = "placements.fees:read"
+    placements_fees_update = "placements.fees:update"
+    placements_manage = "placements:manage"
+    placements_read = "placements:read"
 
 
 class ErrorCode(StrEnum):
@@ -68,6 +72,7 @@ class ErrorCode(StrEnum):
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
+    PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
     STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
@@ -1300,6 +1305,130 @@ class PipelineSummary(BaseModel):
     ]
     placedLast30Days: int
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
+
+
+class PlacementId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["plc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^plc_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class PlacementStatus(StrEnum):
+    active = "active"
+    fell_through = "fell_through"
+    cancelled = "cancelled"
+
+
+class InvoiceStatus(StrEnum):
+    not_invoiced = "not_invoiced"
+    invoiced = "invoiced"
+    paid = "paid"
+
+
+class PlacementRestrictedField(StrEnum):
+    money = "money"
+
+
+class PlacementMoney(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    salary: Annotated[SalaryAmount | None, Field(description="The agreed salary.")]
+    feePercent: Annotated[DecimalAmount | None, Field(description='e.g. "20" for 20% of the yearly salary.')]
+    feeAmount: Annotated[DecimalAmount | None, Field(...)]
+    feeCurrency: Annotated[CurrencyCode | None, Field(...)]
+
+
+class Placement(BaseModel):
+    id: PlacementId
+    version: int
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    jobId: JobOrderId
+    jobTitle: str
+    companyName: str
+    recruiterId: Annotated[UserId | None, Field(description="The recruiter credited with the placement.")]
+    recruiterName: Annotated[str | None, Field(...)]
+    startDate: date
+    guaranteeDays: Annotated[
+        int,
+        Field(
+            description="How long after the start the candidate is guaranteed: if they leave within it, the placement fell through."
+        ),
+    ]
+    guaranteeEndsOn: date
+    status: PlacementStatus
+    leftOn: Annotated[date | None, Field(description="When the candidate left (fell_through only).")]
+    statusNote: Annotated[str | None, Field(...)]
+    invoiceStatus: InvoiceStatus
+    invoiceNumber: Annotated[str | None, Field(...)]
+    invoicedOn: Annotated[date | None, Field(...)]
+    paidOn: Annotated[date | None, Field(...)]
+    money: Annotated[
+        PlacementMoney | None,
+        Field(
+            description="Left out (and listed in restrictedFields) without placements.fees:read. null means none recorded."
+        ),
+    ] = None
+    restrictedFields: list[PlacementRestrictedField]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class FeeTotal(BaseModel):
+    currency: CurrencyCode
+    total: DecimalAmount
+    notInvoiced: DecimalAmount
+    invoiced: Annotated[DecimalAmount, Field(description="Invoiced and not yet paid.")]
+    paid: DecimalAmount
+
+
+class PlacementList(BaseModel):
+    items: list[Placement]
+    feeTotals: Annotated[
+        list[FeeTotal] | None, Field(description="Left out without placements.fees:read.")
+    ] = None
+
+
+class PlacementMoneyInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    salary: SalaryAmount | None = None
+    feePercent: DecimalAmount | None = None
+    feeAmount: DecimalAmount | None = None
+    feeCurrency: CurrencyCode | None = None
+
+
+class PlacementInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    startDate: date
+    guaranteeDays: Annotated[int | None, Field(description="Defaults to 90.", ge=0, le=365)] = None
+    recruiterId: Annotated[UserId | None, Field(description="Defaults to you.")] = None
+    money: PlacementMoneyInput | None = None
+
+
+class PlacementUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    startDate: date | None = None
+    guaranteeDays: Annotated[int | None, Field(ge=0, le=365)] = None
+    recruiterId: UserId | None = None
+    status: PlacementStatus | None = None
+    leftOn: date | None = None
+    statusNote: Annotated[str | None, Field(max_length=1000)] = None
+    invoiceStatus: InvoiceStatus | None = None
+    invoiceNumber: Annotated[str | None, Field(max_length=100)] = None
+    invoicedOn: date | None = None
+    paidOn: date | None = None
+    money: Annotated[
+        PlacementMoneyInput | None, Field(description="The whole of the salary and fee (null clears them).")
+    ] = None
 
 
 class PublicJobAd(BaseModel):

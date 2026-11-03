@@ -27,6 +27,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Job ads with publishing rules; a public careers page with an apply form; job board links, feed and Google for Jobs |
 | ✅ | Interviews with clash checks, calendar files and interviewer feedback |
 | ✅ | Email from the app with templates, sent through your mail server; interview reminders |
+| ✅ | Placements with guarantee periods, invoices and protected salary and fee |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -82,11 +83,11 @@ job. Today the app has candidates but nothing to place them into.
 | 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
 | 5.5 **Company auto-fill** | Fill company details from the website name or address, as suggestions you accept |
 
-### Phase 6: agency business and reports ⬜
+### Phase 6: agency business and reports 🔜
 
 | Step | Delivers |
 |---|---|
-| 6.1 **Placements and fees** (agency) | Placement record with start date, salary, fee and invoice status; guarantee periods |
+| ✅ 6.1 **Placements and fees** (agency) | Placement per application (moves it to placed) with start date, guarantee period and fall-throughs, recruiter credited, invoice and payment; agreed salary and fee (a percentage of the yearly salary or fixed) visible only to those allowed; a Placements page with fee totals and guarantees ending soon |
 | 6.2 **Offers** (in-house) | Offer details and approvals |
 | 6.3 **Reports** | Pipeline conversion, time to fill, placements and fees per recruiter, source effectiveness |
 | 6.4 **Job ads puller** | Collect hiring signals from allowed sources (careers pages, public ATS feeds, ads you save) as business development leads |

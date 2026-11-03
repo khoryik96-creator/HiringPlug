@@ -62,6 +62,9 @@ details get their own permissions.
 | `emails:read` (emails sent about a candidate) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | `emails:send` | ✓ | ✓ | ✓ | ✓ | | |
 | `emails.templates:manage` | ✓ | ✓ | ✓ | | | |
+| `placements:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `placements:manage` (record and change) | ✓ | ✓ | ✓ | | | |
+| `placements.fees:read`, `placements.fees:update` (salary and fee) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency

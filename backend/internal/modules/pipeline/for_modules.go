@@ -1,5 +1,8 @@
 package pipeline
 
+// What other modules use: application briefs, and the stage moves that
+// follow from their records (an interview scheduled, a placement recorded).
+
 import (
 	"context"
 	"slices"
@@ -12,7 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// Brief is an application as other modules show it.
+// Brief is an application as other modules show it (interviews, placements).
 type Brief struct {
 	ID, Stage                  string
 	JobID, JobTitle            string
@@ -71,5 +74,32 @@ func (m *Module) ReachInterview(ctx context.Context, tx pgx.Tx, id string) error
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "application.moved", EntityType: "application", EntityID: id,
 		Changes: map[string]any{"stage": map[string]string{"from": row.Stage, "to": Interview}, "via": "interview scheduled"},
+	})
+}
+
+// Place moves an application to placed (recording a placement), in the
+// caller's transaction, by the pipeline rules: a closed application is
+// reopened first. Already placed: nothing changes.
+func (m *Module) Place(ctx context.Context, tx pgx.Tx, id string) error {
+	q := store.New(tx)
+	row, err := q.GetApplication(ctx, id)
+	if database.IsNoRows(err) {
+		return apperr.NotFound("application")
+	}
+	if err != nil {
+		return err
+	}
+	if row.Stage == Placed {
+		return nil
+	}
+	if IsClosed(row.Stage) {
+		return MoveNotAllowedError{Message: "Reopen the application (move it to an open stage) before placing the candidate."}
+	}
+	if _, err := q.MoveApplication(ctx, store.MoveApplicationParams{ID: id, ExpectedVersion: row.Version, Stage: Placed}); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{
+		Action: "application.moved", EntityType: "application", EntityID: id,
+		Changes: map[string]any{"stage": map[string]string{"from": row.Stage, "to": Placed}, "via": "placement recorded"},
 	})
 }

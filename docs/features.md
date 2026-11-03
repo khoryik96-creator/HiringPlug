@@ -257,6 +257,25 @@ requirements), de-duplicated, and kept with its source and date.
   quotes the CV and the job ad, so a recruiter can check it. It suggests; the
   recruiter decides.
 
+## Placements and fees ✅
+
+Recording a placement (on a candidate's job at the offer stage, "Record
+placement") moves the application to placed. A placement has the start date,
+the guarantee period (90 days unless changed), the recruiter credited (whoever
+records it unless changed), what happened (placed; fell through, with the day
+they left, which must be within the guarantee; or did not start), and the
+invoice (not invoiced; invoiced, with its number and date; paid, with the date,
+not before the invoice; dates default to today). The agreed salary and the fee
+are separate, like candidate salaries: only owners, admins and recruiters see
+or change them (`placements.fees:read` / `:update`), the database hides them
+from everyone else, and the audit log records only that they changed. The fee
+is a percentage of the yearly salary (a monthly salary counts 12 times; worked
+out to the cent on the server, with a preview in the form) or a fixed amount.
+The **Placements** page lists them all, filtered by what happened or the
+invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
+paid; fall-throughs and no-starts not counted) and the placements whose
+guarantee ends within two weeks.
+
 ## 5. Notes and activity
 
 ✅ Notes (general, screening, interview, call) on candidates, jobs, companies

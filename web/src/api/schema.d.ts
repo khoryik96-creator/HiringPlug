@@ -893,6 +893,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/placements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Placements, newest start date first, with fee totals
+         * @description `money` is only included with placements.fees:read, and so are the fee totals.
+         */
+        get: operations["listPlacements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/applications/{applicationId}/placement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a placement for an application (moves it to placed)
+         * @description `money` needs placements.fees:update.
+         */
+        post: operations["createPlacement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/placements/{placementId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                placementId: components["parameters"]["PlacementIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a placement (start, guarantee, status, invoice, money)
+         * @description Fields left out stay as they are. `money` needs placements.fees:update.
+         */
+        patch: operations["updatePlacement"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -900,9 +964,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind";
         Error: {
@@ -1934,6 +1998,117 @@ export interface components {
             /** @description Applications that changed stage in the last 7 days. */
             movedLast7Days: number;
         };
+        /** @example plc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        PlacementId: string;
+        /**
+         * @description active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start.
+         * @enum {string}
+         */
+        PlacementStatus: "active" | "fell_through" | "cancelled";
+        /** @enum {string} */
+        InvoiceStatus: "not_invoiced" | "invoiced" | "paid";
+        /**
+         * @description A field left out because you lack the permission to see it.
+         * @enum {string}
+         */
+        PlacementRestrictedField: "money";
+        /** @description The fee is either a percentage of the yearly salary (a monthly salary counts 12 times; feeAmount is then worked out) or a fixed amount (feePercent null). */
+        PlacementMoney: {
+            /** @description The agreed salary. */
+            salary: components["schemas"]["SalaryAmount"] | null;
+            /** @description e.g. "20" for 20% of the yearly salary. */
+            feePercent: components["schemas"]["DecimalAmount"] | null;
+            feeAmount: components["schemas"]["DecimalAmount"] | null;
+            feeCurrency: components["schemas"]["CurrencyCode"] | null;
+        };
+        Placement: {
+            id: components["schemas"]["PlacementId"];
+            version: number;
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            companyName: string;
+            /** @description The recruiter credited with the placement. */
+            recruiterId: components["schemas"]["UserId"] | null;
+            recruiterName: string | null;
+            /** Format: date */
+            startDate: string;
+            /** @description How long after the start the candidate is guaranteed: if they leave within it, the placement fell through. */
+            guaranteeDays: number;
+            /** Format: date */
+            guaranteeEndsOn: string;
+            status: components["schemas"]["PlacementStatus"];
+            /**
+             * Format: date
+             * @description When the candidate left (fell_through only).
+             */
+            leftOn: string | null;
+            statusNote: string | null;
+            invoiceStatus: components["schemas"]["InvoiceStatus"];
+            invoiceNumber: string | null;
+            /** Format: date */
+            invoicedOn: string | null;
+            /** Format: date */
+            paidOn: string | null;
+            /** @description Left out (and listed in restrictedFields) without placements.fees:read. null means none recorded. */
+            money?: components["schemas"]["PlacementMoney"] | null;
+            restrictedFields: components["schemas"]["PlacementRestrictedField"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description Fees of the listed placements that did not fall through or get cancelled, in one currency. */
+        FeeTotal: {
+            currency: components["schemas"]["CurrencyCode"];
+            total: components["schemas"]["DecimalAmount"];
+            notInvoiced: components["schemas"]["DecimalAmount"];
+            /** @description Invoiced and not yet paid. */
+            invoiced: components["schemas"]["DecimalAmount"];
+            paid: components["schemas"]["DecimalAmount"];
+        };
+        PlacementList: {
+            items: components["schemas"]["Placement"][];
+            /** @description Left out without placements.fees:read. */
+            feeTotals?: components["schemas"]["FeeTotal"][];
+        };
+        /** @description Either feePercent (with a monthly or yearly salary) or feeAmount and feeCurrency; or neither. */
+        PlacementMoneyInput: {
+            salary?: components["schemas"]["SalaryAmount"] | null;
+            feePercent?: components["schemas"]["DecimalAmount"] | null;
+            feeAmount?: components["schemas"]["DecimalAmount"] | null;
+            feeCurrency?: components["schemas"]["CurrencyCode"] | null;
+        };
+        PlacementInput: {
+            /** Format: date */
+            startDate: string;
+            /** @description Defaults to 90. */
+            guaranteeDays?: number;
+            /** @description Defaults to you. */
+            recruiterId?: components["schemas"]["UserId"];
+            money?: components["schemas"]["PlacementMoneyInput"];
+        };
+        PlacementUpdate: {
+            version: number;
+            /** Format: date */
+            startDate?: string;
+            guaranteeDays?: number;
+            recruiterId?: components["schemas"]["UserId"] | null;
+            status?: components["schemas"]["PlacementStatus"];
+            /** Format: date */
+            leftOn?: string | null;
+            statusNote?: string | null;
+            invoiceStatus?: components["schemas"]["InvoiceStatus"];
+            invoiceNumber?: string | null;
+            /** Format: date */
+            invoicedOn?: string | null;
+            /** Format: date */
+            paidOn?: string | null;
+            /** @description The whole of the salary and fee (null clears them). */
+            money?: components["schemas"]["PlacementMoneyInput"] | null;
+        };
     };
     responses: {
         /** @description The request is invalid (VALIDATION_FAILED). */
@@ -2008,6 +2183,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not allowed (PLACEMENT_NOT_ALLOWED). */
+        PlacementNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         CandidateIdPath: components["schemas"]["CandidateId"];
@@ -2020,6 +2204,7 @@ export interface components {
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
+        PlacementIdPath: components["schemas"]["PlacementId"];
     };
     requestBodies: never;
     headers: never;
@@ -3716,6 +3901,100 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listPlacements: {
+        parameters: {
+            query?: {
+                applicationId?: components["schemas"]["ApplicationId"];
+                status?: components["schemas"]["PlacementStatus"];
+                invoiceStatus?: components["schemas"]["InvoiceStatus"];
+                /** @description Started on or after this day. */
+                startFrom?: string;
+                /** @description Started on or before this day. */
+                startTo?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacementList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createPlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: components["parameters"]["ApplicationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlacementInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Placement"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["PlacementNotAllowed"];
+        };
+    };
+    updatePlacement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                placementId: components["parameters"]["PlacementIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlacementUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Placement"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["PlacementNotAllowed"];
         };
     };
 }
