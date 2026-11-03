@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import socket
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,13 @@ class Config:
     ocr_enabled: bool
     ocr_languages: str  # e.g. "eng", or "eng+msa" for English and Malay
     max_download_bytes: int
+    # The AI provider: "off", or "openai_compatible" (DeepSeek's API, a host
+    # running its open model, or your own server).
+    ai_provider: str = "off"
+    ai_url: str = ""
+    ai_key: str = field(default="", repr=False)  # never printed
+    ai_model: str = ""
+    ai_timeout_seconds: float = 90.0
 
 
 class ConfigError(ValueError):
@@ -52,6 +59,19 @@ def load_config(env: Mapping[str, str]) -> Config:
     if ocr not in {"on", "off"}:
         problems.append(f"HP_AI_OCR must be on or off, got {ocr!r}")
 
+    provider = env.get("HP_AI_PROVIDER", "off").strip().lower() or "off"
+    if provider not in {"off", "openai_compatible"}:
+        problems.append(f"HP_AI_PROVIDER must be off or openai_compatible, got {provider!r}")
+    ai_url = env.get("HP_AI_PROVIDER_URL", "").strip()
+    ai_model = env.get("HP_AI_MODEL", "").strip()
+    if provider == "openai_compatible":
+        if not ai_url.startswith(("https://", "http://")):
+            problems.append(
+                "HP_AI_PROVIDER_URL must be the provider's address, e.g. https://api.deepseek.com/v1"
+            )
+        if not ai_model:
+            problems.append("HP_AI_MODEL is required with an AI provider, e.g. deepseek-chat")
+
     config = Config(
         database_url=database_url,
         worker_id=env.get("HP_AI_WORKER_ID", "").strip() or f"py:{socket.gethostname()}:{os.getpid()}",
@@ -61,7 +81,14 @@ def load_config(env: Mapping[str, str]) -> Config:
         ocr_enabled=ocr == "on",
         ocr_languages=env.get("HP_AI_OCR_LANGUAGES", "eng").strip() or "eng",
         max_download_bytes=int(number("HP_MAX_UPLOAD_BYTES", 10 * 1024 * 1024)),
+        ai_provider=provider,
+        ai_url=ai_url,
+        ai_key=env.get("HP_AI_PROVIDER_KEY", "").strip(),
+        ai_model=ai_model,
+        ai_timeout_seconds=number("HP_AI_TIMEOUT_SECONDS", 90.0),
     )
+    if config.ai_timeout_seconds <= 0 or config.ai_timeout_seconds * 2 >= config.lease_seconds:
+        problems.append("HP_AI_TIMEOUT_SECONDS must be positive and well under HP_AI_LEASE_SECONDS")
     if config.lease_seconds < 30:
         problems.append("HP_AI_LEASE_SECONDS must be at least 30")
     if problems:

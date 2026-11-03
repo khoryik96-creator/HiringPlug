@@ -25,6 +25,7 @@ from .contracts import JobKind
 from .download import download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
 from .jobs import HANDLERS, Deps
+from .provider import OpenAICompatible
 from .queue import ClaimedJob, LeaseLostError, Queue
 
 log = logging.getLogger("hiringplug_ai.worker")
@@ -62,8 +63,13 @@ def main() -> None:
     ocr = TesseractOcr(config.ocr_languages) if config.ocr_enabled else None
     if ocr is not None and not ocr.available():
         log.warning("OCR is on but Tesseract is not installed; scanned documents will be marked needs_ocr")
+    ai = (
+        OpenAICompatible(config.ai_url, config.ai_key, config.ai_model, config.ai_timeout_seconds)
+        if config.ai_provider == "openai_compatible"
+        else None
+    )
     deps = Deps(
-        download=download, ocr=ocr, limits=DEFAULT_LIMITS, max_download_bytes=config.max_download_bytes
+        download=download, ocr=ocr, limits=DEFAULT_LIMITS, max_download_bytes=config.max_download_bytes, ai=ai
     )
     queue = Queue(config.database_url, config.worker_id)
 
@@ -71,7 +77,14 @@ def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
 
-    log.info("worker started", extra={"worker_id": config.worker_id, "ocr": ocr.name if ocr else "off"})
+    log.info(
+        "worker started",
+        extra={
+            "worker_id": config.worker_id,
+            "ocr": ocr.name if ocr else "off",
+            "ai": config.ai_model or "off",
+        },
+    )
     while not stop.is_set():
         try:
             job = queue.claim(config.lease_seconds)

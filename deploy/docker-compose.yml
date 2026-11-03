@@ -30,6 +30,9 @@ x-backend-env: &backend-env
   HP_SMTP_PASSWORD: ${HP_SMTP_PASSWORD:-}
   HP_SMTP_FROM: ${HP_SMTP_FROM:-no-reply@hiringplug.local}
   HP_SMTP_TLS: ${HP_SMTP_TLS:-none}
+  # The AI assistant: off until a provider is set up (see docs/playbooks/run-locally.md).
+  HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+  HP_AI_MONTHLY_TOKENS: ${HP_AI_MONTHLY_TOKENS:-2000000}
 
 services:
   postgres:
@@ -78,6 +81,10 @@ services:
     environment:
       HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
       HP_AI_OCR_LANGUAGES: eng
+      HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+      HP_AI_PROVIDER_URL: ${HP_AI_PROVIDER_URL:-}
+      HP_AI_PROVIDER_KEY: ${HP_AI_PROVIDER_KEY:-}
+      HP_AI_MODEL: ${HP_AI_MODEL:-}
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 

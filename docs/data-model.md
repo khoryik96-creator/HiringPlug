@@ -40,6 +40,7 @@ tenant ─┬─ app_user (role)
 | `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
 | `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
 | `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
+| `assistant_answer` | a question to the AI assistant: who asked, about what (candidate/job/application + id), kind, question, status (queued/done/failed), answer or error, model, input and output tokens, asked and answered; shown only to the asker |
 | `cv_template` | the company's Word CV templates: name, stored file, uploaded by (the built-in standard one is not stored) |
 | `document` (PDF) | for formatted CVs made by the app: PDF status (queued/ready/failed), stored PDF, error |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |

@@ -96,6 +96,7 @@ details get their own permissions.
 | `cvformats:create` (formatted CVs) | ✓ | ✓ | ✓ | ✓ | | |
 | `cvformats.templates:manage` (upload and remove CV templates) | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
+| `assistant:use` (the AI assistant; it sees only what you may see, never contact details or salary) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 
 
 Coming later: **custom roles** per company (an admin screen to pick

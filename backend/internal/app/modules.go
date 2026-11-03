@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
@@ -55,6 +56,7 @@ type Modules struct {
 	Integrations *integrations.Module
 	Leads        *leads.Module
 	Cvformats    *cvformats.Module
+	Assistant    *assistant.Module
 	// scaffold:fields
 }
 
@@ -95,6 +97,10 @@ func NewModules(d Deps) *Modules {
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
 		Tenants: m.Identity, Users: m.Identity,
 	}, d.Files, d.Config.MaxUploadBytes)
+	m.Assistant = assistant.New(d.Pool, assistant.Deps{
+		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
+		Applications: assistantApplications{m.Pipeline},
+	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -121,6 +127,7 @@ type (
 	integrationsHTTP = integrations.HTTP
 	leadsHTTP        = leads.HTTP
 	cvformatsHTTP    = cvformats.HTTP
+	assistantHTTP    = assistant.HTTP
 	// scaffold:aliases
 )
 
@@ -145,6 +152,7 @@ type Server struct {
 	*integrationsHTTP
 	*leadsHTTP
 	*cvformatsHTTP
+	*assistantHTTP
 	// scaffold:embeds
 }
 
@@ -170,6 +178,7 @@ func (m *Modules) Server() *Server {
 		integrationsHTTP: m.Integrations.HTTP,
 		leadsHTTP:        m.Leads.HTTP,
 		cvformatsHTTP:    m.Cvformats.HTTP,
+		assistantHTTP:    m.Assistant.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -184,6 +193,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Integrations.JobHandlers(),
 		m.Leads.JobHandlers(),
 		m.Companies.JobHandlers(),
+		m.Assistant.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

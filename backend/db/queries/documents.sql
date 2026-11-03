@@ -52,3 +52,10 @@ UPDATE document SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHER
 UPDATE document SET pdf_status = @pdf_status, pdf_key = sqlc.narg(pdf_key), pdf_error = sqlc.narg(pdf_error)
 WHERE id = @id AND pdf_status = 'queued'
 RETURNING id;
+
+-- The text of the candidate's newest CV that was read (not one the app made).
+-- name: LatestCvText :one
+SELECT extracted_text::text FROM document
+WHERE candidate_id = @candidate_id AND source <> 'formatted' AND extracted_text IS NOT NULL AND extracted_text <> ''
+ORDER BY id DESC
+LIMIT 1;

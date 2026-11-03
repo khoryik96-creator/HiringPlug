@@ -4,6 +4,41 @@
  */
 
 export interface paths {
+    "/v1/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the assistant is on, and how much of this month's allowance the company has used */
+        get: operations["getAssistant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assistant/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your latest questions about one candidate, job or application, newest first */
+        get: operations["listAssistantAnswers"];
+        put?: never;
+        /** Ask the assistant (answered in the background) */
+        post: operations["askAssistant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates": {
         parameters: {
             query?: never;
@@ -1561,11 +1596,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
+        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1603,6 +1638,84 @@ export interface components {
          * @example 8500.00
          */
         DecimalAmount: string;
+        /** @example ask_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        AssistantAnswerId: string;
+        /**
+         * @description What the question is about; an application is a candidate for a job.
+         * @enum {string}
+         */
+        AssistantSubjectType: "candidate" | "job" | "application";
+        /**
+         * @description summary = a short summary; red_flags = gaps, red flags and what to ask about; fit = how well the candidate fits the job (applications only); question = your own question.
+         * @enum {string}
+         */
+        AssistantKind: "summary" | "red_flags" | "fit" | "question";
+        /**
+         * @description queued = waiting for the AI; done = answered; failed = the AI could not answer (see error).
+         * @enum {string}
+         */
+        AssistantAnswerStatus: "queued" | "done" | "failed";
+        AssistantStatus: {
+            /** @description Whether an AI provider is set up. */
+            enabled: boolean;
+            /**
+             * Format: int64
+             * @description Tokens the company used this calendar month.
+             */
+            usedTokens: number;
+            /**
+             * Format: int64
+             * @description The company's monthly allowance.
+             */
+            monthlyTokens: number;
+        };
+        AssistantQuestion: {
+            subjectType: components["schemas"]["AssistantSubjectType"];
+            subjectId: string;
+            kind: components["schemas"]["AssistantKind"];
+            /** @description Your question (for kind question). */
+            question?: string;
+        };
+        AssistantAnswer: {
+            id: components["schemas"]["AssistantAnswerId"];
+            subjectType: components["schemas"]["AssistantSubjectType"];
+            subjectId: string;
+            kind: components["schemas"]["AssistantKind"];
+            question: string | null;
+            status: components["schemas"]["AssistantAnswerStatus"];
+            answer: string | null;
+            error: string | null;
+            /** @description The AI model that answered. */
+            model: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            answeredAt: string | null;
+        };
+        AssistantAnswerList: {
+            items: components["schemas"]["AssistantAnswer"][];
+        };
+        AssistantSection: {
+            /** @description What this is, e.g. Profile, CV text, Job. */
+            title: string;
+            text: string;
+        };
+        AssistantAskJob: {
+            answerId: components["schemas"]["AssistantAnswerId"];
+            kind: components["schemas"]["AssistantKind"];
+            question: string | null;
+            /** @description What the asking user may see, without contact details or salary. */
+            sections: components["schemas"]["AssistantSection"][];
+        };
+        AssistantAnsweredJob: {
+            answerId: components["schemas"]["AssistantAnswerId"];
+            answer: string | null;
+            /** @description Why there is no answer (provider down, switched off, ...). */
+            error: string | null;
+            model: string | null;
+            inputTokens: number;
+            outputTokens: number;
+        };
         /** @example cand_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CandidateId: string;
         /**
@@ -3284,6 +3397,24 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Switched off (ASSISTANT_OFF). */
+        AssistantOff: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description This month's allowance is used (ASSISTANT_LIMIT_REACHED). */
+        AssistantLimitReached: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Not blind (CV_NOT_BLIND). */
         CvNotBlind: {
             headers: {
@@ -3391,6 +3522,84 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getAssistant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAssistantAnswers: {
+        parameters: {
+            query: {
+                subjectType: components["schemas"]["AssistantSubjectType"];
+                subjectId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantAnswerList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    askAssistant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantQuestion"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantAnswer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AssistantOff"];
+            429: components["responses"]["AssistantLimitReached"];
+        };
+    };
     listCandidates: {
         parameters: {
             query?: {

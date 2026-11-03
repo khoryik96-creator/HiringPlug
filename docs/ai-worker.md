@@ -167,13 +167,21 @@ source-grounding check as parsing. Embeddings (stored in PostgreSQL with
 pgvector) shortlist candidates for a job; the model explains the top matches.
 It suggests; recruiters decide.
 
-## AI assistant sidebar (M4)
+## AI assistant (built)
 
-See [features.md](features.md#35-ai-interpretation-sidebar-deepseek): the
-context is built by Go from what the user may see, the provider is a setting
-per company (DeepSeek through a host and region you choose, or another
-provider), contact details are removed, and usage and cost are tracked with
-limits.
+`assistant.ask` carries the question and the context Go gathered (sections of
+text, already without names, contact details or salary). `jobs/assistant_ask.py`
+builds the prompt (one system prompt, one task per kind) and calls the
+provider; the answer, the model and the tokens go back as
+`assistant.answered`. A provider failure becomes a readable error on the
+answer ("the AI provider did not answer in time"), not a retry loop.
+
+`provider.py` is the one interface (`complete(system, user, max_tokens)`);
+`OpenAICompatible` covers DeepSeek's API, hosts of its open model and
+self-hosted servers. Settings: `HP_AI_PROVIDER` (off / openai_compatible),
+`HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY` (never logged or printed),
+`HP_AI_MODEL`, `HP_AI_TIMEOUT_SECONDS`. See
+[features.md](features.md#35-ai-assistant-sidebar--off-until-an-ai-provider-is-set-up).
 
 ## Adding a job to the AI worker
 

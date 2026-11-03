@@ -87,6 +87,13 @@ export const SUGGESTION_FIELD: Record<Schemas["CompanySuggestionField"], string>
   about: "About",
 };
 
+export const ASSISTANT_KIND: Record<Schemas["AssistantKind"], string> = {
+  summary: "Summary",
+  red_flags: "Gaps and red flags",
+  fit: "Fit for this job",
+  question: "Your question",
+};
+
 export const CONTACT_STATUS: Record<Schemas["ContactStatus"], string> = {
   active: "Works there",
   left: "Has left",

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"maps"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -56,7 +57,8 @@ type testApp struct {
 	router  routers.Router
 }
 
-func newTestApp(t *testing.T) *testApp {
+// newTestApp starts the API for a test; overrides change settings (HP_*).
+func newTestApp(t *testing.T, overrides ...map[string]string) *testApp {
 	t.Helper()
 	env := map[string]string{
 		"HP_ENV":               config.EnvTest,
@@ -69,6 +71,9 @@ func newTestApp(t *testing.T) *testApp {
 		"HP_LOG_LEVEL":         "error",
 		// Webhook tests post to a local test server.
 		"HP_ALLOW_PRIVATE_NETWORKS": "true",
+	}
+	for _, o := range overrides {
+		maps.Copy(env, o)
 	}
 	cfg, err := config.Load(func(k string) string { return env[k] })
 	require.NoError(t, err)

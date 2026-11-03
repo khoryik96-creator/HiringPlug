@@ -48,6 +48,25 @@ in with their email (e.g. `owner@demo.hiringplug.local`) and the password
 the two secrets in `deploy/docker-compose.yml` (or move them to a `.env` file),
 and put HTTPS in front (e.g. Caddy).
 
+## Turning on the AI assistant
+
+It is off until an AI provider is set up. With Docker, put these in
+`deploy/.env` (next to `docker-compose.yml`; never commit it); for development,
+in your environment. They are read by the API and the AI worker. For
+DeepSeek's API or any OpenAI-compatible host:
+
+```
+HP_AI_PROVIDER=openai_compatible
+HP_AI_PROVIDER_URL=https://api.deepseek.com/v1
+HP_AI_PROVIDER_KEY=sk-...
+HP_AI_MODEL=deepseek-chat
+HP_AI_MONTHLY_TOKENS=2000000
+```
+
+Then run the update again (`docker compose -f deploy/docker-compose.yml up -d`). Choose the host with your data's location in mind (PDPA):
+DeepSeek's own API stores data in China; a host running DeepSeek's open model
+in a region you pick, or your own server, keeps it where you choose.
+
 ## Backups
 
 ```bash

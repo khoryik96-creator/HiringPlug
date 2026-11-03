@@ -118,23 +118,43 @@ too) is checked for the name, email or phone: if one is still there, usually
 written in a template's own text, nothing is saved and you are told what
 kind of detail it was. The file name carries the reference, not the name.
 
-## 3.5 AI interpretation sidebar (DeepSeek)
+## 3.5 AI assistant sidebar ✅ (off until an AI provider is set up)
 
-A panel on candidate and job pages: a summary, gaps and red flags, "how does
-this candidate fit this job?", and free questions.
+A panel on candidate and job pages: **Summary**, **Gaps and red flags**, and
+your own questions. On a candidate's page, "About" switches to one of their
+jobs for **Fit for this job** ("how well does this candidate fit?").
+Answers come back in a few seconds and are kept, newest first; each person
+sees only their own.
 
-- **Permission-aware context.** Go builds what the AI may see from the
-  signed-in user's permissions. A user who cannot see salary gets an assistant
-  that cannot see it either, so the sidebar can never leak a restricted field.
-- **Privacy.** DeepSeek's own API stores data in China, which matters under
-  Malaysia's PDPA. The provider is a setting per company. Options: DeepSeek's
-  open model through a host in a region you choose, or on your own server; or
-  another provider. Contact details are removed before anything is sent.
-- **Costs.** Tokens and cost are recorded per company and user, with monthly
-  limits (as CV Studio's AI cost guardrails do).
-- **Flow.** Browser → Go API (permission check, context) → internal Python AI
-  service → provider; the answer streams back. All AI code lives in Python
-  behind one provider interface.
+- **It sees only what you may see.** Go gathers the context with the asking
+  user's permissions: the profile, work history, education and the newest
+  CV's text (with `documents:read`), the job and its description. A record you
+  cannot see is "not found" to the assistant too.
+- **Never names, contact details or salary.** The candidate's name, emails,
+  phone numbers and profile links are taken out of every text
+  (`platform/redact`, shared with blind CVs); recorded salaries are never
+  read; salary figures written in a CV or job description ("Expected salary:
+  RM 5,000") are cut out (`assistant.WithoutSalary`). Nationality is left out
+  as well: the right to work says what matters for a job.
+- **The prompts** (in `ai/src/hiringplug_ai/jobs/assistant_ask.py`) tell the
+  model to answer only from the data, say when something is missing, never
+  judge or guess race, religion, age, gender, marital status, health or
+  nationality, and to ignore instructions written inside a CV.
+- **Provider.** Any OpenAI-compatible chat API: DeepSeek's own API, a host
+  running DeepSeek's open model in a region you choose, or your own server
+  (vLLM, Ollama). DeepSeek's own API stores data in China, which matters under
+  Malaysia's PDPA, so the choice is yours (settings `HP_AI_PROVIDER`,
+  `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL`). While
+  `HP_AI_PROVIDER=off` the panel says the assistant is off.
+- **Costs.** Tokens are recorded per answer; each company has a monthly
+  allowance (`HP_AI_MONTHLY_TOKENS`, default 2,000,000), shown in the panel.
+  Once used, asking is refused (`ASSISTANT_LIMIT_REACHED`) until the 1st.
+- **Flow.** Browser → Go API (permission check, context, allowance) → job
+  queue → Python AI worker → provider → result job → Go saves it; the page
+  polls while an answer is on its way. Questions and answers are never logged.
+- **Later:** a per-company choice of provider (and switching it off for one
+  company), streaming answers, notes in the context (with the sensitive-notes
+  permission).
 
 ## 1, 2. Companies and contacts
 

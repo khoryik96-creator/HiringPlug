@@ -14,12 +14,14 @@
 package jobs
 
 import (
-	"time"
-
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
 
 // Companies is what this module needs from the companies module.
@@ -55,6 +57,16 @@ func New(pool *pgxpool.Pool, companies Companies, contacts Contacts) *Module {
 // Exists reports whether a job exists in tx's tenant.
 func (m *Module) Exists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error) {
 	return m.service.Exists(ctx, tx, jobID)
+}
+
+// ViewIn returns a job as the user may see it (salary only with permission),
+// in the caller's transaction, for other modules (e.g. the AI assistant).
+func (m *Module) ViewIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (View, error) {
+	row, err := getRow(ctx, store.New(tx), id)
+	if err != nil {
+		return View{}, err
+	}
+	return m.service.view(ctx, tx, p, fromRow(row))
 }
 
 // Brief is what other modules need to show a job.

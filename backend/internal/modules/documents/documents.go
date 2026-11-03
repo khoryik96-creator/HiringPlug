@@ -23,8 +23,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -81,6 +83,17 @@ func (m *Module) AddFormatted(ctx context.Context, tx pgx.Tx, tenantID, candidat
 		err = m.service.queuePdf(ctx, tx, tenantID, doc, key) // and as a PDF
 	}
 	return doc.ID, undo, err
+}
+
+// LatestCVText returns the text of the candidate's newest CV that was read
+// (uploaded, not made by the app), or "" when there is none, in the caller's
+// transaction.
+func (m *Module) LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error) {
+	text, err := store.New(tx).LatestCvText(ctx, candidateID)
+	if database.IsNoRows(err) {
+		return "", nil
+	}
+	return text, err
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.

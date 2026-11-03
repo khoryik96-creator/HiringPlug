@@ -27,3 +27,5 @@ export const applicationPlacementKey = (applicationId: string) => ["placements",
 export const offersKey = ["offers"] as const;
 export const applicationOffersKey = (applicationId: string) => ["offers", "application", applicationId] as const;
 export const companyAutofillKey = (id: string) => ["company", id, "autofill"] as const;
+export const assistantKey = ["assistant"] as const;
+export const assistantAnswersKey = (subjectType: string, subjectId: string) => ["assistant", "answers", subjectType, subjectId] as const;

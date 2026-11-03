@@ -63,6 +63,24 @@ type ApplicationStageChange struct {
 	ChangedAt     time.Time
 }
 
+type AssistantAnswer struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	SubjectType  string
+	SubjectID    string
+	Kind         string
+	Question     *string
+	Status       string
+	Answer       *string
+	Error        *string
+	Model        *string
+	InputTokens  int32
+	OutputTokens int32
+	CreatedAt    time.Time
+	AnsweredAt   *time.Time
+}
+
 type AuditLog struct {
 	ID         string
 	TenantID   string

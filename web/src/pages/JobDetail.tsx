@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { jobKey } from "../api/keys";
+import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { JobAds } from "../components/JobAds";
@@ -55,6 +56,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
       {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} />}
+      <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
       <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
     </main>

@@ -14,10 +14,17 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from ..contracts import DocumentExtractTextJob, DocumentParseCvJob, DocumentRenderPdfJob, JobKind
+from ..contracts import (
+    AssistantAskJob,
+    DocumentExtractTextJob,
+    DocumentParseCvJob,
+    DocumentRenderPdfJob,
+    JobKind,
+)
 from ..extraction import Limits, OcrEngine
+from ..provider import Provider
 from ..queue import FollowUp
-from . import extract_text, parse_cv, render_pdf
+from . import assistant_ask, extract_text, parse_cv, render_pdf
 
 
 @dataclass(frozen=True)
@@ -28,6 +35,7 @@ class Deps:
     ocr: OcrEngine | None
     limits: Limits
     max_download_bytes: int
+    ai: Provider | None = None  # None: the AI provider is off
 
 
 @dataclass(frozen=True)
@@ -40,4 +48,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_extract_text: Handler(DocumentExtractTextJob, extract_text.run),
     JobKind.document_parse_cv: Handler(DocumentParseCvJob, parse_cv.run),
     JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
+    JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
 }

@@ -18,6 +18,7 @@ class Role(StrEnum):
 
 
 class Permission(StrEnum):
+    assistant_use = "assistant:use"
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
     candidates_create = "candidates:create"
@@ -70,6 +71,8 @@ class Permission(StrEnum):
 
 class ErrorCode(StrEnum):
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
+    ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
+    ASSISTANT_OFF = "ASSISTANT_OFF"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
@@ -101,6 +104,8 @@ class ErrorCode(StrEnum):
 
 
 class JobKind(StrEnum):
+    assistant_answered = "assistant.answered"
+    assistant_ask = "assistant.ask"
     company_autofill = "company.autofill"
     document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
@@ -173,6 +178,102 @@ class DecimalAmount(RootModel[str]):
             pattern="^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
         ),
     ]
+
+
+class AssistantAnswerId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ask_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ask_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class AssistantSubjectType(StrEnum):
+    candidate = "candidate"
+    job = "job"
+    application = "application"
+
+
+class AssistantKind(StrEnum):
+    summary = "summary"
+    red_flags = "red_flags"
+    fit = "fit"
+    question = "question"
+
+
+class AssistantAnswerStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class AssistantStatus(BaseModel):
+    enabled: Annotated[bool, Field(description="Whether an AI provider is set up.")]
+    usedTokens: Annotated[int, Field(description="Tokens the company used this calendar month.")]
+    monthlyTokens: Annotated[int, Field(description="The company's monthly allowance.")]
+
+
+class AssistantQuestion(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    subjectType: AssistantSubjectType
+    subjectId: Annotated[str, Field(max_length=40)]
+    kind: AssistantKind
+    question: Annotated[
+        str | None, Field(description="Your question (for kind question).", max_length=1000)
+    ] = None
+
+
+class AssistantAnswer(BaseModel):
+    id: AssistantAnswerId
+    subjectType: AssistantSubjectType
+    subjectId: str
+    kind: AssistantKind
+    question: Annotated[str | None, Field(...)]
+    status: AssistantAnswerStatus
+    answer: Annotated[str | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(description="The AI model that answered.")]
+    createdAt: AwareDatetime
+    answeredAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class AssistantAnswerList(BaseModel):
+    items: list[AssistantAnswer]
+
+
+class AssistantSection(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(description="What this is, e.g. Profile, CV text, Job.")]
+    text: str
+
+
+class AssistantAskJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    answerId: AssistantAnswerId
+    kind: AssistantKind
+    question: Annotated[str | None, Field(...)]
+    sections: Annotated[
+        list[AssistantSection],
+        Field(description="What the asking user may see, without contact details or salary."),
+    ]
+
+
+class AssistantAnsweredJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    answerId: AssistantAnswerId
+    answer: Annotated[str | None, Field(...)]
+    error: Annotated[
+        str | None, Field(description="Why there is no answer (provider down, switched off, ...).")
+    ]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class CandidateId(RootModel[str]):

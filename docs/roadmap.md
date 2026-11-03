@@ -84,7 +84,7 @@ job. Today the app has candidates but nothing to place them into.
 |---|---|
 | ✅ 5.1 **Formatted CVs** | The profile filled into a Word template (built-in standard, or your own uploaded one with placeholders); contact details hidden unless asked, salary only when asked by those who may see it, a summary, for a particular job; saved as the formatted CV, with a PDF |
 | ✅ 5.2 **Blind CVs** | A reference instead of the name; no contact details, nationality or work authorization; names, emails, phones and links scrubbed from text; the finished file checked for leaks before it is saved |
-| 5.3 **AI sidebar (DeepSeek)** | On candidate and job pages: summary, gaps and red flags, "how well does this candidate fit this job?", free questions; it only sees what the user may see |
+| ✅ 5.3 **AI sidebar** | On candidate and job pages: summary, gaps and red flags, "how well does this candidate fit this job?", free questions; it sees only what the user may see, never names, contact details or salary; any OpenAI-compatible provider (DeepSeek), off until set up; a monthly token allowance per company |
 | 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
 | ✅ 5.5 **Company auto-fill** | Name, phone, address, country, size, registration number and description read from the company's website (schema.org data, its contact page; robots.txt respected), as suggestions with their source you accept or dismiss |
 
@@ -121,7 +121,7 @@ sign-in (1.7).
 - **Your branded CV template** in Word (step 5.1): download the standard one
   from the CV templates page, restyle it, and upload it (the built-in one works
   meanwhile).
-- **The AI provider and hosting region** for DeepSeek (step 5.3).
+- **The AI provider and hosting region** for DeepSeek (steps 5.3 and 5.4 are built and switched off until then): its address, key and model name, set as `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL` with `HP_AI_PROVIDER=openai_compatible`.
 - **Calendar sync** (step 4.3): a Google Cloud OAuth app and/or a Microsoft
   Entra app registration (client ID and secret), and the address people reach
   HiringPlug at (for the sign-in redirect).

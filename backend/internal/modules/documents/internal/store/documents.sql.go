@@ -104,6 +104,21 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 	return i, err
 }
 
+const latestCvText = `-- name: LatestCvText :one
+SELECT extracted_text::text FROM document
+WHERE candidate_id = $1 AND source <> 'formatted' AND extracted_text IS NOT NULL AND extracted_text <> ''
+ORDER BY id DESC
+LIMIT 1
+`
+
+// The text of the candidate's newest CV that was read (not one the app made).
+func (q *Queries) LatestCvText(ctx context.Context, candidateID string) (string, error) {
+	row := q.db.QueryRow(ctx, latestCvText, candidateID)
+	var extracted_text string
+	err := row.Scan(&extracted_text)
+	return extracted_text, err
+}
+
 const listDocumentsForCandidate = `-- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
        status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,

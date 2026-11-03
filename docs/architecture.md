@@ -5,8 +5,8 @@ monolith*), written in three languages, each where it is strongest:
 
 - **Go** runs the API, the business rules, the database and core background
   jobs. It is fast, strict and stable: the part that must never break.
-- **Python** reads documents and runs AI: text extraction and OCR today;
-  parsing, formatting, matching and the assistant next. It has the best
+- **Python** reads documents and runs AI: text extraction, OCR, CV parsing,
+  PDFs and the AI assistant; matching next. It has the best
   libraries, and keeping this fast-changing, less predictable work separate
   protects the core.
 - **TypeScript** (React) is the web app recruiters use.

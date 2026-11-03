@@ -68,6 +68,17 @@ type Config struct {
 	// webhooks use plain HTTP. Off by default: such an address must not reach
 	// into the server's own network. For local testing only.
 	AllowPrivateNetworks bool // HP_ALLOW_PRIVATE_NETWORKS
+	// AI is the AI assistant: off until a provider is chosen (the Python
+	// worker reads the provider's address, key and model).
+	AI AI
+}
+
+// AI is how much the AI assistant may be used.
+type AI struct {
+	Enabled bool // HP_AI_PROVIDER is not off
+	// MonthlyTokens is what each company may use in a calendar month
+	// (question and answer together).
+	MonthlyTokens int64 // HP_AI_MONTHLY_TOKENS
 }
 
 // SMTP is how to reach the mail server.
@@ -107,6 +118,13 @@ func Load(getenv func(string) string) (Config, error) {
 	c.AllowPrivateNetworks = r.oneOf("HP_ALLOW_PRIVATE_NETWORKS", "false", "false", "true") == "true"
 	if c.AllowPrivateNetworks && c.Env == EnvProduction {
 		r.fail("HP_ALLOW_PRIVATE_NETWORKS must be false in production")
+	}
+	c.AI = AI{
+		Enabled:       r.oneOf("HP_AI_PROVIDER", "off", "off", "openai_compatible") != "off",
+		MonthlyTokens: r.int64("HP_AI_MONTHLY_TOKENS", 2_000_000),
+	}
+	if c.AI.MonthlyTokens < 0 {
+		r.fail("HP_AI_MONTHLY_TOKENS must not be negative")
 	}
 	zone := r.str("HP_TIME_ZONE", "Asia/Kuala_Lumpur")
 	if loc, err := time.LoadLocation(zone); err != nil || zone == "Local" {

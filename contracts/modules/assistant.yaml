@@ -1,0 +1,192 @@
+# Module contract: assistant (the AI sidebar: questions about a candidate, a
+# job, or a candidate for a job, answered by the AI provider the company chose).
+# See contracts/README.md for the format.
+x-module:
+  name: assistant
+  description: >
+    The AI assistant. Go gathers what the asking user may see (never contact
+    details, never salary), queues it for the Python AI worker, which asks
+    the AI provider; the answer comes back on the queue. Answers are shown
+    only to the person who asked. Off until an AI provider is set up; each
+    company has a monthly token limit.
+  permissions:
+    assistant:use:
+      description: Ask the AI assistant about candidates, jobs and applications you may see.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  errorCodes:
+    ASSISTANT_OFF:
+      status: 409
+      description: The AI assistant is switched off (no AI provider is set up).
+    ASSISTANT_LIMIT_REACHED:
+      status: 429
+      description: The company has used this month's AI allowance; it starts again on the 1st.
+  jobs:
+    assistant.ask:
+      queue: ai
+      payload: AssistantAskJob
+      description: Ask the AI provider one question with the context Go gathered (Python AI worker).
+    assistant.answered:
+      queue: core
+      payload: AssistantAnsweredJob
+      description: Save the provider's answer and the tokens used (Go worker).
+
+paths:
+  /v1/assistant:
+    get:
+      operationId: getAssistant
+      tags: [assistant]
+      summary: Whether the assistant is on, and how much of this month's allowance the company has used
+      x-permission: assistant:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/assistant/answers:
+    get:
+      operationId: listAssistantAnswers
+      tags: [assistant]
+      summary: Your latest questions about one candidate, job or application, newest first
+      x-permission: assistant:use
+      parameters:
+        - { name: subjectType, in: query, required: true, schema: { $ref: '#/components/schemas/AssistantSubjectType' } }
+        - { name: subjectId, in: query, required: true, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantAnswerList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: askAssistant
+      tags: [assistant]
+      summary: Ask the assistant (answered in the background)
+      x-permission: assistant:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantQuestion' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantAnswer' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AssistantOff' }
+        '429': { $ref: '#/components/responses/AssistantLimitReached' }
+
+components:
+  responses:
+    AssistantOff:
+      description: Switched off (ASSISTANT_OFF).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    AssistantLimitReached:
+      description: This month's allowance is used (ASSISTANT_LIMIT_REACHED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    AssistantAnswerId:
+      type: string
+      pattern: '^ask_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ask_01jbz6w0m0k8q9x2r3s4t5v6w7
+    AssistantSubjectType:
+      type: string
+      description: What the question is about; an application is a candidate for a job.
+      enum: [candidate, job, application]
+    AssistantKind:
+      type: string
+      description: >
+        summary = a short summary; red_flags = gaps, red flags and what to ask
+        about; fit = how well the candidate fits the job (applications only);
+        question = your own question.
+      enum: [summary, red_flags, fit, question]
+    AssistantAnswerStatus:
+      type: string
+      description: queued = waiting for the AI; done = answered; failed = the AI could not answer (see error).
+      enum: [queued, done, failed]
+    AssistantStatus:
+      type: object
+      required: [enabled, usedTokens, monthlyTokens]
+      properties:
+        enabled: { type: boolean, description: Whether an AI provider is set up. }
+        usedTokens: { type: integer, format: int64, description: "Tokens the company used this calendar month." }
+        monthlyTokens: { type: integer, format: int64, description: "The company's monthly allowance." }
+    AssistantQuestion:
+      type: object
+      additionalProperties: false
+      required: [subjectType, subjectId, kind]
+      properties:
+        subjectType: { $ref: '#/components/schemas/AssistantSubjectType' }
+        subjectId: { type: string, maxLength: 40 }
+        kind: { $ref: '#/components/schemas/AssistantKind' }
+        question: { type: string, maxLength: 1000, description: "Your question (for kind question)." }
+    AssistantAnswer:
+      type: object
+      required: [id, subjectType, subjectId, kind, question, status, answer, error, model, createdAt, answeredAt]
+      properties:
+        id: { $ref: '#/components/schemas/AssistantAnswerId' }
+        subjectType: { $ref: '#/components/schemas/AssistantSubjectType' }
+        subjectId: { type: string }
+        kind: { $ref: '#/components/schemas/AssistantKind' }
+        question: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/AssistantAnswerStatus' }
+        answer: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        model: { type: string, nullable: true, description: The AI model that answered. }
+        createdAt: { type: string, format: date-time }
+        answeredAt: { type: string, format: date-time, nullable: true }
+    AssistantAnswerList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AssistantAnswer' }
+
+    # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    AssistantSection:
+      type: object
+      additionalProperties: false
+      required: [title, text]
+      properties:
+        title: { type: string, description: "What this is, e.g. Profile, CV text, Job." }
+        text: { type: string }
+    AssistantAskJob:
+      type: object
+      additionalProperties: false
+      required: [answerId, kind, question, sections]
+      properties:
+        answerId: { $ref: '#/components/schemas/AssistantAnswerId' }
+        kind: { $ref: '#/components/schemas/AssistantKind' }
+        question: { type: string, nullable: true }
+        sections:
+          type: array
+          description: What the asking user may see, without contact details or salary.
+          items: { $ref: '#/components/schemas/AssistantSection' }
+    AssistantAnsweredJob:
+      type: object
+      additionalProperties: false
+      required: [answerId, answer, error, model, inputTokens, outputTokens]
+      properties:
+        answerId: { $ref: '#/components/schemas/AssistantAnswerId' }
+        answer: { type: string, nullable: true }
+        error: { type: string, nullable: true, description: "Why there is no answer (provider down, switched off, ...)." }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }
