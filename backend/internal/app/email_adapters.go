@@ -106,3 +106,11 @@ func (a interviewMailer) EmailUsers(ctx context.Context, tx pgx.Tx, tenantID str
 	}
 	return len(to), a.emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: m.Subject, Body: m.Body, ApplicationID: &m.ApplicationID})
 }
+
+// identityMailer sends identity's invitations and password resets through the
+// emails module (built after identity, so read when called).
+type identityMailer struct{ modules *Modules }
+
+func (a identityMailer) Notify(ctx context.Context, tx pgx.Tx, tenantID string, to []string, subject, body string) error {
+	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body})
+}

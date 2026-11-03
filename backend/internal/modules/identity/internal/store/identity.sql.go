@@ -7,7 +7,63 @@ package store
 
 import (
 	"context"
+	"time"
 )
+
+const accountsByEmail = `-- name: AccountsByEmail :many
+SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name, careers_slug::text AS careers_slug, user_id::text AS user_id,
+  user_name::text AS user_name, coalesce(password_hash, '')::text AS password_hash, active::boolean AS active
+FROM app_accounts_by_email($1::text)
+`
+
+type AccountsByEmailRow struct {
+	TenantID     string
+	TenantName   string
+	CareersSlug  string
+	UserID       string
+	UserName     string
+	PasswordHash string
+	Active       bool
+}
+
+func (q *Queries) AccountsByEmail(ctx context.Context, email string) ([]AccountsByEmailRow, error) {
+	rows, err := q.db.Query(ctx, accountsByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AccountsByEmailRow
+	for rows.Next() {
+		var i AccountsByEmailRow
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.TenantName,
+			&i.CareersSlug,
+			&i.UserID,
+			&i.UserName,
+			&i.PasswordHash,
+			&i.Active,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const activeOwners = `-- name: ActiveOwners :one
+SELECT count(*) FROM app_user WHERE role = 'owner' AND active
+`
+
+func (q *Queries) ActiveOwners(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, activeOwners)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const activeUserEmails = `-- name: ActiveUserEmails :many
 SELECT id, name, email FROM app_user WHERE active AND id = ANY($1::text[])
@@ -88,6 +144,21 @@ func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenant
 	return i, err
 }
 
+const endLinks = `-- name: EndLinks :exec
+UPDATE user_link SET used_at = now() WHERE user_id = $1 AND kind = $2 AND used_at IS NULL
+`
+
+type EndLinksParams struct {
+	UserID string
+	Kind   string
+}
+
+// Using a link, or replacing it with a new one, ends it.
+func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
+	_, err := q.db.Exec(ctx, endLinks, arg.UserID, arg.Kind)
+	return err
+}
+
 const getTenant = `-- name: GetTenant :one
 SELECT id, name, careers_slug::text AS careers_slug FROM tenant WHERE id = $1
 `
@@ -134,6 +205,94 @@ func (q *Queries) GetUser(ctx context.Context, id string) (GetUserRow, error) {
 	return i, err
 }
 
+const insertLink = `-- name: InsertLink :one
+INSERT INTO user_link (tenant_id, user_id, kind, token_hash, expires_at, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+RETURNING id
+`
+
+type InsertLinkParams struct {
+	UserID    string
+	Kind      string
+	TokenHash string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) (string, error) {
+	row := q.db.QueryRow(ctx, insertLink,
+		arg.UserID,
+		arg.Kind,
+		arg.TokenHash,
+		arg.ExpiresAt,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
+const inviteUser = `-- name: InviteUser :one
+INSERT INTO app_user (tenant_id, email, name, role, active, invited)
+VALUES (app_current_tenant(), $1, $2, $3, false, true)
+RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at
+`
+
+type InviteUserParams struct {
+	Email string
+	Name  string
+	Role  string
+}
+
+type InviteUserRow struct {
+	ID           string
+	Email        string
+	Name         string
+	Role         string
+	Active       bool
+	Invited      bool
+	LastSignInAt *time.Time
+	CreatedAt    time.Time
+}
+
+func (q *Queries) InviteUser(ctx context.Context, arg InviteUserParams) (InviteUserRow, error) {
+	row := q.db.QueryRow(ctx, inviteUser, arg.Email, arg.Name, arg.Role)
+	var i InviteUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.Role,
+		&i.Active,
+		&i.Invited,
+		&i.LastSignInAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const linkByHash = `-- name: LinkByHash :one
+SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS user_id, kind::text AS kind
+FROM app_user_link($1::text)
+`
+
+type LinkByHashRow struct {
+	LinkID   string
+	TenantID string
+	UserID   string
+	Kind     string
+}
+
+func (q *Queries) LinkByHash(ctx context.Context, tokenHash string) (LinkByHashRow, error) {
+	row := q.db.QueryRow(ctx, linkByHash, tokenHash)
+	var i LinkByHashRow
+	err := row.Scan(
+		&i.LinkID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Kind,
+	)
+	return i, err
+}
+
 const listActiveUsers = `-- name: ListActiveUsers :many
 SELECT id, name, role FROM app_user WHERE active ORDER BY name LIMIT 500
 `
@@ -162,6 +321,189 @@ func (q *Queries) ListActiveUsers(ctx context.Context) ([]ListActiveUsersRow, er
 		return nil, err
 	}
 	return items, nil
+}
+
+const listTeam = `-- name: ListTeam :many
+SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000
+`
+
+type ListTeamRow struct {
+	ID           string
+	Email        string
+	Name         string
+	Role         string
+	Active       bool
+	Invited      bool
+	LastSignInAt *time.Time
+	CreatedAt    time.Time
+}
+
+func (q *Queries) ListTeam(ctx context.Context) ([]ListTeamRow, error) {
+	rows, err := q.db.Query(ctx, listTeam)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTeamRow
+	for rows.Next() {
+		var i ListTeamRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Name,
+			&i.Role,
+			&i.Active,
+			&i.Invited,
+			&i.LastSignInAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setPassword = `-- name: SetPassword :exec
+UPDATE app_user SET password_hash = $1, tokens_valid_after = $2,
+  active = CASE WHEN invited THEN true ELSE active END, invited = false,
+  name = coalesce($3, name)
+WHERE id = $4
+`
+
+type SetPasswordParams struct {
+	PasswordHash *string
+	ValidAfter   *time.Time
+	Name         *string
+	ID           string
+}
+
+// A new password; sessions from before it are signed out.
+func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
+	_, err := q.db.Exec(ctx, setPassword,
+		arg.PasswordHash,
+		arg.ValidAfter,
+		arg.Name,
+		arg.ID,
+	)
+	return err
+}
+
+const signedIn = `-- name: SignedIn :exec
+UPDATE app_user SET last_sign_in_at = now() WHERE id = $1
+`
+
+func (q *Queries) SignedIn(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, signedIn, id)
+	return err
+}
+
+const teamMember = `-- name: TeamMember :one
+SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = $1
+`
+
+type TeamMemberRow struct {
+	ID           string
+	Email        string
+	Name         string
+	Role         string
+	Active       bool
+	Invited      bool
+	LastSignInAt *time.Time
+	CreatedAt    time.Time
+}
+
+func (q *Queries) TeamMember(ctx context.Context, id string) (TeamMemberRow, error) {
+	row := q.db.QueryRow(ctx, teamMember, id)
+	var i TeamMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.Role,
+		&i.Active,
+		&i.Invited,
+		&i.LastSignInAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateMember = `-- name: UpdateMember :one
+UPDATE app_user SET role = $1, active = $2,
+  tokens_valid_after = CASE WHEN active AND NOT $2 THEN date_trunc('second', now()) ELSE tokens_valid_after END
+WHERE id = $3
+RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at
+`
+
+type UpdateMemberParams struct {
+	Role   string
+	Active bool
+	ID     string
+}
+
+type UpdateMemberRow struct {
+	ID           string
+	Email        string
+	Name         string
+	Role         string
+	Active       bool
+	Invited      bool
+	LastSignInAt *time.Time
+	CreatedAt    time.Time
+}
+
+// Deactivating signs the user out (their tokens stop working).
+func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (UpdateMemberRow, error) {
+	row := q.db.QueryRow(ctx, updateMember, arg.Role, arg.Active, arg.ID)
+	var i UpdateMemberRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.Role,
+		&i.Active,
+		&i.Invited,
+		&i.LastSignInAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const userAuth = `-- name: UserAuth :one
+SELECT id, tenant_id, email, name, role, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = $1
+`
+
+type UserAuthRow struct {
+	ID               string
+	TenantID         string
+	Email            string
+	Name             string
+	Role             string
+	Active           bool
+	Invited          bool
+	PasswordHash     *string
+	TokensValidAfter *time.Time
+}
+
+func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) {
+	row := q.db.QueryRow(ctx, userAuth, id)
+	var i UserAuthRow
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.Name,
+		&i.Role,
+		&i.Active,
+		&i.Invited,
+		&i.PasswordHash,
+		&i.TokensValidAfter,
+	)
+	return i, err
 }
 
 const userNames = `-- name: UserNames :many

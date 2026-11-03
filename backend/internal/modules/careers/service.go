@@ -13,13 +13,14 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ratelimit"
 )
 
 // Service holds the careers use cases.
 type Service struct {
 	pool      *pgxpool.Pool
 	deps      Deps
-	limiter   *limiter
+	limiter   *ratelimit.Limiter
 	publicURL string
 }
 

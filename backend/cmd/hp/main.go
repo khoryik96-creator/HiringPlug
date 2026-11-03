@@ -5,6 +5,7 @@
 //	hp dev-setup                       local development: bootstrap, plus a demo tenant with users, and print their tokens
 //	hp tenant -name "Acme Recruitment" -owner-email you@acme.com -owner-name "Your Name"
 //	hp user -tenant tnt_... -email a@b.com -name "A B" -role recruiter
+//	hp password-link -user usr_...   (a link to choose a password)
 //	hp token -user usr_... [-ttl 12h]  print a sign-in token for a user (development)
 package main
 
@@ -42,7 +43,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link> [flags]")
 }
 
 func run(ctx context.Context, cmd string, args []string) error {
@@ -59,6 +60,8 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return createUser(ctx, args)
 	case "token":
 		return printToken(ctx, args)
+	case "password-link":
+		return printPasswordLink(ctx, args)
 	default:
 		usage()
 		return fmt.Errorf("unknown command %q", cmd)
@@ -130,7 +133,7 @@ func devSetup(ctx context.Context) error {
 		return err
 	}
 	verifier := authn.NewVerifier(cfg.AuthJWTSecret, cfg.AuthIssuer, cfg.AuthAudience)
-	fmt.Printf("Demo tenant %s\n\nSign-in tokens (valid 30 days, development only):\n", tenantID)
+	fmt.Printf("Demo tenant %s\n\nSign in with these emails and the password %q, or the tokens (valid 30 days, development only):\n", tenantID, devPassword)
 	for _, role := range []api.Role{api.RoleOwner, api.RoleRecruiter, api.RoleSourcer, api.RoleViewer} {
 		email := string(role) + "@demo.hiringplug.local"
 		var userID string
@@ -141,6 +144,9 @@ func devSetup(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if err := app.SetPassword(ctx, admin, userID, devPassword); err != nil {
+			return err
+		}
 		token, err := verifier.Mint(tenantID, userID, 30*24*time.Hour)
 		if err != nil {
 			return err
@@ -149,6 +155,9 @@ func devSetup(ctx context.Context) error {
 	}
 	return nil
 }
+
+// devPassword is the demo users' password (development databases only).
+const devPassword = "demo-password-2026"
 
 func createTenant(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("tenant", flag.ContinueOnError)
@@ -175,6 +184,15 @@ func createTenant(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Printf("tenant %s\nowner  %s\n", tenantID, userID)
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return err
+	}
+	link, err := app.PasswordLink(ctx, admin, cfg, userID, 7*24*time.Hour)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("\nThe owner chooses their password here (valid 7 days):\n%s\n", link)
 	return nil
 }
 
@@ -225,5 +243,32 @@ func printToken(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Println(token)
+	return nil
+}
+
+// printPasswordLink prints a link for a user to choose their password: the
+// first owner, someone the app cannot email, or a forgotten password when
+// email is not set up.
+func printPasswordLink(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("password-link", flag.ContinueOnError)
+	user := fs.String("user", "", "user ID (usr_...)")
+	valid := fs.Duration("valid", 24*time.Hour, "how long the link works")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return err
+	}
+	admin, err := adminPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer admin.Close()
+	link, err := app.PasswordLink(ctx, admin, cfg, *user, *valid)
+	if err != nil {
+		return err
+	}
+	fmt.Println(link)
 	return nil
 }

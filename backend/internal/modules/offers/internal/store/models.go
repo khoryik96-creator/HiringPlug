@@ -24,13 +24,17 @@ type ApiKey struct {
 }
 
 type AppUser struct {
-	ID        string
-	TenantID  string
-	Email     string
-	Name      string
-	Role      string
-	Active    bool
-	CreatedAt time.Time
+	ID               string
+	TenantID         string
+	Email            string
+	Name             string
+	Role             string
+	Active           bool
+	CreatedAt        time.Time
+	PasswordHash     *string
+	Invited          bool
+	TokensValidAfter *time.Time
+	LastSignInAt     *time.Time
 }
 
 type Application struct {
@@ -454,6 +458,18 @@ type Tenant struct {
 	Name        string
 	CreatedAt   time.Time
 	CareersSlug *string
+}
+
+type UserLink struct {
+	ID        string
+	TenantID  string
+	UserID    string
+	Kind      string
+	TokenHash string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedBy string
+	CreatedAt time.Time
 }
 
 type Webhook struct {

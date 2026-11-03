@@ -367,8 +367,11 @@ both on the Integrations page, described in [integrations](integrations.md).
 Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 **modify** (`:update`). **Sensitive** details have their own permissions
 (`candidates.compensation:read` / `:update`). Defaults per role are in the
-contract. M2 adds custom roles per company, user invites, SSO, and a "who
-viewed salary" log. Details: [access-control.md](access-control.md).
+contract. ✅ People sign in with email and password; owners and admins invite
+them, change roles and deactivate them on the **Team** page; "Forgot your
+password?" emails a reset link; everyone changes their password under their
+name. Later: custom roles per company, single sign-on, and a "who viewed
+salary" log. Details: [access-control.md](access-control.md).
 
 ## Agency and in-house, own team and SaaS
 

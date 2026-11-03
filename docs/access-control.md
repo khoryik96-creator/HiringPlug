@@ -4,10 +4,30 @@
 
 Every API call carries `Authorization: Bearer <token>`. The token names the
 company (tenant) and the user. The user is looked up on every request, so
-deactivating a user signs them out at once. Development uses tokens signed with
-a shared secret (`hp dev-setup`, `hp token`). Production will use single
-sign-on (Google, Microsoft) through an OpenID Connect provider; only the token
-check changes.
+deactivating a user signs them out at once.
+
+**Signing in** (✅): email and password (`POST /v1/auth/sign-in`) gives a
+12-hour token, kept for the browser tab. Passwords are stored as salted
+Argon2id hashes, need at least 10 characters (not the email, the name or a
+common password), and attempts are limited per client address and per email.
+An unknown email and a wrong password get the same answer, taking the same
+time. An email with accounts at several companies chooses one. Changing or
+resetting a password, or being deactivated, ends every earlier session
+(tokens issued before it are refused).
+
+**Invitations and resets.** Owners and admins invite people (email, name,
+role); the invitation is emailed and its link is also shown, to pass on if
+email is not set up. "Forgot your password?" emails a reset link and says the
+same whether or not the email is known. Links work once (invitations 7 days,
+resets 1 hour), a new one ends the old, and only their SHA-256 is stored. On
+the command line, `hp tenant` prints the first owner's link and
+`hp password-link -user usr_...` makes one for anyone. Developers can still
+use tokens (`hp dev-setup`, `hp token`); single sign-on (Google, Microsoft)
+can come later, changing only how a token is obtained.
+
+**Team rules** (`identity.team:manage`: owners and admins): nobody changes
+their own role or deactivates themselves; only owners make, change or
+deactivate owners; the company always keeps an active owner.
 
 **Public endpoints** (`x-permission: public`, under `/v1/public/`) are the only
 exception: the careers page and its apply form, for signed-out candidates. The
@@ -72,11 +92,13 @@ details get their own permissions.
 | `offers.salary:update` | ✓ | ✓ | ✓ | | | |
 | `integrations:manage` (API keys and webhooks; never with an API key) | ✓ | ✓ | | | | |
 | `leads:read`, `leads:manage` (hiring leads and their sources) | ✓ | ✓ | ✓ | ✓ | | |
+| `identity.team:manage` (invite, change roles, deactivate) | ✓ | ✓ | | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
-Coming in M2: **custom roles** per company (an admin screen to pick
+
+Coming later: **custom roles** per company (an admin screen to pick
 permissions), **data scope** (own / team / all candidates, important for agency
-ownership), user invites, and a "who viewed salary" log.
+ownership), single sign-on, and a "who viewed salary" log.
 
 ## Three layers of enforcement
 

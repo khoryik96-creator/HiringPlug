@@ -65,7 +65,11 @@ func (v *Verifier) Verify(token string) (Claims, error) {
 
 // Mint issues a token for a user. Used by `hp token` and tests.
 func (v *Verifier) Mint(tenantID, userID string, ttl time.Duration) (string, error) {
-	now := v.now()
+	return v.MintAt(tenantID, userID, v.now(), ttl)
+}
+
+// MintAt issues a token for a user, issued at now (signing in).
+func (v *Verifier) MintAt(tenantID, userID string, now time.Time, ttl time.Duration) (string, error) {
 	c := Claims{
 		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{

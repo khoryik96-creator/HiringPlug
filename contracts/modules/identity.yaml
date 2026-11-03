@@ -3,9 +3,26 @@
 x-module:
   name: identity
   description: Tenants (companies using HiringPlug), their users, and who is signed in.
-  permissions: {}
-  errorCodes: {}
-  jobs: {}
+  permissions:
+    identity.team:manage:
+      description: Invite people, change roles, deactivate and reactivate users.
+      roles: [owner, admin]
+  errorCodes:
+    SIGN_IN_FAILED:
+      status: 401
+      description: The email or password is wrong (which is not said), or the account is not active.
+    SIGN_IN_CHOOSE_COMPANY:
+      status: 409
+      description: The email and password match accounts at several companies; send one of `details.companies` (slug) as `company`.
+    TOO_MANY_ATTEMPTS:
+      status: 429
+      description: Too many attempts from this address or for this email; wait and try again.
+    LINK_NOT_VALID:
+      status: 410
+      description: The invitation or password reset link was used, replaced or has expired.
+    TEAM_CHANGE_NOT_ALLOWED:
+      status: 422
+      description: The change would break a team rule (your own role, the last owner, owners changed only by owners). The message says why.
 
 paths:
   /v1/me:
@@ -36,7 +53,211 @@ paths:
               schema: { $ref: '#/components/schemas/UserList' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  /v1/auth/sign-in:
+    post:
+      operationId: signIn
+      tags: [identity]
+      summary: Sign in with email and password
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignInInput' }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/SignInFailed' }
+        '409': { $ref: '#/components/responses/ChooseCompany' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/auth/password-resets:
+    post:
+      operationId: requestPasswordReset
+      tags: [identity]
+      summary: Email a password reset link (the answer is the same whether or not the email is known)
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetRequest' }
+      responses:
+        '202': { description: "If the email belongs to an active account, a link is on its way." }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/auth/links/{linkToken}:
+    parameters:
+      - { name: linkToken, in: path, required: true, schema: { type: string, minLength: 20, maxLength: 200 } }
+    get:
+      operationId: getAuthLink
+      tags: [identity]
+      summary: What an invitation or password reset link is for (to show before choosing a password)
+      x-permission: public
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthLink' }
+        '410': { $ref: '#/components/responses/LinkNotValid' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+    post:
+      operationId: useAuthLink
+      tags: [identity]
+      summary: Choose a password with an invitation or reset link, and sign in
+      description: An invitation activates the account; a reset signs out every other session.
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChoosePassword' }
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '410': { $ref: '#/components/responses/LinkNotValid' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/me/password:
+    put:
+      operationId: changePassword
+      tags: [identity]
+      summary: Change your password (signs out your other sessions)
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordChange' }
+      responses:
+        '200':
+          description: Changed; a new session for this browser
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '429': { $ref: '#/components/responses/TooManyAttempts' }
+
+  /v1/team:
+    get:
+      operationId: listTeam
+      tags: [identity]
+      summary: Everyone in the company, with invited and deactivated people
+      x-permission: identity.team:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/team/invites:
+    post:
+      operationId: inviteUser
+      tags: [identity]
+      summary: Invite someone (emailed; the link is also in the answer, to pass on if email is not set up)
+      x-permission: identity.team:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteInput' }
+      responses:
+        '201':
+          description: Invited
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
+  /v1/team/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: '#/components/schemas/UserId' } }
+    patch:
+      operationId: updateTeamMember
+      tags: [identity]
+      summary: Change someone's role, or deactivate or reactivate them (deactivating signs them out)
+      x-permission: identity.team:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TeamMemberUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamMember' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
+  /v1/team/{userId}/invite:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { $ref: '#/components/schemas/UserId' } }
+    post:
+      operationId: resendInvite
+      tags: [identity]
+      summary: Send someone who has not joined yet a new invitation (the old link stops working)
+      x-permission: identity.team:manage
+      responses:
+        '201':
+          description: Invited again
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+
 components:
+  responses:
+    SignInFailed:
+      description: Wrong email or password (SIGN_IN_FAILED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ChooseCompany:
+      description: Choose the company (SIGN_IN_CHOOSE_COMPANY).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyAttempts:
+      description: Too many attempts (TOO_MANY_ATTEMPTS).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    LinkNotValid:
+      description: The link is no longer valid (LINK_NOT_VALID).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TeamChangeNotAllowed:
+      description: Not allowed (TEAM_CHANGE_NOT_ALLOWED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
   schemas:
     UserList:
       type: object
@@ -79,3 +300,90 @@ components:
           description: The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment).
         id: { $ref: '#/components/schemas/TenantId' }
         name: { type: string }
+    SignInInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 1, maxLength: 200 }
+        company: { type: string, maxLength: 100, description: "The company's careers page address (slug), when the account is at several companies." }
+    Session:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token: { type: string, description: "Send it as Authorization: Bearer <token>." }
+        expiresAt: { type: string, format: date-time }
+    PasswordResetRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+    AuthLink:
+      type: object
+      required: [kind, email, name, companyName]
+      properties:
+        kind: { type: string, enum: [invite, reset] }
+        email: { type: string }
+        name: { type: string }
+        companyName: { type: string }
+    ChoosePassword:
+      type: object
+      additionalProperties: false
+      required: [password]
+      properties:
+        password: { type: string, minLength: 10, maxLength: 200, description: At least 10 characters. }
+        name: { type: string, minLength: 1, maxLength: 200, description: "Your name (an invitation can correct it)." }
+    PasswordChange:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, maxLength: 200 }
+        newPassword: { type: string, minLength: 10, maxLength: 200 }
+    TeamStatus:
+      type: string
+      description: invited = has not chosen a password yet; active; deactivated = cannot sign in.
+      enum: [invited, active, deactivated]
+    TeamMember:
+      type: object
+      required: [id, name, email, role, status, lastSignInAt, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/UserId' }
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { $ref: '#/components/schemas/TeamStatus' }
+        lastSignInAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    TeamList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TeamMember' }
+    InviteInput:
+      type: object
+      additionalProperties: false
+      required: [email, name, role]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        role: { $ref: '#/components/schemas/Role' }
+    Invitation:
+      type: object
+      required: [member, link, expiresAt, emailed]
+      properties:
+        member: { $ref: '#/components/schemas/TeamMember' }
+        link: { type: string, description: "The invitation link (also emailed), to pass on another way if needed." }
+        expiresAt: { type: string, format: date-time }
+        emailed: { type: boolean, description: "Whether an email was queued (it fails later if no mail server is set up)." }
+    TeamMemberUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        role: { $ref: '#/components/schemas/Role' }
+        active: { type: boolean }
+

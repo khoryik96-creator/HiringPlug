@@ -229,3 +229,8 @@ export const LEAD_SOURCE_KIND: Record<Schemas["LeadSourceKind"], string> = {
   smartrecruiters: "SmartRecruiters job board", careers_page: "Careers page",
 };
 export const LEAD_STATUS: Record<Schemas["LeadStatus"], string> = { new: "New", contacted: "Contacted", client: "Became a client", ignored: "Ignored" };
+
+export const ROLE: Record<Schemas["Role"], string> = {
+  owner: "Owner", admin: "Admin", recruiter: "Recruiter", sourcer: "Sourcer", hiring_manager: "Hiring manager", viewer: "Viewer",
+};
+export const TEAM_STATUS: Record<Schemas["TeamStatus"], string> = { invited: "Invited", active: "Active", deactivated: "Deactivated" };

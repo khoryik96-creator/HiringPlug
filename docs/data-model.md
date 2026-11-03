@@ -37,6 +37,8 @@ tenant ─┬─ app_user (role)
 | `webhook_delivery` | webhook, event, payload (as sent), status (pending/delivered/failed), attempts, last answer or error, next attempt; written by a trigger on `audit_log` |
 | `lead_source` | kind (greenhouse/lever/ashby/smartrecruiters/careers_page), board name or page address (once each), company name and record, on/off, open openings, last check and its error, next check, `version` |
 | `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
+| `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
+| `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
@@ -58,7 +60,7 @@ candidate belonging to the same company.
 |---|---|---|
 | `candidates` | managed taxonomy lists (industries, specializations), saved searches, consent and retention | M2 |
 | `notes` | note templates per company, notes on an application, editing | Phase 2 |
-| `identity` | custom roles, team, data scope, invites | M2 |
+| `identity` | custom roles, data scope, single sign-on | 7 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
 | `pipeline` | stage templates per company | M3 |

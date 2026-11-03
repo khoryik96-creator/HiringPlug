@@ -35,6 +35,7 @@ class Permission(StrEnum):
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
     emails_send = "emails:send"
+    identity_team_manage = "identity.team:manage"
     integrations_manage = "integrations:manage"
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
@@ -78,6 +79,7 @@ class ErrorCode(StrEnum):
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
     INTERVIEW_NOT_ALLOWED = "INTERVIEW_NOT_ALLOWED"
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
+    LINK_NOT_VALID = "LINK_NOT_VALID"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
@@ -85,7 +87,11 @@ class ErrorCode(StrEnum):
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
+    SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
+    SIGN_IN_FAILED = "SIGN_IN_FAILED"
     STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
+    TEAM_CHANGE_NOT_ALLOWED = "TEAM_CHANGE_NOT_ALLOWED"
+    TOO_MANY_ATTEMPTS = "TOO_MANY_ATTEMPTS"
     UNAUTHENTICATED = "UNAUTHENTICATED"
     UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE"
     VALIDATION_FAILED = "VALIDATION_FAILED"
@@ -888,6 +894,112 @@ class Tenant(BaseModel):
     ]
     id: TenantId
     name: str
+
+
+class SignInInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    email: Annotated[EmailStr, Field(max_length=254)]
+    password: Annotated[str, Field(max_length=200, min_length=1)]
+    company: Annotated[
+        str | None,
+        Field(
+            description="The company's careers page address (slug), when the account is at several companies.",
+            max_length=100,
+        ),
+    ] = None
+
+
+class Session(BaseModel):
+    token: Annotated[str, Field(description="Send it as Authorization: Bearer <token>.")]
+    expiresAt: AwareDatetime
+
+
+class PasswordResetRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    email: Annotated[EmailStr, Field(max_length=254)]
+
+
+class Kind(StrEnum):
+    invite = "invite"
+    reset = "reset"
+
+
+class AuthLink(BaseModel):
+    kind: Kind
+    email: str
+    name: str
+    companyName: str
+
+
+class ChoosePassword(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    password: Annotated[str, Field(description="At least 10 characters.", max_length=200, min_length=10)]
+    name: Annotated[
+        str | None,
+        Field(description="Your name (an invitation can correct it).", max_length=200, min_length=1),
+    ] = None
+
+
+class PasswordChange(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    currentPassword: Annotated[str, Field(max_length=200)]
+    newPassword: Annotated[str, Field(max_length=200, min_length=10)]
+
+
+class TeamStatus(StrEnum):
+    invited = "invited"
+    active = "active"
+    deactivated = "deactivated"
+
+
+class TeamMember(BaseModel):
+    id: UserId
+    name: str
+    email: str
+    role: Role
+    status: TeamStatus
+    lastSignInAt: Annotated[AwareDatetime | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class TeamList(BaseModel):
+    items: list[TeamMember]
+
+
+class InviteInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    email: Annotated[EmailStr, Field(max_length=254)]
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    role: Role
+
+
+class Invitation(BaseModel):
+    member: TeamMember
+    link: Annotated[
+        str, Field(description="The invitation link (also emailed), to pass on another way if needed.")
+    ]
+    expiresAt: AwareDatetime
+    emailed: Annotated[
+        bool, Field(description="Whether an email was queued (it fails later if no mail server is set up).")
+    ]
+
+
+class TeamMemberUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    role: Role | None = None
+    active: bool | None = None
 
 
 class ApiKeyId(RootModel[str]):

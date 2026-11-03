@@ -10,11 +10,15 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 )
 
 // Group roles created by migration 00001.
@@ -90,4 +94,26 @@ func UserTenant(ctx context.Context, admin *pgxpool.Pool, userID string) (string
 		return "", fmt.Errorf("no user with id %s", userID)
 	}
 	return tenantID, err
+}
+
+// PasswordLink makes a link for a user to choose their password (an
+// invitation if they have none yet, else a reset), valid for valid: for the
+// first owner, or anyone the app cannot email.
+func PasswordLink(ctx context.Context, admin *pgxpool.Pool, cfg config.Config, userID string, valid time.Duration) (string, error) {
+	tenantID, err := UserTenant(ctx, admin, userID)
+	if err != nil {
+		return "", err
+	}
+	m := identity.New(admin, authn.NewVerifier(cfg.AuthJWTSecret, cfg.AuthIssuer, cfg.AuthAudience), nil, cfg.PublicURL)
+	return m.PasswordLink(ctx, tenantID, userID, valid)
+}
+
+// SetPassword sets a user's password directly (development demo users only).
+func SetPassword(ctx context.Context, admin *pgxpool.Pool, userID, password string) error {
+	hash, err := identity.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	_, err = admin.Exec(ctx, `UPDATE app_user SET password_hash = $2, invited = false WHERE id = $1`, userID, hash)
+	return err
 }

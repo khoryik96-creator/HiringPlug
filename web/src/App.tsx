@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { api, ApiError, type Permission, unwrap } from "./api/client";
-import { clearToken, getToken } from "./auth";
+import { api, ApiError, type Me, type Permission, unwrap } from "./api/client";
+import { authLinkRoute, clearToken, getToken } from "./auth";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { CandidateDetail } from "./pages/CandidateDetail";
 import { CandidateList } from "./pages/CandidateList";
@@ -22,7 +22,9 @@ import { Leads } from "./pages/Leads";
 import { Placements } from "./pages/Placements";
 import { Reports } from "./pages/Reports";
 import { CompanyList } from "./pages/CompanyList";
+import { ChoosePassword } from "./pages/ChoosePassword";
 import { SignIn } from "./pages/SignIn";
+import { ChangePassword, Team } from "./pages/Team";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -48,7 +50,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|team|account)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -69,18 +71,21 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
+          {permissions.includes("identity.team:manage") && (
+            <a href="#/team" aria-current={section === "team" ? "page" : undefined}>Team</a>
+          )}
           {permissions.includes("integrations:manage") && (
             <a href="#/integrations" aria-current={section === "integrations" ? "page" : undefined}>Integrations</a>
           )}
         </nav>
         <span className="muted">
-          {me.data.user.name} · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
+          <a href="#/account" aria-current={section === "account" ? "page" : undefined}>{me.data.user.name}</a> · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
           <button type="button" className="link" onClick={onSignOut}>
             Sign out
           </button>
         </span>
       </header>
-      <Page hash={hash} permissions={permissions} />
+      <Page hash={hash} permissions={permissions} me={me.data} />
     </>
   );
 }
@@ -89,7 +94,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
  * The page for a location. Detail pages get key={id}: a different record gets
  * a fresh page, so no edit state carries over.
  */
-function Page({ hash, permissions }: { hash: string; permissions: Permission[] }) {
+function Page({ hash, permissions, me }: { hash: string; permissions: Permission[]; me: Me }) {
+  if (hash.startsWith("#/team") && permissions.includes("identity.team:manage")) return <Team myRole={me.role} myId={me.user.id} />;
+  if (hash.startsWith("#/account")) return <><h2>Your account</h2><ChangePassword /></>;
   const compare = /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/.exec(hash)?.[1];
   if (compare) return <CompareCvs key={compare} candidateId={compare} />;
   const candidate = /^#\/candidates\/(cand_[0-9a-z]+)$/.exec(hash)?.[1];
@@ -121,6 +128,8 @@ export function App() {
   const [signedIn, setSignedIn] = useState(getToken() !== null);
   // The public careers page: never behind sign-in. (hash re-renders on change.)
   const careers = careersRoute(window.location);
+  // Invitation and password reset links: also never behind sign-in.
+  const link = authLinkRoute(window.location.hash);
   const signOut = () => {
     clearToken();
     queryClient.clear();
@@ -131,6 +140,8 @@ export function App() {
       {careers ? (
         // Public: candidates are never asked to sign in.
         <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />
+      ) : link ? (
+        <ChoosePassword key={link.token} token={link.token} onSignedIn={() => { queryClient.clear(); setSignedIn(true); }} />
       ) : signedIn ? (
         <Shell onSignOut={signOut} />
       ) : (

@@ -1,16 +1,25 @@
-// Package identity knows who is signed in: it turns a bearer token into a
-// Principal (tenant, user, role, permissions) and serves GET /v1/me.
+// Package identity knows who is signed in and who is in the team: signing in
+// with email and password (Argon2id hashes; attempts limited per address and
+// email), invitations and password reset links (only their SHA-256 kept),
+// turning a bearer token into a Principal (tenant, user, role, permissions),
+// and the team admin rules (nobody locks themselves out; the last owner
+// stays). Changing a password or deactivating someone signs out their
+// sessions.
 //
 // Layout (the same in every module):
 //
 //	identity.go        the module's public API, used by internal/app and other modules
-//	http.go            HTTP handlers: map contract types <-> service calls, no business rules
+//	domain.go          password and team rules, as pure functions (unit tested)
+//	auth.go            signing in, links (invitations, resets), changing a password
+//	team.go            team admin: invitations, roles, deactivating
+//	http.go, team_http.go  HTTP handlers: contract types <-> service calls
 //	internal/store     generated SQL (db/queries/identity.sql); private to this module
 package identity
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,16 +31,25 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// Module is the identity module.
-type Module struct {
-	pool     *pgxpool.Pool
-	verifier *authn.Verifier
-	HTTP     *HTTP
+// Mailer sends the app's own emails (invitations, password resets), in the
+// caller's transaction (emails module).
+type Mailer interface {
+	Notify(ctx context.Context, tx pgx.Tx, tenantID string, to []string, subject, body string) error
 }
 
-// New wires the module.
-func New(pool *pgxpool.Pool, verifier *authn.Verifier) *Module {
-	m := &Module{pool: pool, verifier: verifier}
+// Module is the identity module.
+type Module struct {
+	pool      *pgxpool.Pool
+	verifier  *authn.Verifier
+	mailer    Mailer
+	publicURL string
+	limits    limits
+	HTTP      *HTTP
+}
+
+// New wires the module. Links in emails point to publicURL (the web app).
+func New(pool *pgxpool.Pool, verifier *authn.Verifier, mailer Mailer, publicURL string) *Module {
+	m := &Module{pool: pool, verifier: verifier, mailer: mailer, publicURL: publicURL, limits: newLimits(time.Now)}
 	m.HTTP = &HTTP{m: m}
 	return m
 }
@@ -45,7 +63,7 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 	}
 	var principal authz.Principal
 	err = database.InTx(ctx, m.pool, authz.TenantOnly(claims.TenantID), func(tx pgx.Tx) error {
-		u, err := store.New(tx).GetUser(ctx, claims.Subject)
+		u, err := store.New(tx).UserAuth(ctx, claims.Subject)
 		if database.IsNoRows(err) {
 			return fmt.Errorf("%w: user %s not found in tenant %s", authn.ErrInvalidToken, claims.Subject, claims.TenantID)
 		}
@@ -54,6 +72,10 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		}
 		if !u.Active {
 			return fmt.Errorf("%w: user %s is deactivated", authn.ErrInvalidToken, u.ID)
+		}
+		// Signed out by a password change or a deactivation since the token was issued.
+		if u.TokensValidAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.TokensValidAfter) {
+			return fmt.Errorf("%w: token issued before the user's sessions were ended", authn.ErrInvalidToken)
 		}
 		principal = authz.NewPrincipal(u.TenantID, u.ID, u.Email, u.Name, api.Role(u.Role))
 		return nil

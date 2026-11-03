@@ -29,10 +29,20 @@ First company and owner:
 
 ```bash
 docker compose -f deploy/docker-compose.yml run --rm api /app/hp tenant -name "Your Agency" -owner-email you@agency.com -owner-name "Your Name"
-docker compose -f deploy/docker-compose.yml run --rm api /app/hp token -user usr_...
 ```
 
-Until single sign-on arrives (M7), sign in with that token.
+It prints a link: open it, choose your password, and you are signed in. Then
+invite your team from the **Team** page (each invitation is emailed, and its
+link is shown too, in case email is not set up yet). If someone cannot get an
+email, make them a link on the command line:
+
+```bash
+docker compose -f deploy/docker-compose.yml run --rm api /app/hp password-link -user usr_...
+```
+
+For development, `task db:setup` (`hp dev-setup`) creates demo users who sign
+in with their email (e.g. `owner@demo.hiringplug.local`) and the password
+`demo-password-2026`.
 
 **Before anything beyond your own laptop:** change every `*_dev` password and
 the two secrets in `deploy/docker-compose.yml` (or move them to a `.env` file),

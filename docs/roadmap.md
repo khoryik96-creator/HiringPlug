@@ -32,6 +32,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Offers with approvals; replacements owed after a fall-through |
 | ✅ | API keys and signed webhooks for your other systems |
 | ✅ | Hiring leads from public job boards, careers pages and saved ads |
+| ✅ | Sign-in with passwords, invitations, password resets and a Team page |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -49,7 +50,7 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ **1.4 Pipeline** | Add candidates to a job; stages (applied, screened, submitted, interview, offer, placed, plus rejected / withdrawn with a reason); a drag-and-drop board per job; a candidate's jobs on their page | Stages configurable per company; moves checked in one place and tested move by move. |
 | ✅ **1.5 Notes and timeline** | Screening, CV and interview notes on a candidate, job or application, with templates (screening questions); one timeline per record of notes and changes | Notes that mention salary follow the salary permission. |
 | ✅ **1.6 Dashboard** | My open jobs, candidates per stage, applications stuck too long, activity this week | |
-| ⬜ **1.7 Sign-in and team** (last, by choice) | Sign in with email and password (or Google / Microsoft); an admin screen to invite users, change roles and deactivate them | Today users paste a token and are created on the command line. Needed before anyone else uses it. |
+| ✅ **1.7 Sign-in and team** | Sign in with email and password (Argon2id, limited attempts, several companies per email); invitations and password resets by emailed link; a Team page to invite, change roles and deactivate (nobody locks themselves out; an owner always remains); changing a password ends other sessions | Google / Microsoft single sign-on can be added later (Phase 7). |
 
 ### Phase 2: getting candidates in faster ✅
 

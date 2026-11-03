@@ -61,7 +61,7 @@ type Modules struct {
 // with Candidates.
 func NewModules(d Deps) *Modules {
 	m := &Modules{}
-	m.Identity = identity.New(d.Pool, d.Verifier)
+	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool)
