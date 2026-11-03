@@ -32,6 +32,9 @@ tenant ─┬─ app_user (role)
 | `application_stage_change` | application, from stage, to stage, when; written by a database trigger on every stage change (history before it rebuilt from the audit log) |
 | `offer` | application (one open offer each), status (draft/pending approval/approved/sent/accepted/declined/withdrawn), start date, answer-by date, other terms, who asked for approval, who approved (or sent back) and when with a note, sent and answered times, `version` |
 | `offer_salary` | offer, amount/currency/period; row-level security: only with `offers.salary:read` (write: `:update`) |
+| `api_key` | name, role (never owner), SHA-256 of the key, its first characters, created by, last used (to the minute), revoked at; looked up before any company is known by `app_api_key` |
+| `webhook` | address, events, signing secret, on/off, description, `version` |
+| `webhook_delivery` | webhook, event, payload (as sent), status (pending/delivered/failed), attempts, last answer or error, next attempt; written by a trigger on `audit_log` |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |

@@ -348,8 +348,9 @@ history before this was rebuilt from the audit log.
 ## 6. API documentation
 
 `/docs` renders the contract (endpoints, fields, permissions, error codes) and
-`/openapi.json` serves it for tools. Integrations will get API keys per company
-and webhooks (M6), driven by the same contract.
+`/openapi.json` serves it for tools. ✅ Other systems use it with **API keys**
+(acting as a chosen role) and hear about changes through signed **webhooks**:
+both on the Integrations page, described in [integrations](integrations.md).
 
 ## 7. User access
 

@@ -70,6 +70,7 @@ details get their own permissions.
 | `offers:approve` (approve others' requests; send without asking) | ✓ | ✓ | | | ✓ | |
 | `offers.salary:read` | ✓ | ✓ | ✓ | | ✓ | |
 | `offers.salary:update` | ✓ | ✓ | ✓ | | | |
+| `integrations:manage` (API keys and webhooks; never with an API key) | ✓ | ✓ | | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 
 Coming in M2: **custom roles** per company (an admin screen to pick

@@ -111,3 +111,9 @@ sql:
           - db_type: date
             nullable: true
             go_type: { type: time.Time, pointer: true }
+  - <<: *module
+    queries: db/queries/integrations.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/integrations/internal/store

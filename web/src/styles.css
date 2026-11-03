@@ -93,3 +93,4 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .feedback { display: grid; gap: 0.5rem; max-width: 40rem; }
 .bar { display: inline-block; height: 0.75rem; min-width: 2px; background: #2563eb; border-radius: 2px; }
 .badge.pending_approval, .badge.draft { background: #fef3c7; } .badge.approved, .badge.accepted { background: #dcfce7; } .badge.declined, .badge.withdrawn { background: #fee2e2; }
+.secret { word-break: break-all; user-select: all; }

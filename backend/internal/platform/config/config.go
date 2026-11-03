@@ -63,6 +63,10 @@ type Config struct {
 	// SMTP is the mail server email from the app is sent through. Without a
 	// host, emails are recorded but fail with "no mail server is set up".
 	SMTP SMTP
+	// WebhooksAllowPrivate lets webhooks go to private and local network
+	// addresses, and over plain HTTP. Off by default: a webhook address must
+	// not reach into the server's own network. For local testing only.
+	WebhooksAllowPrivate bool // HP_WEBHOOKS_ALLOW_PRIVATE
 }
 
 // SMTP is how to reach the mail server.
@@ -99,6 +103,10 @@ func Load(getenv func(string) string) (Config, error) {
 		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
+	c.WebhooksAllowPrivate = r.oneOf("HP_WEBHOOKS_ALLOW_PRIVATE", "false", "false", "true") == "true"
+	if c.WebhooksAllowPrivate && c.Env == EnvProduction {
+		r.fail("HP_WEBHOOKS_ALLOW_PRIVATE must be false in production")
+	}
 	zone := r.str("HP_TIME_ZONE", "Asia/Kuala_Lumpur")
 	if loc, err := time.LoadLocation(zone); err != nil || zone == "Local" {
 		r.fail("HP_TIME_ZONE must be a time zone name, e.g. Asia/Kuala_Lumpur")

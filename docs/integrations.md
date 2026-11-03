@@ -22,5 +22,55 @@ cannot take the core down:
 | Job ads puller | Find companies that are hiring | Recruiter-saved ads, careers pages and public ATS feeds, licensed data. No automated scraping of LinkedIn or JobStreet (their terms forbid it). | M6 |
 | Job boards | Post ads, receive applicants | Official partner APIs (e.g. SEEK/JobStreet, LinkedIn Jobs) or a multiposting service | M6 |
 | Data import | Move from your current ATS | CSV import with a preview and mapping; API importers where the old system allows | M2 |
-| Public API and webhooks | Let other systems integrate | API keys per company with permissions; webhooks from the same events that write the audit log; documented at `/docs` | M6 |
+| Public API and webhooks ✅ | Let other systems integrate | API keys per company acting as a role; webhooks from the same events that write the audit log; documented at `/docs` (see below) | 6.5 |
 | AI providers | Parsing, matching, assistant | One provider interface in Python; provider and region per company; usage and cost tracked | M2–M4 |
+
+## Connecting your own systems: API keys and webhooks ✅
+
+**API keys** (Integrations page, owners and admins). A key acts as the role
+chosen for it (admin, recruiter, sourcer, hiring manager or viewer; never
+owner), in your company only. Send it as `Authorization: Bearer hpk_...` to any
+endpoint in `/docs`. The key is shown once; only its SHA-256 is stored. A
+revoked key stops working at once. Changes made with a key are recorded with
+the key as the actor. Keys cannot create keys or webhooks, even as admin.
+
+**Webhooks.** Choose the events (candidate created or updated, application
+added or moved, careers applications, interviews scheduled or changed,
+feedback, offers approved, sent, accepted, declined or withdrawn, placements,
+jobs, companies, contacts). Every change is already written to the audit log;
+a database trigger turns each one a webhook listens for into a delivery,
+queued in the same transaction as the change, so nothing is announced that
+did not happen, and nothing that happened is missed. Salary changes are never
+events, and salary values never appear in them.
+
+Each delivery is a JSON `POST`:
+
+```json
+{"id": "whd_...", "event": "application.moved", "occurredAt": "2026-11-03T02:00:00Z", "actorId": "usr_...",
+ "entity": {"type": "application", "id": "appl_..."}, "changes": {"stage": {"from": "interview", "to": "offer"}}}
+```
+
+with headers `X-HiringPlug-Event`, `X-HiringPlug-Delivery` (the same `id`, to
+ignore repeats) and `X-HiringPlug-Signature: t=<unix time>,v1=<hex>`, where
+`<hex>` is the HMAC-SHA256 of `<unix time>.<raw body>` with the webhook's
+secret (shown once when the webhook is added). Check it, and that the time is
+within a few minutes, before trusting a delivery. In Python:
+
+```python
+import hashlib, hmac, time
+
+def verify(secret: str, header: str, body: bytes) -> bool:
+    parts = dict(p.split("=", 1) for p in header.split(","))
+    expected = hmac.new(secret.encode(), f"{parts['t']}.".encode() + body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, parts["v1"]) and abs(time.time() - int(parts["t"])) < 300
+```
+
+Answer with any 2xx within 10 seconds. Anything else (or no answer) is tried
+again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, then the
+delivery fails; each webhook's latest deliveries, with the answer or error,
+are on the Integrations page, and "Send test" sends a `webhook.ping`.
+Addresses must be HTTPS. Deliveries never go to the server's own or private
+networks (checked on the address actually connected to) and never follow
+redirects; `HP_WEBHOOKS_ALLOW_PRIVATE=true` lifts both for trying webhooks on
+your own machine (refused in production).
+

@@ -897,6 +897,150 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/UserList'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
+  /v1/api-keys:
+    get:
+      operationId: listApiKeys
+      tags: [integrations]
+      summary: The company's API keys (never the keys themselves)
+      x-permission: integrations:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiKeyList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createApiKey
+      tags: [integrations]
+      summary: Create an API key (the key is in the response, once)
+      x-permission: integrations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ApiKeyInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApiKeyCreated'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/api-keys/{apiKeyId}:
+    parameters:
+      - $ref: '#/components/parameters/ApiKeyIdPath'
+    delete:
+      operationId: revokeApiKey
+      tags: [integrations]
+      summary: Revoke an API key (it stops working at once)
+      x-permission: integrations:manage
+      responses:
+        '204': {description: Revoked}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/webhooks:
+    get:
+      operationId: listWebhooks
+      tags: [integrations]
+      summary: The company's webhooks (never their secrets), with the events they may send
+      x-permission: integrations:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createWebhook
+      tags: [integrations]
+      summary: Add a webhook (its signing secret is in the response, once)
+      x-permission: integrations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebhookInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookCreated'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/webhooks/{webhookId}:
+    parameters:
+      - $ref: '#/components/parameters/WebhookIdPath'
+    patch:
+      operationId: updateWebhook
+      tags: [integrations]
+      summary: Change a webhook's address, events or whether it is on
+      x-permission: integrations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WebhookUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Webhook'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteWebhook
+      tags: [integrations]
+      summary: Remove a webhook (and its delivery record)
+      x-permission: integrations:manage
+      responses:
+        '204': {description: Removed}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/webhooks/{webhookId}/deliveries:
+    parameters:
+      - $ref: '#/components/parameters/WebhookIdPath'
+    get:
+      operationId: listWebhookDeliveries
+      tags: [integrations]
+      summary: A webhook's latest deliveries, newest first
+      x-permission: integrations:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookDeliveryList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: pingWebhook
+      tags: [integrations]
+      summary: Send a webhook.ping event, to check the receiver
+      x-permission: integrations:manage
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WebhookDelivery'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/applications/{applicationId}/interviews:
     parameters:
       - $ref: '#/components/parameters/ApplicationIdPath'
@@ -1741,6 +1885,7 @@ components:
         - emails.templates:manage
         - emails:read
         - emails:send
+        - integrations:manage
         - interviews:feedback
         - interviews:read
         - interviews:schedule
@@ -1801,6 +1946,7 @@ components:
         - document.text_extracted
         - email.send
         - interview.remind
+        - webhook.deliver
     Error:
       type: object
       required: [error]
@@ -2781,6 +2927,146 @@ components:
           description: The company's public careers page address, e.g. contoh-recruitment (/#/careers/contoh-recruitment).
         id: {$ref: '#/components/schemas/TenantId'}
         name: {type: string}
+    ApiKeyId:
+      type: string
+      pattern: '^akey_[0-9a-hjkmnp-tv-z]{26}$'
+      example: akey_01jbz6w0m0k8q9x2r3s4t5v6w7
+    WebhookId:
+      type: string
+      pattern: '^whk_[0-9a-hjkmnp-tv-z]{26}$'
+      example: whk_01jbz6w0m0k8q9x2r3s4t5v6w7
+    WebhookDeliveryId:
+      type: string
+      pattern: '^whd_[0-9a-hjkmnp-tv-z]{26}$'
+      example: whd_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ApiKeyRole:
+      type: string
+      description: What the key may do, as that role (never owner).
+      enum: [admin, recruiter, sourcer, hiring_manager, viewer]
+    ApiKey:
+      type: object
+      required: [id, name, role, prefix, createdAt, createdByName, lastUsedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ApiKeyId'}
+        name: {type: string}
+        role: {$ref: '#/components/schemas/ApiKeyRole'}
+        prefix: {type: string, description: "The key's first characters, to recognise it (e.g. hpk_3f9a)."}
+        createdAt: {type: string, format: date-time}
+        createdByName: {type: string, nullable: true}
+        lastUsedAt: {type: string, format: date-time, nullable: true, description: To the minute.}
+    ApiKeyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ApiKey'}
+    ApiKeyInput:
+      type: object
+      additionalProperties: false
+      required: [name, role]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100, description: "What uses it, e.g. Payroll sync."}
+        role: {$ref: '#/components/schemas/ApiKeyRole'}
+    ApiKeyCreated:
+      type: object
+      required: [apiKey, key]
+      properties:
+        apiKey: {$ref: '#/components/schemas/ApiKey'}
+        key: {type: string, description: "Send it as Authorization: Bearer <key>. Shown only now: keep it safe."}
+    WebhookEvent:
+      type: string
+      description: What happened (the audit action of the change).
+      enum: [candidate.created, candidate.updated, candidate.merged, application.created, application.moved, careers.applied, interview.scheduled, interview.updated, interview.feedback_given, offer.approved, offer.sent, offer.accepted, offer.declined, offer.withdrawn, placement.recorded, placement.updated, job.created, job.updated, company.created, contact.created, webhook.ping]
+    Webhook:
+      type: object
+      required: [id, version, url, events, active, description, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/WebhookId'}
+        version: {type: integer}
+        url: {type: string}
+        events:
+          type: array
+          items: {$ref: '#/components/schemas/WebhookEvent'}
+        active: {type: boolean}
+        description: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    WebhookList:
+      type: object
+      required: [items, events]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Webhook'}
+        events:
+          type: array
+          description: Every event a webhook may subscribe to.
+          items: {$ref: '#/components/schemas/WebhookEvent'}
+    WebhookInput:
+      type: object
+      additionalProperties: false
+      required: [url, events]
+      properties:
+        url: {type: string, maxLength: 500, description: An HTTPS address.}
+        events:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/WebhookEvent'}
+        description: {type: string, maxLength: 200}
+    WebhookCreated:
+      type: object
+      required: [webhook, secret]
+      properties:
+        webhook: {$ref: '#/components/schemas/Webhook'}
+        secret:
+          type: string
+          description: >
+            Signs every delivery: the X-HiringPlug-Signature header is t=<unix time>,v1=<hex HMAC-SHA256 of "<unix time>.<body>" with this secret>. Shown only now: keep it safe.
+
+    WebhookUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        url: {type: string, maxLength: 500}
+        events:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/WebhookEvent'}
+        active: {type: boolean}
+        description: {type: string, maxLength: 200, nullable: true}
+    WebhookDeliveryStatus:
+      type: string
+      description: pending = waiting to be sent, or to be tried again; delivered = the receiver answered 2xx; failed = gave up after the last attempt.
+      enum: [pending, delivered, failed]
+    WebhookDelivery:
+      type: object
+      required: [id, event, status, attempts, responseStatus, lastError, createdAt, deliveredAt, nextAttemptAt]
+      properties:
+        id: {$ref: '#/components/schemas/WebhookDeliveryId'}
+        event: {$ref: '#/components/schemas/WebhookEvent'}
+        status: {$ref: '#/components/schemas/WebhookDeliveryStatus'}
+        attempts: {type: integer}
+        responseStatus: {type: integer, nullable: true}
+        lastError: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+        deliveredAt: {type: string, format: date-time, nullable: true}
+        nextAttemptAt: {type: string, format: date-time, nullable: true}
+    WebhookDeliveryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/WebhookDelivery'}
+    WebhookDeliverJob:
+      type: object
+      additionalProperties: false
+      required: [deliveryId]
+      properties:
+        deliveryId: {$ref: '#/components/schemas/WebhookDeliveryId'}
     InterviewId:
       type: string
       pattern: '^intv_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3655,6 +3941,16 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/EmailTemplateId'}
+    ApiKeyIdPath:
+      name: apiKeyId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ApiKeyId'}
+    WebhookIdPath:
+      name: webhookId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/WebhookId'}
     InterviewIdPath:
       name: interviewId
       in: path
@@ -3771,6 +4067,11 @@ x-permissions:
     description: Send email from the app.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  integrations:manage:
+    module: integrations
+    description: Create and revoke API keys; add, change and remove webhooks.
+    sensitive: false
+    roles: [owner, admin]
   interviews:feedback:
     module: interviews
     description: Give feedback on interviews you are an interviewer on.
@@ -3927,6 +4228,11 @@ x-jobs:
     queue: core
     payload: InterviewRemindJob
     description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
+  webhook.deliver:
+    module: integrations
+    queue: core
+    payload: WebhookDeliverJob
+    description: POST one webhook delivery to its address (Go worker); a failure is retried later.
 x-modules:
   - name: candidates
     description: Candidate profiles. Salary details are stored and permissioned separately.
@@ -3942,6 +4248,8 @@ x-modules:
     description: 'Email from the app: templates with placeholders filled from the candidate, job, interview and sender; messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it.'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
+  - name: integrations
+    description: API keys let another system use this API as a role (never as owner); the key is shown once and only its hash is kept. Webhooks send a signed JSON POST to an HTTPS address when chosen events happen (queued in the same transaction as the change, retried when the receiver fails). API keys cannot manage API keys or webhooks.
   - name: interviews
     description: 'Interviews for an application: when, how and where, who interviews, and each interviewer''s feedback. Scheduling moves the application to the interview stage if it is at an earlier one.'
   - name: jobs

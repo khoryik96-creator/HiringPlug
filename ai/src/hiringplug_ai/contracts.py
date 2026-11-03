@@ -35,6 +35,7 @@ class Permission(StrEnum):
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
     emails_send = "emails:send"
+    integrations_manage = "integrations:manage"
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
     interviews_schedule = "interviews:schedule"
@@ -95,6 +96,7 @@ class JobKind(StrEnum):
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
     interview_remind = "interview.remind"
+    webhook_deliver = "webhook.deliver"
 
 
 class Error1(BaseModel):
@@ -883,6 +885,160 @@ class Tenant(BaseModel):
     ]
     id: TenantId
     name: str
+
+
+class ApiKeyId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["akey_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^akey_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class WebhookId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["whk_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^whk_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class WebhookDeliveryId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["whd_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^whd_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class ApiKeyRole(StrEnum):
+    admin = "admin"
+    recruiter = "recruiter"
+    sourcer = "sourcer"
+    hiring_manager = "hiring_manager"
+    viewer = "viewer"
+
+
+class ApiKey(BaseModel):
+    id: ApiKeyId
+    name: str
+    role: ApiKeyRole
+    prefix: Annotated[str, Field(description="The key's first characters, to recognise it (e.g. hpk_3f9a).")]
+    createdAt: AwareDatetime
+    createdByName: Annotated[str | None, Field(...)]
+    lastUsedAt: Annotated[AwareDatetime | None, Field(description="To the minute.")]
+
+
+class ApiKeyList(BaseModel):
+    items: list[ApiKey]
+
+
+class ApiKeyInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(description="What uses it, e.g. Payroll sync.", max_length=100, min_length=1)]
+    role: ApiKeyRole
+
+
+class ApiKeyCreated(BaseModel):
+    apiKey: ApiKey
+    key: Annotated[
+        str, Field(description="Send it as Authorization: Bearer <key>. Shown only now: keep it safe.")
+    ]
+
+
+class WebhookEvent(StrEnum):
+    candidate_created = "candidate.created"
+    candidate_updated = "candidate.updated"
+    candidate_merged = "candidate.merged"
+    application_created = "application.created"
+    application_moved = "application.moved"
+    careers_applied = "careers.applied"
+    interview_scheduled = "interview.scheduled"
+    interview_updated = "interview.updated"
+    interview_feedback_given = "interview.feedback_given"
+    offer_approved = "offer.approved"
+    offer_sent = "offer.sent"
+    offer_accepted = "offer.accepted"
+    offer_declined = "offer.declined"
+    offer_withdrawn = "offer.withdrawn"
+    placement_recorded = "placement.recorded"
+    placement_updated = "placement.updated"
+    job_created = "job.created"
+    job_updated = "job.updated"
+    company_created = "company.created"
+    contact_created = "contact.created"
+    webhook_ping = "webhook.ping"
+
+
+class Webhook(BaseModel):
+    id: WebhookId
+    version: int
+    url: str
+    events: list[WebhookEvent]
+    active: bool
+    description: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class WebhookList(BaseModel):
+    items: list[Webhook]
+    events: Annotated[list[WebhookEvent], Field(description="Every event a webhook may subscribe to.")]
+
+
+class WebhookInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    url: Annotated[str, Field(description="An HTTPS address.", max_length=500)]
+    events: Annotated[list[WebhookEvent], Field(min_length=1)]
+    description: Annotated[str | None, Field(max_length=200)] = None
+
+
+class WebhookCreated(BaseModel):
+    webhook: Webhook
+    secret: Annotated[
+        str,
+        Field(
+            description='Signs every delivery: the X-HiringPlug-Signature header is t=<unix time>,v1=<hex HMAC-SHA256 of "<unix time>.<body>" with this secret>. Shown only now: keep it safe.\n'
+        ),
+    ]
+
+
+class WebhookUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    url: Annotated[str | None, Field(max_length=500)] = None
+    events: Annotated[list[WebhookEvent] | None, Field(min_length=1)] = None
+    active: bool | None = None
+    description: Annotated[str | None, Field(max_length=200)] = None
+
+
+class WebhookDeliveryStatus(StrEnum):
+    pending = "pending"
+    delivered = "delivered"
+    failed = "failed"
+
+
+class WebhookDelivery(BaseModel):
+    id: WebhookDeliveryId
+    event: WebhookEvent
+    status: WebhookDeliveryStatus
+    attempts: int
+    responseStatus: Annotated[int | None, Field(...)]
+    lastError: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    deliveredAt: Annotated[AwareDatetime | None, Field(...)]
+    nextAttemptAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class WebhookDeliveryList(BaseModel):
+    items: list[WebhookDelivery]
+
+
+class WebhookDeliverJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    deliveryId: WebhookDeliveryId
 
 
 class InterviewId(RootModel[str]):

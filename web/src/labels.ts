@@ -218,3 +218,8 @@ export const OFFER_STATUS: Record<Schemas["OfferStatus"], string> = {
 export const REPLACEMENT: Record<Schemas["ReplacementStatus"], string> = {
   none: "", owed: "Replacement owed", provided: "Replacement provided", refunded: "Refunded",
 };
+
+export const API_KEY_ROLE: Record<Schemas["ApiKeyRole"], string> = {
+  admin: "Admin", recruiter: "Recruiter", sourcer: "Sourcer", hiring_manager: "Hiring manager", viewer: "Viewer",
+};
+export const DELIVERY_STATUS: Record<Schemas["WebhookDeliveryStatus"], string> = { pending: "Waiting", delivered: "Delivered", failed: "Failed" };

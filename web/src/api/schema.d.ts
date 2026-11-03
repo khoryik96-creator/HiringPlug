@@ -542,6 +542,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's API keys (never the keys themselves) */
+        get: operations["listApiKeys"];
+        put?: never;
+        /** Create an API key (the key is in the response, once) */
+        post: operations["createApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/api-keys/{apiKeyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                apiKeyId: components["parameters"]["ApiKeyIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke an API key (it stops working at once) */
+        delete: operations["revokeApiKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's webhooks (never their secrets), with the events they may send */
+        get: operations["listWebhooks"];
+        put?: never;
+        /** Add a webhook (its signing secret is in the response, once) */
+        post: operations["createWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/webhooks/{webhookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a webhook (and its delivery record) */
+        delete: operations["deleteWebhook"];
+        options?: never;
+        head?: never;
+        /** Change a webhook's address, events or whether it is on */
+        patch: operations["updateWebhook"];
+        trace?: never;
+    };
+    "/v1/webhooks/{webhookId}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A webhook's latest deliveries, newest first */
+        get: operations["listWebhookDeliveries"];
+        put?: never;
+        /** Send a webhook.ping event, to check the receiver */
+        post: operations["pingWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/applications/{applicationId}/interviews": {
         parameters: {
             query?: never;
@@ -1086,11 +1181,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "STAGE_MOVE_NOT_ALLOWED" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind";
+        JobKind: "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.text_extracted" | "email.send" | "interview.remind" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -1734,6 +1829,110 @@ export interface components {
             careersSlug: string;
             id: components["schemas"]["TenantId"];
             name: string;
+        };
+        /** @example akey_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        ApiKeyId: string;
+        /** @example whk_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        WebhookId: string;
+        /** @example whd_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        WebhookDeliveryId: string;
+        /**
+         * @description What the key may do, as that role (never owner).
+         * @enum {string}
+         */
+        ApiKeyRole: "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
+        ApiKey: {
+            id: components["schemas"]["ApiKeyId"];
+            name: string;
+            role: components["schemas"]["ApiKeyRole"];
+            /** @description The key's first characters, to recognise it (e.g. hpk_3f9a). */
+            prefix: string;
+            /** Format: date-time */
+            createdAt: string;
+            createdByName: string | null;
+            /**
+             * Format: date-time
+             * @description To the minute.
+             */
+            lastUsedAt: string | null;
+        };
+        ApiKeyList: {
+            items: components["schemas"]["ApiKey"][];
+        };
+        ApiKeyInput: {
+            /** @description What uses it, e.g. Payroll sync. */
+            name: string;
+            role: components["schemas"]["ApiKeyRole"];
+        };
+        ApiKeyCreated: {
+            apiKey: components["schemas"]["ApiKey"];
+            /** @description Send it as Authorization: Bearer <key>. Shown only now: keep it safe. */
+            key: string;
+        };
+        /**
+         * @description What happened (the audit action of the change).
+         * @enum {string}
+         */
+        WebhookEvent: "candidate.created" | "candidate.updated" | "candidate.merged" | "application.created" | "application.moved" | "careers.applied" | "interview.scheduled" | "interview.updated" | "interview.feedback_given" | "offer.approved" | "offer.sent" | "offer.accepted" | "offer.declined" | "offer.withdrawn" | "placement.recorded" | "placement.updated" | "job.created" | "job.updated" | "company.created" | "contact.created" | "webhook.ping";
+        Webhook: {
+            id: components["schemas"]["WebhookId"];
+            version: number;
+            url: string;
+            events: components["schemas"]["WebhookEvent"][];
+            active: boolean;
+            description: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        WebhookList: {
+            items: components["schemas"]["Webhook"][];
+            /** @description Every event a webhook may subscribe to. */
+            events: components["schemas"]["WebhookEvent"][];
+        };
+        WebhookInput: {
+            /** @description An HTTPS address. */
+            url: string;
+            events: components["schemas"]["WebhookEvent"][];
+            description?: string;
+        };
+        WebhookCreated: {
+            webhook: components["schemas"]["Webhook"];
+            /** @description Signs every delivery: the X-HiringPlug-Signature header is t=<unix time>,v1=<hex HMAC-SHA256 of "<unix time>.<body>" with this secret>. Shown only now: keep it safe. */
+            secret: string;
+        };
+        WebhookUpdate: {
+            version: number;
+            url?: string;
+            events?: components["schemas"]["WebhookEvent"][];
+            active?: boolean;
+            description?: string | null;
+        };
+        /**
+         * @description pending = waiting to be sent, or to be tried again; delivered = the receiver answered 2xx; failed = gave up after the last attempt.
+         * @enum {string}
+         */
+        WebhookDeliveryStatus: "pending" | "delivered" | "failed";
+        WebhookDelivery: {
+            id: components["schemas"]["WebhookDeliveryId"];
+            event: components["schemas"]["WebhookEvent"];
+            status: components["schemas"]["WebhookDeliveryStatus"];
+            attempts: number;
+            responseStatus: number | null;
+            lastError: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            deliveredAt: string | null;
+            /** Format: date-time */
+            nextAttemptAt: string | null;
+        };
+        WebhookDeliveryList: {
+            items: components["schemas"]["WebhookDelivery"][];
+        };
+        WebhookDeliverJob: {
+            deliveryId: components["schemas"]["WebhookDeliveryId"];
         };
         /** @example intv_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         InterviewId: string;
@@ -2482,6 +2681,8 @@ export interface components {
         ContactIdPath: components["schemas"]["ContactId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
         EmailTemplateIdPath: components["schemas"]["EmailTemplateId"];
+        ApiKeyIdPath: components["schemas"]["ApiKeyId"];
+        WebhookIdPath: components["schemas"]["WebhookId"];
         InterviewIdPath: components["schemas"]["InterviewId"];
         JobOrderIdPath: components["schemas"]["JobOrderId"];
         JobAdIdPath: components["schemas"]["JobAdId"];
@@ -3471,6 +3672,231 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+        };
+    };
+    listApiKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyCreated"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    revokeApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                apiKeyId: components["parameters"]["ApiKeyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listWebhooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookCreated"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Webhook"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listWebhookDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveryList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    pingWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webhookId: components["parameters"]["WebhookIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDelivery"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listApplicationInterviews: {

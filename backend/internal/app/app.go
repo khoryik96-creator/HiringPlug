@@ -17,7 +17,9 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/db"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
@@ -96,7 +98,7 @@ func NewHTTPHandler(d Deps, m *Modules) (http.Handler, error) {
 	return httpserver.New(httpserver.Options{
 		Logger:         d.Logger,
 		API:            m.Server(),
-		Authenticate:   m.Identity.Authenticate,
+		Authenticate:   m.authenticate,
 		Files:          d.Files,
 		Ready:          func(ctx context.Context) error { return d.Pool.Ping(ctx) },
 		MaxBodyBytes:   maxJSONBodyBytes,
@@ -183,4 +185,13 @@ func RunWorker(ctx context.Context, getenv func(string) string, out io.Writer) e
 		return err
 	}
 	return w.Run(ctx)
+}
+
+// authenticate signs a request in: with an API key (integrations), or with a
+// user's sign-in token (identity).
+func (m *Modules) authenticate(ctx context.Context, token string) (authz.Principal, error) {
+	if integrations.IsAPIKey(token) {
+		return m.Integrations.Authenticate(ctx, token)
+	}
+	return m.Identity.Authenticate(ctx, token)
 }

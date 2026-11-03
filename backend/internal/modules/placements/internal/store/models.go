@@ -10,6 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiKey struct {
+	ID         string
+	TenantID   string
+	Name       string
+	Role       string
+	KeyHash    string
+	Prefix     string
+	CreatedBy  string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+	RevokedAt  *time.Time
+}
+
 type AppUser struct {
 	ID        string
 	TenantID  string
@@ -401,4 +414,33 @@ type Tenant struct {
 	Name        string
 	CreatedAt   time.Time
 	CareersSlug *string
+}
+
+type Webhook struct {
+	ID          string
+	TenantID    string
+	Version     int32
+	Url         string
+	Events      []string
+	Secret      string
+	Active      bool
+	Description *string
+	CreatedBy   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type WebhookDelivery struct {
+	ID             string
+	TenantID       string
+	WebhookID      string
+	Event          string
+	Payload        []byte
+	Status         string
+	Attempts       int32
+	ResponseStatus *int32
+	LastError      *string
+	NextAttemptAt  *time.Time
+	CreatedAt      time.Time
+	DeliveredAt    *time.Time
 }

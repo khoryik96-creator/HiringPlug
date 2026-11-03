@@ -67,6 +67,8 @@ func newTestApp(t *testing.T) *testApp {
 		"HP_INTERNAL_BASE_URL": "http://api.test",
 		"HP_MAX_UPLOAD_BYTES":  "262144",
 		"HP_LOG_LEVEL":         "error",
+		// Webhook tests post to a local test server.
+		"HP_WEBHOOKS_ALLOW_PRIVATE": "true",
 	}
 	cfg, err := config.Load(func(k string) string { return env[k] })
 	require.NoError(t, err)

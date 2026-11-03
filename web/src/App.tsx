@@ -16,6 +16,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { EmailTemplates } from "./pages/EmailTemplates";
 import { ImportPage } from "./pages/ImportPage";
 import { JobDetail } from "./pages/JobDetail";
+import { Integrations } from "./pages/Integrations";
 import { JobList } from "./pages/JobList";
 import { Placements } from "./pages/Placements";
 import { Reports } from "./pages/Reports";
@@ -46,7 +47,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|import)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|import|integrations)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -64,6 +65,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
+          {permissions.includes("integrations:manage") && (
+            <a href="#/integrations" aria-current={section === "integrations" ? "page" : undefined}>Integrations</a>
+          )}
         </nav>
         <span className="muted">
           {me.data.user.name} · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
@@ -100,6 +104,7 @@ function Page({ hash, permissions }: { hash: string; permissions: Permission[] }
   }
   if (hash.startsWith("#/placements") && permissions.includes("placements:read")) return <Placements permissions={permissions} />;
   if (hash.startsWith("#/reports") && permissions.includes("reports:read")) return <Reports />;
+  if (hash.startsWith("#/integrations") && permissions.includes("integrations:manage")) return <Integrations />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;

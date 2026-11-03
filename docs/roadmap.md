@@ -30,6 +30,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Placements with guarantee periods, invoices and protected salary and fee |
 | ✅ | Reports: conversion, sources, recruiters, time to fill |
 | ✅ | Offers with approvals; replacements owed after a fall-through |
+| ✅ | API keys and signed webhooks for your other systems |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan
@@ -93,7 +94,7 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ 6.2 **Offers** | Offer terms (protected salary, start, answer-by date, other terms) on an application; approval by someone other than who asked (approvers may send straight away); sent, accepted, declined or withdrawn; offers to approve on the dashboard; a replacement owed after a fall-through |
 | ✅ 6.3 **Reports** | Pipeline conversion by furthest stage reached, sources (applications, interviews, placements), placements and fees per recruiter, time to fill and to place, for any period |
 | 6.4 **Job ads puller** | Collect hiring signals from allowed sources (careers pages, public ATS feeds, ads you save) as business development leads |
-| 6.5 **Integrations** | API keys per company and webhooks |
+| ✅ 6.5 **Integrations** | API keys acting as a role (hashed, shown once, revocable); signed webhooks for chosen events, queued with the change, retried, never to private networks; an Integrations page |
 
 ### Phase 7: cloud and selling it ⬜
 

@@ -22,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
@@ -35,20 +36,21 @@ import (
 
 // Modules holds every module, wired together.
 type Modules struct {
-	Identity   *identity.Module
-	Candidates *candidates.Module
-	Documents  *documents.Module
-	Companies  *companies.Module
-	Contacts   *contacts.Module
-	Jobs       *jobs.Module
-	Pipeline   *pipeline.Module
-	Notes      *notes.Module
-	Careers    *careers.Module
-	Interviews *interviews.Module
-	Emails     *emails.Module
-	Placements *placements.Module
-	Reports    *reports.Module
-	Offers     *offers.Module
+	Identity     *identity.Module
+	Candidates   *candidates.Module
+	Documents    *documents.Module
+	Companies    *companies.Module
+	Contacts     *contacts.Module
+	Jobs         *jobs.Module
+	Pipeline     *pipeline.Module
+	Notes        *notes.Module
+	Careers      *careers.Module
+	Interviews   *interviews.Module
+	Emails       *emails.Module
+	Placements   *placements.Module
+	Reports      *reports.Module
+	Offers       *offers.Module
+	Integrations *integrations.Module
 	// scaffold:fields
 }
 
@@ -83,6 +85,7 @@ func NewModules(d Deps) *Modules {
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
 	}, d.Config.TimeZone)
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
+	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.WebhooksAllowPrivate)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -92,20 +95,21 @@ func NewModules(d Deps) *Modules {
 // Each module's handler type is called HTTP; these aliases give the embedded
 // fields distinct names.
 type (
-	identityHTTP   = identity.HTTP
-	candidatesHTTP = candidates.HTTP
-	documentsHTTP  = documents.HTTP
-	companiesHTTP  = companies.HTTP
-	contactsHTTP   = contacts.HTTP
-	jobsHTTP       = jobs.HTTP
-	pipelineHTTP   = pipeline.HTTP
-	notesHTTP      = notes.HTTP
-	careersHTTP    = careers.HTTP
-	interviewsHTTP = interviews.HTTP
-	emailsHTTP     = emails.HTTP
-	placementsHTTP = placements.HTTP
-	reportsHTTP    = reports.HTTP
-	offersHTTP     = offers.HTTP
+	identityHTTP     = identity.HTTP
+	candidatesHTTP   = candidates.HTTP
+	documentsHTTP    = documents.HTTP
+	companiesHTTP    = companies.HTTP
+	contactsHTTP     = contacts.HTTP
+	jobsHTTP         = jobs.HTTP
+	pipelineHTTP     = pipeline.HTTP
+	notesHTTP        = notes.HTTP
+	careersHTTP      = careers.HTTP
+	interviewsHTTP   = interviews.HTTP
+	emailsHTTP       = emails.HTTP
+	placementsHTTP   = placements.HTTP
+	reportsHTTP      = reports.HTTP
+	offersHTTP       = offers.HTTP
+	integrationsHTTP = integrations.HTTP
 	// scaffold:aliases
 )
 
@@ -127,6 +131,7 @@ type Server struct {
 	*placementsHTTP
 	*reportsHTTP
 	*offersHTTP
+	*integrationsHTTP
 	// scaffold:embeds
 }
 
@@ -135,20 +140,21 @@ var _ api.StrictServerInterface = (*Server)(nil)
 // Server returns the composed HTTP handlers.
 func (m *Modules) Server() *Server {
 	return &Server{
-		identityHTTP:   m.Identity.HTTP,
-		candidatesHTTP: m.Candidates.HTTP,
-		documentsHTTP:  m.Documents.HTTP,
-		companiesHTTP:  m.Companies.HTTP,
-		contactsHTTP:   m.Contacts.HTTP,
-		jobsHTTP:       m.Jobs.HTTP,
-		pipelineHTTP:   m.Pipeline.HTTP,
-		notesHTTP:      m.Notes.HTTP,
-		careersHTTP:    m.Careers.HTTP,
-		interviewsHTTP: m.Interviews.HTTP,
-		emailsHTTP:     m.Emails.HTTP,
-		placementsHTTP: m.Placements.HTTP,
-		reportsHTTP:    m.Reports.HTTP,
-		offersHTTP:     m.Offers.HTTP,
+		identityHTTP:     m.Identity.HTTP,
+		candidatesHTTP:   m.Candidates.HTTP,
+		documentsHTTP:    m.Documents.HTTP,
+		companiesHTTP:    m.Companies.HTTP,
+		contactsHTTP:     m.Contacts.HTTP,
+		jobsHTTP:         m.Jobs.HTTP,
+		pipelineHTTP:     m.Pipeline.HTTP,
+		notesHTTP:        m.Notes.HTTP,
+		careersHTTP:      m.Careers.HTTP,
+		interviewsHTTP:   m.Interviews.HTTP,
+		emailsHTTP:       m.Emails.HTTP,
+		placementsHTTP:   m.Placements.HTTP,
+		reportsHTTP:      m.Reports.HTTP,
+		offersHTTP:       m.Offers.HTTP,
+		integrationsHTTP: m.Integrations.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -160,6 +166,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Documents.JobHandlers(),
 		m.Emails.JobHandlers(),
 		m.Interviews.JobHandlers(),
+		m.Integrations.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {
