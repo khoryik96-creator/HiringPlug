@@ -34,10 +34,20 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	mailServer = server
+	filesDir, err = os.MkdirTemp("", "hiringplug-test-files-")
+	if err != nil {
+		panic(err)
+	}
 	code := testutil.Main(m)
 	server.Close()
+	_ = os.RemoveAll(filesDir)
 	os.Exit(code)
 }
+
+// filesDir is the file store of every test app, for the same reason as
+// mailServer: a worker in one test may run another test's job (saving a PDF,
+// reading a CV) and must find and keep files where that test looks.
+var filesDir string
 
 // mailServer receives the email every test app sends. It is one server for
 // all of them: a worker in one test may run another test's jobs, so every
@@ -64,7 +74,7 @@ func newTestApp(t *testing.T, overrides ...map[string]string) *testApp {
 		"HP_ENV":               config.EnvTest,
 		"HP_DATABASE_URL":      testutil.Current.AppURL,
 		"HP_AUTH_JWT_SECRET":   testutil.JWTSecret,
-		"HP_FILES_DIR":         t.TempDir(),
+		"HP_FILES_DIR":         filesDir,
 		"HP_FILES_URL_SECRET":  "files-secret-for-tests-0123456789abcdef",
 		"HP_INTERNAL_BASE_URL": "http://api.test",
 		"HP_MAX_UPLOAD_BYTES":  "262144",

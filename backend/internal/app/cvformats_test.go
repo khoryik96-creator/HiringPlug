@@ -194,3 +194,24 @@ func TestFormattedCvs(t *testing.T) {
 		a.formatCv(stranger, c.Id, map[string]any{}, http.StatusNotFound)
 	})
 }
+
+// The job queue is shared by every test, so a worker in one test may run
+// another test's job (TestFormattedCvs failed now and then in CI this way):
+// every test app must use the same file store, as every worker does in
+// production.
+func TestAnotherTestAppsWorkerSavesThePDFWhereThisAppFindsIt(t *testing.T) {
+	t.Parallel()
+	a, other := newTestApp(t), newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	recruiter := tenant.Users[api.RoleRecruiter].Token
+	c := a.createCandidate(recruiter, map[string]any{"firstName": "Ali", "lastName": "Hassan"})
+	out, _ := a.formatCv(recruiter, c.Id, map[string]any{}, http.StatusCreated)
+	pdf := base64.StdEncoding.EncodeToString([]byte("%PDF-1.7 shared store"))
+	_, err := testutil.Current.Admin.Exec(context.Background(), `SELECT job_enqueue($1, 'core', 'document.pdf_rendered', $2::jsonb)`, tenant.ID,
+		`{"documentId":"`+out.DocumentId+`","pdfBase64":"`+pdf+`","error":null}`)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, other, tenant.ID)
+	res := a.request(http.MethodGet, "/v1/documents/"+out.DocumentId+"/pdf", recruiter, nil)
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, "%PDF-1.7 shared store", string(res.Body))
+}
