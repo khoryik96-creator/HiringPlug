@@ -15,7 +15,7 @@ const job: JobOrder = {
   id: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank",
   contactId: null, contactName: null, title: "Senior Auditor", status: "open", location: "Kuala Lumpur",
   workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.",
-  restrictedFields: ["salary"], createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
+  restrictedFields: ["salary"], ownerId: null, ownerName: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 /** Answers the panel's reads: who is signed in (for the careers link), and the ads. */
 const reads = (ads: Schemas["JobAd"][]) =>

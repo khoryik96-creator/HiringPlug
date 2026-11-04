@@ -280,3 +280,17 @@ export const PRIVACY_KIND: Record<Schemas["PrivacyRequestKind"], string> = {
 };
 
 export const PRIVACY_STATUS: Record<Schemas["PrivacyRequestStatus"], string> = { open: "Open", done: "Done", declined: "Declined" };
+
+export const CANDIDATE_SCOPE: Record<Schemas["CandidateScope"], string> = {
+  all: "All candidates",
+  team: "Their team's candidates",
+  own: "Their own candidates",
+};
+
+/** Readable names for the contract's modules (permissions are grouped by them). */
+export const MODULE: Record<string, string> = {
+  assistant: "AI assistant", candidates: "Candidates", careers: "Careers page", companies: "Companies", contacts: "Contacts",
+  cvformats: "Formatted CVs", documents: "CVs and documents", emails: "Email", identity: "Team and sign-in", integrations: "Integrations",
+  interviews: "Interviews", jobs: "Jobs", leads: "Leads", matching: "Fit scores", notes: "Notes", offers: "Offers", pipeline: "Pipeline",
+  placements: "Placements", privacy: "Data protection", reports: "Reports",
+};

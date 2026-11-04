@@ -2,10 +2,11 @@
 // a transaction scoped to one tenant and one principal.
 //
 // InTx is the only way application code should touch the database. It sets
-// app.tenant_id, app.user_id and app.permissions with SET LOCAL semantics, so
-// row-level security limits every query to that tenant (and salary rows to
-// permitted users), and nothing leaks to the next transaction on a pooled
-// connection.
+// app.tenant_id, app.user_id, app.permissions and the candidate scope
+// (app.scope_users, app.scope_jobs) with SET LOCAL semantics, so row-level
+// security limits every query to that tenant, salary rows to permitted users
+// and candidates to those the user may see, and nothing leaks to the next
+// transaction on a pooled connection.
 package database
 
 import (
@@ -41,8 +42,9 @@ func InTx(ctx context.Context, pool *pgxpool.Pool, p authz.Principal, fn func(pg
 	}
 	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx,
-			`SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true), set_config('app.permissions', $3, true)`,
-			p.TenantID, p.UserID, p.PermissionCSV(),
+			`SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true), set_config('app.permissions', $3, true),
+			        set_config('app.scope_users', $4, true), set_config('app.scope_jobs', $5, true)`,
+			p.TenantID, p.UserID, p.PermissionCSV(), p.ScopeUsersSetting(), p.ScopeJobsSetting(),
 		); err != nil {
 			return fmt.Errorf("database: scoping transaction: %w", err)
 		}

@@ -111,7 +111,8 @@ func toAPI(v View) api.JobOrder {
 		WorkType:        c.OrNull(c.Convert[api.WorkType](d.WorkType)),
 		WorkArrangement: c.OrNull(c.Convert[api.WorkArrangement](d.WorkArrangement)),
 		Openings:        d.Openings, Description: c.OrNull(d.Description),
-		RestrictedFields: []api.JobRestrictedField{}, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
+		RestrictedFields: []api.JobRestrictedField{}, OwnerId: c.OrNull(v.OwnerID), OwnerName: c.OrNull(v.OwnerName),
+		CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}
 	if v.SalaryRestricted {
 		out.RestrictedFields = append(out.RestrictedFields, api.JobRestrictedFieldSalary)
@@ -132,4 +133,16 @@ func salaryToAPI(s Salary) api.JobSalary {
 		rng = &api.JobSalaryRange{Min: r.Min, Max: c.OrNull(r.Max), Currency: r.Currency, Period: api.PayPeriod(r.Period)}
 	}
 	return api.JobSalary{Version: s.Version, Range: c.OrNull(rng), UpdatedAt: s.UpdatedAt}
+}
+
+// SetJobOwner handles PUT /v1/jobs/{jobId}/owner.
+func (h *HTTP) SetJobOwner(ctx context.Context, req api.SetJobOwnerRequestObject) (api.SetJobOwnerResponseObject, error) {
+	var owner *string
+	if v, err := req.Body.OwnerId.Get(); err == nil {
+		owner = &v
+	}
+	if err := h.svc.SetOwner(ctx, authz.MustFromContext(ctx), req.JobId, owner); err != nil {
+		return nil, err
+	}
+	return api.SetJobOwner204Response{}, nil
 }

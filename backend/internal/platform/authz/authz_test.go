@@ -48,3 +48,28 @@ func TestPermissionCSVIsSortedAndStable(t *testing.T) {
 		assert.Equal(t, csv, NewPrincipal("tnt_x", "usr_x", "", "", api.RoleViewer).PermissionCSV())
 	}
 }
+
+func TestALimitedScopeNeverMeansEveryone(t *testing.T) {
+	all := NewPrincipal("t", "u", "", "", api.RoleRecruiter)
+	assert.Empty(t, all.ScopeUsersSetting(), "the contract's roles see all candidates")
+	assert.Empty(t, all.ScopeJobsSetting())
+
+	own := NewPrincipalWithAccess("t", "usr_1", "", "", api.RoleRecruiter, []api.Permission{api.PermissionCandidatesRead, "made:up"}, Scope{Users: []string{"usr_1", "usr_2"}, Jobs: true})
+	assert.Equal(t, "usr_1,usr_2", own.ScopeUsersSetting())
+	assert.Equal(t, "on", own.ScopeJobsSetting())
+	assert.Equal(t, []api.Permission{api.PermissionCandidatesRead}, own.Permissions(), "unknown permissions are ignored")
+
+	nobody := NewPrincipalWithAccess("t", "u", "", "", api.RoleViewer, nil, Scope{Users: []string{}, Jobs: true})
+	assert.Equal(t, "-", nobody.ScopeUsersSetting(), "an empty list would mean all")
+	assert.Equal(t, "", NewPrincipalWithAccess("t", "u", "", "", api.RoleViewer, nil, Scope{Jobs: true}).ScopeJobsSetting(), "jobs only narrow a limited scope")
+}
+
+func TestTheCatalogHasEveryPermissionWithItsWords(t *testing.T) {
+	c := Catalog()
+	assert.Len(t, c, len(System("t").Permissions()))
+	for _, p := range c {
+		assert.NotEmpty(t, p.Description, p.Permission)
+		assert.NotEmpty(t, p.Module, p.Permission)
+	}
+	assert.Equal(t, "assistant", c[0].Module, "sorted by module")
+}

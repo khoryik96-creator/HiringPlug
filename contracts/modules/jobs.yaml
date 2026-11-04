@@ -243,6 +243,26 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/jobs/{jobId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    put:
+      operationId: setJobOwner
+      tags: [jobs]
+      summary: Give the job to another recruiter (or to nobody)
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerInput' }
+      responses:
+        '204': { description: Changed }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   parameters:
     JobOrderIdPath:
@@ -386,8 +406,13 @@ components:
 
     JobOrder:
       type: object
-      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, workType, workArrangement, openings, description, restrictedFields, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, workType, workArrangement, openings, description, ownerId, ownerName, restrictedFields, createdAt, updatedAt]
       properties:
+        ownerId:
+          description: The recruiter the job belongs to (who added it, unless changed).
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+        ownerName: { type: string, nullable: true }
         id: { $ref: '#/components/schemas/JobOrderId' }
         version: { type: integer }
         companyId: { $ref: '#/components/schemas/CompanyId' }

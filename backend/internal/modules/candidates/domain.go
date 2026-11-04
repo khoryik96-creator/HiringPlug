@@ -59,6 +59,7 @@ type Candidate struct {
 	ID        string
 	Version   int
 	Profile   Profile
+	OwnerID   *string // the recruiter they belong to; nil for none
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -71,6 +72,7 @@ type View struct {
 	// CompensationRestricted is true when the user lacks permission to see
 	// salary details; the API then omits them and says so.
 	CompensationRestricted bool
+	OwnerName              *string
 }
 
 // Compensation holds salary details. Amounts are exact decimal strings.

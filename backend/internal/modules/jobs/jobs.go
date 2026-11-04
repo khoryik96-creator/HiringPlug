@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
@@ -42,6 +43,13 @@ type Contacts interface {
 	Info(ctx context.Context, tx pgx.Tx, ids []string) (map[string]ContactInfo, error)
 }
 
+// Users is what this module needs from the identity module: owners' names,
+// and whether someone is an active user (to own jobs).
+type Users interface {
+	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+	ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]api.Permission, error)
+}
+
 // Module is the jobs module.
 type Module struct {
 	service *Service
@@ -49,8 +57,8 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, companies Companies, contacts Contacts) *Module {
-	svc := &Service{pool: pool, companies: companies, contacts: contacts}
+func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users) *Module {
+	svc := &Service{pool: pool, companies: companies, contacts: contacts, users: users}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

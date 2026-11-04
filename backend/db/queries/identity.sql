@@ -35,7 +35,7 @@ SELECT link_id::text AS link_id, tenant_id::text AS tenant_id, user_id::text AS 
 FROM app_user_link(sqlc.arg(token_hash)::text);
 
 -- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = @id;
+SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = @id;
 
 -- name: SignedIn :exec
 UPDATE app_user SET last_sign_in_at = now() WHERE id = @id;
@@ -57,23 +57,71 @@ RETURNING id;
 UPDATE user_link SET used_at = now() WHERE user_id = @user_id AND kind = @kind AND used_at IS NULL;
 
 -- name: ListTeam :many
-SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
+SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000;
 
 -- name: InviteUser :one
 INSERT INTO app_user (tenant_id, email, name, role, active, invited)
 VALUES (app_current_tenant(), @email, @name, @role, false, true)
-RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at;
+RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
 
 -- name: TeamMember :one
-SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
+SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = @id;
 
 -- Deactivating signs the user out: tokens issued up to the end of this second
 -- stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
 -- name: UpdateMember :one
-UPDATE app_user SET role = @role, active = @active,
+UPDATE app_user SET role = @role, active = @active, team_id = sqlc.narg(team_id),
   tokens_valid_after = CASE WHEN active AND NOT @active THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
 WHERE id = @id
-RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at;
+RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
 
 -- name: ActiveOwners :one
 SELECT count(*) FROM app_user WHERE role = 'owner' AND active;
+
+-- A company's own settings for one role (none: the contract's defaults).
+-- name: GetRoleSetting :one
+SELECT * FROM role_setting WHERE role = @role;
+
+-- name: ListRoleSettings :many
+SELECT * FROM role_setting ORDER BY role;
+
+-- name: InsertRoleSetting :one
+INSERT INTO role_setting (tenant_id, role, permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), @role, @permissions, @candidate_scope, @job_candidates, app_current_user())
+ON CONFLICT (tenant_id, role) DO NOTHING
+RETURNING *;
+
+-- Optimistic concurrency: no row returned = stale version.
+-- name: UpdateRoleSetting :one
+UPDATE role_setting
+SET permissions = @permissions, candidate_scope = @candidate_scope, job_candidates = @job_candidates,
+    updated_by = app_current_user(), version = version + 1, updated_at = now()
+WHERE role = @role AND version = @version
+RETURNING *;
+
+-- name: DeleteRoleSetting :exec
+DELETE FROM role_setting WHERE role = @role;
+
+-- The active users in a team (whose candidates its members see with the team scope).
+-- name: TeamUserIDs :many
+SELECT id FROM app_user WHERE team_id = @team_id AND active ORDER BY id;
+
+-- name: ListTeamGroups :many
+SELECT g.id, g.version, g.name, (SELECT count(*) FROM app_user u WHERE u.team_id = g.id AND u.active)::integer AS member_count
+FROM team_group g ORDER BY lower(g.name) LIMIT 500;
+
+-- name: GetTeamGroup :one
+SELECT id, version, name FROM team_group WHERE id = @id;
+
+-- name: InsertTeamGroup :one
+INSERT INTO team_group (tenant_id, name, created_by) VALUES (app_current_tenant(), @name, app_current_user())
+RETURNING id, version, name;
+
+-- name: RenameTeamGroup :one
+UPDATE team_group SET name = @name, version = version + 1, updated_at = now()
+WHERE id = @id AND version = @version
+RETURNING id, version, name;
+
+-- Its people stay, in no team (the foreign key clears their team_id).
+-- name: DeleteTeamGroup :execrows
+DELETE FROM team_group WHERE id = @id;

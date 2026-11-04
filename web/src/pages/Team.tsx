@@ -3,26 +3,31 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { setToken } from "../auth";
+import { teamsKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
 import { formatWhen, keysOf, ROLE, TEAM_STATUS } from "../labels";
 
 type Member = Schemas["TeamMember"];
+type Group = Schemas["TeamGroup"];
 const teamKey = ["team"] as const;
 
 /** Who is in the company: invite people, change roles, deactivate (owners and admins). */
 export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }) {
   const list = useQuery({ queryKey: teamKey, queryFn: async () => unwrap(await api.GET("/v1/team")).items });
+  const groups = useQuery({ queryKey: teamsKey, queryFn: async () => unwrap(await api.GET("/v1/teams")).items });
   return (
     <>
       <h2>Team</h2>
-      <ErrorMessage error={list.error} />
+      {myRole === "owner" && <p className="muted">Choose what each role may do and which candidates it sees under <a href="#/access">Roles and access</a>.</p>}
+      <ErrorMessage error={list.error ?? groups.error} />
       {list.data && (
         <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last signed in</th><th /></tr></thead>
-          <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} />)}</tbody>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Last signed in</th><th /></tr></thead>
+          <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} groups={groups.data ?? []} />)}</tbody>
         </table>
       )}
+      <Teams groups={groups.data ?? []} />
       <Invite myRole={myRole} />
     </>
   );
@@ -30,13 +35,16 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
 
 const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => r !== "owner" || myRole === "owner");
 
-function MemberRow({ member: m, myRole, me }: { member: Member; myRole: Schemas["Role"]; me: boolean }) {
+function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[] }) {
   const queryClient = useQueryClient();
   const [link, setLink] = useState<string | null>(null);
   const update = useMutation({
     mutationFn: async (body: Schemas["TeamMemberUpdate"]) =>
       unwrap(await api.PATCH("/v1/team/{userId}", { params: { path: { userId: m.id } }, body })),
-    onSettled: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: teamKey });
+      await queryClient.invalidateQueries({ queryKey: teamsKey });
+    },
   });
   const resend = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })),
@@ -55,6 +63,13 @@ function MemberRow({ member: m, myRole, me }: { member: Member; myRole: Schemas[
           </select>
         )}
       </td>
+      <td>
+        <select aria-label={`Team of ${m.name}`} value={m.teamId ?? ""} disabled={update.isPending}
+          onChange={(e) => { update.mutate({ teamId: e.target.value || null }); }}>
+          <option value="">No team</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+      </td>
       <td><span className={`badge ${m.status === "active" ? "accepted" : m.status === "invited" ? "draft" : "withdrawn"}`}>{TEAM_STATUS[m.status]}</span></td>
       <td className="muted">{m.lastSignInAt ? formatWhen(m.lastSignInAt) : "Never"}</td>
       <td>
@@ -67,6 +82,61 @@ function MemberRow({ member: m, myRole, me }: { member: Member; myRole: Schemas[
         <ErrorMessage error={update.error ?? resend.error} />
       </td>
     </tr>
+  );
+}
+
+/** Teams of people (e.g. desks): roles set to see their team's candidates see their teammates'. */
+function Teams({ groups }: { groups: Group[] }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: teamsKey });
+    await queryClient.invalidateQueries({ queryKey: teamKey });
+  };
+  const add = useMutation({
+    mutationFn: async () => unwrap(await api.POST("/v1/teams", { body: { name: name.trim() } })),
+    onSuccess: async () => { setName(""); await refresh(); },
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => { unwrap(await api.DELETE("/v1/teams/{teamId}", { params: { path: { teamId: id } } })); },
+    onSuccess: refresh,
+  });
+  return (
+    <section className="panel" aria-label="Teams">
+      <h3>Teams</h3>
+      <p className="muted small">Group people, e.g. by desk. A role can be set to see only its team&apos;s candidates.</p>
+      <ul>
+        {groups.map((g) => (
+          <li key={g.id}>
+            <TeamName group={g} onDone={refresh} /> <span className="muted">{g.memberCount} {g.memberCount === 1 ? "person" : "people"}</span>{" "}
+            <button type="button" className="link" disabled={remove.isPending}
+              onClick={() => { if (window.confirm(`Remove the team ${g.name}? Its people stay, in no team.`)) remove.mutate(g.id); }}>Remove</button>
+          </li>
+        ))}
+      </ul>
+      <form className="row" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+        <input aria-label="New team" placeholder="New team, e.g. Finance desk" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); }} />
+        <button type="submit" disabled={add.isPending || !name.trim()}>Add team</button>
+      </form>
+      <ErrorMessage error={add.error ?? remove.error} />
+    </section>
+  );
+}
+
+function TeamName({ group, onDone }: { group: Group; onDone: () => Promise<void> }) {
+  const [name, setName] = useState<string | null>(null);
+  const rename = useMutation({
+    mutationFn: async (to: string) => unwrap(await api.PATCH("/v1/teams/{teamId}", { params: { path: { teamId: group.id } }, body: { version: group.version, name: to } })),
+    onSuccess: async () => { setName(null); await onDone(); },
+  });
+  if (name === null) return <button type="button" className="link" title="Rename" onClick={() => { setName(group.name); }}>{group.name}</button>;
+  return (
+    <form className="row" style={{ display: "inline-flex" }} onSubmit={(e) => { e.preventDefault(); rename.mutate(name.trim()); }}>
+      <input aria-label={`Rename ${group.name}`} value={name} maxLength={100} onChange={(e) => { setName(e.target.value); }} />
+      <button type="submit" disabled={rename.isPending || !name.trim()}>Rename</button>
+      <button type="button" className="link" onClick={() => { setName(null); }}>Cancel</button>
+      <ErrorMessage error={rename.error} />
+    </form>
   );
 }
 

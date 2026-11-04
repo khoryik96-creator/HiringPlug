@@ -1,20 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
-import { jobKey } from "../api/keys";
+import { applicationsKey, jobKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { JobAds } from "../components/JobAds";
 import { JobForm } from "../components/JobForm";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
+import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { JOB_STATUS, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 
 /** One job. Render it with key={id} so edit state never carries over. */
 export function JobDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
+  const queryClient = useQueryClient();
   const job = useQuery({
     queryKey: jobKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}", { params: { path: { jobId: id } } })),
@@ -45,6 +47,13 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       <p className="muted">
         <a href={`#/companies/${j.companyId}`}>{j.companyName}</a>
         {j.contactId && <> · contact <a href={`#/contacts/${j.contactId}`}>{j.contactName}</a></>}
+        {" · "}
+        <Owner what="job" ownerId={j.ownerId} ownerName={j.ownerName} canChange={permissions.includes("jobs:update")}
+          save={async (ownerId) => {
+            unwrap(await api.PUT("/v1/jobs/{jobId}/owner", { params: { path: { jobId: j.id } }, body: { ownerId } }));
+            await queryClient.invalidateQueries({ queryKey: jobKey(j.id) });
+            await queryClient.invalidateQueries({ queryKey: applicationsKey }); // who sees its candidates may change
+          }} />
       </p>
       {editing ? (
         <JobForm job={j} onDone={() => { setEditing(false); }} />

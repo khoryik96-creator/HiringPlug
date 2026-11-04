@@ -50,6 +50,10 @@ paths:
           in: query
           description: Only candidates with this skill (ignoring case).
           schema: { type: string, minLength: 1, maxLength: 60 }
+        - name: owner
+          in: query
+          description: Only candidates owned by this user ("me" for your own).
+          schema: { type: string, minLength: 1, maxLength: 40 }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
@@ -253,6 +257,29 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/candidates/{candidateId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    put:
+      operationId: setCandidateOwner
+      tags: [candidates]
+      summary: Give the candidate to another recruiter (or to nobody)
+      description: >
+        Roles that see only their own (or their team's) candidates may no
+        longer see a candidate they hand over; nothing else changes.
+      x-permission: candidates:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnerInput' }
+      responses:
+        '204': { description: Changed }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   parameters:
     CandidateIdPath:
@@ -262,6 +289,15 @@ components:
       schema: { $ref: '#/components/schemas/CandidateId' }
 
   schemas:
+    OwnerInput:
+      type: object
+      additionalProperties: false
+      required: [ownerId]
+      properties:
+        ownerId:
+          description: A user of the company, or null for nobody.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
     CandidateId:
       type: string
       pattern: '^cand_[0-9a-hjkmnp-tv-z]{26}$'
@@ -420,10 +456,17 @@ components:
         - currentCompany
         - location
         - source
+        - ownerId
+        - ownerName
         - restrictedFields
         - createdAt
         - updatedAt
       properties:
+        ownerId:
+          description: The recruiter the candidate belongs to; null for none (e.g. applied on the careers page).
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/UserId' }]
+        ownerName: { type: string, nullable: true }
         experience:
           type: array
           description: Work history, newest first.

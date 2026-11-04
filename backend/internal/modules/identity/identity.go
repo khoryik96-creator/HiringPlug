@@ -77,8 +77,9 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		if u.TokensValidAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.TokensValidAfter) {
 			return fmt.Errorf("%w: token issued before the user's sessions were ended", authn.ErrInvalidToken)
 		}
-		principal = authz.NewPrincipal(u.TenantID, u.ID, u.Email, u.Name, api.Role(u.Role))
-		return nil
+		// Their company's settings for their role: permissions, and which candidates they see.
+		principal, err = principalOf(ctx, store.New(tx), u)
+		return err
 	})
 	return principal, err
 }
@@ -123,15 +124,23 @@ func (m *Module) UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[st
 }
 
 // ActiveUsers returns, for those of the given users who are active in the
-// caller's tenant, what their role may do (to check interviewers), in the
-// caller's transaction.
+// caller's tenant, what their role may do there (the company's settings for
+// it), e.g. to check interviewers and owners, in the caller's transaction.
 func (m *Module) ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]api.Permission, error) {
-	found, err := store.New(tx).ActiveUserRoles(ctx, ids)
+	q := store.New(tx)
+	found, err := q.ActiveUserRoles(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make(map[string][]api.Permission, len(found))
 	for _, u := range found {
-		out[u.ID] = authz.PermissionsForRole(api.Role(u.Role))
+		a, err := roleAccess(ctx, q, u.Role)
+		if err != nil {
+			return nil, err
+		}
+		out[u.ID] = a.Permissions
 	}
-	return out, err
+	return out, nil
 }
 
 // TenantName returns the company's name, in the caller's transaction.

@@ -19,6 +19,7 @@ type Service struct {
 	pool      *pgxpool.Pool
 	companies Companies
 	contacts  Contacts
+	users     Users
 }
 
 // Create adds a job.
@@ -35,7 +36,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Vi
 		row, err := store.New(tx).InsertJobOrder(ctx, store.InsertJobOrderParams{
 			CompanyID: d.CompanyID, ContactID: d.ContactID, Title: d.Title, Status: d.Status, Location: d.Location,
 			WorkType: d.WorkType, WorkArrangement: d.WorkArrangement, Openings: int32(d.Openings), //nolint:gosec // 1..999 per the contract
-			Description: d.Description,
+			Description: d.Description, OwnerID: ownerFor(p),
 		})
 		if err != nil {
 			return err
@@ -285,6 +286,15 @@ func (s *Service) view(ctx context.Context, tx pgx.Tx, p authz.Principal, j JobO
 			j.ContactName = &c.Name
 		}
 	}
+	if j.OwnerID != nil {
+		names, err := s.users.UserNames(ctx, tx, []string{*j.OwnerID})
+		if err != nil {
+			return View{}, err
+		}
+		if n, ok := names[*j.OwnerID]; ok {
+			j.OwnerName = &n
+		}
+	}
 	v := View{JobOrder: j}
 	if !p.Can(api.PermissionJobsSalaryRead) {
 		v.SalaryRestricted = true
@@ -319,7 +329,7 @@ func salaryFromRow(r store.GetJobSalaryRow) *Salary {
 
 func fromRow(r store.JobOrder) JobOrder {
 	return JobOrder{
-		ID: r.ID, Version: int(r.Version), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		ID: r.ID, Version: int(r.Version), OwnerID: r.OwnerID, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Details: Details{
 			CompanyID: r.CompanyID, ContactID: r.ContactID, Title: r.Title, Status: r.Status, Location: r.Location,
 			WorkType: r.WorkType, WorkArrangement: r.WorkArrangement, Openings: int(r.Openings), Description: r.Description,

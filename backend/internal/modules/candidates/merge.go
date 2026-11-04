@@ -122,7 +122,7 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 				return err
 			}
 		}
-		out, err = loadView(ctx, q, p, fromRow(row))
+		out, err = loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
 	})
 	return out, err

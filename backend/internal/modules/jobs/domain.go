@@ -46,6 +46,8 @@ type JobOrder struct {
 	Details     Details
 	CompanyName string
 	ContactName *string
+	OwnerID     *string // the recruiter it belongs to; nil for none
+	OwnerName   *string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

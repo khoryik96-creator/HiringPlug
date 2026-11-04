@@ -144,6 +144,28 @@ func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenant
 	return i, err
 }
 
+const deleteRoleSetting = `-- name: DeleteRoleSetting :exec
+DELETE FROM role_setting WHERE role = $1
+`
+
+func (q *Queries) DeleteRoleSetting(ctx context.Context, role string) error {
+	_, err := q.db.Exec(ctx, deleteRoleSetting, role)
+	return err
+}
+
+const deleteTeamGroup = `-- name: DeleteTeamGroup :execrows
+DELETE FROM team_group WHERE id = $1
+`
+
+// Its people stay, in no team (the foreign key clears their team_id).
+func (q *Queries) DeleteTeamGroup(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTeamGroup, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const endLinks = `-- name: EndLinks :exec
 UPDATE user_link SET used_at = now() WHERE user_id = $1 AND kind = $2 AND used_at IS NULL
 `
@@ -157,6 +179,44 @@ type EndLinksParams struct {
 func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	_, err := q.db.Exec(ctx, endLinks, arg.UserID, arg.Kind)
 	return err
+}
+
+const getRoleSetting = `-- name: GetRoleSetting :one
+SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at FROM role_setting WHERE role = $1
+`
+
+// A company's own settings for one role (none: the contract's defaults).
+func (q *Queries) GetRoleSetting(ctx context.Context, role string) (RoleSetting, error) {
+	row := q.db.QueryRow(ctx, getRoleSetting, role)
+	var i RoleSetting
+	err := row.Scan(
+		&i.TenantID,
+		&i.Role,
+		&i.Permissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.Version,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTeamGroup = `-- name: GetTeamGroup :one
+SELECT id, version, name FROM team_group WHERE id = $1
+`
+
+type GetTeamGroupRow struct {
+	ID      string
+	Version int32
+	Name    string
+}
+
+func (q *Queries) GetTeamGroup(ctx context.Context, id string) (GetTeamGroupRow, error) {
+	row := q.db.QueryRow(ctx, getTeamGroup, id)
+	var i GetTeamGroupRow
+	err := row.Scan(&i.ID, &i.Version, &i.Name)
+	return i, err
 }
 
 const getTenant = `-- name: GetTenant :one
@@ -230,10 +290,63 @@ func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) (string,
 	return id, err
 }
 
+const insertRoleSetting = `-- name: InsertRoleSetting :one
+INSERT INTO role_setting (tenant_id, role, permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+ON CONFLICT (tenant_id, role) DO NOTHING
+RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at
+`
+
+type InsertRoleSettingParams struct {
+	Role           string
+	Permissions    []string
+	CandidateScope string
+	JobCandidates  bool
+}
+
+func (q *Queries) InsertRoleSetting(ctx context.Context, arg InsertRoleSettingParams) (RoleSetting, error) {
+	row := q.db.QueryRow(ctx, insertRoleSetting,
+		arg.Role,
+		arg.Permissions,
+		arg.CandidateScope,
+		arg.JobCandidates,
+	)
+	var i RoleSetting
+	err := row.Scan(
+		&i.TenantID,
+		&i.Role,
+		&i.Permissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.Version,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertTeamGroup = `-- name: InsertTeamGroup :one
+INSERT INTO team_group (tenant_id, name, created_by) VALUES (app_current_tenant(), $1, app_current_user())
+RETURNING id, version, name
+`
+
+type InsertTeamGroupRow struct {
+	ID      string
+	Version int32
+	Name    string
+}
+
+func (q *Queries) InsertTeamGroup(ctx context.Context, name string) (InsertTeamGroupRow, error) {
+	row := q.db.QueryRow(ctx, insertTeamGroup, name)
+	var i InsertTeamGroupRow
+	err := row.Scan(&i.ID, &i.Version, &i.Name)
+	return i, err
+}
+
 const inviteUser = `-- name: InviteUser :one
 INSERT INTO app_user (tenant_id, email, name, role, active, invited)
 VALUES (app_current_tenant(), $1, $2, $3, false, true)
-RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at
+RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
 `
 
 type InviteUserParams struct {
@@ -247,6 +360,7 @@ type InviteUserRow struct {
 	Email        string
 	Name         string
 	Role         string
+	TeamID       *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -261,6 +375,7 @@ func (q *Queries) InviteUser(ctx context.Context, arg InviteUserParams) (InviteU
 		&i.Email,
 		&i.Name,
 		&i.Role,
+		&i.TeamID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
@@ -323,8 +438,41 @@ func (q *Queries) ListActiveUsers(ctx context.Context) ([]ListActiveUsersRow, er
 	return items, nil
 }
 
+const listRoleSettings = `-- name: ListRoleSettings :many
+SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at FROM role_setting ORDER BY role
+`
+
+func (q *Queries) ListRoleSettings(ctx context.Context) ([]RoleSetting, error) {
+	rows, err := q.db.Query(ctx, listRoleSettings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RoleSetting
+	for rows.Next() {
+		var i RoleSetting
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Role,
+			&i.Permissions,
+			&i.CandidateScope,
+			&i.JobCandidates,
+			&i.Version,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeam = `-- name: ListTeam :many
-SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000
+SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user ORDER BY active DESC, lower(name) LIMIT 1000
 `
 
 type ListTeamRow struct {
@@ -332,6 +480,7 @@ type ListTeamRow struct {
 	Email        string
 	Name         string
 	Role         string
+	TeamID       *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -352,6 +501,7 @@ func (q *Queries) ListTeam(ctx context.Context) ([]ListTeamRow, error) {
 			&i.Email,
 			&i.Name,
 			&i.Role,
+			&i.TeamID,
 			&i.Active,
 			&i.Invited,
 			&i.LastSignInAt,
@@ -365,6 +515,68 @@ func (q *Queries) ListTeam(ctx context.Context) ([]ListTeamRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const listTeamGroups = `-- name: ListTeamGroups :many
+SELECT g.id, g.version, g.name, (SELECT count(*) FROM app_user u WHERE u.team_id = g.id AND u.active)::integer AS member_count
+FROM team_group g ORDER BY lower(g.name) LIMIT 500
+`
+
+type ListTeamGroupsRow struct {
+	ID          string
+	Version     int32
+	Name        string
+	MemberCount int32
+}
+
+func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listTeamGroups)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTeamGroupsRow
+	for rows.Next() {
+		var i ListTeamGroupsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Version,
+			&i.Name,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const renameTeamGroup = `-- name: RenameTeamGroup :one
+UPDATE team_group SET name = $1, version = version + 1, updated_at = now()
+WHERE id = $2 AND version = $3
+RETURNING id, version, name
+`
+
+type RenameTeamGroupParams struct {
+	Name    string
+	ID      string
+	Version int32
+}
+
+type RenameTeamGroupRow struct {
+	ID      string
+	Version int32
+	Name    string
+}
+
+func (q *Queries) RenameTeamGroup(ctx context.Context, arg RenameTeamGroupParams) (RenameTeamGroupRow, error) {
+	row := q.db.QueryRow(ctx, renameTeamGroup, arg.Name, arg.ID, arg.Version)
+	var i RenameTeamGroupRow
+	err := row.Scan(&i.ID, &i.Version, &i.Name)
+	return i, err
 }
 
 const setPassword = `-- name: SetPassword :exec
@@ -402,7 +614,7 @@ func (q *Queries) SignedIn(ctx context.Context, id string) error {
 }
 
 const teamMember = `-- name: TeamMember :one
-SELECT id, email, name, role, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = $1
+SELECT id, email, name, role, team_id, active, invited, last_sign_in_at, created_at FROM app_user WHERE id = $1
 `
 
 type TeamMemberRow struct {
@@ -410,6 +622,7 @@ type TeamMemberRow struct {
 	Email        string
 	Name         string
 	Role         string
+	TeamID       *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -424,6 +637,7 @@ func (q *Queries) TeamMember(ctx context.Context, id string) (TeamMemberRow, err
 		&i.Email,
 		&i.Name,
 		&i.Role,
+		&i.TeamID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
@@ -432,16 +646,42 @@ func (q *Queries) TeamMember(ctx context.Context, id string) (TeamMemberRow, err
 	return i, err
 }
 
+const teamUserIDs = `-- name: TeamUserIDs :many
+SELECT id FROM app_user WHERE team_id = $1 AND active ORDER BY id
+`
+
+// The active users in a team (whose candidates its members see with the team scope).
+func (q *Queries) TeamUserIDs(ctx context.Context, teamID *string) ([]string, error) {
+	rows, err := q.db.Query(ctx, teamUserIDs, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateMember = `-- name: UpdateMember :one
-UPDATE app_user SET role = $1, active = $2,
+UPDATE app_user SET role = $1, active = $2, team_id = $3,
   tokens_valid_after = CASE WHEN active AND NOT $2 THEN date_trunc('second', now()) + interval '1 second' ELSE tokens_valid_after END
-WHERE id = $3
-RETURNING id, email, name, role, active, invited, last_sign_in_at, created_at
+WHERE id = $4
+RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at
 `
 
 type UpdateMemberParams struct {
 	Role   string
 	Active bool
+	TeamID *string
 	ID     string
 }
 
@@ -450,6 +690,7 @@ type UpdateMemberRow struct {
 	Email        string
 	Name         string
 	Role         string
+	TeamID       *string
 	Active       bool
 	Invited      bool
 	LastSignInAt *time.Time
@@ -459,13 +700,19 @@ type UpdateMemberRow struct {
 // Deactivating signs the user out: tokens issued up to the end of this second
 // stop working (tokens carry whole seconds, like sessionsEndedAt in auth.go).
 func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (UpdateMemberRow, error) {
-	row := q.db.QueryRow(ctx, updateMember, arg.Role, arg.Active, arg.ID)
+	row := q.db.QueryRow(ctx, updateMember,
+		arg.Role,
+		arg.Active,
+		arg.TeamID,
+		arg.ID,
+	)
 	var i UpdateMemberRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
 		&i.Role,
+		&i.TeamID,
 		&i.Active,
 		&i.Invited,
 		&i.LastSignInAt,
@@ -474,8 +721,47 @@ func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (Upd
 	return i, err
 }
 
+const updateRoleSetting = `-- name: UpdateRoleSetting :one
+UPDATE role_setting
+SET permissions = $1, candidate_scope = $2, job_candidates = $3,
+    updated_by = app_current_user(), version = version + 1, updated_at = now()
+WHERE role = $4 AND version = $5
+RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at
+`
+
+type UpdateRoleSettingParams struct {
+	Permissions    []string
+	CandidateScope string
+	JobCandidates  bool
+	Role           string
+	Version        int32
+}
+
+// Optimistic concurrency: no row returned = stale version.
+func (q *Queries) UpdateRoleSetting(ctx context.Context, arg UpdateRoleSettingParams) (RoleSetting, error) {
+	row := q.db.QueryRow(ctx, updateRoleSetting,
+		arg.Permissions,
+		arg.CandidateScope,
+		arg.JobCandidates,
+		arg.Role,
+		arg.Version,
+	)
+	var i RoleSetting
+	err := row.Scan(
+		&i.TenantID,
+		&i.Role,
+		&i.Permissions,
+		&i.CandidateScope,
+		&i.JobCandidates,
+		&i.Version,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const userAuth = `-- name: UserAuth :one
-SELECT id, tenant_id, email, name, role, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = $1
+SELECT id, tenant_id, email, name, role, team_id, active, invited, password_hash, tokens_valid_after FROM app_user WHERE id = $1
 `
 
 type UserAuthRow struct {
@@ -484,6 +770,7 @@ type UserAuthRow struct {
 	Email            string
 	Name             string
 	Role             string
+	TeamID           *string
 	Active           bool
 	Invited          bool
 	PasswordHash     *string
@@ -499,6 +786,7 @@ func (q *Queries) UserAuth(ctx context.Context, id string) (UserAuthRow, error) 
 		&i.Email,
 		&i.Name,
 		&i.Role,
+		&i.TeamID,
 		&i.Active,
 		&i.Invited,
 		&i.PasswordHash,

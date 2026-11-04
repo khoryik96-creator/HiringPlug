@@ -101,11 +101,40 @@ details get their own permissions.
 | `matching:create` (ask for fit scores; uses the AI allowance) | ✓ | ✓ | ✓ | ✓ | | |
 | `privacy:read`, `privacy:record` (a candidate's consent and data protection requests; record them) | ✓ | ✓ | ✓ | ✓ | | |
 | `privacy:manage` (the Data protection page, decide requests, download a copy of a candidate's data) | ✓ | ✓ | | | | |
+| `identity.roles:manage` (Roles and access: what each role may do and which candidates it sees) | ✓ | | | | | |
 
 
-Coming later: **custom roles** per company (an admin screen to pick
-permissions), **data scope** (own / team / all candidates, important for agency
-ownership), single sign-on, and a "who viewed salary" log.
+The table above is the default. **Each company can change it** on the
+**Roles and access** page (owners only):
+
+- **What each role may do**: tick or untick any permission for admins,
+  recruiters, sourcers, hiring managers and viewers (sensitive ones are
+  marked). The owner role is fixed (every permission, all candidates), so a
+  company can never lock itself out, and only owners may change roles.
+- **Which candidates each role sees**: all candidates, their team's (people
+  can be put in teams on the Team page, e.g. desks), or their own; and
+  optionally also the candidates on jobs they (or their team) own.
+- Candidates and jobs have an **owner**: whoever added them, unless changed on
+  their page (applicants from the careers page belong to nobody until someone
+  takes them). Handing a candidate over is allowed even if the giver then no
+  longer sees them. The candidate list has a "Mine" filter.
+- Changes apply on each person's next click. API keys acting as a role get
+  the company's permissions for it (and all candidates: a key owns none).
+  Who may interview follows the company's settings too.
+
+**A candidate out of someone's scope is hidden everywhere**, enforced by the
+database: the API puts the scope in every transaction (`app.scope_users`, the
+people whose candidates the user sees, empty for all; `app.scope_jobs`), and
+restrictive row-level security policies on the candidate and on every table
+about them (salary, history, CVs, notes, emails, applications and their stage
+history, interviews and feedback, offers, placements, fit scores, assistant
+answers, consent, requests, and their audit entries) refuse their rows. Lists,
+pages, the job board, dashboards and reports therefore only ever count and
+show what the user may see. `TestOwnScopeHidesOtherPeoplesCandidatesEverywhere`
+checks it through the API and with raw SQL.
+
+Coming later: new named roles (beyond editing the six), single sign-on, and a
+"who viewed salary" log.
 
 ## Three layers of enforcement
 

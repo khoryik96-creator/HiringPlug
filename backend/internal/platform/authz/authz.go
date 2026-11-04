@@ -28,7 +28,8 @@ import (
 // SystemUserID is the actor recorded for changes made by background workers.
 const SystemUserID = "system"
 
-// Principal is who is acting, in which tenant, with which permissions.
+// Principal is who is acting, in which tenant, with which permissions, and
+// which candidates they see.
 type Principal struct {
 	TenantID string
 	UserID   string
@@ -36,6 +37,53 @@ type Principal struct {
 	Name     string
 	Role     api.Role
 	perms    map[api.Permission]bool
+	scope    Scope
+}
+
+// Scope is which candidates a principal sees: all of them (Users nil), or
+// those owned by Users, and with Jobs also those on jobs Users own. The
+// database enforces it (row-level security on every table about a
+// candidate).
+type Scope struct {
+	Users []string
+	Jobs  bool
+}
+
+// NewPrincipalWithAccess builds a user principal with the given permissions
+// and candidate scope: their company's own settings for their role.
+func NewPrincipalWithAccess(tenantID, userID, email, name string, role api.Role, perms []api.Permission, scope Scope) Principal {
+	p := Principal{TenantID: tenantID, UserID: userID, Email: email, Name: name, Role: role, perms: map[api.Permission]bool{}, scope: scope}
+	for _, perm := range perms {
+		if _, known := catalog().permissions[perm]; known {
+			p.perms[perm] = true
+		}
+	}
+	return p
+}
+
+// Scope returns which candidates the principal sees.
+func (p Principal) Scope() Scope { return p.scope }
+
+// ScopeUsersSetting is the form stored in the transaction setting
+// app.scope_users: "" for all candidates, else the users whose candidates
+// the principal sees. A limited scope with nobody in it sees no one's ("-"
+// names no user), never everyone's.
+func (p Principal) ScopeUsersSetting() string {
+	if p.scope.Users == nil {
+		return ""
+	}
+	if len(p.scope.Users) == 0 {
+		return "-"
+	}
+	return strings.Join(p.scope.Users, ",")
+}
+
+// ScopeJobsSetting is the form stored in app.scope_jobs.
+func (p Principal) ScopeJobsSetting() string {
+	if p.scope.Users != nil && p.scope.Jobs {
+		return "on"
+	}
+	return ""
 }
 
 // NewPrincipal builds a user principal with the permissions of their role.
@@ -95,9 +143,39 @@ func PermissionsForRole(role api.Role) []api.Permission {
 func IsSensitive(perm api.Permission) bool { return catalog().permissions[perm].Sensitive }
 
 type permissionInfo struct {
-	Module    string   `json:"module"`
-	Sensitive bool     `json:"sensitive"`
-	Roles     []string `json:"roles"`
+	Module      string   `json:"module"`
+	Description string   `json:"description"`
+	Sensitive   bool     `json:"sensitive"`
+	Roles       []string `json:"roles"`
+}
+
+// PermissionDetails is one permission as the contract declares it.
+type PermissionDetails struct {
+	Permission   api.Permission
+	Module       string
+	Description  string
+	Sensitive    bool
+	DefaultRoles []api.Role
+}
+
+// Catalog returns every permission the contract declares, by module and
+// name.
+func Catalog() []PermissionDetails {
+	out := make([]PermissionDetails, 0, len(catalog().permissions))
+	for perm, info := range catalog().permissions {
+		roles := make([]api.Role, len(info.Roles))
+		for i, r := range info.Roles {
+			roles[i] = api.Role(r)
+		}
+		out = append(out, PermissionDetails{Permission: perm, Module: info.Module, Description: info.Description, Sensitive: info.Sensitive, DefaultRoles: roles})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Module != out[j].Module {
+			return out[i].Module < out[j].Module
+		}
+		return out[i].Permission < out[j].Permission
+	})
+	return out
 }
 
 type permissionCatalog struct {

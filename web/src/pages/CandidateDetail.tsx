@@ -1,8 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Permission, unwrap } from "../api/client";
-import { candidateKey } from "../api/keys";
+import { api, ApiError, type Candidate, type Permission, unwrap } from "../api/client";
+import { candidateKey, candidatesKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
@@ -12,6 +12,7 @@ import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { History } from "../components/History";
+import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
@@ -30,12 +31,22 @@ function workAuthorization(c: Candidate): string {
  */
 export function CandidateDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
+  const queryClient = useQueryClient();
   const candidate = useQuery({
     queryKey: candidateKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}", { params: { path: { candidateId: id } } })),
   });
   const c = candidate.data;
-  if (!c) return candidate.error ? <ErrorMessage error={candidate.error} /> : <p className="muted">Loading…</p>;
+  if (!c) {
+    if (!candidate.error) return <p className="muted">Loading…</p>;
+    return (
+      <ErrorMessage error={candidate.error}>
+        {candidate.error instanceof ApiError && candidate.error.code === "NOT_FOUND" && (
+          <p className="muted">They may belong to someone else: your role may see only some candidates. <a href="#/candidates">Back to candidates</a></p>
+        )}
+      </ErrorMessage>
+    );
+  }
 
   return (
     <main>
@@ -52,7 +63,15 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           <button type="button" onClick={() => { setEditing(true); }}>Edit profile</button>
         )}
       </div>
-      <p className="muted">{[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}</p>
+      <p className="muted">
+        {[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}{" "}
+        <Owner what="candidate" ownerId={c.ownerId} ownerName={c.ownerName} canChange={permissions.includes("candidates:update")}
+          save={async (ownerId) => {
+            unwrap(await api.PUT("/v1/candidates/{candidateId}/owner", { params: { path: { candidateId: c.id } }, body: { ownerId } }));
+            await queryClient.invalidateQueries({ queryKey: candidatesKey });
+            await queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
+          }} />
+      </p>
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />

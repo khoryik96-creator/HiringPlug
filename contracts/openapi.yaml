@@ -132,6 +132,10 @@ x-error-codes:
     module: placements
     status: 422
     description: The placement cannot be recorded or changed like this (the application is closed or already has one, a fall-through after the guarantee ended, ...). The message says why.
+  ROLE_NOT_EDITABLE:
+    module: identity
+    status: 422
+    description: The owner role always has every permission and sees all candidates; it cannot be changed.
   ROUTE_NOT_FOUND:
     module: shared
     status: 404
@@ -246,6 +250,10 @@ paths:
           in: query
           description: Only candidates with this skill (ignoring case).
           schema: {type: string, minLength: 1, maxLength: 60}
+        - name: owner
+          in: query
+          description: Only candidates owned by this user ("me" for your own).
+          schema: {type: string, minLength: 1, maxLength: 40}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -440,6 +448,28 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/{candidateId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    put:
+      operationId: setCandidateOwner
+      tags: [candidates]
+      summary: Give the candidate to another recruiter (or to nobody)
+      description: >
+        Roles that see only their own (or their team's) candidates may no longer see a candidate they hand over; nothing else changes.
+
+      x-permission: candidates:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OwnerInput'}
+      responses:
+        '204': {description: Changed}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/public/careers/{slug}:
     parameters:
       - $ref: '#/components/parameters/CareersSlugPath'
@@ -1346,6 +1376,125 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/TeamChangeNotAllowed'}
+  /v1/access:
+    get:
+      operationId: getAccessSettings
+      tags: [identity]
+      summary: What each role may do and which candidates it sees, with every permission there is
+      x-permission: identity.roles:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccessSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/access/roles/{role}:
+    parameters:
+      - {name: role, in: path, required: true, schema: {$ref: '#/components/schemas/Role'}}
+    put:
+      operationId: setRoleAccess
+      tags: [identity]
+      summary: Choose a role's permissions and which candidates it sees (not the owner's)
+      description: Takes effect on each user's next request. version is 0 while the role has the defaults.
+      x-permission: identity.roles:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RoleAccessInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoleAccess'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/RoleNotEditable'}
+    delete:
+      operationId: resetRoleAccess
+      tags: [identity]
+      summary: Give a role its default permissions back (and all candidates)
+      x-permission: identity.roles:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RoleAccess'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/RoleNotEditable'}
+  /v1/teams:
+    get:
+      operationId: listTeams
+      tags: [identity]
+      summary: The company's teams (groups of users, e.g. desks), with how many people are in each
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamGroupList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+    post:
+      operationId: createTeam
+      tags: [identity]
+      summary: Add a team
+      x-permission: identity.team:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TeamGroupInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamGroup'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/teams/{teamId}:
+    parameters:
+      - {name: teamId, in: path, required: true, schema: {$ref: '#/components/schemas/TeamGroupId'}}
+    patch:
+      operationId: renameTeam
+      tags: [identity]
+      summary: Rename a team
+      x-permission: identity.team:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TeamGroupUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamGroup'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteTeam
+      tags: [identity]
+      summary: Remove a team; its people stay, in no team
+      x-permission: identity.team:manage
+      responses:
+        '204': {description: Removed}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/api-keys:
     get:
       operationId: listApiKeys
@@ -1841,6 +1990,25 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/jobs/{jobId}/owner:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    put:
+      operationId: setJobOwner
+      tags: [jobs]
+      summary: Give the job to another recruiter (or to nobody)
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OwnerInput'}
+      responses:
+        '204': {description: Changed}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/lead-sources:
     get:
       operationId: listLeadSources
@@ -2650,6 +2818,11 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    RoleNotEditable:
+      description: The owner role cannot be changed (ROLE_NOT_EDITABLE).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     SignInFailed:
       description: Wrong email or password (SIGN_IN_FAILED).
       content:
@@ -2733,6 +2906,7 @@ components:
         - emails.templates:manage
         - emails:read
         - emails:send
+        - identity.roles:manage
         - identity.team:manage
         - integrations:manage
         - interviews:feedback
@@ -2795,6 +2969,7 @@ components:
         - OFFER_NOT_ALLOWED
         - PAYLOAD_TOO_LARGE
         - PLACEMENT_NOT_ALLOWED
+        - ROLE_NOT_EDITABLE
         - ROUTE_NOT_FOUND
         - SERVICE_UNAVAILABLE
         - SIGN_IN_CHOOSE_COMPANY
@@ -2955,6 +3130,15 @@ components:
         model: {type: string, nullable: true}
         inputTokens: {type: integer, minimum: 0}
         outputTokens: {type: integer, minimum: 0}
+    OwnerInput:
+      type: object
+      additionalProperties: false
+      required: [ownerId]
+      properties:
+        ownerId:
+          description: A user of the company, or null for nobody.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
     CandidateId:
       type: string
       pattern: '^cand_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3106,10 +3290,17 @@ components:
         - currentCompany
         - location
         - source
+        - ownerId
+        - ownerName
         - restrictedFields
         - createdAt
         - updatedAt
       properties:
+        ownerId:
+          description: The recruiter the candidate belongs to; null for none (e.g. applied on the careers page).
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        ownerName: {type: string, nullable: true}
         experience:
           type: array
           description: Work history, newest first.
@@ -3962,6 +4153,90 @@ components:
       required: [emailId]
       properties:
         emailId: {$ref: '#/components/schemas/EmailId'}
+    CandidateScope:
+      type: string
+      description: all = every candidate; team = those owned by the user's team (their own without a team); own = their own.
+      enum: [all, team, own]
+    RoleAccess:
+      type: object
+      required: [role, permissions, candidateScope, jobCandidates, custom, editable, version]
+      properties:
+        role: {$ref: '#/components/schemas/Role'}
+        permissions:
+          type: array
+          items: {$ref: '#/components/schemas/Permission'}
+        candidateScope: {$ref: '#/components/schemas/CandidateScope'}
+        jobCandidates:
+          type: boolean
+          description: With team or own, also the candidates on jobs the user (or their team) owns.
+        custom: {type: boolean, description: The company changed this role from the defaults.}
+        editable: {type: boolean, description: "False for the owner, who always has every permission and sees all candidates."}
+        version: {type: integer, minimum: 0, description: 0 while the role has the defaults.}
+    RoleAccessInput:
+      type: object
+      additionalProperties: false
+      required: [version, permissions, candidateScope, jobCandidates]
+      properties:
+        version: {type: integer, minimum: 0}
+        permissions:
+          type: array
+          maxItems: 500
+          items: {$ref: '#/components/schemas/Permission'}
+        candidateScope: {$ref: '#/components/schemas/CandidateScope'}
+        jobCandidates: {type: boolean}
+    PermissionInfo:
+      type: object
+      required: [permission, module, description, sensitive, defaultRoles]
+      properties:
+        permission: {$ref: '#/components/schemas/Permission'}
+        module: {type: string}
+        description: {type: string}
+        sensitive: {type: boolean, description: "Guards sensitive data such as salary."}
+        defaultRoles:
+          type: array
+          items: {$ref: '#/components/schemas/Role'}
+    AccessSettings:
+      type: object
+      required: [roles, permissions]
+      properties:
+        roles:
+          type: array
+          items: {$ref: '#/components/schemas/RoleAccess'}
+        permissions:
+          type: array
+          items: {$ref: '#/components/schemas/PermissionInfo'}
+    TeamGroupId:
+      type: string
+      pattern: '^team_[0-9a-hjkmnp-tv-z]{26}$'
+      example: team_01jbz6w0m0k8q9x2r3s4t5v6w7
+    TeamGroup:
+      type: object
+      required: [id, version, name, memberCount]
+      properties:
+        id: {$ref: '#/components/schemas/TeamGroupId'}
+        version: {type: integer, minimum: 1}
+        name: {type: string}
+        memberCount: {type: integer, minimum: 0}
+    TeamGroupList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/TeamGroup'}
+    TeamGroupInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+    TeamGroupUpdate:
+      type: object
+      additionalProperties: false
+      required: [version, name]
+      properties:
+        version: {type: integer, minimum: 1}
+        name: {type: string, minLength: 1, maxLength: 100}
     UserList:
       type: object
       required: [items]
@@ -4051,12 +4326,15 @@ components:
       enum: [invited, active, deactivated]
     TeamMember:
       type: object
-      required: [id, name, email, role, status, lastSignInAt, createdAt]
+      required: [id, name, email, role, teamId, status, lastSignInAt, createdAt]
       properties:
         id: {$ref: '#/components/schemas/UserId'}
         name: {type: string}
         email: {type: string}
         role: {$ref: '#/components/schemas/Role'}
+        teamId:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
         status: {$ref: '#/components/schemas/TeamStatus'}
         lastSignInAt: {type: string, format: date-time, nullable: true}
         createdAt: {type: string, format: date-time}
@@ -4089,6 +4367,10 @@ components:
       properties:
         role: {$ref: '#/components/schemas/Role'}
         active: {type: boolean}
+        teamId:
+          description: The team they are in; null for none.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
     ApiKeyId:
       type: string
       pattern: '^akey_[0-9a-hjkmnp-tv-z]{26}$'
@@ -4472,8 +4754,13 @@ components:
           nullable: true
     JobOrder:
       type: object
-      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, workType, workArrangement, openings, description, restrictedFields, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, workType, workArrangement, openings, description, ownerId, ownerName, restrictedFields, createdAt, updatedAt]
       properties:
+        ownerId:
+          description: The recruiter the job belongs to (who added it, unless changed).
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UserId'}]
+        ownerName: {type: string, nullable: true}
         id: {$ref: '#/components/schemas/JobOrderId'}
         version: {type: integer}
         companyId: {$ref: '#/components/schemas/CompanyId'}
@@ -5654,9 +5941,14 @@ x-permissions:
     description: Send email from the app.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  identity.roles:manage:
+    module: identity
+    description: Choose what each role may do and which candidates it sees (Roles and access). Only owners have it.
+    sensitive: false
+    roles: [owner]
   identity.team:manage:
     module: identity
-    description: Invite people, change roles, deactivate and reactivate users.
+    description: Invite people, change roles, deactivate and reactivate users, and put them in teams.
     sensitive: false
     roles: [owner, admin]
   integrations:manage:

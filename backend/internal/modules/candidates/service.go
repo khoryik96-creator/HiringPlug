@@ -25,6 +25,7 @@ const emailUniqueIndex = "candidate_tenant_email_uq"
 type Service struct {
 	pool        *pgxpool.Pool
 	phoneRegion string
+	users       Users
 	movers      []RecordMover
 }
 
@@ -40,7 +41,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 		if err := checkEmailFree(ctx, q, profile.Email, ""); err != nil {
 			return err
 		}
-		row, err := q.InsertCandidate(ctx, insertParams(profile))
+		row, err := q.InsertCandidate(ctx, insertParams(profile, ownerFor(p)))
 		if database.IsUniqueViolation(err, emailUniqueIndex) {
 			return duplicateEmail("")
 		}
@@ -53,7 +54,8 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 			return err
 		}
 		view = View{Candidate: fromRow(row), CompensationRestricted: !canSeeSalary(p)}
-		return nil
+		view.OwnerName, err = ownerName(ctx, tx, s.users, view.OwnerID)
+		return err
 	})
 	return view, err
 }
@@ -70,7 +72,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 		if err != nil {
 			return err
 		}
-		view, err = loadView(ctx, q, p, fromRow(row))
+		view, err = loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
 	})
 	return view, err
@@ -99,6 +101,7 @@ type Page struct {
 // Filter narrows a list: text, tag and skill (each optional).
 type Filter struct {
 	Query, Tag, Skill *string
+	Owner             *string // a user id
 }
 
 // List returns up to limit candidates matching f, starting after cursor (the
@@ -107,7 +110,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -169,7 +172,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		}); err != nil {
 			return err
 		}
-		view, err = loadView(ctx, q, p, fromRow(updated))
+		view, err = loadView(ctx, tx, s.users, p, fromRow(updated))
 		return err
 	})
 	return view, err
@@ -245,12 +248,16 @@ func canSeeSalary(p authz.Principal) bool {
 // rather than "none recorded".
 // loadView reads what the candidate page shows besides the profile: work
 // history, education and (if the user may see it) salary.
-func loadView(ctx context.Context, q *store.Queries, p authz.Principal, c Candidate) (View, error) {
+func loadView(ctx context.Context, tx pgx.Tx, users Users, p authz.Principal, c Candidate) (View, error) {
+	q := store.New(tx)
 	history, err := loadHistory(ctx, q, c.ID)
 	if err != nil {
 		return View{}, err
 	}
 	view := View{Candidate: c, History: history}
+	if view.OwnerName, err = ownerName(ctx, tx, users, c.OwnerID); err != nil {
+		return View{}, err
+	}
 	if !canSeeSalary(p) {
 		view.CompensationRestricted = true
 		return view, nil
@@ -308,10 +315,12 @@ func fromRow(r store.Candidate) Candidate {
 	if r.NoticePeriodValue != nil && r.NoticePeriodUnit != nil {
 		p.NoticePeriod = &NoticePeriod{Value: int(*r.NoticePeriodValue), Unit: *r.NoticePeriodUnit}
 	}
-	return Candidate{ID: r.ID, Version: int(r.Version), Profile: p, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
+	return Candidate{ID: r.ID, Version: int(r.Version), Profile: p, OwnerID: r.OwnerID, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
-func insertParams(p Profile) store.InsertCandidateParams {
+// insertParams are a new candidate's columns; owner is who they belong to
+// (nil for none).
+func insertParams(p Profile, owner *string) store.InsertCandidateParams {
 	u := updateParams("", 0, p)
 	return store.InsertCandidateParams{
 		FirstName: u.FirstName, LastName: u.LastName, Email: u.Email, Phone: u.Phone, Nationality: u.Nationality,
@@ -319,7 +328,7 @@ func insertParams(p Profile) store.InsertCandidateParams {
 		WorkAuthorizationNote: u.WorkAuthorizationNote, NoticePeriodValue: u.NoticePeriodValue,
 		NoticePeriodUnit: u.NoticePeriodUnit, Industry: u.Industry, Specialization: u.Specialization,
 		CurrentTitle: u.CurrentTitle, CurrentCompany: u.CurrentCompany, Location: u.Location, Source: u.Source,
-		Tags: u.Tags, Skills: u.Skills,
+		Tags: u.Tags, Skills: u.Skills, OwnerID: owner,
 	}
 }
 

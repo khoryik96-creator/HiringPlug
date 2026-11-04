@@ -110,9 +110,10 @@ func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p 
 	return Invitation{Member: member, Link: link, ExpiresAt: expires, Emailed: true}, nil
 }
 
-// UpdateMember changes someone's role, or deactivates or reactivates them,
-// by the team rules (ChangeProblem). Deactivating signs them out.
-func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool) (TeamMember, error) {
+// UpdateMember changes someone's role or team, or deactivates or reactivates
+// them, by the team rules (ChangeProblem). Deactivating signs them out. team
+// is nil to keep their team; a nil *string inside it means no team.
+func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID string, role *string, active *bool, team **string) (TeamMember, error) {
 	var out TeamMember
 	err := database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
@@ -141,13 +142,27 @@ func (m *Module) UpdateMember(ctx context.Context, p authz.Principal, userID str
 		if problem := ChangeProblem(actor, Member{ID: row.ID, Role: row.Role, Active: row.Active}, newRole, newActive, int(owners)); problem != "" {
 			return teamProblem(problem)
 		}
-		updated, err := q.UpdateMember(ctx, store.UpdateMemberParams{ID: userID, Role: newRole, Active: newActive})
+		newTeam := row.TeamID
+		if team != nil {
+			newTeam = *team
+			if newTeam != nil {
+				if _, err := q.GetTeamGroup(ctx, *newTeam); database.IsNoRows(err) {
+					var errs apperr.FieldErrors
+					errs.Add("teamId", "no such team")
+					return errs.Err()
+				} else if err != nil {
+					return err
+				}
+			}
+		}
+		updated, err := q.UpdateMember(ctx, store.UpdateMemberParams{ID: userID, Role: newRole, Active: newActive, TeamID: newTeam})
 		if err != nil {
 			return err
 		}
 		out = TeamMember(updated)
 		return audit.Record(ctx, tx, audit.Entry{Action: "user.updated", EntityType: "user", EntityID: userID,
-			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active}, map[string]any{"role": newRole, "active": newActive})})
+			Changes: audit.Diff(map[string]any{"role": row.Role, "active": row.Active, "teamId": deref(row.TeamID)},
+				map[string]any{"role": newRole, "active": newActive, "teamId": deref(newTeam)})})
 	})
 	return out, err
 }

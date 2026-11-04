@@ -33,6 +33,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | API keys and signed webhooks for your other systems |
 | ✅ | Hiring leads from public job boards, careers pages and saved ads |
 | ✅ | An AI sidebar and CV vs job fit scores with quoted reasons (off until an AI provider is set up) |
+| ✅ | Roles and access: each company chooses what each role may do and which candidates it sees (all, team, own, plus those on its jobs), with teams and owners on candidates and jobs, enforced by the database |
 | ✅ | Data protection (PDPA): consent on every candidate, requests with their 21-day due dates, a Data protection page, a copy of a candidate's data; nothing is deleted automatically and records are kept until you decide |
 | ✅ | Sign-in with passwords, invitations, password resets and a Team page |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
@@ -103,8 +104,9 @@ job. Today the app has candidates but nothing to place them into.
 ### Phase 7: cloud and selling it ⬜
 
 Cloud hosting (file storage, managed database, backups with restore drills),
-single sign-on, alerts and tracing, company sign-up and billing for SaaS,
-custom roles and "own / team / all" data scope per recruiter.
+single sign-on, alerts and tracing, company sign-up and billing for SaaS.
+✅ Done early: each company's own role permissions and "own / team / all"
+candidate scope (Roles and access).
 
 ## Older milestone names
 

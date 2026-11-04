@@ -16,7 +16,7 @@ const job: JobOrder = {
   contactId: null, contactName: null, title: "Senior Auditor", status: "open", location: "Kuala Lumpur",
   workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.",
   salary: { version: 1, range: { min: "9000.00", max: "12000.00", currency: "MYR", period: "month" }, updatedAt: "2026-11-01T00:00:00Z" },
-  restrictedFields: [], createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
+  restrictedFields: [], ownerId: null, ownerName: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 
 const change = (label: string, value: string) => {

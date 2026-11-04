@@ -20,7 +20,7 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 5 | Email with templates | `emails` | ✅ sending; inbox sync 🧩 4.3 |
 | 5 | Notes: screening, call and interview notes | `notes` | ✅ |
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
-| 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles; custom roles 🧩 M2 |
+| 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles, each company's own permissions and candidate scope per role, teams, owners |
 
 ## 3. Candidates
 
@@ -500,8 +500,13 @@ Roles have permissions per area: **view** (`:read`), **write** (`:create`),
 contract. ✅ People sign in with email and password; owners and admins invite
 them, change roles and deactivate them on the **Team** page; "Forgot your
 password?" emails a reset link; everyone changes their password under their
-name. Later: custom roles per company, single sign-on, and a "who viewed
-salary" log. Details: [access-control.md](access-control.md).
+name. ✅ **Roles and access** (owners): each company chooses what each role may
+do and which candidates it sees (all, its team's or its own, plus those on
+the jobs it owns); teams of people on the Team page; an owner on every
+candidate and job, changeable on their pages; a "Mine" filter on the candidate
+list. A candidate someone may not see is hidden from them everywhere, by the
+database. Later: new named roles, single sign-on, and a "who viewed salary"
+log. Details: [access-control.md](access-control.md).
 
 ## Agency and in-house, own team and SaaS
 

@@ -41,7 +41,7 @@ func (m *Module) FindOrCreateApplicant(ctx context.Context, tx pgx.Tx, a Applica
 	if !database.IsNoRows(err) {
 		return "", false, err
 	}
-	row, err := q.InsertCandidate(ctx, insertParams(profile))
+	row, err := q.InsertCandidate(ctx, insertParams(profile, nil)) // applied: nobody's until someone takes them
 	if err != nil {
 		return "", false, err
 	}

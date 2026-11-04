@@ -115,7 +115,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -147,6 +147,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.UpdatedAt,
 		&i.Tags,
 		&i.Skills,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -183,14 +184,15 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, created_by
+  current_title, current_company, location, source, tags, skills, owner_id, created_by
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5,
   $6, $7, $8,
   $9, $10, $11, $12,
-  $13, $14, $15, $16, $17, $18, app_current_user()
+  $13, $14, $15, $16, $17, $18,
+  $19, app_current_user()
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id
 `
 
 type InsertCandidateParams struct {
@@ -212,6 +214,7 @@ type InsertCandidateParams struct {
 	Source                 *string
 	Tags                   []string
 	Skills                 []string
+	OwnerID                *string
 }
 
 // Queries owned by the candidates module. Run inside a tenant-scoped
@@ -236,6 +239,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		arg.Source,
 		arg.Tags,
 		arg.Skills,
+		arg.OwnerID,
 	)
 	var i Candidate
 	err := row.Scan(
@@ -264,6 +268,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.UpdatedAt,
 		&i.Tags,
 		&i.Skills,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -385,8 +390,9 @@ WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR search_text LIKE '%' || app_normalize_text($2::text) || '%')
   AND ($3::text IS NULL OR app_lower_array(tags) @> ARRAY[lower($3::text)])
   AND ($4::text IS NULL OR app_lower_array(skills) @> ARRAY[lower($4::text)])
+  AND ($5::text IS NULL OR owner_id = $5::text)
 ORDER BY id DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListCandidatesParams struct {
@@ -394,6 +400,7 @@ type ListCandidatesParams struct {
 	Query    *string
 	Tag      *string
 	Skill    *string
+	Owner    *string
 	RowLimit int32
 }
 
@@ -418,6 +425,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 		arg.Query,
 		arg.Tag,
 		arg.Skill,
+		arg.Owner,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -569,6 +577,24 @@ func (q *Queries) MoveWorkIfNone(ctx context.Context, arg MoveWorkIfNoneParams) 
 	return err
 }
 
+const setCandidateOwner = `-- name: SetCandidateOwner :one
+SELECT app_set_candidate_owner($1::text, $2::text)::boolean AS changed
+`
+
+type SetCandidateOwnerParams struct {
+	ID      string
+	OwnerID *string
+}
+
+// Through a database function: whoever hands a candidate over may no longer
+// see them, which a plain UPDATE would be refused for (row-level security).
+func (q *Queries) SetCandidateOwner(ctx context.Context, arg SetCandidateOwnerParams) (bool, error) {
+	row := q.db.QueryRow(ctx, setCandidateOwner, arg.ID, arg.OwnerID)
+	var changed bool
+	err := row.Scan(&changed)
+	return changed, err
+}
+
 const similarCandidates = `-- name: SimilarCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company, location, work_authorization, updated_at,
        (phone IS NOT NULL AND phone = $1::text)::boolean AS same_phone,
@@ -640,7 +666,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id
 `
 
 type TouchCandidateParams struct {
@@ -679,6 +705,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.UpdatedAt,
 		&i.Tags,
 		&i.Skills,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -706,7 +733,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $19 AND version = $20
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id
 `
 
 type UpdateCandidateParams struct {
@@ -784,6 +811,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.UpdatedAt,
 		&i.Tags,
 		&i.Skills,
+		&i.OwnerID,
 	)
 	return i, err
 }

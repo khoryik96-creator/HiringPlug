@@ -12,6 +12,7 @@ export function testCandidate(overrides: Partial<Candidate> = {}): Candidate {
     email: "siti@example.com", phone: null, nationality: "MY", workAuthorization: null,
     noticePeriod: { value: 1, unit: "month" }, industry: null, specialization: null, currentTitle: "Accountant",
     currentCompany: null, location: null, source: "jobstreet", tags: [], skills: [], experience: [], education: [], restrictedFields: [],
+    ownerId: null, ownerName: null,
     createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
     ...overrides,
   };

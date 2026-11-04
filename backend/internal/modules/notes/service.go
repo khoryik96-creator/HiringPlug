@@ -60,6 +60,10 @@ func (s *Service) List(ctx context.Context, p authz.Principal, subjectType, subj
 	var out []Note
 	var hidden int32
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		// A record the user may not see has no notes for them (and no count of hidden ones).
+		if err := s.requireSubject(ctx, tx, subjectType, subjectID); err != nil {
+			return err
+		}
 		q := store.New(tx)
 		rows, err := q.ListNotes(ctx, store.ListNotesParams{SubjectType: subjectType, SubjectID: subjectID})
 		if err != nil {

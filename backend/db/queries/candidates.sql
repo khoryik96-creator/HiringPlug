@@ -6,12 +6,13 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, created_by
+  current_title, current_company, location, source, tags, skills, owner_id, created_by
 ) VALUES (
   app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality),
   sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
   sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
-  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills, app_current_user()
+  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills,
+  sqlc.narg(owner_id), app_current_user()
 )
 RETURNING *;
 
@@ -60,6 +61,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
+  AND (sqlc.narg(owner)::text IS NULL OR owner_id = sqlc.narg(owner)::text)
 ORDER BY id DESC
 LIMIT @row_limit;
 
@@ -179,3 +181,8 @@ WHERE m.candidate_id = sqlc.arg(from_id)::text
 -- How many candidates the company has (the data protection dashboard).
 -- name: CountCandidates :one
 SELECT count(*)::integer FROM candidate;
+
+-- Through a database function: whoever hands a candidate over may no longer
+-- see them, which a plain UPDATE would be refused for (row-level security).
+-- name: SetCandidateOwner :one
+SELECT app_set_candidate_owner(@id::text, sqlc.narg(owner_id)::text)::boolean AS changed;

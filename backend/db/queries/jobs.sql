@@ -5,10 +5,10 @@
 -- name: InsertJobOrder :one
 INSERT INTO job_order (
   tenant_id, company_id, contact_id, title, status, location, work_type, work_arrangement,
-  openings, description, created_by
+  openings, description, owner_id, created_by
 ) VALUES (
   app_current_tenant(), @company_id, sqlc.narg(contact_id), @title, @status, sqlc.narg(location),
-  sqlc.narg(work_type), sqlc.narg(work_arrangement), @openings, sqlc.narg(description), app_current_user()
+  sqlc.narg(work_type), sqlc.narg(work_arrangement), @openings, sqlc.narg(description), sqlc.narg(owner_id), app_current_user()
 )
 RETURNING *;
 
@@ -127,3 +127,6 @@ ORDER BY published_at DESC LIMIT 200;
 -- name: GetPublishedAd :one
 SELECT * FROM job_ad
 WHERE id = @id AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date);
+
+-- name: SetJobOwner :execrows
+UPDATE job_order SET owner_id = sqlc.narg(owner_id), version = version + 1, updated_at = now() WHERE id = @id;

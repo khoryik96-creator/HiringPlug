@@ -25,7 +25,12 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill}, req.Params.Cursor, limit)
+	p := authz.MustFromContext(ctx)
+	owner := req.Params.Owner
+	if owner != nil && *owner == "me" {
+		owner = &p.UserID
+	}
+	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +171,8 @@ func candidateToAPI(v View) api.Candidate {
 		Tags:              nonNil(p.Tags),
 		Skills:            nonNil(p.Skills),
 		RestrictedFields:  []api.RestrictedField{},
+		OwnerId:           orNull(v.OwnerID),
+		OwnerName:         orNull(v.OwnerName),
 		CreatedAt:         v.CreatedAt,
 		UpdatedAt:         v.UpdatedAt,
 	}
@@ -288,3 +295,16 @@ func deref[T any](p *T) T {
 }
 
 func identity[T any](v T) T { return v }
+
+// SetCandidateOwner handles PUT /v1/candidates/{candidateId}/owner.
+func (h *HTTP) SetCandidateOwner(ctx context.Context, req api.SetCandidateOwnerRequestObject) (api.SetCandidateOwnerResponseObject, error) {
+	owner, _ := req.Body.OwnerId.Get()
+	var ownerID *string
+	if req.Body.OwnerId.IsSpecified() && !req.Body.OwnerId.IsNull() {
+		ownerID = &owner
+	}
+	if err := h.svc.SetOwner(ctx, authz.MustFromContext(ctx), req.CandidateId, ownerID); err != nil {
+		return nil, err
+	}
+	return api.SetCandidateOwner204Response{}, nil
+}

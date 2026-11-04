@@ -73,7 +73,7 @@ func (q *Queries) GetJobAd(ctx context.Context, id string) (JobAd, error) {
 }
 
 const getJobOrder = `-- name: GetJobOrder :one
-SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at FROM job_order WHERE id = $1
+SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id FROM job_order WHERE id = $1
 `
 
 func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) {
@@ -96,6 +96,7 @@ func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -215,12 +216,12 @@ const insertJobOrder = `-- name: InsertJobOrder :one
 
 INSERT INTO job_order (
   tenant_id, company_id, contact_id, title, status, location, work_type, work_arrangement,
-  openings, description, created_by
+  openings, description, owner_id, created_by
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5,
-  $6, $7, $8, $9, app_current_user()
+  $6, $7, $8, $9, $10, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id
 `
 
 type InsertJobOrderParams struct {
@@ -233,6 +234,7 @@ type InsertJobOrderParams struct {
 	WorkArrangement *string
 	Openings        int32
 	Description     *string
+	OwnerID         *string
 }
 
 // Queries owned by the jobs module. Run inside a tenant-scoped transaction:
@@ -249,6 +251,7 @@ func (q *Queries) InsertJobOrder(ctx context.Context, arg InsertJobOrderParams) 
 		arg.WorkArrangement,
 		arg.Openings,
 		arg.Description,
+		arg.OwnerID,
 	)
 	var i JobOrder
 	err := row.Scan(
@@ -268,6 +271,7 @@ func (q *Queries) InsertJobOrder(ctx context.Context, arg InsertJobOrderParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }
@@ -547,6 +551,23 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 	return items, nil
 }
 
+const setJobOwner = `-- name: SetJobOwner :execrows
+UPDATE job_order SET owner_id = $1, version = version + 1, updated_at = now() WHERE id = $2
+`
+
+type SetJobOwnerParams struct {
+	OwnerID *string
+	ID      string
+}
+
+func (q *Queries) SetJobOwner(ctx context.Context, arg SetJobOwnerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setJobOwner, arg.OwnerID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateJobAd = `-- name: UpdateJobAd :one
 UPDATE job_ad SET
   title = $1,
@@ -629,7 +650,7 @@ UPDATE job_order SET
   version = version + 1,
   updated_at = now()
 WHERE id = $10 AND version = $11
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id
 `
 
 type UpdateJobOrderParams struct {
@@ -679,6 +700,7 @@ func (q *Queries) UpdateJobOrder(ctx context.Context, arg UpdateJobOrderParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwnerID,
 	)
 	return i, err
 }

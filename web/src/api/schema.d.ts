@@ -191,6 +191,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Give the candidate to another recruiter (or to nobody)
+         * @description Roles that see only their own (or their team's) candidates may no longer see a candidate they hand over; nothing else changes.
+         */
+        put: operations["setCandidateOwner"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/careers/{slug}": {
         parameters: {
             query?: never;
@@ -863,6 +885,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What each role may do and which candidates it sees, with every permission there is */
+        get: operations["getAccessSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/access/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose a role's permissions and which candidates it sees (not the owner's)
+         * @description Takes effect on each user's next request. version is 0 while the role has the defaults.
+         */
+        put: operations["setRoleAccess"];
+        post?: never;
+        /** Give a role its default permissions back (and all candidates) */
+        delete: operations["resetRoleAccess"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's teams (groups of users, e.g. desks), with how many people are in each */
+        get: operations["listTeams"];
+        put?: never;
+        /** Add a team */
+        post: operations["createTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/teams/{teamId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: components["schemas"]["TeamGroupId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a team; its people stay, in no team */
+        delete: operations["deleteTeam"];
+        options?: never;
+        head?: never;
+        /** Rename a team */
+        patch: operations["renameTeam"];
+        trace?: never;
+    };
     "/v1/api-keys": {
         parameters: {
             query?: never;
@@ -1164,6 +1264,25 @@ export interface paths {
          * @description Replaces the budget; send `range: null` to clear it. Send `expectedVersion: 0` the first time, then the `version` you loaded.
          */
         put: operations["putJobSalary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Give the job to another recruiter (or to nobody) */
+        put: operations["setJobOwner"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1758,9 +1877,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
@@ -1878,6 +1997,10 @@ export interface components {
             inputTokens: number;
             outputTokens: number;
         };
+        OwnerInput: {
+            /** @description A user of the company, or null for nobody. */
+            ownerId: components["schemas"]["UserId"] | null;
+        };
         /** @example cand_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CandidateId: string;
         /**
@@ -1958,6 +2081,9 @@ export interface components {
             education: components["schemas"]["EducationEntry"][];
         };
         Candidate: {
+            /** @description The recruiter the candidate belongs to; null for none (e.g. applied on the careers page). */
+            ownerId: components["schemas"]["UserId"] | null;
+            ownerName: string | null;
             /** @description Work history, newest first. */
             experience: components["schemas"]["WorkEntry"][];
             education: components["schemas"]["EducationEntry"][];
@@ -2542,6 +2668,60 @@ export interface components {
         EmailSendJob: {
             emailId: components["schemas"]["EmailId"];
         };
+        /**
+         * @description all = every candidate; team = those owned by the user's team (their own without a team); own = their own.
+         * @enum {string}
+         */
+        CandidateScope: "all" | "team" | "own";
+        RoleAccess: {
+            role: components["schemas"]["Role"];
+            permissions: components["schemas"]["Permission"][];
+            candidateScope: components["schemas"]["CandidateScope"];
+            /** @description With team or own, also the candidates on jobs the user (or their team) owns. */
+            jobCandidates: boolean;
+            /** @description The company changed this role from the defaults. */
+            custom: boolean;
+            /** @description False for the owner, who always has every permission and sees all candidates. */
+            editable: boolean;
+            /** @description 0 while the role has the defaults. */
+            version: number;
+        };
+        RoleAccessInput: {
+            version: number;
+            permissions: components["schemas"]["Permission"][];
+            candidateScope: components["schemas"]["CandidateScope"];
+            jobCandidates: boolean;
+        };
+        PermissionInfo: {
+            permission: components["schemas"]["Permission"];
+            module: string;
+            description: string;
+            /** @description Guards sensitive data such as salary. */
+            sensitive: boolean;
+            defaultRoles: components["schemas"]["Role"][];
+        };
+        AccessSettings: {
+            roles: components["schemas"]["RoleAccess"][];
+            permissions: components["schemas"]["PermissionInfo"][];
+        };
+        /** @example team_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        TeamGroupId: string;
+        TeamGroup: {
+            id: components["schemas"]["TeamGroupId"];
+            version: number;
+            name: string;
+            memberCount: number;
+        };
+        TeamGroupList: {
+            items: components["schemas"]["TeamGroup"][];
+        };
+        TeamGroupInput: {
+            name: string;
+        };
+        TeamGroupUpdate: {
+            version: number;
+            name: string;
+        };
         UserList: {
             items: components["schemas"]["UserSummary"][];
         };
@@ -2614,6 +2794,7 @@ export interface components {
             name: string;
             email: string;
             role: components["schemas"]["Role"];
+            teamId: components["schemas"]["TeamGroupId"] | null;
             status: components["schemas"]["TeamStatus"];
             /** Format: date-time */
             lastSignInAt: string | null;
@@ -2641,6 +2822,8 @@ export interface components {
         TeamMemberUpdate: {
             role?: components["schemas"]["Role"];
             active?: boolean;
+            /** @description The team they are in; null for none. */
+            teamId?: components["schemas"]["TeamGroupId"] | null;
         };
         /** @example akey_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ApiKeyId: string;
@@ -2927,6 +3110,9 @@ export interface components {
             range: components["schemas"]["JobSalaryRange"] | null;
         };
         JobOrder: {
+            /** @description The recruiter the job belongs to (who added it, unless changed). */
+            ownerId: components["schemas"]["UserId"] | null;
+            ownerName: string | null;
             id: components["schemas"]["JobOrderId"];
             version: number;
             companyId: components["schemas"]["CompanyId"];
@@ -3816,6 +4002,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description The owner role cannot be changed (ROLE_NOT_EDITABLE). */
+        RoleNotEditable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Wrong email or password (SIGN_IN_FAILED). */
         SignInFailed: {
             headers: {
@@ -4019,6 +4214,8 @@ export interface operations {
                 tag?: string;
                 /** @description Only candidates with this skill (ignoring case). */
                 skill?: string;
+                /** @description Only candidates owned by this user ("me" for your own). */
+                owner?: string;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CandidateId"];
@@ -4265,6 +4462,34 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    setCandidateOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerInput"];
+            };
+        };
+        responses: {
+            /** @description Changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getCareersPage: {
@@ -5473,6 +5698,186 @@ export interface operations {
             422: components["responses"]["TeamChangeNotAllowed"];
         };
     };
+    getAccessSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setRoleAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAccessInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAccess"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["RoleNotEditable"];
+        };
+    };
+    resetRoleAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleAccess"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["RoleNotEditable"];
+        };
+    };
+    listTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamGroupList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    createTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamGroup"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    deleteTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: components["schemas"]["TeamGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    renameTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                teamId: components["schemas"]["TeamGroupId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamGroupUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamGroup"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     listApiKeys: {
         parameters: {
             query?: never;
@@ -6160,6 +6565,34 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    setJobOwner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerInput"];
+            };
+        };
+        responses: {
+            /** @description Changed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listLeadSources: {

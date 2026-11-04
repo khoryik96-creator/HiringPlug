@@ -111,3 +111,6 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .privacy-request { padding: 0.5rem 0; border-top: 1px solid #e5e7eb; }
 .privacy-request form input { flex: 1; }
 .badge.done { background: #dcfce7; } .badge.declined { background: #e5e7eb; }
+.access-scope, .access-perms { border: 1px solid #e5e7eb; border-radius: 6px; margin: 0.5rem 0; display: grid; gap: 0.25rem; }
+.access-perms label, .access-scope label { font-weight: normal; }
+.owner select { font-size: 0.9rem; }

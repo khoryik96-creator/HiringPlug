@@ -13,14 +13,16 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("");
   const [skill, setSkill] = useState("");
+  const [mine, setMine] = useState(false);
   const used = useUsedValues();
   const list = useQuery({
-    queryKey: [...candidatesKey, q, tag, skill],
+    queryKey: [...candidatesKey, q, tag, skill, mine],
     queryFn: async () => {
-      const query: { q?: string; tag?: string; skill?: string } = {};
+      const query: { q?: string; tag?: string; skill?: string; owner?: string } = {};
       if (q.trim()) query.q = q.trim();
       if (tag) query.tag = tag;
       if (skill) query.skill = skill;
+      if (mine) query.owner = "me";
       return unwrap(await api.GET("/v1/candidates", { params: { query } }));
     },
   });
@@ -31,6 +33,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
         <h2>Candidates</h2>
         <div className="row">
           <input aria-label="Search candidates" placeholder="Search name or email" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <label className="small"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine</label>
           <select aria-label="Skill" value={skill} onChange={(e) => { setSkill(e.target.value); }}>
             <option value="">Any skill</option>
             {used.skills.map((s) => <option key={s} value={s}>{s}</option>)}

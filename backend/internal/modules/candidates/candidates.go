@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -32,9 +33,16 @@ type Module struct {
 
 // New wires the module. phoneRegion is the country assumed for local phone
 // numbers, e.g. "MY".
-func New(pool *pgxpool.Pool, phoneRegion string) *Module {
-	svc := &Service{pool: pool, phoneRegion: phoneRegion}
+func New(pool *pgxpool.Pool, phoneRegion string, users Users) *Module {
+	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// Users is what this module needs from the identity module: owners' names,
+// and whether someone is an active user (to own candidates).
+type Users interface {
+	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+	ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[string][]api.Permission, error)
 }
 
 // Exists reports whether a candidate exists in tx's tenant. Other modules use
@@ -77,5 +85,5 @@ func (m *Module) ViewIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id st
 	if err != nil {
 		return View{}, err
 	}
-	return loadView(ctx, q, p, fromRow(row))
+	return loadView(ctx, tx, m.service.users, p, fromRow(row))
 }

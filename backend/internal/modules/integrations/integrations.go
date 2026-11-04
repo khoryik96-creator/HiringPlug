@@ -34,9 +34,11 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
-// Users names who created API keys (identity module).
+// Users names who created API keys, and says what a role may do in the
+// company (identity module).
 type Users interface {
 	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+	RolePermissions(ctx context.Context, tx pgx.Tx, role string) ([]api.Permission, error)
 }
 
 // Module is the integrations module.
@@ -53,8 +55,9 @@ func New(pool *pgxpool.Pool, users Users, allowPrivate bool) *Module {
 	return &Module{pool: pool, service: svc, HTTP: &HTTP{svc: svc}}
 }
 
-// Authenticate signs in with an API key: the principal is the key, with its
-// role's permissions, in its company. Unknown and revoked keys are refused.
+// Authenticate signs in with an API key: the principal is the key, with what
+// its role may do in its company (the company's settings for the role), and
+// every candidate (a key owns none). Unknown and revoked keys are refused.
 func (m *Module) Authenticate(ctx context.Context, key string) (authz.Principal, error) {
 	row, err := store.New(m.pool).ApiKeyByHash(ctx, HashKey(key))
 	if database.IsNoRows(err) {
@@ -63,7 +66,15 @@ func (m *Module) Authenticate(ctx context.Context, key string) (authz.Principal,
 	if err != nil {
 		return authz.Principal{}, err
 	}
-	return authz.NewPrincipal(row.TenantID, row.KeyID, "", "API key: "+row.KeyName, api.Role(row.KeyRole)), nil
+	var perms []api.Permission
+	err = database.InTx(ctx, m.pool, authz.TenantOnly(row.TenantID), func(tx pgx.Tx) error {
+		perms, err = m.service.users.RolePermissions(ctx, tx, row.KeyRole)
+		return err
+	})
+	if err != nil {
+		return authz.Principal{}, err
+	}
+	return authz.NewPrincipalWithAccess(row.TenantID, row.KeyID, "", "API key: "+row.KeyName, api.Role(row.KeyRole), perms, authz.Scope{}), nil
 }
 
 // JobHandlers returns the module's handlers for the core queue.

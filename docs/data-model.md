@@ -17,12 +17,12 @@ tenant ─┬─ app_user (role)
 | Table | Key fields |
 |---|---|
 | `tenant` | name, careers page address (`careers_slug`: unique, made from the name when the company is created) |
-| `app_user` | email, name, role, active |
-| `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, tags and skills (text arrays, indexed for case-insensitive filters), `version`, search text |
+| `app_user` | email, name, role, team, active |
+| `candidate` | names, email (unique per company), phone (E.164), nationality, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source, tags and skills (text arrays, indexed for case-insensitive filters), owner (a user, or none), `version`, search text |
 | `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text; how the last website reading went (`autofill_status` idle/queued/done/failed, error, when) |
 | `company_suggestion` | a detail read from the company's website: company, field, value, source (what and which page), status (pending/accepted/dismissed; who decided is in the audit log) |
 | `contact` | company (same tenant, foreign key), names, job title, email (unique per company) with check status + reasons + date, office phone, mobile, LinkedIn, status (active/left), notes, `version`, search text |
-| `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, `version`, search text. (Not `job`: that is the background job queue.) |
+| `job_order` | company and optional hiring contact (same tenant, foreign keys), title, status (open/on_hold/filled/closed), location, work type, arrangement, openings, description, owner (a user, or none), `version`, search text. (Not `job`: that is the background job queue.) |
 | `job_ad` | job, title, location, work type/arrangement, salary text (published as written), text, closes on, status (draft/published/closed; published needs text), published at, `version` |
 | `job_order_salary` | the salary budget (min, optional max, currency, period, `version`); row-level security needs `jobs.salary:read` to see and `jobs.salary:update` to write; clearing deletes the row |
 | `application` | job and candidate (same tenant, foreign keys; once per job), stage (applied/screening/submitted/interview/offer/placed/rejected/withdrawn), reason + note exactly when rejected or withdrawn, when it entered its stage, channel (where it came from: careers page, JobStreet, LinkedIn, Indeed, ...; empty when a recruiter added it), `version` |
@@ -38,6 +38,8 @@ tenant ─┬─ app_user (role)
 | `webhook_delivery` | webhook, event, payload (as sent), status (pending/delivered/failed), attempts, last answer or error, next attempt; written by a trigger on `audit_log` |
 | `lead_source` | kind (greenhouse/lever/ashby/smartrecruiters/careers_page), board name or page address (once each), company name and record, on/off, open openings, last check and its error, next check, `version` |
 | `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
+| `team_group` | a team of users (e.g. a desk): name (unique per company, ignoring case), `version` |
+| `role_setting` | a company's own settings for a role (none: the defaults): permissions, candidate scope (all/team/own), also candidates on owned jobs, `version`; never for the owner |
 | `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
 | `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
 | `assistant_answer` | a question to the AI assistant: who asked, about what (candidate/job/application + id), kind, question, status (queued/done/failed), answer or error, model, input and output tokens, asked and answered; shown only to the asker |
@@ -67,7 +69,7 @@ candidate belonging to the same company.
 |---|---|---|
 | `candidates` | managed taxonomy lists (industries, specializations), saved searches | M2 |
 | `notes` | note templates per company, notes on an application, editing | Phase 2 |
-| `identity` | custom roles, data scope, single sign-on | 7 |
+| `identity` | new named roles, single sign-on | 7 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
 | `pipeline` | stage templates per company | M3 |

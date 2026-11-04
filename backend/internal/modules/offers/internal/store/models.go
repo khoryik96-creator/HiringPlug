@@ -35,6 +35,7 @@ type AppUser struct {
 	Invited          bool
 	TokensValidAfter *time.Time
 	LastSignInAt     *time.Time
+	TeamID           *string
 }
 
 type Application struct {
@@ -119,6 +120,7 @@ type Candidate struct {
 	UpdatedAt              time.Time
 	Tags                   []string
 	Skills                 []string
+	OwnerID                *string
 }
 
 type CandidateCompensation struct {
@@ -421,6 +423,7 @@ type JobOrder struct {
 	CreatedBy       string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	OwnerID         *string
 }
 
 type JobOrderSalary struct {
@@ -545,6 +548,27 @@ type PrivacyRequest struct {
 	CreatedBy   string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type RoleSetting struct {
+	TenantID       string
+	Role           string
+	Permissions    []string
+	CandidateScope string
+	JobCandidates  bool
+	Version        int32
+	UpdatedBy      string
+	UpdatedAt      time.Time
+}
+
+type TeamGroup struct {
+	ID        string
+	TenantID  string
+	Version   int32
+	Name      string
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Tenant struct {

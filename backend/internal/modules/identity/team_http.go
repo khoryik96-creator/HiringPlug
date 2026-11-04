@@ -93,7 +93,12 @@ func (h *HTTP) ResendInvite(ctx context.Context, req api.ResendInviteRequestObje
 // UpdateTeamMember handles PATCH /v1/team/{userId}.
 func (h *HTTP) UpdateTeamMember(ctx context.Context, req api.UpdateTeamMemberRequestObject) (api.UpdateTeamMemberResponseObject, error) {
 	b := req.Body
-	row, err := h.m.UpdateMember(ctx, authz.MustFromContext(ctx), req.UserId, c.Convert[string](b.Role), b.Active)
+	var team **string
+	if b.TeamId.IsSpecified() {
+		t := c.ValueOrNil(b.TeamId)
+		team = &t
+	}
+	row, err := h.m.UpdateMember(ctx, authz.MustFromContext(ctx), req.UserId, c.Convert[string](b.Role), b.Active, team)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +107,7 @@ func (h *HTTP) UpdateTeamMember(ctx context.Context, req api.UpdateTeamMemberReq
 
 func memberToAPI(r TeamMember) api.TeamMember {
 	return api.TeamMember{
-		Id: r.ID, Name: r.Name, Email: r.Email, Role: api.Role(r.Role), Status: api.TeamStatus(Status(r)),
+		Id: r.ID, Name: r.Name, Email: r.Email, Role: api.Role(r.Role), TeamId: c.OrNull(r.TeamID), Status: api.TeamStatus(Status(r)),
 		LastSignInAt: c.OrNull(r.LastSignInAt), CreatedAt: r.CreatedAt,
 	}
 }

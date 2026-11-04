@@ -38,6 +38,7 @@ class Permission(StrEnum):
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
     emails_send = "emails:send"
+    identity_roles_manage = "identity.roles:manage"
     identity_team_manage = "identity.team:manage"
     integrations_manage = "integrations:manage"
     interviews_feedback = "interviews:feedback"
@@ -100,6 +101,7 @@ class ErrorCode(StrEnum):
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
+    ROLE_NOT_EDITABLE = "ROLE_NOT_EDITABLE"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
     SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
@@ -287,6 +289,13 @@ class AssistantAnsweredJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class OwnerInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ownerId: Annotated[UserId | None, Field(description="A user of the company, or null for nobody.")]
+
+
 class CandidateId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["cand_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cand_[0-9a-hjkmnp-tv-z]{26}$")
@@ -415,6 +424,13 @@ class CandidateHistoryUpdate(BaseModel):
 
 
 class Candidate(BaseModel):
+    ownerId: Annotated[
+        UserId | None,
+        Field(
+            description="The recruiter the candidate belongs to; null for none (e.g. applied on the careers page)."
+        ),
+    ]
+    ownerName: Annotated[str | None, Field(...)]
     experience: Annotated[list[WorkEntry], Field(description="Work history, newest first.")]
     education: list[EducationEntry]
     id: CandidateId
@@ -1108,6 +1124,83 @@ class EmailSendJob(BaseModel):
     emailId: EmailId
 
 
+class CandidateScope(StrEnum):
+    all = "all"
+    team = "team"
+    own = "own"
+
+
+class RoleAccess(BaseModel):
+    role: Role
+    permissions: list[Permission]
+    candidateScope: CandidateScope
+    jobCandidates: Annotated[
+        bool,
+        Field(description="With team or own, also the candidates on jobs the user (or their team) owns."),
+    ]
+    custom: Annotated[bool, Field(description="The company changed this role from the defaults.")]
+    editable: Annotated[
+        bool,
+        Field(description="False for the owner, who always has every permission and sees all candidates."),
+    ]
+    version: Annotated[int, Field(description="0 while the role has the defaults.", ge=0)]
+
+
+class RoleAccessInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0)]
+    permissions: Annotated[list[Permission], Field(max_length=500)]
+    candidateScope: CandidateScope
+    jobCandidates: bool
+
+
+class PermissionInfo(BaseModel):
+    permission: Permission
+    module: str
+    description: str
+    sensitive: Annotated[bool, Field(description="Guards sensitive data such as salary.")]
+    defaultRoles: list[Role]
+
+
+class AccessSettings(BaseModel):
+    roles: list[RoleAccess]
+    permissions: list[PermissionInfo]
+
+
+class TeamGroupId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["team_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^team_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class TeamGroup(BaseModel):
+    id: TeamGroupId
+    version: Annotated[int, Field(ge=1)]
+    name: str
+    memberCount: Annotated[int, Field(ge=0)]
+
+
+class TeamGroupList(BaseModel):
+    items: list[TeamGroup]
+
+
+class TeamGroupInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+
+
+class TeamGroupUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+
+
 class UserSummary(BaseModel):
     canInterview: Annotated[
         bool, Field(description="Their role may give interview feedback, so they can be an interviewer.")
@@ -1203,6 +1296,7 @@ class TeamMember(BaseModel):
     name: str
     email: str
     role: Role
+    teamId: Annotated[TeamGroupId | None, Field(...)]
     status: TeamStatus
     lastSignInAt: Annotated[AwareDatetime | None, Field(...)]
     createdAt: AwareDatetime
@@ -1238,6 +1332,7 @@ class TeamMemberUpdate(BaseModel):
     )
     role: Role | None = None
     active: bool | None = None
+    teamId: Annotated[TeamGroupId | None, Field(description="The team they are in; null for none.")] = None
 
 
 class ApiKeyId(RootModel[str]):
@@ -1556,6 +1651,10 @@ class JobSalaryUpdate(BaseModel):
 
 
 class JobOrder(BaseModel):
+    ownerId: Annotated[
+        UserId | None, Field(description="The recruiter the job belongs to (who added it, unless changed).")
+    ]
+    ownerName: Annotated[str | None, Field(...)]
     id: JobOrderId
     version: int
     companyId: CompanyId

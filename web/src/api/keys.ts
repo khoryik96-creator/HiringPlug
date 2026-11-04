@@ -34,3 +34,5 @@ export const jobMatchesKey = (jobId: string) => ["matches", "job", jobId] as con
 export const applicationMatchKey = (applicationId: string) => ["matches", "application", applicationId] as const;
 export const privacyKey = ["privacy"] as const;
 export const candidatePrivacyKey = (candidateId: string) => ["privacy", "candidate", candidateId] as const;
+export const accessKey = ["access"] as const;
+export const teamsKey = ["teams"] as const;
