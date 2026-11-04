@@ -107,6 +107,9 @@ type Worker struct {
 	Logger   *slog.Logger
 	Lease    time.Duration // how long a claimed job is ours before others may retry it
 	Idle     time.Duration // how long to wait for new jobs when the queue is empty
+	// Tenant, if set, limits the worker to one company's jobs (tests: each
+	// test's worker runs only its own companies' jobs). Empty: every company.
+	Tenant string
 }
 
 var errLeaseLost = errors.New("lease lost: another worker took this job")
@@ -190,14 +193,20 @@ func (w *Worker) handle(ctx context.Context, job Job) (err error) {
 	})
 }
 
+const (
+	claimAny       = `SELECT id, tenant_id, queue, kind, payload, attempts, max_attempts, request_id FROM job_claim($1, $2, $3)`
+	claimForTenant = `SELECT id, tenant_id, queue, kind, payload, attempts, max_attempts, request_id FROM job_claim_for_tenant($1, $2, $3, $4)`
+)
+
 func (w *Worker) claim(ctx context.Context) (Job, bool, error) {
 	var j Job
 	var kind string
 	var reqID *string
-	err := w.Pool.QueryRow(ctx,
-		`SELECT id, tenant_id, queue, kind, payload, attempts, max_attempts, request_id FROM job_claim($1, $2, $3)`,
-		w.Queue, w.ID, int(w.Lease.Seconds()),
-	).Scan(&j.ID, &j.TenantID, &j.Queue, &kind, &j.Payload, &j.Attempts, &j.MaxAttempts, &reqID)
+	query, args := claimAny, []any{w.Queue, w.ID, int(w.Lease.Seconds())}
+	if w.Tenant != "" {
+		query, args = claimForTenant, append(args, w.Tenant)
+	}
+	err := w.Pool.QueryRow(ctx, query, args...).Scan(&j.ID, &j.TenantID, &j.Queue, &kind, &j.Payload, &j.Attempts, &j.MaxAttempts, &reqID)
 	if database.IsNoRows(err) {
 		return Job{}, false, nil
 	}

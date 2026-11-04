@@ -140,14 +140,18 @@ unit and integration tests, and the wiring. See
 
 ## Background jobs
 
-The job queue is a PostgreSQL table with four functions, written once and
-called identically from Go and Python: `job_enqueue`, `job_claim`,
+The job queue is a PostgreSQL table with four main functions, written once
+and called identically from Go and Python: `job_enqueue`, `job_claim`,
 `job_complete`, `job_fail`.
 
 - **Queued in the same transaction** as the data change, so a job can never be
   lost or point at data that was rolled back.
 - **Claimed with a lease.** If a worker dies, the lease expires and another
   worker takes over; the first worker's late result is discarded.
+- **One company only, when asked.** `job_claim_for_tenant` claims only one
+  company's jobs (`Worker.Tenant`). Tests use it: they run in parallel on one
+  queue, each with its own companies and settings, and a test's worker must
+  not run another test's jobs.
 - **Retried** with growing waits (10s, 20s, 40s, up to 1 hour), then marked
   `dead` with its last error, so failures are visible, never silent.
 - **Declared in the contract** (`x-jobs`: queue and payload schema). Payloads

@@ -95,6 +95,27 @@ func TestAJobThatSucceedsIsDone(t *testing.T) {
 	assert.Equal(t, tenant.ID, sawTenant, "handlers run scoped to the job's tenant")
 }
 
+func TestAWorkerForOneCompanyRunsOnlyItsJobs(t *testing.T) {
+	theirs, err := enqueue(t, testutil.Current.NewTenant(t).ID, validPayload())
+	require.NoError(t, err)
+	ours := testutil.Current.NewTenant(t)
+	id, err := enqueue(t, ours.ID, validPayload())
+	require.NoError(t, err)
+	var ran []string
+	w := worker(func(_ context.Context, _ pgx.Tx, job jobqueue.Job) error {
+		ran = append(ran, job.TenantID)
+		return nil
+	})
+	w.Tenant = ours.ID
+	runUntil(t, w, id, "done")
+	found, err := w.RunOnce(context.Background())
+	require.NoError(t, err)
+	assert.False(t, found, "nothing else of this company's to run")
+	assert.Equal(t, []string{ours.ID}, ran)
+	assert.Equal(t, "pending", state(t, theirs).Status, "another company's job is left for other workers")
+	runUntil(t, worker(func(context.Context, pgx.Tx, jobqueue.Job) error { return nil }), theirs, "done")
+}
+
 func TestAFailingJobIsRetriedThenMarkedDead(t *testing.T) {
 	tenant := testutil.Current.NewTenant(t)
 	id, err := enqueue(t, tenant.ID, validPayload())

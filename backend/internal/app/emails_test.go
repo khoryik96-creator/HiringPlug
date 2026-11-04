@@ -213,6 +213,7 @@ func TestEmailIsRetriedWhileTheMailServerIsBusy(t *testing.T) {
 		require.NoError(t, err)
 		w, err := app.NewWorker(a.deps, a.modules)
 		require.NoError(t, err)
+		w.Tenant = tenant.ID
 		for range 1000 {
 			_, err := w.RunOnce(ctx)
 			require.NoError(t, err)

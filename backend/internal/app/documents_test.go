@@ -209,15 +209,17 @@ func claimAIJobWhere(t *testing.T, conn *pgx.Conn, key, value string) claimedJob
 	return j
 }
 
-// runCoreJobsUntilIdle runs the real Go worker until the tenant's core jobs
-// are done. Tests run in parallel and share the queue, so another test's
-// worker may be running one of them: an empty claim is not enough, the
-// tenant's jobs must be finished.
+// runCoreJobsUntilIdle runs the real Go worker (this test app's, with its
+// settings) on the tenant's core jobs until they are done. Tests run in
+// parallel and share the queue, so the worker claims only this tenant's jobs:
+// another test's worker, with other settings (the AI on or off), never runs
+// them.
 func runCoreJobsUntilIdle(t *testing.T, a *testApp, tenantID string) {
 	t.Helper()
 	ctx := context.Background()
 	w, err := app.NewWorker(a.deps, a.modules)
 	require.NoError(t, err)
+	w.Tenant = tenantID
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		found, err := w.RunOnce(ctx)
