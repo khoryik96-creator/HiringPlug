@@ -1,7 +1,7 @@
 # The AI worker (Python)
 
-`ai/` processes jobs on the `ai` queue. It reads and parses CVs today;
-formatting, blind CVs, matching and the assistant are designed below. It never
+`ai/` processes jobs on the `ai` queue: it reads and parses CVs, renders
+PDFs, answers the assistant and scores CV vs job fit. It never
 touches business tables: it receives a job, does the work, and returns a result
 job that the Go worker saves.
 
@@ -160,12 +160,26 @@ very messy two-column CVs.
 - Options per export: hide contact details, hide salary, blind, include the
   recruiter's summary.
 
-## CV-to-job matching (M4)
+## CV-to-job matching (built)
 
-A score with reasons. Every reason quotes the CV and the job ad, using the same
-source-grounding check as parsing. Embeddings (stored in PostgreSQL with
-pgvector) shortlist candidates for a job; the model explains the top matches.
-It suggests; recruiters decide.
+`match.score` carries the job's text (title, details, description and its
+best ad) and the CV's text, both already without names, contact details or
+salary. `jobs/match_score.py` asks for at most 10 requirements as JSON, each
+copied word for word from the job text with a verdict (met / partly / missing)
+and evidence copied from the CV, plus a one-line summary. It only reads the
+answer into the contract's shape (unknown verdicts skipped, values clipped,
+code fences and chatter around the JSON tolerated); an answer that is not the
+JSON asked for becomes a readable error, with its tokens still counted.
+
+Go trusts none of it (`matching/domain.go`): a requirement must quote the job
+text and a met or partly verdict must quote the CV (`platform/quote`, the
+check CV parsing uses), or it counts as not shown; requirements about age,
+gender, race, religion, marital status or nationality are dropped; the score
+is worked out from what passes (met 1, partly ½). It suggests; recruiters
+decide.
+
+**Next:** embeddings (PostgreSQL with pgvector) to shortlist candidates who
+are not on the job yet; the model then explains the top ones the same way.
 
 ## AI assistant (built)
 

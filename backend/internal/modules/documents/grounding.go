@@ -6,13 +6,14 @@ import (
 	"github.com/oapi-codegen/nullable"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/quote"
 )
 
 // groundProfile keeps only the values of p whose quote is in the CV text and
 // whose value can be read from the quote (rules in domain.go), and
 // counts what it dropped. Jobs and schools left with nothing are dropped.
 func groundProfile(text string, p api.ParsedProfile) api.ParsedProfile {
-	g := grounder{text: ForQuotes(text)}
+	g := grounder{text: quote.Prepare(text)}
 	out := api.ParsedProfile{
 		Parser:       p.Parser,
 		FullName:     g.one(p.FullName, FieldText),
@@ -54,14 +55,14 @@ func groundProfile(text string, p api.ParsedProfile) api.ParsedProfile {
 }
 
 type grounder struct {
-	text    string
+	text    quote.Source
 	dropped int
 }
 
 func (g *grounder) ok(s api.SourcedText, kind string) bool {
 	// Limits in characters, as the contract counts them (not bytes: Chinese or accented text is longer in bytes).
 	keep := utf8.RuneCountInString(s.Value) <= 300 && utf8.RuneCountInString(s.Quote) <= 1000 &&
-		Quotes(g.text, s.Quote) && ValueFromQuote(kind, s.Value, s.Quote)
+		g.text.Has(s.Quote) && ValueFromQuote(kind, s.Value, s.Quote)
 	if !keep {
 		g.dropped++
 	}

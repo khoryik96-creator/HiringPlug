@@ -55,7 +55,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
         </section>
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
-      {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} />}
+      {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
       <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
       <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />

@@ -1,0 +1,238 @@
+# Module contract: matching (how well a candidate fits a job: a score with
+# reasons, each quoting the job and the CV). See contracts/README.md for the format.
+x-module:
+  name: matching
+  description: >
+    CV vs job match. Go sends the job's text and the candidate's CV text
+    (without names, contact details or salary) to the Python AI worker, which
+    asks the AI provider for the job's requirements, whether the CV meets
+    each, and a quote from both for every one. Go keeps a requirement only if
+    its quote is in the job's text and counts it as met only if its evidence
+    is in the CV, then works out the score from what is left. It suggests;
+    the recruiter decides. Off until an AI provider is set up; it uses the
+    company's monthly AI allowance, shared with the assistant.
+  permissions:
+    matching:read:
+      description: See fit scores and their reasons (which quote candidates' CVs) on applications.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+    matching:create:
+      description: Ask the AI to score how well candidates fit their jobs (uses the AI allowance).
+      roles: [owner, admin, recruiter, sourcer]
+  errorCodes:
+    MATCHING_OFF:
+      status: 409
+      description: Matching is switched off (no AI provider is set up).
+    MATCHING_LIMIT_REACHED:
+      status: 429
+      description: The company has used this month's AI allowance; it starts again on the 1st.
+    MATCH_NEEDS_TEXT:
+      status: 409
+      description: There is nothing to compare yet - the candidate has no CV with readable text, or the job has no description or ad text. The message says which.
+  jobs:
+    match.score:
+      queue: ai
+      payload: MatchScoreJob
+      description: Ask the AI provider how well a CV meets a job's requirements, quoting both (Python AI worker).
+    match.scored:
+      queue: core
+      payload: MatchScoredJob
+      description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
+
+paths:
+  /v1/matches:
+    get:
+      operationId: listMatches
+      tags: [matching]
+      summary: The latest fit score of each application on a job, or of one application
+      description: Give jobId or applicationId. Also says whether matching is switched on.
+      x-permission: matching:read
+      parameters:
+        - { name: jobId, in: query, schema: { type: string, maxLength: 40 } }
+        - { name: applicationId, in: query, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: scoreApplication
+      tags: [matching]
+      summary: Score how well a candidate fits the job they are on (in the background)
+      description: A score already waiting for the AI is returned instead of asking again.
+      x-permission: matching:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Match' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/MatchingUnavailable' }
+        '429': { $ref: '#/components/responses/MatchingLimitReached' }
+
+  /v1/matches/for-job:
+    post:
+      operationId: scoreJobApplications
+      tags: [matching]
+      summary: Score the fit of every active candidate on a job (in the background)
+      description: >
+        Candidates already scored (or waiting) are left as they are unless
+        rescore is true; candidates without a CV with readable text are counted
+        and left out. At most 100 candidates at a time.
+      x-permission: matching:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchJobRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchJobResult' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/MatchingUnavailable' }
+        '429': { $ref: '#/components/responses/MatchingLimitReached' }
+
+components:
+  responses:
+    MatchingUnavailable:
+      description: Switched off (MATCHING_OFF), or nothing to compare yet (MATCH_NEEDS_TEXT).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    MatchingLimitReached:
+      description: This month's AI allowance is used (MATCHING_LIMIT_REACHED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    MatchId:
+      type: string
+      pattern: '^mat_[0-9a-hjkmnp-tv-z]{26}$'
+      example: mat_01jbz6w0m0k8q9x2r3s4t5v6w7
+    MatchStatus:
+      type: string
+      description: queued = waiting for the AI; done = scored; failed = no score (see error).
+      enum: [queued, done, failed]
+    MatchVerdict:
+      type: string
+      description: met = the CV shows it; partly = the CV shows some of it; missing = the CV does not show it.
+      enum: [met, partly, missing]
+    MatchReason:
+      type: object
+      required: [requirement, verdict, evidence, note]
+      properties:
+        requirement: { type: string, description: "A requirement, quoted from the job's description or ad." }
+        verdict: { $ref: '#/components/schemas/MatchVerdict' }
+        evidence:
+          type: string
+          nullable: true
+          description: "What shows it, quoted from the CV (empty for those who may not see CVs)."
+        note: { type: string, nullable: true, description: "The AI's short explanation." }
+    Match:
+      type: object
+      required: [id, applicationId, jobId, status, score, summary, reasons, dropped, error, model, createdAt, scoredAt]
+      properties:
+        id: { $ref: '#/components/schemas/MatchId' }
+        applicationId: { type: string }
+        jobId: { type: string }
+        status: { $ref: '#/components/schemas/MatchStatus' }
+        score:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: "How much of the job's requirements the CV shows: met counts in full, partly as half."
+        summary: { type: string, nullable: true, description: "The AI's overall view, in a sentence or two." }
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/MatchReason' }
+        dropped:
+          type: integer
+          minimum: 0
+          description: "Requirements the AI listed that were left out: their quote was not in the job's text (or their verdict could not be read)."
+        error: { type: string, nullable: true }
+        model: { type: string, nullable: true, description: The AI model that scored it. }
+        createdAt: { type: string, format: date-time }
+        scoredAt: { type: string, format: date-time, nullable: true }
+    MatchList:
+      type: object
+      required: [enabled, items]
+      properties:
+        enabled: { type: boolean, description: Whether an AI provider is set up. }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Match' }
+    MatchRequest:
+      type: object
+      additionalProperties: false
+      required: [applicationId]
+      properties:
+        applicationId: { type: string, maxLength: 40 }
+    MatchJobRequest:
+      type: object
+      additionalProperties: false
+      required: [jobId]
+      properties:
+        jobId: { type: string, maxLength: 40 }
+        rescore: { type: boolean, default: false, description: "Also score again those already scored." }
+    MatchJobResult:
+      type: object
+      required: [queued, alreadyScored, withoutCv]
+      properties:
+        queued: { type: integer, description: Candidates sent to the AI. }
+        alreadyScored: { type: integer, description: "Candidates left as they are (scored, or waiting)." }
+        withoutCv: { type: integer, description: Candidates without a CV with readable text. }
+
+    # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    MatchScoreJob:
+      type: object
+      additionalProperties: false
+      required: [matchId, job, cv]
+      properties:
+        matchId: { $ref: '#/components/schemas/MatchId' }
+        job: { type: string, description: "The job's title, details, description and ad, without salary." }
+        cv: { type: string, description: "The CV's text, without names, contact details or salary." }
+    MatchClaim:
+      type: object
+      additionalProperties: false
+      required: [requirement, verdict, evidence, note]
+      properties:
+        requirement: { type: string, maxLength: 2000, description: "Quoted from the job's text." }
+        verdict: { $ref: '#/components/schemas/MatchVerdict' }
+        evidence: { type: string, nullable: true, maxLength: 2000, description: "Quoted from the CV's text." }
+        note: { type: string, nullable: true, maxLength: 2000 }
+    MatchScoredJob:
+      type: object
+      additionalProperties: false
+      required: [matchId, summary, claims, error, model, inputTokens, outputTokens]
+      properties:
+        matchId: { $ref: '#/components/schemas/MatchId' }
+        summary: { type: string, nullable: true, maxLength: 2000 }
+        claims:
+          type: array
+          maxItems: 30
+          description: The AI's reading, not yet checked against the texts (Go checks every quote).
+          items: { $ref: '#/components/schemas/MatchClaim' }
+        error: { type: string, nullable: true, description: "Why there is no score (provider down, switched off, an answer that could not be read)." }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }

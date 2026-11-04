@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -216,6 +217,31 @@ func (m *Module) PublishedAds(ctx context.Context, tx pgx.Tx) ([]Ad, error) {
 		ads[i] = adFromRow(r)
 	}
 	return ads, nil
+}
+
+// BestAd returns the ad that best describes a job, for other modules (CV vs
+// job matching): its newest published ad with text, else its newest ad with
+// text; nil when it has none. In the caller's transaction.
+func (m *Module) BestAd(ctx context.Context, tx pgx.Tx, jobID string) (*Ad, error) {
+	rows, err := store.New(tx).ListJobAds(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	var best *Ad
+	for _, r := range rows { // newest first
+		if r.Description == nil || strings.TrimSpace(*r.Description) == "" {
+			continue
+		}
+		if r.Status == "published" {
+			ad := adFromRow(r)
+			return &ad, nil
+		}
+		if best == nil {
+			ad := adFromRow(r)
+			best = &ad
+		}
+	}
+	return best, nil
 }
 
 // PublishedAd returns one ad on the careers page; anything else (a draft, a

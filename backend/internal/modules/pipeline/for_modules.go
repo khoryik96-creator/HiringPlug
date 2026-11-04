@@ -55,6 +55,27 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 	return out, nil
 }
 
+// OnJob is an application as seen from its job (e.g. for CV vs job matching).
+type OnJob struct {
+	ID, CandidateID, Stage string
+}
+
+// OpenOnJob returns the job's applications that are not rejected or
+// withdrawn, oldest first, in the caller's transaction.
+func (m *Module) OpenOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]OnJob, error) {
+	rows, err := store.New(tx).ListJobApplications(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	var out []OnJob
+	for _, r := range rows {
+		if !IsClosed(r.Stage) {
+			out = append(out, OnJob{ID: r.ID, CandidateID: r.CandidateID, Stage: r.Stage})
+		}
+	}
+	return out, nil
+}
+
 // ReachInterview moves an application to the interview stage when it is at an
 // earlier one (applied, screening, submitted), in the caller's transaction:
 // scheduling an interview means the candidate got that far.

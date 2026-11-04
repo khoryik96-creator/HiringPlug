@@ -28,6 +28,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -57,6 +58,7 @@ type Modules struct {
 	Leads        *leads.Module
 	Cvformats    *cvformats.Module
 	Assistant    *assistant.Module
+	Matching     *matching.Module
 	// scaffold:fields
 }
 
@@ -99,8 +101,12 @@ func NewModules(d Deps) *Modules {
 	}, d.Files, d.Config.MaxUploadBytes)
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
-		Applications: assistantApplications{m.Pipeline},
+		Applications: assistantApplications{m.Pipeline}, OtherAIUse: matchingAIUse{m},
 	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	m.Matching = matching.New(d.Pool, matching.Deps{
+		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: m.Documents,
+		Jobs: matchingJobs{m.Jobs}, OtherAIUse: m.Assistant,
+	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes and emails follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
@@ -128,6 +134,7 @@ type (
 	leadsHTTP        = leads.HTTP
 	cvformatsHTTP    = cvformats.HTTP
 	assistantHTTP    = assistant.HTTP
+	matchingHTTP     = matching.HTTP
 	// scaffold:aliases
 )
 
@@ -153,6 +160,7 @@ type Server struct {
 	*leadsHTTP
 	*cvformatsHTTP
 	*assistantHTTP
+	*matchingHTTP
 	// scaffold:embeds
 }
 
@@ -179,6 +187,7 @@ func (m *Modules) Server() *Server {
 		leadsHTTP:        m.Leads.HTTP,
 		cvformatsHTTP:    m.Cvformats.HTTP,
 		assistantHTTP:    m.Assistant.HTTP,
+		matchingHTTP:     m.Matching.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -194,6 +203,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Leads.JobHandlers(),
 		m.Companies.JobHandlers(),
 		m.Assistant.JobHandlers(),
+		m.Matching.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

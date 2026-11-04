@@ -11,12 +11,12 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 |---|---|---|---|
 | 1 | Contacts with built-in email verifier | `companies`, `contacts` | ✅ |
 | 1.5 | Job ads puller | `leads` | ✅ job board feeds, careers pages, saved ads |
-| 2 | Companies | `companies` | ✅ records; auto-fill 🧩 |
+| 2 | Companies | `companies` | ✅ records, auto-fill from the website |
 | 3 | Candidate profile fields | `candidates` | ✅ |
 | 3 | JobStreet / LinkedIn / original / formatted CVs | `documents`, `cvformats` | ✅ upload, text, formatted CVs in your Word template, PDF |
-| 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | 🧩 M4 |
-| 4 | Pipeline dashboard | `pipeline` | ✅ board and dashboard; reports 🧩 |
-| 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline, interviews; 🧩 matching |
+| 3.5 | AI interpretation sidebar (DeepSeek) | `assistant` + AI worker | ✅ off until an AI provider is set up |
+| 4 | Pipeline dashboard | `pipeline`, `reports` | ✅ board, dashboard and reports |
+| 5 | Jobs and applicants ✅; interview scheduling, CV vs job match | `jobs`, `pipeline`, `interviews`, `matching` | ✅ jobs, pipeline, interviews; matching (off until an AI provider is set up) |
 | 5 | Email with templates | `emails` | ✅ sending; inbox sync 🧩 4.3 |
 | 5 | Notes: screening, call and interview notes | `notes` | ✅ |
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
@@ -134,7 +134,7 @@ sees only their own.
   phone numbers and profile links are taken out of every text
   (`platform/redact`, shared with blind CVs); recorded salaries are never
   read; salary figures written in a CV or job description ("Expected salary:
-  RM 5,000") are cut out (`assistant.WithoutSalary`). Nationality is left out
+  RM 5,000") are cut out (`redact.WithoutSalary`). Nationality is left out
   as well: the right to work says what matters for a job.
 - **The prompts** (in `ai/src/hiringplug_ai/jobs/assistant_ask.py`) tell the
   model to answer only from the data, say when something is missing, never
@@ -147,14 +147,61 @@ sees only their own.
   `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL`). While
   `HP_AI_PROVIDER=off` the panel says the assistant is off.
 - **Costs.** Tokens are recorded per answer; each company has a monthly
-  allowance (`HP_AI_MONTHLY_TOKENS`, default 2,000,000), shown in the panel.
-  Once used, asking is refused (`ASSISTANT_LIMIT_REACHED`) until the 1st.
+  allowance (`HP_AI_MONTHLY_TOKENS`, default 2,000,000) for the assistant and
+  CV vs job matching together, shown in the panel. Once used, asking is
+  refused (`ASSISTANT_LIMIT_REACHED`) until the 1st.
 - **Flow.** Browser → Go API (permission check, context, allowance) → job
   queue → Python AI worker → provider → result job → Go saves it; the page
   polls while an answer is on its way. Questions and answers are never logged.
 - **Later:** a per-company choice of provider (and switching it off for one
   company), streaming answers, notes in the context (with the sensitive-notes
   permission).
+
+## 3.6 CV vs job match ✅ (off until an AI provider is set up)
+
+A fit score for a candidate on a job, with its reasons, so a recruiter can see
+at a glance who meets the job and check why. On a job's board, **Score
+candidates' fit** scores every active candidate not scored yet (**Score all
+again** after the job or a CV changed; at most 100 at a time; candidates
+without a CV with readable text are counted and left out). Each card then
+shows **Fit 72%**; clicking it opens the reasons above the board, and **Best
+fit first** orders each column by score. A candidate's page shows the score
+for each of their jobs, with **Score fit** / **Score again**.
+
+- **Reasons quote both texts.** The AI lists the job's main requirements
+  (skills, experience, qualifications, languages, tools), each copied from the
+  job's description or its ad, a verdict for each (meets, partly, not in the
+  CV) and the words of the CV that show it. Go checks every quote with the
+  same check CV parsing uses (`platform/quote`: ignoring case, spacing, curly
+  quotes and dashes): a requirement that is not in the job's text is left out
+  (and counted), and a "meets" or "partly" without a quote from the CV counts
+  as not shown, with a note saying so. An invented quote can never raise a
+  score.
+- **The score is worked out, not asked for:** met counts in full, partly as
+  half, of the requirements that passed (at most 15). Strong from 75%,
+  partial from 50%. It suggests; the recruiter decides.
+- **Never who a person is.** Requirements about age, gender, race, religion,
+  marital status or nationality ("Malaysians only", "aged below 35") are never
+  scored, whatever the ad says; the prompt also tells the model not to consider
+  them. The right to work is on the profile for the recruiter to check.
+- **Never names, contact details or salary.** As for the assistant: the CV's
+  text has the candidate's name, emails, phones and links taken out, salary
+  figures are cut from the CV, the description and the ad, and recorded
+  salaries are never read. What was sent is kept only until the answer is
+  checked, then cleared; the audit log records the score and counts, never
+  quotes.
+- **Who sees it.** `matching:read` (everyone who may see the pipeline) sees
+  scores and reasons; the CV quotes need `documents:read` too.
+  `matching:create` (owners, admins, recruiters, sourcers) asks for scores,
+  which uses the company's AI allowance, shared with the assistant
+  (`MATCHING_LIMIT_REACHED` once used).
+- **Flow.** Browser → Go API (permissions, texts, allowance) → `match.score` on
+  the job queue → Python AI worker (`jobs/match_score.py`) → provider →
+  `match.scored` → Go checks the quotes, works out the score and saves it; the
+  page polls while scores are on their way.
+- **Later:** shortlisting candidates who are not on the job yet (embeddings),
+  scoring automatically when someone applies, and flagging scores whose CV or
+  job changed since.
 
 ## 1, 2. Companies and contacts
 
@@ -313,9 +360,8 @@ lead's company (with the built-in email check).
   only goes back to offer or is withdrawn. Two people moving the same card:
   the second is told and reloads. Next: dashboard counts and conversion.
 - **Interviews:** Google and Microsoft calendar sync (4.3).
-- **CV vs job match:** the AI worker scores fit and explains it. Every reason
-  quotes the CV and the job ad, so a recruiter can check it. It suggests; the
-  recruiter decides.
+- **CV vs job match** ✅: a fit score per application with reasons quoting the
+  job and the CV; see [3.6](#36-cv-vs-job-match--off-until-an-ai-provider-is-set-up).
 
 ## Offers ✅
 

@@ -4,7 +4,8 @@
 //
 // What the AI sees is gathered here from what the asking user may see, with
 // contact details and names taken out, and never salary. Answers are shown
-// only to the person who asked. Each company has a monthly token allowance.
+// only to the person who asked. Each company has a monthly token allowance,
+// shared with CV vs job matching.
 //
 // Layout (the same in every module):
 //
@@ -23,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -43,6 +45,11 @@ type Deps struct {
 	}
 	Applications interface {
 		ForAssistant(ctx context.Context, tx pgx.Tx, id string) (Application, error)
+	}
+	// OtherAIUse is the company's other use of the AI (CV vs job matching):
+	// one monthly allowance covers both. Nil: none.
+	OtherAIUse interface {
+		TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error)
 	}
 }
 
@@ -66,6 +73,13 @@ func New(pool *pgxpool.Pool, deps Deps, settings Settings) *Module {
 	}
 	svc := &Service{pool: pool, deps: deps, settings: settings, now: time.Now}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// TokensSince returns the AI tokens the company used for the assistant since
+// the given time, in the caller's transaction (matching counts them in the
+// shared allowance).
+func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
+	return store.New(tx).TokensSince(ctx, since)
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.

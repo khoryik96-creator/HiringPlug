@@ -1,16 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, ApiError, type Application, type Schemas, unwrap } from "../api/client";
+import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
 import { ApplicationCard, MoveMenu } from "./ApplicationCard";
 import { ErrorMessage } from "./ErrorMessage";
+import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
 import { useMoveApplication } from "./useMoveApplication";
 
-/** A job's pipeline: a column per stage, closed applications listed below. */
-export function PipelineBoard({ jobId, canUpdate }: { jobId: string; canUpdate: boolean }) {
+/**
+ * A job's pipeline: a column per stage, closed applications listed below.
+ * With matching, each card shows its fit score and the board can put the
+ * best fits first.
+ */
+export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: string; canUpdate: boolean; permissions?: Permission[] }) {
   const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: jobApplicationsKey(jobId),
@@ -22,6 +27,12 @@ export function PipelineBoard({ jobId, canUpdate }: { jobId: string; canUpdate: 
   const apps = list.data?.items ?? [];
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
   const stale = move.error instanceof ApiError && move.error.code === "CONFLICT_STALE_VERSION";
+  const matches = useJobMatches(jobId, permissions.includes("matching:read"));
+  const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
+  const [bestFirst, setBestFirst] = useState(false);
+  const [fitShown, setFitShown] = useState<Application | null>(null);
+  const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
+  const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
 
   return (
     <section className="panel" aria-label="Pipeline">
@@ -29,6 +40,23 @@ export function PipelineBoard({ jobId, canUpdate }: { jobId: string; canUpdate: 
         <h3>Pipeline ({String(apps.length - closed.length)} active)</h3>
         {canUpdate && <AddCandidate jobId={jobId} />}
       </div>
+      {matches.data && permissions.includes("matching:create") && (
+        <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} anyScored={fit.size > 0} />
+      )}
+      {fit.size > 0 && (
+        <label className="small">
+          <input type="checkbox" checked={bestFirst} onChange={(e) => { setBestFirst(e.target.checked); }} /> Best fit first
+        </label>
+      )}
+      {fitShown && shownMatch && (
+        <section className="fit-panel" aria-label={`Fit of ${fitShown.candidateName}`}>
+          <div className="row spread">
+            <h4>{fitShown.candidateName} <FitBadge match={shownMatch} /></h4>
+            <button type="button" className="link" onClick={() => { setFitShown(null); }}>Close</button>
+          </div>
+          <FitReasons match={shownMatch} open />
+        </section>
+      )}
       <ErrorMessage error={list.error ?? move.error}>
         {stale && (
           <button type="button" className="link" onClick={() => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); move.reset(); }}>
@@ -38,7 +66,8 @@ export function PipelineBoard({ jobId, canUpdate }: { jobId: string; canUpdate: 
       </ErrorMessage>
       <div className="board">
         {OPEN_STAGES.map((stage) => {
-          const cards = apps.filter((a) => a.stage === stage);
+          const inStage = apps.filter((a) => a.stage === stage);
+          const cards = bestFirst ? inStage.sort((a, b) => scoreOf(b) - scoreOf(a)) : inStage;
           return (
             <div
               key={stage}
@@ -57,7 +86,7 @@ export function PipelineBoard({ jobId, canUpdate }: { jobId: string; canUpdate: 
               <h4>{STAGE[stage]} ({String(cards.length)})</h4>
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
-                  <ApplicationCard app={a} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
+                  <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
                 </div>
               ))}
             </div>

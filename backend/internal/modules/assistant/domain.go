@@ -6,7 +6,6 @@ package assistant
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -103,48 +102,12 @@ func MonthStart(now time.Time, loc *time.Location) time.Time {
 	return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
 }
 
-var (
-	salaryWord = regexp.MustCompile(`(?i)\b(?:salary|salaries|gaji|remuneration|compensation|ctc|take[- ]home|(?:expected|current|last[- ]drawn|basic)\s+pay|pay\s*:)`)
-	amount     = regexp.MustCompile(`(?i)(?:rm|myr|sgd|usd|idr|s\$|\$)\s?\d|\d[\d,.]*\s?k\b|\d{1,3}(?:,\d{3})+|\d{4,}`)
-)
-
-// WithoutSalary takes salary figures out of free text (a CV, a job
-// description): on each line, from a salary word to the end of the line,
-// when an amount follows it ("Expected salary: RM 5,000"). Duties such as
-// "compensation and benefits for 300 staff" are kept: no money follows.
-func WithoutSalary(text string) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		for _, loc := range salaryWord.FindAllStringIndex(line, -1) {
-			if hasAmount(line[loc[1]:]) {
-				lines[i] = line[:loc[0]] + "[salary removed]"
-				break
-			}
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-var year = regexp.MustCompile(`^(?:19|20)\d\d$`)
-
-// hasAmount reports whether text (after a salary word) holds money. A
-// number like a year counts only right after the word ("Salary: 2000"), so
-// "salary for staff since 2019" keeps its year.
-func hasAmount(text string) bool {
-	for _, loc := range amount.FindAllStringIndex(text, -1) {
-		if !year.MatchString(text[loc[0]:loc[1]]) || loc[0] <= 3 {
-			return true
-		}
-	}
-	return false
-}
-
 // CandidateSections is what the AI sees of a candidate: the profile, work
 // history, education and the CV's text (empty when none was read or the
 // user may not see documents), each without contact details or names.
 func CandidateSections(c Candidate, cvText string) []Section {
 	id := redact.IdentityOf(c.Name, c.Email, c.Phone)
-	clean := func(s string) string { return WithoutSalary(redact.Scrub(s, id)) }
+	clean := func(s string) string { return redact.WithoutSalary(redact.Scrub(s, id)) }
 
 	var profile []string
 	line := func(label string, v *string) {
@@ -204,7 +167,7 @@ func JobSections(j Job) []Section {
 	}
 	out := []Section{{Title: "Job", Text: strings.Join(lines, "\n")}}
 	if j.Description != nil && strings.TrimSpace(*j.Description) != "" {
-		out = append(out, Section{Title: "Job description", Text: clip(WithoutSalary(strings.TrimSpace(*j.Description)), maxDescription)})
+		out = append(out, Section{Title: "Job description", Text: clip(redact.WithoutSalary(strings.TrimSpace(*j.Description)), maxDescription)})
 	}
 	return out
 }

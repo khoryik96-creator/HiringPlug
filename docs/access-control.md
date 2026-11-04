@@ -97,6 +97,8 @@ details get their own permissions.
 | `cvformats.templates:manage` (upload and remove CV templates) | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
 | `assistant:use` (the AI assistant; it sees only what you may see, never contact details or salary) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `matching:read` (fit scores and reasons; the CV quotes in them also need `documents:read`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `matching:create` (ask for fit scores; uses the AI allowance) | ✓ | ✓ | ✓ | ✓ | | |
 
 
 Coming later: **custom roles** per company (an admin screen to pick
@@ -122,8 +124,9 @@ Salary is the example; every sensitive field follows the same pattern.
 ![A sourcer sees that salary is restricted](images/candidate-sourcer.png)
 
 The same permissions also bound what leaves the system. Audit entries record
-that a salary changed but never the amounts, and the AI assistant (M4) only
-receives the fields the user may see.
+that a salary changed but never the amounts, and the AI (the assistant and
+CV vs job matching) only receives what the user may see, never contact
+details or salary.
 
 ## Company isolation
 

@@ -107,19 +107,8 @@ func CleanExtractedText(s string) string {
 
 // These rules decide which parsed CV values are kept. They hold for any
 // reader (rules today, an AI model later): a value is kept only if its quote
-// is text from the CV and the value can be read from that quote.
-
-// Quotes reports whether quote appears in the CV text, ignoring case and
-// differences in spacing. Prepare the text once with ForQuotes.
-func Quotes(preparedText, quote string) bool {
-	q := ForQuotes(quote)
-	return q != "" && strings.Contains(preparedText, q)
-}
-
-// ForQuotes lower-cases s and collapses whitespace, for Quotes.
-func ForQuotes(s string) string {
-	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
-}
+// is text from the CV (platform/quote) and the value can be read from that
+// quote.
 
 // squash keeps only letters and digits, lower-cased: "+60 12-345" -> "6012345".
 // "]" and "!" count as "i": OCR often reads a final I that way ("BINT]"), and

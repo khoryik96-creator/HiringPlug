@@ -36,7 +36,7 @@ func (s *Service) Status(ctx context.Context, p authz.Principal) (Status, error)
 	out := Status{Enabled: s.settings.Enabled, MonthlyTokens: s.settings.MonthlyTokens}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		out.UsedTokens, err = store.New(tx).TokensSince(ctx, MonthStart(s.now(), s.settings.TimeZone))
+		out.UsedTokens, err = s.used(ctx, tx)
 		return err
 	})
 	return out, err
@@ -67,7 +67,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 	var out store.AssistantAnswer
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		qs := store.New(tx)
-		used, err := qs.TokensSince(ctx, MonthStart(s.now(), s.settings.TimeZone))
+		used, err := s.used(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -97,6 +97,18 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 		})
 	})
 	return out, err
+}
+
+// used is the AI tokens the company used this month, the assistant's and
+// matching's together.
+func (s *Service) used(ctx context.Context, tx pgx.Tx) (int64, error) {
+	since := MonthStart(s.now(), s.settings.TimeZone)
+	used, err := store.New(tx).TokensSince(ctx, since)
+	if err != nil || s.deps.OtherAIUse == nil {
+		return used, err
+	}
+	other, err := s.deps.OtherAIUse.TokensSince(ctx, tx, since)
+	return used + other, err
 }
 
 // sections gathers what the AI may see of the subject: only what the user

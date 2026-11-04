@@ -43,7 +43,7 @@ Your full feature list and how each item is designed: [docs/features.md](docs/fe
 |---|---|---|
 | `contracts/` | OpenAPI (YAML) | The single source of truth for the API and job messages. Each module has its own file. |
 | `backend/` | Go | The API and the business rules, the database, and the worker for core jobs. One codebase split into modules. |
-| `ai/` | Python | Reading CVs (text extraction, OCR). Next: parsing, formatting, blind CVs, matching, AI assistant. |
+| `ai/` | Python | Reading CVs (text extraction, OCR), parsing them, PDFs, the AI assistant and CV vs job matching. |
 | `web/` | TypeScript (React) | The screens recruiters use. |
 | `deploy/` | Docker | Runs everything on one machine. |
 

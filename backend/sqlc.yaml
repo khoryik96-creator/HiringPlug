@@ -135,3 +135,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/assistant/internal/store
+  - <<: *module
+    queries: db/queries/matching.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/matching/internal/store

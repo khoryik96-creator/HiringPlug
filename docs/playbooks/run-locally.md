@@ -48,9 +48,9 @@ in with their email (e.g. `owner@demo.hiringplug.local`) and the password
 the two secrets in `deploy/docker-compose.yml` (or move them to a `.env` file),
 and put HTTPS in front (e.g. Caddy).
 
-## Turning on the AI assistant
+## Turning on the AI assistant and matching
 
-It is off until an AI provider is set up. With Docker, put these in
+Both are off until an AI provider is set up. With Docker, put these in
 `deploy/.env` (next to `docker-compose.yml`; never commit it); for development,
 in your environment. They are read by the API and the AI worker. For
 DeepSeek's API or any OpenAI-compatible host:

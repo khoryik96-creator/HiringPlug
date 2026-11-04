@@ -6,6 +6,7 @@ import { applicationsKey, candidateApplicationsKey, jobsKey } from "../api/keys"
 import { CLOSE_REASON, STAGE } from "../labels";
 import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ApplicationPlacement } from "./ApplicationPlacement";
+import { ApplicationFit } from "./Fit";
 import { ApplicationOffers } from "./Offers";
 import { ErrorMessage } from "./ErrorMessage";
 import { ApplicationInterviews } from "./Interviews";
@@ -44,6 +45,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
               {a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}
             </span>{" "}
             {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+            {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
             {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
             {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
             {permissions.includes("interviews:read") && (

@@ -58,14 +58,6 @@ func TestCleanExtractedTextRemovesNUL(t *testing.T) {
 	assert.Equal(t, "ab", CleanExtractedText("a\x00b"))
 }
 
-func TestQuotesMustBeCVText(t *testing.T) {
-	text := ForQuotes("SITI  AISYAH\nSenior   Accountant | ABC Sdn Bhd")
-	assert.True(t, Quotes(text, "Siti Aisyah"), "case and spacing may differ")
-	assert.True(t, Quotes(text, "Senior Accountant | ABC"))
-	assert.False(t, Quotes(text, "Big Bank"))
-	assert.False(t, Quotes(text, "   "))
-}
-
 func TestValuesMustBeReadableFromTheirQuote(t *testing.T) {
 	for _, c := range []struct {
 		kind, value, quote string

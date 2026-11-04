@@ -32,6 +32,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Offers with approvals; replacements owed after a fall-through |
 | ✅ | API keys and signed webhooks for your other systems |
 | ✅ | Hiring leads from public job boards, careers pages and saved ads |
+| ✅ | An AI sidebar and CV vs job fit scores with quoted reasons (off until an AI provider is set up) |
 | ✅ | Sign-in with passwords, invitations, password resets and a Team page |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
@@ -78,14 +79,14 @@ job. Today the app has candidates but nothing to place them into.
 | ✅ 4.2 **Email** | Send email from a candidate's page or an interview with templates (interview invitation, submit to client, application received, unsuccessful) filled from the candidate, job, interview and sender; sent in the background through the company's mail server, with replies to the sender; every email listed on the candidate's page with its state. Needs your mail server's SMTP settings for real sending. |
 | 🔜 4.3 **Reminders, calendar and inbox sync** | ✅ Interviewers emailed a reminder the day before (moved interviews at their new time, cancelled ones not at all). Waiting on you: Google / Microsoft calendar sync for interviews; replies coming back into the app |
 
-### Phase 5: AI and formatted CVs 🔜
+### Phase 5: AI and formatted CVs ✅
 
 | Step | Delivers |
 |---|---|
 | ✅ 5.1 **Formatted CVs** | The profile filled into a Word template (built-in standard, or your own uploaded one with placeholders); contact details hidden unless asked, salary only when asked by those who may see it, a summary, for a particular job; saved as the formatted CV, with a PDF |
 | ✅ 5.2 **Blind CVs** | A reference instead of the name; no contact details, nationality or work authorization; names, emails, phones and links scrubbed from text; the finished file checked for leaks before it is saved |
 | ✅ 5.3 **AI sidebar** | On candidate and job pages: summary, gaps and red flags, "how well does this candidate fit this job?", free questions; it sees only what the user may see, never names, contact details or salary; any OpenAI-compatible provider (DeepSeek), off until set up; a monthly token allowance per company |
-| 5.4 **CV vs job match** | A fit score per application with reasons quoted from the CV and the job ad |
+| ✅ 5.4 **CV vs job match** | A fit score per application with reasons quoted from the job (description and ad) and the CV, every quote checked and the score worked out from what passes; requirements about who a person is never scored; on the board (best fit first) and the candidate's page; off until the AI provider is set up, sharing the monthly allowance. Next: shortlisting candidates not yet on the job. |
 | ✅ 5.5 **Company auto-fill** | Name, phone, address, country, size, registration number and description read from the company's website (schema.org data, its contact page; robots.txt respected), as suggestions with their source you accept or dismiss |
 
 ### Phase 6: agency business and reports ✅

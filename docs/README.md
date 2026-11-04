@@ -11,8 +11,8 @@ Read in this order. Each page is short and links to the next.
 4. **[Access control](access-control.md)**: roles, permissions, and how salary
    and other sensitive data stay hidden.
 5. **[Data model](data-model.md)**: the records and their fields, today and planned.
-6. **[AI worker](ai-worker.md)**: reading CVs (text, OCR), and the plan for
-   parsing, formatting, blind CVs, matching and the AI assistant.
+6. **[AI worker](ai-worker.md)**: reading CVs (text, OCR), parsing,
+   formatting and blind CVs, the AI assistant and CV vs job matching.
 7. **[Integrations](integrations.md)**: job ads puller, company auto-fill, email
    verifier, email, calendars, job boards, public API.
 8. **[Roadmap](roadmap.md)**: the milestones, in order.

@@ -50,6 +50,8 @@ class Permission(StrEnum):
     jobs_update = "jobs:update"
     leads_manage = "leads:manage"
     leads_read = "leads:read"
+    matching_create = "matching:create"
+    matching_read = "matching:read"
     notes_activity_read = "notes.activity:read"
     notes_sensitive_read = "notes.sensitive:read"
     notes_create = "notes:create"
@@ -86,6 +88,9 @@ class ErrorCode(StrEnum):
     INTERVIEW_NOT_ALLOWED = "INTERVIEW_NOT_ALLOWED"
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
     LINK_NOT_VALID = "LINK_NOT_VALID"
+    MATCHING_LIMIT_REACHED = "MATCHING_LIMIT_REACHED"
+    MATCHING_OFF = "MATCHING_OFF"
+    MATCH_NEEDS_TEXT = "MATCH_NEEDS_TEXT"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
@@ -116,6 +121,8 @@ class JobKind(StrEnum):
     email_send = "email.send"
     interview_remind = "interview.remind"
     lead_source_check = "lead_source.check"
+    match_score = "match.score"
+    match_scored = "match.scored"
     webhook_deliver = "webhook.deliver"
 
 
@@ -1747,6 +1754,131 @@ class LeadSourceCheckJob(BaseModel):
             description='The check this job is for; an older one (replaced by a "check now") does nothing.'
         ),
     ]
+
+
+class MatchId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["mat_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^mat_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class MatchStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class MatchVerdict(StrEnum):
+    met = "met"
+    partly = "partly"
+    missing = "missing"
+
+
+class MatchReason(BaseModel):
+    requirement: Annotated[str, Field(description="A requirement, quoted from the job's description or ad.")]
+    verdict: MatchVerdict
+    evidence: Annotated[
+        str | None,
+        Field(description="What shows it, quoted from the CV (empty for those who may not see CVs)."),
+    ]
+    note: Annotated[str | None, Field(description="The AI's short explanation.")]
+
+
+class Match(BaseModel):
+    id: MatchId
+    applicationId: str
+    jobId: str
+    status: MatchStatus
+    score: Annotated[
+        int | None,
+        Field(
+            description="How much of the job's requirements the CV shows: met counts in full, partly as half.",
+            ge=0,
+            le=100,
+        ),
+    ]
+    summary: Annotated[str | None, Field(description="The AI's overall view, in a sentence or two.")]
+    reasons: list[MatchReason]
+    dropped: Annotated[
+        int,
+        Field(
+            description="Requirements the AI listed that were left out: their quote was not in the job's text (or their verdict could not be read).",
+            ge=0,
+        ),
+    ]
+    error: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(description="The AI model that scored it.")]
+    createdAt: AwareDatetime
+    scoredAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class MatchList(BaseModel):
+    enabled: Annotated[bool, Field(description="Whether an AI provider is set up.")]
+    items: list[Match]
+
+
+class MatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    applicationId: Annotated[str, Field(max_length=40)]
+
+
+class MatchJobRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jobId: Annotated[str, Field(max_length=40)]
+    rescore: Annotated[bool, Field(description="Also score again those already scored.")] = False
+
+
+class MatchJobResult(BaseModel):
+    queued: Annotated[int, Field(description="Candidates sent to the AI.")]
+    alreadyScored: Annotated[int, Field(description="Candidates left as they are (scored, or waiting).")]
+    withoutCv: Annotated[int, Field(description="Candidates without a CV with readable text.")]
+
+
+class MatchScoreJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    matchId: MatchId
+    job: Annotated[str, Field(description="The job's title, details, description and ad, without salary.")]
+    cv: Annotated[str, Field(description="The CV's text, without names, contact details or salary.")]
+
+
+class MatchClaim(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    requirement: Annotated[str, Field(description="Quoted from the job's text.", max_length=2000)]
+    verdict: MatchVerdict
+    evidence: Annotated[str | None, Field(description="Quoted from the CV's text.", max_length=2000)]
+    note: Annotated[str | None, Field(max_length=2000)]
+
+
+class MatchScoredJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    matchId: MatchId
+    summary: Annotated[str | None, Field(max_length=2000)]
+    claims: Annotated[
+        list[MatchClaim],
+        Field(
+            description="The AI's reading, not yet checked against the texts (Go checks every quote).",
+            max_length=30,
+        ),
+    ]
+    error: Annotated[
+        str | None,
+        Field(
+            description="Why there is no score (provider down, switched off, an answer that could not be read)."
+        ),
+    ]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class NoteId(RootModel[str]):

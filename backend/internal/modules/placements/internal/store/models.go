@@ -371,6 +371,27 @@ type JobLead struct {
 	UpdatedAt   time.Time
 }
 
+type JobMatch struct {
+	ID            string
+	TenantID      string
+	ApplicationID string
+	JobID         string
+	Status        string
+	Score         *int32
+	Summary       *string
+	Reasons       []byte
+	Dropped       int32
+	Error         *string
+	Model         *string
+	InputTokens   int32
+	OutputTokens  int32
+	SentJob       *string
+	SentCv        *string
+	CreatedBy     string
+	CreatedAt     time.Time
+	ScoredAt      *time.Time
+}
+
 type JobOrder struct {
 	ID              string
 	TenantID        string

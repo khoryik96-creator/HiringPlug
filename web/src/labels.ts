@@ -87,6 +87,12 @@ export const SUGGESTION_FIELD: Record<Schemas["CompanySuggestionField"], string>
   about: "About",
 };
 
+export const MATCH_VERDICT: Record<Schemas["MatchVerdict"], string> = {
+  met: "Meets",
+  partly: "Partly",
+  missing: "Not in the CV",
+};
+
 export const ASSISTANT_KIND: Record<Schemas["AssistantKind"], string> = {
   summary: "Summary",
   red_flags: "Gaps and red flags",

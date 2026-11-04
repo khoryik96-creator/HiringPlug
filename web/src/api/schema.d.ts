@@ -1265,6 +1265,50 @@ export interface paths {
         patch: operations["updateJobLead"];
         trace?: never;
     };
+    "/v1/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest fit score of each application on a job, or of one application
+         * @description Give jobId or applicationId. Also says whether matching is switched on.
+         */
+        get: operations["listMatches"];
+        put?: never;
+        /**
+         * Score how well a candidate fits the job they are on (in the background)
+         * @description A score already waiting for the AI is returned instead of asking again.
+         */
+        post: operations["scoreApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/matches/for-job": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score the fit of every active candidate on a job (in the background)
+         * @description Candidates already scored (or waiting) are left as they are unless rescore is true; candidates without a CV with readable text are counted and left out. At most 100 candidates at a time.
+         */
+        post: operations["scoreJobApplications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes": {
         parameters: {
             query?: never;
@@ -1596,11 +1640,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "webhook.deliver";
+        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2930,6 +2974,97 @@ export interface components {
              */
             runAt: string;
         };
+        /** @example mat_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        MatchId: string;
+        /**
+         * @description queued = waiting for the AI; done = scored; failed = no score (see error).
+         * @enum {string}
+         */
+        MatchStatus: "queued" | "done" | "failed";
+        /**
+         * @description met = the CV shows it; partly = the CV shows some of it; missing = the CV does not show it.
+         * @enum {string}
+         */
+        MatchVerdict: "met" | "partly" | "missing";
+        MatchReason: {
+            /** @description A requirement, quoted from the job's description or ad. */
+            requirement: string;
+            verdict: components["schemas"]["MatchVerdict"];
+            /** @description What shows it, quoted from the CV (empty for those who may not see CVs). */
+            evidence: string | null;
+            /** @description The AI's short explanation. */
+            note: string | null;
+        };
+        Match: {
+            id: components["schemas"]["MatchId"];
+            applicationId: string;
+            jobId: string;
+            status: components["schemas"]["MatchStatus"];
+            /** @description How much of the job's requirements the CV shows: met counts in full, partly as half. */
+            score: number | null;
+            /** @description The AI's overall view, in a sentence or two. */
+            summary: string | null;
+            reasons: components["schemas"]["MatchReason"][];
+            /** @description Requirements the AI listed that were left out: their quote was not in the job's text (or their verdict could not be read). */
+            dropped: number;
+            error: string | null;
+            /** @description The AI model that scored it. */
+            model: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            scoredAt: string | null;
+        };
+        MatchList: {
+            /** @description Whether an AI provider is set up. */
+            enabled: boolean;
+            items: components["schemas"]["Match"][];
+        };
+        MatchRequest: {
+            applicationId: string;
+        };
+        MatchJobRequest: {
+            jobId: string;
+            /**
+             * @description Also score again those already scored.
+             * @default false
+             */
+            rescore: boolean;
+        };
+        MatchJobResult: {
+            /** @description Candidates sent to the AI. */
+            queued: number;
+            /** @description Candidates left as they are (scored, or waiting). */
+            alreadyScored: number;
+            /** @description Candidates without a CV with readable text. */
+            withoutCv: number;
+        };
+        MatchScoreJob: {
+            matchId: components["schemas"]["MatchId"];
+            /** @description The job's title, details, description and ad, without salary. */
+            job: string;
+            /** @description The CV's text, without names, contact details or salary. */
+            cv: string;
+        };
+        MatchClaim: {
+            /** @description Quoted from the job's text. */
+            requirement: string;
+            verdict: components["schemas"]["MatchVerdict"];
+            /** @description Quoted from the CV's text. */
+            evidence: string | null;
+            note: string | null;
+        };
+        MatchScoredJob: {
+            matchId: components["schemas"]["MatchId"];
+            summary: string | null;
+            /** @description The AI's reading, not yet checked against the texts (Go checks every quote). */
+            claims: components["schemas"]["MatchClaim"][];
+            /** @description Why there is no score (provider down, switched off, an answer that could not be read). */
+            error: string | null;
+            model: string | null;
+            inputTokens: number;
+            outputTokens: number;
+        };
         /** @example note_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         NoteId: string;
         /** @enum {string} */
@@ -3471,6 +3606,24 @@ export interface components {
         };
         /** @description Not allowed (INTERVIEW_NOT_ALLOWED). */
         InterviewNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Switched off (MATCHING_OFF), or nothing to compare yet (MATCH_NEEDS_TEXT). */
+        MatchingUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description This month's AI allowance is used (MATCHING_LIMIT_REACHED). */
+        MatchingLimitReached: {
             headers: {
                 [name: string]: unknown;
             };
@@ -5965,6 +6118,92 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listMatches: {
+        parameters: {
+            query?: {
+                jobId?: string;
+                applicationId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    scoreApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Match"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["MatchingUnavailable"];
+            429: components["responses"]["MatchingLimitReached"];
+        };
+    };
+    scoreJobApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchJobResult"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["MatchingUnavailable"];
+            429: components["responses"]["MatchingLimitReached"];
         };
     };
     listNotes: {

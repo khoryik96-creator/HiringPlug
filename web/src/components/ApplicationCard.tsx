@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { Application, Schemas } from "../api/client";
 import { CHANNEL, CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
+import { FitBadge, type Match } from "./Fit";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
@@ -60,9 +61,11 @@ export function timeInStage(app: Application, now = Date.now()): string {
   return days === 1 ? "1 day" : `${String(days)} days`;
 }
 
-/** A candidate's card on a job's board: drag it to another column, or use the menu. */
-export function ApplicationCard({ app, canMove, onMove, busy, onDragStart }: {
+/** A candidate's card on a job's board: drag it to another column, or use the menu. Its fit badge opens the reasons. */
+export function ApplicationCard({ app, match, onShowFit, canMove, onMove, busy, onDragStart }: {
   app: Application;
+  match?: Match;
+  onShowFit?: (app: Application) => void;
   canMove: boolean;
   onMove: (m: MoveRequest) => void;
   busy: boolean;
@@ -78,6 +81,11 @@ export function ApplicationCard({ app, canMove, onMove, busy, onDragStart }: {
       {app.candidateTitle && <div className="muted">{app.candidateTitle}</div>}
       <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}</div>
       {app.channel && <div className="muted">Applied via {CHANNEL[app.channel]}</div>}
+      {match && (
+        <button type="button" className="link" aria-label={`Fit of ${app.candidateName}: why?`} onClick={() => onShowFit?.(app)}>
+          <FitBadge match={match} />
+        </button>
+      )}
       {canMove && <MoveMenu app={app} onMove={onMove} busy={busy} />}
     </div>
   );
