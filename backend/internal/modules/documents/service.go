@@ -29,7 +29,12 @@ type Service struct {
 	pool       *pgxpool.Pool
 	files      *blob.Store
 	candidates Candidates
+	whenRead   []TextReadHook
 }
+
+// TextReadHook runs when a candidate's CV (not one the app made) has been
+// read, in the same transaction (e.g. CV vs job matching scores them again).
+type TextReadHook func(ctx context.Context, tx pgx.Tx, tenantID, candidateID string) error
 
 // Upload stores a file for a candidate and queues its text extraction. The
 // document row and the job are committed together: there is never a document

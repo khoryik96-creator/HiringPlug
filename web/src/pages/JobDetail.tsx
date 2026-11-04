@@ -11,6 +11,7 @@ import { JobForm } from "../components/JobForm";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
+import { PossibleCandidates } from "../components/PossibleCandidates";
 import { JOB_STATUS, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 
 /** One job. Render it with key={id} so edit state never carries over. */
@@ -65,6 +66,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
       {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
+      <PossibleCandidates jobId={j.id} permissions={permissions} />
       <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
       <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />

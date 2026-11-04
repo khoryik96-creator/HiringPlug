@@ -178,8 +178,13 @@ gender, race, religion, marital status or nationality are dropped; the score
 is worked out from what passes (met 1, partly ½). It suggests; recruiters
 decide.
 
-**Next:** embeddings (PostgreSQL with pgvector) to shortlist candidates who
-are not on the job yet; the model then explains the top ones the same way.
+Scores are asked for automatically too (on joining a job, on a new CV), and
+marked outdated when the job's text changes (`job_match.job_hash`). Possible
+candidates for a job come from a PostgreSQL full-text search of CVs
+(`cv_search`, kept by a trigger), not from the model.
+
+**Next:** embeddings (PostgreSQL with pgvector) to find possible candidates by
+meaning; the model then explains the top ones the same way.
 
 ## AI assistant (built)
 

@@ -40,7 +40,22 @@ func (h *HTTP) ScoreJobApplications(ctx context.Context, req api.ScoreJobApplica
 	if err != nil {
 		return nil, err
 	}
-	return api.ScoreJobApplications202JSONResponse{Queued: res.Queued, AlreadyScored: res.AlreadyScored, WithoutCv: res.WithoutCV}, nil
+	return api.ScoreJobApplications202JSONResponse{Queued: res.Queued, AlreadyScored: res.AlreadyScored, WithoutCv: res.WithoutCV, ConsentWithdrawn: res.ConsentWithdrawn}, nil
+}
+
+// SuggestCandidates handles GET /v1/matches/suggestions.
+func (h *HTTP) SuggestCandidates(ctx context.Context, req api.SuggestCandidatesRequestObject) (api.SuggestCandidatesResponseObject, error) {
+	found, err := h.svc.Suggest(ctx, authz.MustFromContext(ctx), req.Params.JobId)
+	if err != nil {
+		return nil, err
+	}
+	out := api.SuggestCandidates200JSONResponse{Items: make([]api.MatchSuggestion, len(found))}
+	for i, s := range found {
+		out.Items[i] = api.MatchSuggestion{
+			CandidateId: s.CandidateID, CandidateName: s.Name, CurrentTitle: apiconv.OrNull(s.Title), Rank: float32(s.Rank), Snippet: s.Snippet,
+		}
+	}
+	return out, nil
 }
 
 func toAPI(m Match) api.Match {
@@ -52,7 +67,7 @@ func toAPI(m Match) api.Match {
 	}
 	return api.Match{
 		Id: m.ID, ApplicationId: m.ApplicationID, JobId: m.JobID, Status: api.MatchStatus(m.Status), Score: apiconv.OrNull(m.Score),
-		Summary: apiconv.OrNull(m.Summary), Reasons: reasons, Dropped: m.Dropped, Error: apiconv.OrNull(m.Error),
+		Summary: apiconv.OrNull(m.Summary), Reasons: reasons, Dropped: m.Dropped, Outdated: m.Outdated, Error: apiconv.OrNull(m.Error),
 		Model: apiconv.OrNull(m.Model), CreatedAt: m.CreatedAt, ScoredAt: apiconv.OrNull(m.ScoredAt),
 	}
 }

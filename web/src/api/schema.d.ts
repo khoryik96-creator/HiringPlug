@@ -1408,6 +1408,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/matches/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Possible candidates for a job - people not on it whose CVs share the most words with the job's text
+         * @description A keyword search of CVs (not the AI, so it works without one), best first, at most 20. Leaves out candidates already on the job, those who withdrew consent, and those you may not see.
+         */
+        get: operations["suggestCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/matches/for-job": {
         parameters: {
             query?: never;
@@ -1879,7 +1899,7 @@ export interface components {
         /** @enum {string} */
         Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
@@ -3311,6 +3331,8 @@ export interface components {
             reasons: components["schemas"]["MatchReason"][];
             /** @description Requirements the AI listed that were left out: their quote was not in the job's text (or their verdict could not be read). */
             dropped: number;
+            /** @description The job's description or ad changed after it was scored: score it again. */
+            outdated: boolean;
             error: string | null;
             /** @description The AI model that scored it. */
             model: string | null;
@@ -3342,6 +3364,20 @@ export interface components {
             alreadyScored: number;
             /** @description Candidates without a CV with readable text. */
             withoutCv: number;
+            /** @description Candidates who withdrew consent (left out). */
+            consentWithdrawn: number;
+        };
+        MatchSuggestion: {
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            currentTitle: string | null;
+            /** @description How much the CV shares the job's words, 0 to 1 (only for ordering). */
+            rank: number;
+            /** @description Where the CV mentions the job's words, which are marked [[like this]]. */
+            snippet: string;
+        };
+        MatchSuggestionList: {
+            items: components["schemas"]["MatchSuggestion"][];
         };
         MatchScoreJob: {
             matchId: components["schemas"]["MatchId"];
@@ -4065,7 +4101,7 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Switched off (MATCHING_OFF), or nothing to compare yet (MATCH_NEEDS_TEXT). */
+        /** @description Switched off (MATCHING_OFF), nothing to compare yet (MATCH_NEEDS_TEXT), or the candidate withdrew consent (MATCH_CONSENT_WITHDRAWN). */
         MatchingUnavailable: {
             headers: {
                 [name: string]: unknown;
@@ -6865,6 +6901,33 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["MatchingUnavailable"];
             429: components["responses"]["MatchingLimitReached"];
+        };
+    };
+    suggestCandidates: {
+        parameters: {
+            query: {
+                jobId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSuggestionList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["MatchingUnavailable"];
         };
     };
     scoreJobApplications: {

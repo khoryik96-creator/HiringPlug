@@ -76,6 +76,43 @@ func (m *Module) OpenOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]OnJo
 	return out, nil
 }
 
+// WhenAdded registers what runs when a candidate is put on a job (called by
+// internal/app once every module exists).
+func (m *Module) WhenAdded(hooks ...AddedHook) { m.service.whenAdded = hooks }
+
+// CandidatesOnJob returns the candidates on a job, at any stage, in the
+// caller's transaction.
+func (m *Module) CandidatesOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error) {
+	rows, err := store.New(tx).ListJobApplications(ctx, jobID)
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.CandidateID
+	}
+	return out, err
+}
+
+// OnJobOf is an application of a candidate, with its job.
+type OnJobOf struct {
+	OnJob
+	JobID string
+}
+
+// OpenOfCandidate returns a candidate's applications that are not rejected
+// or withdrawn, in the caller's transaction.
+func (m *Module) OpenOfCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]OnJobOf, error) {
+	rows, err := store.New(tx).ListCandidateApplications(ctx, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	var out []OnJobOf
+	for _, r := range rows {
+		if !IsClosed(r.Stage) {
+			out = append(out, OnJobOf{OnJob: OnJob{ID: r.ID, CandidateID: r.CandidateID, Stage: r.Stage}, JobID: r.JobOrderID})
+		}
+	}
+	return out, nil
+}
+
 // ReachInterview moves an application to the interview stage when it is at an
 // earlier one (applied, screening, submitted), in the caller's transaction:
 // scheduling an interview means the candidate got that far.

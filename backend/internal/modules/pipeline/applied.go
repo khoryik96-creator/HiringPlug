@@ -14,7 +14,7 @@ import (
 // transaction (the careers page's apply form). A candidate already on the job
 // stays where they are: added is false.
 // channel is where they came from (careers_page, linkedin, ...).
-func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID, channel string) (added bool, err error) {
+func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, tenantID, jobID, candidateID, channel string) (added bool, err error) {
 	row, err := store.New(tx).InsertApplication(ctx, store.InsertApplicationParams{
 		JobOrderID: jobID, CandidateID: candidateID, Stage: Applied, Channel: &channel,
 	})
@@ -24,8 +24,11 @@ func (m *Module) AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID, 
 	if err != nil {
 		return false, err
 	}
-	return true, audit.Record(ctx, tx, audit.Entry{
+	if err := audit.Record(ctx, tx, audit.Entry{
 		Action: "application.created", EntityType: "application", EntityID: row.ID,
 		Changes: map[string]any{"jobId": jobID, "candidateId": candidateID, "stage": Applied, "channel": channel},
-	})
+	}); err != nil {
+		return false, err
+	}
+	return true, m.service.added(ctx, tx, tenantID, OnJob{ID: row.ID, CandidateID: candidateID, Stage: Applied}, jobID)
 }

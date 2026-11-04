@@ -2,21 +2,21 @@
 -- Lists never return sent_job / sent_cv: they are only for checking the AI's quotes.
 
 -- name: InsertMatch :one
-INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, created_by)
-VALUES (app_current_tenant(), @application_id, @job_id, @sent_job, @sent_cv, app_current_user())
-RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at;
+INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, job_hash, created_by)
+VALUES (app_current_tenant(), @application_id, @job_id, @sent_job, @sent_cv, @job_hash, app_current_user())
+RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash;
 
 -- The latest score of each of a job's applications.
 -- name: LatestForJob :many
 SELECT DISTINCT ON (application_id)
-  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at
+  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
 FROM job_match
 WHERE job_id = @job_id
 ORDER BY application_id, created_at DESC, id DESC
 LIMIT 1000;
 
 -- name: LatestForApplication :many
-SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at
+SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
 FROM job_match
 WHERE application_id = @application_id
 ORDER BY created_at DESC, id DESC

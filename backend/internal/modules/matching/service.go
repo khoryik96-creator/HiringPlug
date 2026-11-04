@@ -33,13 +33,15 @@ type Match struct {
 	Summary                          *string
 	Reasons                          []Reason
 	Dropped                          int
+	Outdated                         bool
+	JobHash                          *string
 	Error, Model                     *string
 	CreatedAt                        time.Time
 	ScoredAt                         *time.Time
 }
 
 // JobResult is what scoring a job's candidates did.
-type JobResult struct{ Queued, AlreadyScored, WithoutCV int }
+type JobResult struct{ Queued, AlreadyScored, WithoutCV, ConsentWithdrawn int }
 
 // maxBatch is how many candidates one "score them all" sends to the AI.
 const maxBatch = 100
@@ -72,11 +74,18 @@ func (s *Service) List(ctx context.Context, p authz.Principal, jobID, applicatio
 		if err != nil {
 			return err
 		}
+		hashes := map[string]string{} // the job's text now, per job
 		for _, r := range rows {
 			m, err := fromRow(r)
 			if err != nil {
 				return err
 			}
+			if _, ok := hashes[m.JobID]; !ok {
+				if hashes[m.JobID], err = s.currentHash(ctx, tx, p.TenantID, m.JobID); err != nil {
+					return err
+				}
+			}
+			m.Outdated = Outdated(m.Status, m.JobHash, hashes[m.JobID])
 			m.Reasons = Visible(m.Reasons, p.Can(api.PermissionDocumentsRead))
 			out = append(out, m)
 		}
@@ -104,6 +113,13 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 		if len(latest) == 1 && latest[0].Status == "queued" {
 			out, err = fromRow(store.LatestForJobRow(latest[0]))
 			return err
+		}
+		if no, err := s.consentWithdrawn(ctx, tx, a.CandidateID); err != nil || no {
+			if err != nil {
+				return err
+			}
+			return apperr.New(api.ErrorCodeMATCHCONSENTWITHDRAWN,
+				"This candidate withdrew consent to their data being used, so it is not sent to the AI.")
 		}
 		if err := s.withinAllowance(ctx, tx); err != nil {
 			return err
@@ -164,6 +180,12 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 			}
 			if res.Queued == maxBatch {
 				break
+			}
+			if no, err := s.consentWithdrawn(ctx, tx, a.CandidateID); err != nil {
+				return err
+			} else if no {
+				res.ConsentWithdrawn++
+				continue
 			}
 			cv, err := s.cvText(ctx, tx, p, a.CandidateID)
 			if err != nil {
@@ -252,7 +274,8 @@ func (s *Service) cvText(ctx context.Context, tx pgx.Tx, p authz.Principal, cand
 // queue saves a match waiting for the AI, with what it is sent, and queues
 // the question for the AI worker.
 func (s *Service) queue(ctx context.Context, tx pgx.Tx, p authz.Principal, a Application, job, cv string) (Match, error) {
-	row, err := store.New(tx).InsertMatch(ctx, store.InsertMatchParams{ApplicationID: a.ID, JobID: a.JobID, SentJob: &job, SentCv: &cv})
+	hash := Hash(job)
+	row, err := store.New(tx).InsertMatch(ctx, store.InsertMatchParams{ApplicationID: a.ID, JobID: a.JobID, SentJob: &job, SentCv: &cv, JobHash: &hash})
 	if err != nil {
 		return Match{}, err
 	}
@@ -271,7 +294,7 @@ func (s *Service) queue(ctx context.Context, tx pgx.Tx, p authz.Principal, a App
 func fromRow(r store.LatestForJobRow) (Match, error) {
 	m := Match{
 		ID: r.ID, ApplicationID: r.ApplicationID, JobID: r.JobID, Status: r.Status, Summary: r.Summary,
-		Dropped: int(r.Dropped), Error: r.Error, Model: r.Model, CreatedAt: r.CreatedAt, ScoredAt: r.ScoredAt,
+		Dropped: int(r.Dropped), JobHash: r.JobHash, Error: r.Error, Model: r.Model, CreatedAt: r.CreatedAt, ScoredAt: r.ScoredAt,
 	}
 	if r.Score != nil {
 		score := int(*r.Score)

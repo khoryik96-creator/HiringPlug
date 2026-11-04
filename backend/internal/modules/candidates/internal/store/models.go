@@ -230,6 +230,13 @@ type Contact struct {
 	UpdatedAt         time.Time
 }
 
+type CvSearch struct {
+	DocumentID  string
+	TenantID    string
+	CandidateID string
+	Terms       interface{}
+}
+
 type CvTemplate struct {
 	ID         string
 	TenantID   string
@@ -404,6 +411,7 @@ type JobMatch struct {
 	CreatedBy     string
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
+	JobHash       *string
 }
 
 type JobOrder struct {

@@ -32,9 +32,9 @@ func (q *Queries) GetQueuedForUpdate(ctx context.Context, id string) (GetQueuedF
 
 const insertMatch = `-- name: InsertMatch :one
 
-INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
-RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at
+INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, job_hash, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
+RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
 `
 
 type InsertMatchParams struct {
@@ -42,6 +42,7 @@ type InsertMatchParams struct {
 	JobID         string
 	SentJob       *string
 	SentCv        *string
+	JobHash       *string
 }
 
 type InsertMatchRow struct {
@@ -57,6 +58,7 @@ type InsertMatchRow struct {
 	Model         *string
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
+	JobHash       *string
 }
 
 // Queries owned by the matching module. Run inside a tenant-scoped transaction.
@@ -67,6 +69,7 @@ func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) (Inser
 		arg.JobID,
 		arg.SentJob,
 		arg.SentCv,
+		arg.JobHash,
 	)
 	var i InsertMatchRow
 	err := row.Scan(
@@ -82,12 +85,13 @@ func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) (Inser
 		&i.Model,
 		&i.CreatedAt,
 		&i.ScoredAt,
+		&i.JobHash,
 	)
 	return i, err
 }
 
 const latestForApplication = `-- name: LatestForApplication :many
-SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at
+SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
 FROM job_match
 WHERE application_id = $1
 ORDER BY created_at DESC, id DESC
@@ -107,6 +111,7 @@ type LatestForApplicationRow struct {
 	Model         *string
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
+	JobHash       *string
 }
 
 func (q *Queries) LatestForApplication(ctx context.Context, applicationID string) ([]LatestForApplicationRow, error) {
@@ -131,6 +136,7 @@ func (q *Queries) LatestForApplication(ctx context.Context, applicationID string
 			&i.Model,
 			&i.CreatedAt,
 			&i.ScoredAt,
+			&i.JobHash,
 		); err != nil {
 			return nil, err
 		}
@@ -144,7 +150,7 @@ func (q *Queries) LatestForApplication(ctx context.Context, applicationID string
 
 const latestForJob = `-- name: LatestForJob :many
 SELECT DISTINCT ON (application_id)
-  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at
+  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
 FROM job_match
 WHERE job_id = $1
 ORDER BY application_id, created_at DESC, id DESC
@@ -164,6 +170,7 @@ type LatestForJobRow struct {
 	Model         *string
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
+	JobHash       *string
 }
 
 // The latest score of each of a job's applications.
@@ -189,6 +196,7 @@ func (q *Queries) LatestForJob(ctx context.Context, jobID string) ([]LatestForJo
 			&i.Model,
 			&i.CreatedAt,
 			&i.ScoredAt,
+			&i.JobHash,
 		); err != nil {
 			return nil, err
 		}

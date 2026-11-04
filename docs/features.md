@@ -199,9 +199,20 @@ for each of their jobs, with **Score fit** / **Score again**.
   the job queue → Python AI worker (`jobs/match_score.py`) → provider →
   `match.scored` → Go checks the quotes, works out the score and saves it; the
   page polls while scores are on their way.
-- **Later:** shortlisting candidates who are not on the job yet (embeddings),
-  scoring automatically when someone applies, and flagging scores whose CV or
-  job changed since.
+- **Scored without being asked** while an AI provider is set up: when someone
+  is put on a job or applies (as soon as their CV has text), and again when a
+  new CV of theirs is read. Not those who withdrew consent (asking is refused
+  too, `MATCH_CONSENT_WITHDRAWN`), and nothing once the month's allowance is
+  used.
+- **Outdated scores**: once the job's description or ad changes, its scores
+  say "outdated"; **Score all again** refreshes them.
+- **Possible candidates** on each job's page: people not on the job whose CVs
+  share the most words with its description and ad (a keyword search of CVs,
+  not the AI, so it works without one), best first, with where their CV has
+  those words. Those who withdrew consent, and those the user may not see, are
+  left out. **Add to job** puts them on it (and scores them).
+- **Later:** finding possible candidates by meaning rather than words
+  (embeddings).
 
 ## 1, 2. Companies and contacts
 

@@ -110,3 +110,20 @@ func TestScoreAndWhatOthersSee(t *testing.T) {
 	assert.Len(t, []rune(*long), maxSummary)
 	assert.True(t, strings.HasSuffix(*long, "…"))
 }
+
+func TestAScoreIsOutdatedOnceItsJobChanges(t *testing.T) {
+	text, _ := JobText(Job{Title: "Clerk", Description: ptrs("Filing.")})
+	h := Hash(text)
+	assert.Len(t, h, 64)
+	assert.False(t, Outdated("done", &h, h))
+	changed, _ := JobText(Job{Title: "Clerk", Description: ptrs("Filing and typing.")})
+	assert.True(t, Outdated("done", &h, Hash(changed)))
+	assert.False(t, Outdated("queued", &h, Hash(changed)), "not while it is being scored")
+	assert.False(t, Outdated("done", nil, Hash(changed)), "older scores have no hash")
+}
+
+func TestPossibleCandidatesAreLookedForWithTheJobsWordsOnly(t *testing.T) {
+	got := SearchText(Job{Title: "Finance Manager", CompanyName: "Maju Bhd", Location: ptrs("KL"),
+		Description: ptrs("Audit and SAP.\nSalary: RM 9,000"), AdTitle: ptrs("Finance Manager (KL)"), AdText: ptrs("MFRS reporting")})
+	assert.Equal(t, "Finance Manager\nAudit and SAP.\n[salary removed]\nFinance Manager (KL)\nMFRS reporting", got)
+}

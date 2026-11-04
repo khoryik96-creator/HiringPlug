@@ -110,12 +110,13 @@ func NewModules(d Deps) *Modules {
 		Applications: assistantApplications{m.Pipeline}, OtherAIUse: matchingAIUse{m},
 	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
-		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: m.Documents,
-		Jobs: matchingJobs{m.Jobs}, OtherAIUse: m.Assistant,
+		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
+		Jobs: matchingJobs{m.Jobs}, OtherAIUse: m.Assistant, Consent: m.Privacy,
 	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
+	matchingHooks(m)
 	return m
 }
 

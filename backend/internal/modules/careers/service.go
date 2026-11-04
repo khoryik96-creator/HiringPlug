@@ -106,7 +106,7 @@ func (s *Service) Apply(ctx context.Context, slug, adID, clientAddr string, f Fo
 		if err != nil {
 			return err
 		}
-		added, err := s.deps.Pipeline.AddApplied(ctx, tx, ad.JobID, candidateID, applicant.Channel)
+		added, err := s.deps.Pipeline.AddApplied(ctx, tx, p.TenantID, ad.JobID, candidateID, applicant.Channel)
 		if err != nil {
 			return err
 		}

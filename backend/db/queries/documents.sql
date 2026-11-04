@@ -64,3 +64,23 @@ LIMIT 1;
 -- name: ListDocumentTexts :many
 SELECT id, source, file_name, status, extracted_text, created_at FROM document
 WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
+
+-- Possible candidates for a job: those whose CVs share the most words with
+-- the job's text (any of its words; each candidate's best CV), best first,
+-- leaving out the given candidates. The snippet marks the shared words.
+-- name: SearchCVs :many
+WITH q AS (
+  SELECT string_agg(quote_literal(l), ' | ')::tsquery AS query
+  FROM unnest(tsvector_to_array(to_tsvector('english', @job_text::text))) AS l
+), best AS (
+  SELECT DISTINCT ON (s.candidate_id) s.candidate_id, s.document_id, ts_rank_cd(s.terms, q.query, 32)::real AS rank
+  FROM cv_search s, q
+  WHERE q.query IS NOT NULL AND s.terms @@ q.query AND NOT (s.candidate_id = ANY (@exclude::text[]))
+  ORDER BY s.candidate_id, rank DESC
+)
+SELECT b.candidate_id, b.rank,
+       ts_headline('english', d.extracted_text, q.query,
+         'MaxFragments=2, MaxWords=14, MinWords=6, FragmentDelimiter=" ... ", StartSel=[[, StopSel=]]')::text AS snippet
+FROM best b JOIN document d ON d.id = b.document_id, q
+ORDER BY b.rank DESC, b.candidate_id
+LIMIT @row_limit;

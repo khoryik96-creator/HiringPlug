@@ -6,6 +6,8 @@ package matching
 // left. The AI never sets the score itself.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"math"
 	"regexp"
 	"strings"
@@ -29,6 +31,19 @@ type Job struct {
 
 // Application is a candidate on a job.
 type Application struct{ ID, CandidateID, JobID, Stage string }
+
+// CandidateBrief is how a possible candidate is shown.
+type CandidateBrief struct {
+	Name  string
+	Title *string
+}
+
+// CVHit is a candidate whose CV shares words with a job.
+type CVHit struct {
+	CandidateID string
+	Rank        float64
+	Snippet     string
+}
 
 // Verdicts: how much of a requirement the CV shows.
 const (
@@ -98,6 +113,30 @@ func JobText(j Job) (text string, ok bool) {
 		ok = true
 	}
 	return clip(b.String(), maxJobText), ok
+}
+
+// SearchText is what possible candidates are looked for with: the job's
+// title, description and ad, without salary or the labels JobText adds.
+func SearchText(j Job) string {
+	parts := []string{j.Title}
+	for _, s := range []*string{j.Description, j.AdTitle, j.AdText} {
+		if t := trimmed(s); t != "" {
+			parts = append(parts, redact.WithoutSalary(t))
+		}
+	}
+	return clip(strings.Join(parts, "\n"), maxJobText)
+}
+
+// Hash identifies a job text, to tell when a score's job has changed since.
+func Hash(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
+}
+
+// Outdated reports whether a finished score was made from another job text
+// than the job's now (scores from before this was recorded never are).
+func Outdated(status string, scoredHash *string, currentHash string) bool {
+	return status != "queued" && scoredHash != nil && *scoredHash != currentHash
 }
 
 // CVText is what the AI reads of a CV: its text without the candidate's

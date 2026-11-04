@@ -17,7 +17,7 @@ const match = (over: Partial<Match>): Match => ({
     { requirement: "Degree in Accounting", verdict: "met", evidence: "Bachelor of Accounting, UiTM", note: "Accounting degree." },
     { requirement: "5 years in audit", verdict: "missing", evidence: null, note: null },
   ],
-  dropped: 1, error: null, model: "deepseek-chat", createdAt: "2026-11-04T01:00:00Z", scoredAt: "2026-11-04T01:01:00Z", ...over,
+  dropped: 1, outdated: false, error: null, model: "deepseek-chat", createdAt: "2026-11-04T01:00:00Z", scoredAt: "2026-11-04T01:01:00Z", ...over,
 });
 const READ: Permission[] = ["matching:read", "pipeline:read"];
 const SCORE: Permission[] = [...READ, "matching:create"];
@@ -83,7 +83,7 @@ describe("fit on a job's board", () => {
       "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali"), app("a2", "Siti"), app("a3", "Wei")] },
       "/v1/matches": { enabled: true, items: [match({ applicationId: "a1", score: 40 }), match({ id: "mat_2", applicationId: "a2", score: 90 })] },
     });
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ queued: 1, alreadyScored: 2, withoutCv: 1 }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ queued: 1, alreadyScored: 2, withoutCv: 1, consentWithdrawn: 1 }));
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={SCORE} />);
     const column = screen.getByRole("list", { name: "Screening" });
     expect(await within(column).findByText("Fit 90%")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("fit on a job's board", () => {
     fireEvent.click(screen.getByRole("button", { name: "Score candidates' fit" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ jobId: "jo_1", rescore: false });
-    expect((await screen.findByText(/Scoring 1 candidate/)).textContent).toBe("Scoring 1 candidate(s)… 1 without a readable CV left out.");
+    expect((await screen.findByText(/Scoring 1 candidate/)).textContent).toBe("Scoring 1 candidate(s)… 1 without a readable CV left out. 1 who withdrew consent left out.");
     fireEvent.click(screen.getByRole("button", { name: "Score all again" }));
     await waitFor(() => { expect(sentBody(post, 1)).toEqual({ jobId: "jo_1", rescore: true }); });
   });
@@ -116,5 +116,13 @@ describe("fit on a job's board", () => {
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} />);
     await screen.findByText("Ali");
     expect(get.mock.calls.map((c) => c[0])).toEqual(["/v1/jobs/{jobId}/applications"]);
+  });
+});
+
+describe("an outdated score", () => {
+  it("says the job changed since", () => {
+    renderWithClient(<><FitBadge match={match({ outdated: true })} /><FitReasons match={match({ outdated: true })} open /></>);
+    expect(screen.getByText("Fit 50% · outdated").getAttribute("title")).toContain("score it again");
+    expect(screen.getByText(/changed after this score/)).toBeTruthy();
   });
 });

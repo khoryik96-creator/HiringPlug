@@ -108,6 +108,10 @@ x-error-codes:
     module: matching
     status: 409
     description: Matching is switched off (no AI provider is set up).
+  MATCH_CONSENT_WITHDRAWN:
+    module: matching
+    status: 409
+    description: The candidate withdrew consent to their data being used, so it is not sent to the AI.
   MATCH_NEEDS_TEXT:
     module: matching
     status: 409
@@ -2198,6 +2202,28 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/MatchingUnavailable'}
         '429': {$ref: '#/components/responses/MatchingLimitReached'}
+  /v1/matches/suggestions:
+    get:
+      operationId: suggestCandidates
+      tags: [matching]
+      summary: Possible candidates for a job - people not on it whose CVs share the most words with the job's text
+      description: >
+        A keyword search of CVs (not the AI, so it works without one), best first, at most 20. Leaves out candidates already on the job, those who withdrew consent, and those you may not see.
+
+      x-permission: matching:read
+      parameters:
+        - {name: jobId, in: query, required: true, schema: {type: string, maxLength: 40}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MatchSuggestionList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/MatchingUnavailable'}
   /v1/matches/for-job:
     post:
       operationId: scoreJobApplications
@@ -2854,7 +2880,7 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
     MatchingUnavailable:
-      description: Switched off (MATCHING_OFF), or nothing to compare yet (MATCH_NEEDS_TEXT).
+      description: Switched off (MATCHING_OFF), nothing to compare yet (MATCH_NEEDS_TEXT), or the candidate withdrew consent (MATCH_CONSENT_WITHDRAWN).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -2963,6 +2989,7 @@ components:
         - LINK_NOT_VALID
         - MATCHING_LIMIT_REACHED
         - MATCHING_OFF
+        - MATCH_CONSENT_WITHDRAWN
         - MATCH_NEEDS_TEXT
         - METHOD_NOT_ALLOWED
         - NOT_FOUND
@@ -5004,7 +5031,7 @@ components:
         note: {type: string, nullable: true, description: "The AI's short explanation."}
     Match:
       type: object
-      required: [id, applicationId, jobId, status, score, summary, reasons, dropped, error, model, createdAt, scoredAt]
+      required: [id, applicationId, jobId, status, score, summary, reasons, dropped, outdated, error, model, createdAt, scoredAt]
       properties:
         id: {$ref: '#/components/schemas/MatchId'}
         applicationId: {type: string}
@@ -5024,6 +5051,9 @@ components:
           type: integer
           minimum: 0
           description: "Requirements the AI listed that were left out: their quote was not in the job's text (or their verdict could not be read)."
+        outdated:
+          type: boolean
+          description: "The job's description or ad changed after it was scored: score it again."
         error: {type: string, nullable: true}
         model: {type: string, nullable: true, description: The AI model that scored it.}
         createdAt: {type: string, format: date-time}
@@ -5051,11 +5081,28 @@ components:
         rescore: {type: boolean, default: false, description: "Also score again those already scored."}
     MatchJobResult:
       type: object
-      required: [queued, alreadyScored, withoutCv]
+      required: [queued, alreadyScored, withoutCv, consentWithdrawn]
       properties:
         queued: {type: integer, description: Candidates sent to the AI.}
         alreadyScored: {type: integer, description: "Candidates left as they are (scored, or waiting)."}
         withoutCv: {type: integer, description: Candidates without a CV with readable text.}
+        consentWithdrawn: {type: integer, description: "Candidates who withdrew consent (left out)."}
+    MatchSuggestion:
+      type: object
+      required: [candidateId, candidateName, currentTitle, rank, snippet]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        currentTitle: {type: string, nullable: true}
+        rank: {type: number, minimum: 0, maximum: 1, description: "How much the CV shares the job's words, 0 to 1 (only for ordering)."}
+        snippet: {type: string, description: "Where the CV mentions the job's words, which are marked [[like this]]."}
+    MatchSuggestionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/MatchSuggestion'}
     MatchScoreJob:
       type: object
       additionalProperties: false

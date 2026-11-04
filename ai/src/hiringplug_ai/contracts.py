@@ -95,6 +95,7 @@ class ErrorCode(StrEnum):
     LINK_NOT_VALID = "LINK_NOT_VALID"
     MATCHING_LIMIT_REACHED = "MATCHING_LIMIT_REACHED"
     MATCHING_OFF = "MATCHING_OFF"
+    MATCH_CONSENT_WITHDRAWN = "MATCH_CONSENT_WITHDRAWN"
     MATCH_NEEDS_TEXT = "MATCH_NEEDS_TEXT"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
@@ -1909,6 +1910,9 @@ class Match(BaseModel):
             ge=0,
         ),
     ]
+    outdated: Annotated[
+        bool, Field(description="The job's description or ad changed after it was scored: score it again.")
+    ]
     error: Annotated[str | None, Field(...)]
     model: Annotated[str | None, Field(description="The AI model that scored it.")]
     createdAt: AwareDatetime
@@ -1939,6 +1943,26 @@ class MatchJobResult(BaseModel):
     queued: Annotated[int, Field(description="Candidates sent to the AI.")]
     alreadyScored: Annotated[int, Field(description="Candidates left as they are (scored, or waiting).")]
     withoutCv: Annotated[int, Field(description="Candidates without a CV with readable text.")]
+    consentWithdrawn: Annotated[int, Field(description="Candidates who withdrew consent (left out).")]
+
+
+class MatchSuggestion(BaseModel):
+    candidateId: CandidateId
+    candidateName: str
+    currentTitle: Annotated[str | None, Field(...)]
+    rank: Annotated[
+        float,
+        Field(
+            description="How much the CV shares the job's words, 0 to 1 (only for ordering).", ge=0.0, le=1.0
+        ),
+    ]
+    snippet: Annotated[
+        str, Field(description="Where the CV mentions the job's words, which are marked [[like this]].")
+    ]
+
+
+class MatchSuggestionList(BaseModel):
+    items: list[MatchSuggestion]
 
 
 class MatchScoreJob(BaseModel):

@@ -30,7 +30,11 @@ export function FitBadge({ match }: { match?: Match }) {
   if (!match) return null;
   if (match.status === "queued") return <span className="badge queued" role="status">Scoring fit…</span>;
   if (match.status === "failed" || match.score === null) return <span className="badge failed">No fit score</span>;
-  return <span className={`badge fit-${fitBand(match.score)}`}>Fit {match.score}%</span>;
+  return (
+    <span className={`badge fit-${fitBand(match.score)}`} title={match.outdated ? "The job's description or ad changed since: score it again" : undefined}>
+      Fit {match.score}%{match.outdated && " · outdated"}
+    </span>
+  );
 }
 
 /** Why: each requirement quoted from the job, with what the CV shows (folded unless open). */
@@ -50,6 +54,7 @@ export function FitReasons({ match, open = false }: { match: Match; open?: boole
           </li>
         ))}
       </ul>
+      {match.outdated && <p className="warning small">The job&apos;s description or ad changed after this score: score it again.</p>}
       <p className="muted small">
         Each requirement is quoted from the job and each “meets” from the CV; anything the AI could not quote does not count.
         {match.dropped > 0 && ` ${String(match.dropped)} requirement(s) it listed were left out: they are not in the job's text.`}
@@ -79,6 +84,7 @@ export function ScoreJobFit({ jobId, enabled, anyScored }: { jobId: string; enab
         <span className="muted small" role="status">
           {r.queued === 0 ? "Nothing new to score." : `Scoring ${String(r.queued)} candidate(s)…`}
           {r.withoutCv > 0 && ` ${String(r.withoutCv)} without a readable CV left out.`}
+          {r.consentWithdrawn > 0 && ` ${String(r.consentWithdrawn)} who withdrew consent left out.`}
         </span>
       )}
       <ErrorMessage error={score.error} />

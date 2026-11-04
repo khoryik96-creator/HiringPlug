@@ -45,7 +45,8 @@ tenant ─┬─ app_user (role)
 | `assistant_answer` | a question to the AI assistant: who asked, about what (candidate/job/application + id), kind, question, status (queued/done/failed), answer or error, model, input and output tokens, asked and answered; shown only to the asker |
 | `candidate_consent` | one per candidate: given or withdrawn (withdrawn = do not contact), how (careers form, email, phone, in person, document, on request), the day, note, recorded by, `version` |
 | `privacy_request` | a candidate's request about their data: kind (access, correction, withdraw consent, removal, other), received on, details, status (open/done/declined), outcome (required to close), closed by and when, `version`; never deletes data |
-| `job_match` | a fit score of an application: application, job, status (queued/done/failed), score 0-100, summary, reasons (requirement quoted from the job, verdict, evidence quoted from the CV, note), requirements dropped, error, model, input and output tokens, asked by and when, scored; what the AI was sent is kept only while queued |
+| `job_match` | a fit score of an application: application, job, status (queued/done/failed), score 0-100, summary, reasons (requirement quoted from the job, verdict, evidence quoted from the CV, note), requirements dropped, error, model, input and output tokens, asked by and when, scored, a hash of the job text (to tell when it is outdated); what the AI was sent is kept only while queued |
+| `cv_search` | the words of each candidate's CV (not formatted ones), as a full-text index, for possible candidates; kept in step with `document` by a trigger |
 | `cv_template` | the company's Word CV templates: name, stored file, uploaded by (the built-in standard one is not stored) |
 | `document` (PDF) | for formatted CVs made by the app: PDF status (queued/ready/failed), stored PDF, error |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
@@ -75,7 +76,7 @@ candidate belonging to the same company.
 | `pipeline` | stage templates per company | M3 |
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
-| `matching` | shortlists of candidates not on a job yet (embeddings) | later |
+| `matching` | possible candidates by meaning (embeddings) | later |
 | `communications` | inbox sync (replies on the timeline), threads, sequences | 4.3 |
 | `leads` | licensed job-data providers; contacts found for a lead's company | later |
 | `integrations` | API key, webhook subscription and delivery | M6 |

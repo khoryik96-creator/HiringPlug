@@ -54,6 +54,13 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 		if err := queueParse(ctx, tx, job.TenantID, row); err != nil {
 			return err
 		}
+		if row.Source != "formatted" {
+			for _, hook := range s.whenRead {
+				if err := hook(ctx, tx, job.TenantID, row.CandidateID); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "document.text_extracted", EntityType: "document", EntityID: result.DocumentId,

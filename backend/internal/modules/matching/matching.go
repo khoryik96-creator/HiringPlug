@@ -40,13 +40,26 @@ type Deps struct {
 		ForMatching(ctx context.Context, tx pgx.Tx, id string) (Application, error)
 		// OpenOnJob returns the job's applications that are not rejected or withdrawn.
 		OpenOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]Application, error)
+		// OpenOfCandidate returns the candidate's applications that are not rejected or withdrawn.
+		OpenOfCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]Application, error)
+		// CandidatesOnJob returns the candidates on a job, at any stage.
+		CandidatesOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error)
 	}
 	Candidates interface {
 		ForMatching(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Candidate, error)
+		// Briefs returns the given candidates the user may see (others are left out).
+		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]CandidateBrief, error)
 	}
-	// CVs returns the text of the candidate's newest CV ("" if none).
+	// CVs returns the text of the candidate's newest CV ("" if none), and
+	// finds CVs sharing words with a text (possible candidates).
 	CVs interface {
 		LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error)
+		SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]CVHit, error)
+	}
+	// Consent says whether a candidate withdrew consent (privacy module):
+	// their data is then not sent to the AI or suggested. Nil: nobody did.
+	Consent interface {
+		DoNotContact(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
 	}
 	Jobs interface {
 		ForMatching(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Job, error)

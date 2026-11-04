@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -39,7 +40,53 @@ func (a matchingApplications) OpenOnJob(ctx context.Context, tx pgx.Tx, jobID st
 	return out, err
 }
 
+func (a matchingApplications) OpenOfCandidate(ctx context.Context, tx pgx.Tx, candidateID string) ([]matching.Application, error) {
+	apps, err := a.pipeline.OpenOfCandidate(ctx, tx, candidateID)
+	out := make([]matching.Application, len(apps))
+	for i, x := range apps {
+		out[i] = matching.Application{ID: x.ID, CandidateID: x.CandidateID, JobID: x.JobID, Stage: x.Stage}
+	}
+	return out, err
+}
+
+func (a matchingApplications) CandidatesOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error) {
+	return a.pipeline.CandidatesOnJob(ctx, tx, jobID)
+}
+
 type matchingCandidates struct{ candidates *candidates.Module }
+
+func (a matchingCandidates) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]matching.CandidateBrief, error) {
+	briefs, err := a.candidates.Briefs(ctx, tx, ids)
+	out := make(map[string]matching.CandidateBrief, len(briefs))
+	for id, b := range briefs {
+		out[id] = matching.CandidateBrief{Name: b.Name, Title: b.CurrentTitle}
+	}
+	return out, err
+}
+
+type matchingCVs struct{ documents *documents.Module }
+
+func (a matchingCVs) LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error) {
+	return a.documents.LatestCVText(ctx, tx, candidateID)
+}
+
+func (a matchingCVs) SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]matching.CVHit, error) {
+	hits, err := a.documents.SearchCVs(ctx, tx, text, exclude, limit)
+	out := make([]matching.CVHit, len(hits))
+	for i, h := range hits {
+		out[i] = matching.CVHit{CandidateID: h.CandidateID, Rank: h.Rank, Snippet: h.Snippet}
+	}
+	return out, err
+}
+
+// matchingHooks scores candidates when they are put on a job or a new CV of
+// theirs is read (pipeline and documents call them; matching scores).
+func matchingHooks(m *Modules) {
+	m.Pipeline.WhenAdded(func(ctx context.Context, tx pgx.Tx, tenantID, jobID string, a pipeline.OnJob) error {
+		return m.Matching.WhenAdded(ctx, tx, tenantID, matching.Application{ID: a.ID, CandidateID: a.CandidateID, JobID: jobID, Stage: a.Stage})
+	})
+	m.Documents.WhenTextRead(m.Matching.WhenCVRead)
+}
 
 // ForMatching gives only what identifies the candidate, to take it out of
 // their CV's text: never their salary.

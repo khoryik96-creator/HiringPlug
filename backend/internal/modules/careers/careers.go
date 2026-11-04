@@ -68,7 +68,7 @@ type CVs interface {
 
 // Pipeline puts the applicant on the job (pipeline module).
 type Pipeline interface {
-	AddApplied(ctx context.Context, tx pgx.Tx, jobID, candidateID, channel string) (added bool, err error)
+	AddApplied(ctx context.Context, tx pgx.Tx, tenantID, jobID, candidateID, channel string) (added bool, err error)
 }
 
 // Deps are what the module uses from the others.

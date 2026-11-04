@@ -21,6 +21,20 @@ type Service struct {
 	candidates Candidates
 	jobs       Jobs
 	companies  Companies
+	whenAdded  []AddedHook
+}
+
+// AddedHook runs when a candidate is put on a job, in the same transaction
+// (e.g. CV vs job matching scores them). An error undoes the addition.
+type AddedHook func(ctx context.Context, tx pgx.Tx, tenantID, jobID string, a OnJob) error
+
+func (s *Service) added(ctx context.Context, tx pgx.Tx, tenantID string, a OnJob, jobID string) error {
+	for _, hook := range s.whenAdded {
+		if err := hook(ctx, tx, tenantID, jobID, a); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Add puts a candidate on a job at an open stage (applied by default).
@@ -61,6 +75,9 @@ func (s *Service) Add(ctx context.Context, p authz.Principal, jobID, candidateID
 			Action: "application.created", EntityType: "application", EntityID: row.ID,
 			Changes: map[string]any{"jobId": jobID, "candidateId": candidateID, "stage": stage},
 		}); err != nil {
+			return err
+		}
+		if err := s.added(ctx, tx, p.TenantID, OnJob{ID: row.ID, CandidateID: candidateID, Stage: stage}, jobID); err != nil {
 			return err
 		}
 		views, err := s.views(ctx, tx, []store.Application{row})

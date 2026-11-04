@@ -104,9 +104,8 @@ func TestMatchingQuotesTheJobAndTheCVAndNeverSeesSalary(t *testing.T) {
 
 	list := a.matches(token, "jobId="+job.Id)
 	assert.True(t, list.Enabled)
-	assert.Empty(t, list.Items)
-
-	queued := a.scoreFit(token, appl.Id)
+	require.Len(t, list.Items, 1, "putting a candidate with a CV on a job scores them, without being asked")
+	queued := list.Items[0]
 	assert.Equal(t, api.MatchStatusQueued, queued.Status)
 	assert.Equal(t, job.Id, queued.JobId)
 	assert.Equal(t, queued.Id, a.scoreFit(token, appl.Id).Id, "a score already waiting is not asked for again")
@@ -161,7 +160,8 @@ func TestMatchingQuotesTheJobAndTheCVAndNeverSeesSalary(t *testing.T) {
 		r := a.request(http.MethodPost, "/v1/matches/for-job", token, map[string]any{"jobId": job.Id})
 		require.Equal(t, http.StatusAccepted, r.Status, "%s", r.Body)
 		r.JSON(&res)
-		assert.Equal(t, api.MatchJobResult{Queued: 1, AlreadyScored: 1, WithoutCv: 1}, res, "Wei; Siti is scored; Ali has no CV; Gone withdrew")
+		assert.Equal(t, api.MatchJobResult{Queued: 0, AlreadyScored: 2, WithoutCv: 1}, res,
+			"Siti is scored and Wei was queued when added; Ali has no CV; Gone withdrew")
 
 		a.request(http.MethodPost, "/v1/matches/for-job", token, map[string]any{"jobId": job.Id, "rescore": true}).JSON(&res)
 		assert.Equal(t, api.MatchJobResult{Queued: 1, AlreadyScored: 1, WithoutCv: 1}, res, "Siti again; Wei is still waiting")
