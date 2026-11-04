@@ -8,6 +8,7 @@ import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
 import { Documents } from "../components/Documents";
+import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { History } from "../components/History";
@@ -85,6 +86,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       {permissions.includes("emails:read") && <CandidateEmails candidateId={c.id} permissions={permissions} />}
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} permissions={permissions} />
+      <PrivacyPanel candidateId={c.id} candidateName={c.fullName} permissions={permissions} />
       <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
     </main>
   );

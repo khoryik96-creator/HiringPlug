@@ -78,6 +78,12 @@ type Deps struct {
 	Candidates Candidates
 	CVs        CVs
 	Pipeline   Pipeline
+	Consent    Consent
+}
+
+// Consent records that an applicant consented on the form (privacy module).
+type Consent interface {
+	RecordFormConsent(ctx context.Context, tx pgx.Tx, candidateID string) error
 }
 
 // Module is the careers module.

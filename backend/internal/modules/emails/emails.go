@@ -73,6 +73,11 @@ type Deps struct {
 	Tenants interface {
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
 	}
+	// Consent says whether a candidate asked not to be contacted (privacy
+	// module); emails to them are refused. Nil: nobody is.
+	Consent interface {
+		DoNotContact(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
+	}
 }
 
 // Module is the emails module.

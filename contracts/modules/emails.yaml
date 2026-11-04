@@ -17,7 +17,10 @@ x-module:
     emails.templates:manage:
       description: Add and change the company's email templates.
       roles: [owner, admin, recruiter]
-  errorCodes: {}
+  errorCodes:
+    EMAIL_DO_NOT_CONTACT:
+      status: 409
+      description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
   jobs:
     email.send:
       queue: core
@@ -147,8 +150,15 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/DoNotContact' }
 
 components:
+  responses:
+    DoNotContact:
+      description: The candidate asked not to be contacted (EMAIL_DO_NOT_CONTACT).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
   parameters:
     EmailTemplateIdPath:
       name: templateId

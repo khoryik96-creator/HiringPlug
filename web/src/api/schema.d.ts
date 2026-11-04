@@ -1616,6 +1616,124 @@ export interface paths {
         patch: operations["updatePlacement"];
         trace?: never;
     };
+    "/v1/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The data protection dashboard - open requests, consent counts, candidates who withdrew consent */
+        get: operations["getPrivacyOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A candidate's consent and data protection requests */
+        get: operations["getCandidatePrivacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record that a candidate gave or withdrew consent
+         * @description expectedVersion is 0 when no consent is recorded yet.
+         */
+        put: operations["setCandidateConsent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/privacy-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log a request a candidate made about their data */
+        post: operations["createPrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/privacy-requests/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["schemas"]["PrivacyRequestId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Close a request (done or declined, with what was done) or reopen it
+         * @description Closing a "withdraw consent" request as done records the candidate's consent as withdrawn. Nothing is deleted: for a removal request, say in the outcome what you did.
+         */
+        patch: operations["decidePrivacyRequest"];
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/data-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A copy of everything held about a candidate (for an access request), as you may see it */
+        get: operations["exportCandidateData"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/summary": {
         parameters: {
             query?: never;
@@ -1640,9 +1758,9 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "reports:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
         JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
@@ -3408,6 +3526,136 @@ export interface components {
             /** @description The whole of the salary and fee (null clears them). */
             money?: components["schemas"]["PlacementMoneyInput"] | null;
         };
+        /** @example prq_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        PrivacyRequestId: string;
+        /**
+         * @description given = agreed to their data being kept and used for recruiting; withdrawn = do not contact them.
+         * @enum {string}
+         */
+        ConsentStatus: "given" | "withdrawn";
+        /**
+         * @description How the consent (or its withdrawal) was received; request = by closing a withdraw-consent request.
+         * @enum {string}
+         */
+        ConsentMethod: "careers_form" | "email" | "phone" | "in_person" | "document" | "request" | "other";
+        Consent: {
+            version: number;
+            status: components["schemas"]["ConsentStatus"];
+            method: components["schemas"]["ConsentMethod"];
+            /**
+             * Format: date
+             * @description The day it was given or withdrawn.
+             */
+            day: string;
+            note: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ConsentInput: {
+            expectedVersion: number;
+            status: components["schemas"]["ConsentStatus"];
+            method: components["schemas"]["ConsentMethod"];
+            /** Format: date */
+            day: string;
+            note?: string | null;
+        };
+        /**
+         * @description access = a copy of their data; correction = correct their data; withdraw_consent = stop using their data and contacting them; removal = remove their data; other = anything else.
+         * @enum {string}
+         */
+        PrivacyRequestKind: "access" | "correction" | "withdraw_consent" | "removal" | "other";
+        /** @enum {string} */
+        PrivacyRequestStatus: "open" | "done" | "declined";
+        PrivacyRequest: {
+            id: components["schemas"]["PrivacyRequestId"];
+            version: number;
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            kind: components["schemas"]["PrivacyRequestKind"];
+            /** Format: date */
+            receivedOn: string;
+            details: string | null;
+            status: components["schemas"]["PrivacyRequestStatus"];
+            /** @description What was done, or why it was declined. */
+            outcome: string | null;
+            /**
+             * Format: date
+             * @description Access and correction requests must be answered within 21 days of receiving them (PDPA ss. 31 and 35).
+             */
+            dueOn: string | null;
+            /** @description Still open after its due day. */
+            overdue: boolean;
+            /** @description Days since it was received (to when it was closed). */
+            daysOpen: number;
+            /** Format: date-time */
+            closedAt: string | null;
+            closedByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PrivacyRequestInput: {
+            kind: components["schemas"]["PrivacyRequestKind"];
+            /** Format: date */
+            receivedOn: string;
+            details?: string | null;
+        };
+        PrivacyDecision: {
+            version: number;
+            status: components["schemas"]["PrivacyRequestStatus"];
+            /** @description Required to close a request. */
+            outcome?: string | null;
+        };
+        CandidatePrivacy: {
+            /** @description Null when none is recorded. */
+            consent: components["schemas"]["Consent"] | null;
+            /** @description The candidate withdrew consent. */
+            doNotContact: boolean;
+            /** @description Newest first. */
+            requests: components["schemas"]["PrivacyRequest"][];
+        };
+        ConsentCounts: {
+            given: number;
+            withdrawn: number;
+            /** @description Candidates with no consent recorded (added by hand, imported, sourced). */
+            notRecorded: number;
+        };
+        WithdrawnCandidate: {
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            /** Format: date */
+            day: string;
+        };
+        PrivacyOverview: {
+            consent: components["schemas"]["ConsentCounts"];
+            /** @description Oldest first. */
+            openRequests: components["schemas"]["PrivacyRequest"][];
+            /** @description The 20 closed most recently. */
+            closedRequests: components["schemas"]["PrivacyRequest"][];
+            /** @description Candidates who withdrew consent, most recent first (at most 200). */
+            withdrawn: components["schemas"]["WithdrawnCandidate"][];
+        };
+        DataExportField: {
+            label: string;
+            value: string;
+        };
+        DataExportItem: {
+            fields: components["schemas"]["DataExportField"][];
+        };
+        DataExportSection: {
+            title: string;
+            items: components["schemas"]["DataExportItem"][];
+        };
+        CandidateDataExport: {
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            /** @description The company holding the data. */
+            company: string;
+            /** Format: date-time */
+            exportedAt: string;
+            sections: components["schemas"]["DataExportSection"][];
+            /** @description What is held but was left out because you may not see it (e.g. salary). */
+            notIncluded: string[];
+        };
         Report: {
             /** Format: date */
             from: string;
@@ -3552,6 +3800,15 @@ export interface components {
         };
         /** @description Not blind (CV_NOT_BLIND). */
         CvNotBlind: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The candidate asked not to be contacted (EMAIL_DO_NOT_CONTACT). */
+        DoNotContact: {
             headers: {
                 [name: string]: unknown;
             };
@@ -4932,6 +5189,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["DoNotContact"];
         };
     };
     getMe: {
@@ -6700,6 +6958,170 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["PlacementNotAllowed"];
+        };
+    };
+    getPrivacyOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyOverview"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getCandidatePrivacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidatePrivacy"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setCandidateConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Consent"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decidePrivacyRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: components["schemas"]["PrivacyRequestId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyDecision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequest"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    exportCandidateData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDataExport"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getReport: {

@@ -72,6 +72,10 @@ x-error-codes:
     module: documents
     status: 409
     description: The document has no extracted text yet (still being read, scanned without OCR, or unreadable), so there is nothing to parse.
+  EMAIL_DO_NOT_CONTACT:
+    module: emails
+    status: 409
+    description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
   FORBIDDEN:
     module: shared
     status: 403
@@ -1146,6 +1150,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/DoNotContact'}
   /v1/me:
     get:
       operationId: getMe
@@ -2439,6 +2444,132 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/PlacementNotAllowed'}
+  /v1/privacy:
+    get:
+      operationId: getPrivacyOverview
+      tags: [privacy]
+      summary: The data protection dashboard - open requests, consent counts, candidates who withdrew consent
+      x-permission: privacy:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrivacyOverview'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/candidates/{candidateId}/privacy:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    get:
+      operationId: getCandidatePrivacy
+      tags: [privacy]
+      summary: A candidate's consent and data protection requests
+      x-permission: privacy:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CandidatePrivacy'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/candidates/{candidateId}/consent:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    put:
+      operationId: setCandidateConsent
+      tags: [privacy]
+      summary: Record that a candidate gave or withdrew consent
+      description: expectedVersion is 0 when no consent is recorded yet.
+      x-permission: privacy:record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ConsentInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Consent'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/{candidateId}/privacy-requests:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    post:
+      operationId: createPrivacyRequest
+      tags: [privacy]
+      summary: Log a request a candidate made about their data
+      x-permission: privacy:record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PrivacyRequestInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrivacyRequest'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/privacy-requests/{requestId}:
+    parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/PrivacyRequestId'}
+    patch:
+      operationId: decidePrivacyRequest
+      tags: [privacy]
+      summary: Close a request (done or declined, with what was done) or reopen it
+      description: >
+        Closing a "withdraw consent" request as done records the candidate's consent as withdrawn. Nothing is deleted: for a removal request, say in the outcome what you did.
+
+      x-permission: privacy:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PrivacyDecision'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PrivacyRequest'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/{candidateId}/data-export:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    get:
+      operationId: exportCandidateData
+      tags: [privacy]
+      summary: A copy of everything held about a candidate (for an access request), as you may see it
+      x-permission: privacy:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CandidateDataExport'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/reports/summary:
     get:
       operationId: getReport
@@ -2511,6 +2642,11 @@ components:
           schema: {$ref: '#/components/schemas/Error'}
     CvNotBlind:
       description: Not blind (CV_NOT_BLIND).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    DoNotContact:
+      description: The candidate asked not to be contacted (EMAIL_DO_NOT_CONTACT).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -2627,6 +2763,9 @@ components:
         - placements.fees:update
         - placements:manage
         - placements:read
+        - privacy:manage
+        - privacy:read
+        - privacy:record
         - reports:read
     ErrorCode:
       type: string
@@ -2641,6 +2780,7 @@ components:
         - CONTACT_DUPLICATE_EMAIL
         - CV_NOT_BLIND
         - DOCUMENT_HAS_NO_TEXT
+        - EMAIL_DO_NOT_CONTACT
         - FORBIDDEN
         - INTERNAL
         - INTERVIEW_CLASH
@@ -5088,6 +5228,166 @@ components:
           description: The whole of the salary and fee (null clears them).
           allOf: [{$ref: '#/components/schemas/PlacementMoneyInput'}]
           nullable: true
+    PrivacyRequestId:
+      type: string
+      pattern: '^prq_[0-9a-hjkmnp-tv-z]{26}$'
+      example: prq_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ConsentStatus:
+      type: string
+      description: given = agreed to their data being kept and used for recruiting; withdrawn = do not contact them.
+      enum: [given, withdrawn]
+    ConsentMethod:
+      type: string
+      description: How the consent (or its withdrawal) was received; request = by closing a withdraw-consent request.
+      enum: [careers_form, email, phone, in_person, document, request, other]
+    Consent:
+      type: object
+      required: [version, status, method, day, note, updatedAt]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/ConsentStatus'}
+        method: {$ref: '#/components/schemas/ConsentMethod'}
+        day: {type: string, format: date, description: The day it was given or withdrawn.}
+        note: {type: string, nullable: true}
+        updatedAt: {type: string, format: date-time}
+    ConsentInput:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, status, method, day]
+      properties:
+        expectedVersion: {type: integer, minimum: 0}
+        status: {$ref: '#/components/schemas/ConsentStatus'}
+        method: {$ref: '#/components/schemas/ConsentMethod'}
+        day: {type: string, format: date}
+        note: {type: string, maxLength: 1000, nullable: true}
+    PrivacyRequestKind:
+      type: string
+      description: >
+        access = a copy of their data; correction = correct their data; withdraw_consent = stop using their data and contacting them; removal = remove their data; other = anything else.
+
+      enum: [access, correction, withdraw_consent, removal, other]
+    PrivacyRequestStatus:
+      type: string
+      enum: [open, done, declined]
+    PrivacyRequest:
+      type: object
+      required: [id, version, candidateId, candidateName, kind, receivedOn, details, status, outcome, dueOn, overdue, daysOpen, closedAt, closedByName, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/PrivacyRequestId'}
+        version: {type: integer, minimum: 1}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        kind: {$ref: '#/components/schemas/PrivacyRequestKind'}
+        receivedOn: {type: string, format: date}
+        details: {type: string, nullable: true}
+        status: {$ref: '#/components/schemas/PrivacyRequestStatus'}
+        outcome: {type: string, nullable: true, description: "What was done, or why it was declined."}
+        dueOn:
+          type: string
+          format: date
+          nullable: true
+          description: "Access and correction requests must be answered within 21 days of receiving them (PDPA ss. 31 and 35)."
+        overdue: {type: boolean, description: Still open after its due day.}
+        daysOpen: {type: integer, minimum: 0, description: "Days since it was received (to when it was closed)."}
+        closedAt: {type: string, format: date-time, nullable: true}
+        closedByName: {type: string, nullable: true}
+        createdAt: {type: string, format: date-time}
+    PrivacyRequestInput:
+      type: object
+      additionalProperties: false
+      required: [kind, receivedOn]
+      properties:
+        kind: {$ref: '#/components/schemas/PrivacyRequestKind'}
+        receivedOn: {type: string, format: date}
+        details: {type: string, maxLength: 2000, nullable: true}
+    PrivacyDecision:
+      type: object
+      additionalProperties: false
+      required: [version, status]
+      properties:
+        version: {type: integer, minimum: 1}
+        status: {$ref: '#/components/schemas/PrivacyRequestStatus'}
+        outcome: {type: string, maxLength: 2000, nullable: true, description: "Required to close a request."}
+    CandidatePrivacy:
+      type: object
+      required: [consent, doNotContact, requests]
+      properties:
+        consent:
+          description: Null when none is recorded.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/Consent'}]
+        doNotContact: {type: boolean, description: The candidate withdrew consent.}
+        requests:
+          type: array
+          description: Newest first.
+          items: {$ref: '#/components/schemas/PrivacyRequest'}
+    ConsentCounts:
+      type: object
+      required: [given, withdrawn, notRecorded]
+      properties:
+        given: {type: integer}
+        withdrawn: {type: integer}
+        notRecorded: {type: integer, description: "Candidates with no consent recorded (added by hand, imported, sourced)."}
+    WithdrawnCandidate:
+      type: object
+      required: [candidateId, candidateName, day]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        day: {type: string, format: date}
+    PrivacyOverview:
+      type: object
+      required: [consent, openRequests, closedRequests, withdrawn]
+      properties:
+        consent: {$ref: '#/components/schemas/ConsentCounts'}
+        openRequests:
+          type: array
+          description: Oldest first.
+          items: {$ref: '#/components/schemas/PrivacyRequest'}
+        closedRequests:
+          type: array
+          description: The 20 closed most recently.
+          items: {$ref: '#/components/schemas/PrivacyRequest'}
+        withdrawn:
+          type: array
+          description: Candidates who withdrew consent, most recent first (at most 200).
+          items: {$ref: '#/components/schemas/WithdrawnCandidate'}
+    DataExportField:
+      type: object
+      required: [label, value]
+      properties:
+        label: {type: string}
+        value: {type: string}
+    DataExportItem:
+      type: object
+      required: [fields]
+      properties:
+        fields:
+          type: array
+          items: {$ref: '#/components/schemas/DataExportField'}
+    DataExportSection:
+      type: object
+      required: [title, items]
+      properties:
+        title: {type: string}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/DataExportItem'}
+    CandidateDataExport:
+      type: object
+      required: [candidateId, candidateName, company, exportedAt, sections, notIncluded]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        company: {type: string, description: The company holding the data.}
+        exportedAt: {type: string, format: date-time}
+        sections:
+          type: array
+          items: {$ref: '#/components/schemas/DataExportSection'}
+        notIncluded:
+          type: array
+          description: What is held but was left out because you may not see it (e.g. salary).
+          items: {type: string}
     Report:
       type: object
       required: [from, to, funnel, sources, recruiters, timeToFill, feesHidden]
@@ -5504,6 +5804,21 @@ x-permissions:
     description: View placements (salary and fee need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  privacy:manage:
+    module: privacy
+    description: See the data protection dashboard, decide requests and download a copy of a candidate's data.
+    sensitive: false
+    roles: [owner, admin]
+  privacy:read:
+    module: privacy
+    description: See a candidate's consent and data protection requests.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  privacy:record:
+    module: privacy
+    description: Record a candidate's consent (given or withdrawn) and log a request they made.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   reports:read:
     module: reports
     description: See the reports (fees in them need placements.fees:read).
@@ -5622,5 +5937,7 @@ x-modules:
     description: Candidates on jobs (applications) and their stages.
   - name: placements
     description: 'A placement records a candidate starting a job: the start date, the guarantee period (if they leave within it, the placement fell through), the recruiter credited, the agreed salary and the fee, and whether it has been invoiced and paid. Recording one moves the application to placed.'
+  - name: privacy
+    description: 'Data protection (Malaysia''s PDPA). Each candidate''s consent (given on the careers form, or recorded by a recruiter; withdrawn means do not contact, and emails to them are refused), the requests candidates make about their data with how long each has been open, and a copy of everything held about a candidate for access requests. Nothing is ever deleted or anonymised by the app: people decide each request and record what they did.'
   - name: reports
     description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill. Reports keep no data of their own: they read other modules'' records.'

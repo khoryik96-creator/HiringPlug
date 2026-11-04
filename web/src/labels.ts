@@ -258,3 +258,25 @@ export const ROLE: Record<Schemas["Role"], string> = {
   owner: "Owner", admin: "Admin", recruiter: "Recruiter", sourcer: "Sourcer", hiring_manager: "Hiring manager", viewer: "Viewer",
 };
 export const TEAM_STATUS: Record<Schemas["TeamStatus"], string> = { invited: "Invited", active: "Active", deactivated: "Deactivated" };
+
+export const CONSENT_STATUS: Record<Schemas["ConsentStatus"], string> = { given: "Given", withdrawn: "Withdrawn" };
+
+export const CONSENT_METHOD: Record<Schemas["ConsentMethod"], string> = {
+  careers_form: "Careers page application",
+  email: "Email",
+  phone: "Phone",
+  in_person: "In person",
+  document: "Signed document",
+  request: "On their request",
+  other: "Other",
+};
+
+export const PRIVACY_KIND: Record<Schemas["PrivacyRequestKind"], string> = {
+  access: "A copy of their data",
+  correction: "Correct their data",
+  withdraw_consent: "Stop using their data and contacting them",
+  removal: "Remove their data",
+  other: "Other",
+};
+
+export const PRIVACY_STATUS: Record<Schemas["PrivacyRequestStatus"], string> = { open: "Open", done: "Done", declined: "Declined" };

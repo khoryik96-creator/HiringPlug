@@ -268,6 +268,16 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, o Outgoing, candi
 			if _, ok := found[*candidateID]; !ok {
 				return apperr.NotFound("candidate")
 			}
+			if s.deps.Consent != nil {
+				no, err := s.deps.Consent.DoNotContact(ctx, tx, *candidateID)
+				if err != nil {
+					return err
+				}
+				if no {
+					return apperr.New(api.ErrorCodeEMAILDONOTCONTACT,
+						"This candidate withdrew consent to be contacted, so no email is sent to them. See Data protection on their page.")
+				}
+			}
 		}
 		row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
 			CandidateID: candidateID, ApplicationID: appID, ToAddresses: o.To, CcAddresses: o.Cc,

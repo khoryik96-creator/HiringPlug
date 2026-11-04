@@ -44,6 +44,13 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, candidateID string) (boo
 	return m.service.Exists(ctx, tx, candidateID)
 }
 
+// Count returns how many candidates the company has, in the caller's
+// transaction (the data protection dashboard).
+func (m *Module) Count(ctx context.Context, tx pgx.Tx) (int, error) {
+	n, err := store.New(tx).CountCandidates(ctx)
+	return int(n), err
+}
+
 // Brief is what other modules need to show a candidate.
 type Brief struct {
 	Name         string

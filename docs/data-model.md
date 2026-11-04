@@ -41,6 +41,8 @@ tenant ─┬─ app_user (role)
 | `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
 | `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
 | `assistant_answer` | a question to the AI assistant: who asked, about what (candidate/job/application + id), kind, question, status (queued/done/failed), answer or error, model, input and output tokens, asked and answered; shown only to the asker |
+| `candidate_consent` | one per candidate: given or withdrawn (withdrawn = do not contact), how (careers form, email, phone, in person, document, on request), the day, note, recorded by, `version` |
+| `privacy_request` | a candidate's request about their data: kind (access, correction, withdraw consent, removal, other), received on, details, status (open/done/declined), outcome (required to close), closed by and when, `version`; never deletes data |
 | `job_match` | a fit score of an application: application, job, status (queued/done/failed), score 0-100, summary, reasons (requirement quoted from the job, verdict, evidence quoted from the CV, note), requirements dropped, error, model, input and output tokens, asked by and when, scored; what the AI was sent is kept only while queued |
 | `cv_template` | the company's Word CV templates: name, stored file, uploaded by (the built-in standard one is not stored) |
 | `document` (PDF) | for formatted CVs made by the app: PDF status (queued/ready/failed), stored PDF, error |
@@ -63,7 +65,7 @@ candidate belonging to the same company.
 
 | Module | Records | Milestone |
 |---|---|---|
-| `candidates` | managed taxonomy lists (industries, specializations), saved searches, consent and retention | M2 |
+| `candidates` | managed taxonomy lists (industries, specializations), saved searches | M2 |
 | `notes` | note templates per company, notes on an application, editing | Phase 2 |
 | `identity` | custom roles, data scope, single sign-on | 7 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |

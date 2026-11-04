@@ -110,6 +110,9 @@ func (s *Service) Apply(ctx context.Context, slug, adID, clientAddr string, f Fo
 		if err != nil {
 			return err
 		}
+		if err := s.deps.Consent.RecordFormConsent(ctx, tx, candidateID); err != nil {
+			return err
+		}
 		// Counts and ids only: no names or contact details in the audit log.
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "careers.applied", EntityType: "candidate", EntityID: candidateID,

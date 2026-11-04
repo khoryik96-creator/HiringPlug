@@ -141,3 +141,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/matching/internal/store
+  - <<: *module
+    queries: db/queries/privacy.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/privacy/internal/store

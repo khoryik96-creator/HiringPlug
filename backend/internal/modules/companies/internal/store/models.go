@@ -136,6 +136,18 @@ type CandidateCompensation struct {
 	UpdatedAt        time.Time
 }
 
+type CandidateConsent struct {
+	CandidateID string
+	TenantID    string
+	Version     int32
+	Status      string
+	Method      string
+	Day         pgtype.Date
+	Note        *string
+	RecordedBy  string
+	UpdatedAt   time.Time
+}
+
 type CandidateEducation struct {
 	TenantID      string
 	CandidateID   string
@@ -516,6 +528,23 @@ type PlacementMoney struct {
 	FeeCurrency    *string
 	UpdatedBy      string
 	UpdatedAt      time.Time
+}
+
+type PrivacyRequest struct {
+	ID          string
+	TenantID    string
+	Version     int32
+	CandidateID string
+	Kind        string
+	ReceivedOn  pgtype.Date
+	Details     *string
+	Status      string
+	Outcome     *string
+	ClosedBy    *string
+	ClosedAt    *time.Time
+	CreatedBy   string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Tenant struct {

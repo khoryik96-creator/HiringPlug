@@ -59,3 +59,8 @@ SELECT extracted_text::text FROM document
 WHERE candidate_id = @candidate_id AND source <> 'formatted' AND extracted_text IS NOT NULL AND extracted_text <> ''
 ORDER BY id DESC
 LIMIT 1;
+
+-- A candidate's documents with their text, for a copy of their data.
+-- name: ListDocumentTexts :many
+SELECT id, source, file_name, status, extracted_text, created_at FROM document
+WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;

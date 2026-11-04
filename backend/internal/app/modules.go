@@ -33,6 +33,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/privacy"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/reports"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
@@ -59,6 +60,7 @@ type Modules struct {
 	Cvformats    *cvformats.Module
 	Assistant    *assistant.Module
 	Matching     *matching.Module
+	Privacy      *privacy.Module
 	// scaffold:fields
 }
 
@@ -77,13 +79,17 @@ func NewModules(d Deps) *Modules {
 	m.Notes = notes.New(d.Pool, notes.Subjects{
 		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
 	}, m.Identity)
+	// Before careers and emails, which record and check consent with it.
+	m.Privacy = privacy.New(d.Pool, privacy.Deps{
+		Candidates: privacyCandidates{m.Candidates}, Users: m.Identity, Tenants: m.Identity, Data: privacyData{m},
+	}, d.Config.TimeZone)
 	m.Careers = careers.New(d.Pool, careers.Deps{
 		Tenants: m.Identity, Ads: careersAds{m.Jobs}, Candidates: careersCandidates{m.Candidates},
-		CVs: m.Documents, Pipeline: m.Pipeline,
+		CVs: m.Documents, Pipeline: m.Pipeline, Consent: m.Privacy,
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
 	m.Emails = emails.New(d.Pool, emails.Deps{
 		Candidates: emailCandidates{m.Candidates}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
-		Interviews: emailInterviews{m}, Tenants: m.Identity,
+		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
 	}, d.Mail)
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
 		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
@@ -108,8 +114,8 @@ func NewModules(d Deps) *Modules {
 		Jobs: matchingJobs{m.Jobs}, OtherAIUse: m.Assistant,
 	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// scaffold:constructors
-	// A merged duplicate's CVs, jobs, notes and emails follow it.
-	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails)
+	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
+	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
 	return m
 }
 
@@ -135,6 +141,7 @@ type (
 	cvformatsHTTP    = cvformats.HTTP
 	assistantHTTP    = assistant.HTTP
 	matchingHTTP     = matching.HTTP
+	privacyHTTP      = privacy.HTTP
 	// scaffold:aliases
 )
 
@@ -161,6 +168,7 @@ type Server struct {
 	*cvformatsHTTP
 	*assistantHTTP
 	*matchingHTTP
+	*privacyHTTP
 	// scaffold:embeds
 }
 
@@ -188,6 +196,7 @@ func (m *Modules) Server() *Server {
 		cvformatsHTTP:    m.Cvformats.HTTP,
 		assistantHTTP:    m.Assistant.HTTP,
 		matchingHTTP:     m.Matching.HTTP,
+		privacyHTTP:      m.Privacy.HTTP,
 		// scaffold:server-fields
 	}
 }

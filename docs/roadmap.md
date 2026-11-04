@@ -33,6 +33,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | API keys and signed webhooks for your other systems |
 | ✅ | Hiring leads from public job boards, careers pages and saved ads |
 | ✅ | An AI sidebar and CV vs job fit scores with quoted reasons (off until an AI provider is set up) |
+| ✅ | Data protection (PDPA): consent on every candidate, requests with their 21-day due dates, a Data protection page, a copy of a candidate's data; nothing is deleted automatically and records are kept until you decide |
 | ✅ | Sign-in with passwords, invitations, password resets and a Team page |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 

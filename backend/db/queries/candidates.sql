@@ -175,3 +175,7 @@ WHERE m.candidate_id = sqlc.arg(from_id)::text
 UPDATE candidate_education AS m SET candidate_id = sqlc.arg(to_id)::text
 WHERE m.candidate_id = sqlc.arg(from_id)::text
   AND NOT EXISTS (SELECT 1 FROM candidate_education e WHERE e.candidate_id = sqlc.arg(to_id)::text);
+
+-- How many candidates the company has (the data protection dashboard).
+-- name: CountCandidates :one
+SELECT count(*)::integer FROM candidate;

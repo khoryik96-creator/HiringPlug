@@ -61,6 +61,18 @@ func (q *Queries) CandidateExists(ctx context.Context, id string) (bool, error) 
 	return exists, err
 }
 
+const countCandidates = `-- name: CountCandidates :one
+SELECT count(*)::integer FROM candidate
+`
+
+// How many candidates the company has (the data protection dashboard).
+func (q *Queries) CountCandidates(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, countCandidates)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const deleteCandidate = `-- name: DeleteCandidate :execrows
 DELETE FROM candidate WHERE id = $1
 `

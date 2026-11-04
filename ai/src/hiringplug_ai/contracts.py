@@ -68,6 +68,9 @@ class Permission(StrEnum):
     placements_fees_update = "placements.fees:update"
     placements_manage = "placements:manage"
     placements_read = "placements:read"
+    privacy_manage = "privacy:manage"
+    privacy_read = "privacy:read"
+    privacy_record = "privacy:record"
     reports_read = "reports:read"
 
 
@@ -82,6 +85,7 @@ class ErrorCode(StrEnum):
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
     CV_NOT_BLIND = "CV_NOT_BLIND"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
+    EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
@@ -2277,6 +2281,158 @@ class PlacementUpdate(BaseModel):
     money: Annotated[
         PlacementMoneyInput | None, Field(description="The whole of the salary and fee (null clears them).")
     ] = None
+
+
+class PrivacyRequestId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["prq_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^prq_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class ConsentStatus(StrEnum):
+    given = "given"
+    withdrawn = "withdrawn"
+
+
+class ConsentMethod(StrEnum):
+    careers_form = "careers_form"
+    email = "email"
+    phone = "phone"
+    in_person = "in_person"
+    document = "document"
+    request = "request"
+    other = "other"
+
+
+class Consent(BaseModel):
+    version: Annotated[int, Field(ge=1)]
+    status: ConsentStatus
+    method: ConsentMethod
+    day: Annotated[date, Field(description="The day it was given or withdrawn.")]
+    note: Annotated[str | None, Field(...)]
+    updatedAt: AwareDatetime
+
+
+class ConsentInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    expectedVersion: Annotated[int, Field(ge=0)]
+    status: ConsentStatus
+    method: ConsentMethod
+    day: date
+    note: Annotated[str | None, Field(max_length=1000)] = None
+
+
+class PrivacyRequestKind(StrEnum):
+    access = "access"
+    correction = "correction"
+    withdraw_consent = "withdraw_consent"
+    removal = "removal"
+    other = "other"
+
+
+class PrivacyRequestStatus(StrEnum):
+    open = "open"
+    done = "done"
+    declined = "declined"
+
+
+class PrivacyRequest(BaseModel):
+    id: PrivacyRequestId
+    version: Annotated[int, Field(ge=1)]
+    candidateId: CandidateId
+    candidateName: str
+    kind: PrivacyRequestKind
+    receivedOn: date
+    details: Annotated[str | None, Field(...)]
+    status: PrivacyRequestStatus
+    outcome: Annotated[str | None, Field(description="What was done, or why it was declined.")]
+    dueOn: Annotated[
+        date | None,
+        Field(
+            description="Access and correction requests must be answered within 21 days of receiving them (PDPA ss. 31 and 35)."
+        ),
+    ]
+    overdue: Annotated[bool, Field(description="Still open after its due day.")]
+    daysOpen: Annotated[int, Field(description="Days since it was received (to when it was closed).", ge=0)]
+    closedAt: Annotated[AwareDatetime | None, Field(...)]
+    closedByName: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class PrivacyRequestInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: PrivacyRequestKind
+    receivedOn: date
+    details: Annotated[str | None, Field(max_length=2000)] = None
+
+
+class PrivacyDecision(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    status: PrivacyRequestStatus
+    outcome: Annotated[str | None, Field(description="Required to close a request.", max_length=2000)] = None
+
+
+class CandidatePrivacy(BaseModel):
+    consent: Annotated[Consent | None, Field(description="Null when none is recorded.")]
+    doNotContact: Annotated[bool, Field(description="The candidate withdrew consent.")]
+    requests: Annotated[list[PrivacyRequest], Field(description="Newest first.")]
+
+
+class ConsentCounts(BaseModel):
+    given: int
+    withdrawn: int
+    notRecorded: Annotated[
+        int, Field(description="Candidates with no consent recorded (added by hand, imported, sourced).")
+    ]
+
+
+class WithdrawnCandidate(BaseModel):
+    candidateId: CandidateId
+    candidateName: str
+    day: date
+
+
+class PrivacyOverview(BaseModel):
+    consent: ConsentCounts
+    openRequests: Annotated[list[PrivacyRequest], Field(description="Oldest first.")]
+    closedRequests: Annotated[list[PrivacyRequest], Field(description="The 20 closed most recently.")]
+    withdrawn: Annotated[
+        list[WithdrawnCandidate],
+        Field(description="Candidates who withdrew consent, most recent first (at most 200)."),
+    ]
+
+
+class DataExportField(BaseModel):
+    label: str
+    value: str
+
+
+class DataExportItem(BaseModel):
+    fields: list[DataExportField]
+
+
+class DataExportSection(BaseModel):
+    title: str
+    items: list[DataExportItem]
+
+
+class CandidateDataExport(BaseModel):
+    candidateId: CandidateId
+    candidateName: str
+    company: Annotated[str, Field(description="The company holding the data.")]
+    exportedAt: AwareDatetime
+    sections: list[DataExportSection]
+    notIncluded: Annotated[
+        list[str],
+        Field(description="What is held but was left out because you may not see it (e.g. salary)."),
+    ]
 
 
 class FunnelStage(BaseModel):

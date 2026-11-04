@@ -451,6 +451,40 @@ Every stage change is recorded (by the database, whatever made it), so these
 figures come from what happened, not from where applications are now; the
 history before this was rebuilt from the audit log.
 
+## Data protection (PDPA) ✅
+
+Malaysia's Personal Data Protection Act, for the candidates you hold. **HiringPlug
+never deletes or anonymises anything by itself, and keeps records until you
+decide otherwise**: it shows you what needs deciding and records what you did.
+
+- **Consent** on every candidate's page (**Data protection**): given or
+  withdrawn, how (careers page application, email, phone, in person, signed
+  document) and when, with a note. Applying on the careers page records it
+  automatically (applying again after withdrawing is a new consent).
+  Candidates added by hand, imported or sourced show "No consent recorded"
+  until someone records it.
+- **Withdrawn consent means do not contact**: the page says so, and emails to
+  the candidate are refused (`EMAIL_DO_NOT_CONTACT`).
+- **Requests** a candidate makes about their data, logged on their page: a
+  copy of their data, a correction, stop using their data and contacting them,
+  remove their data, or other, with the day received and how they asked.
+  Access and correction requests show when they must be answered (21 days,
+  PDPA ss. 31 and 35) and turn red when late.
+- **The Data protection page** (owners and admins): consent counts (given,
+  withdrawn, not recorded), open requests oldest first with their due days,
+  who withdrew consent, and the latest decisions. Each request is closed as
+  done or declined with what was done (required); closing a "stop using their
+  data" request as done marks the candidate do not contact. For a removal
+  request, nothing is deleted: you say what you did. Requests can be reopened.
+- **A copy of their data** (for access requests): **Download a copy of their
+  data** on the candidate's page gives a plain text file (or JSON): profile,
+  work history, education, salary, CVs with their text, the jobs they were put
+  forward for, notes, emails sent, consent and requests. It holds only what
+  the person downloading may see, and says what was left out (e.g. salary,
+  sensitive notes). Each download is in the audit log.
+- Merging duplicates keeps both candidates' requests, and withdrawn consent
+  wins.
+
 ## 6. API documentation
 
 `/docs` renders the contract (endpoints, fields, permissions, error codes) and

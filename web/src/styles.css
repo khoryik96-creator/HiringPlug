@@ -107,3 +107,7 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .application-fit { margin: 0.25rem 0 0.5rem 1rem; }
 .fit-panel { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
 .fit-panel h4 { margin: 0; }
+.privacy-requests { list-style: none; padding: 0; } .privacy-requests li { padding: 0.25rem 0; border-top: 1px solid #e5e7eb; }
+.privacy-request { padding: 0.5rem 0; border-top: 1px solid #e5e7eb; }
+.privacy-request form input { flex: 1; }
+.badge.done { background: #dcfce7; } .badge.declined { background: #e5e7eb; }

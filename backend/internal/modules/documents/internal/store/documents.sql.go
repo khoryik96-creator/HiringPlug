@@ -119,6 +119,48 @@ func (q *Queries) LatestCvText(ctx context.Context, candidateID string) (string,
 	return extracted_text, err
 }
 
+const listDocumentTexts = `-- name: ListDocumentTexts :many
+SELECT id, source, file_name, status, extracted_text, created_at FROM document
+WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+`
+
+type ListDocumentTextsRow struct {
+	ID            string
+	Source        string
+	FileName      string
+	Status        string
+	ExtractedText *string
+	CreatedAt     time.Time
+}
+
+// A candidate's documents with their text, for a copy of their data.
+func (q *Queries) ListDocumentTexts(ctx context.Context, candidateID string) ([]ListDocumentTextsRow, error) {
+	rows, err := q.db.Query(ctx, listDocumentTexts, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDocumentTextsRow
+	for rows.Next() {
+		var i ListDocumentTextsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Source,
+			&i.FileName,
+			&i.Status,
+			&i.ExtractedText,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDocumentsForCandidate = `-- name: ListDocumentsForCandidate :many
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key,
        status, NULL::text AS extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at,
