@@ -518,8 +518,9 @@ decide otherwise**: it shows you what needs deciding and records what you did.
   adds a record (the quick "Add candidate" row asks for them too) and cannot be
   emptied later; records from before keep working until someone edits that
   field. Fields the app always needs (a candidate's first name, a job's title
-  and company) stay on. Records made without a person (careers page,
-  imports, CV reading) are not held to them. Forms mark mandatory fields with *.
+  and company) stay on. CSV imports and other systems using an API key are
+  held to them too (an import lists the rows that miss one, to fix); the
+  careers page and CV reading are not. Forms mark mandatory fields with *.
 
 ## 6. API documentation
 

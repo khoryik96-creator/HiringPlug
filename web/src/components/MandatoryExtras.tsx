@@ -1,7 +1,7 @@
 // Inputs for the fields a company made mandatory, on quick "add" forms that
 // otherwise ask only for the basics.
 import type { Schemas } from "../api/client";
-import { keysOf, WORK_AUTH_STATUS } from "../labels";
+import { keysOf, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Body = Partial<Schemas["CandidateCreate"]>;
@@ -30,7 +30,12 @@ export function CandidateExtras({ values, onChange }: { values: Record<string, s
           case "industry": return select(f, "Industry", fs.options("industry"));
           case "source": return select(f, "Source", fs.options("candidate_source"));
           case "noticePeriod": return select(f, "Notice period", fs.options("notice_period"));
-          case "workAuthorization": return select(f, "Work authorization", keysOf(WORK_AUTH_STATUS).map((k) => ({ key: k, label: WORK_AUTH_STATUS[k] })));
+          case "workAuthorization": return (
+            <span key={f} className="row">
+              {select(f, "Work authorization", keysOf(WORK_AUTH_STATUS).map((k) => ({ key: k, label: WORK_AUTH_STATUS[k] })))}
+              {values[f] === "expat_eligible" && select("workAuthorizationBasis", "Pass held", keysOf(WORK_AUTH_BASIS).map((k) => ({ key: k, label: WORK_AUTH_BASIS[k] })))}
+            </span>
+          );
           default: return <input key={f} aria-label={TEXT[f]} placeholder={TEXT[f]} value={values[f] ?? ""} onChange={set(f)} />;
         }
       })}
@@ -47,8 +52,11 @@ export function extrasBody(values: Record<string, string>): Body {
     if (f === "noticePeriod") {
       const [value = "0", unit = "month"] = v.split("_");
       out.noticePeriod = { value: Number(value), unit: unit as Schemas["NoticePeriodUnit"] };
+    } else if (f === "workAuthorizationBasis") {
+      continue; // sent with the status
     } else if (f === "workAuthorization") {
-      out.workAuthorization = { status: v as Schemas["WorkAuthorizationStatus"], basis: null, note: null };
+      const basis = v === "expat_eligible" ? values.workAuthorizationBasis?.trim() : "";
+      out.workAuthorization = { status: v as Schemas["WorkAuthorizationStatus"], basis: (basis || null) as Schemas["WorkAuthorizationBasis"] | null, note: null };
     } else if (f === "nationality") {
       out.nationality = v.toUpperCase();
     } else {

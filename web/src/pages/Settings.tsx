@@ -59,7 +59,7 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
   return (
     <section className="panel" aria-label="Mandatory fields">
       <h3>Mandatory fields</h3>
-      <p className="muted">People must fill these in when they add a record, and cannot empty them later. Older records stay editable.</p>
+      <p className="muted">People must fill these in when they add a record (CSV imports too), and cannot empty them later. Older records stay editable.</p>
       <div className="row">{group("candidate", "Candidates")}{group("job", "Jobs")}</div>
       <button type="button" disabled={save.isPending} onClick={() => { save.mutate(); }}>Save mandatory fields</button>
       {save.isSuccess && <span className="muted" role="status"> Saved.</span>}

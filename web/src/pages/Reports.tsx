@@ -3,13 +3,15 @@ import { useState } from "react";
 
 import { api, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { formatDay, formatMoney, sourceLabel, STAGE } from "../labels";
+import { useFieldSettings } from "../components/useFieldSettings";
+import { formatDay, formatMoney, STAGE } from "../labels";
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${String(Math.round((part * 100) / whole))}%` : "–");
 
 /** How the business is doing over a period (the last 90 days unless chosen). */
 export function Reports() {
   const [period, setPeriod] = useState({ from: "", to: "" });
+  const fs = useFieldSettings();
   const report = useQuery({
     queryKey: ["reports", period],
     queryFn: async () => unwrap(await api.GET("/v1/reports/summary", {
@@ -53,7 +55,7 @@ export function Reports() {
                 <tbody>
                   {r.sources.map((s) => (
                     <tr key={s.source}>
-                      <td>{sourceLabel(s.source)}</td><td>{s.applications}</td><td>{s.interviewed}</td><td>{s.placed}</td>
+                      <td>{fs.label("candidate_source", s.source)}</td><td>{s.applications}</td><td>{s.interviewed}</td><td>{s.placed}</td>
                       <td>{pct(s.placed, s.applications)}</td>
                     </tr>
                   ))}

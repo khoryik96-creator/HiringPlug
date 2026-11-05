@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { sourceLabel } from "../labels";
-import { ok, renderWithClient } from "../test-utils";
+import { ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { Reports } from "./Reports";
 
 afterEach(() => {
@@ -24,9 +24,13 @@ const report = (over: Partial<Schemas["Report"]> = {}): Schemas["Report"] => ({
   ...over,
 });
 
+/** The report for the summary, the company's settings for source names. */
+const reads = (summary: unknown) => vi.spyOn(api, "GET").mockImplementation(((path: string) =>
+  Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(summary))) as never);
+
 describe("reports", () => {
   it("shows conversion, sources, recruiters' fees and time to fill", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(report()));
+    reads(report());
     renderWithClient(<Reports />);
     const funnel = await screen.findByRole("region", { name: "Pipeline conversion" });
     expect(within(funnel).getByText("67%")).toBeTruthy();
@@ -39,13 +43,22 @@ describe("reports", () => {
   });
 
   it("asks for the chosen period, and says when fees are hidden", async () => {
-    const get = vi.spyOn(api, "GET").mockResolvedValue(ok(report({ feesHidden: true, recruiters: [] })));
+    const get = reads(report({ feesHidden: true, recruiters: [] }));
     renderWithClient(<Reports />);
     expect(await screen.findByText(/Fees are not shown to your role/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
     await waitFor(() => {
       expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: "2026-01-01", to: undefined } } });
     });
+  });
+
+  it("names a company's own sources", async () => {
+    const settings = testFieldSettings() as unknown as Schemas["FieldSettings"];
+    settings.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hidden: false, builtIn: false });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(settings)
+      : ok(report({ sources: [{ source: "job_fair", applications: 2, interviewed: 1, placed: 0 }] })))) as never);
+    renderWithClient(<Reports />);
+    expect(await screen.findByRole("cell", { name: "Job fair" })).toBeTruthy();
   });
 
   it("names sources from either list", () => {

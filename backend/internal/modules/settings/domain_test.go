@@ -53,6 +53,8 @@ func TestOpenListsTakeNewOptions(t *testing.T) {
 	assert.Equal(t, []string{"options"}, fieldsOf(t, err), "built-in options are hidden, not removed")
 	_, err = CheckList("candidate_source", append(builtIns("candidate_source"), OptionInput{Label: "!!!"}))
 	assert.Equal(t, []string{"options[6].label"}, fieldsOf(t, err))
+	_, err = CheckList("candidate_source", append(builtIns("candidate_source"), OptionInput{Key: "Job Fair", Label: "Job fair"}))
+	assert.Equal(t, []string{"options[6].key"}, fieldsOf(t, err), "a key no candidate could be given")
 }
 
 func TestNoticePeriodsAndIndustries(t *testing.T) {

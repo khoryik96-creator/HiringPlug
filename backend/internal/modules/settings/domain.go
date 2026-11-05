@@ -99,6 +99,7 @@ func Lists(saved map[string][]Option) []List {
 
 var (
 	noticeKey = regexp.MustCompile(`^(\d{1,3})_(day|week|month)$`)
+	sourceKey = regexp.MustCompile(`^[a-z0-9_]{1,40}$`) // as a candidate's source
 	keyChars  = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
@@ -144,6 +145,10 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 		}
 		if key == "" {
 			errs.Add(field+".label", "use letters or numbers")
+			continue
+		}
+		if name == "candidate_source" && !sourceKey.MatchString(key) {
+			errs.Add(field+".key", "lower-case letters, numbers and _ (at most 40), or leave it out")
 			continue
 		}
 		if label == "" {

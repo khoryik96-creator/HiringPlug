@@ -17,6 +17,17 @@ function Harness() {
 }
 
 describe("mandatory fields on quick add", () => {
+  it("asks for the pass held when the candidate may already work here", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings([{ form: "candidate", field: "workAuthorization" }])));
+    renderWithClient(<Harness />);
+    expect(screen.queryByLabelText("Pass held")).toBeNull();
+    fireEvent.change(await screen.findByLabelText("Work authorization"), { target: { value: "expat_eligible" } });
+    fireEvent.change(screen.getByLabelText("Pass held"), { target: { value: "rp_t" } });
+    expect(JSON.parse(screen.getByRole("status").textContent)).toEqual({
+      workAuthorization: { status: "expat_eligible", basis: "rp_t", note: null },
+    });
+  });
+
   it("asks only for the company's mandatory fields not already on the form", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings([
       { form: "candidate", field: "email" }, { form: "candidate", field: "source" }, { form: "candidate", field: "noticePeriod" },

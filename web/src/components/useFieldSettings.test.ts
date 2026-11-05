@@ -18,6 +18,10 @@ describe("field settings helpers", () => {
     const loading = fieldHelpers(undefined);
     expect(loading.label("work_type", "full_time")).toBe("Full time");
     expect(loading.options("candidate_source").map((o) => o.key)).toContain("careers_page");
+    expect(loading.options("notice_period").map((o) => o.key)).toContain("1_month");
+    expect(loading.options("industry")).toHaveLength(10);
+    expect(fs.options("notice_period", "5_week").at(-1)).toEqual({ key: "5_week", label: "5 weeks" });
+    expect(fs.label("candidate_source", "indeed")).toBe("Indeed"); // an application channel, in reports
     expect(labelFor("Email", true)).toBe("Email *");
     expect(noticeKey("2", "week")).toBe("2_week");
   });
