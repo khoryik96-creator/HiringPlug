@@ -57,6 +57,9 @@ func (m *Module) SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude 
 // (called by internal/app once every module exists).
 func (m *Module) WhenTextRead(hooks ...TextReadHook) { m.service.whenRead = hooks }
 
+// WhenReadDone registers what runs when reading a document has ended.
+func (m *Module) WhenReadDone(hooks ...ReadDoneHook) { m.service.whenDone = hooks }
+
 // UseAI lets the AI fill in what the rules leave empty when reading CVs,
 // while ai allows it.
 func (m *Module) UseAI(ai AIAllowance) { m.service.ai = ai }

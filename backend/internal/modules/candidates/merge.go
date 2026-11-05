@@ -37,6 +37,7 @@ func FillFrom(keep, dup Profile) (Profile, []string) {
 	fill("phone", &keep.Phone, dup.Phone)
 	fill("nationality", &keep.Nationality, dup.Nationality)
 	fill("residenceCountry", &keep.ResidenceCountry, dup.ResidenceCountry)
+	fill("linkedinUrl", &keep.LinkedinURL, dup.LinkedinURL)
 	fill("industry", &keep.Industry, dup.Industry)
 	fill("specialization", &keep.Specialization, dup.Specialization)
 	fill("currentTitle", &keep.CurrentTitle, dup.CurrentTitle)
@@ -83,45 +84,9 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err != nil {
 			return err
 		}
-		for _, m := range s.movers {
-			if err := m.MoveCandidate(ctx, tx, dupID, keepID); err != nil {
-				return err
-			}
-		}
-		if _, err := q.GetCompensation(ctx, keepID); database.IsNoRows(err) {
-			if _, err := q.MoveCompensation(ctx, store.MoveCompensationParams{FromID: dupID, ToID: keepID}); err != nil {
-				return err
-			}
-		} else if err != nil {
+		row, err := s.mergeRows(ctx, tx, keepRow, dupRow, version)
+		if err != nil {
 			return err
-		}
-		// The duplicate's work history and education, if the kept candidate has none.
-		if err := q.MoveWorkIfNone(ctx, store.MoveWorkIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
-			return err
-		}
-		if err := q.MoveEducationIfNone(ctx, store.MoveEducationIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
-			return err
-		}
-		before := fromRow(keepRow).Profile
-		after, filled := FillFrom(before, fromRow(dupRow).Profile)
-		// The duplicate goes first: its email may be moving to the kept candidate.
-		if _, err := q.DeleteCandidate(ctx, dupID); err != nil {
-			return err
-		}
-		row := keepRow
-		if len(filled) > 0 {
-			if row, err = q.UpdateCandidate(ctx, updateParams(keepID, version, after)); err != nil {
-				return err
-			}
-		}
-		for _, e := range []audit.Entry{
-			{Action: "candidate.merged", EntityType: "candidate", EntityID: keepID,
-				Changes: map[string]any{"duplicateId": dupID, "duplicateName": FullName(fromRow(dupRow).Profile), "filled": filled}},
-			{Action: "candidate.merged_into", EntityType: "candidate", EntityID: dupID, Changes: map[string]any{"keptId": keepID}},
-		} {
-			if err := audit.Record(ctx, tx, e); err != nil {
-				return err
-			}
 		}
 		out, err = loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
@@ -136,4 +101,70 @@ func (h *HTTP) MergeCandidate(ctx context.Context, req api.MergeCandidateRequest
 		return nil, err
 	}
 	return api.MergeCandidate200JSONResponse(candidateToAPI(view)), nil
+}
+
+// mergeRows moves dupRow's records and empty-field values into keepRow and
+// deletes dupRow, in the caller's transaction (see Merge).
+func (s *Service) mergeRows(ctx context.Context, tx pgx.Tx, keepRow, dupRow store.Candidate, version int) (store.Candidate, error) {
+	q := store.New(tx)
+	keepID, dupID := keepRow.ID, dupRow.ID
+	for _, m := range s.movers {
+		if err := m.MoveCandidate(ctx, tx, dupID, keepID); err != nil {
+			return keepRow, err
+		}
+	}
+	if _, err := q.GetCompensation(ctx, keepID); database.IsNoRows(err) {
+		if _, err := q.MoveCompensation(ctx, store.MoveCompensationParams{FromID: dupID, ToID: keepID}); err != nil {
+			return keepRow, err
+		}
+	} else if err != nil {
+		return keepRow, err
+	}
+	// The duplicate's work history and education, if the kept candidate has none.
+	if err := q.MoveWorkIfNone(ctx, store.MoveWorkIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
+		return keepRow, err
+	}
+	if err := q.MoveEducationIfNone(ctx, store.MoveEducationIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
+		return keepRow, err
+	}
+	before := fromRow(keepRow).Profile
+	after, filled := FillFrom(before, fromRow(dupRow).Profile)
+	// The duplicate goes first: its email may be moving to the kept candidate.
+	if _, err := q.DeleteCandidate(ctx, dupID); err != nil {
+		return keepRow, err
+	}
+	row := keepRow
+	if len(filled) > 0 {
+		var err error
+		if row, err = q.UpdateCandidate(ctx, updateParams(keepID, version, after)); err != nil {
+			return keepRow, err
+		}
+	}
+	for _, e := range []audit.Entry{
+		{Action: "candidate.merged", EntityType: "candidate", EntityID: keepID,
+			Changes: map[string]any{"duplicateId": dupID, "duplicateName": FullName(fromRow(dupRow).Profile), "filled": filled}},
+		{Action: "candidate.merged_into", EntityType: "candidate", EntityID: dupID, Changes: map[string]any{"keptId": keepID}},
+	} {
+		if err := audit.Record(ctx, tx, e); err != nil {
+			return keepRow, err
+		}
+	}
+	return row, nil
+}
+
+// MergeInto merges candidate dupID into keepID (as Merge, without a person's
+// version check), in the caller's transaction: an imported CV whose email
+// belongs to keepID joins them.
+func (m *Module) MergeInto(ctx context.Context, tx pgx.Tx, keepID, dupID string) error {
+	q := store.New(tx)
+	keepRow, err := q.GetCandidate(ctx, keepID)
+	if err != nil {
+		return err
+	}
+	dupRow, err := q.GetCandidate(ctx, dupID)
+	if err != nil {
+		return err
+	}
+	_, err = m.service.mergeRows(ctx, tx, keepRow, dupRow, int(keepRow.Version))
+	return err
 }

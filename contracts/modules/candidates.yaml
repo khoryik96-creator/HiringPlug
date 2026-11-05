@@ -454,6 +454,7 @@ components:
         - phone
         - nationality
         - residenceCountry
+        - linkedinUrl
         - workAuthorization
         - noticePeriod
         - industry
@@ -497,6 +498,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
+        linkedinUrl: { type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah." }
         workAuthorization:
           allOf: [{ $ref: '#/components/schemas/WorkAuthorization' }]
           nullable: true
@@ -543,6 +545,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
+        linkedinUrl: { type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah." }
         workAuthorization:
           allOf: [{ $ref: '#/components/schemas/WorkAuthorization' }]
           nullable: true
@@ -587,6 +590,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
+        linkedinUrl: { type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah." }
         workAuthorization:
           allOf: [{ $ref: '#/components/schemas/WorkAuthorization' }]
           nullable: true

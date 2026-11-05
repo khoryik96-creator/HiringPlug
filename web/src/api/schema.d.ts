@@ -963,6 +963,65 @@ export interface paths {
         patch: operations["renameTeam"];
         trace?: never;
     };
+    "/v1/cv-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your latest imports, newest first, with each file's progress */
+        get: operations["listCvImports"];
+        put?: never;
+        /** Start an import (then send its files one by one) */
+        post: operations["createCvImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cv-imports/{cvImportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvImportId: components["parameters"]["CvImportIdPath"];
+            };
+            cookie?: never;
+        };
+        /** One of your imports, with each file's progress */
+        get: operations["getCvImport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cv-imports/{cvImportId}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvImportId: components["parameters"]["CvImportIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add one file (PDF, .docx or .doc) to an import
+         * @description A file that is not a CV file is recorded as failed, so the import shows it.
+         */
+        post: operations["addCvImportFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/api-keys": {
         parameters: {
             query?: never;
@@ -1969,7 +2028,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -2194,6 +2253,8 @@ export interface components {
             nationality: components["schemas"]["CountryCode"] | null;
             /** @description Where the candidate lives now (null = not known, shown as NA). */
             residenceCountry: components["schemas"]["CountryCode"] | null;
+            /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
+            linkedinUrl: string | null;
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;
@@ -2222,6 +2283,8 @@ export interface components {
             nationality?: components["schemas"]["CountryCode"] | null;
             /** @description Where the candidate lives now (null = not known, shown as NA). */
             residenceCountry?: components["schemas"]["CountryCode"] | null;
+            /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
+            linkedinUrl?: string | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
@@ -2245,6 +2308,8 @@ export interface components {
             nationality?: components["schemas"]["CountryCode"] | null;
             /** @description Where the candidate lives now (null = not known, shown as NA). */
             residenceCountry?: components["schemas"]["CountryCode"] | null;
+            /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
+            linkedinUrl?: string | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
@@ -2938,6 +3003,48 @@ export interface components {
             active?: boolean;
             /** @description The team they are in; null for none. */
             teamId?: components["schemas"]["TeamGroupId"] | null;
+        };
+        /** @example cvi_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        CvImportId: string;
+        /** @example cvf_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        CvImportItemId: string;
+        /**
+         * @description reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error).
+         * @enum {string}
+         */
+        CvImportItemStatus: "reading" | "created" | "added" | "unread" | "failed";
+        CvImportItem: {
+            id: components["schemas"]["CvImportItemId"];
+            fileName: string;
+            status: components["schemas"]["CvImportItemStatus"];
+            candidateId: components["schemas"]["CandidateId"] | null;
+            /** @description Null when there is none or you may not see them. */
+            candidateName: string | null;
+            error: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CvImportCounts: {
+            reading: number;
+            created: number;
+            added: number;
+            unread: number;
+            failed: number;
+        };
+        CvImport: {
+            id: components["schemas"]["CvImportId"];
+            source: components["schemas"]["CandidateSource"];
+            /** Format: date-time */
+            createdAt: string;
+            counts: components["schemas"]["CvImportCounts"];
+            items: components["schemas"]["CvImportItem"][];
+        };
+        CvImportList: {
+            items: components["schemas"]["CvImport"][];
+        };
+        CvImportInput: {
+            /** @description The new candidates' source (e.g. linkedin for LinkedIn PDFs), from the company's list. */
+            source: components["schemas"]["CandidateSource"];
         };
         /** @example akey_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ApiKeyId: string;
@@ -4348,6 +4455,7 @@ export interface components {
         CvTemplateIdPath: components["schemas"]["CvTemplateId"];
         DocumentIdPath: components["schemas"]["DocumentId"];
         EmailTemplateIdPath: components["schemas"]["EmailTemplateId"];
+        CvImportIdPath: components["schemas"]["CvImportId"];
         ApiKeyIdPath: components["schemas"]["ApiKeyId"];
         WebhookIdPath: components["schemas"]["WebhookId"];
         InterviewIdPath: components["schemas"]["InterviewId"];
@@ -6114,6 +6222,114 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    listCvImports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvImportList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createCvImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CvImportInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvImport"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getCvImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvImportId: components["parameters"]["CvImportIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvImport"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addCvImportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cvImportId: components["parameters"]["CvImportIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CvImportItem"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
         };
     };
     listApiKeys: {

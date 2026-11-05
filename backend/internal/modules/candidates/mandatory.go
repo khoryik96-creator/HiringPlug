@@ -27,6 +27,8 @@ func filled(p Profile, field string) bool {
 		return set(p.Nationality)
 	case "residenceCountry":
 		return set(p.ResidenceCountry)
+	case "linkedinUrl":
+		return set(p.LinkedinURL)
 	case "location":
 		return set(p.Location)
 	case "currentTitle":

@@ -12,6 +12,7 @@ import (
 	"github.com/nyaruka/phonenumbers"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/linkedin"
 )
 
 // Work authorization statuses and bases (mirroring the contract's enums).
@@ -29,6 +30,7 @@ type Profile struct {
 	Phone             *string
 	Nationality       *string
 	ResidenceCountry  *string // ISO code; nil = not known (NA)
+	LinkedinURL       *string // https://www.linkedin.com/in/...
 	WorkAuthorization *WorkAuthorization
 	NoticePeriod      *NoticePeriod
 	Industry          *string
@@ -114,6 +116,7 @@ type ProfilePatch struct {
 	Phone             Change[*string]
 	Nationality       Change[*string]
 	ResidenceCountry  Change[*string]
+	LinkedinURL       Change[*string]
 	WorkAuthorization Change[*WorkAuthorization]
 	NoticePeriod      Change[*NoticePeriod]
 	Industry          Change[*string]
@@ -134,6 +137,7 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.Phone, pp.Phone)
 	apply(&p.Nationality, pp.Nationality)
 	apply(&p.ResidenceCountry, pp.ResidenceCountry)
+	apply(&p.LinkedinURL, pp.LinkedinURL)
 	apply(&p.WorkAuthorization, pp.WorkAuthorization)
 	apply(&p.NoticePeriod, pp.NoticePeriod)
 	apply(&p.Industry, pp.Industry)
@@ -185,6 +189,15 @@ func NormalizeProfile(p Profile, phoneRegion string) (Profile, apperr.FieldError
 		}
 	}
 
+	if l := trimmedOrNil(p.LinkedinURL); l != nil {
+		normal, ok := linkedin.Normalize(*l)
+		if !ok {
+			errs.Add("linkedinUrl", "is not a LinkedIn profile address, e.g. linkedin.com/in/name")
+		}
+		p.LinkedinURL = &normal
+	} else {
+		p.LinkedinURL = nil
+	}
 	if p.Nationality != nil {
 		n := strings.ToUpper(strings.TrimSpace(*p.Nationality))
 		p.Nationality = &n

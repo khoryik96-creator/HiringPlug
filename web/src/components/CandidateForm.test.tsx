@@ -25,10 +25,11 @@ describe("candidate form", () => {
     // Meanwhile someone else saved a phone number; a background refresh brings version 4.
     rerender(<CandidateForm candidate={testCandidate({ version: 4, phone: "+60123456789" })} onDone={onDone} />);
     change("Current title", "Senior Accountant");
+    change("LinkedIn profile", " linkedin.com/in/siti-aisyah ");
     save();
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     // Version 3 makes the API answer CONFLICT_STALE_VERSION instead of wiping their phone number.
-    expect(sentBody(patch)).toMatchObject({ version: 3, currentTitle: "Senior Accountant" });
+    expect(sentBody(patch)).toMatchObject({ version: 3, currentTitle: "Senior Accountant", linkedinUrl: "linkedin.com/in/siti-aisyah" });
   });
 
   it("names the candidate who already has the email, with a link", async () => {

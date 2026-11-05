@@ -96,6 +96,7 @@ details get their own permissions.
 | `cvformats:create` (formatted CVs) | ✓ | ✓ | ✓ | ✓ | | |
 | `cvformats.templates:manage` (upload and remove CV templates) | ✓ | ✓ | ✓ | | | |
 | `reports:read` (fees in them need `placements.fees:read`) | ✓ | ✓ | ✓ | | | |
+| `intake:create` (import CVs and LinkedIn PDFs as candidates; follow your imports) | ✓ | ✓ | ✓ | ✓ | | |
 | `settings:read` (dropdown options and mandatory fields; every form needs it) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `settings:manage` (change them) | ✓ | ✓ | | | | |
 | `assistant:use` (the AI assistant; it sees only what you may see, never contact details or salary) | ✓ | ✓ | ✓ | ✓ | ✓ | |

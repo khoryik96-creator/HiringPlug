@@ -85,6 +85,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dd>{c.email ?? "—"}</dd>
             <dt>Phone</dt>
             <dd>{c.phone ?? "—"}</dd>
+            <dt>LinkedIn</dt>
+            <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
             <dt>Nationality</dt>
             <dd>{c.nationality ? countryName(c.nationality) : "—"}</dd>
             <dt>Country of residence</dt>

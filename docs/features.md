@@ -30,6 +30,7 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 |---|---|
 | First and last name | Spaces tidied; full name derived |
 | Email | Lower-cased; **one candidate per email** in a company: adding someone with an email another candidate has is refused, naming that candidate and who owns them with a link (unless you may not see them) |
+| LinkedIn profile | Their LinkedIn link, tidied to `https://www.linkedin.com/in/...` (`lnkd.in` short links kept); shown as a link on the profile. Read from a CV like Kano and CV Studio do: a `linkedin.com/in/...` (or `/pub/`, `lnkd.in`) address in the text, or one **hidden behind a link** in the file (a "LinkedIn" icon or word linking to the profile, in a PDF or Word CV) |
 | Phone | Any common format in; stored internationally (`012-345 6789` → `+60123456789`, default country configurable) |
 | Nationality | ISO country code (`MY`, `SG`, ...) |
 | Country of residence | ISO country code; not known is shown as **NA**. Read from a CV: the country in their address, else Malaysian place names near the top (Kuala Lumpur, Selangor, KL, ...), else their phone's country code (`+65` → SG, `012-...` → MY). Unlike Kano's check, an employer's "Sdn Bhd" or an address further down the CV says nothing about where they live |
@@ -442,6 +443,23 @@ owners and admins any. Next: templates per company and notes on an
 application.
 
 ## Import
+
+✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick
+one file or many (PDF, .docx, .doc; on LinkedIn: *More → Save to PDF*) and
+their source (LinkedIn to start). Each file becomes a candidate named after
+the file, owned by whoever imported it, and is read like any CV; when the
+reading is done the candidate is filled in from it: name, email, phone,
+location, nationality, country of residence, LinkedIn link, current title and
+company (the latest job), industry, notice period, skills, work history and
+education. A value the rules refuse (e.g. a phone in no known format) is left
+out and the rest kept. **One candidate per email:** when the CV's email
+belongs to a candidate already, the file is added to that candidate and the
+new one merged into them (their empty fields filled, nothing they have
+replaced). The page shows each import with its files' progress (reading, new
+candidate, added to existing, could not be read: fill it in, failed: not a CV
+file), refreshing while files are read, with a link to each candidate. Your
+imports are yours: others do not see them, and a candidate you may not see is
+not named.
 
 ✅ **Import** (menu: Import) candidates, companies or contacts from a CSV file
 (in Excel: Save As, CSV). Columns are matched to fields by their names

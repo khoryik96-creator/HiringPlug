@@ -122,6 +122,7 @@ type Candidate struct {
 	Skills                 []string
 	OwnerID                *string
 	ResidenceCountry       *string
+	LinkedinUrl            *string
 }
 
 type CandidateCompensation struct {
@@ -229,6 +230,27 @@ type Contact struct {
 	CreatedBy         string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+type CvImport struct {
+	ID        string
+	TenantID  string
+	Source    string
+	CreatedBy string
+	CreatedAt time.Time
+}
+
+type CvImportItem struct {
+	ID          string
+	TenantID    string
+	ImportID    string
+	FileName    string
+	DocumentID  *string
+	CandidateID *string
+	Status      string
+	Error       *string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type CvSearch struct {

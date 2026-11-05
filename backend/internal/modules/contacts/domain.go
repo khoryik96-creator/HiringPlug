@@ -3,12 +3,12 @@ package contacts
 // The contacts rules, as plain functions on plain values: no database, no HTTP.
 
 import (
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/linkedin"
 )
 
 // Details are the editable fields of a contact.
@@ -128,22 +128,7 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 }
 
 // NormalizeLinkedIn turns "linkedin.com/in/siti" into "https://www.linkedin.com/in/siti".
-func NormalizeLinkedIn(raw string) (string, bool) {
-	s := raw
-	if !strings.Contains(s, "://") {
-		s = "https://" + s
-	}
-	u, err := url.Parse(s)
-	if err != nil {
-		return raw, false
-	}
-	host := strings.ToLower(u.Hostname())
-	if host != "linkedin.com" && !strings.HasSuffix(host, ".linkedin.com") || strings.Trim(u.Path, "/") == "" {
-		return raw, false
-	}
-	u.Scheme, u.Host, u.RawQuery, u.Fragment = "https", "www.linkedin.com", "", ""
-	return strings.TrimSuffix(u.String(), "/"), true
-}
+func NormalizeLinkedIn(raw string) (string, bool) { return linkedin.Normalize(raw) }
 
 func squeeze(s string) string { return strings.Join(strings.Fields(s), " ") }
 

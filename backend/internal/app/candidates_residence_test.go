@@ -45,3 +45,13 @@ func TestOneCandidatePerEmailNamesWhoHasIt(t *testing.T) {
 	assert.Equal(t, "Siti Aisyah", details["existingCandidateName"])
 	assert.Equal(t, first.OwnerName.MustGet(), details["existingOwnerName"], "and who owns them")
 }
+
+func TestLinkedInProfileLink(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "Aina", "linkedinUrl": "my.linkedin.com/in/aina-r/"})
+	assert.Equal(t, "https://www.linkedin.com/in/aina-r", c.LinkedinUrl.MustGet())
+	res := a.request(http.MethodPost, "/v1/candidates", token, map[string]any{"firstName": "X", "linkedinUrl": "facebook.com/aina"})
+	assert.Equal(t, []string{"linkedinUrl"}, fieldNames(t, res.Error()))
+}

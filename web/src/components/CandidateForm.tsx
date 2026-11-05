@@ -20,7 +20,7 @@ import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 import { SourcePicker } from "./SourcePicker";
 
-type TextKey = "firstName" | "lastName" | "email" | "phone" | "nationality" | "waNote" | "industry"
+type TextKey = "firstName" | "lastName" | "email" | "phone" | "linkedinUrl" | "nationality" | "waNote" | "industry"
   | "specialization" | "currentTitle" | "currentCompany" | "location";
 
 /** Edit a candidate's profile. Salary is edited separately (its own permission). */
@@ -76,6 +76,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       {/* Not type="email": the browser's rule refuses addresses the API accepts (e.g. josé@…). */}
       {text("email", req("Email", "email"), { inputMode: "email", autoComplete: "off", spellCheck: false })}
       {text("phone", req("Phone", "phone"), { placeholder: "+60 12 345 6789" })}
+      {text("linkedinUrl", req("LinkedIn profile", "linkedinUrl"), { placeholder: "linkedin.com/in/…", inputMode: "url", spellCheck: false })}
       {text("nationality", req("Nationality (2-letter code)", "nationality"), { list: "countries", placeholder: "e.g. MY", className: "code" })}
       <datalist id="countries">
         {COUNTRIES.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}

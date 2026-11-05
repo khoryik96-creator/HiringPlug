@@ -20,7 +20,7 @@ tenant ─┬─ app_user (role)
 | `app_user` | email, name, role, team, active |
 | `field_option` | a company's dropdown options: list (candidate_source, notice_period, industry, work_type, work_arrangement), key, label, hidden, position; `field_list_saved` marks a list as saved (no rows = the built-in options) |
 | `field_rule` | a company's choice for a form field (candidate/job + field): mandatory or not |
-| `candidate` | names, email (unique per company), phone (E.164), nationality, country of residence, work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source (a key from the company's source list), tags and skills (text arrays, indexed for case-insensitive filters), owner (a user, or none), `version`, search text |
+| `candidate` | names, email (unique per company), phone (E.164), nationality, country of residence, LinkedIn link (https), work authorization + basis + note, notice period (value, unit), industry, specialization, current title/company, location, source (a key from the company's source list), tags and skills (text arrays, indexed for case-insensitive filters), owner (a user, or none), `version`, search text |
 | `company` | name (unique per company, ignoring case and accents), type (client/prospect/internal), website (https), industry, size, phone, address, city, country, registration number, about, `version`, search text; how the last website reading went (`autofill_status` idle/queued/done/failed, error, when) |
 | `company_suggestion` | a detail read from the company's website: company, field, value, source (what and which page), status (pending/accepted/dismissed; who decided is in the audit log) |
 | `contact` | company (same tenant, foreign key), names, job title, email (unique per company) with check status + reasons + date, office phone, mobile, LinkedIn, status (active/left), notes, `version`, search text |
@@ -54,6 +54,8 @@ tenant ─┬─ app_user (role)
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
+| `cv_import` | an import of CVs or LinkedIn PDFs: source given to the new candidates, who started it (only they see it) |
+| `cv_import_item` | one file of an import: file name, status (reading/created/added/unread/failed), candidate, document, error |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |
 | `candidate_education` | candidate, position, qualification, institution, year finished |
 | `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |

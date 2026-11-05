@@ -10,7 +10,7 @@ type Profile = Schemas["ParsedProfile"];
 type Sourced = Schemas["SourcedText"];
 type Notice = Schemas["NoticePeriod"];
 
-export type SuggestionKey = "name" | "email" | "phone" | "location" | "nationality" | "residenceCountry" | "industry" | "noticePeriod"
+export type SuggestionKey = "name" | "email" | "phone" | "linkedinUrl" | "location" | "nationality" | "residenceCountry" | "industry" | "noticePeriod"
   | "currentTitle" | "currentCompany";
 
 export interface Suggestion {
@@ -46,6 +46,7 @@ export function suggestions(p: Profile, c: Candidate): Suggestion[] {
   add("name", "Name", p.fullName, c.fullName);
   add("email", "Email", p.email, c.email);
   add("phone", "Phone", p.phone, c.phone);
+  add("linkedinUrl", "LinkedIn profile", p.linkedinUrl, c.linkedinUrl);
   add("location", "Location", p.location, c.location);
   if (p.nationality) add("nationality", "Nationality", p.nationality, c.nationality && countryName(c.nationality), countryName(p.nationality.value));
   if (p.residenceCountry) {
@@ -77,6 +78,7 @@ export function applyBody(p: Profile, c: Candidate, ticked: Set<SuggestionKey>, 
   }
   if (ticked.has("email") && p.email) body.email = p.email.value;
   if (ticked.has("phone") && p.phone) body.phone = p.phone.value;
+  if (ticked.has("linkedinUrl") && p.linkedinUrl) body.linkedinUrl = p.linkedinUrl.value;
   if (ticked.has("location") && p.location) body.location = p.location.value;
   if (ticked.has("nationality") && p.nationality) body.nationality = p.nationality.value;
   if (ticked.has("residenceCountry") && p.residenceCountry) body.residenceCountry = p.residenceCountry.value;

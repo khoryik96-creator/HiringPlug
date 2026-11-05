@@ -7,11 +7,14 @@ run it explicitly.
 
 from __future__ import annotations
 
+import io
 import os
 import time
 
 import httpx
 import pytest
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 from ..documents import CV_LINES, join_pdfs, scanned_pdf, text_pdf
 
@@ -77,3 +80,44 @@ def test_a_cv_is_uploaded_read_and_returned(api: httpx.Client) -> None:
     assert isinstance(profile, dict)
     assert profile["fullName"]["value"] == "Nur Aisyah binti Rahman"
     assert profile["fullName"]["quote"] in text
+
+
+def linked_cv(email: str) -> bytes:
+    """A CV whose LinkedIn address is only behind the word "LinkedIn"."""
+    out = io.BytesIO()
+    c = canvas.Canvas(out, pagesize=A4)
+    c.setFont("Helvetica", 12)
+    for i, line in enumerate(["NUR AISYAH BINTI RAHMAN", f"{email} | LinkedIn", "Senior Accountant"]):
+        c.drawString(60, 780 - i * 20, line)
+    c.linkURL("https://my.linkedin.com/in/nur-aisyah-e2e", (60, 755, 400, 770), relative=0)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def test_an_imported_linkedin_pdf_becomes_a_filled_in_candidate(api: httpx.Client) -> None:
+    created = api.post("/v1/cv-imports", json={"source": "linkedin"})
+    assert created.status_code == 201, created.text
+    import_id = created.json()["id"]
+    email = f"nur.{time.time_ns()}@example.com"
+    added = api.post(
+        f"/v1/cv-imports/{import_id}/files",
+        files={"file": ("Nur Aisyah - LinkedIn.pdf", linked_cv(email), "application/pdf")},
+    )
+    assert added.status_code == 201, added.text
+    assert added.json()["status"] == "reading"
+    assert added.json()["candidateName"] == "Nur Aisyah LinkedIn"  # named after the file until read
+
+    deadline = time.monotonic() + 90
+    item = added.json()
+    while item["status"] == "reading" and time.monotonic() < deadline:
+        time.sleep(0.5)
+        item = api.get(f"/v1/cv-imports/{import_id}").json()["items"][0]
+    assert item["status"] == "created", item
+    candidate = api.get(f"/v1/candidates/{item['candidateId']}").json()
+    assert candidate["firstName"] == "Nur", candidate  # the name from the CV, not the file's
+    assert "Rahman" in candidate["lastName"], candidate
+    assert candidate["email"] == email
+    assert candidate["source"] == "linkedin"
+    # From the link hidden behind the word, tidied.
+    assert candidate["linkedinUrl"] == "https://www.linkedin.com/in/nur-aisyah-e2e"

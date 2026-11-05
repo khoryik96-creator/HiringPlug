@@ -30,6 +30,7 @@ type Service struct {
 	files      *blob.Store
 	candidates Candidates
 	whenRead   []TextReadHook
+	whenDone   []ReadDoneHook
 	ai         AIAllowance // nil: the AI never fills in CV readings
 }
 
@@ -38,6 +39,11 @@ type Service struct {
 type AIAllowance interface {
 	Allowed(ctx context.Context, tx pgx.Tx) (bool, error)
 }
+
+// ReadDoneHook runs when reading a document has ended, in the same
+// transaction: with the details read from it (as kept), or nil when its text
+// or its details could not be read (e.g. CV imports fill candidates in).
+type ReadDoneHook func(ctx context.Context, tx pgx.Tx, tenantID, documentID string, profile *api.ParsedProfile) error
 
 // TextReadHook runs when a candidate's CV (not one the app made) has been
 // read, in the same transaction (e.g. CV vs job matching scores them again).

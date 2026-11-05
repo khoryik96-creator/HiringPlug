@@ -62,6 +62,8 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 				}
 			}
 		}
+	} else if err := s.readDone(ctx, tx, job.TenantID, row.ID, nil); err != nil { // no text: nothing to parse
+		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "document.text_extracted", EntityType: "document", EntityID: result.DocumentId,
@@ -110,8 +112,10 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	status := string(api.DocumentParseStatusFailed)
 	params := store.SaveParseParams{ID: row.ID, ParseStatus: &status}
 	changes := map[string]any{"status": status}
+	var kept *api.ParsedProfile
 	if profile, err := result.Profile.Get(); err == nil && hasText(row.ExtractedText) {
 		grounded := groundProfile(*row.ExtractedText, profile)
+		kept = &grounded
 		data, err := json.Marshal(grounded)
 		if err != nil {
 			return err
@@ -133,9 +137,22 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 		}
 		changes["aiTokens"] = *result.AiTokens
 	}
-	return audit.Record(ctx, tx, audit.Entry{
+	if err := audit.Record(ctx, tx, audit.Entry{
 		Action: "document.cv_parsed", EntityType: "document", EntityID: row.ID, Changes: changes,
-	})
+	}); err != nil {
+		return err
+	}
+	return s.readDone(ctx, tx, job.TenantID, row.ID, kept)
+}
+
+// readDone runs the hooks for a document whose reading has ended.
+func (s *Service) readDone(ctx context.Context, tx pgx.Tx, tenantID, documentID string, profile *api.ParsedProfile) error {
+	for _, hook := range s.whenDone {
+		if err := hook(ctx, tx, tenantID, documentID, profile); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func hasText(t *string) bool {

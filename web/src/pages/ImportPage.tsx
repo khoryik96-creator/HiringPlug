@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { Permission } from "../api/client";
+import { CvImports } from "../components/CvImports";
 import { parseCsv, toCsv } from "../import/csv";
 import { autoMap, FIELDS, type ImportKind, mappingProblems } from "../import/mapping";
 import { type RowResult, runImport } from "../import/runImport";
@@ -14,8 +15,20 @@ const KINDS: { kind: ImportKind; label: string; permission: Permission }[] = [
 
 const STATUS: Record<RowResult["status"], string> = { added: "Added", exists: "Already there", fix: "To fix", failed: "Failed" };
 
-/** Import candidates, companies or contacts from a CSV file, with a report. */
+/** Import CVs and LinkedIn PDFs, or candidates, companies or contacts from a CSV file, with a report. */
 export function ImportPage({ permissions }: { permissions: Permission[] }) {
+  const cvs = permissions.includes("intake:create");
+  return (
+    <main>
+      <h2>Import</h2>
+      {cvs && <CvImports />}
+      <CsvImport permissions={permissions} cvs={cvs} />
+    </main>
+  );
+}
+
+/** Candidates, companies or contacts from a CSV file. */
+function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boolean }) {
   const queryClient = useQueryClient();
   const allowed = KINDS.filter((k) => permissions.includes(k.permission));
   const [kind, setKind] = useState<ImportKind>(allowed[0]?.kind ?? "candidates");
@@ -25,7 +38,7 @@ export function ImportPage({ permissions }: { permissions: Permission[] }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [results, setResults] = useState<RowResult[] | null>(null);
 
-  if (allowed.length === 0) return <main><h2>Import</h2><p className="muted">Your role cannot add records.</p></main>;
+  if (allowed.length === 0) return cvs ? null : <p className="muted">Your role cannot add records.</p>;
 
   const choose = (k: ImportKind, f = file) => {
     setKind(k);
@@ -59,9 +72,9 @@ export function ImportPage({ permissions }: { permissions: Permission[] }) {
   };
 
   return (
-    <main>
-      <h2>Import</h2>
-      <section className="panel">
+    <>
+      <section className="panel" aria-label="CSV import">
+        <h3>From a spreadsheet</h3>
         <p>Import from a CSV file (in Excel: <em>File → Save As → CSV</em>). The first row must be the column names.</p>
         <div className="row">
           <label className="row">What: <select value={kind} onChange={(e) => { choose(e.target.value as ImportKind); }}>
@@ -125,6 +138,6 @@ export function ImportPage({ permissions }: { permissions: Permission[] }) {
           </table>
         </section>
       )}
-    </main>
+    </>
   );
 }

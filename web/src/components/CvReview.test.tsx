@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient, sentBody, testCandidate } from "../test-utils";
 import { CvReview } from "./CvReview";
-import { noticeFrom, suggestions } from "./cvSuggestions";
+import { applyBody, noticeFrom, suggestions } from "./cvSuggestions";
 
 afterEach(() => {
   cleanup();
@@ -47,6 +47,17 @@ describe("suggestions from a CV", () => {
     // email and nationality (MY) already match the profile, so they are not offered.
     expect(noticeFrom("2 week")).toEqual({ value: 2, unit: "week" });
     expect(noticeFrom("soon")).toBeNull();
+  });
+
+  it("offers the CV's LinkedIn link, including one hidden behind a link in the file", () => {
+    const withLink = { ...profile, linkedinUrl: s("https://www.linkedin.com/in/siti-aisyah", "linkedin.com/in/siti-aisyah") };
+    const candidate = testCandidate({ linkedinUrl: null });
+    const row = suggestions(withLink, candidate).find((r) => r.key === "linkedinUrl");
+    expect(row).toMatchObject({ label: "LinkedIn profile", value: "https://www.linkedin.com/in/siti-aisyah", checked: true });
+    expect(applyBody(withLink, candidate, new Set(["linkedinUrl"]), []).linkedinUrl).toBe("https://www.linkedin.com/in/siti-aisyah");
+    expect(applyBody(withLink, candidate, new Set(), []).linkedinUrl).toBeNull();
+    // Already on the profile: not offered again.
+    expect(suggestions(withLink, testCandidate({ linkedinUrl: "https://www.linkedin.com/in/siti-aisyah" })).some((r) => r.key === "linkedinUrl")).toBe(false);
   });
 });
 

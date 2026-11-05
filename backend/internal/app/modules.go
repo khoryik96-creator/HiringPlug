@@ -25,6 +25,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/intake"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
@@ -64,6 +65,7 @@ type Modules struct {
 	Matching     *matching.Module
 	Privacy      *privacy.Module
 	Settings     *settings.Module
+	Intake       *intake.Module
 	// scaffold:fields
 }
 
@@ -119,6 +121,10 @@ func NewModules(d Deps) *Modules {
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy,
 		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents} }},
 	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	m.Intake = intake.New(d.Pool, intake.Deps{
+		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
+	}, d.Config.MaxUploadBytes)
+	m.Documents.WhenReadDone(m.Intake.ReadDone) // imported CVs fill their candidates in
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
@@ -154,6 +160,7 @@ type (
 	matchingHTTP     = matching.HTTP
 	privacyHTTP      = privacy.HTTP
 	settingsHTTP     = settings.HTTP
+	intakeHTTP       = intake.HTTP
 	// scaffold:aliases
 )
 
@@ -182,6 +189,7 @@ type Server struct {
 	*matchingHTTP
 	*privacyHTTP
 	*settingsHTTP
+	*intakeHTTP
 	// scaffold:embeds
 }
 
@@ -211,6 +219,7 @@ func (m *Modules) Server() *Server {
 		matchingHTTP:     m.Matching.HTTP,
 		privacyHTTP:      m.Privacy.HTTP,
 		settingsHTTP:     m.Settings.HTTP,
+		intakeHTTP:       m.Intake.HTTP,
 		// scaffold:server-fields
 	}
 }

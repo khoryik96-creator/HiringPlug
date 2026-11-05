@@ -153,3 +153,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/settings/internal/store
+  - <<: *module
+    queries: db/queries/intake.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/intake/internal/store

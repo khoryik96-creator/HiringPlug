@@ -1499,6 +1499,85 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/cv-imports:
+    get:
+      operationId: listCvImports
+      tags: [intake]
+      summary: Your latest imports, newest first, with each file's progress
+      x-permission: intake:create
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvImportList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createCvImport
+      tags: [intake]
+      summary: Start an import (then send its files one by one)
+      x-permission: intake:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CvImportInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvImport'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/cv-imports/{cvImportId}:
+    parameters:
+      - $ref: '#/components/parameters/CvImportIdPath'
+    get:
+      operationId: getCvImport
+      tags: [intake]
+      summary: One of your imports, with each file's progress
+      x-permission: intake:create
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvImport'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/cv-imports/{cvImportId}/files:
+    parameters:
+      - $ref: '#/components/parameters/CvImportIdPath'
+    post:
+      operationId: addCvImportFile
+      tags: [intake]
+      summary: Add one file (PDF, .docx or .doc) to an import
+      description: A file that is not a CV file is recorded as failed, so the import shows it.
+      x-permission: intake:create
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CvImportItem'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
   /v1/api-keys:
     get:
       operationId: listApiKeys
@@ -3018,6 +3097,7 @@ components:
         - emails:send
         - identity.roles:manage
         - identity.team:manage
+        - intake:create
         - integrations:manage
         - interviews:feedback
         - interviews:read
@@ -3400,6 +3480,7 @@ components:
         - phone
         - nationality
         - residenceCountry
+        - linkedinUrl
         - workAuthorization
         - noticePeriod
         - industry
@@ -3443,6 +3524,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
+        linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -3488,6 +3570,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
+        linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -3531,6 +3614,7 @@ components:
           description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
+        linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -4524,6 +4608,68 @@ components:
           description: The team they are in; null for none.
           nullable: true
           allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
+    CvImportId:
+      type: string
+      pattern: '^cvi_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cvi_01jbz6w0m0k8q9x2r3s4t5v6w7
+    CvImportItemId:
+      type: string
+      pattern: '^cvf_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cvf_01jbz6w0m0k8q9x2r3s4t5v6w7
+    CvImportItemStatus:
+      type: string
+      description: >
+        reading = being read; created = a new candidate, filled in from the file; added = the file went to the candidate who already has its email; unread = a new candidate named after the file (its details could not be read: fill them in); failed = not a CV file (see error).
+
+      enum: [reading, created, added, unread, failed]
+    CvImportItem:
+      type: object
+      required: [id, fileName, status, candidateId, candidateName, error, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/CvImportItemId'}
+        fileName: {type: string}
+        status: {$ref: '#/components/schemas/CvImportItemStatus'}
+        candidateId:
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        candidateName: {type: string, nullable: true, description: Null when there is none or you may not see them.}
+        error: {type: string, nullable: true}
+        updatedAt: {type: string, format: date-time}
+    CvImportCounts:
+      type: object
+      required: [reading, created, added, unread, failed]
+      properties:
+        reading: {type: integer}
+        created: {type: integer}
+        added: {type: integer}
+        unread: {type: integer}
+        failed: {type: integer}
+    CvImport:
+      type: object
+      required: [id, source, createdAt, counts, items]
+      properties:
+        id: {$ref: '#/components/schemas/CvImportId'}
+        source: {$ref: '#/components/schemas/CandidateSource'}
+        createdAt: {type: string, format: date-time}
+        counts: {$ref: '#/components/schemas/CvImportCounts'}
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CvImportItem'}
+    CvImportList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CvImport'}
+    CvImportInput:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        source:
+          description: The new candidates' source (e.g. linkedin for LinkedIn PDFs), from the company's list.
+          allOf: [{$ref: '#/components/schemas/CandidateSource'}]
     ApiKeyId:
       type: string
       pattern: '^akey_[0-9a-hjkmnp-tv-z]{26}$'
@@ -6095,6 +6241,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/EmailTemplateId'}
+    CvImportIdPath:
+      name: cvImportId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/CvImportId'}
     ApiKeyIdPath:
       name: apiKeyId
       in: path
@@ -6256,6 +6407,11 @@ x-permissions:
     description: Invite people, change roles, deactivate and reactivate users, and put them in teams.
     sensitive: false
     roles: [owner, admin]
+  intake:create:
+    module: intake
+    description: Import CVs and LinkedIn PDFs as candidates, and follow your imports.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   integrations:manage:
     module: integrations
     description: Create and revoke API keys; add, change and remove webhooks.
@@ -6526,6 +6682,8 @@ x-modules:
     description: 'Email from the app: templates with placeholders filled from the candidate, job, interview and sender; messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it.'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
+  - name: intake
+    description: CV imports. Each file (a CV, or a LinkedIn profile saved as PDF) becomes a candidate named after the file, owned by whoever uploaded it, and is read like any CV. When the reading is done the candidate is filled in from it (name, email, phone, location, LinkedIn link, current job, work history, education, skills, industry), or, when its email already belongs to a candidate, merged into that candidate (one candidate per email). Files are sent one per request, so a batch shows each file's progress.
   - name: integrations
     description: API keys let another system use this API as a role (never as owner); the key is shown once and only its hash is kept. Webhooks send a signed JSON POST to an HTTPS address when chosen events happen (queued in the same transaction as the change, retried when the receiver fails). API keys cannot manage API keys or webhooks.
   - name: interviews

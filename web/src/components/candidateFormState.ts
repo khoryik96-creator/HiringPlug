@@ -7,6 +7,7 @@ export interface CandidateFormState {
   lastName: string;
   email: string;
   phone: string;
+  linkedinUrl: string;
   nationality: string;
   residenceCountry: string; // "" = not known (NA)
   waStatus: "" | Schemas["WorkAuthorizationStatus"];
@@ -30,6 +31,7 @@ export const FIELD_PATHS: Record<keyof CandidateFormState, string> = {
   lastName: "lastName",
   email: "email",
   phone: "phone",
+  linkedinUrl: "linkedinUrl",
   nationality: "nationality",
   residenceCountry: "residenceCountry",
   waStatus: "workAuthorization.status",
@@ -53,6 +55,7 @@ export function formFromCandidate(c: Candidate): CandidateFormState {
     lastName: c.lastName,
     email: c.email ?? "",
     phone: c.phone ?? "",
+    linkedinUrl: c.linkedinUrl ?? "",
     nationality: c.nationality ?? "",
     residenceCountry: c.residenceCountry ?? "",
     waStatus: c.workAuthorization?.status ?? "",
@@ -92,6 +95,7 @@ export function toUpdateBody(f: CandidateFormState, version: number): Schemas["C
     lastName: f.lastName,
     email: orNull(f.email),
     phone: orNull(f.phone),
+    linkedinUrl: orNull(f.linkedinUrl),
     nationality: orNull(f.nationality.toUpperCase()),
     residenceCountry: orNull(f.residenceCountry),
     workAuthorization: f.waStatus

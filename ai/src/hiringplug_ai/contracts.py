@@ -40,6 +40,7 @@ class Permission(StrEnum):
     emails_send = "emails:send"
     identity_roles_manage = "identity.roles:manage"
     identity_team_manage = "identity.team:manage"
+    intake_create = "intake:create"
     integrations_manage = "integrations:manage"
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
@@ -450,6 +451,13 @@ class Candidate(BaseModel):
         CountryCode | None,
         Field(description="Where the candidate lives now (null = not known, shown as NA)."),
     ]
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
+    ]
     workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
@@ -494,6 +502,13 @@ class CandidateCreate(BaseModel):
         CountryCode | None,
         Field(description="Where the candidate lives now (null = not known, shown as NA)."),
     ] = None
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
+    ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None
     industry: Annotated[str | None, Field(max_length=100)] = None
@@ -525,6 +540,13 @@ class CandidateUpdate(BaseModel):
     residenceCountry: Annotated[
         CountryCode | None,
         Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ] = None
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
     ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None
@@ -1378,6 +1400,70 @@ class TeamMemberUpdate(BaseModel):
     role: Role | None = None
     active: bool | None = None
     teamId: Annotated[TeamGroupId | None, Field(description="The team they are in; null for none.")] = None
+
+
+class CvImportId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cvi_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cvi_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class CvImportItemId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cvf_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cvf_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class CvImportItemStatus(StrEnum):
+    reading = "reading"
+    created = "created"
+    added = "added"
+    unread = "unread"
+    failed = "failed"
+
+
+class CvImportItem(BaseModel):
+    id: CvImportItemId
+    fileName: str
+    status: CvImportItemStatus
+    candidateId: Annotated[CandidateId | None, Field(...)]
+    candidateName: Annotated[
+        str | None, Field(description="Null when there is none or you may not see them.")
+    ]
+    error: Annotated[str | None, Field(...)]
+    updatedAt: AwareDatetime
+
+
+class CvImportCounts(BaseModel):
+    reading: int
+    created: int
+    added: int
+    unread: int
+    failed: int
+
+
+class CvImport(BaseModel):
+    id: CvImportId
+    source: CandidateSource
+    createdAt: AwareDatetime
+    counts: CvImportCounts
+    items: list[CvImportItem]
+
+
+class CvImportList(BaseModel):
+    items: list[CvImport]
+
+
+class CvImportInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    source: Annotated[
+        CandidateSource,
+        Field(
+            description="The new candidates' source (e.g. linkedin for LinkedIn PDFs), from the company's list."
+        ),
+    ]
 
 
 class ApiKeyId(RootModel[str]):

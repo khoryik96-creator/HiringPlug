@@ -38,3 +38,4 @@ export const accessKey = ["access"] as const;
 export const teamsKey = ["teams"] as const;
 export const jobSuggestionsKey = (jobId: string) => ["suggestions", jobId] as const;
 export const fieldSettingsKey = ["settings", "fields"] as const;
+export const cvImportsKey = ["cv-imports"] as const;

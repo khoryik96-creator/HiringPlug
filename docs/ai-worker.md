@@ -48,7 +48,12 @@ rebuilt here as small, separately tested modules.
 6. **Safety** (`limits.py`, `zipsafety.py`): page limits, zip-bomb checks for
    Word files, pixel limits for images. A damaged or unsafe file becomes a
    `failed` result with a readable message, not a retry loop.
-7. **Clean-up** (`text.py`): known ligature codes are fixed
+7. **Hidden links** (`links.py`, from Kano): addresses behind links in the
+   file (PDF link annotations, Word hyperlinks) are added at the end of the
+   text under "Links in the file:", LinkedIn first, unless the text already
+   shows them, so a CV whose "LinkedIn" icon links to the profile still gives
+   its address (and the parser can quote it).
+8. **Clean-up** (`text.py`): known ligature codes are fixed
    (`Accoun(cid:415)ng` → `Accounting`), NUL characters (which PostgreSQL cannot
    store) are removed, and whitespace is tidied. Real words are never rewritten.
 
