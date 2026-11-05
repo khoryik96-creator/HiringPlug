@@ -34,7 +34,8 @@ const insertMatch = `-- name: InsertMatch :one
 
 INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, job_hash, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
-RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
+RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps
 `
 
 type InsertMatchParams struct {
@@ -59,6 +60,9 @@ type InsertMatchRow struct {
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
 	JobHash       *string
+	Dimensions    []byte
+	Strengths     []string
+	Gaps          []string
 }
 
 // Queries owned by the matching module. Run inside a tenant-scoped transaction.
@@ -86,12 +90,16 @@ func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) (Inser
 		&i.CreatedAt,
 		&i.ScoredAt,
 		&i.JobHash,
+		&i.Dimensions,
+		&i.Strengths,
+		&i.Gaps,
 	)
 	return i, err
 }
 
 const latestForApplication = `-- name: LatestForApplication :many
-SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
+SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps
 FROM job_match
 WHERE application_id = $1
 ORDER BY created_at DESC, id DESC
@@ -112,6 +120,9 @@ type LatestForApplicationRow struct {
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
 	JobHash       *string
+	Dimensions    []byte
+	Strengths     []string
+	Gaps          []string
 }
 
 func (q *Queries) LatestForApplication(ctx context.Context, applicationID string) ([]LatestForApplicationRow, error) {
@@ -137,6 +148,9 @@ func (q *Queries) LatestForApplication(ctx context.Context, applicationID string
 			&i.CreatedAt,
 			&i.ScoredAt,
 			&i.JobHash,
+			&i.Dimensions,
+			&i.Strengths,
+			&i.Gaps,
 		); err != nil {
 			return nil, err
 		}
@@ -150,7 +164,8 @@ func (q *Queries) LatestForApplication(ctx context.Context, applicationID string
 
 const latestForJob = `-- name: LatestForJob :many
 SELECT DISTINCT ON (application_id)
-  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
+  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps
 FROM job_match
 WHERE job_id = $1
 ORDER BY application_id, created_at DESC, id DESC
@@ -171,6 +186,9 @@ type LatestForJobRow struct {
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
 	JobHash       *string
+	Dimensions    []byte
+	Strengths     []string
+	Gaps          []string
 }
 
 // The latest score of each of a job's applications.
@@ -197,6 +215,9 @@ func (q *Queries) LatestForJob(ctx context.Context, jobID string) ([]LatestForJo
 			&i.CreatedAt,
 			&i.ScoredAt,
 			&i.JobHash,
+			&i.Dimensions,
+			&i.Strengths,
+			&i.Gaps,
 		); err != nil {
 			return nil, err
 		}
@@ -211,9 +232,10 @@ func (q *Queries) LatestForJob(ctx context.Context, jobID string) ([]LatestForJo
 const saveScore = `-- name: SaveScore :execrows
 UPDATE job_match
 SET status = $1, score = $2, summary = $3, reasons = $4, dropped = $5,
-    error = $6, model = $7, input_tokens = $8, output_tokens = $9,
+    dimensions = $6, strengths = $7, gaps = $8,
+    error = $9, model = $10, input_tokens = $11, output_tokens = $12,
     scored_at = now(), sent_job = NULL, sent_cv = NULL
-WHERE id = $10 AND status = 'queued'
+WHERE id = $13 AND status = 'queued'
 `
 
 type SaveScoreParams struct {
@@ -222,6 +244,9 @@ type SaveScoreParams struct {
 	Summary      *string
 	Reasons      []byte
 	Dropped      int32
+	Dimensions   []byte
+	Strengths    []string
+	Gaps         []string
 	Error        *string
 	Model        *string
 	InputTokens  int32
@@ -236,6 +261,9 @@ func (q *Queries) SaveScore(ctx context.Context, arg SaveScoreParams) (int64, er
 		arg.Summary,
 		arg.Reasons,
 		arg.Dropped,
+		arg.Dimensions,
+		arg.Strengths,
+		arg.Gaps,
 		arg.Error,
 		arg.Model,
 		arg.InputTokens,

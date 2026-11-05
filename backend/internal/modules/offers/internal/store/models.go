@@ -62,6 +62,7 @@ type ApplicationStageChange struct {
 	FromStage     *string
 	ToStage       string
 	ChangedAt     time.Time
+	ChangedBy     *string
 }
 
 type AssistantAnswer struct {
@@ -472,6 +473,9 @@ type JobMatch struct {
 	CreatedAt     time.Time
 	ScoredAt      *time.Time
 	JobHash       *string
+	Dimensions    []byte
+	Strengths     []string
+	Gaps          []string
 }
 
 type JobOrder struct {

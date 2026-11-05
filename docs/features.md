@@ -182,6 +182,16 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **The score is worked out, not asked for:** met counts in full, partly as
   half, of the requirements that passed (at most 15). Strong from 75%,
   partial from 50%. It suggests; the recruiter decides.
+- **Fit stats, CV Studio's CV scoring:** with the score, the AI rates the CV
+  0-100 on CV Studio's six dimensions (technical / functional skills,
+  experience level, industry / domain background, education &
+  qualifications, leadership & communication, keyword & requirement match),
+  each with a one-sentence note, shown as coloured bars (green from 70, amber
+  from 45), and lists up to five **strengths** and **gaps to ask about**
+  (the AI notes). The **recommendation** follows CV Studio's thresholds but
+  from the worked-out score: shortlist from 70, consider from 45, pass below.
+  The ratings and notes are marked as the AI's opinion; Go keeps each known
+  rating once, holds it to 0-100, and drops anything else.
 - **Never who a person is.** Requirements about age, gender, race, religion,
   marital status or nationality ("Malaysians only", "aged below 35") are never
   scored, whatever the ad says; the prompt also tells the model not to consider
@@ -491,6 +501,13 @@ accents), or add it. Excel files (.xlsx) directly: later.
 ✅ The home page: open jobs with candidates per stage, totals, candidates
 moved this week, placements in the last 30 days, and who has waited more than
 14 days in one stage.
+
+✅ **Recent moves**: a timeline of stage moves, newest first and grouped by
+day (Today, Yesterday, then the date): the time, the candidate, from which
+stage to which (or "added at Applied"), on which job, and **who moved them**
+(blank when the app did, e.g. an accepted offer). It refreshes after every
+move or addition, and shows only candidates your role may see. A candidate's
+page has the same timeline for them (**Stage history**).
 
 ## Reports ✅
 

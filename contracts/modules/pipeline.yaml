@@ -132,6 +132,34 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/pipeline/moves:
+    get:
+      operationId: listStageMoves
+      tags: [pipeline]
+      summary: 'Stage moves, newest first: the dashboard timeline, or one candidate''s'
+      description: >
+        Every time an application was added or changed stage, with who did it
+        (none when the app did it, e.g. an offer accepted). Only applications
+        you may see.
+      x-permission: pipeline:read
+      parameters:
+        - name: candidateId
+          in: query
+          description: Only this candidate's moves.
+          schema: { $ref: '#/components/schemas/CandidateId' }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StageMoveList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   parameters:
     ApplicationIdPath:
@@ -237,6 +265,31 @@ components:
         companyId: { $ref: '#/components/schemas/CompanyId' }
         companyName: { type: string }
         stageCounts: { $ref: '#/components/schemas/StageCounts' }
+    StageMove:
+      type: object
+      required: [id, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, fromStage, toStage, changedAt, changedByName]
+      properties:
+        id: { type: string }
+        applicationId: { $ref: '#/components/schemas/ApplicationId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        candidateName: { type: string }
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        jobTitle: { type: string }
+        companyName: { type: string }
+        fromStage:
+          description: Null when the candidate was added to the job at toStage.
+          allOf: [{ $ref: '#/components/schemas/Stage' }]
+          nullable: true
+        toStage: { $ref: '#/components/schemas/Stage' }
+        changedAt: { type: string, format: date-time }
+        changedByName: { type: string, nullable: true, description: Who moved them; null when the app did (or before this was recorded). }
+    StageMoveList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StageMove' }
     PipelineSummary:
       type: object
       required: [openJobs, stageCounts, jobs, stuck, placedLast30Days, movedLast7Days]

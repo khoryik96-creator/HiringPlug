@@ -82,6 +82,7 @@ func NewModules(d Deps) *Modules {
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
+	m.Pipeline.NameUsersWith(m.Identity)
 	m.Notes = notes.New(d.Pool, notes.Subjects{
 		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
 	}, m.Identity)

@@ -2064,6 +2064,27 @@ class MatchReason(BaseModel):
     note: Annotated[str | None, Field(description="The AI's short explanation.")]
 
 
+class MatchDimensionName(StrEnum):
+    skills = "skills"
+    experience = "experience"
+    industry = "industry"
+    education = "education"
+    leadership = "leadership"
+    keywords = "keywords"
+
+
+class MatchDimension(BaseModel):
+    name: MatchDimensionName
+    score: Annotated[int, Field(ge=0, le=100)]
+    note: Annotated[str | None, Field(description="The AI's reason, in a sentence.", max_length=1000)]
+
+
+class MatchRecommendation(StrEnum):
+    shortlist = "shortlist"
+    consider = "consider"
+    pass_ = "pass"
+
+
 class Match(BaseModel):
     id: MatchId
     applicationId: str
@@ -2093,6 +2114,15 @@ class Match(BaseModel):
     model: Annotated[str | None, Field(description="The AI model that scored it.")]
     createdAt: AwareDatetime
     scoredAt: Annotated[AwareDatetime | None, Field(...)]
+    dimensions: Annotated[
+        list[MatchDimension],
+        Field(
+            description="The AI's ratings on CV Studio's six dimensions (its opinion: the score above is worked out from the quoted requirements)."
+        ),
+    ]
+    strengths: Annotated[list[str], Field(description="The AI's notes: what speaks for the candidate.")]
+    gaps: Annotated[list[str], Field(description="The AI's notes: gaps or concerns to ask about.")]
+    recommendation: Annotated[MatchRecommendation | None, Field(...)]
 
 
 class MatchList(BaseModel):
@@ -2160,6 +2190,14 @@ class MatchClaim(BaseModel):
     note: Annotated[str | None, Field(max_length=2000)]
 
 
+class Strength(RootModel[str]):
+    root: Annotated[str, Field(max_length=1000)]
+
+
+class Gap(RootModel[str]):
+    root: Annotated[str, Field(max_length=1000)]
+
+
 class MatchScoredJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2173,6 +2211,15 @@ class MatchScoredJob(BaseModel):
             max_length=30,
         ),
     ]
+    dimensions: Annotated[
+        list[MatchDimension],
+        Field(
+            description="The AI's ratings on CV Studio's six dimensions (Go keeps each known one once).",
+            max_length=12,
+        ),
+    ]
+    strengths: Annotated[list[Strength], Field(max_length=10)]
+    gaps: Annotated[list[Gap], Field(max_length=10)]
     error: Annotated[
         str | None,
         Field(
@@ -2428,6 +2475,28 @@ class DashboardJob(BaseModel):
     companyId: CompanyId
     companyName: str
     stageCounts: StageCounts
+
+
+class StageMove(BaseModel):
+    id: str
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    jobId: JobOrderId
+    jobTitle: str
+    companyName: str
+    fromStage: Annotated[
+        Stage | None, Field(description="Null when the candidate was added to the job at toStage.")
+    ]
+    toStage: Stage
+    changedAt: AwareDatetime
+    changedByName: Annotated[
+        str | None, Field(description="Who moved them; null when the app did (or before this was recorded).")
+    ]
+
+
+class StageMoveList(BaseModel):
+    items: list[StageMove]
 
 
 class PipelineSummary(BaseModel):

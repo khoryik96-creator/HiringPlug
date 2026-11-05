@@ -40,6 +40,7 @@ func (s *Service) scored(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 		InputTokens: int32(min(max(r.InputTokens, 0), 1<<30)), OutputTokens: int32(min(max(r.OutputTokens, 0), 1<<30)), //nolint:gosec // capped
 	}
 	var reasons []Reason
+	var dims []Dimension
 	if e := apiconv.ValueOrNil(r.Error); e != nil && strings.TrimSpace(*e) != "" {
 		params.Error = clipped(e, 1000)
 	} else {
@@ -53,6 +54,10 @@ func (s *Service) scored(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 		if score, ok := Score(reasons); ok {
 			v := int32(score) //nolint:gosec // 0 to 100
 			params.Status, params.Score, params.Summary = "done", &v, Summary(apiconv.ValueOrNil(r.Summary))
+			params.Strengths, params.Gaps = CheckNotes(r.Strengths), CheckNotes(r.Gaps)
+			for _, d := range r.Dimensions {
+				dims = append(dims, Dimension{Name: string(d.Name), Score: d.Score, Note: apiconv.ValueOrNil(d.Note)})
+			}
 		} else {
 			params.Error = ptr(noRequirements)
 		}
@@ -63,11 +68,18 @@ func (s *Service) scored(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 	if params.Reasons, err = json.Marshal(reasons); err != nil {
 		return err
 	}
+	if params.Dimensions, err = json.Marshal(CheckDimensions(dims)); err != nil {
+		return err
+	}
+	if params.Strengths == nil {
+		params.Strengths, params.Gaps = []string{}, []string{}
+	}
 	if n, err := q.SaveScore(ctx, params); err != nil || n == 0 {
 		return err
 	}
 	// No quotes or notes in the audit log: they are about a person.
-	changes := map[string]any{"status": params.Status, "requirements": len(reasons), "dropped": params.Dropped, "tokens": params.InputTokens + params.OutputTokens}
+	changes := map[string]any{"status": params.Status, "requirements": len(reasons), "dropped": params.Dropped, "tokens": params.InputTokens + params.OutputTokens,
+		"dimensions": len(CheckDimensions(dims))}
 	if params.Score != nil {
 		changes["score"] = *params.Score
 	}

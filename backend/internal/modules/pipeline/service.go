@@ -22,6 +22,7 @@ type Service struct {
 	jobs       Jobs
 	companies  Companies
 	whenAdded  []AddedHook
+	users      Users // names on the timeline of stage moves
 }
 
 // AddedHook runs when a candidate is put on a job, in the same transaction

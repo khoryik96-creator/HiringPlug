@@ -1791,6 +1791,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pipeline/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stage moves, newest first: the dashboard timeline, or one candidate's
+         * @description Every time an application was added or changed stage, with who did it (none when the app did it, e.g. an offer accepted). Only applications you may see.
+         */
+        get: operations["listStageMoves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/placements": {
         parameters: {
             query?: never;
@@ -3614,6 +3634,22 @@ export interface components {
             /** @description The AI's short explanation. */
             note: string | null;
         };
+        /**
+         * @description CV Studio's six ratings: skills = technical / functional skills; experience = experience level; industry = industry / domain background; education = education and qualifications; leadership = leadership and communication; keywords = keyword and requirement match.
+         * @enum {string}
+         */
+        MatchDimensionName: "skills" | "experience" | "industry" | "education" | "leadership" | "keywords";
+        MatchDimension: {
+            name: components["schemas"]["MatchDimensionName"];
+            score: number;
+            /** @description The AI's reason, in a sentence. */
+            note: string | null;
+        };
+        /**
+         * @description From the score, as CV Studio: shortlist at 70 or more, consider from 45, pass below.
+         * @enum {string}
+         */
+        MatchRecommendation: "shortlist" | "consider" | "pass";
         Match: {
             id: components["schemas"]["MatchId"];
             applicationId: string;
@@ -3635,6 +3671,13 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             scoredAt: string | null;
+            /** @description The AI's ratings on CV Studio's six dimensions (its opinion: the score above is worked out from the quoted requirements). */
+            dimensions: components["schemas"]["MatchDimension"][];
+            /** @description The AI's notes: what speaks for the candidate. */
+            strengths: string[];
+            /** @description The AI's notes: gaps or concerns to ask about. */
+            gaps: string[];
+            recommendation: components["schemas"]["MatchRecommendation"] | null;
         };
         MatchList: {
             /** @description Whether an AI provider is set up. */
@@ -3694,6 +3737,10 @@ export interface components {
             summary: string | null;
             /** @description The AI's reading, not yet checked against the texts (Go checks every quote). */
             claims: components["schemas"]["MatchClaim"][];
+            /** @description The AI's ratings on CV Studio's six dimensions (Go keeps each known one once). */
+            dimensions: components["schemas"]["MatchDimension"][];
+            strengths: string[];
+            gaps: string[];
             /** @description Why there is no score (provider down, switched off, an answer that could not be read). */
             error: string | null;
             model: string | null;
@@ -3910,6 +3957,25 @@ export interface components {
             companyId: components["schemas"]["CompanyId"];
             companyName: string;
             stageCounts: components["schemas"]["StageCounts"];
+        };
+        StageMove: {
+            id: string;
+            applicationId: components["schemas"]["ApplicationId"];
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            companyName: string;
+            /** @description Null when the candidate was added to the job at toStage. */
+            fromStage: components["schemas"]["Stage"] | null;
+            toStage: components["schemas"]["Stage"];
+            /** Format: date-time */
+            changedAt: string;
+            /** @description Who moved them; null when the app did (or before this was recorded). */
+            changedByName: string | null;
+        };
+        StageMoveList: {
+            items: components["schemas"]["StageMove"][];
         };
         PipelineSummary: {
             /** @description Jobs with status open. */
@@ -7878,6 +7944,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineSummary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listStageMoves: {
+        parameters: {
+            query?: {
+                /** @description Only this candidate's moves. */
+                candidateId?: components["schemas"]["CandidateId"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageMoveList"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

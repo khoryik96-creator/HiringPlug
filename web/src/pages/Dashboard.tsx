@@ -6,6 +6,7 @@ import { timeInStage } from "../components/ApplicationCard";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
 import { OffersToApprove } from "../components/Offers";
+import { StageMoves } from "../components/StageMoves";
 import { OPEN_STAGES, STAGE } from "../labels";
 
 type Counts = Schemas["StageCounts"];
@@ -58,6 +59,8 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
           </tbody>
         </table>
       </section>
+
+      <StageMoves />
 
       <section className="panel" aria-label="Waiting too long">
         <h3>Waiting too long</h3>

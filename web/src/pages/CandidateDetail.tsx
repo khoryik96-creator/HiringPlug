@@ -17,6 +17,7 @@ import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
 import { SourceIcon } from "../components/SourcePicker";
+import { StageMoves } from "../components/StageMoves";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
@@ -111,6 +112,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       )}
       <History candidate={c} canEdit={permissions.includes("candidates:update")} />
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
+      {permissions.includes("pipeline:read") && <StageMoves candidateId={c.id} title="Stage history" limit={50} />}
       <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} />
       <SalaryPanel candidate={c} canEdit={permissions.includes("candidates.compensation:update")} />
       {permissions.includes("emails:read") && <CandidateEmails candidateId={c.id} permissions={permissions} />}

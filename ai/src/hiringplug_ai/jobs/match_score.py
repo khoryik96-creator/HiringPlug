@@ -1,4 +1,5 @@
-"""match.score: ask the AI provider how well a CV meets a job's requirements.
+"""match.score: ask the AI provider how well a CV meets a job's requirements,
+and for CV Studio's CV scoring: six ratings with a note each, strengths and gaps.
 
 Go sends the job's text and the CV's text, with names, contact details and
 salary already taken out. The model lists the job's requirements, a verdict
@@ -12,9 +13,20 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..contracts import JobKind, MatchClaim, MatchScoredJob, MatchScoreJob, MatchVerdict
+from ..contracts import (
+    Gap,
+    JobKind,
+    MatchClaim,
+    MatchDimension,
+    MatchDimensionName,
+    MatchScoredJob,
+    MatchScoreJob,
+    MatchVerdict,
+    Strength,
+)
 from ..provider import ProviderError
 from ..queue import FollowUp
 
@@ -24,9 +36,10 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 RESULT_QUEUE = "core"  # checked against the contract by tests/test_contract_wiring.py
-MAX_ANSWER_TOKENS = 1500
+MAX_ANSWER_TOKENS = 2500
 MAX_CLAIMS = 20  # the contract allows 30; Go keeps at most 15
 MAX_TEXT = 1000  # characters per value; the contract allows 2000
+MAX_NOTES = 5  # strengths, and gaps
 
 SYSTEM = """You check how well a candidate's CV fits a job, for recruiters at a recruitment agency
 in Malaysia. Use only the job text and the CV text below. Names and contact details were removed.
@@ -42,10 +55,17 @@ tools), at most 10, the most important first. For each give:
 - "verdict": "met" if the CV shows it, "partly" if it shows some of it, "missing" if it does not
 - "evidence": copied word for word from the CV text (a short phrase or one line) that shows it, or null
 - "note": why, in at most 20 words
+Then rate the fit from 0 to 100 on each of these six, with a one-sentence note (use the job as the
+ground truth; do not reward unrelated experience; do not invent skills the CV does not show):
+"skills" (technical / functional skills), "experience" (experience level), "industry" (industry /
+domain background), "education" (education and qualifications), "leadership" (leadership and
+communication), "keywords" (keyword and requirement match).
+Then "strengths" and "gaps": up to 3 each, short, about the work only.
 Then "summary": the overall fit in one or two sentences.
 Reply in exactly this form:
 {"requirements": [{"requirement": "...", "verdict": "met", "evidence": "...", "note": "..."}],
- "summary": "..."}"""
+ "dimensions": [{"name": "skills", "score": 80, "note": "..."}],
+ "strengths": ["..."], "gaps": ["..."], "summary": "..."}"""
 
 
 def prompt(payload: MatchScoreJob) -> str:
@@ -62,6 +82,28 @@ class UnreadableAnswerError(ValueError):
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
 _VERDICTS = {v.value: v for v in MatchVerdict}
+# CV Studio's names for the six ratings, and the short ones asked for.
+_DIMENSIONS = {d.value: d for d in MatchDimensionName} | {
+    "technical / functional skills": MatchDimensionName.skills,
+    "technical/functional skills": MatchDimensionName.skills,
+    "experience level": MatchDimensionName.experience,
+    "industry / domain background": MatchDimensionName.industry,
+    "industry/domain background": MatchDimensionName.industry,
+    "education & qualifications": MatchDimensionName.education,
+    "leadership & communication": MatchDimensionName.leadership,
+    "keyword & requirement match": MatchDimensionName.keywords,
+}
+
+
+@dataclass
+class Reading:
+    """The model's answer in the contract's shape (not yet checked by Go)."""
+
+    claims: list[MatchClaim] = field(default_factory=list)
+    summary: str | None = None
+    dimensions: list[MatchDimension] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    gaps: list[str] = field(default_factory=list)
 
 
 def _text(value: Any) -> str | None:
@@ -71,10 +113,47 @@ def _text(value: Any) -> str | None:
     return value.strip()[:MAX_TEXT]
 
 
-def parse(text: str) -> tuple[list[MatchClaim], str | None]:
-    """The model's answer as claims and a summary. Items that are not a
-    requirement with a known verdict are skipped; an answer that is not the
-    expected JSON object raises UnreadableAnswerError."""
+def _score(value: Any) -> int | None:
+    """A rating as a whole number from 0 to 100 ("85", 85.4, "85/100"), or None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        m = re.match(r"\s*(\d{1,3}(?:\.\d+)?)", value)
+        value = float(m.group(1)) if m else None
+    if not isinstance(value, int | float):
+        return None
+    return max(0, min(100, round(value)))
+
+
+def _dimensions(value: Any) -> list[MatchDimension]:
+    """The six ratings, as a list of objects or an object keyed by name."""
+    items = value if isinstance(value, list) else []
+    if isinstance(value, dict):
+        items = [
+            {"name": k, **v} if isinstance(v, dict) else {"name": k, "score": v} for k, v in value.items()
+        ]
+    out: list[MatchDimension] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = _DIMENSIONS.get(str(item.get("name", "")).strip().lower())
+        score = _score(item.get("score"))
+        if name is None or score is None or any(d.name == name for d in out):
+            continue
+        out.append(MatchDimension(name=name, score=score, note=_text(item.get("note"))))
+    return out
+
+
+def _notes(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [t for t in (_text(v) for v in value) if t][:MAX_NOTES]
+
+
+def parse(text: str) -> Reading:
+    """The model's answer. Items that are not a requirement with a known
+    verdict, or a known rating with a score, are skipped; an answer that is
+    not the expected JSON object raises UnreadableAnswerError."""
     body = _FENCE.sub("", text.strip())
     start, end = body.find("{"), body.rfind("}")
     if start < 0 or end < start:
@@ -85,7 +164,12 @@ def parse(text: str) -> tuple[list[MatchClaim], str | None]:
         raise UnreadableAnswerError("the answer is not valid JSON") from exc
     if not isinstance(data, dict) or not isinstance(data.get("requirements"), list):
         raise UnreadableAnswerError("the answer has no list of requirements")
-    claims: list[MatchClaim] = []
+    reading = Reading(
+        summary=_text(data.get("summary")),
+        dimensions=_dimensions(data.get("dimensions")),
+        strengths=_notes(data.get("strengths")),
+        gaps=_notes(data.get("gaps")),
+    )
     for item in data["requirements"]:
         if not isinstance(item, dict):
             continue
@@ -93,7 +177,7 @@ def parse(text: str) -> tuple[list[MatchClaim], str | None]:
         verdict = _VERDICTS.get(str(item.get("verdict", "")).strip().lower())
         if requirement is None or verdict is None:
             continue
-        claims.append(
+        reading.claims.append(
             MatchClaim(
                 requirement=requirement,
                 verdict=verdict,
@@ -101,14 +185,14 @@ def parse(text: str) -> tuple[list[MatchClaim], str | None]:
                 note=_text(item.get("note")),
             )
         )
-        if len(claims) == MAX_CLAIMS:
+        if len(reading.claims) == MAX_CLAIMS:
             break
-    return claims, _text(data.get("summary"))
+    return reading
 
 
 def run(payload: MatchScoreJob, deps: Deps) -> list[FollowUp]:
-    claims: list[MatchClaim] = []
-    summary = error = model = None
+    reading = Reading()
+    error = model = None
     input_tokens = output_tokens = 0
     if deps.ai is None:
         error = "matching is switched off in the AI worker (HP_AI_PROVIDER is off)"
@@ -116,7 +200,7 @@ def run(payload: MatchScoreJob, deps: Deps) -> list[FollowUp]:
         try:
             done = deps.ai.complete(SYSTEM, prompt(payload), max_tokens=MAX_ANSWER_TOKENS)
             model, input_tokens, output_tokens = done.model, done.input_tokens, done.output_tokens
-            claims, summary = parse(done.text)
+            reading = parse(done.text)
         except ProviderError as exc:
             error = str(exc)
         except UnreadableAnswerError:
@@ -127,7 +211,8 @@ def run(payload: MatchScoreJob, deps: Deps) -> list[FollowUp]:
         extra={
             "match_id": payload.matchId.root,
             "ok": error is None,
-            "claims": len(claims),
+            "claims": len(reading.claims),
+            "dimensions": len(reading.dimensions),
             "tokens": input_tokens + output_tokens,
         },
     )
@@ -137,8 +222,11 @@ def run(payload: MatchScoreJob, deps: Deps) -> list[FollowUp]:
             kind=JobKind.match_scored,
             payload=MatchScoredJob(
                 matchId=payload.matchId,
-                summary=summary,
-                claims=claims,
+                summary=reading.summary,
+                claims=reading.claims,
+                dimensions=reading.dimensions,
+                strengths=[Strength(root=t) for t in reading.strengths],
+                gaps=[Gap(root=t) for t in reading.gaps],
                 error=error,
                 model=model,
                 inputTokens=input_tokens,

@@ -4,6 +4,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationMatchKey, jobMatchesKey, matchesKey } from "../api/keys";
 import { formatWhen, MATCH_VERDICT } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { FitStats } from "./FitStats";
 
 export type Match = Schemas["Match"];
 
@@ -45,6 +46,7 @@ export function FitReasons({ match, open = false }: { match: Match; open?: boole
     <details className="fit" open={open}>
       <summary>Why {match.score}%?</summary>
       {match.summary && <p>{match.summary}</p>}
+      <FitStats match={match} />
       <ul className="fit-reasons">
         {match.reasons.map((r, i) => (
           <li key={i} className={r.verdict}>

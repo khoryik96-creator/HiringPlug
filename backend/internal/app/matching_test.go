@@ -68,9 +68,20 @@ func claim(req string, verdict api.MatchVerdict, evidence string) api.MatchClaim
 	return c
 }
 
+func dim(name api.MatchDimensionName, score int, note string) api.MatchDimension {
+	return api.MatchDimension{Name: name, Score: score, Note: nullable.NewNullableWithValue(note)}
+}
+
 func scoredWith(claims ...api.MatchClaim) api.MatchScoredJob {
 	return api.MatchScoredJob{
-		Claims: claims, Summary: nullable.NewNullableWithValue("A partial fit: strong accounting, less audit."), Error: nullable.NewNullNullable[string](),
+		Dimensions: []api.MatchDimension{
+			dim("keywords", 55, "Most required tools appear."), dim("skills", 120, "Strong IFRS and SAP."), dim("skills", 10, "a second rating"),
+			dim("charisma", 90, "not one of the six"), dim("experience", 60, "Fewer audit years than asked."),
+			dim("industry", 70, "FMCG finance."), dim("education", 85, "Accounting degree."), dim("leadership", 40, "No team lead roles."),
+		},
+		Strengths: []string{"Hands-on SAP S/4HANA", "  hands-on  SAP S/4HANA ", "IFRS reporting", "", "a", "b", "c", "d"},
+		Gaps:      []string{"Audit experience shorter than asked"},
+		Claims:    claims, Summary: nullable.NewNullableWithValue("A partial fit: strong accounting, less audit."), Error: nullable.NewNullNullable[string](),
 		Model: nullable.NewNullableWithValue("deepseek-chat"), InputTokens: 1000, OutputTokens: 200,
 	}
 }
@@ -135,6 +146,17 @@ func TestMatchingQuotesTheJobAndTheCVAndNeverSeesSalary(t *testing.T) {
 	assert.Equal(t, api.MatchVerdictMissing, m.Reasons[2].Verdict, "evidence that is not in the CV does not count")
 	assert.Equal(t, "A partial fit: strong accounting, less audit.", m.Summary.MustGet())
 	assert.Equal(t, "deepseek-chat", m.Model.MustGet())
+	assert.Equal(t, api.MatchRecommendationConsider, m.Recommendation.MustGet(), "50: consider, as CV Studio")
+	var names []api.MatchDimensionName
+	for _, d := range m.Dimensions {
+		names = append(names, d.Name)
+	}
+	assert.Equal(t, []api.MatchDimensionName{"skills", "experience", "industry", "education", "leadership", "keywords"}, names,
+		"CV Studio's six, once each, in order; unknown ones left out")
+	assert.Equal(t, 100, m.Dimensions[0].Score, "held to 100")
+	assert.Equal(t, "Strong IFRS and SAP.", m.Dimensions[0].Note.MustGet(), "the first rating of a dimension counts")
+	assert.Equal(t, []string{"Hands-on SAP S/4HANA", "IFRS reporting", "a", "b", "c"}, m.Strengths, "distinct, at most five")
+	assert.Equal(t, []string{"Audit experience shorter than asked"}, m.Gaps)
 	assert.Equal(t, []api.Match{m}, a.matches(viewer, "jobId="+job.Id).Items, "everyone who may see the pipeline sees it")
 	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/matches", viewer, map[string]any{"applicationId": appl.Id}).Status)
 
@@ -186,6 +208,8 @@ func TestMatchingQuotesTheJobAndTheCVAndNeverSeesSalary(t *testing.T) {
 		assert.Equal(t, api.MatchStatusFailed, f.Status)
 		assert.Equal(t, "the AI provider did not answer in time", f.Error.MustGet())
 		assert.True(t, f.Score.IsNull())
+		assert.True(t, f.Recommendation.IsNull())
+		assert.Empty(t, f.Dimensions)
 
 		q = a.scoreFit(token, appl.Id)
 		aiScores(t, a, aiConn, q.Id, scoredWith(claim("Ten years as CFO", api.MatchVerdictMet, "Senior Accountant")))

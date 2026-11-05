@@ -174,9 +174,28 @@ components:
           nullable: true
           description: "What shows it, quoted from the CV (empty for those who may not see CVs)."
         note: { type: string, nullable: true, description: "The AI's short explanation." }
+    MatchDimensionName:
+      type: string
+      description: >
+        CV Studio's six ratings: skills = technical / functional skills;
+        experience = experience level; industry = industry / domain
+        background; education = education and qualifications; leadership =
+        leadership and communication; keywords = keyword and requirement match.
+      enum: [skills, experience, industry, education, leadership, keywords]
+    MatchDimension:
+      type: object
+      required: [name, score, note]
+      properties:
+        name: { $ref: '#/components/schemas/MatchDimensionName' }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        note: { type: string, nullable: true, maxLength: 1000, description: "The AI's reason, in a sentence." }
+    MatchRecommendation:
+      type: string
+      description: "From the score, as CV Studio: shortlist at 70 or more, consider from 45, pass below."
+      enum: [shortlist, consider, pass]
     Match:
       type: object
-      required: [id, applicationId, jobId, status, score, summary, reasons, dropped, outdated, error, model, createdAt, scoredAt]
+      required: [id, applicationId, jobId, status, score, summary, reasons, dropped, outdated, error, model, createdAt, scoredAt, dimensions, strengths, gaps, recommendation]
       properties:
         id: { $ref: '#/components/schemas/MatchId' }
         applicationId: { type: string }
@@ -203,6 +222,15 @@ components:
         model: { type: string, nullable: true, description: The AI model that scored it. }
         createdAt: { type: string, format: date-time }
         scoredAt: { type: string, format: date-time, nullable: true }
+        dimensions:
+          type: array
+          description: "The AI's ratings on CV Studio's six dimensions (its opinion: the score above is worked out from the quoted requirements)."
+          items: { $ref: '#/components/schemas/MatchDimension' }
+        strengths: { type: array, items: { type: string }, description: "The AI's notes: what speaks for the candidate." }
+        gaps: { type: array, items: { type: string }, description: "The AI's notes: gaps or concerns to ask about." }
+        recommendation:
+          allOf: [{ $ref: '#/components/schemas/MatchRecommendation' }]
+          nullable: true
     MatchList:
       type: object
       required: [enabled, items]
@@ -270,7 +298,7 @@ components:
     MatchScoredJob:
       type: object
       additionalProperties: false
-      required: [matchId, summary, claims, error, model, inputTokens, outputTokens]
+      required: [matchId, summary, claims, dimensions, strengths, gaps, error, model, inputTokens, outputTokens]
       properties:
         matchId: { $ref: '#/components/schemas/MatchId' }
         summary: { type: string, nullable: true, maxLength: 2000 }
@@ -279,6 +307,19 @@ components:
           maxItems: 30
           description: The AI's reading, not yet checked against the texts (Go checks every quote).
           items: { $ref: '#/components/schemas/MatchClaim' }
+        dimensions:
+          type: array
+          maxItems: 12
+          description: The AI's ratings on CV Studio's six dimensions (Go keeps each known one once).
+          items: { $ref: '#/components/schemas/MatchDimension' }
+        strengths:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 1000 }
+        gaps:
+          type: array
+          maxItems: 10
+          items: { type: string, maxLength: 1000 }
         error: { type: string, nullable: true, description: "Why there is no score (provider down, switched off, an answer that could not be read)." }
         model: { type: string, nullable: true }
         inputTokens: { type: integer, minimum: 0 }

@@ -79,3 +79,11 @@ FROM application a JOIN application_stage_change c ON c.tenant_id = a.tenant_id 
 GROUP BY a.id
 HAVING min(c.changed_at) >= @from_time AND min(c.changed_at) < @to_time
 LIMIT 20000;
+
+-- Stage moves, newest first (the dashboard's timeline, or one candidate's).
+-- name: StageMoves :many
+SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE (sqlc.narg(candidate_id)::text IS NULL OR a.candidate_id = sqlc.narg(candidate_id)::text)
+ORDER BY c.changed_at DESC, c.id DESC
+LIMIT @max_rows::integer;

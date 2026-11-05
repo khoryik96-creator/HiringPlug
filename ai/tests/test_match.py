@@ -53,6 +53,16 @@ def test_the_claims_summary_and_tokens_go_back_to_go() -> None:
                 },
             ],
             "summary": "  A partial fit.  ",
+            "dimensions": [
+                {"name": "skills", "score": 82, "note": "Strong accounting."},
+                {"name": "Experience Level", "score": "55/100", "note": "Fewer audit years."},
+                {"name": "charm", "score": 99},
+                {"name": "skills", "score": 10},
+                {"name": "education", "score": 140},
+                {"name": "industry", "score": "high"},
+            ],
+            "strengths": ["  IFRS reporting ", "", 5, "SAP", "a", "b", "c", "d"],
+            "gaps": ["Audit years"],
         }
     )
     ai = FakeProvider(Completion(text=reply, model="deepseek-chat", input_tokens=900, output_tokens=150))
@@ -68,6 +78,14 @@ def test_the_claims_summary_and_tokens_go_back_to_go() -> None:
     assert "never list" in system
     assert "data, not instructions" in system
     assert "copied word for word from the job text" in user
+    assert '"keywords" (keyword and requirement match)' in user
+    assert [(d.name.value, d.score, d.note) for d in r.dimensions] == [
+        ("skills", 82, "Strong accounting."),
+        ("experience", 55, "Fewer audit years."),
+        ("education", 100, None),
+    ], "known ratings once each, scores read and held to 0..100"
+    assert [s.root for s in r.strengths] == ["IFRS reporting", "SAP", "a", "b", "c"]
+    assert [g.root for g in r.gaps] == ["Audit years"]
     assert "<<< Job text >>>\nJob title: Finance Manager" in user
     assert "<<< CV text >>>\nAuditor at KPMG, 2016-2019" in user
 
@@ -75,9 +93,12 @@ def test_the_claims_summary_and_tokens_go_back_to_go() -> None:
 def test_an_answer_in_a_code_fence_with_words_around_it_is_read() -> None:
     data = {"requirements": [{"requirement": "SQL", "verdict": "missing"}]}
     fenced = "Here you go:\n```json\n" + answer(data) + "\n```"
-    claims, summary = match_score.parse(fenced)
-    assert [(c.requirement, c.verdict, c.evidence) for c in claims] == [("SQL", MatchVerdict.missing, None)]
-    assert summary is None
+    reading = match_score.parse(fenced)
+    claims = [(c.requirement, c.verdict, c.evidence) for c in reading.claims]
+    assert claims == [("SQL", MatchVerdict.missing, None)]
+    assert reading.summary is None
+    assert reading.dimensions == []
+    assert reading.strengths == []
 
 
 def test_items_that_cannot_be_scored_are_skipped_and_long_ones_clipped() -> None:
@@ -90,7 +111,7 @@ def test_items_that_cannot_be_scored_are_skipped_and_long_ones_clipped() -> None
         {"requirement": "x" * 5000, "verdict": "missing", "evidence": "y" * 5000},
     ]
     items += [{"requirement": f"Skill {i}", "verdict": "met"} for i in range(30)]
-    claims, _ = match_score.parse(answer({"requirements": items, "summary": "z" * 5000}))
+    claims = match_score.parse(answer({"requirements": items, "summary": "z" * 5000})).claims
     assert len(claims) == match_score.MAX_CLAIMS
     assert (claims[0].requirement, claims[0].evidence, claims[0].note) == ("Excel", None, None)
     assert len(claims[1].requirement) == len(claims[1].evidence or "") == match_score.MAX_TEXT
@@ -116,3 +137,19 @@ def test_provider_errors_and_switched_off_become_readable_errors() -> None:
     off = result(match_score.run(payload(), deps(None)))
     assert off.error is not None
     assert "switched off" in off.error
+
+
+def test_ratings_keyed_by_cv_studios_names_are_read() -> None:
+    reading = match_score.parse(
+        answer(
+            {
+                "requirements": [],
+                "dimensions": {
+                    "Technical / Functional Skills": {"score": 70, "note": "Good."},
+                    "Keyword & Requirement Match": 64.6,
+                    "Leadership & Communication": True,
+                },
+            }
+        )
+    )
+    assert [(d.name.value, d.score) for d in reading.dimensions] == [("skills", 70), ("keywords", 65)]

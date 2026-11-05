@@ -407,6 +407,60 @@ func (q *Queries) StageCounts(ctx context.Context, jobIds []string) ([]StageCoun
 	return items, nil
 }
 
+const stageMoves = `-- name: StageMoves :many
+SELECT c.id, c.application_id, c.from_stage, c.to_stage, c.changed_at, c.changed_by, a.candidate_id, a.job_order_id
+FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id AND a.id = c.application_id
+WHERE ($1::text IS NULL OR a.candidate_id = $1::text)
+ORDER BY c.changed_at DESC, c.id DESC
+LIMIT $2::integer
+`
+
+type StageMovesParams struct {
+	CandidateID *string
+	MaxRows     int32
+}
+
+type StageMovesRow struct {
+	ID            string
+	ApplicationID string
+	FromStage     *string
+	ToStage       string
+	ChangedAt     time.Time
+	ChangedBy     *string
+	CandidateID   string
+	JobOrderID    string
+}
+
+// Stage moves, newest first (the dashboard's timeline, or one candidate's).
+func (q *Queries) StageMoves(ctx context.Context, arg StageMovesParams) ([]StageMovesRow, error) {
+	rows, err := q.db.Query(ctx, stageMoves, arg.CandidateID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StageMovesRow
+	for rows.Next() {
+		var i StageMovesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.FromStage,
+			&i.ToStage,
+			&i.ChangedAt,
+			&i.ChangedBy,
+			&i.CandidateID,
+			&i.JobOrderID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const stuckApplications = `-- name: StuckApplications :many
 SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application
 WHERE job_order_id = ANY($1::text[])

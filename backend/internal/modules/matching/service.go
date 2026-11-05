@@ -38,6 +38,8 @@ type Match struct {
 	Error, Model                     *string
 	CreatedAt                        time.Time
 	ScoredAt                         *time.Time
+	Dimensions                       []Dimension // the AI's ratings (CV Studio's six)
+	Strengths, Gaps                  []string    // the AI's notes
 }
 
 // JobResult is what scoring a job's candidates did.
@@ -303,6 +305,10 @@ func fromRow(r store.LatestForJobRow) (Match, error) {
 	if err := json.Unmarshal(r.Reasons, &m.Reasons); err != nil {
 		return Match{}, fmt.Errorf("match %s: reasons: %w", r.ID, err)
 	}
+	if err := json.Unmarshal(r.Dimensions, &m.Dimensions); err != nil {
+		return Match{}, fmt.Errorf("match %s: dimensions: %w", r.ID, err)
+	}
+	m.Strengths, m.Gaps = r.Strengths, r.Gaps
 	return m, nil
 }
 

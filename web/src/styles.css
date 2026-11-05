@@ -132,3 +132,21 @@ a.button { display: inline-block; padding: 0.4rem 0.6rem; border: 1px solid #9ca
 .screening-cv pre.extracted { max-height: 75vh; overflow: auto; }
 .screening-side textarea { width: 100%; box-sizing: border-box; }
 @media (max-width: 900px) { .screening { grid-template-columns: 1fr; } .screening-cv { position: static; } }
+/* Timeline of stage moves. */
+.timeline { list-style: none; margin: 0 0 0.75rem; padding-left: 0.9rem; border-left: 2px solid #e5e7eb; }
+.timeline li { position: relative; padding: 0.2rem 0 0.2rem 0.4rem; }
+.timeline li::before { content: ""; position: absolute; left: -1.27rem; top: 0.6rem; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #2563eb; }
+.timeline time { color: #6b7280; font-variant-numeric: tabular-nums; }
+.timeline-day h4 { margin: 0.5rem 0 0.25rem; font-size: 0.9rem; color: #374151; }
+/* Fit stats (CV Studio's CV scoring): ratings as bars, strengths and gaps. */
+.fit-dimensions { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
+.fit-bar { height: 0.45rem; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+.fit-bar-fill { height: 100%; }
+.fit-bar-fill.high { background: #16a34a; }
+.fit-bar-fill.mid { background: #d97706; }
+.fit-bar-fill.low { background: #dc2626; }
+.fit-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem; }
+.fit-notes h5 { margin: 0.25rem 0; }
+.badge.reco-shortlist { background: #dcfce7; }
+.badge.reco-consider { background: #fef3c7; }
+.badge.reco-pass { background: #fee2e2; }

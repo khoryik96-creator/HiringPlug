@@ -4,19 +4,22 @@
 -- name: InsertMatch :one
 INSERT INTO job_match (tenant_id, application_id, job_id, sent_job, sent_cv, job_hash, created_by)
 VALUES (app_current_tenant(), @application_id, @job_id, @sent_job, @sent_cv, @job_hash, app_current_user())
-RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash;
+RETURNING id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps;
 
 -- The latest score of each of a job's applications.
 -- name: LatestForJob :many
 SELECT DISTINCT ON (application_id)
-  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
+  id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps
 FROM job_match
 WHERE job_id = @job_id
 ORDER BY application_id, created_at DESC, id DESC
 LIMIT 1000;
 
 -- name: LatestForApplication :many
-SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash
+SELECT id, application_id, job_id, status, score, summary, reasons, dropped, error, model, created_at, scored_at, job_hash,
+  dimensions, strengths, gaps
 FROM job_match
 WHERE application_id = @application_id
 ORDER BY created_at DESC, id DESC
@@ -31,6 +34,7 @@ FOR UPDATE;
 -- name: SaveScore :execrows
 UPDATE job_match
 SET status = @status, score = sqlc.narg(score), summary = sqlc.narg(summary), reasons = @reasons, dropped = @dropped,
+    dimensions = @dimensions, strengths = @strengths, gaps = @gaps,
     error = sqlc.narg(error), model = sqlc.narg(model), input_tokens = @input_tokens, output_tokens = @output_tokens,
     scored_at = now(), sent_job = NULL, sent_cv = NULL
 WHERE id = @id AND status = 'queued';

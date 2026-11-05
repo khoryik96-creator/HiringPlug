@@ -127,3 +127,10 @@ func TestPossibleCandidatesAreLookedForWithTheJobsWordsOnly(t *testing.T) {
 		Description: ptrs("Audit and SAP.\nSalary: RM 9,000"), AdTitle: ptrs("Finance Manager (KL)"), AdText: ptrs("MFRS reporting")})
 	assert.Equal(t, "Finance Manager\nAudit and SAP.\n[salary removed]\nFinance Manager (KL)\nMFRS reporting", got)
 }
+
+func TestRecommendationFollowsCVStudiosThresholds(t *testing.T) {
+	for score, want := range map[int]string{100: "shortlist", 70: "shortlist", 69: "consider", 45: "consider", 44: "pass", 0: "pass"} {
+		assert.Equal(t, want, *Recommendation(&score), score)
+	}
+	assert.Nil(t, Recommendation(nil), "no score, no advice")
+}

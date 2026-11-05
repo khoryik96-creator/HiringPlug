@@ -65,9 +65,22 @@ func toAPI(m Match) api.Match {
 			Requirement: r.Requirement, Verdict: api.MatchVerdict(r.Verdict), Evidence: apiconv.OrNull(r.Evidence), Note: apiconv.OrNull(r.Note),
 		}
 	}
+	dims := make([]api.MatchDimension, len(m.Dimensions))
+	for i, d := range m.Dimensions {
+		dims[i] = api.MatchDimension{Name: api.MatchDimensionName(d.Name), Score: d.Score, Note: apiconv.OrNull(d.Note)}
+	}
 	return api.Match{
-		Id: m.ID, ApplicationId: m.ApplicationID, JobId: m.JobID, Status: api.MatchStatus(m.Status), Score: apiconv.OrNull(m.Score),
+		Dimensions: dims, Strengths: nonNil(m.Strengths), Gaps: nonNil(m.Gaps),
+		Recommendation: apiconv.OrNull(apiconv.Convert[api.MatchRecommendation](Recommendation(m.Score))),
+		Id:             m.ID, ApplicationId: m.ApplicationID, JobId: m.JobID, Status: api.MatchStatus(m.Status), Score: apiconv.OrNull(m.Score),
 		Summary: apiconv.OrNull(m.Summary), Reasons: reasons, Dropped: m.Dropped, Outdated: m.Outdated, Error: apiconv.OrNull(m.Error),
 		Model: apiconv.OrNull(m.Model), CreatedAt: m.CreatedAt, ScoredAt: apiconv.OrNull(m.ScoredAt),
 	}
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }

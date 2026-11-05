@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Application, type Permission } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { ApplicationFit, fitBand, FitBadge, FitReasons, type Match } from "./Fit";
+import { ratingBand } from "./FitStats";
 import { PipelineBoard } from "./PipelineBoard";
 
 afterEach(() => {
@@ -17,12 +18,43 @@ const match = (over: Partial<Match>): Match => ({
     { requirement: "Degree in Accounting", verdict: "met", evidence: "Bachelor of Accounting, UiTM", note: "Accounting degree." },
     { requirement: "5 years in audit", verdict: "missing", evidence: null, note: null },
   ],
-  dropped: 1, outdated: false, error: null, model: "deepseek-chat", createdAt: "2026-11-04T01:00:00Z", scoredAt: "2026-11-04T01:01:00Z", ...over,
+  dropped: 1, outdated: false, error: null, model: "deepseek-chat", createdAt: "2026-11-04T01:00:00Z", scoredAt: "2026-11-04T01:01:00Z",
+  dimensions: [], strengths: [], gaps: [], recommendation: null, ...over,
 });
 const READ: Permission[] = ["matching:read", "pipeline:read"];
 const SCORE: Permission[] = [...READ, "matching:create"];
 const gets = (byPath: Record<string, unknown>) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(byPath[path]))) as never);
+
+describe("fit stats (CV Studio's CV scoring)", () => {
+  it("show the recommendation, the six ratings as bars with notes, and the AI's strengths and gaps", () => {
+    expect([ratingBand(70), ratingBand(69), ratingBand(45), ratingBand(44)]).toEqual(["high", "mid", "mid", "low"]);
+    renderWithClient(<FitReasons open match={match({
+      recommendation: "consider",
+      dimensions: [
+        { name: "skills", score: 82, note: "Strong IFRS." },
+        { name: "leadership", score: 30, note: null },
+      ],
+      strengths: ["Hands-on SAP"], gaps: ["Few audit years"],
+    })} />);
+    expect(screen.getByText("Consider with reservations").className).toBe("badge reco-consider");
+    const ratings = within(screen.getByRole("list", { name: "Ratings" })).getAllByRole("listitem");
+    expect(ratings.map((r) => r.textContent)).toEqual(["Technical / functional skills82/100Strong IFRS.", "Leadership & communication30/100"]);
+    const skills = screen.getByRole("meter", { name: "Technical / functional skills" });
+    expect(skills.getAttribute("aria-valuenow")).toBe("82");
+    expect((skills.firstChild as HTMLElement).className).toBe("fit-bar-fill high");
+    expect(screen.getByText("Hands-on SAP")).toBeTruthy();
+    expect(screen.getByText("Few audit years")).toBeTruthy();
+    expect(screen.getByText(/AI's opinion/)).toBeTruthy();
+  });
+
+  it("are left out for a score made before them", () => {
+    renderWithClient(<FitReasons open match={match({})} />);
+    expect(screen.queryByText(/Recommendation/)).toBeNull();
+    expect(screen.queryByRole("list", { name: "Ratings" })).toBeNull();
+    expect(screen.queryByText(/AI's opinion/)).toBeNull();
+  });
+});
 
 describe("fit scores", () => {
   it("show the score in a colour by band, or why there is none", () => {

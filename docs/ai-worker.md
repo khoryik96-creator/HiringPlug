@@ -190,8 +190,12 @@ monthly allowance the assistant and matching share. The parser then reads
 best ad) and the CV's text, both already without names, contact details or
 salary. `jobs/match_score.py` asks for at most 10 requirements as JSON, each
 copied word for word from the job text with a verdict (met / partly / missing)
-and evidence copied from the CV, plus a one-line summary. It only reads the
-answer into the contract's shape (unknown verdicts skipped, values clipped,
+and evidence copied from the CV, plus a one-line summary, and, as CV Studio's
+CV scoring does, a 0-100 rating with a note on each of six dimensions (skills,
+experience, industry, education, leadership, keywords; CV Studio's own names
+are understood too) and up to 3 strengths and gaps. It only reads the
+answer into the contract's shape (unknown verdicts and ratings skipped, scores
+such as "85/100" read and held to 0-100, values clipped,
 code fences and chatter around the JSON tolerated); an answer that is not the
 JSON asked for becomes a readable error, with its tokens still counted.
 
