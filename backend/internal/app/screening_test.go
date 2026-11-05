@@ -67,6 +67,33 @@ func TestAScreeningCallUpdatesTheCandidate(t *testing.T) {
 		after = again.Candidate
 	})
 
+	t.Run("notes and salary alone leave the profile as it is, even if it changed meanwhile", func(t *testing.T) {
+		edited := a.request(http.MethodPatch, "/v1/candidates/"+c.Id, token, map[string]any{"version": after.Version, "phone": "+60123456789"})
+		require.Equal(t, http.StatusOK, edited.Status, "%s", edited.Body)
+		var colleague api.Candidate
+		edited.JSON(&colleague)
+		var updates int
+		count := func() {
+			require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(),
+				`SELECT count(*) FROM audit_log WHERE entity_id = $1 AND action = 'candidate.updated'`, c.Id).Scan(&updates))
+		}
+		count()
+		before := updates
+
+		// Sent with the version from before the colleague's edit, unchanged fields and the same source.
+		res := a.request(http.MethodPost, path, token, map[string]any{
+			"version": after.Version, "notes": "Called back: still keen.", "nationality": "SG", "source": "referral",
+		})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var got api.ScreeningCallResult
+		res.JSON(&got)
+		assert.Equal(t, colleague.Version, got.Candidate.Version, "nothing written to the profile")
+		assert.True(t, got.SourceKept, "a source was sent and they already had one")
+		count()
+		assert.Equal(t, before, updates, "no empty update in the timeline")
+		after = got.Candidate
+	})
+
 	t.Run("an out-of-date version is a conflict", func(t *testing.T) {
 		res := a.request(http.MethodPost, path, token, map[string]any{"version": c.Version, "nationality": "ID"})
 		assert.Equal(t, http.StatusConflict, res.Status)
@@ -86,7 +113,7 @@ func TestAScreeningCallUpdatesTheCandidate(t *testing.T) {
 		assert.Equal(t, "SG", now.Nationality.MustGet(), "the profile change was rolled back with the salary")
 		var notes api.NoteList
 		a.request(http.MethodGet, "/v1/notes?subjectType=candidate&subjectId="+c.Id, token, nil).JSON(&notes)
-		assert.Len(t, notes.Items, 1, "and so was the note")
+		assert.Len(t, notes.Items, 2, "and so was the note (the two kept are from earlier calls)")
 	})
 
 	t.Run("salary needs its own permission, and viewers cannot record calls", func(t *testing.T) {

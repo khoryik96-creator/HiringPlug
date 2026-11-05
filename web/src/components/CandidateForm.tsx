@@ -3,7 +3,7 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type Candidate, unwrap } from "../api/client";
 import { candidateKey, candidatesKey } from "../api/keys";
-import { keysOf, regionName, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import { regionName } from "../labels";
 import {
   type CandidateFormState,
   candidateProblems,
@@ -13,7 +13,8 @@ import {
 } from "./candidateFormState";
 import { Field } from "./Field";
 import { LabelInput } from "./LabelInput";
-import { labelFor, noticeKey, useFieldSettings } from "./useFieldSettings";
+import { labelFor, useFieldSettings } from "./useFieldSettings";
+import { NoticeField, WorkAuthFields } from "./ProfileFields";
 import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { DuplicateEmail } from "./DuplicateEmail";
@@ -55,7 +56,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
   const set = <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
-  const notice = form.noticeValue.trim() === "" ? "" : noticeKey(form.noticeValue.trim(), form.noticeUnit);
+  const change = (patch: Partial<CandidateFormState>) => { setForm((f) => ({ ...f, ...patch })); };
   const text = (key: TextKey, label: string, extra: InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Field label={label} error={errorFor(key)}>
       <input value={form[key]} onChange={(e) => { set(key, e.target.value); }} {...extra} />
@@ -90,31 +91,11 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
           ))}
         </select>
       </Field>
-      <Field label={req("Work authorization", "workAuthorization")} error={errorFor("waStatus")}>
-        <select value={form.waStatus} onChange={(e) => { set("waStatus", e.target.value as CandidateFormState["waStatus"]); }}>
-          <option value="">—</option>
-          {keysOf(WORK_AUTH_STATUS).map((s) => <option key={s} value={s}>{WORK_AUTH_STATUS[s]}</option>)}
-        </select>
-      </Field>
-      {form.waStatus === "expat_eligible" && (
-        <Field label="Pass held" error={errorFor("waBasis")}>
-          <select value={form.waBasis} onChange={(e) => { set("waBasis", e.target.value as CandidateFormState["waBasis"]); }}>
-            <option value="">Choose…</option>
-            {keysOf(WORK_AUTH_BASIS).map((b) => <option key={b} value={b}>{WORK_AUTH_BASIS[b]}</option>)}
-          </select>
-        </Field>
-      )}
+      <WorkAuthFields form={form} onChange={change} label={req("Work authorization", "workAuthorization")}
+        errors={{ status: errorFor("waStatus"), basis: errorFor("waBasis") }} />
       {form.waStatus !== "" && text("waNote", "Work authorization note")}
 
-      <Field label={req("Notice period", "noticePeriod")} error={errorFor("noticeValue") ?? errorFor("noticeUnit")}>
-        <select value={notice} onChange={(e) => {
-          const [value = "", unit = "month"] = e.target.value.split("_");
-          setForm((f) => ({ ...f, noticeValue: value, noticeUnit: unit as CandidateFormState["noticeUnit"] }));
-        }}>
-          <option value="">—</option>
-          {fs.options("notice_period", notice).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
-      </Field>
+      <NoticeField form={form} onChange={change} label={req("Notice period", "noticePeriod")} error={errorFor("noticeValue") ?? errorFor("noticeUnit")} />
       <Field label={req("Industry", "industry")} error={errorFor("industry")}>
         <select value={form.industry} onChange={(e) => { set("industry", e.target.value); }}>
           <option value="">—</option>

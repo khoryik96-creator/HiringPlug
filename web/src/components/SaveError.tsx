@@ -8,7 +8,12 @@ import { fieldErrors } from "./forms";
  * here, so a failed save never looks as if nothing happened. A conflict
  * (someone else saved first) offers to load their version.
  */
-export function SaveError({ error, shown, onReload }: { error: unknown; shown: readonly string[]; onReload: () => void }) {
+export function SaveError({ error, shown, onReload, reloadLabel = "Reload their version (your changes here will be lost)" }: {
+  error: unknown;
+  shown: readonly string[];
+  onReload: () => void;
+  reloadLabel?: string;
+}) {
   if (error === null || error === undefined) return null;
   const unshown = Object.entries(fieldErrors(error)).filter(([field]) => !shown.includes(field));
   const stale = error instanceof ApiError && error.code === "CONFLICT_STALE_VERSION";
@@ -26,7 +31,7 @@ export function SaveError({ error, shown, onReload }: { error: unknown; shown: r
         )}
         {stale && (
           <button type="button" className="link" onClick={onReload}>
-            Reload their version (your changes here will be lost)
+            {reloadLabel}
           </button>
         )}
       </ErrorMessage>

@@ -144,15 +144,16 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply)
+		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply, false)
 		return err
 	})
 	return view, err
 }
 
 // updateIn changes a candidate in the caller's transaction: change turns the
-// profile as stored into the new one.
-func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string, expectedVersion int, change func(Profile) Profile) (View, error) {
+// profile as stored into the new one. With unchangedOK, a change that alters
+// nothing writes nothing and needs no version check.
+func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string, expectedVersion int, change func(Profile) Profile, unchangedOK bool) (View, error) {
 	q := store.New(tx)
 	row, err := q.GetCandidate(ctx, id)
 	if database.IsNoRows(err) {
@@ -161,11 +162,14 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	if err != nil {
 		return View{}, err
 	}
+	before := fromRow(row).Profile
+	after, errs := NormalizeProfile(change(before), s.phoneRegion)
+	if unchangedOK && len(errs) == 0 && len(audit.Diff(profileFields(before), profileFields(after))) == 0 {
+		return loadView(ctx, tx, s.users, p, fromRow(row))
+	}
 	if int(row.Version) != expectedVersion {
 		return View{}, apperr.StaleVersion("candidate").WithDetail("currentVersion", row.Version)
 	}
-	before := fromRow(row).Profile
-	after, errs := NormalizeProfile(change(before), s.phoneRegion)
 	if err := errs.Err(); err != nil {
 		return View{}, err
 	}

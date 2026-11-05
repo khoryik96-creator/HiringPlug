@@ -70,16 +70,15 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		change := func(before Profile) Profile {
 			after := in.Patch.Apply(before)
-			if in.Source != nil {
-				if before.Source == nil {
-					after.Source = in.Source
-				} else {
-					out.SourceKept = *before.Source != *in.Source
-				}
+			out.SourceKept = in.Source != nil && before.Source != nil
+			if in.Source != nil && before.Source == nil {
+				after.Source = in.Source
 			}
 			return after
 		}
-		view, err := s.updateIn(ctx, tx, p, id, in.Version, change)
+		// A call that changes nothing in the profile (only notes or salary)
+		// leaves it alone, even if someone else changed it meanwhile.
+		view, err := s.updateIn(ctx, tx, p, id, in.Version, change, true)
 		if err != nil {
 			return err
 		}

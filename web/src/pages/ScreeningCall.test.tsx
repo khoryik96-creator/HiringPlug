@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Candidate, type Document, type Permission } from "../api/client";
 import { latestCv } from "../components/CvPane";
-import { ok, RECRUITER, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
+import { failure, ok, RECRUITER, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
 import { ScreeningCall } from "./ScreeningCall";
 
 afterEach(() => {
@@ -46,6 +46,7 @@ describe("screening call", () => {
     expect(await screen.findByText("text of doc_new")).toBeTruthy(); // the CV, readable during the call
     const form = screen.getByRole("form", { name: "Screening call" });
     fireEvent.change(within(form).getByLabelText("Notes"), { target: { value: "  Wants hybrid; open to SG.  " } });
+    fireEvent.click(within(form).getByLabelText(/Sensitive note/));
     fireEvent.change(within(form).getByLabelText("Notice period"), { target: { value: "2_week" } });
     fireEvent.change(within(form).getByLabelText("Nationality"), { target: { value: "SG" } });
     fireEvent.change(within(form).getByLabelText("Work authorization"), { target: { value: "requires_visa" } });
@@ -57,7 +58,7 @@ describe("screening call", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/screening-calls");
     expect(sentBody(post)).toEqual({
-      version: 3, notes: "Wants hybrid; open to SG.", sensitive: false,
+      version: 3, notes: "Wants hybrid; open to SG.", sensitive: true,
       nationality: "SG", workAuthorization: { status: "requires_visa", basis: null, note: null }, noticePeriod: { value: 2, unit: "week" },
       source: "referral",
       compensation: {
@@ -67,6 +68,7 @@ describe("screening call", () => {
     });
     expect((await screen.findByRole("status")).textContent).toContain("with the notes");
     expect(within(form).getByLabelText<HTMLTextAreaElement>("Notes").value).toBe("");
+    expect(within(form).getByLabelText<HTMLInputElement>(/Sensitive note/).checked).toBe(false); // each note is marked on its own
   });
 
   it("keeps an existing source and leaves salary alone when it was not touched or may not be changed", async () => {
@@ -78,9 +80,8 @@ describe("screening call", () => {
     expect(within(form).getByText(/JobStreet \(kept/)).toBeTruthy();
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
-    const body = sentBody(post) as Record<string, unknown>;
-    expect(body.source).toBeUndefined();
-    expect(body.compensation).toBeUndefined();
+    // Only what changed is sent: nothing here, so nothing a colleague changed meanwhile is sent back.
+    expect(sentBody(post)).toEqual({ version: 3, notes: "", sensitive: false });
     cleanup();
 
     reads(c);
@@ -88,5 +89,28 @@ describe("screening call", () => {
     const sourcerForm = await screen.findByRole("form", { name: "Screening call" });
     expect(within(sourcerForm).queryByText("Expected salary")).toBeNull(); // salary needs its own permission
     expect(within(sourcerForm).queryByLabelText(/Sensitive note/)).toBeNull();
+  });
+
+  it("when someone saved first, starts again from their version and keeps the notes typed", async () => {
+    const c = testCandidate({ source: "jobstreet" });
+    const get = reads(c);
+    const post = vi.spyOn(api, "POST").mockResolvedValueOnce(failure("CONFLICT_STALE_VERSION", "Someone else saved first.", undefined, 409));
+    renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
+    const form = await screen.findByRole("form", { name: "Screening call" });
+    fireEvent.change(within(form).getByLabelText("Notes"), { target: { value: "Twenty minutes of notes" } });
+    fireEvent.change(within(form).getByLabelText("Nationality"), { target: { value: "SG" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
+    const reload = await within(form).findByRole("button", { name: "Reload their version (your notes are kept; other changes here are lost)" });
+
+    get.mockRestore();
+    reads(testCandidate({ ...c, version: 5, nationality: "ID" }));
+    fireEvent.click(reload);
+    await waitFor(() => { expect(within(form).getByLabelText<HTMLSelectElement>("Nationality").value).toBe("ID"); });
+    expect(within(form).getByLabelText<HTMLTextAreaElement>("Notes").value).toBe("Twenty minutes of notes");
+
+    post.mockResolvedValueOnce(ok({ candidate: testCandidate({ ...c, version: 5 }), noteId: "note_2", sourceKept: false }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect(sentBody(post, 1)).toMatchObject({ version: 5, notes: "Twenty minutes of notes" });
   });
 });
