@@ -1226,6 +1226,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/job-ads/{adId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Download an ad, or its blind version, as a Word file or a PDF */
+        get: operations["exportJobAd"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/job-ads/{adId}": {
         parameters: {
             query?: never;
@@ -2277,11 +2296,14 @@ export interface components {
         /** @description A published ad as visitors see it (no internal fields). */
         PublicJobAd: {
             id: components["schemas"]["JobAdId"];
+            /** @description The blind title when the ad is published blind. */
             title: string;
             location: string | null;
+            country: components["schemas"]["CountryCode"] | null;
             workType: components["schemas"]["WorkType"] | null;
             workArrangement: components["schemas"]["WorkArrangement"] | null;
             salaryText: string | null;
+            /** @description The blind text when the ad is published blind. */
             description: string;
             /** Format: date */
             closesOn: string | null;
@@ -3112,6 +3134,7 @@ export interface components {
             jobId: components["schemas"]["JobOrderId"];
             title: string;
             location: string | null;
+            country: components["schemas"]["CountryCode"] | null;
             workType: components["schemas"]["WorkType"] | null;
             workArrangement: components["schemas"]["WorkArrangement"] | null;
             /** @description Shown on the ad as written, e.g. "RM 8,000 - 10,000 a month". Separate from the job's private budget. */
@@ -3123,6 +3146,18 @@ export interface components {
             status: components["schemas"]["JobAdStatus"];
             /** Format: date-time */
             publishedAt: string | null;
+            /** @description The blind ad's title: the client is not named. */
+            blindTitle: string;
+            /** @description The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then "our client"). Made from the ad's text unless a person edited it. */
+            blindDescription: string | null;
+            /** @description What the blind ad says instead of the client's name, e.g. "a leading Malaysian bank". */
+            clientDescription: string | null;
+            /** @description A person edited the blind text; changes to the ad no longer remake it. */
+            blindEdited: boolean;
+            /** @description The ad changed after the blind text was edited by a person. */
+            blindOutdated: boolean;
+            /** @description The careers page and job feed show the blind version. */
+            publishBlind: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3134,18 +3169,22 @@ export interface components {
         JobAdCreate: {
             title: string;
             location?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
             workType?: components["schemas"]["WorkType"] | null;
             workArrangement?: components["schemas"]["WorkArrangement"] | null;
             salaryText?: string | null;
             description?: string | null;
             /** Format: date */
             closesOn?: string | null;
+            clientDescription?: string | null;
+            publishBlind?: boolean;
         };
         JobAdUpdate: {
             /** @description The version you loaded. */
             version: number;
             title?: string;
             location?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
             workType?: components["schemas"]["WorkType"] | null;
             workArrangement?: components["schemas"]["WorkArrangement"] | null;
             salaryText?: string | null;
@@ -3153,7 +3192,22 @@ export interface components {
             /** Format: date */
             closesOn?: string | null;
             status?: components["schemas"]["JobAdStatus"];
+            clientDescription?: string | null;
+            publishBlind?: boolean;
+            /** @description Your own blind title (the blind ad stops following the ad). */
+            blindTitle?: string;
+            /** @description Your own blind text (likewise). */
+            blindDescription?: string | null;
+            /** @description true: make the blind ad from the ad again, dropping your own edits. */
+            remakeBlind?: boolean;
         };
+        /**
+         * @description original = the ad as written; blind = without the client's identity.
+         * @enum {string}
+         */
+        JobAdVersion: "original" | "blind";
+        /** @enum {string} */
+        JobAdExportFormat: "docx" | "pdf";
         /** @example jo_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobOrderId: string;
         /**
@@ -3199,11 +3253,17 @@ export interface components {
             title: string;
             status: components["schemas"]["JobStatus"];
             location: string | null;
+            country: components["schemas"]["CountryCode"] | null;
             workType: components["schemas"]["WorkType"] | null;
             workArrangement: components["schemas"]["WorkArrangement"] | null;
             /** @description How many people to hire. */
             openings: number;
             description: string | null;
+            /**
+             * Format: date
+             * @description When the job was officially received (today unless chosen).
+             */
+            intakeDate: string;
             /** @description Left out (and listed in restrictedFields) without jobs.salary:read. null means no budget recorded. */
             salary?: components["schemas"]["JobSalary"] | null;
             restrictedFields: components["schemas"]["JobRestrictedField"][];
@@ -3218,11 +3278,17 @@ export interface components {
             title: string;
             status?: components["schemas"]["JobStatus"];
             location?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
             workType?: components["schemas"]["WorkType"] | null;
             workArrangement?: components["schemas"]["WorkArrangement"] | null;
             /** @description Defaults to 1. */
             openings?: number;
             description?: string | null;
+            /**
+             * Format: date
+             * @description When the job was officially received; today if left out.
+             */
+            intakeDate?: string;
         };
         JobOrderUpdate: {
             /** @description The version you loaded. */
@@ -3232,10 +3298,13 @@ export interface components {
             title?: string;
             status?: components["schemas"]["JobStatus"];
             location?: string | null;
+            country?: components["schemas"]["CountryCode"] | null;
             workType?: components["schemas"]["WorkType"] | null;
             workArrangement?: components["schemas"]["WorkArrangement"] | null;
             openings?: number;
             description?: string | null;
+            /** Format: date */
+            intakeDate?: string;
         };
         JobOrderSummary: {
             id: components["schemas"]["JobOrderId"];
@@ -6612,6 +6681,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAd"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportJobAd: {
+        parameters: {
+            query: {
+                version: components["schemas"]["JobAdVersion"];
+                format: components["schemas"]["JobAdExportFormat"];
+            };
+            header?: never;
+            path: {
+                adId: components["parameters"]["JobAdIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
                 };
             };
             400: components["responses"]["ValidationFailed"];

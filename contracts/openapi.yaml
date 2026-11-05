@@ -1921,6 +1921,31 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/job-ads/{adId}/export:
+    parameters:
+      - $ref: '#/components/parameters/JobAdIdPath'
+    get:
+      operationId: exportJobAd
+      tags: [jobs]
+      summary: Download an ad, or its blind version, as a Word file or a PDF
+      x-permission: jobs:read
+      parameters:
+        - {name: version, in: query, required: true, schema: {$ref: '#/components/schemas/JobAdVersion'}}
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/JobAdExportFormat'}}
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/job-ads/{adId}:
     parameters:
       - $ref: '#/components/parameters/JobAdIdPath'
@@ -3589,11 +3614,14 @@ components:
     PublicJobAd:
       type: object
       description: A published ad as visitors see it (no internal fields).
-      required: [id, title, location, workType, workArrangement, salaryText, description, closesOn, publishedAt]
+      required: [id, title, location, country, workType, workArrangement, salaryText, description, closesOn, publishedAt]
       properties:
         id: {$ref: '#/components/schemas/JobAdId'}
-        title: {type: string}
+        title: {type: string, description: The blind title when the ad is published blind.}
         location: {type: string, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -3601,7 +3629,7 @@ components:
           allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
           nullable: true
         salaryText: {type: string, nullable: true}
-        description: {type: string}
+        description: {type: string, description: The blind text when the ad is published blind.}
         closesOn: {type: string, format: date, nullable: true}
         publishedAt: {type: string, format: date-time}
     ApplicationReceived:
@@ -4730,13 +4758,16 @@ components:
       enum: [draft, published, closed]
     JobAd:
       type: object
-      required: [id, version, jobId, title, location, workType, workArrangement, salaryText, description, closesOn, status, publishedAt, createdAt, updatedAt]
+      required: [id, version, jobId, title, location, country, workType, workArrangement, salaryText, description, closesOn, status, publishedAt, blindTitle, blindDescription, clientDescription, blindEdited, blindOutdated, publishBlind, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/JobAdId'}
         version: {type: integer}
         jobId: {$ref: '#/components/schemas/JobOrderId'}
         title: {type: string}
         location: {type: string, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4754,6 +4785,17 @@ components:
         closesOn: {type: string, format: date, nullable: true}
         status: {$ref: '#/components/schemas/JobAdStatus'}
         publishedAt: {type: string, format: date-time, nullable: true}
+        blindTitle: {type: string, description: "The blind ad's title: the client is not named."}
+        blindDescription:
+          type: string
+          nullable: true
+          description: >
+            The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then "our client"). Made from the ad's text unless a person edited it.
+
+        clientDescription: {type: string, nullable: true, description: 'What the blind ad says instead of the client''s name, e.g. "a leading Malaysian bank".'}
+        blindEdited: {type: boolean, description: A person edited the blind text; changes to the ad no longer remake it.}
+        blindOutdated: {type: boolean, description: The ad changed after the blind text was edited by a person.}
+        publishBlind: {type: boolean, description: The careers page and job feed show the blind version.}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     JobAdList:
@@ -4770,6 +4812,9 @@ components:
       properties:
         title: {type: string, minLength: 1, maxLength: 200}
         location: {type: string, maxLength: 200, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4779,6 +4824,8 @@ components:
         salaryText: {type: string, maxLength: 100, nullable: true}
         description: {type: string, maxLength: 20000, nullable: true}
         closesOn: {type: string, format: date, nullable: true}
+        clientDescription: {type: string, maxLength: 200, nullable: true}
+        publishBlind: {type: boolean}
     JobAdUpdate:
       type: object
       additionalProperties: false
@@ -4787,6 +4834,9 @@ components:
         version: {type: integer, minimum: 1, description: The version you loaded.}
         title: {type: string, minLength: 1, maxLength: 200}
         location: {type: string, maxLength: 200, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4797,6 +4847,18 @@ components:
         description: {type: string, maxLength: 20000, nullable: true}
         closesOn: {type: string, format: date, nullable: true}
         status: {$ref: '#/components/schemas/JobAdStatus'}
+        clientDescription: {type: string, maxLength: 200, nullable: true}
+        publishBlind: {type: boolean}
+        blindTitle: {type: string, minLength: 1, maxLength: 200, description: Your own blind title (the blind ad stops following the ad).}
+        blindDescription: {type: string, maxLength: 20000, nullable: true, description: Your own blind text (likewise).}
+        remakeBlind: {type: boolean, description: "true: make the blind ad from the ad again, dropping your own edits."}
+    JobAdVersion:
+      type: string
+      description: original = the ad as written; blind = without the client's identity.
+      enum: [original, blind]
+    JobAdExportFormat:
+      type: string
+      enum: [docx, pdf]
     JobOrderId:
       type: string
       pattern: '^jo_[0-9a-hjkmnp-tv-z]{26}$'
@@ -4846,7 +4908,7 @@ components:
           nullable: true
     JobOrder:
       type: object
-      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, workType, workArrangement, openings, description, ownerId, ownerName, restrictedFields, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, contactId, contactName, title, status, location, country, workType, workArrangement, openings, description, intakeDate, ownerId, ownerName, restrictedFields, createdAt, updatedAt]
       properties:
         ownerId:
           description: The recruiter the job belongs to (who added it, unless changed).
@@ -4865,6 +4927,9 @@ components:
         title: {type: string}
         status: {$ref: '#/components/schemas/JobStatus'}
         location: {type: string, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4873,6 +4938,7 @@ components:
           nullable: true
         openings: {type: integer, description: How many people to hire.}
         description: {type: string, nullable: true}
+        intakeDate: {type: string, format: date, description: "When the job was officially received (today unless chosen)."}
         salary:
           description: Left out (and listed in restrictedFields) without jobs.salary:read. null means no budget recorded.
           allOf: [{$ref: '#/components/schemas/JobSalary'}]
@@ -4894,6 +4960,9 @@ components:
         title: {type: string, minLength: 1, maxLength: 200}
         status: {$ref: '#/components/schemas/JobStatus'}
         location: {type: string, maxLength: 200, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4902,6 +4971,7 @@ components:
           nullable: true
         openings: {type: integer, minimum: 1, maximum: 999, description: Defaults to 1.}
         description: {type: string, maxLength: 20000, nullable: true}
+        intakeDate: {type: string, format: date, description: "When the job was officially received; today if left out."}
     JobOrderUpdate:
       type: object
       additionalProperties: false
@@ -4915,6 +4985,9 @@ components:
         title: {type: string, minLength: 1, maxLength: 200}
         status: {$ref: '#/components/schemas/JobStatus'}
         location: {type: string, maxLength: 200, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
         workType:
           allOf: [{$ref: '#/components/schemas/WorkType'}]
           nullable: true
@@ -4923,6 +4996,7 @@ components:
           nullable: true
         openings: {type: integer, minimum: 1, maximum: 999}
         description: {type: string, maxLength: 20000, nullable: true}
+        intakeDate: {type: string, format: date}
     JobOrderSummary:
       type: object
       required: [id, title, companyId, companyName, status, location, openings, updatedAt]

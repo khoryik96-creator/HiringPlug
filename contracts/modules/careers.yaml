@@ -146,11 +146,14 @@ components:
     PublicJobAd:
       type: object
       description: A published ad as visitors see it (no internal fields).
-      required: [id, title, location, workType, workArrangement, salaryText, description, closesOn, publishedAt]
+      required: [id, title, location, country, workType, workArrangement, salaryText, description, closesOn, publishedAt]
       properties:
         id: { $ref: '#/components/schemas/JobAdId' }
-        title: { type: string }
+        title: { type: string, description: The blind title when the ad is published blind. }
         location: { type: string, nullable: true }
+        country:
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
         workType:
           allOf: [{ $ref: '#/components/schemas/WorkType' }]
           nullable: true
@@ -158,7 +161,7 @@ components:
           allOf: [{ $ref: '#/components/schemas/WorkArrangement' }]
           nullable: true
         salaryText: { type: string, nullable: true }
-        description: { type: string }
+        description: { type: string, description: The blind text when the ad is published blind. }
         closesOn: { type: string, format: date, nullable: true }
         publishedAt: { type: string, format: date-time }
     ApplicationReceived:

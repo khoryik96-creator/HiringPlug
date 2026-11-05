@@ -2,8 +2,10 @@ package jobs
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
@@ -40,7 +42,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Vi
 		row, err := store.New(tx).InsertJobOrder(ctx, store.InsertJobOrderParams{
 			CompanyID: d.CompanyID, ContactID: d.ContactID, Title: d.Title, Status: d.Status, Location: d.Location,
 			WorkType: d.WorkType, WorkArrangement: d.WorkArrangement, Openings: int32(d.Openings), //nolint:gosec // 1..999 per the contract
-			Description: d.Description, OwnerID: ownerFor(p),
+			Description: d.Description, OwnerID: ownerFor(p), Country: d.Country, IntakeDate: pgtype.Date{Time: d.IntakeDate, Valid: true},
 		})
 		if err != nil {
 			return err
@@ -104,6 +106,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			CompanyID: after.CompanyID, ContactID: after.ContactID, Title: after.Title, Status: after.Status,
 			Location: after.Location, WorkType: after.WorkType, WorkArrangement: after.WorkArrangement,
 			Openings: int32(after.Openings), Description: after.Description, //nolint:gosec // 1..999 per the contract
+			Country: after.Country, IntakeDate: pgtype.Date{Time: after.IntakeDate, Valid: true},
 		})
 		if database.IsNoRows(err) {
 			return apperr.StaleVersion("job")
@@ -340,6 +343,7 @@ func fromRow(r store.JobOrder) JobOrder {
 		Details: Details{
 			CompanyID: r.CompanyID, ContactID: r.ContactID, Title: r.Title, Status: r.Status, Location: r.Location,
 			WorkType: r.WorkType, WorkArrangement: r.WorkArrangement, Openings: int(r.Openings), Description: r.Description,
+			Country: r.Country, IntakeDate: r.IntakeDate.Time,
 		},
 	}
 }
@@ -349,6 +353,7 @@ func fields(d Details) map[string]any {
 	return map[string]any{
 		"companyId": d.CompanyID, "contactId": d.ContactID, "title": d.Title, "status": d.Status,
 		"location": d.Location, "workType": d.WorkType, "workArrangement": d.WorkArrangement,
-		"openings": d.Openings, "description": d.Description,
+		"openings": d.Openings, "description": d.Description, "country": d.Country,
+		"intakeDate": d.IntakeDate.Format(time.DateOnly),
 	}
 }

@@ -77,6 +77,10 @@ tr.total td { font-weight: 600; }
 .ad { border-top: 1px solid #e5e7eb; padding-top: 0.5rem; margin-top: 0.5rem; }
 .ad h4 { margin: 0.25rem 0; }
 .ad-text p { margin: 0.4rem 0; }
+.ad-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.ad-columns > section { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.5rem 0.75rem; min-width: 0; }
+.ad-columns h5 { margin: 0.25rem 0; font-size: 0.9rem; }
+@media (max-width: 760px) { .ad-columns { grid-template-columns: 1fr; } }
 .badge.draft { background: #f3f4f6; } .badge.published { background: #dcfce7; } .badge.closed { background: #fee2e2; }
 textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .careers { max-width: 46rem; margin: 0 auto; }

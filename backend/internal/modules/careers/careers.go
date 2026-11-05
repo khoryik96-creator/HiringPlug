@@ -30,6 +30,7 @@ import (
 type Ad struct {
 	ID, JobID, Title string
 	Location         *string
+	Country          *string // ISO code
 	WorkType         *string
 	WorkArrangement  *string
 	SalaryText       *string

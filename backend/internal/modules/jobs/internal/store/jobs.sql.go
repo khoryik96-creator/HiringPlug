@@ -45,7 +45,7 @@ func (q *Queries) DeleteJobSalary(ctx context.Context, arg DeleteJobSalaryParams
 }
 
 const getJobAd = `-- name: GetJobAd :one
-SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad WHERE id = $1
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad WHERE id = $1
 `
 
 func (q *Queries) GetJobAd(ctx context.Context, id string) (JobAd, error) {
@@ -68,12 +68,19 @@ func (q *Queries) GetJobAd(ctx context.Context, id string) (JobAd, error) {
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Country,
+		&i.ClientDescription,
+		&i.BlindTitleEdit,
+		&i.BlindDescriptionEdit,
+		&i.BlindEdited,
+		&i.BlindSourceHash,
+		&i.PublishBlind,
 	)
 	return i, err
 }
 
 const getJobOrder = `-- name: GetJobOrder :one
-SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id FROM job_order WHERE id = $1
+SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date FROM job_order WHERE id = $1
 `
 
 func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) {
@@ -97,6 +104,8 @@ func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.Country,
+		&i.IntakeDate,
 	)
 	return i, err
 }
@@ -132,7 +141,7 @@ func (q *Queries) GetJobSalary(ctx context.Context, jobOrderID string) (GetJobSa
 }
 
 const getPublishedAd = `-- name: GetPublishedAd :one
-SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad
 WHERE id = $1 AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
 `
 
@@ -156,26 +165,37 @@ func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Country,
+		&i.ClientDescription,
+		&i.BlindTitleEdit,
+		&i.BlindDescriptionEdit,
+		&i.BlindEdited,
+		&i.BlindSourceHash,
+		&i.PublishBlind,
 	)
 	return i, err
 }
 
 const insertJobAd = `-- name: InsertJobAd :one
-INSERT INTO job_ad (tenant_id, job_order_id, title, location, work_type, work_arrangement, salary_text, description, closes_on, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, $5,
-        $6, $7, $8, app_current_user())
-RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at
+INSERT INTO job_ad (tenant_id, job_order_id, title, location, country, work_type, work_arrangement, salary_text, description, closes_on,
+                    client_description, publish_blind, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6,
+        $7, $8, $9, $10, $11, app_current_user())
+RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind
 `
 
 type InsertJobAdParams struct {
-	JobOrderID      string
-	Title           string
-	Location        *string
-	WorkType        *string
-	WorkArrangement *string
-	SalaryText      *string
-	Description     *string
-	ClosesOn        pgtype.Date
+	JobOrderID        string
+	Title             string
+	Location          *string
+	Country           *string
+	WorkType          *string
+	WorkArrangement   *string
+	SalaryText        *string
+	Description       *string
+	ClosesOn          pgtype.Date
+	ClientDescription *string
+	PublishBlind      bool
 }
 
 // Job ads.
@@ -184,11 +204,14 @@ func (q *Queries) InsertJobAd(ctx context.Context, arg InsertJobAdParams) (JobAd
 		arg.JobOrderID,
 		arg.Title,
 		arg.Location,
+		arg.Country,
 		arg.WorkType,
 		arg.WorkArrangement,
 		arg.SalaryText,
 		arg.Description,
 		arg.ClosesOn,
+		arg.ClientDescription,
+		arg.PublishBlind,
 	)
 	var i JobAd
 	err := row.Scan(
@@ -208,6 +231,13 @@ func (q *Queries) InsertJobAd(ctx context.Context, arg InsertJobAdParams) (JobAd
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Country,
+		&i.ClientDescription,
+		&i.BlindTitleEdit,
+		&i.BlindDescriptionEdit,
+		&i.BlindEdited,
+		&i.BlindSourceHash,
+		&i.PublishBlind,
 	)
 	return i, err
 }
@@ -215,13 +245,13 @@ func (q *Queries) InsertJobAd(ctx context.Context, arg InsertJobAdParams) (JobAd
 const insertJobOrder = `-- name: InsertJobOrder :one
 
 INSERT INTO job_order (
-  tenant_id, company_id, contact_id, title, status, location, work_type, work_arrangement,
-  openings, description, owner_id, created_by
+  tenant_id, company_id, contact_id, title, status, location, country, work_type, work_arrangement,
+  openings, description, intake_date, owner_id, created_by
 ) VALUES (
-  app_current_tenant(), $1, $2, $3, $4, $5,
-  $6, $7, $8, $9, $10, app_current_user()
+  app_current_tenant(), $1, $2, $3, $4, $5, $6,
+  $7, $8, $9, $10, $11, $12, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date
 `
 
 type InsertJobOrderParams struct {
@@ -230,10 +260,12 @@ type InsertJobOrderParams struct {
 	Title           string
 	Status          string
 	Location        *string
+	Country         *string
 	WorkType        *string
 	WorkArrangement *string
 	Openings        int32
 	Description     *string
+	IntakeDate      pgtype.Date
 	OwnerID         *string
 }
 
@@ -247,10 +279,12 @@ func (q *Queries) InsertJobOrder(ctx context.Context, arg InsertJobOrderParams) 
 		arg.Title,
 		arg.Status,
 		arg.Location,
+		arg.Country,
 		arg.WorkType,
 		arg.WorkArrangement,
 		arg.Openings,
 		arg.Description,
+		arg.IntakeDate,
 		arg.OwnerID,
 	)
 	var i JobOrder
@@ -272,6 +306,8 @@ func (q *Queries) InsertJobOrder(ctx context.Context, arg InsertJobOrderParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.Country,
+		&i.IntakeDate,
 	)
 	return i, err
 }
@@ -373,7 +409,7 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 }
 
 const listJobAds = `-- name: ListJobAds :many
-SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad WHERE job_order_id = $1 ORDER BY id DESC LIMIT 100
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad WHERE job_order_id = $1 ORDER BY id DESC LIMIT 100
 `
 
 func (q *Queries) ListJobAds(ctx context.Context, jobOrderID string) ([]JobAd, error) {
@@ -402,6 +438,13 @@ func (q *Queries) ListJobAds(ctx context.Context, jobOrderID string) ([]JobAd, e
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Country,
+			&i.ClientDescription,
+			&i.BlindTitleEdit,
+			&i.BlindDescriptionEdit,
+			&i.BlindEdited,
+			&i.BlindSourceHash,
+			&i.PublishBlind,
 		); err != nil {
 			return nil, err
 		}
@@ -478,7 +521,7 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 }
 
 const listPublishedAds = `-- name: ListPublishedAds :many
-SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at FROM job_ad
+SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad
 WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
 ORDER BY published_at DESC LIMIT 200
 `
@@ -510,6 +553,13 @@ func (q *Queries) ListPublishedAds(ctx context.Context) ([]JobAd, error) {
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Country,
+			&i.ClientDescription,
+			&i.BlindTitleEdit,
+			&i.BlindDescriptionEdit,
+			&i.BlindEdited,
+			&i.BlindSourceHash,
+			&i.PublishBlind,
 		); err != nil {
 			return nil, err
 		}
@@ -572,31 +622,45 @@ const updateJobAd = `-- name: UpdateJobAd :one
 UPDATE job_ad SET
   title = $1,
   location = $2,
-  work_type = $3,
-  work_arrangement = $4,
-  salary_text = $5,
-  description = $6,
-  closes_on = $7,
-  status = $8,
-  published_at = $9,
+  country = $3,
+  work_type = $4,
+  work_arrangement = $5,
+  salary_text = $6,
+  description = $7,
+  closes_on = $8,
+  status = $9,
+  published_at = $10,
+  client_description = $11,
+  publish_blind = $12,
+  blind_edited = $13,
+  blind_title_edit = $14,
+  blind_description_edit = $15,
+  blind_source_hash = $16,
   version = version + 1,
   updated_at = now()
-WHERE id = $10 AND version = $11
-RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at
+WHERE id = $17 AND version = $18
+RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind
 `
 
 type UpdateJobAdParams struct {
-	Title           string
-	Location        *string
-	WorkType        *string
-	WorkArrangement *string
-	SalaryText      *string
-	Description     *string
-	ClosesOn        pgtype.Date
-	Status          string
-	PublishedAt     *time.Time
-	ID              string
-	ExpectedVersion int32
+	Title                string
+	Location             *string
+	Country              *string
+	WorkType             *string
+	WorkArrangement      *string
+	SalaryText           *string
+	Description          *string
+	ClosesOn             pgtype.Date
+	Status               string
+	PublishedAt          *time.Time
+	ClientDescription    *string
+	PublishBlind         bool
+	BlindEdited          bool
+	BlindTitleEdit       *string
+	BlindDescriptionEdit *string
+	BlindSourceHash      *string
+	ID                   string
+	ExpectedVersion      int32
 }
 
 // Optimistic concurrency: no row returned = stale version (or not found).
@@ -604,6 +668,7 @@ func (q *Queries) UpdateJobAd(ctx context.Context, arg UpdateJobAdParams) (JobAd
 	row := q.db.QueryRow(ctx, updateJobAd,
 		arg.Title,
 		arg.Location,
+		arg.Country,
 		arg.WorkType,
 		arg.WorkArrangement,
 		arg.SalaryText,
@@ -611,6 +676,12 @@ func (q *Queries) UpdateJobAd(ctx context.Context, arg UpdateJobAdParams) (JobAd
 		arg.ClosesOn,
 		arg.Status,
 		arg.PublishedAt,
+		arg.ClientDescription,
+		arg.PublishBlind,
+		arg.BlindEdited,
+		arg.BlindTitleEdit,
+		arg.BlindDescriptionEdit,
+		arg.BlindSourceHash,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -632,6 +703,13 @@ func (q *Queries) UpdateJobAd(ctx context.Context, arg UpdateJobAdParams) (JobAd
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Country,
+		&i.ClientDescription,
+		&i.BlindTitleEdit,
+		&i.BlindDescriptionEdit,
+		&i.BlindEdited,
+		&i.BlindSourceHash,
+		&i.PublishBlind,
 	)
 	return i, err
 }
@@ -643,14 +721,16 @@ UPDATE job_order SET
   title = $3,
   status = $4,
   location = $5,
-  work_type = $6,
-  work_arrangement = $7,
-  openings = $8,
-  description = $9,
+  country = $6,
+  work_type = $7,
+  work_arrangement = $8,
+  openings = $9,
+  description = $10,
+  intake_date = $11,
   version = version + 1,
   updated_at = now()
-WHERE id = $10 AND version = $11
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id
+WHERE id = $12 AND version = $13
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date
 `
 
 type UpdateJobOrderParams struct {
@@ -659,10 +739,12 @@ type UpdateJobOrderParams struct {
 	Title           string
 	Status          string
 	Location        *string
+	Country         *string
 	WorkType        *string
 	WorkArrangement *string
 	Openings        int32
 	Description     *string
+	IntakeDate      pgtype.Date
 	ID              string
 	ExpectedVersion int32
 }
@@ -675,10 +757,12 @@ func (q *Queries) UpdateJobOrder(ctx context.Context, arg UpdateJobOrderParams) 
 		arg.Title,
 		arg.Status,
 		arg.Location,
+		arg.Country,
 		arg.WorkType,
 		arg.WorkArrangement,
 		arg.Openings,
 		arg.Description,
+		arg.IntakeDate,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -701,6 +785,8 @@ func (q *Queries) UpdateJobOrder(ctx context.Context, arg UpdateJobOrderParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwnerID,
+		&i.Country,
+		&i.IntakeDate,
 	)
 	return i, err
 }

@@ -375,22 +375,29 @@ type Job struct {
 }
 
 type JobAd struct {
-	ID              string
-	TenantID        string
-	JobOrderID      string
-	Version         int32
-	Title           string
-	Location        *string
-	WorkType        *string
-	WorkArrangement *string
-	SalaryText      *string
-	Description     *string
-	ClosesOn        pgtype.Date
-	Status          string
-	PublishedAt     *time.Time
-	CreatedBy       string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                   string
+	TenantID             string
+	JobOrderID           string
+	Version              int32
+	Title                string
+	Location             *string
+	WorkType             *string
+	WorkArrangement      *string
+	SalaryText           *string
+	Description          *string
+	ClosesOn             pgtype.Date
+	Status               string
+	PublishedAt          *time.Time
+	CreatedBy            string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	Country              *string
+	ClientDescription    *string
+	BlindTitleEdit       *string
+	BlindDescriptionEdit *string
+	BlindEdited          bool
+	BlindSourceHash      *string
+	PublishBlind         bool
 }
 
 type JobLead struct {
@@ -455,6 +462,8 @@ type JobOrder struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	OwnerID         *string
+	Country         *string
+	IntakeDate      pgtype.Date
 }
 
 type JobOrderSalary struct {

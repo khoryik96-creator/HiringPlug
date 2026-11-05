@@ -75,8 +75,11 @@ func nameRe(name string) *regexp.Regexp {
 }
 
 // Scrub takes identifying details out of free text: every email, link and
-// phone number (8 digits or more), and the person's names.
-func Scrub(text string, id Identity) string {
+// phone number (8 digits or more), and the person's names ("the candidate").
+func Scrub(text string, id Identity) string { return ScrubWith(text, id, "the candidate") }
+
+// ScrubWith is Scrub with the words that replace a name.
+func ScrubWith(text string, id Identity, name string) string {
 	text = emailRe.ReplaceAllString(text, "[email removed]")
 	text = linkRe.ReplaceAllString(text, "[link removed]")
 	text = phoneRe.ReplaceAllStringFunc(text, func(m string) string {
@@ -86,7 +89,7 @@ func Scrub(text string, id Identity) string {
 		return m
 	})
 	for _, n := range id.Names {
-		text = nameRe(n).ReplaceAllString(text, "${1}the candidate${2}")
+		text = nameRe(n).ReplaceAllString(text, "${1}"+strings.ReplaceAll(name, "$", "$$")+"${2}")
 	}
 	return text
 }

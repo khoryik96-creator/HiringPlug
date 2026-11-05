@@ -77,3 +77,6 @@ SELECT * FROM company_suggestion WHERE id = @id AND company_id = @company_id;
 
 -- name: DecideSuggestion :exec
 UPDATE company_suggestion SET status = @status WHERE id = @id;
+
+-- name: CompanyWebsite :one
+SELECT coalesce(website, '')::text FROM company WHERE id = @id;

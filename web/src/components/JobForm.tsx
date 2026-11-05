@@ -3,12 +3,12 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type JobOrder, unwrap } from "../api/client";
 import { contactsKey, jobKey, jobsKey } from "../api/keys";
-import { JOB_STATUS, keysOf } from "../labels";
+import { JOB_STATUS, keysOf, regionName } from "../labels";
 import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { Field } from "./Field";
-import { fieldErrors, FormInvalid, sameBody } from "./forms";
-import { formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems } from "./jobFormState";
+import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
 import { SaveError } from "./SaveError";
 
 /**
@@ -88,6 +88,15 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
         </select>
       </Field>
       {text("location", req("Location", "location"))}
+      <Field label="Country" error={errors[JOB_PATHS.country]}>
+        <select value={form.country} onChange={(e) => { set("country", e.target.value); }}>
+          <option value="">—</option>
+          {[...new Set([...COUNTRIES, ...(form.country ? [form.country] : [])])].map((c) => <option key={c} value={c}>{regionName(c) ?? c}</option>)}
+        </select>
+      </Field>
+      <Field label="Official intake date" error={errors[JOB_PATHS.intakeDate]}>
+        <input type="date" value={form.intakeDate} onChange={(e) => { set("intakeDate", e.target.value || todayLocal()); }} />
+      </Field>
       <Field label={req("Work type", "workType")} error={errors[JOB_PATHS.workType]}>
         <select value={form.workType} onChange={(e) => { set("workType", e.target.value as JobFormState["workType"]); }}>
           <option value="">—</option>

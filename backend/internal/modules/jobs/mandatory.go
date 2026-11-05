@@ -9,9 +9,10 @@ import (
 )
 
 // FieldRules is what this module needs from the settings module: the
-// fields a company made mandatory.
+// fields a company made mandatory, and its words for work types.
 type FieldRules interface {
 	Mandatory(ctx context.Context, tx pgx.Tx, form string) ([]string, error)
+	Label(ctx context.Context, tx pgx.Tx, list, key string) (string, error)
 }
 
 func filled(d Details, field string) bool {

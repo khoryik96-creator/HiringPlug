@@ -24,6 +24,7 @@ type feedJob struct {
 	URL             string `xml:"url"`
 	Company         string `xml:"company"`
 	City            string `xml:"city,omitempty"`
+	Country         string `xml:"country,omitempty"`
 	Description     string `xml:"description"`
 	Salary          string `xml:"salary,omitempty"`
 	JobType         string `xml:"jobtype,omitempty"`
@@ -47,6 +48,9 @@ func Feed(company, slug, publicURL string, ads []Ad, now time.Time) ([]byte, err
 		}
 		if a.Location != nil {
 			j.City = *a.Location
+		}
+		if a.Country != nil {
+			j.Country = *a.Country
 		}
 		if a.SalaryText != nil {
 			j.Salary = *a.SalaryText

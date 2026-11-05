@@ -22,6 +22,8 @@ type Details struct {
 	WorkArrangement *string
 	Openings        int
 	Description     *string
+	Country         *string   // ISO code, e.g. MY
+	IntakeDate      time.Time // when the job was officially received (a date); zero on create = today
 }
 
 // SalaryRange is a job's salary budget: one figure (Max nil) or a range.
@@ -78,6 +80,8 @@ type Patch struct {
 	WorkArrangement apiconv.Change[*string]
 	Openings        apiconv.Change[int]
 	Description     apiconv.Change[*string]
+	Country         apiconv.Change[*string]
+	IntakeDate      apiconv.Change[time.Time]
 }
 
 // Apply returns d with the patch's fields replaced.
@@ -91,6 +95,8 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.WorkArrangement, p.WorkArrangement)
 	apiconv.Apply(&d.Openings, p.Openings)
 	apiconv.Apply(&d.Description, p.Description)
+	apiconv.Apply(&d.Country, p.Country)
+	apiconv.Apply(&d.IntakeDate, p.IntakeDate)
 	return d
 }
 
@@ -107,6 +113,9 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 	}
 	if d.Openings == 0 {
 		d.Openings = 1
+	}
+	if d.IntakeDate.IsZero() {
+		d.IntakeDate = today()
 	}
 	if d.Location != nil {
 		t := strings.Join(strings.Fields(*d.Location), " ")
@@ -161,18 +170,26 @@ type AdDetails struct {
 	Description     *string
 	ClosesOn        *time.Time // a date
 	Status          string     // draft, published, closed
+	Country         *string    // ISO code
+	// ClientDescription is what the blind ad says instead of the client's
+	// name, e.g. "a leading Malaysian bank".
+	ClientDescription *string
+	PublishBlind      bool // the careers page shows the blind version
 }
 
 // AdPatch is a partial update of AdDetails.
 type AdPatch struct {
-	Title           apiconv.Change[string]
-	Location        apiconv.Change[*string]
-	WorkType        apiconv.Change[*string]
-	WorkArrangement apiconv.Change[*string]
-	SalaryText      apiconv.Change[*string]
-	Description     apiconv.Change[*string]
-	ClosesOn        apiconv.Change[*time.Time]
-	Status          apiconv.Change[string]
+	Title             apiconv.Change[string]
+	Location          apiconv.Change[*string]
+	WorkType          apiconv.Change[*string]
+	WorkArrangement   apiconv.Change[*string]
+	SalaryText        apiconv.Change[*string]
+	Description       apiconv.Change[*string]
+	ClosesOn          apiconv.Change[*time.Time]
+	Status            apiconv.Change[string]
+	Country           apiconv.Change[*string]
+	ClientDescription apiconv.Change[*string]
+	PublishBlind      apiconv.Change[bool]
 }
 
 // Apply returns d with the patch's fields replaced.
@@ -185,6 +202,9 @@ func (p AdPatch) Apply(d AdDetails) AdDetails {
 	apiconv.Apply(&d.Description, p.Description)
 	apiconv.Apply(&d.ClosesOn, p.ClosesOn)
 	apiconv.Apply(&d.Status, p.Status)
+	apiconv.Apply(&d.Country, p.Country)
+	apiconv.Apply(&d.ClientDescription, p.ClientDescription)
+	apiconv.Apply(&d.PublishBlind, p.PublishBlind)
 	return d
 }
 
@@ -200,6 +220,7 @@ func NormalizeAd(d AdDetails) (AdDetails, apperr.FieldErrors) {
 		d.Status = "draft"
 	}
 	d.Location, d.SalaryText = squeezedOrNil(d.Location), squeezedOrNil(d.SalaryText)
+	d.ClientDescription = squeezedOrNil(d.ClientDescription)
 	if d.Description != nil {
 		t := strings.TrimSpace(*d.Description)
 		d.Description = &t

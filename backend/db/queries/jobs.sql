@@ -4,11 +4,11 @@
 
 -- name: InsertJobOrder :one
 INSERT INTO job_order (
-  tenant_id, company_id, contact_id, title, status, location, work_type, work_arrangement,
-  openings, description, owner_id, created_by
+  tenant_id, company_id, contact_id, title, status, location, country, work_type, work_arrangement,
+  openings, description, intake_date, owner_id, created_by
 ) VALUES (
-  app_current_tenant(), @company_id, sqlc.narg(contact_id), @title, @status, sqlc.narg(location),
-  sqlc.narg(work_type), sqlc.narg(work_arrangement), @openings, sqlc.narg(description), sqlc.narg(owner_id), app_current_user()
+  app_current_tenant(), @company_id, sqlc.narg(contact_id), @title, @status, sqlc.narg(location), sqlc.narg(country),
+  sqlc.narg(work_type), sqlc.narg(work_arrangement), @openings, sqlc.narg(description), @intake_date, sqlc.narg(owner_id), app_current_user()
 )
 RETURNING *;
 
@@ -26,10 +26,12 @@ UPDATE job_order SET
   title = @title,
   status = @status,
   location = sqlc.narg(location),
+  country = sqlc.narg(country),
   work_type = sqlc.narg(work_type),
   work_arrangement = sqlc.narg(work_arrangement),
   openings = @openings,
   description = sqlc.narg(description),
+  intake_date = @intake_date,
   version = version + 1,
   updated_at = now()
 WHERE id = @id AND version = @expected_version
@@ -85,9 +87,10 @@ SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DE
 
 -- Job ads.
 -- name: InsertJobAd :one
-INSERT INTO job_ad (tenant_id, job_order_id, title, location, work_type, work_arrangement, salary_text, description, closes_on, created_by)
-VALUES (app_current_tenant(), @job_order_id, @title, sqlc.narg(location), sqlc.narg(work_type), sqlc.narg(work_arrangement),
-        sqlc.narg(salary_text), sqlc.narg(description), sqlc.narg(closes_on), app_current_user())
+INSERT INTO job_ad (tenant_id, job_order_id, title, location, country, work_type, work_arrangement, salary_text, description, closes_on,
+                    client_description, publish_blind, created_by)
+VALUES (app_current_tenant(), @job_order_id, @title, sqlc.narg(location), sqlc.narg(country), sqlc.narg(work_type), sqlc.narg(work_arrangement),
+        sqlc.narg(salary_text), sqlc.narg(description), sqlc.narg(closes_on), sqlc.narg(client_description), @publish_blind, app_current_user())
 RETURNING *;
 
 -- name: GetJobAd :one
@@ -101,6 +104,7 @@ SELECT * FROM job_ad WHERE job_order_id = @job_order_id ORDER BY id DESC LIMIT 1
 UPDATE job_ad SET
   title = @title,
   location = sqlc.narg(location),
+  country = sqlc.narg(country),
   work_type = sqlc.narg(work_type),
   work_arrangement = sqlc.narg(work_arrangement),
   salary_text = sqlc.narg(salary_text),
@@ -108,6 +112,12 @@ UPDATE job_ad SET
   closes_on = sqlc.narg(closes_on),
   status = @status,
   published_at = sqlc.narg(published_at),
+  client_description = sqlc.narg(client_description),
+  publish_blind = @publish_blind,
+  blind_edited = @blind_edited,
+  blind_title_edit = sqlc.narg(blind_title_edit),
+  blind_description_edit = sqlc.narg(blind_description_edit),
+  blind_source_hash = sqlc.narg(blind_source_hash),
   version = version + 1,
   updated_at = now()
 WHERE id = @id AND version = @expected_version

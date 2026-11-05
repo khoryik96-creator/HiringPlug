@@ -14,7 +14,7 @@ afterEach(() => {
 const job: JobOrder = {
   id: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank",
   contactId: null, contactName: null, title: "Senior Auditor", status: "open", location: "Kuala Lumpur",
-  workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.",
+  workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.", country: "MY", intakeDate: "2026-11-01",
   salary: { version: 1, range: { min: "9000.00", max: "12000.00", currency: "MYR", period: "month" }, updatedAt: "2026-11-01T00:00:00Z" },
   restrictedFields: [], ownerId: null, ownerName: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
@@ -66,7 +66,7 @@ describe("job page", () => {
     renderWithClient(<JobDetail id={job.id} permissions={["jobs:read", "jobs:update", "jobs.salary:read", "jobs.salary:update"]} />);
     await screen.findByRole("heading", { name: /Senior Auditor/ });
     expect(screen.getByText("MYR 9000.00 – 12000.00 / month")).toBeTruthy();
-    expect(screen.getByText("Kuala Lumpur · Full time · Hybrid · 2 openings")).toBeTruthy();
+    expect(screen.getByText("Kuala Lumpur, Malaysia (MY) · Full time · Hybrid · 2 openings · intake 1 Nov 2026")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit budget" })).toBeTruthy();
   });
 

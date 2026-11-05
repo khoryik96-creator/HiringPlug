@@ -38,11 +38,15 @@ func (a careersAds) PublishedAd(ctx context.Context, tx pgx.Tx, id string) (care
 func careersAd(ad jobs.Ad) careers.Ad {
 	d := ad.Details
 	out := careers.Ad{
-		ID: ad.ID, JobID: ad.JobID, Title: d.Title, Location: d.Location, WorkType: d.WorkType,
+		ID: ad.ID, JobID: ad.JobID, Title: d.Title, Location: d.Location, Country: d.Country, WorkType: d.WorkType,
 		WorkArrangement: d.WorkArrangement, SalaryText: d.SalaryText, ClosesOn: d.ClosesOn,
 	}
-	if d.Description != nil {
-		out.Description = *d.Description
+	text := d.Description
+	if d.PublishBlind { // the client stays unnamed in public
+		out.Title, text = ad.Blind.Title, ad.Blind.Description
+	}
+	if text != nil {
+		out.Description = *text
 	}
 	if ad.PublishedAt != nil {
 		out.PublishedAt = *ad.PublishedAt

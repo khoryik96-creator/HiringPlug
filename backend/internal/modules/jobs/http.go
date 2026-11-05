@@ -3,6 +3,8 @@ package jobs
 import (
 	"context"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -41,6 +43,10 @@ func (h *HTTP) CreateJob(ctx context.Context, req api.CreateJobRequestObject) (a
 		WorkType:        c.Convert[string](c.ValueOrNil(b.WorkType)),
 		WorkArrangement: c.Convert[string](c.ValueOrNil(b.WorkArrangement)),
 		Description:     c.ValueOrNil(b.Description),
+		Country:         c.ValueOrNil(b.Country),
+	}
+	if b.IntakeDate != nil {
+		in.IntakeDate = b.IntakeDate.Time
 	}
 	if b.Status != nil {
 		in.Status = string(*b.Status)
@@ -77,6 +83,8 @@ func (h *HTTP) UpdateJob(ctx context.Context, req api.UpdateJobRequestObject) (a
 		WorkArrangement: c.Optional(b.WorkArrangement, func(v api.WorkArrangement) string { return string(v) }),
 		Openings:        c.Required(b.Openings),
 		Description:     c.Optional(b.Description, c.Same[string]),
+		Country:         c.Optional(b.Country, c.Same[string]),
+		IntakeDate:      c.Required(dateOrNil(b.IntakeDate)),
 	}
 	view, err := h.svc.Update(ctx, authz.MustFromContext(ctx), req.JobId, b.Version, patch)
 	if err != nil {
@@ -111,6 +119,7 @@ func toAPI(v View) api.JobOrder {
 		WorkType:        c.OrNull(c.Convert[api.WorkType](d.WorkType)),
 		WorkArrangement: c.OrNull(c.Convert[api.WorkArrangement](d.WorkArrangement)),
 		Openings:        d.Openings, Description: c.OrNull(d.Description),
+		Country: c.OrNull(d.Country), IntakeDate: openapi_types.Date{Time: d.IntakeDate},
 		RestrictedFields: []api.JobRestrictedField{}, OwnerId: c.OrNull(v.OwnerID), OwnerName: c.OrNull(v.OwnerName),
 		CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}

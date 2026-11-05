@@ -14,7 +14,7 @@ afterEach(() => {
 const job: JobOrder = {
   id: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank",
   contactId: null, contactName: null, title: "Senior Auditor", status: "open", location: "Kuala Lumpur",
-  workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.",
+  workType: "full_time", workArrangement: "hybrid", openings: 2, description: "Audit banks.", country: "MY", intakeDate: "2026-11-01",
   restrictedFields: ["salary"], ownerId: null, ownerName: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 /** Answers the panel's reads: who is signed in (for the careers link), and the ads. */
@@ -26,6 +26,8 @@ const draft: Schemas["JobAd"] = {
   id: "ad_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, jobId: job.id, title: "Senior Auditor", location: "Kuala Lumpur",
   workType: "full_time", workArrangement: null, salaryText: "RM 9,000", description: null, closesOn: null, status: "draft",
   publishedAt: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
+  country: "MY", blindTitle: "Senior Auditor", blindDescription: null, clientDescription: null,
+  blindEdited: false, blindOutdated: false, publishBlind: true,
 };
 
 describe("ad text", () => {
@@ -49,6 +51,7 @@ describe("job ads", () => {
     expect(sentBody(post)).toEqual({
       title: "Senior Auditor", location: "Kuala Lumpur", workType: "full_time", workArrangement: "hybrid",
       salaryText: "RM 9,000 - 12,000", closesOn: null, description: "Audit banks.",
+      country: "MY", clientDescription: null, publishBlind: true, // the job's country; new ads go out blind
     });
   });
 
@@ -69,7 +72,8 @@ describe("job ads", () => {
     renderWithClient(<JobAds job={job} canEdit={false} />);
     await screen.findByRole("article", { name: "Senior Auditor" });
     expect((await screen.findByRole("link", { name: /\/careers\/demo-company$/ })).getAttribute("href")).toBe(`${window.location.origin}/careers/demo-company`);
-    expect(screen.queryAllByRole("button")).toEqual([]);
+    // They may download the ad (Word, PDF), not change it.
+    expect(screen.queryAllByRole("button").map((b) => b.textContent)).toEqual(["Word", "PDF", "Word", "PDF"]);
   });
 
   it("gives published ads a link per job board", async () => {

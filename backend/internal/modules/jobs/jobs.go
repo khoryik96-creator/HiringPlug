@@ -29,6 +29,7 @@ import (
 type Companies interface {
 	Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool, error)
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+	Website(ctx context.Context, tx pgx.Tx, companyID string) (string, error)
 }
 
 // ContactInfo is what a job shows of its hiring contact.

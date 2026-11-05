@@ -83,6 +83,17 @@ func (q *Queries) CompanyNames(ctx context.Context, ids []string) ([]CompanyName
 	return items, nil
 }
 
+const companyWebsite = `-- name: CompanyWebsite :one
+SELECT coalesce(website, '')::text FROM company WHERE id = $1
+`
+
+func (q *Queries) CompanyWebsite(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, companyWebsite, id)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const decideSuggestion = `-- name: DecideSuggestion :exec
 UPDATE company_suggestion SET status = $1 WHERE id = $2
 `

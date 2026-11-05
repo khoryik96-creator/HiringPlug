@@ -4,10 +4,12 @@ import { useState } from "react";
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobAdsKey } from "../api/keys";
 import { careersUrl } from "../careersRoute";
-import { CHANNEL } from "../labels";
+import { CHANNEL, regionName } from "../labels";
 import { useFieldSettings } from "./useFieldSettings";
 import { AdText } from "./AdText";
+import { AdVersions } from "./AdVersions";
 import { ErrorMessage } from "./ErrorMessage";
+import { COUNTRIES } from "./forms";
 import { SaveError } from "./SaveError";
 
 type Ad = Schemas["JobAd"];
@@ -18,7 +20,6 @@ const orNull = (v: string) => (v.trim() === "" ? null : v);
 export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Ad | "new" | null>(null);
-  const fs = useFieldSettings();
   const ads = useQuery({
     queryKey: jobAdsKey(job.id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } } })).items,
@@ -68,12 +69,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
               </div>
             )}
           </div>
-          <p className="muted">
-            {[ad.location, ad.workType && fs.label("work_type", ad.workType), ad.workArrangement && fs.label("work_arrangement", ad.workArrangement), ad.salaryText]
-              .filter(Boolean).join(" · ")}
-            {ad.closesOn && ` · closes ${ad.closesOn}`}
-          </p>
-          {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
+          <AdVersions ad={ad} canEdit={canEdit && editing === null} />
           {ad.status === "published" && me.data && <ShareLinks slug={me.data.tenant.careersSlug} adId={ad.id} />}
         </article>
       ))}
@@ -89,6 +85,9 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
     form: {
       title: ad?.title ?? job.title,
       location: ad ? ad.location ?? "" : job.location ?? "",
+      country: ad ? ad.country ?? "" : job.country ?? "",
+      clientDescription: ad?.clientDescription ?? "",
+      publishBlind: ad ? (ad.publishBlind ? "blind" : "original") : "blind",
       workType: ad ? ad.workType ?? "" : job.workType ?? "",
       workArrangement: ad ? ad.workArrangement ?? "" : job.workArrangement ?? "",
       salaryText: ad?.salaryText ?? "",
@@ -103,6 +102,9 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
   const body = {
     title: form.title,
     location: orNull(form.location),
+    country: orNull(form.country),
+    clientDescription: orNull(form.clientDescription),
+    publishBlind: form.publishBlind === "blind",
     workType: (orNull(form.workType) as Schemas["WorkType"] | null),
     workArrangement: (orNull(form.workArrangement) as Schemas["WorkArrangement"] | null),
     salaryText: orNull(form.salaryText),
@@ -123,6 +125,12 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
     <form className="panel form-grid" aria-label={ad ? "Edit ad" : "New ad"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <label className="field">Ad title<input value={form.title} onChange={(e) => { set("title", e.target.value); }} /></label>
       <label className="field">Location<input value={form.location} onChange={(e) => { set("location", e.target.value); }} /></label>
+      <label className="field">Country
+        <select value={form.country} onChange={(e) => { set("country", e.target.value); }}>
+          <option value="">—</option>
+          {[...new Set([...COUNTRIES, ...(form.country ? [form.country] : [])])].map((c) => <option key={c} value={c}>{regionName(c) ?? c}</option>)}
+        </select>
+      </label>
       <label className="field">Work type
         <select value={form.workType} onChange={(e) => { set("workType", e.target.value); }}>
           <option value="">—</option>
@@ -137,6 +145,16 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
       </label>
       <label className="field">Salary shown on the ad<input value={form.salaryText} placeholder="e.g. RM 8,000 - 10,000 a month (leave empty to hide)" onChange={(e) => { set("salaryText", e.target.value); }} /></label>
       <label className="field">Closes on<input type="date" value={form.closesOn} onChange={(e) => { set("closesOn", e.target.value); }} /></label>
+      <label className="field">In the blind ad, the client is
+        <input value={form.clientDescription} placeholder="e.g. a leading Malaysian bank (else: our client)" maxLength={200}
+          onChange={(e) => { set("clientDescription", e.target.value); }} />
+      </label>
+      <label className="field">The careers page shows
+        <select value={form.publishBlind} onChange={(e) => { set("publishBlind", e.target.value); }}>
+          <option value="blind">The blind ad</option>
+          <option value="original">The ad as written (names the client)</option>
+        </select>
+      </label>
       <div className="full">
         <div className="row spread">
           <span>Ad text <span className="muted">(lines starting with "- " become bullet points)</span></span>

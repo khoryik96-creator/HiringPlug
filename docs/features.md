@@ -282,14 +282,30 @@ lead's company (with the built-in email check).
 
 - **Jobs** ✅: job orders for clients (agency) or requisitions (in-house):
   company, hiring contact (must work at that company), title, status (open,
-  on hold, filled, closed), location, work type, on site / hybrid / remote,
-  openings and description, listed on the company's page. The **salary
+  on hold, filled, closed), location and country, work type, on site / hybrid /
+  remote, openings, description and the **official intake date** (today
+  unless chosen), listed on the company's page. The **salary
   budget** follows the salary pattern: its own permissions (hiring managers
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
   text) come in Phase 3.
+- **Blind ads** ✅: every ad is shown in two columns, as written and blind.
+  The blind version is made from the ad when it is read: the client's name
+  (also without "Sdn Bhd", "Berhad" and the like), its website and the name
+  part of its address, and the hiring contact are replaced, and every email,
+  phone number and link removed. The first mention of the client becomes the
+  ad's "client description" ("a leading Malaysian bank"), later ones "our
+  client". A person may write their own blind title and text; it may not name
+  the client, changes to the ad then no longer remake it, and the ad shows when
+  it was written for an older version ("Make again from the ad" goes back).
+  Each ad chooses what the careers page and job feed show: new ads the blind
+  version, ads published before keep showing the ad as written. Either version
+  downloads as **Word or PDF** (title, a line of facts, the text with its bullet
+  points; the PDF uses a standard font, so characters beyond Western European
+  ones, such as Chinese, print as "?"). Later: an AI rewrite like CV Studio's
+  Blind JD (tone, paraphrase strength), once the AI is on.
 - **Job ads** ✅: the advertised text of a job, separate from the internal job
-  order (a job can have several). Each has its own title, location, work type
+  order (a job can have several), with its own country (the job's unless chosen). Each has its own title, location, work type
   and arrangement, an optional salary line shown as written (separate from the
   job's private budget), a closing date and the ad's text, where lines starting
   with "- " become bullet points (plain text only: nothing typed into an ad can

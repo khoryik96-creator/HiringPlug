@@ -20,6 +20,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -45,6 +47,16 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool,
 // for other modules that show a company next to their records.
 func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
 	return m.service.Names(ctx, tx, ids)
+}
+
+// Website returns a company's website ("" when none or no such company),
+// for other modules (e.g. blind job ads, which leave it out).
+func (m *Module) Website(ctx context.Context, tx pgx.Tx, companyID string) (string, error) {
+	w, err := store.New(tx).CompanyWebsite(ctx, companyID)
+	if database.IsNoRows(err) {
+		return "", nil
+	}
+	return w, err
 }
 
 // JobHandlers returns the module's handlers for the core queue.

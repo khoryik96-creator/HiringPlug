@@ -109,7 +109,7 @@ func readError(err error) error {
 func adToAPI(a Ad) api.PublicJobAd {
 	out := api.PublicJobAd{
 		Id: a.ID, Title: a.Title, Description: a.Description, PublishedAt: a.PublishedAt,
-		Location: c.OrNull(a.Location), SalaryText: c.OrNull(a.SalaryText),
+		Location: c.OrNull(a.Location), Country: c.OrNull(a.Country), SalaryText: c.OrNull(a.SalaryText),
 		WorkType:        c.OrNull(enumPtr[api.WorkType](a.WorkType)),
 		WorkArrangement: c.OrNull(enumPtr[api.WorkArrangement](a.WorkArrangement)),
 	}

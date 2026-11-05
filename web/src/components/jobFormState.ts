@@ -13,12 +13,21 @@ export interface JobFormState {
   workArrangement: "" | Schemas["WorkArrangement"];
   openings: string;
   description: string;
+  country: string;
+  intakeDate: string; // YYYY-MM-DD
+}
+
+/** Today's date where the user is, as YYYY-MM-DD. */
+export function todayLocal(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
 export const JOB_PATHS: Record<keyof JobFormState, string> = {
   company: "companyId", contactId: "contactId", title: "title", status: "status", location: "location",
   workType: "workType", workArrangement: "workArrangement", openings: "openings", description: "description",
+  country: "country", intakeDate: "intakeDate",
 };
 
 export function formFromJob(j: JobOrder | null, company: PickedCompany | null = null): JobFormState {
@@ -32,6 +41,8 @@ export function formFromJob(j: JobOrder | null, company: PickedCompany | null = 
     workArrangement: j?.workArrangement ?? "",
     openings: String(j?.openings ?? 1),
     description: j?.description ?? "",
+    country: j?.country ?? "",
+    intakeDate: j?.intakeDate ?? todayLocal(), // a new job's intake is today unless chosen
   };
 }
 
@@ -56,5 +67,7 @@ export function jobFields(f: JobFormState) {
     workArrangement: f.workArrangement === "" ? null : f.workArrangement,
     openings: Number(f.openings.trim()),
     description: orNull(f.description),
+    country: f.country === "" ? null : f.country,
+    ...(f.intakeDate ? { intakeDate: f.intakeDate } : {}),
   };
 }

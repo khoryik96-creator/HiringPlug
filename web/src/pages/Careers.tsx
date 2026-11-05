@@ -6,12 +6,12 @@ import { AdText } from "../components/AdText";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
 import type { CareersRoute } from "../careersRoute";
-import { WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
+import { countryName, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 
 type Ad = Schemas["PublicJobAd"];
 
 const meta = (ad: Ad) =>
-  [ad.location, ad.workType && WORK_TYPE[ad.workType], ad.workArrangement && WORK_ARRANGEMENT[ad.workArrangement], ad.salaryText]
+  [[ad.location, ad.country ? countryName(ad.country) : null].filter(Boolean).join(", "), ad.workType && WORK_TYPE[ad.workType], ad.workArrangement && WORK_ARRANGEMENT[ad.workArrangement], ad.salaryText]
     .filter(Boolean)
     .join(" · ");
 
@@ -140,7 +140,9 @@ export function jobPostingData(ad: Ad, company: string): Record<string, unknown>
     ...(ad.closesOn ? { validThrough: ad.closesOn } : {}),
     ...(ad.workType ? { employmentType: EMPLOYMENT[ad.workType] } : {}),
     hiringOrganization: { "@type": "Organization", name: company },
-    ...(ad.location ? { jobLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: ad.location } } } : {}),
+    ...(ad.location || ad.country ? { jobLocation: { "@type": "Place", address: {
+      "@type": "PostalAddress", ...(ad.location ? { addressLocality: ad.location } : {}), ...(ad.country ? { addressCountry: ad.country } : {}),
+    } } } : {}),
     ...(ad.workArrangement === "remote" ? { jobLocationType: "TELECOMMUTE" } : {}),
   };
 }

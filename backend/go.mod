@@ -6,6 +6,7 @@ toolchain go1.27.3
 
 require (
 	github.com/getkin/kin-openapi v0.152.0
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/nyaruka/phonenumbers v1.8.1

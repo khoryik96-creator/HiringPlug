@@ -1598,6 +1598,16 @@ class JobAdStatus(StrEnum):
     closed = "closed"
 
 
+class JobAdVersion(StrEnum):
+    original = "original"
+    blind = "blind"
+
+
+class JobAdExportFormat(StrEnum):
+    docx = "docx"
+    pdf = "pdf"
+
+
 class JobOrderId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["jo_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jo_[0-9a-hjkmnp-tv-z]{26}$")
@@ -1669,10 +1679,14 @@ class JobOrder(BaseModel):
     title: str
     status: JobStatus
     location: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
     workType: Annotated[WorkType | None, Field(...)]
     workArrangement: Annotated[WorkArrangement | None, Field(...)]
     openings: Annotated[int, Field(description="How many people to hire.")]
     description: Annotated[str | None, Field(...)]
+    intakeDate: Annotated[
+        date, Field(description="When the job was officially received (today unless chosen).")
+    ]
     salary: Annotated[
         JobSalary | None,
         Field(
@@ -1693,10 +1707,14 @@ class JobOrderCreate(BaseModel):
     title: Annotated[str, Field(max_length=200, min_length=1)]
     status: JobStatus | None = None
     location: Annotated[str | None, Field(max_length=200)] = None
+    country: CountryCode | None = None
     workType: WorkType | None = None
     workArrangement: WorkArrangement | None = None
     openings: Annotated[int | None, Field(description="Defaults to 1.", ge=1, le=999)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
+    intakeDate: Annotated[
+        date | None, Field(description="When the job was officially received; today if left out.")
+    ] = None
 
 
 class JobOrderUpdate(BaseModel):
@@ -1709,10 +1727,12 @@ class JobOrderUpdate(BaseModel):
     title: Annotated[str | None, Field(max_length=200, min_length=1)] = None
     status: JobStatus | None = None
     location: Annotated[str | None, Field(max_length=200)] = None
+    country: CountryCode | None = None
     workType: WorkType | None = None
     workArrangement: WorkArrangement | None = None
     openings: Annotated[int | None, Field(ge=1, le=999)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
+    intakeDate: date | None = None
 
 
 class JobOrderSummary(BaseModel):
@@ -2686,12 +2706,13 @@ class FieldSettings(BaseModel):
 
 class PublicJobAd(BaseModel):
     id: JobAdId
-    title: str
+    title: Annotated[str, Field(description="The blind title when the ad is published blind.")]
     location: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
     workType: Annotated[WorkType | None, Field(...)]
     workArrangement: Annotated[WorkArrangement | None, Field(...)]
     salaryText: Annotated[str | None, Field(...)]
-    description: str
+    description: Annotated[str, Field(description="The blind text when the ad is published blind.")]
     closesOn: Annotated[date | None, Field(...)]
     publishedAt: AwareDatetime
 
@@ -2869,6 +2890,7 @@ class JobAd(BaseModel):
     jobId: JobOrderId
     title: str
     location: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
     workType: Annotated[WorkType | None, Field(...)]
     workArrangement: Annotated[WorkArrangement | None, Field(...)]
     salaryText: Annotated[
@@ -2883,6 +2905,26 @@ class JobAd(BaseModel):
     closesOn: Annotated[date | None, Field(...)]
     status: JobAdStatus
     publishedAt: Annotated[AwareDatetime | None, Field(...)]
+    blindTitle: Annotated[str, Field(description="The blind ad's title: the client is not named.")]
+    blindDescription: Annotated[
+        str | None,
+        Field(
+            description="The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then \"our client\"). Made from the ad's text unless a person edited it.\n"
+        ),
+    ]
+    clientDescription: Annotated[
+        str | None,
+        Field(
+            description='What the blind ad says instead of the client\'s name, e.g. "a leading Malaysian bank".'
+        ),
+    ]
+    blindEdited: Annotated[
+        bool, Field(description="A person edited the blind text; changes to the ad no longer remake it.")
+    ]
+    blindOutdated: Annotated[
+        bool, Field(description="The ad changed after the blind text was edited by a person.")
+    ]
+    publishBlind: Annotated[bool, Field(description="The careers page and job feed show the blind version.")]
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
 
@@ -2897,11 +2939,14 @@ class JobAdCreate(BaseModel):
     )
     title: Annotated[str, Field(max_length=200, min_length=1)]
     location: Annotated[str | None, Field(max_length=200)] = None
+    country: CountryCode | None = None
     workType: WorkType | None = None
     workArrangement: WorkArrangement | None = None
     salaryText: Annotated[str | None, Field(max_length=100)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
     closesOn: date | None = None
+    clientDescription: Annotated[str | None, Field(max_length=200)] = None
+    publishBlind: bool | None = None
 
 
 class JobAdUpdate(BaseModel):
@@ -2911,12 +2956,29 @@ class JobAdUpdate(BaseModel):
     version: Annotated[int, Field(description="The version you loaded.", ge=1)]
     title: Annotated[str | None, Field(max_length=200, min_length=1)] = None
     location: Annotated[str | None, Field(max_length=200)] = None
+    country: CountryCode | None = None
     workType: WorkType | None = None
     workArrangement: WorkArrangement | None = None
     salaryText: Annotated[str | None, Field(max_length=100)] = None
     description: Annotated[str | None, Field(max_length=20000)] = None
     closesOn: date | None = None
     status: JobAdStatus | None = None
+    clientDescription: Annotated[str | None, Field(max_length=200)] = None
+    publishBlind: bool | None = None
+    blindTitle: Annotated[
+        str | None,
+        Field(
+            description="Your own blind title (the blind ad stops following the ad).",
+            max_length=200,
+            min_length=1,
+        ),
+    ] = None
+    blindDescription: Annotated[
+        str | None, Field(description="Your own blind text (likewise).", max_length=20000)
+    ] = None
+    remakeBlind: Annotated[
+        bool | None, Field(description="true: make the blind ad from the ad again, dropping your own edits.")
+    ] = None
 
 
 class Offer(BaseModel):

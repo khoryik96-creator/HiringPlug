@@ -1,7 +1,9 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
+	"mime"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -31,6 +33,8 @@ func (h *HTTP) CreateJobAd(ctx context.Context, req api.CreateJobAdRequestObject
 		Title: b.Title, Location: c.ValueOrNil(b.Location), WorkType: enumOrNil(b.WorkType),
 		WorkArrangement: enumOrNil(b.WorkArrangement), SalaryText: c.ValueOrNil(b.SalaryText),
 		Description: c.ValueOrNil(b.Description), ClosesOn: dateOrNil(c.ValueOrNil(b.ClosesOn)),
+		Country: c.ValueOrNil(b.Country), ClientDescription: c.ValueOrNil(b.ClientDescription),
+		PublishBlind: b.PublishBlind == nil || *b.PublishBlind,
 	})
 	if err != nil {
 		return nil, err
@@ -51,16 +55,24 @@ func (h *HTTP) GetJobAd(ctx context.Context, req api.GetJobAdRequestObject) (api
 func (h *HTTP) UpdateJobAd(ctx context.Context, req api.UpdateJobAdRequestObject) (api.UpdateJobAdResponseObject, error) {
 	b := req.Body
 	patch := AdPatch{
-		Title:           c.Required(b.Title),
-		Location:        c.Optional(b.Location, c.Same[string]),
-		WorkType:        c.Optional(b.WorkType, func(v api.WorkType) string { return string(v) }),
-		WorkArrangement: c.Optional(b.WorkArrangement, func(v api.WorkArrangement) string { return string(v) }),
-		SalaryText:      c.Optional(b.SalaryText, c.Same[string]),
-		Description:     c.Optional(b.Description, c.Same[string]),
-		ClosesOn:        c.Optional(b.ClosesOn, func(d openapi_types.Date) time.Time { return d.Time }),
-		Status:          c.Required(c.Convert[string](b.Status)),
+		Title:             c.Required(b.Title),
+		Location:          c.Optional(b.Location, c.Same[string]),
+		WorkType:          c.Optional(b.WorkType, func(v api.WorkType) string { return string(v) }),
+		WorkArrangement:   c.Optional(b.WorkArrangement, func(v api.WorkArrangement) string { return string(v) }),
+		SalaryText:        c.Optional(b.SalaryText, c.Same[string]),
+		Description:       c.Optional(b.Description, c.Same[string]),
+		ClosesOn:          c.Optional(b.ClosesOn, func(d openapi_types.Date) time.Time { return d.Time }),
+		Status:            c.Required(c.Convert[string](b.Status)),
+		Country:           c.Optional(b.Country, c.Same[string]),
+		ClientDescription: c.Optional(b.ClientDescription, c.Same[string]),
+		PublishBlind:      c.Required(b.PublishBlind),
 	}
-	ad, err := h.svc.UpdateAd(ctx, authz.MustFromContext(ctx), req.AdId, b.Version, patch)
+	blind := BlindEdit{Title: b.BlindTitle, Remake: b.RemakeBlind != nil && *b.RemakeBlind}
+	if b.BlindDescription.IsSpecified() {
+		blind.DescriptionSet = true
+		blind.Description = c.ValueOrNil(b.BlindDescription)
+	}
+	ad, err := h.svc.UpdateAd(ctx, authz.MustFromContext(ctx), req.AdId, b.Version, patch, blind)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +86,8 @@ func adToAPI(a Ad) api.JobAd {
 		Location: c.OrNull(d.Location), SalaryText: c.OrNull(d.SalaryText), Description: c.OrNull(d.Description),
 		PublishedAt: c.OrNull(a.PublishedAt), CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
 		WorkType: c.OrNull(enumPtr[api.WorkType](d.WorkType)), WorkArrangement: c.OrNull(enumPtr[api.WorkArrangement](d.WorkArrangement)),
+		Country: c.OrNull(d.Country), ClientDescription: c.OrNull(d.ClientDescription), PublishBlind: d.PublishBlind,
+		BlindTitle: a.Blind.Title, BlindDescription: c.OrNull(a.Blind.Description), BlindEdited: a.Blind.Edited, BlindOutdated: a.Blind.Outdated,
 	}
 	var closes *openapi_types.Date
 	if d.ClosesOn != nil {
@@ -105,4 +119,17 @@ func dateOrNil(d *openapi_types.Date) *time.Time {
 		return nil
 	}
 	return &d.Time
+}
+
+// ExportJobAd handles GET /v1/job-ads/{adId}/export.
+func (h *HTTP) ExportJobAd(ctx context.Context, req api.ExportJobAdRequestObject) (api.ExportJobAdResponseObject, error) {
+	e, err := h.svc.ExportAd(ctx, authz.MustFromContext(ctx), req.AdId, string(req.Params.Version), string(req.Params.Format))
+	if err != nil {
+		return nil, err
+	}
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": e.FileName})
+	return api.ExportJobAd200ApplicationoctetStreamResponse{
+		Body: bytes.NewReader(e.Data), ContentLength: int64(len(e.Data)),
+		Headers: api.ExportJobAd200ResponseHeaders{ContentDisposition: &disposition},
+	}, nil
 }

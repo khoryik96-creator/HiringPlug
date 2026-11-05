@@ -12,7 +12,7 @@ import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { PossibleCandidates } from "../components/PossibleCandidates";
-import { JOB_STATUS } from "../labels";
+import { countryName, formatDay, JOB_STATUS } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
 
 /** One job. Render it with key={id} so edit state never carries over. */
@@ -28,10 +28,11 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
   if (!j) return job.error ? <ErrorMessage error={job.error} /> : <p className="muted">Loading…</p>;
 
   const facts = [
-    j.location,
+    [j.location, j.country ? countryName(j.country) : null].filter(Boolean).join(", "),
     j.workType ? fs.label("work_type", j.workType) : null,
     j.workArrangement ? fs.label("work_arrangement", j.workArrangement) : null,
     `${String(j.openings)} opening${j.openings === 1 ? "" : "s"}`,
+    `intake ${formatDay(j.intakeDate)}`,
   ].filter(Boolean).join(" · ");
   return (
     <main>
