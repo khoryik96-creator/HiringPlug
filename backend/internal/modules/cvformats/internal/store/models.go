@@ -121,6 +121,7 @@ type Candidate struct {
 	Tags                   []string
 	Skills                 []string
 	OwnerID                *string
+	ResidenceCountry       *string
 }
 
 type CandidateCompensation struct {

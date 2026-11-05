@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Supported file types.
@@ -138,6 +139,9 @@ const (
 	FieldURL          = "url"
 	FieldCountry      = "country"
 	FieldNoticePeriod = "notice"
+	// FieldInferred is a value worked out from the quote (an employer's
+	// industry from its name): only the quote must be in the CV.
+	FieldInferred = "inferred"
 )
 
 // ValueFromQuote reports whether value can be read from quote: the same
@@ -149,6 +153,9 @@ func ValueFromQuote(kind, value, quote string) bool {
 		return countryCode.MatchString(value)
 	case FieldNoticePeriod:
 		return noticePeriod.MatchString(value)
+	case FieldInferred:
+		n := utf8.RuneCountInString(strings.TrimSpace(value))
+		return n > 0 && n <= 100
 	case FieldURL:
 		value = urlScheme.ReplaceAllString(value, "")
 	}

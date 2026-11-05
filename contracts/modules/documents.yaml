@@ -296,7 +296,7 @@ components:
     ParsedProfile:
       type: object
       additionalProperties: false
-      required: [parser, fullName, email, phone, linkedinUrl, location, nationality, noticePeriod, skills, experience, education, dropped]
+      required: [parser, fullName, email, phone, linkedinUrl, location, nationality, residenceCountry, industry, noticePeriod, skills, experience, education, dropped]
       description: >
         Details read from a CV, as suggestions to review. nationality is an
         ISO country code; noticePeriod is "<number> day|week|month".
@@ -308,6 +308,14 @@ components:
         linkedinUrl: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }
         location: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }
         nationality: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }
+        residenceCountry:
+          description: Where the candidate lives, an ISO country code, from their address, the places in it, or their phone's country code.
+          allOf: [{ $ref: '#/components/schemas/SourcedText' }]
+          nullable: true
+        industry:
+          description: "The industry of their current (latest) employer, inferred: the quote is the words it was inferred from (Kano's industries)."
+          allOf: [{ $ref: '#/components/schemas/SourcedText' }]
+          nullable: true
         noticePeriod: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }
         skills:
           type: array

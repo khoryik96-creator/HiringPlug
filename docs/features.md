@@ -29,14 +29,15 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Field | Notes |
 |---|---|
 | First and last name | Spaces tidied; full name derived |
-| Email | Lower-cased; unique per company (duplicates are refused and point to the existing candidate) |
+| Email | Lower-cased; **one candidate per email** in a company: adding someone with an email another candidate has is refused, naming that candidate and who owns them with a link (unless you may not see them) |
 | Phone | Any common format in; stored internationally (`012-345 6789` → `+60123456789`, default country configurable) |
 | Nationality | ISO country code (`MY`, `SG`, ...) |
+| Country of residence | ISO country code; not known is shown as **NA**. Read from a CV: the country in their address, else Malaysian place names near the top (Kuala Lumpur, Selangor, KL, ...), else their phone's country code (`+65` → SG, `012-...` → MY). Unlike Kano's check, an employer's "Sdn Bhd" or an address further down the CV says nothing about where they live |
 | Work authorization | `local`; `expat_eligible` with basis `rp_t` (Residence Pass-Talent), `permanent_resident`, `spouse_visa` or `other`; `requires_visa`. The basis is required exactly when the status is `expat_eligible` (checked in Go and again by the database). |
 | Notice period | Value and unit (days, weeks, months); 0 means immediate |
-| Industry, specialization | Free text; the form suggests values already used in your company so everyone spells them the same way |
+| Industry, specialization | Industry from the company's list (Settings; Kano's ten industries to start); specialization free text with suggestions. From a CV, the industry of the latest employer is **inferred** like Kano's local rules: known employers first (Maybank, Infineon, Deloitte, Petronas, ...), then words in the name, then the job title (SAP/ERP work is IT); the review shows the words it was inferred from. When the AI is on, it fills what the rules leave empty (next step) |
 | Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. The form suggests labels already in use; the candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
-| Current title and company, location, source | Source: JobStreet, LinkedIn, referral, careers page, direct, other |
+| Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
 The web app edits every field above. Salary has its own form, shown only to

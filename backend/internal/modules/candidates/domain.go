@@ -28,6 +28,7 @@ type Profile struct {
 	Email             *string
 	Phone             *string
 	Nationality       *string
+	ResidenceCountry  *string // ISO code; nil = not known (NA)
 	WorkAuthorization *WorkAuthorization
 	NoticePeriod      *NoticePeriod
 	Industry          *string
@@ -112,6 +113,7 @@ type ProfilePatch struct {
 	Email             Change[*string]
 	Phone             Change[*string]
 	Nationality       Change[*string]
+	ResidenceCountry  Change[*string]
 	WorkAuthorization Change[*WorkAuthorization]
 	NoticePeriod      Change[*NoticePeriod]
 	Industry          Change[*string]
@@ -131,6 +133,7 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.Email, pp.Email)
 	apply(&p.Phone, pp.Phone)
 	apply(&p.Nationality, pp.Nationality)
+	apply(&p.ResidenceCountry, pp.ResidenceCountry)
 	apply(&p.WorkAuthorization, pp.WorkAuthorization)
 	apply(&p.NoticePeriod, pp.NoticePeriod)
 	apply(&p.Industry, pp.Industry)

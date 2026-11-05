@@ -80,12 +80,14 @@ func TestCVParsingKeepsOnlyValuesFoundInTheCV(t *testing.T) {
 
 	profile := api.ParsedProfile{
 		Parser: "rules@1", FullName: sourced("Siti Aisyah", "SITI AISYAH"),
-		Email:        sourced("siti@example.com", "siti@example.com"),
-		Phone:        sourced("+60 12-345 6789", "+60 12-345 6789"),
-		LinkedinUrl:  nullable.NewNullNullable[api.SourcedText](),
-		Location:     sourced("Kuala Lumpur", "Kuala Lumpur"), // not in the CV: invented
-		Nationality:  sourced("MY", "SITI AISYAH"),
-		NoticePeriod: sourced("forever", "SITI AISYAH"), // not a notice period
+		Email:            sourced("siti@example.com", "siti@example.com"),
+		Phone:            sourced("+60 12-345 6789", "+60 12-345 6789"),
+		LinkedinUrl:      nullable.NewNullNullable[api.SourcedText](),
+		Location:         sourced("Kuala Lumpur", "Kuala Lumpur"), // not in the CV: invented
+		Nationality:      sourced("MY", "SITI AISYAH"),
+		ResidenceCountry: sourced("MY", "+60 12-345 6789"),
+		Industry:         sourced("Professional Services", "Big Bank"), // inferred from words not in the CV
+		NoticePeriod:     sourced("forever", "SITI AISYAH"),            // not a notice period
 		Skills: []api.SourcedText{
 			{Value: "Excel", Quote: "Excel"},
 			{Value: "Python", Quote: "SAP"}, // the value is not in its quote
@@ -115,11 +117,13 @@ func TestCVParsingKeepsOnlyValuesFoundInTheCV(t *testing.T) {
 	assert.Equal(t, "+60 12-345 6789", p.Phone.MustGet().Value)
 	assert.Equal(t, "MY", p.Nationality.MustGet().Value)
 	assert.True(t, p.Location.IsNull(), "invented location dropped")
+	assert.Equal(t, "MY", p.ResidenceCountry.MustGet().Value, "a country code read from the phone number")
+	assert.True(t, p.Industry.IsNull(), "an industry inferred from words not in the CV is dropped")
 	assert.True(t, p.NoticePeriod.IsNull(), "malformed notice period dropped")
 	assert.Equal(t, []api.SourcedText{{Value: "Excel", Quote: "Excel"}}, p.Skills)
 	require.Len(t, p.Experience, 1, "invented employer dropped")
 	assert.Equal(t, "ABC Sdn Bhd", p.Experience[0].Company.MustGet().Value)
-	assert.Equal(t, 5, p.Dropped) // location, notice period, one skill, the invented title and company
+	assert.Equal(t, 6, p.Dropped) // location, notice period, one skill, the invented title and company, the industry
 
 	list := a.request(http.MethodGet, "/v1/candidates/"+c.Id+"/documents", token, nil).Map()
 	item := list["items"].([]any)[0].(map[string]any)

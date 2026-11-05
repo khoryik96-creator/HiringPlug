@@ -10,7 +10,8 @@ type Profile = Schemas["ParsedProfile"];
 type Sourced = Schemas["SourcedText"];
 type Notice = Schemas["NoticePeriod"];
 
-export type SuggestionKey = "name" | "email" | "phone" | "location" | "nationality" | "noticePeriod" | "currentTitle" | "currentCompany";
+export type SuggestionKey = "name" | "email" | "phone" | "location" | "nationality" | "residenceCountry" | "industry" | "noticePeriod"
+  | "currentTitle" | "currentCompany";
 
 export interface Suggestion {
   key: SuggestionKey;
@@ -47,6 +48,10 @@ export function suggestions(p: Profile, c: Candidate): Suggestion[] {
   add("phone", "Phone", p.phone, c.phone);
   add("location", "Location", p.location, c.location);
   if (p.nationality) add("nationality", "Nationality", p.nationality, c.nationality && countryName(c.nationality), countryName(p.nationality.value));
+  if (p.residenceCountry) {
+    add("residenceCountry", "Country of residence", p.residenceCountry, c.residenceCountry && countryName(c.residenceCountry), countryName(p.residenceCountry.value));
+  }
+  add("industry", "Industry (inferred from the latest employer)", p.industry, c.industry);
   const notice = p.noticePeriod && noticeFrom(p.noticePeriod.value);
   if (notice) add("noticePeriod", "Notice period", p.noticePeriod, c.noticePeriod && formatNotice(c.noticePeriod), formatNotice(notice));
   const job = latestJob(p);
@@ -74,6 +79,8 @@ export function applyBody(p: Profile, c: Candidate, ticked: Set<SuggestionKey>, 
   if (ticked.has("phone") && p.phone) body.phone = p.phone.value;
   if (ticked.has("location") && p.location) body.location = p.location.value;
   if (ticked.has("nationality") && p.nationality) body.nationality = p.nationality.value;
+  if (ticked.has("residenceCountry") && p.residenceCountry) body.residenceCountry = p.residenceCountry.value;
+  if (ticked.has("industry") && p.industry) body.industry = p.industry.value;
   if (ticked.has("noticePeriod") && p.noticePeriod) body.noticePeriod = noticeFrom(p.noticePeriod.value);
   if (ticked.has("currentTitle") && job?.title) body.currentTitle = job.title.value;
   if (ticked.has("currentCompany") && job?.company) body.currentCompany = job.company.value;

@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import { ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { CandidateExtras, extrasBody } from "./MandatoryExtras";
+import { SourcePicker } from "./SourcePicker";
 
 afterEach(() => {
   cleanup();
@@ -34,12 +35,28 @@ describe("mandatory fields on quick add", () => {
       { form: "candidate", field: "location" }, { form: "job", field: "location" },
     ])));
     renderWithClient(<Harness />);
-    fireEvent.change(await screen.findByLabelText("Source"), { target: { value: "referral" } });
+    fireEvent.click(within(await screen.findByRole("group", { name: "Source" })).getByRole("button", { name: /Referral/ }));
     fireEvent.change(screen.getByLabelText("Notice period"), { target: { value: "2_week" } });
     fireEvent.change(screen.getByLabelText("Location"), { target: { value: " Penang " } });
     expect(screen.queryByLabelText("Email")).toBeNull(); // the quick form already asks for it
     expect(JSON.parse(screen.getByRole("status").textContent)).toEqual({
       source: "referral", noticePeriod: { value: 2, unit: "week" }, location: "Penang",
     });
+  });
+});
+
+describe("source picker", () => {
+  it("shows the company's sources as icons side by side; picking the chosen one again clears it", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    let value = "linkedin";
+    const { rerender } = renderWithClient(<SourcePicker value={value} onChange={(v) => { value = v; }} />);
+    const group = await screen.findByRole("group", { name: "Source" });
+    const pressed = () => within(group).getAllByRole("button").filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+    await waitFor(() => { expect(within(group).getAllByRole("button")).toHaveLength(6); });
+    expect(pressed()).toEqual(["inLinkedIn"]);
+    fireEvent.click(within(group).getByRole("button", { name: /LinkedIn/ }));
+    expect(value).toBe("");
+    rerender(<SourcePicker value="job_fair" onChange={() => undefined} />);
+    expect(within(group).getByRole("button", { name: /job_fair/ }).getAttribute("aria-pressed")).toBe("true"); // no longer listed: still shown
   });
 });

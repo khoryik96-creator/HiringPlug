@@ -27,7 +27,7 @@ x-module:
   errorCodes:
     CANDIDATE_DUPLICATE_EMAIL:
       status: 409
-      description: Another candidate already has this email. `details.existingCandidateId` points to them when known.
+      description: "Another candidate already has this email (one candidate per email). details: existingCandidateId, existingCandidateName and existingOwnerName, when the user may see them."
   jobs: {}
 
 paths:
@@ -453,6 +453,7 @@ components:
         - email
         - phone
         - nationality
+        - residenceCountry
         - workAuthorization
         - noticePeriod
         - industry
@@ -490,6 +491,10 @@ components:
           nullable: true
           description: International (E.164) format, e.g. +60123456789.
         nationality:
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
+        residenceCountry:
+          description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
         workAuthorization:
@@ -534,6 +539,10 @@ components:
         nationality:
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
+        residenceCountry:
+          description: Where the candidate lives now (null = not known, shown as NA).
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
         workAuthorization:
           allOf: [{ $ref: '#/components/schemas/WorkAuthorization' }]
           nullable: true
@@ -572,6 +581,10 @@ components:
         email: { type: string, format: email, maxLength: 254, nullable: true }
         phone: { type: string, maxLength: 40, nullable: true }
         nationality:
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
+        residenceCountry:
+          description: Where the candidate lives now (null = not known, shown as NA).
           allOf: [{ $ref: '#/components/schemas/CountryCode' }]
           nullable: true
         workAuthorization:

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
 import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
+import { DuplicateEmail } from "../components/DuplicateEmail";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { useUsedValues } from "../components/useUsedValues";
@@ -119,7 +120,7 @@ function AddCandidate() {
       <button type="submit" disabled={!form.firstName.trim() || create.isPending}>
         Add candidate
       </button>
-      <ErrorMessage error={create.error} />
+      <ErrorMessage error={create.error}><DuplicateEmail error={create.error} /></ErrorMessage>
     </form>
   );
 }

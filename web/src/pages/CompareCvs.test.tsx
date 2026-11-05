@@ -18,7 +18,7 @@ const job = (title: string, company: string, startDate: string, endDate: string 
 });
 const profile = (over: Partial<Schemas["ParsedProfile"]> = {}): Schemas["ParsedProfile"] => ({
   parser: "rules@1", fullName: s("Siti Aisyah"), email: s("siti@example.com"), phone: s("+60 12-345 6789"),
-  linkedinUrl: null, location: null, nationality: null, noticePeriod: null, skills: [s("SAP FICO"), s("Excel")],
+  linkedinUrl: null, location: null, nationality: null, residenceCountry: null, industry: null, noticePeriod: null, skills: [s("SAP FICO"), s("Excel")],
   experience: [job("Senior Accountant", "Contoh Berhad", "2020-01", null, true), job("Accountant", "ABC Sdn Bhd", "2016-03", "2019-12")],
   education: [], dropped: 0, ...over,
 });

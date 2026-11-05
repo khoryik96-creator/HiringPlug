@@ -15,17 +15,19 @@ import (
 func groundProfile(text string, p api.ParsedProfile) api.ParsedProfile {
 	g := grounder{text: quote.Prepare(text)}
 	out := api.ParsedProfile{
-		Parser:       p.Parser,
-		FullName:     g.one(p.FullName, FieldText),
-		Email:        g.one(p.Email, FieldText),
-		Phone:        g.one(p.Phone, FieldText),
-		LinkedinUrl:  g.one(p.LinkedinUrl, FieldURL),
-		Location:     g.one(p.Location, FieldText),
-		Nationality:  g.one(p.Nationality, FieldCountry),
-		NoticePeriod: g.one(p.NoticePeriod, FieldNoticePeriod),
-		Skills:       []api.SourcedText{},
-		Experience:   []api.ParsedJob{},
-		Education:    []api.ParsedEducation{},
+		Parser:           p.Parser,
+		FullName:         g.one(p.FullName, FieldText),
+		Email:            g.one(p.Email, FieldText),
+		Phone:            g.one(p.Phone, FieldText),
+		LinkedinUrl:      g.one(p.LinkedinUrl, FieldURL),
+		Location:         g.one(p.Location, FieldText),
+		Nationality:      g.one(p.Nationality, FieldCountry),
+		ResidenceCountry: g.one(p.ResidenceCountry, FieldCountry),
+		Industry:         g.one(p.Industry, FieldInferred),
+		NoticePeriod:     g.one(p.NoticePeriod, FieldNoticePeriod),
+		Skills:           []api.SourcedText{},
+		Experience:       []api.ParsedJob{},
+		Education:        []api.ParsedEducation{},
 	}
 	for _, s := range p.Skills {
 		if g.ok(s, FieldText) && len(out.Skills) < 100 {

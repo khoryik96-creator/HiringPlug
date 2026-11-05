@@ -109,6 +109,10 @@ old .doc files):
   job titles and company words. The candidate that shares words with the email
   address or LinkedIn link wins. Honorifics ("Ts.", "Dr."), letters after the
   name (", PMP"), nicknames ("(Aaron)") and OCR's "BINT]" are handled.
+- `residence.py`: country of residence (address, places near the top, phone's
+  country code); `industry.py`: the latest employer's industry (Kano's
+  industries; known names, then words, then the title), quoted with the words
+  it came from (Go checks the quote is in the CV; the value is an inference).
 - `contacts.py`: email; phone (labelled anywhere, including a label on the line
   above; never a year range; never joined across lines; bare 8-digit runs only
   as Singapore mobiles); LinkedIn; location; nationality; notice period.

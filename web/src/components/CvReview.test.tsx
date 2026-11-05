@@ -21,6 +21,7 @@ const profile: Schemas["ParsedProfile"] = {
   linkedinUrl: null,
   location: s("Petaling Jaya, Selangor"),
   nationality: s("MY", "Nationality: Malaysian"),
+  residenceCountry: null, industry: null,
   noticePeriod: s("1 month", "Notice period: 1 month"),
   skills: [s("SAP FICO"), s("Excel", "Excel (Advanced)")],
   experience: [

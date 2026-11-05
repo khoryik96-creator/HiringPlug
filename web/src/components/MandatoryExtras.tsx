@@ -2,6 +2,7 @@
 // otherwise ask only for the basics.
 import type { Schemas } from "../api/client";
 import { keysOf, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import { SourcePicker } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Body = Partial<Schemas["CandidateCreate"]>;
@@ -28,7 +29,7 @@ export function CandidateExtras({ values, onChange }: { values: Record<string, s
       {needed.map((f) => {
         switch (f) {
           case "industry": return select(f, "Industry", fs.options("industry"));
-          case "source": return select(f, "Source", fs.options("candidate_source"));
+          case "source": return <SourcePicker key={f} value={values[f] ?? ""} onChange={(v) => { onChange({ ...values, [f]: v }); }} />;
           case "noticePeriod": return select(f, "Notice period", fs.options("notice_period"));
           case "workAuthorization": return (
             <span key={f} className="row">

@@ -42,7 +42,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 		if err := s.checkFields(ctx, tx, nil, profile); err != nil {
 			return err
 		}
-		if err := checkEmailFree(ctx, q, profile.Email, ""); err != nil {
+		if err := s.checkEmailFree(ctx, tx, profile.Email, ""); err != nil {
 			return err
 		}
 		row, err := q.InsertCandidate(ctx, insertParams(profile, ownerFor(p)))
@@ -161,7 +161,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if err := s.checkFields(ctx, tx, &before, after); err != nil {
 			return err
 		}
-		if err := checkEmailFree(ctx, q, after.Email, id); err != nil {
+		if err := s.checkEmailFree(ctx, tx, after.Email, id); err != nil {
 			return err
 		}
 		updated, err := q.UpdateCandidate(ctx, updateParams(id, expectedVersion, after))
@@ -284,10 +284,14 @@ func loadView(ctx context.Context, tx pgx.Tx, users Users, p authz.Principal, c 
 	return view, nil
 }
 
-func checkEmailFree(ctx context.Context, q *store.Queries, email *string, selfID string) error {
+// checkEmailFree refuses an email another candidate has (one candidate per
+// email), naming that candidate and who owns them when the user may see
+// them; one they may not see is not named.
+func (s *Service) checkEmailFree(ctx context.Context, tx pgx.Tx, email *string, selfID string) error {
 	if email == nil {
 		return nil
 	}
+	q := store.New(tx)
 	existing, err := q.FindCandidateIDByEmail(ctx, email)
 	if database.IsNoRows(err) || (err == nil && existing == selfID) {
 		return nil
@@ -295,10 +299,22 @@ func checkEmailFree(ctx context.Context, q *store.Queries, email *string, selfID
 	if err != nil {
 		return err
 	}
-	return duplicateEmail(existing)
+	e := duplicateEmail(existing)
+	row, err := q.GetCandidate(ctx, existing)
+	if err != nil {
+		return err
+	}
+	c := fromRow(row)
+	e = e.WithDetail("existingCandidateName", FullName(c.Profile))
+	if owner, err := ownerName(ctx, tx, s.users, c.OwnerID); err != nil {
+		return err
+	} else if owner != nil {
+		e = e.WithDetail("existingOwnerName", *owner)
+	}
+	return e
 }
 
-func duplicateEmail(existingID string) error {
+func duplicateEmail(existingID string) *apperr.Error {
 	e := apperr.New(api.ErrorCodeCANDIDATEDUPLICATEEMAIL, "Another candidate already has this email.")
 	if existingID != "" {
 		e = e.WithDetail("existingCandidateId", existingID)
@@ -311,7 +327,7 @@ func duplicateEmail(existingID string) error {
 func fromRow(r store.Candidate) Candidate {
 	p := Profile{
 		FirstName: r.FirstName, LastName: r.LastName,
-		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality,
+		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry,
 		Industry: r.Industry, Specialization: r.Specialization,
 		CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
 		Location: r.Location, Source: r.Source, Tags: r.Tags, Skills: r.Skills,
@@ -331,6 +347,7 @@ func insertParams(p Profile, owner *string) store.InsertCandidateParams {
 	u := updateParams("", 0, p)
 	return store.InsertCandidateParams{
 		FirstName: u.FirstName, LastName: u.LastName, Email: u.Email, Phone: u.Phone, Nationality: u.Nationality,
+		ResidenceCountry:  u.ResidenceCountry,
 		WorkAuthorization: u.WorkAuthorization, WorkAuthorizationBasis: u.WorkAuthorizationBasis,
 		WorkAuthorizationNote: u.WorkAuthorizationNote, NoticePeriodValue: u.NoticePeriodValue,
 		NoticePeriodUnit: u.NoticePeriodUnit, Industry: u.Industry, Specialization: u.Specialization,
@@ -343,7 +360,8 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 	u := store.UpdateCandidateParams{
 		ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
 		FirstName: p.FirstName, LastName: p.LastName, Email: p.Email, Phone: p.Phone, Nationality: p.Nationality,
-		Industry: p.Industry, Specialization: p.Specialization, CurrentTitle: p.CurrentTitle,
+		ResidenceCountry: p.ResidenceCountry,
+		Industry:         p.Industry, Specialization: p.Specialization, CurrentTitle: p.CurrentTitle,
 		CurrentCompany: p.CurrentCompany, Location: p.Location, Source: p.Source,
 		Tags: CleanLabels(p.Tags), Skills: CleanLabels(p.Skills),
 	}
@@ -361,7 +379,7 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 func profileFields(p Profile) map[string]any {
 	m := map[string]any{
 		"firstName": p.FirstName, "lastName": p.LastName, "email": p.Email, "phone": p.Phone,
-		"nationality": p.Nationality, "industry": p.Industry, "specialization": p.Specialization,
+		"nationality": p.Nationality, "residenceCountry": p.ResidenceCountry, "industry": p.Industry, "specialization": p.Specialization,
 		"currentTitle": p.CurrentTitle, "currentCompany": p.CurrentCompany, "location": p.Location,
 		"source": p.Source, "workAuthorization": nil, "noticePeriod": nil,
 		"tags": CleanLabels(p.Tags), "skills": CleanLabels(p.Skills),

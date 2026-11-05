@@ -16,6 +16,7 @@ import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
+import { SourceIcon } from "../components/SourcePicker";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
@@ -86,6 +87,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dd>{c.phone ?? "—"}</dd>
             <dt>Nationality</dt>
             <dd>{c.nationality ? countryName(c.nationality) : "—"}</dd>
+            <dt>Country of residence</dt>
+            <dd>{c.residenceCountry ? countryName(c.residenceCountry) : "NA"}</dd>
             <dt>Work authorization</dt>
             <dd>{workAuthorization(c)}</dd>
             <dt>Notice period</dt>
@@ -93,7 +96,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dt>Industry / specialization</dt>
             <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
             <dt>Source</dt>
-            <dd>{c.source ? fs.label("candidate_source", c.source) : "—"}</dd>
+            <dd>{c.source ? <span className="row"><SourceIcon source={c.source} label={fs.label("candidate_source", c.source)} />{fs.label("candidate_source", c.source)}</span> : "—"}</dd>
             <dt>Skills</dt>
             <dd><Chips labels={c.skills} /></dd>
             <dt>Tags</dt>

@@ -446,6 +446,10 @@ class Candidate(BaseModel):
     email: Annotated[EmailStr | None, Field(...)]
     phone: Annotated[str | None, Field(description="International (E.164) format, e.g. +60123456789.")]
     nationality: Annotated[CountryCode | None, Field(...)]
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ]
     workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
@@ -486,6 +490,10 @@ class CandidateCreate(BaseModel):
         str | None, Field(description="Any common format; stored in international format.", max_length=40)
     ] = None
     nationality: CountryCode | None = None
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None
     industry: Annotated[str | None, Field(max_length=100)] = None
@@ -514,6 +522,10 @@ class CandidateUpdate(BaseModel):
     email: Annotated[EmailStr | None, Field(max_length=254)] = None
     phone: Annotated[str | None, Field(max_length=40)] = None
     nationality: CountryCode | None = None
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None
     industry: Annotated[str | None, Field(max_length=100)] = None
@@ -946,6 +958,18 @@ class ParsedProfile(BaseModel):
     linkedinUrl: Annotated[SourcedText | None, Field(...)]
     location: Annotated[SourcedText | None, Field(...)]
     nationality: Annotated[SourcedText | None, Field(...)]
+    residenceCountry: Annotated[
+        SourcedText | None,
+        Field(
+            description="Where the candidate lives, an ISO country code, from their address, the places in it, or their phone's country code."
+        ),
+    ]
+    industry: Annotated[
+        SourcedText | None,
+        Field(
+            description="The industry of their current (latest) employer, inferred: the quote is the words it was inferred from (Kano's industries)."
+        ),
+    ]
     noticePeriod: Annotated[SourcedText | None, Field(...)]
     skills: Annotated[list[SourcedText], Field(max_length=100)]
     experience: Annotated[list[ParsedJob], Field(max_length=30)]

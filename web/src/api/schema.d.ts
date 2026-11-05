@@ -2192,6 +2192,8 @@ export interface components {
             /** @description International (E.164) format, e.g. +60123456789. */
             phone: string | null;
             nationality: components["schemas"]["CountryCode"] | null;
+            /** @description Where the candidate lives now (null = not known, shown as NA). */
+            residenceCountry: components["schemas"]["CountryCode"] | null;
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;
@@ -2218,6 +2220,8 @@ export interface components {
             /** @description Any common format; stored in international format. */
             phone?: string | null;
             nationality?: components["schemas"]["CountryCode"] | null;
+            /** @description Where the candidate lives now (null = not known, shown as NA). */
+            residenceCountry?: components["schemas"]["CountryCode"] | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
@@ -2239,6 +2243,8 @@ export interface components {
             email?: string | null;
             phone?: string | null;
             nationality?: components["schemas"]["CountryCode"] | null;
+            /** @description Where the candidate lives now (null = not known, shown as NA). */
+            residenceCountry?: components["schemas"]["CountryCode"] | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
@@ -2629,6 +2635,10 @@ export interface components {
             linkedinUrl: components["schemas"]["SourcedText"] | null;
             location: components["schemas"]["SourcedText"] | null;
             nationality: components["schemas"]["SourcedText"] | null;
+            /** @description Where the candidate lives, an ISO country code, from their address, the places in it, or their phone's country code. */
+            residenceCountry: components["schemas"]["SourcedText"] | null;
+            /** @description The industry of their current (latest) employer, inferred: the quote is the words it was inferred from (Kano's industries). */
+            industry: components["schemas"]["SourcedText"] | null;
             noticePeriod: components["schemas"]["SourcedText"] | null;
             skills: components["schemas"]["SourcedText"][];
             experience: components["schemas"]["ParsedJob"][];

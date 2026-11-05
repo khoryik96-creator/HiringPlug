@@ -17,6 +17,7 @@ import { labelFor, noticeKey, useFieldSettings } from "./useFieldSettings";
 import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
+import { SourcePicker } from "./SourcePicker";
 
 type TextKey = "firstName" | "lastName" | "email" | "phone" | "nationality" | "waNote" | "industry"
   | "specialization" | "currentTitle" | "currentCompany" | "location";
@@ -79,6 +80,14 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
         {COUNTRIES.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
       </datalist>
 
+      <Field label={req("Country of residence", "residenceCountry")} error={errorFor("residenceCountry")}>
+        <select value={form.residenceCountry} onChange={(e) => { set("residenceCountry", e.target.value); }}>
+          <option value="">NA (not known)</option>
+          {[...new Set([...COUNTRIES, ...(form.residenceCountry ? [form.residenceCountry] : [])])].map((c) => (
+            <option key={c} value={c}>{regionName(c) ?? c}</option>
+          ))}
+        </select>
+      </Field>
       <Field label={req("Work authorization", "workAuthorization")} error={errorFor("waStatus")}>
         <select value={form.waStatus} onChange={(e) => { set("waStatus", e.target.value as CandidateFormState["waStatus"]); }}>
           <option value="">—</option>
@@ -115,12 +124,11 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       {text("currentTitle", req("Current title", "currentTitle"))}
       {text("currentCompany", req("Current company", "currentCompany"))}
       {text("location", req("Location", "location"))}
-      <Field label={req("Source", "source")} error={errorFor("source")}>
-        <select value={form.source} onChange={(e) => { set("source", e.target.value); }}>
-          <option value="">—</option>
-          {fs.options("candidate_source", form.source).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
-      </Field>
+      <div className="full field">
+        <span>{req("Source", "source")}</span>
+        <SourcePicker value={form.source} onChange={(v) => { set("source", v); }} label={req("Source", "source")} />
+        {errorFor("source") && <small className="error">{errorFor("source")}</small>}
+      </div>
 
       <div className="full">
         <Field label="Skills" error={errorFor("skills")}>

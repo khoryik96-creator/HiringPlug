@@ -204,6 +204,7 @@ var fields = []fieldDef{
 	{"candidate", "email", "Email", false},
 	{"candidate", "phone", "Phone", false},
 	{"candidate", "nationality", "Nationality", false},
+	{"candidate", "residenceCountry", "Country of residence", false},
 	{"candidate", "location", "Location", false},
 	{"candidate", "currentTitle", "Current title", false},
 	{"candidate", "currentCompany", "Current company", false},

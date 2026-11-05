@@ -9,7 +9,7 @@ import type { Candidate, ErrorBody, Me, Permission } from "./api/client";
 export function testCandidate(overrides: Partial<Candidate> = {}): Candidate {
   return {
     id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 3, firstName: "Siti", lastName: "Aisyah", fullName: "Siti Aisyah",
-    email: "siti@example.com", phone: null, nationality: "MY", workAuthorization: null,
+    email: "siti@example.com", phone: null, nationality: "MY", residenceCountry: null, workAuthorization: null,
     noticePeriod: { value: 1, unit: "month" }, industry: null, specialization: null, currentTitle: "Accountant",
     currentCompany: null, location: null, source: "jobstreet", tags: [], skills: [], experience: [], education: [], restrictedFields: [],
     ownerId: null, ownerName: null,

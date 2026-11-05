@@ -11,8 +11,10 @@ from ..contracts import ParsedEducation, ParsedJob, ParsedProfile, SourcedText
 from . import contacts
 from .education import education
 from .experience import experience
+from .industry import industry
 from .layout import read_lines
 from .names import name
+from .residence import residence_country
 from .skills import skills
 
 PARSER = "rules@1"
@@ -32,6 +34,9 @@ def _text(value: str | None) -> SourcedText | None:
 def parse_cv(text: str) -> ParsedProfile:
     lines = read_lines(text)
     email, linkedin = contacts.email(lines), contacts.linkedin(lines)
+    phone, place = contacts.phone(lines), contacts.location(lines)
+    found = experience(lines)
+    latest = found[0] if found else None  # CVs list the newest job first
     jobs = [
         ParsedJob(
             title=_text(job.title),
@@ -41,7 +46,7 @@ def parse_cv(text: str) -> ParsedProfile:
             endDate=job.dates.end,
             current=job.dates.current,
         )
-        for job in experience(lines)
+        for job in found
     ]
     schools = [
         ParsedEducation(
@@ -56,10 +61,12 @@ def parse_cv(text: str) -> ParsedProfile:
         parser=PARSER,
         fullName=_sourced(name(lines, email and email[0], linkedin and linkedin[0])),
         email=_sourced(email),
-        phone=_sourced(contacts.phone(lines)),
+        phone=_sourced(phone),
         linkedinUrl=_sourced(linkedin),
-        location=_sourced(contacts.location(lines)),
+        location=_sourced(place),
         nationality=_sourced(contacts.nationality(lines)),
+        residenceCountry=_sourced(residence_country(lines, place, phone)),
+        industry=_sourced(industry(latest.company, latest.title) if latest else None),
         noticePeriod=_sourced(contacts.notice_period(lines)),
         skills=[s for s in (_sourced(x) for x in skills(lines)) if s],
         experience=jobs,
