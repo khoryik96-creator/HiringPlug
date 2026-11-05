@@ -39,21 +39,18 @@ func (m *Module) Mandatory(ctx context.Context, tx pgx.Tx, form string) ([]strin
 	return MandatoryOn(form, rules), err
 }
 
-// Label returns an option's words in the company's list (the key itself
-// when it is not listed), in the caller's transaction.
-func (m *Module) Label(ctx context.Context, tx pgx.Tx, list, key string) (string, error) {
+// Labels returns the words for every option in the company's lists
+// (list -> key -> label), read once, in the caller's transaction.
+func (m *Module) Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error) {
 	all, err := listsIn(ctx, store.New(tx))
+	out := make(map[string]map[string]string, len(all))
 	for _, l := range all {
-		if l.Name != list {
-			continue
-		}
+		out[l.Name] = make(map[string]string, len(l.Options))
 		for _, o := range l.Options {
-			if o.Key == key {
-				return o.Label, err
-			}
+			out[l.Name][o.Key] = o.Label
 		}
 	}
-	return key, err
+	return out, err
 }
 
 // HasOption reports whether key is in one of the company's lists (hidden

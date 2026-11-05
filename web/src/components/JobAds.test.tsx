@@ -26,7 +26,7 @@ const draft: Schemas["JobAd"] = {
   id: "ad_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, jobId: job.id, title: "Senior Auditor", location: "Kuala Lumpur",
   workType: "full_time", workArrangement: null, salaryText: "RM 9,000", description: null, closesOn: null, status: "draft",
   publishedAt: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
-  country: "MY", blindTitle: "Senior Auditor", blindDescription: null, clientDescription: null,
+  country: "MY", blindTitle: "Senior Auditor", blindDescription: null, blindLocation: "Kuala Lumpur", blindSalaryText: "RM 9,000", clientDescription: null,
   blindEdited: false, blindOutdated: false, publishBlind: true,
 };
 

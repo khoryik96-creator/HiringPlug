@@ -44,6 +44,7 @@ func careersAd(ad jobs.Ad) careers.Ad {
 	text := d.Description
 	if d.PublishBlind { // the client stays unnamed in public
 		out.Title, text = ad.Blind.Title, ad.Blind.Description
+		out.Location, out.SalaryText = ad.Blind.Location, ad.Blind.SalaryText
 	}
 	if text != nil {
 		out.Description = *text

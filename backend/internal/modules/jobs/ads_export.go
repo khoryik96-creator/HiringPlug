@@ -87,25 +87,25 @@ func (s *Service) ExportAd(ctx context.Context, p authz.Principal, id, version, 
 		if err := s.withBlind(ctx, tx, &ad); err != nil {
 			return err
 		}
-		title, text := ad.Details.Title, ad.Details.Description
+		title, text, facts := ad.Details.Title, ad.Details.Description, ad.Details
 		if version == "blind" {
 			title, text = ad.Blind.Title, ad.Blind.Description
+			facts.Location, facts.SalaryText = ad.Blind.Location, ad.Blind.SalaryText
 		}
-		label := func(list string, key *string) (string, error) {
-			if key == nil || s.rules == nil {
-				return deref(key), nil
+		labels := map[string]map[string]string{}
+		if s.rules != nil {
+			if labels, err = s.rules.Labels(ctx, tx); err != nil {
+				return err
 			}
-			return s.rules.Label(ctx, tx, list, *key)
 		}
-		workType, err := label("work_type", ad.Details.WorkType)
-		if err != nil {
-			return err
+		label := func(list string, key *string) string {
+			if l, ok := labels[list][deref(key)]; ok {
+				return l
+			}
+			return deref(key)
 		}
-		arrangement, err := label("work_arrangement", ad.Details.WorkArrangement)
-		if err != nil {
-			return err
-		}
-		doc := AdDoc(title, text, ad.Details, workType, arrangement)
+		workType, arrangement := label("work_type", ad.Details.WorkType), label("work_arrangement", ad.Details.WorkArrangement)
+		doc := AdDoc(title, text, facts, workType, arrangement)
 		if format == "pdf" {
 			out.Data, err = doc.PDF()
 		} else {

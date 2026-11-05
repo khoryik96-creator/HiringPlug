@@ -40,9 +40,9 @@ function Exports({ ad, version, title }: { ad: Ad; version: Version; title: stri
 /** An ad as written and its blind version (client not named), side by side. */
 export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
   const fs = useFieldSettings();
-  const facts = [
-    [ad.location, ad.country ? countryName(ad.country) : null].filter(Boolean).join(", "),
-    ad.workType && fs.label("work_type", ad.workType), ad.workArrangement && fs.label("work_arrangement", ad.workArrangement), ad.salaryText,
+  const factsOf = (location: string | null, salary: string | null) => [
+    [location, ad.country ? countryName(ad.country) : null].filter(Boolean).join(", "),
+    ad.workType && fs.label("work_type", ad.workType), ad.workArrangement && fs.label("work_arrangement", ad.workArrangement), salary,
   ].filter(Boolean).join(" · ") + (ad.closesOn ? ` · closes ${ad.closesOn}` : "");
   const live = ad.status === "published";
   return (
@@ -52,7 +52,7 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
           <h5>As written {live && !ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="original" title={ad.title} />
         </div>
-        <p className="muted">{facts}</p>
+        <p className="muted">{factsOf(ad.location, ad.salaryText)}</p>
         <strong>{ad.title}</strong>
         {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
       </section>
@@ -61,7 +61,7 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
           <h5>Blind {live && ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="blind" title={ad.blindTitle} />
         </div>
-        <BlindText ad={ad} canEdit={canEdit} facts={facts} />
+        <BlindText ad={ad} canEdit={canEdit} facts={factsOf(ad.blindLocation, ad.blindSalaryText)} />
       </section>
     </div>
   );

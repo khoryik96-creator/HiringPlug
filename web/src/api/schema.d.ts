@@ -3150,6 +3150,10 @@ export interface components {
             blindTitle: string;
             /** @description The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then "our client"). Made from the ad's text unless a person edited it. */
             blindDescription: string | null;
+            /** @description The location as the blind ad shows it (the client's name taken out). */
+            blindLocation: string | null;
+            /** @description The salary line as the blind ad shows it. */
+            blindSalaryText: string | null;
             /** @description What the blind ad says instead of the client's name, e.g. "a leading Malaysian bank". */
             clientDescription: string | null;
             /** @description A person edited the blind text; changes to the ad no longer remake it. */

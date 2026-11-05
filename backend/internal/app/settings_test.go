@@ -72,6 +72,7 @@ func TestCompaniesChooseTheirSourcesAndMandatoryFields(t *testing.T) {
 		map[string]any{"form": "candidate", "field": "email", "mandatory": true},
 		map[string]any{"form": "candidate", "field": "phone", "mandatory": true},
 		map[string]any{"form": "job", "field": "location", "mandatory": true},
+		map[string]any{"form": "job", "field": "country", "mandatory": true},
 	}})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 
@@ -89,7 +90,7 @@ func TestCompaniesChooseTheirSourcesAndMandatoryFields(t *testing.T) {
 
 		company := a.createCompany(recruiter, map[string]any{"name": "Contoh"})
 		res = a.request(http.MethodPost, "/v1/jobs", recruiter, map[string]any{"companyId": company.Id, "title": "Analyst"})
-		assert.Equal(t, []string{"location"}, fieldNames(t, res.Error()))
+		assert.ElementsMatch(t, []string{"location", "country"}, fieldNames(t, res.Error()))
 		res = a.request(http.MethodPatch, "/v1/jobs/"+oldJob.Id, recruiter, map[string]any{"version": oldJob.Version, "openings": 2})
 		assert.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	})

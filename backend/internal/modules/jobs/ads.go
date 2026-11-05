@@ -67,6 +67,13 @@ func (s *Service) CreateAd(ctx context.Context, p authz.Principal, jobID string,
 		if d.Country == nil {
 			d.Country = job.Country // the job's country unless chosen
 		}
+		client, err := s.clientOf(ctx, tx, jobID)
+		if err != nil {
+			return err
+		}
+		if err := checkDescription(d, client); err != nil {
+			return err
+		}
 		row, err := q.InsertJobAd(ctx, store.InsertJobAdParams{
 			JobOrderID: jobID, Title: d.Title, Location: d.Location, WorkType: d.WorkType,
 			WorkArrangement: d.WorkArrangement, SalaryText: d.SalaryText, Description: d.Description, ClosesOn: toDate(d.ClosesOn),
@@ -81,7 +88,7 @@ func (s *Service) CreateAd(ctx context.Context, p authz.Principal, jobID string,
 		}); err != nil {
 			return err
 		}
-		return s.withBlind(ctx, tx, &ad)
+		return withClient(client, &ad)
 	})
 	return ad, err
 }
@@ -119,6 +126,9 @@ func (s *Service) UpdateAd(ctx context.Context, p authz.Principal, id string, ex
 		}
 		client, err := s.clientOf(ctx, tx, row.JobOrderID)
 		if err != nil {
+			return err
+		}
+		if err := checkDescription(after, client); err != nil {
 			return err
 		}
 		stored, err := applyBlindEdit(current, after, blind, client)

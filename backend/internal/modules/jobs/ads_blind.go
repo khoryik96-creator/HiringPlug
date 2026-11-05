@@ -14,6 +14,8 @@ import (
 type BlindView struct {
 	Title       string
 	Description *string
+	Location    *string // the ad's, without the client's name
+	SalaryText  *string
 	Edited      bool // a person wrote it; changes to the ad do not remake it
 	Outdated    bool // the ad changed after that person wrote it
 }
@@ -90,8 +92,7 @@ func (s *Service) withBlind(ctx context.Context, tx pgx.Tx, ads ...*Ad) error {
 // withClient fills in one ad's blind version: a person's own text when
 // there is one, else made from the ad.
 func withClient(c Client, ad *Ad) error {
-	title, text := Blind(ad.Details, c)
-	ad.Blind = BlindView{Title: title, Description: text}
+	ad.Blind = Blind(ad.Details, c)
 	if st := ad.stored; st.Edited {
 		ad.Blind.Edited = true
 		if st.Title != nil {
@@ -115,8 +116,8 @@ func applyBlindEdit(current Ad, after AdDetails, e BlindEdit, c Client) (storedB
 		return st, nil
 	}
 	if !st.Edited { // start from what the person saw
-		title, text := Blind(current.Details, c)
-		st = storedBlind{Title: &title, Description: text}
+		b := Blind(current.Details, c)
+		st = storedBlind{Title: &b.Title, Description: b.Description}
 	}
 	var errs apperr.FieldErrors
 	if e.Title != nil {
@@ -138,6 +139,15 @@ func applyBlindEdit(current Ad, after AdDetails, e BlindEdit, c Client) (storedB
 	hash := SourceHash(after)
 	st.Edited, st.SourceHash = true, &hash
 	return st, errs.Err()
+}
+
+// checkDescription refuses a client description that names the client (the
+// blind ad would name it where it should not).
+func checkDescription(d AdDetails, c Client) error {
+	if d.ClientDescription != nil && NamesClient(*d.ClientDescription, c) {
+		return apperr.Validation(apperr.FieldErrors{{Field: "clientDescription", Message: "describe the client without naming it"}})
+	}
+	return nil
 }
 
 func squeezedLinesOrNil(s *string) *string {

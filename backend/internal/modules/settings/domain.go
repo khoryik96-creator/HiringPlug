@@ -214,6 +214,7 @@ var fields = []fieldDef{
 	{"job", "title", "Title", true},
 	{"job", "companyId", "Client company", true},
 	{"job", "location", "Location", false},
+	{"job", "country", "Country", false},
 	{"job", "workType", "Work type", false},
 	{"job", "workArrangement", "Work arrangement", false},
 	{"job", "contactId", "Hiring contact", false},

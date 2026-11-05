@@ -4758,7 +4758,7 @@ components:
       enum: [draft, published, closed]
     JobAd:
       type: object
-      required: [id, version, jobId, title, location, country, workType, workArrangement, salaryText, description, closesOn, status, publishedAt, blindTitle, blindDescription, clientDescription, blindEdited, blindOutdated, publishBlind, createdAt, updatedAt]
+      required: [id, version, jobId, title, location, country, workType, workArrangement, salaryText, description, closesOn, status, publishedAt, blindTitle, blindDescription, blindLocation, blindSalaryText, clientDescription, blindEdited, blindOutdated, publishBlind, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/JobAdId'}
         version: {type: integer}
@@ -4792,6 +4792,8 @@ components:
           description: >
             The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then "our client"). Made from the ad's text unless a person edited it.
 
+        blindLocation: {type: string, nullable: true, description: "The location as the blind ad shows it (the client's name taken out)."}
+        blindSalaryText: {type: string, nullable: true, description: The salary line as the blind ad shows it.}
         clientDescription: {type: string, nullable: true, description: 'What the blind ad says instead of the client''s name, e.g. "a leading Malaysian bank".'}
         blindEdited: {type: boolean, description: A person edited the blind text; changes to the ad no longer remake it.}
         blindOutdated: {type: boolean, description: The ad changed after the blind text was edited by a person.}

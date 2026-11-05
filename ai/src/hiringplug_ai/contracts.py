@@ -2912,6 +2912,10 @@ class JobAd(BaseModel):
             description="The blind ad's text: the client's name, website and contacts, and every email, phone number and link, replaced (by clientDescription, then \"our client\"). Made from the ad's text unless a person edited it.\n"
         ),
     ]
+    blindLocation: Annotated[
+        str | None, Field(description="The location as the blind ad shows it (the client's name taken out).")
+    ]
+    blindSalaryText: Annotated[str | None, Field(description="The salary line as the blind ad shows it.")]
     clientDescription: Annotated[
         str | None,
         Field(

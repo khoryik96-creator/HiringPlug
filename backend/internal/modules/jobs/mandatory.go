@@ -12,7 +12,7 @@ import (
 // fields a company made mandatory, and its words for work types.
 type FieldRules interface {
 	Mandatory(ctx context.Context, tx pgx.Tx, form string) ([]string, error)
-	Label(ctx context.Context, tx pgx.Tx, list, key string) (string, error)
+	Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
 }
 
 func filled(d Details, field string) bool {
@@ -20,6 +20,8 @@ func filled(d Details, field string) bool {
 	switch field {
 	case "location":
 		return set(d.Location)
+	case "country":
+		return set(d.Country)
 	case "workType":
 		return set(d.WorkType)
 	case "workArrangement":

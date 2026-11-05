@@ -87,7 +87,8 @@ func adToAPI(a Ad) api.JobAd {
 		PublishedAt: c.OrNull(a.PublishedAt), CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
 		WorkType: c.OrNull(enumPtr[api.WorkType](d.WorkType)), WorkArrangement: c.OrNull(enumPtr[api.WorkArrangement](d.WorkArrangement)),
 		Country: c.OrNull(d.Country), ClientDescription: c.OrNull(d.ClientDescription), PublishBlind: d.PublishBlind,
-		BlindTitle: a.Blind.Title, BlindDescription: c.OrNull(a.Blind.Description), BlindEdited: a.Blind.Edited, BlindOutdated: a.Blind.Outdated,
+		BlindTitle: a.Blind.Title, BlindDescription: c.OrNull(a.Blind.Description),
+		BlindLocation: c.OrNull(a.Blind.Location), BlindSalaryText: c.OrNull(a.Blind.SalaryText), BlindEdited: a.Blind.Edited, BlindOutdated: a.Blind.Outdated,
 	}
 	var closes *openapi_types.Date
 	if d.ClosesOn != nil {

@@ -13,10 +13,11 @@ afterEach(() => {
 });
 
 const ad: Schemas["JobAd"] = {
-  id: "ad_1", version: 3, jobId: "jo_1", title: "Ops Manager at Maju", location: "Shah Alam", country: "MY", workType: "full_time",
+  id: "ad_1", version: 3, jobId: "jo_1", title: "Ops Manager at Maju", location: "Maju hub, Shah Alam", country: "MY", workType: "full_time",
   workArrangement: null, salaryText: null, description: "Maju is growing.", closesOn: null, status: "published",
   publishedAt: "2026-11-01T00:00:00Z", createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
   blindTitle: "Ops Manager at our client", blindDescription: "A logistics firm is growing.", clientDescription: "a logistics firm",
+  blindLocation: "Shah Alam", blindSalaryText: null,
   blindEdited: true, blindOutdated: true, publishBlind: true,
 };
 
@@ -27,6 +28,8 @@ describe("ad versions", () => {
     const written = screen.getByRole("region", { name: "As written" });
     const blind = screen.getByRole("region", { name: "Blind" });
     expect(written.textContent).toContain("Maju is growing.");
+    expect(written.textContent).toContain("Maju hub, Shah Alam");
+    expect(blind.textContent).not.toContain("Maju");
     expect(written.textContent).not.toContain("On the careers page");
     expect(blind.textContent).toContain("On the careers page");
     expect(blind.textContent).toContain("A logistics firm is growing.");

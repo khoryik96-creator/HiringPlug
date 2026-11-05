@@ -46,14 +46,18 @@ func TestBlindJobAds(t *testing.T) {
 	contact := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Aisyah", "lastName": "Rahman"})
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "contactId": contact.Id, "title": "Ops Manager"})
 
+	res := a.request(http.MethodPost, "/v1/jobs/"+job.Id+"/ads", token, map[string]any{"title": "Ops", "clientDescription": "Maju Logistik, a logistics firm"})
+	assert.Equal(t, []string{"clientDescription"}, fieldNames(t, res.Error()), "the description must not name the client")
+
 	ad := a.adRequest(http.MethodPost, "/v1/jobs/"+job.Id+"/ads", token, map[string]any{
-		"title": "Ops Manager at Maju Logistik", "clientDescription": "a regional logistics company",
+		"title": "Ops Manager at Maju Logistik", "clientDescription": "a regional logistics company", "location": "Maju Logistik hub, Shah Alam",
 		"description": "Maju Logistik is growing.\n- Run the Shah Alam hub\nSend your CV to Aisyah Rahman, hr@majulogistik.my.",
 	}, http.StatusCreated)
 	assert.True(t, ad.PublishBlind, "new ads go out blind")
 	assert.Equal(t, "Ops Manager at our client", ad.BlindTitle)
 	assert.Equal(t, "A regional logistics company is growing.\n- Run the Shah Alam hub\nSend your CV to the hiring manager, [email removed].", ad.BlindDescription.MustGet())
 	assert.False(t, ad.BlindEdited)
+	assert.Equal(t, "Our client hub, Shah Alam", ad.BlindLocation.MustGet())
 
 	patch := func(body map[string]any) *response {
 		return a.request(http.MethodPatch, "/v1/job-ads/"+ad.Id, token, body)
@@ -63,7 +67,7 @@ func TestBlindJobAds(t *testing.T) {
 		assert.Equal(t, []string{"blindDescription"}, fieldNames(t, res.Error()))
 	})
 
-	res := patch(map[string]any{"version": ad.Version, "blindDescription": "Join a fast-growing logistics firm."})
+	res = patch(map[string]any{"version": ad.Version, "blindDescription": "Join a fast-growing logistics firm."})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	res.JSON(&ad)
 	assert.True(t, ad.BlindEdited)
@@ -86,6 +90,7 @@ func TestBlindJobAds(t *testing.T) {
 		a.request(http.MethodGet, "/v1/public/careers/"+me.Tenant.CareersSlug+"/ads/"+ad.Id, "", nil).JSON(&public)
 		assert.Equal(t, "Ops Manager at our client", public.Title)
 		assert.Equal(t, "Join a fast-growing logistics firm.", public.Description)
+		assert.Equal(t, "Our client hub, Shah Alam", public.Location.MustGet(), "the location goes out blind too")
 		feed := a.request(http.MethodGet, "/v1/public/careers/"+me.Tenant.CareersSlug+"/jobs.xml", "", nil)
 		assert.NotContains(t, string(feed.Body), "Maju")
 	})

@@ -292,8 +292,10 @@ lead's company (with the built-in email check).
 - **Blind ads** ✅: every ad is shown in two columns, as written and blind.
   The blind version is made from the ad when it is read: the client's name
   (also without "Sdn Bhd", "Berhad" and the like), its website and the name
-  part of its address, and the hiring contact are replaced, and every email,
-  phone number and link removed. The first mention of the client becomes the
+  part of its address (acme from careers.acme.com.my), and the hiring contact
+  are replaced in the title, text, location and salary line, and every email,
+  phone number and link removed. The client description itself may not name
+  the client. The first mention of the client becomes the
   ad's "client description" ("a leading Malaysian bank"), later ones "our
   client". A person may write their own blind title and text; it may not name
   the client, changes to the ad then no longer remake it, and the ad shows when
