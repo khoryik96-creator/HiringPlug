@@ -144,9 +144,18 @@ and `tests/test_columns.py`, so a rule change that breaks one fails the build.
 Each result records the parser version (`rules@1`), and **Read details
 again** re-runs it, so CVs can be re-parsed when the parser improves.
 
-**Next:** the AI reader (DeepSeek, once its host and region are chosen),
-behind the same quote check, for what rules still miss: unusual layouts and
-very messy two-column CVs.
+**Kano's detection, with the AI (built; used once the AI is on).** The rules
+read every CV first. If they find the five core details (name, email, phone,
+current title and company), the full AI read is skipped, as in Kano, and only
+the latest employer's industry is asked for when the rules found none (Kano's
+industry prompt and list). Otherwise the AI fills what the rules left empty
+(`jobs/cv_ai.py`), never replacing what they found. Every AI value carries
+its quote and goes through the same check in Go, so an invented value is
+dropped like any other; an industry outside Kano's list is dropped in Python.
+Go offers the AI only while it is on and the company has allowance left
+(`useAi` on the job); the tokens it used come back and count in the one
+monthly allowance the assistant and matching share. The parser then reads
+`rules@1+ai`.
 
 ## CV formatting and blind CVs (M4)
 

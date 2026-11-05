@@ -56,3 +56,13 @@ func (m *Module) SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude 
 // WhenTextRead registers what runs when a candidate's CV has been read
 // (called by internal/app once every module exists).
 func (m *Module) WhenTextRead(hooks ...TextReadHook) { m.service.whenRead = hooks }
+
+// UseAI lets the AI fill in what the rules leave empty when reading CVs,
+// while ai allows it.
+func (m *Module) UseAI(ai AIAllowance) { m.service.ai = ai }
+
+// TokensSince returns the AI tokens the company used reading CVs since a
+// time (part of its monthly allowance), in the caller's transaction.
+func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
+	return store.New(tx).AITokensSince(ctx, since)
+}

@@ -1056,6 +1056,12 @@ class DocumentParseCvJob(BaseModel):
         str,
         Field(description="The document's saved text, so quotes match it exactly.", pattern="^[^\\x00]*$"),
     ]
+    useAi: Annotated[
+        bool | None,
+        Field(
+            description="The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left.\n"
+        ),
+    ] = None
 
 
 class DocumentCvParsedJob(BaseModel):
@@ -1065,6 +1071,9 @@ class DocumentCvParsedJob(BaseModel):
     documentId: DocumentId
     profile: Annotated[ParsedProfile | None, Field(...)]
     errorMessage: Annotated[str | None, Field(...)]
+    aiTokens: Annotated[
+        int | None, Field(description="Tokens the AI used (counted in the monthly allowance).", ge=0)
+    ] = None
 
 
 class EmailTemplateId(RootModel[str]):

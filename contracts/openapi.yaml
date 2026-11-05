@@ -4157,6 +4157,11 @@ components:
           type: string
           pattern: '^[^\x00]*$'
           description: The document's saved text, so quotes match it exactly.
+        useAi:
+          type: boolean
+          description: >
+            The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left.
+
     DocumentCvParsedJob:
       type: object
       additionalProperties: false
@@ -4165,6 +4170,7 @@ components:
         documentId: {$ref: '#/components/schemas/DocumentId'}
         profile: {allOf: [{$ref: '#/components/schemas/ParsedProfile'}], nullable: true}
         errorMessage: {type: string, nullable: true}
+        aiTokens: {type: integer, minimum: 0, description: Tokens the AI used (counted in the monthly allowance).}
     EmailTemplateId:
       type: string
       pattern: '^etpl_[0-9a-hjkmnp-tv-z]{26}$'

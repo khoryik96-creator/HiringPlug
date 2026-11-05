@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -117,13 +116,4 @@ func (a matchingJobs) ForMatching(ctx context.Context, tx pgx.Tx, p authz.Princi
 	}
 	j.AdTitle, j.AdText = &ad.Details.Title, ad.Details.Description // the ad's salary line is left out too
 	return j, nil
-}
-
-// matchingAIUse gives the assistant matching's use of the AI, for the shared
-// allowance. It looks the module up when called: matching is built after the
-// assistant.
-type matchingAIUse struct{ m *Modules }
-
-func (u matchingAIUse) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
-	return u.m.Matching.TokensSince(ctx, tx, since)
 }

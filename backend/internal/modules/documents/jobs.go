@@ -51,7 +51,7 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	// Every CV is parsed as soon as its text is saved: candidates' CVs for
 	// review, formatted ones (our own output) for comparing with the original.
 	if row.Status == string(api.DocumentStatusExtracted) && hasText(row.ExtractedText) {
-		if err := queueParse(ctx, tx, job.TenantID, row); err != nil {
+		if err := s.queueParse(ctx, tx, job.TenantID, row); err != nil {
 			return err
 		}
 		if row.Source != "formatted" {
@@ -68,10 +68,18 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	})
 }
 
-// queueParse asks the AI worker to parse a document's saved text.
-func queueParse(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
+// queueParse asks the AI worker to parse a document's saved text; the AI may
+// fill in what the rules leave empty when it is on and allowance is left.
+func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
+	useAI := false
+	if s.ai != nil {
+		var err error
+		if useAI, err = s.ai.Allowed(ctx, tx); err != nil {
+			return err
+		}
+	}
 	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentParseCv, api.DocumentParseCvJob{
-		DocumentId: row.ID, Text: *row.ExtractedText,
+		DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI,
 	}); err != nil {
 		return err
 	}
@@ -114,6 +122,12 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	}
 	if _, err := q.SaveParse(ctx, params); err != nil {
 		return err
+	}
+	if result.AiTokens != nil && *result.AiTokens > 0 {
+		if err := q.RecordAIUse(ctx, store.RecordAIUseParams{DocumentID: row.ID, Tokens: int32(min(*result.AiTokens, 1<<30))}); err != nil { //nolint:gosec // capped
+			return err
+		}
+		changes["aiTokens"] = *result.AiTokens
 	}
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "document.cv_parsed", EntityType: "document", EntityID: row.ID, Changes: changes,

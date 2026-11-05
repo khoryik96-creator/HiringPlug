@@ -30,6 +30,13 @@ type Service struct {
 	files      *blob.Store
 	candidates Candidates
 	whenRead   []TextReadHook
+	ai         AIAllowance // nil: the AI never fills in CV readings
+}
+
+// AIAllowance says whether the AI may be used now (it is on, and the
+// company has allowance left this month).
+type AIAllowance interface {
+	Allowed(ctx context.Context, tx pgx.Tx) (bool, error)
 }
 
 // TextReadHook runs when a candidate's CV (not one the app made) has been
@@ -162,7 +169,7 @@ func (s *Service) Parse(ctx context.Context, p authz.Principal, id string) (Docu
 		if !hasText(row.ExtractedText) {
 			return apperr.New(api.ErrorCodeDOCUMENTHASNOTEXT, "This document has no text to read yet.")
 		}
-		if err := queueParse(ctx, tx, p.TenantID, row); err != nil {
+		if err := s.queueParse(ctx, tx, p.TenantID, row); err != nil {
 			return err
 		}
 		queued := string(api.DocumentParseStatusQueued)

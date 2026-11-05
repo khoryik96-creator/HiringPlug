@@ -11,6 +11,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -110,16 +111,22 @@ func NewModules(d Deps) *Modules {
 	}, d.Files, d.Config.MaxUploadBytes)
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
-		Applications: assistantApplications{m.Pipeline}, OtherAIUse: matchingAIUse{m},
+		Applications: assistantApplications{m.Pipeline},
+		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents} }},
 	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
-		Jobs: matchingJobs{m.Jobs}, OtherAIUse: m.Assistant, Consent: m.Privacy,
+		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy,
+		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents} }},
 	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
 	matchingHooks(m)
+	m.Documents.UseAI(cvReadingAI{
+		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents} }},
+		cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+	})
 	return m
 }
 

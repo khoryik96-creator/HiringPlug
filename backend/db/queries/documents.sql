@@ -84,3 +84,10 @@ SELECT b.candidate_id, b.rank,
 FROM best b JOIN document d ON d.id = b.document_id, q
 ORDER BY b.rank DESC, b.candidate_id
 LIMIT @row_limit;
+
+-- name: RecordAIUse :exec
+INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current_tenant(), @document_id, @tokens);
+
+-- Tokens the AI used reading the company's CVs since a time.
+-- name: AITokensSince :one
+SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= @since;

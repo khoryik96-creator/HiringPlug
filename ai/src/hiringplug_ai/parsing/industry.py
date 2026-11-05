@@ -82,6 +82,12 @@ WORDS: list[tuple[str, str]] = [
         r"ministry|kementerian|jabatan|government|kerajaan|majlis|dewan bandaraya|statutory body",
     ),
 ]
+# Kano's industries, the values an industry may take.
+RULES_INDUSTRIES = [
+    "Digital & E-Commerce", "Financial Services", "FMCG", "Industrial/Manufacturing",
+    "Information Technology & Services", "Life Science/Medical", "Property & Construction",
+    "Professional Services", "Education", "Government Sector",
+]  # fmt: skip
 _COMPILED = [(name, re.compile(rf"(?i)({pattern})")) for name, pattern in NAMES + WORDS]
 
 

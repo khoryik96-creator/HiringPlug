@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+const aITokensSince = `-- name: AITokensSince :one
+SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= $1
+`
+
+// Tokens the AI used reading the company's CVs since a time.
+func (q *Queries) AITokensSince(ctx context.Context, since time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, aITokensSince, since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error FROM document WHERE id = $1
 `
@@ -313,6 +325,20 @@ UPDATE document SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHER
 
 func (q *Queries) QueuePdf(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, queuePdf, id)
+	return err
+}
+
+const recordAIUse = `-- name: RecordAIUse :exec
+INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current_tenant(), $1, $2)
+`
+
+type RecordAIUseParams struct {
+	DocumentID string
+	Tokens     int32
+}
+
+func (q *Queries) RecordAIUse(ctx context.Context, arg RecordAIUseParams) error {
+	_, err := q.db.Exec(ctx, recordAIUse, arg.DocumentID, arg.Tokens)
 	return err
 }
 

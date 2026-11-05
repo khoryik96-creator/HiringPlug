@@ -274,6 +274,13 @@ type Document struct {
 	PdfError           *string
 }
 
+type DocumentAiUse struct {
+	TenantID   string
+	DocumentID string
+	Tokens     int32
+	CreatedAt  time.Time
+}
+
 type Email struct {
 	ID            string
 	TenantID      string
