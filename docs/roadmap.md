@@ -36,6 +36,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Roles and access: each company chooses what each role may do and which candidates it sees (all, team, own, plus those on its jobs), with teams and owners on candidates and jobs, enforced by the database |
 | ✅ | Data protection (PDPA): consent on every candidate, requests with their 21-day due dates, a Data protection page, a copy of a candidate's data; nothing is deleted automatically and records are kept until you decide |
 | ✅ | Sign-in with passwords, invitations, password resets and a Team page |
+| ✅ | Settings: each company's dropdown options (sources, notice periods, industries, work types) and mandatory fields |
 | ✅ | API documentation at `/docs`; one-click local install and update (`update-hiringplug.bat` / `.command`) |
 
 ## The plan

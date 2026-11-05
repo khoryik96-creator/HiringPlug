@@ -496,6 +496,31 @@ decide otherwise**: it shows you what needs deciding and records what you did.
 - Merging duplicates keeps both candidates' requests, and withdrawn consent
   wins.
 
+## Main settings ✅
+
+**Settings** (owners and admins) has two parts.
+
+- **Dropdowns.** Candidate source, notice period and industry are the
+  company's own lists: add options, rename, reorder, hide. Options that come
+  with the app (the six sources, Kano's ten industries, the usual notice
+  periods) can be hidden but not removed; a notice period is a number of days,
+  weeks or months (`2_week`). Work type and work arrangement can only be
+  renamed, reordered or hidden, because job boards and Google for Jobs need
+  their values. A hidden option is no longer offered, but records that have it
+  keep it and still show its name. A candidate's source must be one of the
+  company's sources (checked by the API); industries are words, so renaming one
+  leaves older records with the old words. The careers page keeps the app's own
+  labels (it has no sign-in to read a company's settings).
+- **Mandatory fields.** Tick which candidate fields (email, phone,
+  nationality, location, current title and company, industry, source, notice
+  period, work authorization) and job fields (location, work type, arrangement,
+  hiring contact, description) must be filled in. They are needed when a person
+  adds a record (the quick "Add candidate" row asks for them too) and cannot be
+  emptied later; records from before keep working until someone edits that
+  field. Fields the app always needs (a candidate's first name, a job's title
+  and company) stay on. Records made without a person (careers page,
+  imports, CV reading) are not held to them. Forms mark mandatory fields with *.
+
 ## 6. API documentation
 
 `/docs` renders the contract (endpoints, fields, permissions, error codes) and

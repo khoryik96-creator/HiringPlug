@@ -33,8 +33,8 @@ type Module struct {
 
 // New wires the module. phoneRegion is the country assumed for local phone
 // numbers, e.g. "MY".
-func New(pool *pgxpool.Pool, phoneRegion string, users Users) *Module {
-	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users}
+func New(pool *pgxpool.Pool, phoneRegion string, users Users, rules FieldRules) *Module {
+	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users, rules: rules}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

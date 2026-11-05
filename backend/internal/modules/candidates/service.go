@@ -26,6 +26,7 @@ type Service struct {
 	pool        *pgxpool.Pool
 	phoneRegion string
 	users       Users
+	rules       FieldRules // the company's mandatory fields and sources
 	movers      []RecordMover
 }
 
@@ -38,6 +39,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		if err := s.checkFields(ctx, tx, nil, profile); err != nil {
+			return err
+		}
 		if err := checkEmailFree(ctx, q, profile.Email, ""); err != nil {
 			return err
 		}
@@ -152,6 +156,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		before := fromRow(row).Profile
 		after, errs := NormalizeProfile(patch.Apply(before), s.phoneRegion)
 		if err := errs.Err(); err != nil {
+			return err
+		}
+		if err := s.checkFields(ctx, tx, &before, after); err != nil {
 			return err
 		}
 		if err := checkEmailFree(ctx, q, after.Email, id); err != nil {

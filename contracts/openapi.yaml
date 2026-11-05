@@ -2782,6 +2782,65 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/fields:
+    get:
+      operationId: getFieldSettings
+      tags: [settings]
+      summary: The company's dropdown lists and mandatory fields
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FieldSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/fields/lists/{fieldList}:
+    parameters:
+      - name: fieldList
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/FieldListName'}
+    put:
+      operationId: putFieldList
+      tags: [settings]
+      summary: Replace a dropdown's options (in the order given)
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FieldListInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FieldList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/fields/mandatory:
+    put:
+      operationId: putMandatoryFields
+      tags: [settings]
+      summary: Choose which fields are mandatory
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MandatoryFieldsInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FieldSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
 components:
   securitySchemes:
     bearerAuth:
@@ -2967,6 +3026,8 @@ components:
         - privacy:read
         - privacy:record
         - reports:read
+        - settings:manage
+        - settings:read
     ErrorCode:
       type: string
       enum:
@@ -3207,7 +3268,11 @@ components:
         unit: {$ref: '#/components/schemas/NoticePeriodUnit'}
     CandidateSource:
       type: string
-      enum: [jobstreet, linkedin, referral, careers_page, direct, other]
+      description: >
+        Where the candidate came from: a key from the company's source list (Settings; built in: jobstreet, linkedin, referral, careers_page, direct, other).
+
+      pattern: '^[a-z0-9_]{1,40}$'
+      example: jobstreet
     SalaryAmount:
       type: object
       additionalProperties: false
@@ -5801,6 +5866,90 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    FieldListName:
+      type: string
+      description: >
+        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed).
+
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement]
+    FieldListKind:
+      type: string
+      description: open = options can be added and removed; fixed = rename, reorder and hide only.
+      enum: [open, fixed]
+    FieldOption:
+      type: object
+      required: [key, label, hidden, builtIn]
+      properties:
+        key: {type: string, description: "What is stored (for notice periods: number_unit, e.g. 2_week)."}
+        label: {type: string}
+        hidden: {type: boolean, description: Not offered for new choices; records that have it keep it.}
+        builtIn: {type: boolean, description: "Comes with the app: hide it instead of removing it."}
+    FieldList:
+      type: object
+      required: [name, label, kind, options]
+      properties:
+        name: {$ref: '#/components/schemas/FieldListName'}
+        label: {type: string}
+        kind: {$ref: '#/components/schemas/FieldListKind'}
+        options:
+          type: array
+          items: {$ref: '#/components/schemas/FieldOption'}
+    FieldOptionInput:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        key: {type: string, maxLength: 100, description: "Omit for a new option (made from the label); notice periods need number_unit."}
+        label: {type: string, minLength: 1, maxLength: 100}
+        hidden: {type: boolean}
+    FieldListInput:
+      type: object
+      additionalProperties: false
+      required: [options]
+      properties:
+        options:
+          type: array
+          maxItems: 200
+          items: {$ref: '#/components/schemas/FieldOptionInput'}
+    FieldForm:
+      type: string
+      enum: [candidate, job]
+    MandatoryField:
+      type: object
+      required: [form, field, label, mandatory, alwaysRequired]
+      properties:
+        form: {$ref: '#/components/schemas/FieldForm'}
+        field: {type: string, description: "The field's name in the API, e.g. noticePeriod."}
+        label: {type: string}
+        mandatory: {type: boolean}
+        alwaysRequired: {type: boolean, description: "Required by the app itself (e.g. a candidate's first name); cannot be turned off."}
+    MandatoryFieldInput:
+      type: object
+      additionalProperties: false
+      required: [form, field, mandatory]
+      properties:
+        form: {$ref: '#/components/schemas/FieldForm'}
+        field: {type: string, maxLength: 50}
+        mandatory: {type: boolean}
+    MandatoryFieldsInput:
+      type: object
+      additionalProperties: false
+      required: [fields]
+      properties:
+        fields:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/MandatoryFieldInput'}
+    FieldSettings:
+      type: object
+      required: [lists, mandatory]
+      properties:
+        lists:
+          type: array
+          items: {$ref: '#/components/schemas/FieldList'}
+        mandatory:
+          type: array
+          items: {$ref: '#/components/schemas/MandatoryField'}
   parameters:
     CandidateIdPath:
       name: candidateId
@@ -6163,6 +6312,16 @@ x-permissions:
     description: See the reports (fees in them need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
+  settings:manage:
+    module: settings
+    description: Change dropdown options and mandatory fields.
+    sensitive: false
+    roles: [owner, admin]
+  settings:read:
+    module: settings
+    description: See the company's dropdown options and mandatory fields (every form needs them).
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
 x-jobs:
   assistant.answered:
     module: assistant
@@ -6280,3 +6439,5 @@ x-modules:
     description: 'Data protection (Malaysia''s PDPA). Each candidate''s consent (given on the careers form, or recorded by a recruiter; withdrawn means do not contact, and emails to them are refused), the requests candidates make about their data with how long each has been open, and a copy of everything held about a candidate for access requests. Nothing is ever deleted or anonymised by the app: people decide each request and record what they did.'
   - name: reports
     description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill. Reports keep no data of their own: they read other modules'' records.'
+  - name: settings
+    description: 'Main settings. Dropdown lists a company can change: open lists (candidate source, notice period, industry) take new options; fixed lists (work type, work arrangement) can be renamed, reordered and hidden only, because other systems (job boards, Google for Jobs) need their values. Fields a company makes mandatory must be filled in when a person adds a record, and cannot be emptied later.'

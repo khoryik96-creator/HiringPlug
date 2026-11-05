@@ -147,3 +147,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/privacy/internal/store
+  - <<: *module
+    queries: db/queries/settings.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/settings/internal/store

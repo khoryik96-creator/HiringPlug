@@ -20,6 +20,7 @@ import { CvTemplates } from "./pages/CvTemplates";
 import { Integrations } from "./pages/Integrations";
 import { Privacy } from "./pages/Privacy";
 import { Access } from "./pages/Access";
+import { Settings } from "./pages/Settings";
 import { JobList } from "./pages/JobList";
 import { Leads } from "./pages/Leads";
 import { Placements } from "./pages/Placements";
@@ -53,7 +54,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|account)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|account)/.exec(hash)?.[1] ?? "dashboard";
   return (
     <>
       <header className="row spread">
@@ -74,6 +75,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
+          {permissions.includes("settings:manage") && (
+            <a href="#/settings" aria-current={section === "settings" ? "page" : undefined}>Settings</a>
+          )}
           {permissions.includes("identity.roles:manage") && (
             <a href="#/access" aria-current={section === "access" ? "page" : undefined}>Roles and access</a>
           )}
@@ -131,6 +135,7 @@ function Page({ hash, permissions, me }: { hash: string; permissions: Permission
   if (hash.startsWith("#/integrations") && permissions.includes("integrations:manage")) return <Integrations />;
   if (hash.startsWith("#/privacy") && permissions.includes("privacy:manage")) return <Privacy />;
   if (hash.startsWith("#/access") && permissions.includes("identity.roles:manage")) return <Access />;
+  if (hash.startsWith("#/settings") && permissions.includes("settings:manage")) return <Settings />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;

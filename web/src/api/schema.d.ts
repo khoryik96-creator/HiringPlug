@@ -1890,6 +1890,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's dropdown lists and mandatory fields */
+        get: operations["getFieldSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/fields/lists/{fieldList}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fieldList: components["schemas"]["FieldListName"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a dropdown's options (in the order given) */
+        put: operations["putFieldList"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/fields/mandatory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose which fields are mandatory */
+        put: operations["putMandatoryFields"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1897,7 +1950,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -2046,8 +2099,11 @@ export interface components {
             value: number;
             unit: components["schemas"]["NoticePeriodUnit"];
         };
-        /** @enum {string} */
-        CandidateSource: "jobstreet" | "linkedin" | "referral" | "careers_page" | "direct" | "other";
+        /**
+         * @description Where the candidate came from: a key from the company's source list (Settings; built in: jobstreet, linkedin, referral, careers_page, direct, other).
+         * @example jobstreet
+         */
+        CandidateSource: string;
         SalaryAmount: {
             amount: components["schemas"]["DecimalAmount"];
             currency: components["schemas"]["CurrencyCode"];
@@ -3936,6 +3992,63 @@ export interface components {
             /** @description From the job being opened to its first placement in the period. */
             daysToFill: number;
             placements: number;
+        };
+        /**
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed).
+         * @enum {string}
+         */
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement";
+        /**
+         * @description open = options can be added and removed; fixed = rename, reorder and hide only.
+         * @enum {string}
+         */
+        FieldListKind: "open" | "fixed";
+        FieldOption: {
+            /** @description What is stored (for notice periods: number_unit, e.g. 2_week). */
+            key: string;
+            label: string;
+            /** @description Not offered for new choices; records that have it keep it. */
+            hidden: boolean;
+            /** @description Comes with the app: hide it instead of removing it. */
+            builtIn: boolean;
+        };
+        FieldList: {
+            name: components["schemas"]["FieldListName"];
+            label: string;
+            kind: components["schemas"]["FieldListKind"];
+            options: components["schemas"]["FieldOption"][];
+        };
+        FieldOptionInput: {
+            /** @description Omit for a new option (made from the label); notice periods need number_unit. */
+            key?: string;
+            label: string;
+            hidden?: boolean;
+        };
+        FieldListInput: {
+            options: components["schemas"]["FieldOptionInput"][];
+        };
+        /** @enum {string} */
+        FieldForm: "candidate" | "job";
+        MandatoryField: {
+            form: components["schemas"]["FieldForm"];
+            /** @description The field's name in the API, e.g. noticePeriod. */
+            field: string;
+            label: string;
+            mandatory: boolean;
+            /** @description Required by the app itself (e.g. a candidate's first name); cannot be turned off. */
+            alwaysRequired: boolean;
+        };
+        MandatoryFieldInput: {
+            form: components["schemas"]["FieldForm"];
+            field: string;
+            mandatory: boolean;
+        };
+        MandatoryFieldsInput: {
+            fields: components["schemas"]["MandatoryFieldInput"][];
+        };
+        FieldSettings: {
+            lists: components["schemas"]["FieldList"][];
+            mandatory: components["schemas"]["MandatoryField"][];
         };
     };
     responses: {
@@ -7641,6 +7754,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Report"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getFieldSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putFieldList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                fieldList: components["schemas"]["FieldListName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldListInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putMandatoryFields: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MandatoryFieldsInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldSettings"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

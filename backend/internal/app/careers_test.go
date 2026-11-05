@@ -103,7 +103,7 @@ func TestCareersPageAndApplying(t *testing.T) {
 	candidateID := items[0].(map[string]any)["id"].(string)
 	var cand api.Candidate
 	a.request(http.MethodGet, "/v1/candidates/"+candidateID, token, nil).JSON(&cand)
-	assert.Equal(t, api.CandidateSourceCareersPage, cand.Source.MustGet())
+	assert.Equal(t, api.CandidateSource("careers_page"), cand.Source.MustGet())
 	assert.Equal(t, "+60123456789", cand.Phone.MustGet())
 	docs := a.request(http.MethodGet, "/v1/candidates/"+candidateID+"/documents", token, nil).Map()["items"].([]any)
 	require.Len(t, docs, 1, "the CV is attached")
@@ -146,7 +146,7 @@ func TestCareersPageAndApplying(t *testing.T) {
 		id := apps[0].(map[string]any)["candidateId"].(string)
 		var li api.Candidate
 		a.request(http.MethodGet, "/v1/candidates/"+id, token, nil).JSON(&li)
-		assert.Equal(t, api.CandidateSourceLinkedin, li.Source.MustGet())
+		assert.Equal(t, api.CandidateSource("linkedin"), li.Source.MustGet())
 
 		// The first application above came without a link: the careers page.
 		first := a.request(http.MethodGet, "/v1/jobs/"+job.Id+"/applications", token, nil).Map()["items"].([]any)

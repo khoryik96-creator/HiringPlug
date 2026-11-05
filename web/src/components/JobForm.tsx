@@ -3,7 +3,8 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type JobOrder, unwrap } from "../api/client";
 import { contactsKey, jobKey, jobsKey } from "../api/keys";
-import { JOB_STATUS, keysOf, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
+import { JOB_STATUS, keysOf } from "../labels";
+import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { Field } from "./Field";
 import { fieldErrors, FormInvalid, sameBody } from "./forms";
@@ -51,6 +52,8 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
     },
   });
   const errors = fieldErrors(save.error);
+  const fs = useFieldSettings();
+  const req = (label: string, field: string) => labelFor(label, fs.mandatory("job", field));
   const set = <K extends keyof JobFormState>(key: K, value: JobFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
@@ -69,11 +72,11 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
         save.mutate();
       }}
     >
-      {text("title", "Job title")}
-      <Field label="Company" error={errors[JOB_PATHS.company]}>
+      {text("title", req("Job title", "title"))}
+      <Field label={req("Company", "companyId")} error={errors[JOB_PATHS.company]}>
         <CompanyPicker value={form.company} onChange={(c) => { setForm((f) => ({ ...f, company: c, contactId: "" })); }} />
       </Field>
-      <Field label="Hiring contact" error={errors[JOB_PATHS.contactId]}>
+      <Field label={req("Hiring contact", "contactId")} error={errors[JOB_PATHS.contactId]}>
         <select value={form.contactId} disabled={!companyId} onChange={(e) => { set("contactId", e.target.value); }}>
           <option value="">—</option>
           {contacts.data?.map((c) => <option key={c.id} value={c.id}>{c.fullName}{c.title ? `, ${c.title}` : ""}</option>)}
@@ -84,22 +87,22 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
           {keysOf(JOB_STATUS).map((s) => <option key={s} value={s}>{JOB_STATUS[s]}</option>)}
         </select>
       </Field>
-      {text("location", "Location")}
-      <Field label="Work type" error={errors[JOB_PATHS.workType]}>
+      {text("location", req("Location", "location"))}
+      <Field label={req("Work type", "workType")} error={errors[JOB_PATHS.workType]}>
         <select value={form.workType} onChange={(e) => { set("workType", e.target.value as JobFormState["workType"]); }}>
           <option value="">—</option>
-          {keysOf(WORK_TYPE).map((w) => <option key={w} value={w}>{WORK_TYPE[w]}</option>)}
+          {fs.options("work_type", form.workType).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </Field>
-      <Field label="Where" error={errors[JOB_PATHS.workArrangement]}>
+      <Field label={req("Where", "workArrangement")} error={errors[JOB_PATHS.workArrangement]}>
         <select value={form.workArrangement} onChange={(e) => { set("workArrangement", e.target.value as JobFormState["workArrangement"]); }}>
           <option value="">—</option>
-          {keysOf(WORK_ARRANGEMENT).map((w) => <option key={w} value={w}>{WORK_ARRANGEMENT[w]}</option>)}
+          {fs.options("work_arrangement", form.workArrangement).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </Field>
       {text("openings", "Openings", { inputMode: "numeric" })}
       <div className="full">
-        <Field label="Description" error={errors[JOB_PATHS.description]}>
+        <Field label={req("Description", "description")} error={errors[JOB_PATHS.description]}>
           <textarea rows={8} value={form.description} onChange={(e) => { set("description", e.target.value); }} />
         </Field>
       </div>

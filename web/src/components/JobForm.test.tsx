@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type JobOrder } from "../api/client";
 import { JobDetail } from "../pages/JobDetail";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { ok, renderWithClient, sentBody, testFieldSettings } from "../test-utils";
 import { JobForm } from "./JobForm";
 
 afterEach(() => {
@@ -25,7 +25,7 @@ const change = (label: string, value: string) => {
 
 describe("job form", () => {
   it("adds a job at the company it was opened from", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null }));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(job));
     const onSaved = vi.fn();
     renderWithClient(<JobForm job={null} company={{ id: job.companyId, name: "Maybank" }} onDone={vi.fn()} onSaved={onSaved} />);
@@ -48,7 +48,7 @@ describe("job form", () => {
   });
 
   it("saves an edit with the version it was opened with", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null }));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...job, version: 4 }));
     const onDone = vi.fn();
     const { rerender } = renderWithClient(<JobForm job={job} onDone={onDone} />);
@@ -62,7 +62,7 @@ describe("job form", () => {
 
 describe("job page", () => {
   it("shows the budget to those who may see it", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(job));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(job))) as never);
     renderWithClient(<JobDetail id={job.id} permissions={["jobs:read", "jobs:update", "jobs.salary:read", "jobs.salary:update"]} />);
     await screen.findByRole("heading", { name: /Senior Auditor/ });
     expect(screen.getByText("MYR 9000.00 – 12000.00 / month")).toBeTruthy();
@@ -73,7 +73,7 @@ describe("job page", () => {
   it("says the budget is restricted, without edit buttons, for other roles", async () => {
     const restricted: Partial<JobOrder> = { ...job, restrictedFields: ["salary"] };
     delete restricted.salary; // left out, as the API does
-    vi.spyOn(api, "GET").mockResolvedValue(ok(restricted));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(restricted))) as never);
     renderWithClient(<JobDetail id={job.id} permissions={["jobs:read"]} />);
     await screen.findByRole("heading", { name: /Senior Auditor/ });
     expect(screen.getByText(/restricted for your role/)).toBeTruthy();

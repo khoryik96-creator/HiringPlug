@@ -73,6 +73,8 @@ class Permission(StrEnum):
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
     reports_read = "reports:read"
+    settings_manage = "settings:manage"
+    settings_read = "settings:read"
 
 
 class ErrorCode(StrEnum):
@@ -342,13 +344,15 @@ class NoticePeriod(BaseModel):
     unit: NoticePeriodUnit
 
 
-class CandidateSource(StrEnum):
-    jobstreet = "jobstreet"
-    linkedin = "linkedin"
-    referral = "referral"
-    careers_page = "careers_page"
-    direct = "direct"
-    other = "other"
+class CandidateSource(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="Where the candidate came from: a key from the company's source list (Settings; built in: jobstreet, linkedin, referral, careers_page, direct, other).\n",
+            examples=["jobstreet"],
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ]
 
 
 class SalaryAmount(BaseModel):
@@ -2590,6 +2594,94 @@ class JobFill(BaseModel):
         int, Field(description="From the job being opened to its first placement in the period.")
     ]
     placements: int
+
+
+class FieldListName(StrEnum):
+    candidate_source = "candidate_source"
+    notice_period = "notice_period"
+    industry = "industry"
+    work_type = "work_type"
+    work_arrangement = "work_arrangement"
+
+
+class FieldListKind(StrEnum):
+    open = "open"
+    fixed = "fixed"
+
+
+class FieldOption(BaseModel):
+    key: Annotated[str, Field(description="What is stored (for notice periods: number_unit, e.g. 2_week).")]
+    label: str
+    hidden: Annotated[bool, Field(description="Not offered for new choices; records that have it keep it.")]
+    builtIn: Annotated[bool, Field(description="Comes with the app: hide it instead of removing it.")]
+
+
+class FieldList(BaseModel):
+    name: FieldListName
+    label: str
+    kind: FieldListKind
+    options: list[FieldOption]
+
+
+class FieldOptionInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        str | None,
+        Field(
+            description="Omit for a new option (made from the label); notice periods need number_unit.",
+            max_length=100,
+        ),
+    ] = None
+    label: Annotated[str, Field(max_length=100, min_length=1)]
+    hidden: bool | None = None
+
+
+class FieldListInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    options: Annotated[list[FieldOptionInput], Field(max_length=200)]
+
+
+class FieldForm(StrEnum):
+    candidate = "candidate"
+    job = "job"
+
+
+class MandatoryField(BaseModel):
+    form: FieldForm
+    field: Annotated[str, Field(description="The field's name in the API, e.g. noticePeriod.")]
+    label: str
+    mandatory: bool
+    alwaysRequired: Annotated[
+        bool,
+        Field(
+            description="Required by the app itself (e.g. a candidate's first name); cannot be turned off."
+        ),
+    ]
+
+
+class MandatoryFieldInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    form: FieldForm
+    field: Annotated[str, Field(max_length=50)]
+    mandatory: bool
+
+
+class MandatoryFieldsInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    fields: Annotated[list[MandatoryFieldInput], Field(max_length=100)]
+
+
+class FieldSettings(BaseModel):
+    lists: list[FieldList]
+    mandatory: list[MandatoryField]
 
 
 class PublicJobAd(BaseModel):

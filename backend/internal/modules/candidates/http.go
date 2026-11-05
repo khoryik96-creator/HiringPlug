@@ -118,7 +118,7 @@ func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateReque
 		CurrentTitle:      change(b.CurrentTitle, identity[string]),
 		CurrentCompany:    change(b.CurrentCompany, identity[string]),
 		Location:          change(b.Location, identity[string]),
-		Source:            change(b.Source, func(s api.CandidateSource) string { return string(s) }),
+		Source:            change(b.Source, func(s api.CandidateSource) string { return s }),
 		Tags:              Change[[]string]{Set: b.Tags != nil, Value: deref(b.Tags)},
 		Skills:            Change[[]string]{Set: b.Skills != nil, Value: deref(b.Skills)},
 	}

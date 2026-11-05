@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Candidate, type Permission } from "../api/client";
 import { candidateKey } from "../api/keys";
-import { failure, ok, RECRUITER, renderWithClient, sentBody, testCandidate } from "../test-utils";
+import { failure, ok, RECRUITER, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
 import { CandidateDetail } from "./CandidateDetail";
 
 afterEach(() => {
@@ -81,6 +81,7 @@ describe("possible duplicates", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => {
       if (path === "/v1/candidates/{candidateId}/similar") return Promise.resolve(ok(similar));
       if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(testCandidate()));
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
       return Promise.resolve(ok({ items: [] }));
     }));
     renderWithClient(<CandidateDetail id={testCandidate().id} permissions={RECRUITER} />);
@@ -94,6 +95,7 @@ describe("possible duplicates", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => {
       if (path === "/v1/candidates/{candidateId}/similar") return Promise.resolve(ok(similar));
       if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(testCandidate()));
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
       return Promise.resolve(ok({ items: [] }));
     }));
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(testCandidate({ version: 4 })));

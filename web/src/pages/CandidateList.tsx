@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
+import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { useUsedValues } from "../components/useUsedValues";
@@ -75,6 +76,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
 function AddCandidate() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [extras, setExtras] = useState<Record<string, string>>({});
   const create = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -84,6 +86,7 @@ function AddCandidate() {
             lastName: form.lastName,
             email: form.email || null,
             phone: form.phone || null,
+            ...extrasBody(extras),
           },
         }),
       ),
@@ -112,6 +115,7 @@ function AddCandidate() {
       {field("lastName", "Last name")}
       {field("email", "Email")}
       {field("phone", "Phone")}
+      <CandidateExtras values={extras} onChange={setExtras} />
       <button type="submit" disabled={!form.firstName.trim() || create.isPending}>
         Add candidate
       </button>

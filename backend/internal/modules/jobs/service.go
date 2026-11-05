@@ -20,6 +20,7 @@ type Service struct {
 	companies Companies
 	contacts  Contacts
 	users     Users
+	rules     FieldRules // the company's mandatory fields
 }
 
 // Create adds a job.
@@ -30,6 +31,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Vi
 	}
 	var out View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if err := s.checkMandatory(ctx, tx, nil, d); err != nil {
+			return err
+		}
 		if err := s.checkReferences(ctx, tx, d); err != nil {
 			return err
 		}
@@ -87,6 +91,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		changes := audit.Diff(fields(before), fields(after))
 		if len(changes) == 0 {
 			out, err = s.view(ctx, tx, p, fromRow(row))
+			return err
+		}
+		if err := s.checkMandatory(ctx, tx, &before, after); err != nil {
 			return err
 		}
 		if err := s.checkReferences(ctx, tx, after); err != nil {

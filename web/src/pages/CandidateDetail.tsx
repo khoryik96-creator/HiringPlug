@@ -16,7 +16,8 @@ import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
-import { CANDIDATE_SOURCE, countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import { useFieldSettings } from "../components/useFieldSettings";
+import { countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
 function workAuthorization(c: Candidate): string {
   const wa = c.workAuthorization;
@@ -31,6 +32,7 @@ function workAuthorization(c: Candidate): string {
  */
 export function CandidateDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
+  const fs = useFieldSettings();
   const queryClient = useQueryClient();
   const candidate = useQuery({
     queryKey: candidateKey(id),
@@ -91,7 +93,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dt>Industry / specialization</dt>
             <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
             <dt>Source</dt>
-            <dd>{c.source ? CANDIDATE_SOURCE[c.source] : "—"}</dd>
+            <dd>{c.source ? fs.label("candidate_source", c.source) : "—"}</dd>
             <dt>Skills</dt>
             <dd><Chips labels={c.skills} /></dd>
             <dt>Tags</dt>

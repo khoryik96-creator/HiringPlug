@@ -18,7 +18,7 @@ export interface CandidateFormState {
   currentTitle: string;
   currentCompany: string;
   location: string;
-  source: "" | Schemas["CandidateSource"];
+  source: string;
   tags: string[];
   skills: string[];
 }

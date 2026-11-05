@@ -4,7 +4,8 @@ import { useState } from "react";
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobAdsKey } from "../api/keys";
 import { careersUrl } from "../careersRoute";
-import { CHANNEL, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
+import { CHANNEL } from "../labels";
+import { useFieldSettings } from "./useFieldSettings";
 import { AdText } from "./AdText";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
@@ -17,6 +18,7 @@ const orNull = (v: string) => (v.trim() === "" ? null : v);
 export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Ad | "new" | null>(null);
+  const fs = useFieldSettings();
   const ads = useQuery({
     queryKey: jobAdsKey(job.id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } } })).items,
@@ -67,7 +69,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
             )}
           </div>
           <p className="muted">
-            {[ad.location, ad.workType && WORK_TYPE[ad.workType], ad.workArrangement && WORK_ARRANGEMENT[ad.workArrangement], ad.salaryText]
+            {[ad.location, ad.workType && fs.label("work_type", ad.workType), ad.workArrangement && fs.label("work_arrangement", ad.workArrangement), ad.salaryText]
               .filter(Boolean).join(" · ")}
             {ad.closesOn && ` · closes ${ad.closesOn}`}
           </p>
@@ -96,6 +98,7 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
   }));
   const [form, setForm] = useState(opened.form);
   const [preview, setPreview] = useState(false);
+  const fs = useFieldSettings();
   const set = (k: keyof typeof form, v: string) => { setForm({ ...form, [k]: v }); };
   const body = {
     title: form.title,
@@ -123,13 +126,13 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
       <label className="field">Work type
         <select value={form.workType} onChange={(e) => { set("workType", e.target.value); }}>
           <option value="">—</option>
-          {Object.entries(WORK_TYPE).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {fs.options("work_type", form.workType).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </label>
       <label className="field">Arrangement
         <select value={form.workArrangement} onChange={(e) => { set("workArrangement", e.target.value); }}>
           <option value="">—</option>
-          {Object.entries(WORK_ARRANGEMENT).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {fs.options("work_arrangement", form.workArrangement).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </label>
       <label className="field">Salary shown on the ad<input value={form.salaryText} placeholder="e.g. RM 8,000 - 10,000 a month (leave empty to hide)" onChange={(e) => { set("salaryText", e.target.value); }} /></label>

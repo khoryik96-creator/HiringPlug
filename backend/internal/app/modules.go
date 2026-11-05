@@ -35,6 +35,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/privacy"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/reports"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
 )
@@ -61,6 +62,7 @@ type Modules struct {
 	Assistant    *assistant.Module
 	Matching     *matching.Module
 	Privacy      *privacy.Module
+	Settings     *settings.Module
 	// scaffold:fields
 }
 
@@ -70,11 +72,12 @@ type Modules struct {
 func NewModules(d Deps) *Modules {
 	m := &Modules{}
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
-	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity)
+	m.Settings = settings.New(d.Pool)
+	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks)
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
-	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity)
+	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Notes = notes.New(d.Pool, notes.Subjects{
 		"candidate": m.Candidates.Exists, "job": m.Jobs.Exists, "company": m.Companies.Exists, "contact": m.Contacts.Exists,
@@ -143,6 +146,7 @@ type (
 	assistantHTTP    = assistant.HTTP
 	matchingHTTP     = matching.HTTP
 	privacyHTTP      = privacy.HTTP
+	settingsHTTP     = settings.HTTP
 	// scaffold:aliases
 )
 
@@ -170,6 +174,7 @@ type Server struct {
 	*assistantHTTP
 	*matchingHTTP
 	*privacyHTTP
+	*settingsHTTP
 	// scaffold:embeds
 }
 
@@ -198,6 +203,7 @@ func (m *Modules) Server() *Server {
 		assistantHTTP:    m.Assistant.HTTP,
 		matchingHTTP:     m.Matching.HTTP,
 		privacyHTTP:      m.Privacy.HTTP,
+		settingsHTTP:     m.Settings.HTTP,
 		// scaffold:server-fields
 	}
 }

@@ -63,3 +63,19 @@ export function sentBody(mock: { mock: { calls: unknown[][] } }, call = 0): unkn
   const init = mock.mock.calls[call]?.[1] as { body?: unknown } | undefined;
   return init?.body;
 }
+
+/** The settings a company starts with (GET /v1/settings/fields), optionally with mandatory fields. */
+export function testFieldSettings(mandatory: { form: "candidate" | "job"; field: string }[] = []): never {
+  const list = (name: string, label: string, kind: "open" | "fixed", pairs: [string, string][]) =>
+    ({ name, label, kind, options: pairs.map(([key, l]) => ({ key, label: l, hidden: false, builtIn: true })) });
+  return {
+    lists: [
+      list("candidate_source", "Candidate source", "open", [["jobstreet", "JobStreet"], ["linkedin", "LinkedIn"], ["referral", "Referral"], ["careers_page", "Careers page"], ["direct", "Direct"], ["other", "Other"]]),
+      list("notice_period", "Notice period", "open", [["0_day", "Immediately"], ["2_week", "2 weeks"], ["1_month", "1 month"], ["3_month", "3 months"]]),
+      list("industry", "Industry", "open", [["Financial Services", "Financial Services"], ["FMCG", "FMCG"]]),
+      list("work_type", "Work type", "fixed", [["full_time", "Full time"], ["contract", "Contract"]]),
+      list("work_arrangement", "Work arrangement", "fixed", [["onsite", "On site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]),
+    ],
+    mandatory: mandatory.map((m) => ({ ...m, label: m.field, mandatory: true, alwaysRequired: false })),
+  } as never;
+}

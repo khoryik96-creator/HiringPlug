@@ -303,6 +303,29 @@ type EmailTemplate struct {
 	UpdatedAt time.Time
 }
 
+type FieldListSaved struct {
+	TenantID  string
+	List      string
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
+type FieldOption struct {
+	TenantID string
+	List     string
+	Key      string
+	Label    string
+	Hidden   bool
+	Position int32
+}
+
+type FieldRule struct {
+	TenantID  string
+	Form      string
+	Field     string
+	Mandatory bool
+}
+
 type Interview struct {
 	ID              string
 	TenantID        string

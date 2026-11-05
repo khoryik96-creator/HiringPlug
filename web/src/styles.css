@@ -115,3 +115,5 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .access-perms label, .access-scope label { font-weight: normal; }
 .owner select { font-size: 0.9rem; }
 mark { background: #fef3c7; padding: 0 0.1rem; }
+label.check { display: flex; gap: 0.4rem; align-items: center; margin: 0.15rem 0; }
+section[aria-label="Mandatory fields"] fieldset { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.5rem 0.75rem; min-width: 14rem; }

@@ -57,8 +57,8 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users) *Module {
-	svc := &Service{pool: pool, companies: companies, contacts: contacts, users: users}
+func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users, rules FieldRules) *Module {
+	svc := &Service{pool: pool, companies: companies, contacts: contacts, users: users, rules: rules}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

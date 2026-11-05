@@ -3,7 +3,7 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type Candidate, unwrap } from "../api/client";
 import { candidateKey, candidatesKey } from "../api/keys";
-import { CANDIDATE_SOURCE, keysOf, NOTICE_UNIT, regionName, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import { keysOf, regionName, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 import {
   type CandidateFormState,
   candidateProblems,
@@ -13,6 +13,7 @@ import {
 } from "./candidateFormState";
 import { Field } from "./Field";
 import { LabelInput } from "./LabelInput";
+import { labelFor, noticeKey, useFieldSettings } from "./useFieldSettings";
 import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
@@ -45,11 +46,14 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
     },
   });
   const used = useUsedValues();
+  const fs = useFieldSettings();
+  const req = (label: string, field: string) => labelFor(label, fs.mandatory("candidate", field));
   const errors = fieldErrors(save.error);
   const errorFor = (key: keyof CandidateFormState) => errors[FIELD_PATHS[key]];
   const set = <K extends keyof CandidateFormState>(key: K, value: CandidateFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
+  const notice = form.noticeValue.trim() === "" ? "" : noticeKey(form.noticeValue.trim(), form.noticeUnit);
   const text = (key: TextKey, label: string, extra: InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Field label={label} error={errorFor(key)}>
       <input value={form[key]} onChange={(e) => { set(key, e.target.value); }} {...extra} />
@@ -65,17 +69,17 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
         save.mutate();
       }}
     >
-      {text("firstName", "First name")}
+      {text("firstName", req("First name", "firstName"))}
       {text("lastName", "Last name")}
       {/* Not type="email": the browser's rule refuses addresses the API accepts (e.g. josé@…). */}
-      {text("email", "Email", { inputMode: "email", autoComplete: "off", spellCheck: false })}
-      {text("phone", "Phone", { placeholder: "+60 12 345 6789" })}
-      {text("nationality", "Nationality (2-letter code)", { list: "countries", placeholder: "e.g. MY", className: "code" })}
+      {text("email", req("Email", "email"), { inputMode: "email", autoComplete: "off", spellCheck: false })}
+      {text("phone", req("Phone", "phone"), { placeholder: "+60 12 345 6789" })}
+      {text("nationality", req("Nationality (2-letter code)", "nationality"), { list: "countries", placeholder: "e.g. MY", className: "code" })}
       <datalist id="countries">
         {COUNTRIES.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
       </datalist>
 
-      <Field label="Work authorization" error={errorFor("waStatus")}>
+      <Field label={req("Work authorization", "workAuthorization")} error={errorFor("waStatus")}>
         <select value={form.waStatus} onChange={(e) => { set("waStatus", e.target.value as CandidateFormState["waStatus"]); }}>
           <option value="">—</option>
           {keysOf(WORK_AUTH_STATUS).map((s) => <option key={s} value={s}>{WORK_AUTH_STATUS[s]}</option>)}
@@ -91,26 +95,30 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       )}
       {form.waStatus !== "" && text("waNote", "Work authorization note")}
 
-      <Field label="Notice period (0 = immediate)" error={errorFor("noticeValue")}>
-        <input type="number" min={0} max={365} value={form.noticeValue}
-          onChange={(e) => { set("noticeValue", e.target.value); }} />
-      </Field>
-      <Field label="Notice period unit" error={errorFor("noticeUnit")}>
-        <select value={form.noticeUnit} onChange={(e) => { set("noticeUnit", e.target.value as CandidateFormState["noticeUnit"]); }}>
-          {keysOf(NOTICE_UNIT).map((u) => <option key={u} value={u}>{NOTICE_UNIT[u].many}</option>)}
+      <Field label={req("Notice period", "noticePeriod")} error={errorFor("noticeValue") ?? errorFor("noticeUnit")}>
+        <select value={notice} onChange={(e) => {
+          const [value = "", unit = "month"] = e.target.value.split("_");
+          setForm((f) => ({ ...f, noticeValue: value, noticeUnit: unit as CandidateFormState["noticeUnit"] }));
+        }}>
+          <option value="">—</option>
+          {fs.options("notice_period", notice).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </Field>
-      {text("industry", "Industry", { list: "industries" })}
-      {text("specialization", "Specialization", { list: "specializations" })}
-      <datalist id="industries">{used.industries.map((v) => <option key={v} value={v} />)}</datalist>
-      <datalist id="specializations">{used.specializations.map((v) => <option key={v} value={v} />)}</datalist>
-      {text("currentTitle", "Current title")}
-      {text("currentCompany", "Current company")}
-      {text("location", "Location")}
-      <Field label="Source" error={errorFor("source")}>
-        <select value={form.source} onChange={(e) => { set("source", e.target.value as CandidateFormState["source"]); }}>
+      <Field label={req("Industry", "industry")} error={errorFor("industry")}>
+        <select value={form.industry} onChange={(e) => { set("industry", e.target.value); }}>
           <option value="">—</option>
-          {keysOf(CANDIDATE_SOURCE).map((s) => <option key={s} value={s}>{CANDIDATE_SOURCE[s]}</option>)}
+          {fs.options("industry", form.industry).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </Field>
+      {text("specialization", "Specialization", { list: "specializations" })}
+      <datalist id="specializations">{used.specializations.map((v) => <option key={v} value={v} />)}</datalist>
+      {text("currentTitle", req("Current title", "currentTitle"))}
+      {text("currentCompany", req("Current company", "currentCompany"))}
+      {text("location", req("Location", "location"))}
+      <Field label={req("Source", "source")} error={errorFor("source")}>
+        <select value={form.source} onChange={(e) => { set("source", e.target.value); }}>
+          <option value="">—</option>
+          {fs.options("candidate_source", form.source).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </Field>
 

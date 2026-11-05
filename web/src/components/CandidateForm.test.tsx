@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { failure, invalidField, ok, renderWithClient, sentBody, testCandidate } from "../test-utils";
+import { failure, invalidField, ok, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
 import { CandidateForm } from "./CandidateForm";
 
 afterEach(() => {
@@ -102,7 +102,8 @@ describe("candidate form", () => {
   });
 
   it("adds skills with Enter or a comma, ignores the same skill in other case, and removes them", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ tags: [], skills: ["Excel"], industries: [], specializations: [] }));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
+      ? ok(testFieldSettings()) : ok({ tags: [], skills: ["Excel"], industries: [], specializations: [] }))) as never);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
     const onDone = vi.fn();
     renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP"] })} onDone={onDone} />);

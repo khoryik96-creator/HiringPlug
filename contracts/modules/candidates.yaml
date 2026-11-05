@@ -342,7 +342,12 @@ components:
 
     CandidateSource:
       type: string
-      enum: [jobstreet, linkedin, referral, careers_page, direct, other]
+      description: >
+        Where the candidate came from: a key from the company's source list
+        (Settings; built in: jobstreet, linkedin, referral, careers_page,
+        direct, other).
+      pattern: '^[a-z0-9_]{1,40}$'
+      example: jobstreet
 
     SalaryAmount:
       type: object
