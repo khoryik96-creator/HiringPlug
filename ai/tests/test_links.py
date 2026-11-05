@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import io
+import zipfile
 
+import pdfplumber
+import pytest
 from docx import Document
 from docx.opc.constants import RELATIONSHIP_TYPE
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from hiringplug_ai.extraction import extract
-from hiringplug_ai.extraction.links import clean, with_links
+from hiringplug_ai.extraction.links import clean, docx_links, with_links
 from hiringplug_ai.parsing import parse_cv
 
 
@@ -74,3 +77,31 @@ def test_links_already_shown_and_format_addresses_are_left_out() -> None:
     assert clean("http://schemas.openxmlformats.org/x") == ""
     assert clean("mailto:siti@example.com") == ""
     assert clean("lnkd.in/abc)") == "https://lnkd.in/abc"
+
+
+def test_a_pdf_is_opened_once_for_its_text_and_its_links(monkeypatch: pytest.MonkeyPatch) -> None:
+    opened = 0
+    real_open = pdfplumber.open
+
+    def counting_open(*args: object, **kwargs: object) -> object:
+        nonlocal opened
+        opened += 1
+        return real_open(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(pdfplumber, "open", counting_open)
+    result = extract(linked_pdf(), ocr=None)
+    assert opened == 1
+    assert result.links[0] == "https://my.linkedin.com/in/siti-aisyah-123"
+
+
+def test_word_link_targets_are_unescaped_before_use() -> None:
+    rels = (
+        '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"'
+        ' Target="https://www.linkedin.com/in/o&#39;brien-1?a=1&amp;b=2" TargetMode="External"/>'
+        "</Relationships>"
+    )
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as z:
+        z.writestr("word/_rels/document.xml.rels", rels)
+    assert docx_links(out.getvalue()) == ["https://www.linkedin.com/in/o'brien-1?a=1&b=2"]

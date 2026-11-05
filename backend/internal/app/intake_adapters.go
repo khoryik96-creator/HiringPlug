@@ -79,12 +79,19 @@ func cvFromParsed(p api.ParsedProfile) candidates.FromCV {
 	for _, s := range p.Skills {
 		cv.Profile.Skills = append(cv.Profile.Skills, s.Value)
 	}
+	latest := -1 // the job marked current, else the first listed (as the CV review)
 	for i, j := range p.Experience {
 		job := candidates.Job{Title: value(j.Title), Company: value(j.Company), StartDate: plain(j.StartDate), EndDate: plain(j.EndDate), Current: j.Current}
-		if i == 0 || j.Current && cv.Profile.CurrentTitle == nil {
-			cv.Profile.CurrentTitle, cv.Profile.CurrentCompany = job.Title, job.Company
+		if latest < 0 && j.Current {
+			latest = i
 		}
 		cv.History.Work = append(cv.History.Work, job)
+	}
+	if latest < 0 && len(cv.History.Work) > 0 {
+		latest = 0
+	}
+	if latest >= 0 {
+		cv.Profile.CurrentTitle, cv.Profile.CurrentCompany = cv.History.Work[latest].Title, cv.History.Work[latest].Company
 	}
 	for _, e := range p.Education {
 		cv.History.Education = append(cv.History.Education, candidates.Qualification{

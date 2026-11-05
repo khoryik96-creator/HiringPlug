@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
 // Service holds the intake use cases.
@@ -132,16 +133,15 @@ func (s *Service) readDone(ctx context.Context, tx pgx.Tx, documentID string, pr
 	}
 	finish := store.FinishItemParams{ID: item.ID, Status: Unread, CandidateID: item.CandidateID}
 	if profile != nil && item.CandidateID != nil {
-		owner, err := s.deps.Candidates.FillFromCV(ctx, tx, *item.CandidateID, *profile)
+		// A problem here must not undo the CV's reading (this runs in its
+		// transaction): the file is then shown as one to fill in by hand.
+		status, candidateID, err := s.fill(ctx, tx, *item.CandidateID, *profile)
 		if err != nil {
-			return err
-		}
-		finish.Status = Created
-		if owner != "" { // one candidate per email: the file joins them
-			if err := s.deps.Candidates.MergeInto(ctx, tx, owner, *item.CandidateID); err != nil {
-				return err
-			}
-			finish.Status, finish.CandidateID = Added, &owner
+			logx.From(ctx).Warn("an imported CV could not fill its candidate in", "item_id", item.ID, "error", err)
+			msg := "The details read from the file could not be saved: fill them in."
+			finish.Error = &msg
+		} else {
+			finish.Status, finish.CandidateID = status, &candidateID
 		}
 	}
 	if err := q.FinishItem(ctx, finish); err != nil {
@@ -150,6 +150,28 @@ func (s *Service) readDone(ctx context.Context, tx pgx.Tx, documentID string, pr
 	return audit.Record(ctx, tx, audit.Entry{
 		Action: "cv_import.file_read", EntityType: "cv_import", EntityID: item.ImportID, Changes: map[string]any{"status": finish.Status},
 	})
+}
+
+// fill fills the file's candidate in from the CV, or merges them into the
+// candidate who already has its email, in a savepoint.
+func (s *Service) fill(ctx context.Context, tx pgx.Tx, candidateID string, profile api.ParsedProfile) (status, finalID string, err error) {
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	defer func() { _ = sp.Rollback(ctx) }()
+	owner, err := s.deps.Candidates.FillFromCV(ctx, sp, candidateID, profile)
+	if err != nil {
+		return "", "", err
+	}
+	status, finalID = Created, candidateID
+	if owner != "" { // one candidate per email: the file joins them
+		if err := s.deps.Candidates.MergeInto(ctx, sp, owner, candidateID); err != nil {
+			return "", "", err
+		}
+		status, finalID = Added, owner
+	}
+	return status, finalID, sp.Commit(ctx)
 }
 
 // List returns the user's latest imports with their files.

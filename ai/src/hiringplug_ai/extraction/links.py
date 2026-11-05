@@ -8,6 +8,7 @@ HiringPlug does the same for PDF and Word files."""
 
 from __future__ import annotations
 
+import html
 import io
 import re
 import zipfile
@@ -37,7 +38,8 @@ def clean(url: str) -> str:
     return u[:300]
 
 
-def _ordered(urls: list[str]) -> list[str]:
+def ordered(urls: list[str]) -> list[str]:
+    """Links a person wrote, once each, at most MAX_LINKS, LinkedIn first."""
     seen: dict[str, str] = {}
     for raw in urls:
         u = clean(raw)
@@ -48,19 +50,17 @@ def _ordered(urls: list[str]) -> list[str]:
     return links
 
 
-def pdf_links(data: bytes) -> list[str]:
-    import pdfplumber  # noqa: PLC0415
-
+def page_links(page: Any) -> list[str]:
+    """The addresses of a PDF page's link annotations (read with its text, so the
+    file is opened once)."""
     urls: list[str] = []
-    with pdfplumber.open(io.BytesIO(data)) as pdf:
-        for page in pdf.pages:
-            for link in getattr(page, "hyperlinks", None) or []:
-                uri: Any = link.get("uri")
-                if isinstance(uri, bytes):
-                    uri = uri.decode("latin-1", "ignore")
-                if isinstance(uri, str):
-                    urls.append(uri)
-    return _ordered(urls)
+    for link in getattr(page, "hyperlinks", None) or []:
+        uri: Any = link.get("uri")
+        if isinstance(uri, bytes):
+            uri = uri.decode("latin-1", "ignore")
+        if isinstance(uri, str):
+            urls.append(uri)
+    return urls
 
 
 def docx_links(data: bytes) -> list[str]:
@@ -69,8 +69,8 @@ def docx_links(data: bytes) -> list[str]:
         for name in z.namelist():
             if name.startswith("word/_rels/") and name.endswith(".rels"):
                 xml = z.read(name).decode("utf-8", "ignore")
-                urls += [a or b for a, b in _REL.findall(xml)]
-    return [u.replace("&amp;", "&") for u in _ordered(urls)]
+                urls += [html.unescape(a or b) for a, b in _REL.findall(xml)]  # &amp;, &#39;, ...
+    return ordered(urls)
 
 
 def with_links(text: str, links: list[str]) -> str:

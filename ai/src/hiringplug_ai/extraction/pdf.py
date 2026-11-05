@@ -17,6 +17,7 @@ Mechanism (from CV Studio, where it was tuned on real CVs):
 
 from __future__ import annotations
 
+import dataclasses
 import io
 from dataclasses import dataclass
 from importlib.metadata import version
@@ -24,6 +25,7 @@ from typing import Any
 
 from .columns import page_text
 from .limits import DocumentRejectedError, Limits
+from .links import ordered, page_links
 from .ocr import OcrEngine, OcrPages
 from .result import Extraction
 from .text import clean_text, letter_count, looks_unextractable
@@ -49,10 +51,15 @@ def extract_pdf(data: bytes, limits: Limits, ocr: OcrEngine | None) -> Extractio
                 f"The PDF has {len(pdf.pages)} pages; the limit is {limits.max_pdf_pages}."
             )
         pages = []
+        urls: list[str] = []
         for page in pdf.pages:
             text = page_text(page)
             pages.append(_Page(text=text, ocr_reason=page_ocr_reason(page, text)))
+            urls += page_links(page)
+    return dataclasses.replace(_read(pages, data, limits, ocr), links=ordered(urls))
 
+
+def _read(pages: list[_Page], data: bytes, limits: Limits, ocr: OcrEngine | None) -> Extraction:
     # A renderable PDF that exposes no text at all: try OCR on every page.
     if pages and not any(p.text.strip() for p in pages):
         for p in pages:

@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -136,5 +137,71 @@ func TestImportingCVsAndLinkedInPDFs(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/cv-imports/"+imp.Id, other, nil).Status)
 		res := a.upload("/v1/cv-imports/"+imp.Id+"/files", other, "", "x.pdf", minimalPDF)
 		assert.Equal(t, http.StatusNotFound, res.Status)
+	})
+}
+
+func TestAnImportedCVIsFilledInSafely(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	var imp api.CvImport
+	a.request(http.MethodPost, "/v1/cv-imports", token, map[string]any{"source": "linkedin"}).JSON(&imp)
+	add := func(name string) api.CvImportItem {
+		var it api.CvImportItem
+		a.upload("/v1/cv-imports/"+imp.Id+"/files", token, "", name, minimalPDF).JSON(&it)
+		return it
+	}
+
+	t.Run("the current job is the current one, and values over the limits are left out", func(t *testing.T) {
+		it := add("Mei Ling.pdf")
+		longPlace := strings.Repeat("Petaling Jaya ", 15) // over 200 characters
+		text, profile := cvOf("Mei Ling Tan", "mei@example.com", "linkedin.com/in/mei")
+		text += "\n" + longPlace + "\nAccountant | Old Co\nSenior Accountant | Maju Berhad"
+		profile.Location = sourced(longPlace, longPlace)
+		profile.Experience = []api.ParsedJob{
+			{Title: sourced("Accountant", "Accountant"), Company: sourced("Old Co", "Old Co"), StartDate: nullable.NewNullableWithValue("2016")},
+			{Title: sourced("Senior Accountant", "Senior Accountant"), Company: sourced("Maju Berhad", "Maju Berhad"), Current: true, StartDate: nullable.NewNullableWithValue("2020")},
+		}
+		readImported(t, a, conn, it.Id, text, profile)
+
+		got := a.cvImport(token, imp.Id).Items[0]
+		require.Equal(t, api.CvImportItemStatusCreated, got.Status, "%+v", got)
+		var c api.Candidate
+		a.request(http.MethodGet, "/v1/candidates/"+got.CandidateId.MustGet(), token, nil).JSON(&c)
+		assert.Equal(t, "Senior Accountant", c.CurrentTitle.MustGet(), "the job marked current, not the first listed")
+		assert.Equal(t, "Maju Berhad", c.CurrentCompany.MustGet())
+		assert.True(t, c.Location.IsNull(), "a location over 200 characters is left out")
+		assert.Equal(t, "Mei", c.FirstName)
+	})
+
+	t.Run("a candidate merged away while read is shown to fill in, and the reading is kept", func(t *testing.T) {
+		it := add("Ravi.pdf")
+		keep := a.createCandidate(token, map[string]any{"firstName": "Ravi"})
+		res := a.request(http.MethodPost, "/v1/candidates/"+keep.Id+"/merge", token,
+			map[string]any{"duplicateId": it.CandidateId.MustGet(), "version": keep.Version})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+
+		text, profile := cvOf("Ravi Shankar", "ravi@example.com", "linkedin.com/in/ravi")
+		readImported(t, a, conn, it.Id, text, profile)
+
+		var got api.CvImportItem
+		for _, i := range a.cvImport(token, imp.Id).Items {
+			if i.Id == it.Id {
+				got = i
+			}
+		}
+		assert.Equal(t, api.CvImportItemStatusUnread, got.Status)
+		assert.Contains(t, got.Error.MustGet(), "fill them in")
+		var docs api.DocumentList
+		a.request(http.MethodGet, "/v1/candidates/"+keep.Id+"/documents", token, nil).JSON(&docs)
+		require.Len(t, docs.Items, 1)
+		var doc api.Document
+		a.request(http.MethodGet, "/v1/documents/"+docs.Items[0].Id, token, nil).JSON(&doc)
+		assert.Equal(t, api.DocumentParseStatusParsed, doc.ParseStatus.MustGet(), "the CV's reading is saved all the same")
 	})
 }

@@ -16,7 +16,7 @@ from collections.abc import Callable
 from .doc_reader import extract_doc
 from .docx_reader import extract_docx
 from .limits import DEFAULT_LIMITS, DocumentRejectedError, Limits
-from .links import docx_links, pdf_links, with_links
+from .links import docx_links, with_links
 from .ocr import OcrEngine, TesseractOcr
 from .pdf import extract_pdf
 from .result import Extraction
@@ -31,9 +31,9 @@ def extract(data: bytes, *, ocr: OcrEngine | None, limits: Limits = DEFAULT_LIMI
     kind = sniff(data)
     try:
         if kind == "pdf":
-            return _add_links(extract_pdf(data, limits, ocr), data, pdf_links)
+            return _add_links(extract_pdf(data, limits, ocr))  # links read with the text
         if kind == "docx":
-            return _add_links(extract_docx(data, limits), data, docx_links)
+            return _add_links(extract_docx(data, limits), lambda: docx_links(data))
         if kind == "doc":
             return extract_doc(data, limits)
     except DocumentRejectedError as exc:
@@ -47,13 +47,13 @@ def extract(data: bytes, *, ocr: OcrEngine | None, limits: Limits = DEFAULT_LIMI
     )
 
 
-def _add_links(result: Extraction, data: bytes, read: Callable[[bytes], list[str]]) -> Extraction:
+def _add_links(result: Extraction, read: Callable[[], list[str]] | None = None) -> Extraction:
     """Kano's way: links hidden behind words ("LinkedIn") are added to the text."""
     if result.status != "extracted" or not result.text:
         return result
     try:
-        links = read(data)
+        links = read() if read else result.links
     except Exception:  # the text stands without them
         log.warning("links could not be read", exc_info=True)
         return result
-    return dataclasses.replace(result, text=with_links(result.text, links))
+    return dataclasses.replace(result, text=with_links(result.text, links), links=links)

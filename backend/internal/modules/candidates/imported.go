@@ -5,7 +5,6 @@ package candidates
 
 import (
 	"context"
-	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -52,30 +51,6 @@ func (m *Module) CreatePlaceholder(ctx context.Context, tx pgx.Tx, fileName, sou
 	})
 }
 
-// fillEmpty takes the CV's value for each field the profile has empty.
-func fillEmpty(p, cv Profile) Profile {
-	take := func(k **string, v *string) {
-		if *k == nil && v != nil {
-			*k = v
-		}
-	}
-	take(&p.Phone, cv.Phone)
-	take(&p.Location, cv.Location)
-	take(&p.Nationality, cv.Nationality)
-	take(&p.ResidenceCountry, cv.ResidenceCountry)
-	take(&p.LinkedinURL, cv.LinkedinURL)
-	take(&p.Industry, cv.Industry)
-	take(&p.CurrentTitle, cv.CurrentTitle)
-	take(&p.CurrentCompany, cv.CurrentCompany)
-	if p.NoticePeriod == nil {
-		p.NoticePeriod = cv.NoticePeriod
-	}
-	if len(p.Skills) == 0 {
-		p.Skills = cv.Skills
-	}
-	return p
-}
-
 // FillFromCV fills an imported candidate in from their CV: the name, and
 // every empty field; the work history and education when they have none.
 // A CV value the rules refuse (a phone in no known format) is left out. When
@@ -88,7 +63,12 @@ func (m *Module) FillFromCV(ctx context.Context, tx pgx.Tx, id string, cv FromCV
 		return "", err
 	}
 	before := fromRow(row).Profile
-	after := fillEmpty(before, cv.Profile)
+	fromCV := cv.Profile
+	fromCV.Email = nil // set below, once it is known to be nobody else's
+	after, _ := FillFrom(before, fromCV)
+	if len(after.Skills) == 0 {
+		after.Skills = cv.Profile.Skills
+	}
 	if strings.TrimSpace(cv.FirstName) != "" {
 		after.FirstName, after.LastName = cv.FirstName, cv.LastName
 	}
@@ -137,19 +117,11 @@ func (m *Module) FillFromCV(ctx context.Context, tx pgx.Tx, id string, cv FromCV
 // not one a CV fills.
 func dropField(p *Profile, before Profile, field string) bool {
 	switch {
-	case field == "phone":
-		p.Phone = before.Phone
-	case field == "email":
-		p.Email = before.Email
-	case field == "linkedinUrl":
-		p.LinkedinURL = before.LinkedinURL
-	case field == "nationality":
-		p.Nationality = before.Nationality
-	case field == "residenceCountry":
-		p.ResidenceCountry = before.ResidenceCountry
+	case cvText(p, field) != nil:
+		*cvText(p, field) = *cvText(&before, field)
 	case strings.HasPrefix(field, "noticePeriod"):
 		p.NoticePeriod = before.NoticePeriod
-	case slices.Contains([]string{"firstName", "lastName"}, field):
+	case field == "firstName" || field == "lastName":
 		p.FirstName, p.LastName = before.FirstName, before.LastName
 	case strings.HasPrefix(field, "skills"):
 		p.Skills = before.Skills
@@ -157,4 +129,29 @@ func dropField(p *Profile, before Profile, field string) bool {
 		return false
 	}
 	return true
+}
+
+// cvText is the text field a CV fills, by its API name; nil for others.
+func cvText(p *Profile, field string) **string {
+	switch field {
+	case "email":
+		return &p.Email
+	case "phone":
+		return &p.Phone
+	case "linkedinUrl":
+		return &p.LinkedinURL
+	case "nationality":
+		return &p.Nationality
+	case "residenceCountry":
+		return &p.ResidenceCountry
+	case "industry":
+		return &p.Industry
+	case "currentTitle":
+		return &p.CurrentTitle
+	case "currentCompany":
+		return &p.CurrentCompany
+	case "location":
+		return &p.Location
+	}
+	return nil
 }

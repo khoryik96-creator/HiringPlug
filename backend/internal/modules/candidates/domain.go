@@ -4,10 +4,12 @@ package candidates
 // HTTP. Everything here is unit-tested in domain_test.go.
 
 import (
+	"fmt"
 	"net/mail"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nyaruka/phonenumbers"
 
@@ -218,7 +220,39 @@ func NormalizeProfile(p Profile, phoneRegion string) (Profile, apperr.FieldError
 	}
 	p.Tags = CleanLabels(p.Tags)
 	p.Skills = CleanLabels(p.Skills)
+	checkLengths(p, &errs)
 	return p, errs
+}
+
+// checkLengths applies the contract's (and the database's) limits, for
+// profiles that do not come through the API, such as one read from a CV.
+func checkLengths(p Profile, errs *apperr.FieldErrors) {
+	long := func(field string, v *string, maxRunes int) {
+		if v != nil && utf8.RuneCountInString(*v) > maxRunes {
+			errs.Add(field, fmt.Sprintf("must be at most %d characters", maxRunes))
+		}
+	}
+	long("firstName", &p.FirstName, 100)
+	long("lastName", &p.LastName, 100)
+	long("email", p.Email, 254)
+	long("linkedinUrl", p.LinkedinURL, 300)
+	long("industry", p.Industry, 100)
+	long("specialization", p.Specialization, 100)
+	long("currentTitle", p.CurrentTitle, 200)
+	long("currentCompany", p.CurrentCompany, 200)
+	long("location", p.Location, 200)
+	if len(p.Skills) > 100 {
+		errs.Add("skills", "must be at most 100")
+	}
+	if len(p.Tags) > 50 {
+		errs.Add("tags", "must be at most 50")
+	}
+	for i, s := range p.Skills {
+		long(fmt.Sprintf("skills[%d]", i), &s, 60)
+	}
+	for i, t := range p.Tags {
+		long(fmt.Sprintf("tags[%d]", i), &t, 60)
+	}
 }
 
 // NormalizePhone returns number in E.164 form (+60123456789), or false if it

@@ -71,6 +71,9 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(url).toBe("/v1/cv-imports/cvi_01jbz6w0m0k8q9x2r3s4t5v6w7/files");
     expect(((init.body as FormData).get("file") as File).name).toBe("Siti Aisyah.pdf");
     expect(new Headers(init.headers).has("Authorization")).toBe(true);
+    // The picker is emptied, so the same files can be picked again.
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("CV files").files?.length ?? 0).toBe(0); });
+    expect(screen.getByRole("button", { name: "Import 0 files" })).toBeTruthy();
   });
 
   it("shows each file's result, with a link to its candidate", async () => {

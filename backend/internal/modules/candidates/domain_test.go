@@ -1,6 +1,8 @@
 package candidates
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -97,4 +99,24 @@ func TestExpectedSalaryRangeMustNotRunBackwards(t *testing.T) {
 	bad := ValidateCompensation(nil, &SalaryRange{Min: "9000", Max: ptr("8999.99"), Currency: "MYR", Period: "month"})
 	assert.Len(t, bad, 1)
 	assert.Equal(t, "expectedSalary.max", bad[0].Field)
+}
+
+func TestProfilesNotFromTheAPIKeepItsLimits(t *testing.T) {
+	// A profile read from a CV skips the contract's checks; the same limits apply.
+	link := "linkedin.com/in/" + strings.Repeat("a", 280) // 296 characters, 304 once tidied
+	skills := make([]string, 101)
+	for i := range skills {
+		skills[i] = fmt.Sprintf("skill %d", i)
+	}
+	_, errs := NormalizeProfile(Profile{
+		FirstName: strings.Repeat("é", 101), LinkedinURL: &link, CurrentTitle: ptr(strings.Repeat("x", 201)), Skills: skills,
+	}, "MY")
+	var fields []string
+	for _, e := range errs {
+		fields = append(fields, e.Field)
+	}
+	assert.ElementsMatch(t, []string{"firstName", "linkedinUrl", "currentTitle", "skills"}, fields)
+
+	_, errs = NormalizeProfile(Profile{FirstName: strings.Repeat("é", 100), CurrentTitle: ptr(strings.Repeat("x", 200))}, "MY")
+	assert.Empty(t, errs, "at the limit is fine; characters are counted, not bytes")
 }

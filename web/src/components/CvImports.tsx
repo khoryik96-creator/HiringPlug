@@ -38,6 +38,7 @@ export function CvImports() {
   const fs = useFieldSettings();
   const [source, setSource] = useState("linkedin");
   const [files, setFiles] = useState<File[]>([]);
+  const [picker, setPicker] = useState(0); // a new file input after each import, so the same files can be picked again
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
 
@@ -66,6 +67,7 @@ export function CvImports() {
     onSettled: () => {
       setSent(null);
       setFiles([]);
+      setPicker((n) => n + 1);
       void queryClient.invalidateQueries({ queryKey: cvImportsKey });
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
     },
@@ -81,7 +83,7 @@ export function CvImports() {
       </p>
       <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
       <div className="row">
-        <input type="file" multiple accept=".pdf,.docx,.doc" aria-label="CV files"
+        <input key={picker} type="file" multiple accept=".pdf,.docx,.doc" aria-label="CV files"
           onChange={(e) => { setFiles([...(e.target.files ?? [])]); }} />
         <button type="button" disabled={files.length === 0 || source === "" || start.isPending} onClick={() => { start.mutate(); }}>
           Import {files.length === 1 ? "1 file" : `${String(files.length)} files`}
