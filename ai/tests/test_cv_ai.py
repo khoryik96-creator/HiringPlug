@@ -78,6 +78,25 @@ def test_a_thin_reading_is_filled_but_never_overwritten() -> None:
     )
 
 
+def test_an_unexpected_ai_error_keeps_the_rules_reading() -> None:
+    class Broken:
+        def complete(self, system: str, user: str, *, max_tokens: int) -> Completion:
+            raise RuntimeError("bug")
+
+    deps = Deps(download=lambda u, n: b"", ocr=None, limits=DEFAULT_LIMITS, max_download_bytes=1, ai=Broken())
+    payload = {
+        "documentId": "doc_01jbz6w0m0k8q9x2r3s4t5v6w7",
+        "text": FULL_CV,
+        "useAi": True,
+        "aiText": FULL_CV,
+    }
+    [result] = parse_cv.run(DocumentParseCvJob.model_validate(payload), deps)
+    assert isinstance(result.payload, DocumentCvParsedJob)
+    assert result.payload.errorMessage is None
+    assert result.payload.profile is not None
+    assert result.payload.profile.fullName is not None
+
+
 def test_a_failing_provider_leaves_the_rules_reading() -> None:
     profile = rules(THIN_CV)
     got = cv_ai.fill(profile, THIN_CV, FakeAI(ProviderError("down")))
@@ -95,8 +114,16 @@ def test_the_job_uses_the_ai_only_when_go_allows_it() -> None:
     assert isinstance(off.payload, DocumentCvParsedJob)
     assert off.payload.aiTokens == 0
 
-    [on] = parse_cv.run(DocumentParseCvJob.model_validate(payload | {"useAi": True}), deps)
+    salaried = FULL_CV + "Expected salary: RM 8,500\n"
+    ai_text = FULL_CV + "Expected [salary removed]\n"  # as Go sends it
+    with_ai: dict[str, object] = {**payload, "text": salaried, "useAi": True}
+    parse_cv.run(DocumentParseCvJob.model_validate(with_ai), deps)
+    assert ai.calls == [], "without the salary-free copy the AI is not asked"
+
+    [on] = parse_cv.run(DocumentParseCvJob.model_validate(with_ai | {"aiText": ai_text}), deps)
     result = DocumentCvParsedJob.model_validate(on.payload.model_dump(mode="json"))
     assert result.aiTokens == 460
+    [(_, prompt)] = ai.calls
+    assert "8,500" not in prompt, "salary never goes to the AI"
     assert result.profile is not None
     assert result.profile.industry is not None

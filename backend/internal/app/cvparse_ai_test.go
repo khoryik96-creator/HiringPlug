@@ -42,12 +42,16 @@ func TestTheAIFillsCVReadingsOnlyWhenOnAndCounts(t *testing.T) {
 	offToken := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 	_, _, payload := readCV(t, off, conn, offToken, "SITI AISYAH")
 	assert.False(t, *payload.UseAi, "the AI is off")
+	assert.Nil(t, payload.AiText)
 
 	on := newTestApp(t, assistantOn)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
 	token := tenant.Users[api.RoleRecruiter].Token
-	doc, job, payload := readCV(t, on, conn, token, "SITI AISYAH works at Contoh Sdn Bhd")
+	doc, job, payload := readCV(t, on, conn, token, "SITI AISYAH works at Contoh Sdn Bhd\nExpected salary: RM 8,500")
 	assert.True(t, *payload.UseAi)
+	require.NotNil(t, payload.AiText)
+	assert.Equal(t, "SITI AISYAH works at Contoh Sdn Bhd\nExpected [salary removed]", *payload.AiText, "salary never goes to the AI")
+	assert.Contains(t, payload.Text, "8,500", "quotes still come from the saved text")
 
 	tokens := 1700
 	answerAIJob(t, on, conn, job, api.JobKindDocumentCvParsed, api.DocumentCvParsedJob{

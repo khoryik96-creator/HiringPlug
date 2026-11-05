@@ -5,6 +5,7 @@ import { api, type Candidate, type Schemas, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
 import { applyBody, historyFromProfile, newSkills, suggestions } from "./cvSuggestions";
 import { ErrorMessage } from "./ErrorMessage";
+import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 
 /**
@@ -132,6 +133,7 @@ function Review({ profile, candidate, onDone }: { profile: Schemas["ParsedProfil
         <button type="button" className="link" onClick={onDone}>Close</button>
       </div>
       <SaveError error={apply.error} shown={[]} onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(candidate.id) }); onDone(); }} />
+      <DuplicateEmail error={apply.error} />
       {profile.dropped > 0 && (
         <p className="muted">{profile.dropped} value(s) were left out because the CV text did not support them.</p>
       )}

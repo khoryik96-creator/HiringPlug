@@ -1062,6 +1062,13 @@ class DocumentParseCvJob(BaseModel):
             description="The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left.\n"
         ),
     ] = None
+    aiText: Annotated[
+        str | None,
+        Field(
+            description="What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text.\n",
+            pattern="^[^\\x00]*$",
+        ),
+    ] = None
 
 
 class DocumentCvParsedJob(BaseModel):

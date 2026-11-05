@@ -22,9 +22,12 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
     tokens = 0
     try:
         profile = parse_cv(payload.text)
-        if payload.useAi and deps.ai is not None:
-            filled = cv_ai.fill(profile, payload.text, deps.ai)
-            profile, tokens = filled.profile, filled.tokens
+        if payload.useAi and payload.aiText and deps.ai is not None:
+            try:
+                filled = cv_ai.fill(profile, payload.aiText, deps.ai)  # never the salary figures
+                profile, tokens = filled.profile, filled.tokens
+            except Exception:  # an AI-step bug must not lose the rules' reading
+                log.warning("ai fill failed", exc_info=True, extra={"document_id": payload.documentId.root})
     except Exception:  # a rule bug must not leave the CV "being read" forever
         # Retrying cannot change the outcome for the same text: report the
         # failure, so the document shows "details could not be read".

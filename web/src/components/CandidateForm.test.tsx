@@ -31,6 +31,16 @@ describe("candidate form", () => {
     expect(sentBody(patch)).toMatchObject({ version: 3, currentTitle: "Senior Accountant" });
   });
 
+  it("names the candidate who already has the email, with a link", async () => {
+    vi.spyOn(api, "PATCH").mockResolvedValue(failure("CANDIDATE_DUPLICATE_EMAIL", "Another candidate already has this email.",
+      { existingCandidateId: "cand_9", existingCandidateName: "Siti Aishah", existingOwnerName: "Aina" }, 409));
+    renderWithClient(<CandidateForm candidate={testCandidate()} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "taken@example.com" } });
+    save();
+    expect((await screen.findByRole("link", { name: "Siti Aishah" })).getAttribute("href")).toBe("#/candidates/cand_9");
+    expect(screen.getByText(/owned by Aina/)).toBeTruthy();
+  });
+
   it("closes without saving when nothing changed", async () => {
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate()));
     const onDone = vi.fn();

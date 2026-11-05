@@ -409,6 +409,12 @@ components:
             rules find name, email, phone, current title and company, only the
             industry is asked for). Set when the AI is on and the company has
             allowance left.
+        aiText:
+          type: string
+          pattern: '^[^\x00]*$'
+          description: >
+            What the AI may read: the text with salary figures taken out (salary
+            never goes to the AI). Sent with useAi; quotes still come from text.
     DocumentCvParsedJob:
       type: object
       additionalProperties: false

@@ -53,6 +53,19 @@ def _place(text: str) -> tuple[str, str] | None:
     return None
 
 
+_WANTS = re.compile(r"(?i)\b(?:seeking|looking|open to|relocat\w*|willing|prefer\w*|target\w*|interested)\b")
+_LIVES = re.compile(r"(?i)\b(?:based in|lives? in|living in|located in|resides? in|address|alamat)\b")
+
+
+def _address_like(text: str) -> bool:
+    """A header line that says where someone is, not where they would like
+    to work or whom they work for: a labelled place, or one with an address's
+    digits or commas."""
+    if _WANTS.search(text):
+        return False
+    return bool(_LIVES.search(text) or re.search(r"\d|,", text))
+
+
 def residence_country(
     lines: list[Line], location: tuple[str, str] | None, phone: tuple[str, str] | None
 ) -> tuple[str, str] | None:
@@ -60,7 +73,7 @@ def residence_country(
     if location and (found := _place(location[1])):
         return found
     for line in lines[:12]:  # the CV's header, where people put their address
-        if found := _place(line.text):
+        if _address_like(line.text) and (found := _place(line.text)):
             return found
     if phone:
         number = phone[1].strip()

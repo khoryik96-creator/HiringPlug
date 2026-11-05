@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
 )
 
 // saveExtraction handles document.text_extracted: the Python worker's result.
@@ -78,9 +79,12 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 			return err
 		}
 	}
-	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentParseCv, api.DocumentParseCvJob{
-		DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI,
-	}); err != nil {
+	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI}
+	if useAI {
+		forAI := redact.WithoutSalary(*row.ExtractedText) // salary never goes to the AI
+		job.AiText = &forAI
+	}
+	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentParseCv, job); err != nil {
 		return err
 	}
 	_, err := store.New(tx).QueueParse(ctx, row.ID)

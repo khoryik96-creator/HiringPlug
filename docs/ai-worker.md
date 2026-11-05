@@ -153,7 +153,13 @@ industry prompt and list). Otherwise the AI fills what the rules left empty
 its quote and goes through the same check in Go, so an invented value is
 dropped like any other; an industry outside Kano's list is dropped in Python.
 Go offers the AI only while it is on and the company has allowance left
-(`useAi` on the job); the tokens it used come back and count in the one
+(`useAi` on the job), with a copy of the text from which salary figures are
+taken out (`aiText`, `redact.WithoutSalary`): salary never goes to the AI.
+Unlike the assistant, the CV reader does send names and contact details, since
+reading them is its job. An unexpected error in the AI step keeps the rules'
+reading. A job title only counts towards the industry for IT work (as Kano's
+ERP rules), and only header lines that read like an address set the country
+of residence; the tokens it used come back and count in the one
 monthly allowance the assistant and matching share. The parser then reads
 `rules@1+ai`.
 

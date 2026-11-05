@@ -16,6 +16,7 @@ import { LabelInput } from "./LabelInput";
 import { labelFor, noticeKey, useFieldSettings } from "./useFieldSettings";
 import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 import { SourcePicker } from "./SourcePicker";
 
@@ -150,6 +151,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
         shown={Object.values(FIELD_PATHS)}
         onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(opened.id) }); onDone(); }}
       />
+      <div className="full"><DuplicateEmail error={save.error} /></div>
     </form>
   );
 }

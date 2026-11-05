@@ -67,13 +67,14 @@ WORDS: list[tuple[str, str]] = [
     ),
     (
         "Property & Construction",
-        r"propert|construction|builders|developer|real estate|realty|architect|hotel|resort|"
+        r"propert|construction|builders|real estate|realty|architect|hotel|resort|"
         r"hospitality|tourism",
     ),
     (
         "Industrial/Manufacturing",
         r"manufactur|semiconductor|electronics|automotive|oil ?& ?gas|petroleum|chemical|"
-        r"plantation|logistic|freight|shipping|energy|power|utilities|industries|steel|rubber|gloves",
+        r"plantation|logistic|freight|shipping|energy|"
+        r"power (?:plant|station|generation)|utilities|industries|steel|rubber|gloves",
     ),
     ("FMCG", r"\bfood|beverage|consumer goods|fmcg|retail|fashion|apparel|cosmetic|luxury"),
     ("Education", r"universit|college|school|academy|education|polytechnic|politeknik"),
@@ -98,9 +99,19 @@ def classify(text: str) -> str | None:
     return None
 
 
+# A job title says little about the employer's industry, except IT work (as
+# Kano's ERP and application-support rules): "Java Developer" is no property
+# developer, "Power BI Analyst" no power plant.
+_IT_TITLE = re.compile(
+    r"(?i)\b(?:sap|erp|oracle|crm|software|developer|programmer|devops|data engineer|it support|"
+    r"network engineer|system administrator|sysadmin|cloud|power bi|full[- ]stack|front[- ]end|back[- ]end)\b"
+)
+
+
 def industry(company: str | None, title: str | None) -> tuple[str, str] | None:
-    """(industry, quote): from the employer's name, else its job title."""
-    for words in (company, title):
-        if words and (found := classify(words)):
-            return found, words
+    """(industry, quote): from the employer's name, else IT work in its job title."""
+    if company and (found := classify(company)):
+        return found, company
+    if title and _IT_TITLE.search(title):
+        return "Information Technology & Services", title
     return None

@@ -34,6 +34,10 @@ def test_an_employer_further_down_says_nothing_about_where_they_live() -> None:
     )
     assert where(text) is None, "not known: shown as NA"
     assert where("AHMAD\nkl office") is None, "kl only in capitals"
+    assert where("AHMAD\nSeeking opportunities in Singapore, KL or Penang") is None, (
+        "where they would like to work"
+    )
+    assert where("AHMAD\nAnalyst | Shopee Malaysia") is None, "whom they work for"
 
 
 @pytest.mark.parametrize(
@@ -54,6 +58,10 @@ def test_an_employer_further_down_says_nothing_about_where_they_live() -> None:
         ("Kementerian Kewangan", None, "Government Sector"),
         ("KPJ Healthcare", None, "Life Science/Medical"),
         ("Contoh Sdn Bhd", "Clerk", None),
+        ("Contoh Sdn Bhd", "Java Developer", "Information Technology & Services"),
+        ("Contoh Sdn Bhd", "Power BI Analyst", "Information Technology & Services"),
+        ("Contoh Sdn Bhd", "Audit Associate", None),  # a title says little about the employer
+        ("Sunrise Property Developer Sdn Bhd", None, "Property & Construction"),
     ],
 )
 def test_industry_of_the_latest_employer(company: str, title: str | None, expected: str | None) -> None:
