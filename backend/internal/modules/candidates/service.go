@@ -28,6 +28,7 @@ type Service struct {
 	users       Users
 	rules       FieldRules // the company's mandatory fields and sources
 	movers      []RecordMover
+	notes       Notes // screening calls' notes
 }
 
 // Create adds a candidate.
@@ -142,47 +143,54 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expectedVersion int, patch ProfilePatch) (View, error) {
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		q := store.New(tx)
-		row, err := q.GetCandidate(ctx, id)
-		if database.IsNoRows(err) {
-			return apperr.NotFound("candidate")
-		}
-		if err != nil {
-			return err
-		}
-		if int(row.Version) != expectedVersion {
-			return apperr.StaleVersion("candidate").WithDetail("currentVersion", row.Version)
-		}
-		before := fromRow(row).Profile
-		after, errs := NormalizeProfile(patch.Apply(before), s.phoneRegion)
-		if err := errs.Err(); err != nil {
-			return err
-		}
-		if err := s.checkFields(ctx, tx, &before, after); err != nil {
-			return err
-		}
-		if err := s.checkEmailFree(ctx, tx, after.Email, id); err != nil {
-			return err
-		}
-		updated, err := q.UpdateCandidate(ctx, updateParams(id, expectedVersion, after))
-		switch {
-		case database.IsNoRows(err):
-			return apperr.StaleVersion("candidate") // changed between our read and our write
-		case database.IsUniqueViolation(err, emailUniqueIndex):
-			return duplicateEmail("")
-		case err != nil:
-			return err
-		}
-		if err := audit.Record(ctx, tx, audit.Entry{
-			Action: "candidate.updated", EntityType: "candidate", EntityID: id,
-			Changes: audit.Diff(profileFields(before), profileFields(after)),
-		}); err != nil {
-			return err
-		}
-		view, err = loadView(ctx, tx, s.users, p, fromRow(updated))
+		var err error
+		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply)
 		return err
 	})
 	return view, err
+}
+
+// updateIn changes a candidate in the caller's transaction: change turns the
+// profile as stored into the new one.
+func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string, expectedVersion int, change func(Profile) Profile) (View, error) {
+	q := store.New(tx)
+	row, err := q.GetCandidate(ctx, id)
+	if database.IsNoRows(err) {
+		return View{}, apperr.NotFound("candidate")
+	}
+	if err != nil {
+		return View{}, err
+	}
+	if int(row.Version) != expectedVersion {
+		return View{}, apperr.StaleVersion("candidate").WithDetail("currentVersion", row.Version)
+	}
+	before := fromRow(row).Profile
+	after, errs := NormalizeProfile(change(before), s.phoneRegion)
+	if err := errs.Err(); err != nil {
+		return View{}, err
+	}
+	if err := s.checkFields(ctx, tx, &before, after); err != nil {
+		return View{}, err
+	}
+	if err := s.checkEmailFree(ctx, tx, after.Email, id); err != nil {
+		return View{}, err
+	}
+	updated, err := q.UpdateCandidate(ctx, updateParams(id, expectedVersion, after))
+	switch {
+	case database.IsNoRows(err):
+		return View{}, apperr.StaleVersion("candidate") // changed between our read and our write
+	case database.IsUniqueViolation(err, emailUniqueIndex):
+		return View{}, duplicateEmail("")
+	case err != nil:
+		return View{}, err
+	}
+	if err := audit.Record(ctx, tx, audit.Entry{
+		Action: "candidate.updated", EntityType: "candidate", EntityID: id,
+		Changes: audit.Diff(profileFields(before), profileFields(after)),
+	}); err != nil {
+		return View{}, err
+	}
+	return loadView(ctx, tx, s.users, p, fromRow(updated))
 }
 
 // SetCompensation replaces a candidate's salary details. expectedVersion is 0
@@ -193,37 +201,43 @@ func (s *Service) SetCompensation(ctx context.Context, p authz.Principal, candid
 	}
 	var result Compensation
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		q := store.New(tx)
-		exists, err := q.CandidateExists(ctx, candidateID)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return apperr.NotFound("candidate")
-		}
-		var row store.CandidateCompensation
-		if expectedVersion == 0 {
-			row, err = q.InsertCompensation(ctx, insertCompensationParams(candidateID, current, expected))
-		} else {
-			row, err = q.UpdateCompensation(ctx, updateCompensationParams(candidateID, expectedVersion, current, expected))
-		}
-		if database.IsNoRows(err) {
-			return apperr.StaleVersion("salary record")
-		}
-		if err != nil {
-			return err
-		}
-		// Salary values never go into the audit log, only the fact they changed.
-		if err := audit.Record(ctx, tx, audit.Entry{
-			Action: "candidate.compensation_updated", EntityType: "candidate", EntityID: candidateID,
-			Changes: map[string]any{"compensation": audit.Redacted},
-		}); err != nil {
-			return err
-		}
-		result, err = fromCompensationRow(row)
+		var err error
+		result, err = setCompensationIn(ctx, tx, candidateID, expectedVersion, current, expected)
 		return err
 	})
 	return result, err
+}
+
+// setCompensationIn writes checked salary details in the caller's transaction.
+func setCompensationIn(ctx context.Context, tx pgx.Tx, candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange) (Compensation, error) {
+	q := store.New(tx)
+	exists, err := q.CandidateExists(ctx, candidateID)
+	if err != nil {
+		return Compensation{}, err
+	}
+	if !exists {
+		return Compensation{}, apperr.NotFound("candidate")
+	}
+	var row store.CandidateCompensation
+	if expectedVersion == 0 {
+		row, err = q.InsertCompensation(ctx, insertCompensationParams(candidateID, current, expected))
+	} else {
+		row, err = q.UpdateCompensation(ctx, updateCompensationParams(candidateID, expectedVersion, current, expected))
+	}
+	if database.IsNoRows(err) {
+		return Compensation{}, apperr.StaleVersion("salary record")
+	}
+	if err != nil {
+		return Compensation{}, err
+	}
+	// Salary values never go into the audit log, only the fact they changed.
+	if err := audit.Record(ctx, tx, audit.Entry{
+		Action: "candidate.compensation_updated", EntityType: "candidate", EntityID: candidateID,
+		Changes: map[string]any{"compensation": audit.Redacted},
+	}); err != nil {
+		return Compensation{}, err
+	}
+	return fromCompensationRow(row)
 }
 
 // Exists reports whether a candidate exists in the transaction's tenant.

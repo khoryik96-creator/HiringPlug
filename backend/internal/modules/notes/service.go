@@ -25,33 +25,39 @@ type Service struct {
 
 // Create writes a note on an existing record.
 func (s *Service) Create(ctx context.Context, p authz.Principal, in Draft) (Note, error) {
+	var out Note
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		out, err = s.createIn(ctx, tx, p, in)
+		return err
+	})
+	return out, err
+}
+
+// createIn writes a note in the caller's transaction.
+func (s *Service) createIn(ctx context.Context, tx pgx.Tx, p authz.Principal, in Draft) (Note, error) {
 	d, errs := Normalize(in, p.Can(api.PermissionNotesSensitiveRead))
 	if err := errs.Err(); err != nil {
 		return Note{}, err
 	}
-	var out Note
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if err := s.requireSubject(ctx, tx, d.SubjectType, d.SubjectID); err != nil {
-			return err
-		}
-		author := p.Name
-		if author == "" {
-			author = p.Email
-		}
-		row, err := store.New(tx).InsertNote(ctx, store.InsertNoteParams{
-			SubjectType: d.SubjectType, SubjectID: d.SubjectID, Kind: d.Kind, Body: d.Body, Sensitive: d.Sensitive, AuthorName: author,
-		})
-		if err != nil {
-			return err
-		}
-		out = fromRow(row)
-		// The note's text is not copied into the audit log (it may be sensitive).
-		return audit.Record(ctx, tx, audit.Entry{
-			Action: "note.created", EntityType: d.SubjectType, EntityID: d.SubjectID,
-			Changes: map[string]any{"noteId": row.ID, "kind": d.Kind, "sensitive": d.Sensitive},
-		})
+	if err := s.requireSubject(ctx, tx, d.SubjectType, d.SubjectID); err != nil {
+		return Note{}, err
+	}
+	author := p.Name
+	if author == "" {
+		author = p.Email
+	}
+	row, err := store.New(tx).InsertNote(ctx, store.InsertNoteParams{
+		SubjectType: d.SubjectType, SubjectID: d.SubjectID, Kind: d.Kind, Body: d.Body, Sensitive: d.Sensitive, AuthorName: author,
 	})
-	return out, err
+	if err != nil {
+		return Note{}, err
+	}
+	// The note's text is not copied into the audit log (it may be sensitive).
+	return fromRow(row), audit.Record(ctx, tx, audit.Entry{
+		Action: "note.created", EntityType: d.SubjectType, EntityID: d.SubjectID,
+		Changes: map[string]any{"noteId": row.ID, "kind": d.Kind, "sensitive": d.Sensitive},
+	})
 }
 
 // List returns a record's notes the user may read, newest first, and how many

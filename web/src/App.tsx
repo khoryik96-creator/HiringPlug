@@ -15,6 +15,7 @@ import { ContactList } from "./pages/ContactList";
 import { Dashboard } from "./pages/Dashboard";
 import { EmailTemplates } from "./pages/EmailTemplates";
 import { ImportPage } from "./pages/ImportPage";
+import { ScreeningCall } from "./pages/ScreeningCall";
 import { JobDetail } from "./pages/JobDetail";
 import { CvTemplates } from "./pages/CvTemplates";
 import { Integrations } from "./pages/Integrations";
@@ -110,6 +111,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
 function Page({ hash, permissions, me }: { hash: string; permissions: Permission[]; me: Me }) {
   if (hash.startsWith("#/team") && permissions.includes("identity.team:manage")) return <Team myRole={me.role} myId={me.user.id} />;
   if (hash.startsWith("#/account")) return <><h2>Your account</h2><ChangePassword /></>;
+  const screening = /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/.exec(hash)?.[1];
+  if (screening) return <ScreeningCall key={screening} candidateId={screening} permissions={permissions} />;
   const compare = /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/.exec(hash)?.[1];
   if (compare) return <CompareCvs key={compare} candidateId={compare} />;
   const candidate = /^#\/candidates\/(cand_[0-9a-z]+)$/.exec(hash)?.[1];

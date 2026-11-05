@@ -442,6 +442,20 @@ it, and others see "2 sensitive notes are hidden". You delete your own notes;
 owners and admins any. Next: templates per company and notes on an
 application.
 
+✅ **Screening call** (candidate page: *Screening call*): the candidate's CV
+on one side (the newest one they sent; PDFs as they are, Word files as text;
+any version can be picked) and the call on the other, so the CV stays in view
+while you take notes, with the **AI assistant docked** underneath for
+prompting (summary, questions to ask). One *Save the call* updates the
+profile with what was asked: **salary and currency** (current and expected;
+needs `candidates.compensation:update`), **notice period** (the company's
+list), **work authorization**, **nationality**, and the **source only when the
+candidate has none** (an existing source is kept and the page says so). The
+notes become a screening note (sensitive if ticked). It is all or nothing: if
+one part is refused (e.g. a salary range that runs backwards, or someone saved
+the profile meanwhile), nothing is saved, and the notes typed are kept. The
+audit log records that a call was saved, never the salary.
+
 ## Import
 
 ✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick

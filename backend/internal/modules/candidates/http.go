@@ -135,20 +135,22 @@ func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateReque
 
 // PutCandidateCompensation handles PUT /v1/candidates/{candidateId}/compensation.
 func (h *HTTP) PutCandidateCompensation(ctx context.Context, req api.PutCandidateCompensationRequestObject) (api.PutCandidateCompensationResponseObject, error) {
-	b := req.Body
-	var current *SalaryAmount
-	if v, err := b.CurrentSalary.Get(); err == nil {
-		current = &SalaryAmount{Amount: v.Amount, Currency: v.Currency, Period: string(v.Period)}
-	}
-	var expected *SalaryRange
-	if v, err := b.ExpectedSalary.Get(); err == nil {
-		expected = &SalaryRange{Min: v.Min, Max: valueOrNil(v.Max), Currency: v.Currency, Period: string(v.Period)}
-	}
-	comp, err := h.svc.SetCompensation(ctx, authz.MustFromContext(ctx), req.CandidateId, b.ExpectedVersion, current, expected)
+	current, expected := salaryFromAPI(*req.Body)
+	comp, err := h.svc.SetCompensation(ctx, authz.MustFromContext(ctx), req.CandidateId, req.Body.ExpectedVersion, current, expected)
 	if err != nil {
 		return nil, err
 	}
 	return api.PutCandidateCompensation200JSONResponse(compensationToAPI(comp)), nil
+}
+
+func salaryFromAPI(b api.CompensationUpdate) (current *SalaryAmount, expected *SalaryRange) {
+	if v, err := b.CurrentSalary.Get(); err == nil {
+		current = &SalaryAmount{Amount: v.Amount, Currency: v.Currency, Period: string(v.Period)}
+	}
+	if v, err := b.ExpectedSalary.Get(); err == nil {
+		expected = &SalaryRange{Min: v.Min, Max: valueOrNil(v.Max), Currency: v.Currency, Period: string(v.Period)}
+	}
+	return current, expected
 }
 
 // --- domain -> contract ---

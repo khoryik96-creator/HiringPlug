@@ -63,7 +63,10 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       <div className="row spread">
         <h2>{c.fullName}</h2>
         {permissions.includes("candidates:update") && !editing && (
-          <button type="button" onClick={() => { setEditing(true); }}>Edit profile</button>
+          <span className="row">
+            <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
+            <button type="button" onClick={() => { setEditing(true); }}>Edit profile</button>
+          </span>
         )}
       </div>
       <p className="muted">

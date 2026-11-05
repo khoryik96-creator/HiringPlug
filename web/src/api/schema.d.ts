@@ -213,6 +213,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/screening-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a screening call, updating the candidate from it
+         * @description In one step: the call's notes become a screening note, and the profile takes what was asked (notice period, work authorization, nationality; the source only when the candidate has none), with the salary (needs candidates.compensation:update). Fields left out are not changed. Notes need notes:create; sensitive ones notes.sensitive:read.
+         */
+        post: operations["recordScreeningCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/careers/{slug}": {
         parameters: {
             query?: never;
@@ -2347,6 +2369,27 @@ export interface components {
         };
         SimilarCandidateList: {
             items: components["schemas"]["SimilarCandidate"][];
+        };
+        ScreeningCallInput: {
+            /** @description The candidate's version you loaded. */
+            version: number;
+            /** @description What was said; empty for no note. */
+            notes?: string;
+            /** @description Make the note sensitive (needs notes.sensitive:read). Defaults to false. */
+            sensitive?: boolean;
+            nationality?: components["schemas"]["CountryCode"] | null;
+            workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
+            noticePeriod?: components["schemas"]["NoticePeriod"] | null;
+            /** @description Set only when the candidate has no source yet. */
+            source?: components["schemas"]["CandidateSource"];
+            /** @description Current and expected salary, replacing both (needs candidates.compensation:update). */
+            compensation?: components["schemas"]["CompensationUpdate"];
+        };
+        ScreeningCallResult: {
+            candidate: components["schemas"]["Candidate"];
+            noteId: components["schemas"]["NoteId"] | null;
+            /** @description True when a source was sent but the candidate already had one. */
+            sourceKept: boolean;
         };
         CandidateMerge: {
             /** @description The candidate to merge in (and delete). */
@@ -4836,6 +4879,37 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    recordScreeningCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreeningCallInput"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningCallResult"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getCareersPage: {

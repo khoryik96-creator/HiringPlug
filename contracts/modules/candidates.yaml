@@ -280,6 +280,38 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/candidates/{candidateId}/screening-calls:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    post:
+      operationId: recordScreeningCall
+      tags: [candidates]
+      summary: Record a screening call, updating the candidate from it
+      description: >
+        In one step: the call's notes become a screening note, and the
+        profile takes what was asked (notice period, work authorization,
+        nationality; the source only when the candidate has none), with the
+        salary (needs candidates.compensation:update). Fields left out are
+        not changed. Notes need notes:create; sensitive ones
+        notes.sensitive:read.
+      x-permission: candidates:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScreeningCallInput' }
+      responses:
+        '200':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScreeningCallResult' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
 components:
   parameters:
     CandidateIdPath:
@@ -660,6 +692,42 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/SimilarCandidate' }
+    ScreeningCallInput:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: The candidate's version you loaded.
+        notes: { type: string, maxLength: 10000, description: What was said; empty for no note. }
+        sensitive: { type: boolean, description: Make the note sensitive (needs notes.sensitive:read). Defaults to false. }
+        nationality:
+          allOf: [{ $ref: '#/components/schemas/CountryCode' }]
+          nullable: true
+        workAuthorization:
+          allOf: [{ $ref: '#/components/schemas/WorkAuthorization' }]
+          nullable: true
+        noticePeriod:
+          allOf: [{ $ref: '#/components/schemas/NoticePeriod' }]
+          nullable: true
+        source:
+          description: Set only when the candidate has no source yet.
+          allOf: [{ $ref: '#/components/schemas/CandidateSource' }]
+        compensation:
+          description: Current and expected salary, replacing both (needs candidates.compensation:update).
+          allOf: [{ $ref: '#/components/schemas/CompensationUpdate' }]
+    ScreeningCallResult:
+      type: object
+      required: [candidate, noteId, sourceKept]
+      properties:
+        candidate: { $ref: '#/components/schemas/Candidate' }
+        noteId:
+          allOf: [{ $ref: '#/components/schemas/NoteId' }]
+          nullable: true
+        sourceKept: { type: boolean, description: True when a source was sent but the candidate already had one. }
+
     CandidateMerge:
       type: object
       additionalProperties: false

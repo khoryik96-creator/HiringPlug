@@ -48,6 +48,36 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
   const set = <K extends keyof SalaryFormState>(key: K, value: SalaryFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
+
+  return (
+    <form
+      className="form-grid"
+      aria-label="Edit salary"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <SalaryFields form={form} set={set} errors={errors} />
+      <div className="row full">
+        <button type="submit" disabled={save.isPending}>Save salary</button>
+        <button type="button" className="link" onClick={onDone}>Cancel</button>
+      </div>
+      <SaveError
+        error={save.error}
+        shown={Object.values(SALARY_PATHS)}
+        onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(opened.id) }); onDone(); }}
+      />
+    </form>
+  );
+}
+
+/** The current and expected salary inputs (also on the screening call). */
+export function SalaryFields({ form, set, errors }: {
+  form: SalaryFormState;
+  set: <K extends keyof SalaryFormState>(key: K, value: SalaryFormState[K]) => void;
+  errors: Record<string, string>;
+}) {
   const amount = (key: "currentAmount" | "expectedMin" | "expectedMax", label: string) => (
     <Field label={label} error={errors[SALARY_PATHS[key]]}>
       <input inputMode="decimal" placeholder="e.g. 8,500" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
@@ -67,16 +97,8 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
       </select>
     </Field>
   );
-
   return (
-    <form
-      className="form-grid"
-      aria-label="Edit salary"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate();
-      }}
-    >
+    <>
       <datalist id="currencies">
         {CURRENCIES.map((c) => <option key={c} value={c} />)}
       </datalist>
@@ -93,15 +115,6 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
         {currency("expectedCurrency")}
         {period("expectedPeriod")}
       </fieldset>
-      <div className="row full">
-        <button type="submit" disabled={save.isPending}>Save salary</button>
-        <button type="button" className="link" onClick={onDone}>Cancel</button>
-      </div>
-      <SaveError
-        error={save.error}
-        shown={Object.values(SALARY_PATHS)}
-        onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(opened.id) }); onDone(); }}
-      />
-    </form>
+    </>
   );
 }

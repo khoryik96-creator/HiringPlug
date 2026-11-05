@@ -128,6 +128,7 @@ func NewModules(d Deps) *Modules {
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
+	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
 		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents} }},

@@ -600,6 +600,32 @@ class SimilarCandidateList(BaseModel):
     items: list[SimilarCandidate]
 
 
+class ScreeningCallInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The candidate's version you loaded.", ge=1)]
+    notes: Annotated[str | None, Field(description="What was said; empty for no note.", max_length=10000)] = (
+        None
+    )
+    sensitive: Annotated[
+        bool | None,
+        Field(description="Make the note sensitive (needs notes.sensitive:read). Defaults to false."),
+    ] = None
+    nationality: CountryCode | None = None
+    workAuthorization: WorkAuthorization | None = None
+    noticePeriod: NoticePeriod | None = None
+    source: Annotated[
+        CandidateSource | None, Field(description="Set only when the candidate has no source yet.")
+    ] = None
+    compensation: Annotated[
+        CompensationUpdate | None,
+        Field(
+            description="Current and expected salary, replacing both (needs candidates.compensation:update)."
+        ),
+    ] = None
+
+
 class CandidateMerge(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2828,6 +2854,14 @@ class MandatoryFieldsInput(BaseModel):
 class FieldSettings(BaseModel):
     lists: list[FieldList]
     mandatory: list[MandatoryField]
+
+
+class ScreeningCallResult(BaseModel):
+    candidate: Candidate
+    noteId: Annotated[NoteId | None, Field(...)]
+    sourceKept: Annotated[
+        bool, Field(description="True when a source was sent but the candidate already had one.")
+    ]
 
 
 class PublicJobAd(BaseModel):

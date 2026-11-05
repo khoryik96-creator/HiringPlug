@@ -21,6 +21,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Pipeline: candidates on jobs, a drag-and-drop board per job, reasons for rejections |
 | ✅ | Notes (sensitive ones protected) and an activity timeline on every record; a dashboard |
 | ✅ | Import candidates, companies and contacts from CSV, with a report of rows to fix |
+| ✅ | Screening calls beside the CV, with the AI assistant: one save updates salary and currency, notice period, work authorization, nationality and (if empty) source, and keeps the notes |
 | ✅ | Import CVs and LinkedIn PDFs, one or many, as filled-in candidates (one per email), with each file's progress; LinkedIn links read from CVs, including hidden ones |
 | ✅ | Duplicates flagged and merged; tags and skills with filters |
 | ✅ | CV parsing: details read from each CV, checked against its text, reviewed and accepted on the candidate's page |

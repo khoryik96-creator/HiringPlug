@@ -18,6 +18,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
 
 // Exists reports whether a record exists in tx's tenant.
@@ -42,4 +44,11 @@ type Module struct {
 func New(pool *pgxpool.Pool, subjects Subjects, users Users) *Module {
 	svc := &Service{pool: pool, subjects: subjects, users: users}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// AddNote writes a note for p in the caller's transaction (e.g. a screening
+// call's), with the same rules as one written on its own; it returns its id.
+func (m *Module) AddNote(ctx context.Context, tx pgx.Tx, p authz.Principal, subjectType, subjectID, kind, body string, sensitive bool) (string, error) {
+	n, err := m.service.createIn(ctx, tx, p, Draft{SubjectType: subjectType, SubjectID: subjectID, Kind: kind, Body: body, Sensitive: sensitive})
+	return n.ID, err
 }
