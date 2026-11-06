@@ -2220,6 +2220,11 @@ export interface components {
             unit: components["schemas"]["NoticePeriodUnit"];
         };
         /**
+         * @description looking = looking out for a move; passive = open to the right offer; not_looking = not looking; placed = placed by you.
+         * @enum {string}
+         */
+        CandidateAvailability: "looking" | "passive" | "not_looking" | "placed";
+        /**
          * @description Where the candidate came from: a key from the company's source list (Settings; built in: jobstreet, linkedin, referral, careers_page, direct, other).
          * @example jobstreet
          */
@@ -2297,6 +2302,8 @@ export interface components {
             residenceCountry: components["schemas"]["CountryCode"] | null;
             /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
             linkedinUrl: string | null;
+            /** @description Whether they are open to a move (colours their page); null = not set. */
+            availability: components["schemas"]["CandidateAvailability"] | null;
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;
@@ -2327,6 +2334,8 @@ export interface components {
             residenceCountry?: components["schemas"]["CountryCode"] | null;
             /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
             linkedinUrl?: string | null;
+            /** @description Whether they are open to a move (colours their page); null = not set. */
+            availability?: components["schemas"]["CandidateAvailability"] | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
@@ -2352,6 +2361,8 @@ export interface components {
             residenceCountry?: components["schemas"]["CountryCode"] | null;
             /** @description Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah. */
             linkedinUrl?: string | null;
+            /** @description Whether they are open to a move (colours their page); null = not set. */
+            availability?: components["schemas"]["CandidateAvailability"] | null;
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;

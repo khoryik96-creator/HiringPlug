@@ -7,7 +7,7 @@ import { SalaryPanel } from "./SalaryPanel";
 
 const base: Candidate = {
   id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, firstName: "Siti", lastName: "Aisyah", fullName: "Siti Aisyah",
-  email: null, phone: null, linkedinUrl: null, nationality: "MY", residenceCountry: null, workAuthorization: { status: "local" }, noticePeriod: null,
+  email: null, phone: null, linkedinUrl: null, availability: null, nationality: "MY", residenceCountry: null, workAuthorization: { status: "local" }, noticePeriod: null,
   industry: null, specialization: null, currentTitle: null, currentCompany: null, location: null, source: null,
   tags: [], skills: [], experience: [], education: [], restrictedFields: [], ownerId: null, ownerName: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",

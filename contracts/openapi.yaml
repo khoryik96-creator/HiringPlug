@@ -3424,6 +3424,10 @@ components:
       properties:
         value: {type: integer, minimum: 0, maximum: 365}
         unit: {$ref: '#/components/schemas/NoticePeriodUnit'}
+    CandidateAvailability:
+      type: string
+      description: looking = looking out for a move; passive = open to the right offer; not_looking = not looking; placed = placed by you.
+      enum: [looking, passive, not_looking, placed]
     CandidateSource:
       type: string
       description: >
@@ -3534,6 +3538,7 @@ components:
         - nationality
         - residenceCountry
         - linkedinUrl
+        - availability
         - workAuthorization
         - noticePeriod
         - industry
@@ -3578,6 +3583,10 @@ components:
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
         linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
+        availability:
+          description: Whether they are open to a move (colours their page); null = not set.
+          allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
+          nullable: true
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -3624,6 +3633,10 @@ components:
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
         linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
+        availability:
+          description: Whether they are open to a move (colours their page); null = not set.
+          allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
+          nullable: true
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -3668,6 +3681,10 @@ components:
           allOf: [{$ref: '#/components/schemas/CountryCode'}]
           nullable: true
         linkedinUrl: {type: string, maxLength: 300, nullable: true, description: "Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah."}
+        availability:
+          description: Whether they are open to a move (colours their page); null = not set.
+          allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
+          nullable: true
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true

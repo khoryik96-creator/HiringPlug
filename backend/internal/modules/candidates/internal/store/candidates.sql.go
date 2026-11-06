@@ -115,7 +115,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -150,6 +150,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.OwnerID,
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
+		&i.Availability,
 	)
 	return i, err
 }
@@ -183,18 +184,18 @@ func (q *Queries) GetCompensation(ctx context.Context, candidateID string) (Cand
 const insertCandidate = `-- name: InsertCandidate :one
 
 INSERT INTO candidate (
-  tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url,
+  tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
   current_title, current_company, location, source, tags, skills, owner_id, created_by
 ) VALUES (
-  app_current_tenant(), $1, $2, $3, $4, $5, $6, $7,
-  $8, $9, $10,
-  $11, $12, $13, $14,
-  $15, $16, $17, $18, $19, $20,
-  $21, app_current_user()
+  app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8,
+  $9, $10, $11,
+  $12, $13, $14, $15,
+  $16, $17, $18, $19, $20, $21,
+  $22, app_current_user()
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
 `
 
 type InsertCandidateParams struct {
@@ -205,6 +206,7 @@ type InsertCandidateParams struct {
 	Nationality            *string
 	ResidenceCountry       *string
 	LinkedinUrl            *string
+	Availability           *string
 	WorkAuthorization      *string
 	WorkAuthorizationBasis *string
 	WorkAuthorizationNote  *string
@@ -232,6 +234,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		arg.Nationality,
 		arg.ResidenceCountry,
 		arg.LinkedinUrl,
+		arg.Availability,
 		arg.WorkAuthorization,
 		arg.WorkAuthorizationBasis,
 		arg.WorkAuthorizationNote,
@@ -277,6 +280,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.OwnerID,
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
+		&i.Availability,
 	)
 	return i, err
 }
@@ -674,7 +678,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
 `
 
 type TouchCandidateParams struct {
@@ -716,6 +720,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.OwnerID,
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
+		&i.Availability,
 	)
 	return i, err
 }
@@ -729,23 +734,24 @@ UPDATE candidate SET
   nationality = $5,
   residence_country = $6,
   linkedin_url = $7,
-  work_authorization = $8,
-  work_authorization_basis = $9,
-  work_authorization_note = $10,
-  notice_period_value = $11,
-  notice_period_unit = $12,
-  industry = $13,
-  specialization = $14,
-  current_title = $15,
-  current_company = $16,
-  location = $17,
-  source = $18,
-  tags = $19,
-  skills = $20,
+  availability = $8,
+  work_authorization = $9,
+  work_authorization_basis = $10,
+  work_authorization_note = $11,
+  notice_period_value = $12,
+  notice_period_unit = $13,
+  industry = $14,
+  specialization = $15,
+  current_title = $16,
+  current_company = $17,
+  location = $18,
+  source = $19,
+  tags = $20,
+  skills = $21,
   version = version + 1,
   updated_at = now()
-WHERE id = $21 AND version = $22
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url
+WHERE id = $22 AND version = $23
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
 `
 
 type UpdateCandidateParams struct {
@@ -756,6 +762,7 @@ type UpdateCandidateParams struct {
 	Nationality            *string
 	ResidenceCountry       *string
 	LinkedinUrl            *string
+	Availability           *string
 	WorkAuthorization      *string
 	WorkAuthorizationBasis *string
 	WorkAuthorizationNote  *string
@@ -784,6 +791,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		arg.Nationality,
 		arg.ResidenceCountry,
 		arg.LinkedinUrl,
+		arg.Availability,
 		arg.WorkAuthorization,
 		arg.WorkAuthorizationBasis,
 		arg.WorkAuthorizationNote,
@@ -830,6 +838,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.OwnerID,
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
+		&i.Availability,
 	)
 	return i, err
 }

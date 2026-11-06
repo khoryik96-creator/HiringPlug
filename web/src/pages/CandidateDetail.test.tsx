@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, within, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Candidate, type Permission } from "../api/client";
@@ -69,9 +69,11 @@ describe("candidate page", () => {
       testCandidate({ nationality: "MY", source: "careers_page", workAuthorization: { status: "expat_eligible", basis: "rp_t" } }),
       RECRUITER,
     );
-    expect(screen.getByText("Malaysia (MY)")).toBeTruthy();
-    expect(screen.getByText("Careers page")).toBeTruthy();
-    expect(screen.getByText("Expat, can work here: Residence Pass-Talent (RP-T)")).toBeTruthy();
+    const banner = screen.getByRole("region", { name: "Candidate" });
+    expect(within(banner).getByText("Malaysia")).toBeTruthy();
+    expect(within(banner).getByText("Careers page")).toBeTruthy();
+    expect(banner.textContent).toContain("Work authorization: RP-T"); // the column on the right
+    expect(screen.getByText("Expat, can work here: Residence Pass-Talent (RP-T)")).toBeTruthy(); // and in full in the profile
   });
 });
 

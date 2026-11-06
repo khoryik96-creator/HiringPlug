@@ -3,12 +3,12 @@
 
 -- name: InsertCandidate :one
 INSERT INTO candidate (
-  tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url,
+  tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
   current_title, current_company, location, source, tags, skills, owner_id, created_by
 ) VALUES (
-  app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality), sqlc.narg(residence_country), sqlc.narg(linkedin_url),
+  app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality), sqlc.narg(residence_country), sqlc.narg(linkedin_url), sqlc.narg(availability),
   sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
   sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
   sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills,
@@ -36,6 +36,7 @@ UPDATE candidate SET
   nationality = sqlc.narg(nationality),
   residence_country = sqlc.narg(residence_country),
   linkedin_url = sqlc.narg(linkedin_url),
+  availability = sqlc.narg(availability),
   work_authorization = sqlc.narg(work_authorization),
   work_authorization_basis = sqlc.narg(work_authorization_basis),
   work_authorization_note = sqlc.narg(work_authorization_note),

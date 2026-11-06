@@ -124,6 +124,7 @@ type Candidate struct {
 	OwnerID                *string
 	ResidenceCountry       *string
 	LinkedinUrl            *string
+	Availability           *string
 }
 
 type CandidateCompensation struct {

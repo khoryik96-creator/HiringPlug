@@ -33,6 +33,7 @@ type Profile struct {
 	Nationality       *string
 	ResidenceCountry  *string // ISO code; nil = not known (NA)
 	LinkedinURL       *string // https://www.linkedin.com/in/...
+	Availability      *string // looking, passive, not_looking, placed; nil = not set
 	WorkAuthorization *WorkAuthorization
 	NoticePeriod      *NoticePeriod
 	Industry          *string
@@ -119,6 +120,7 @@ type ProfilePatch struct {
 	Nationality       Change[*string]
 	ResidenceCountry  Change[*string]
 	LinkedinURL       Change[*string]
+	Availability      Change[*string]
 	WorkAuthorization Change[*WorkAuthorization]
 	NoticePeriod      Change[*NoticePeriod]
 	Industry          Change[*string]
@@ -140,6 +142,7 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.Nationality, pp.Nationality)
 	apply(&p.ResidenceCountry, pp.ResidenceCountry)
 	apply(&p.LinkedinURL, pp.LinkedinURL)
+	apply(&p.Availability, pp.Availability)
 	apply(&p.WorkAuthorization, pp.WorkAuthorization)
 	apply(&p.NoticePeriod, pp.NoticePeriod)
 	apply(&p.Industry, pp.Industry)

@@ -150,3 +150,37 @@ a.button { display: inline-block; padding: 0.4rem 0.6rem; border: 1px solid #9ca
 .badge.reco-shortlist { background: #dcfce7; }
 .badge.reco-consider { background: #fef3c7; }
 .badge.reco-pass { background: #fee2e2; }
+/* The candidate page's banner: coloured by status, with the work authorization column on its right. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.banner { display: flex; border-radius: 16px; overflow: hidden; margin: 0.75rem 0 1rem; color: #1B2230; }
+.banner-body { flex: 1; min-width: 0; padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1rem; }
+.banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap; }
+.banner-who { min-width: 0; }
+.banner-name { margin: 0; font-size: 2.5rem; line-height: 1.05; font-weight: 800; font-stretch: condensed; letter-spacing: -0.01em; }
+.banner-status { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 6px; padding: 0.1rem 0.6rem; }
+.banner-job { margin: 0.35rem 0 0; font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+.banner-facts { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; font-size: 1rem; text-align: right; }
+.banner-facts div { display: flex; gap: 0.4rem; }
+.banner-facts dt { color: #3A4352; }
+.banner-facts dd { margin: 0; font-weight: 700; }
+.banner-pill { font: inherit; font-weight: 600; font-size: 0.9rem; min-height: 44px; padding: 0.4rem 0.9rem; border-radius: 999px; border: 1.5px solid rgba(17, 21, 27, 0.25); background: #fff; color: #1B2230; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+.banner-pill[aria-pressed="true"] { background: #11151B; border-color: #11151B; color: #fff; }
+.banner-pill .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid; box-sizing: border-box; }
+.banner-pill .dot.square { border-radius: 3px; }
+.banner-chip { font-size: 0.82rem; font-weight: 600; background: #fff; border-radius: 999px; padding: 0.3rem 0.75rem; }
+.banner-strip { margin-top: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #fff; border-radius: 12px; box-shadow: 0 1px 2px rgba(17, 21, 27, 0.08); }
+.banner-strip > div { padding: 0.9rem 1.4rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.banner-strip > div + div { border-left: 1px solid #E3E6EB; }
+.banner-strip .label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #4A5363; }
+.banner-strip .figure { font-size: 1.75rem; font-weight: 800; font-stretch: condensed; line-height: 1.15; }
+.banner-strip .figure.small { font-size: 1.1rem; }
+.banner-strip .figure small, .banner-strip .note { font-size: 0.82rem; font-weight: 400; color: #4A5363; }
+.banner-column { width: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.banner-column > span { writing-mode: vertical-rl; transform: rotate(180deg); color: #fff; font-weight: 800; font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; }
+@media (max-width: 700px) {
+  .banner-body { padding: 1rem; }
+  .banner-facts { align-items: flex-start; text-align: left; }
+  .banner-strip { grid-template-columns: 1fr; }
+  .banner-strip > div + div { border-left: 0; border-top: 1px solid #E3E6EB; }
+  .banner-column { width: 36px; }
+}

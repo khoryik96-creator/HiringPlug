@@ -5,6 +5,7 @@ import { api, ApiError, type Candidate, type Permission, unwrap } from "../api/c
 import { candidateKey, candidatesKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CandidateApplications } from "../components/CandidateApplications";
+import { CandidateBanner } from "../components/CandidateBanner";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
 import { Documents } from "../components/Documents";
@@ -16,10 +17,8 @@ import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
-import { SourceIcon } from "../components/SourcePicker";
 import { StageMoves } from "../components/StageMoves";
-import { useFieldSettings } from "../components/useFieldSettings";
-import { countryName, formatNotice, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import { WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
 
 function workAuthorization(c: Candidate): string {
   const wa = c.workAuthorization;
@@ -34,7 +33,6 @@ function workAuthorization(c: Candidate): string {
  */
 export function CandidateDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
-  const fs = useFieldSettings();
   const queryClient = useQueryClient();
   const candidate = useQuery({
     queryKey: candidateKey(id),
@@ -62,7 +60,12 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         </ErrorMessage>
       )}
       <div className="row spread">
-        <h2>{c.fullName}</h2>
+        <span className="row muted"><Owner what="candidate" ownerId={c.ownerId} ownerName={c.ownerName} canChange={permissions.includes("candidates:update")}
+          save={async (ownerId) => {
+            unwrap(await api.PUT("/v1/candidates/{candidateId}/owner", { params: { path: { candidateId: c.id } }, body: { ownerId } }));
+            await queryClient.invalidateQueries({ queryKey: candidatesKey });
+            await queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
+          }} /></span>
         {permissions.includes("candidates:update") && !editing && (
           <span className="row">
             <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
@@ -70,15 +73,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </span>
         )}
       </div>
-      <p className="muted">
-        {[c.currentTitle, c.currentCompany, c.location].filter(Boolean).join(" · ")}{" "}
-        <Owner what="candidate" ownerId={c.ownerId} ownerName={c.ownerName} canChange={permissions.includes("candidates:update")}
-          save={async (ownerId) => {
-            unwrap(await api.PUT("/v1/candidates/{candidateId}/owner", { params: { path: { candidateId: c.id } }, body: { ownerId } }));
-            await queryClient.invalidateQueries({ queryKey: candidatesKey });
-            await queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
-          }} />
-      </p>
+      <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")} />
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
@@ -91,20 +86,10 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dd>{c.phone ?? "—"}</dd>
             <dt>LinkedIn</dt>
             <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
-            <dt>Nationality</dt>
-            <dd>{c.nationality ? countryName(c.nationality) : "—"}</dd>
-            <dt>Country of residence</dt>
-            <dd>{c.residenceCountry ? countryName(c.residenceCountry) : "NA"}</dd>
             <dt>Work authorization</dt>
             <dd>{workAuthorization(c)}</dd>
-            <dt>Notice period</dt>
-            <dd>{formatNotice(c.noticePeriod)}</dd>
             <dt>Industry / specialization</dt>
             <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
-            <dt>Source</dt>
-            <dd>{c.source ? <span className="row"><SourceIcon source={c.source} label={fs.label("candidate_source", c.source)} />{fs.label("candidate_source", c.source)}</span> : "—"}</dd>
-            <dt>Skills</dt>
-            <dd><Chips labels={c.skills} /></dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
           </dl>

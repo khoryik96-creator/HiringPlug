@@ -38,6 +38,7 @@ func FillFrom(keep, dup Profile) (Profile, []string) {
 	fill("nationality", &keep.Nationality, dup.Nationality)
 	fill("residenceCountry", &keep.ResidenceCountry, dup.ResidenceCountry)
 	fill("linkedinUrl", &keep.LinkedinURL, dup.LinkedinURL)
+	fill("availability", &keep.Availability, dup.Availability)
 	fill("industry", &keep.Industry, dup.Industry)
 	fill("specialization", &keep.Specialization, dup.Specialization)
 	fill("currentTitle", &keep.CurrentTitle, dup.CurrentTitle)

@@ -345,6 +345,13 @@ class NoticePeriod(BaseModel):
     unit: NoticePeriodUnit
 
 
+class CandidateAvailability(StrEnum):
+    looking = "looking"
+    passive = "passive"
+    not_looking = "not_looking"
+    placed = "placed"
+
+
 class CandidateSource(RootModel[str]):
     root: Annotated[
         str,
@@ -458,6 +465,10 @@ class Candidate(BaseModel):
             max_length=300,
         ),
     ]
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
+    ]
     workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
@@ -509,6 +520,10 @@ class CandidateCreate(BaseModel):
             max_length=300,
         ),
     ] = None
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
+    ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None
     industry: Annotated[str | None, Field(max_length=100)] = None
@@ -547,6 +562,10 @@ class CandidateUpdate(BaseModel):
             description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
             max_length=300,
         ),
+    ] = None
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
     ] = None
     workAuthorization: WorkAuthorization | None = None
     noticePeriod: NoticePeriod | None = None

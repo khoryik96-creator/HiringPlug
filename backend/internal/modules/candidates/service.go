@@ -345,7 +345,7 @@ func duplicateEmail(existingID string) *apperr.Error {
 func fromRow(r store.Candidate) Candidate {
 	p := Profile{
 		FirstName: r.FirstName, LastName: r.LastName,
-		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, LinkedinURL: r.LinkedinUrl,
+		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, LinkedinURL: r.LinkedinUrl, Availability: r.Availability,
 		Industry: r.Industry, Specialization: r.Specialization,
 		CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
 		Location: r.Location, Source: r.Source, Tags: r.Tags, Skills: r.Skills,
@@ -365,7 +365,7 @@ func insertParams(p Profile, owner *string) store.InsertCandidateParams {
 	u := updateParams("", 0, p)
 	return store.InsertCandidateParams{
 		FirstName: u.FirstName, LastName: u.LastName, Email: u.Email, Phone: u.Phone, Nationality: u.Nationality,
-		ResidenceCountry: u.ResidenceCountry, LinkedinUrl: u.LinkedinUrl,
+		ResidenceCountry: u.ResidenceCountry, LinkedinUrl: u.LinkedinUrl, Availability: u.Availability,
 		WorkAuthorization: u.WorkAuthorization, WorkAuthorizationBasis: u.WorkAuthorizationBasis,
 		WorkAuthorizationNote: u.WorkAuthorizationNote, NoticePeriodValue: u.NoticePeriodValue,
 		NoticePeriodUnit: u.NoticePeriodUnit, Industry: u.Industry, Specialization: u.Specialization,
@@ -378,7 +378,7 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 	u := store.UpdateCandidateParams{
 		ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
 		FirstName: p.FirstName, LastName: p.LastName, Email: p.Email, Phone: p.Phone, Nationality: p.Nationality,
-		ResidenceCountry: p.ResidenceCountry, LinkedinUrl: p.LinkedinURL,
+		ResidenceCountry: p.ResidenceCountry, LinkedinUrl: p.LinkedinURL, Availability: p.Availability,
 		Industry: p.Industry, Specialization: p.Specialization, CurrentTitle: p.CurrentTitle,
 		CurrentCompany: p.CurrentCompany, Location: p.Location, Source: p.Source,
 		Tags: CleanLabels(p.Tags), Skills: CleanLabels(p.Skills),
@@ -397,7 +397,7 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 func profileFields(p Profile) map[string]any {
 	m := map[string]any{
 		"firstName": p.FirstName, "lastName": p.LastName, "email": p.Email, "phone": p.Phone,
-		"nationality": p.Nationality, "residenceCountry": p.ResidenceCountry, "linkedinUrl": p.LinkedinURL, "industry": p.Industry, "specialization": p.Specialization,
+		"nationality": p.Nationality, "residenceCountry": p.ResidenceCountry, "linkedinUrl": p.LinkedinURL, "availability": p.Availability, "industry": p.Industry, "specialization": p.Specialization,
 		"currentTitle": p.CurrentTitle, "currentCompany": p.CurrentCompany, "location": p.Location,
 		"source": p.Source, "workAuthorization": nil, "noticePeriod": nil,
 		"tags": CleanLabels(p.Tags), "skills": CleanLabels(p.Skills),

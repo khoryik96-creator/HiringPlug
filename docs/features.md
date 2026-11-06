@@ -30,6 +30,7 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 |---|---|
 | First and last name | Spaces tidied; full name derived |
 | Email | Lower-cased; **one candidate per email** in a company: adding someone with an email another candidate has is refused, naming that candidate and who owns them with a link (unless you may not see them) |
+| Status | Whether they are open to a move: **looking out**, **passive**, **not looking** or **placed** (or not set). It colours the candidate's page (light yellow, light green, pink, light purple) |
 | LinkedIn profile | Their LinkedIn link, tidied to `https://www.linkedin.com/in/...` (`lnkd.in` short links kept); shown as a link on the profile. Read from a CV like Kano and CV Studio do: a `linkedin.com/in/...` (or `/pub/`, `lnkd.in`) address in the text, or one **hidden behind a link** in the file (a "LinkedIn" icon or word linking to the profile, in a PDF or Word CV) |
 | Phone | Any common format in; stored internationally (`012-345 6789` → `+60123456789`, default country configurable) |
 | Nationality | ISO country code (`MY`, `SG`, ...) |
@@ -40,6 +41,16 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. The form suggests labels already in use; the candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
+
+**The candidate's page** opens with a banner coloured by their status: their
+name and status, job title and company, and in the top-right corner their
+nationality, where they live and the source; the status buttons; their skills;
+then notice period, current and expected salary (with "+26% on current" when
+the two compare; "Restricted" for roles without salary access); and the work
+authorization buttons. A column down the banner's right edge is coloured by
+work authorization and says which: **Local** (green), **PR** (purple),
+**Spousal / RP-T** (blue: it asks which pass), **Needs pass** (red), **Not
+known** (grey). A click saves at once, with the lost-update protection below.
 
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
