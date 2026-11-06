@@ -30,6 +30,9 @@ class Config:
     ai_key: str = field(default="", repr=False)  # never printed
     ai_model: str = ""
     ai_timeout_seconds: float = 90.0
+    # Opens the API keys companies save in Settings (the API seals them with
+    # the same secret). Empty: those keys cannot be used.
+    ai_keys_secret: str = field(default="", repr=False)  # never printed
 
 
 class ConfigError(ValueError):
@@ -86,7 +89,10 @@ def load_config(env: Mapping[str, str]) -> Config:
         ai_key=env.get("HP_AI_PROVIDER_KEY", "").strip(),
         ai_model=ai_model,
         ai_timeout_seconds=number("HP_AI_TIMEOUT_SECONDS", 90.0),
+        ai_keys_secret=env.get("HP_AI_KEYS_SECRET", "").strip(),
     )
+    if 0 < len(config.ai_keys_secret) < 32:
+        problems.append("HP_AI_KEYS_SECRET must be at least 32 characters (or empty)")
     if config.ai_timeout_seconds <= 0 or config.ai_timeout_seconds * 2 >= config.lease_seconds:
         problems.append("HP_AI_TIMEOUT_SECONDS must be positive and well under HP_AI_LEASE_SECONDS")
     if config.lease_seconds < 30:

@@ -32,6 +32,8 @@ x-backend-env: &backend-env
   HP_SMTP_TLS: ${HP_SMTP_TLS:-none}
   # The AI assistant: off until a provider is set up (see docs/playbooks/run-locally.md).
   HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
+  # Seals the AI keys companies enter in Settings > AI provider (the AI worker opens them).
+  HP_AI_KEYS_SECRET: ${HP_AI_KEYS_SECRET:-dev-only-ai-keys-secret-change-me-0123456789}
   HP_AI_MONTHLY_TOKENS: ${HP_AI_MONTHLY_TOKENS:-2000000}
 
 services:
@@ -85,6 +87,7 @@ services:
       HP_AI_PROVIDER_URL: ${HP_AI_PROVIDER_URL:-}
       HP_AI_PROVIDER_KEY: ${HP_AI_PROVIDER_KEY:-}
       HP_AI_MODEL: ${HP_AI_MODEL:-}
+      HP_AI_KEYS_SECRET: ${HP_AI_KEYS_SECRET:-dev-only-ai-keys-secret-change-me-0123456789}
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 

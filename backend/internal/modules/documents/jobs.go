@@ -75,14 +75,16 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 // fill in what the rules leave empty when it is on and allowance is left.
 func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, row store.Document) error {
 	useAI := false
+	var ai *api.AiAccess
 	if s.ai != nil {
 		var err error
-		if useAI, err = s.ai.Allowed(ctx, tx); err != nil {
+		if ai, useAI, err = s.ai.Allowed(ctx, tx); err != nil {
 			return err
 		}
 	}
 	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI}
 	if useAI {
+		job.Ai = ai
 		forAI := redact.WithoutSalary(*row.ExtractedText) // salary never goes to the AI
 		job.AiText = &forAI
 	}

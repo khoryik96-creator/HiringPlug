@@ -21,6 +21,7 @@ import { CvTemplates } from "./pages/CvTemplates";
 import { Integrations } from "./pages/Integrations";
 import { Privacy } from "./pages/Privacy";
 import { Access } from "./pages/Access";
+import { AiProvider } from "./pages/AiProvider";
 import { Settings } from "./pages/Settings";
 import { JobList } from "./pages/JobList";
 import { Leads } from "./pages/Leads";
@@ -55,7 +56,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|account)/.exec(hash)?.[1] ?? "dashboard";
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|ai-provider|account)/.exec(hash)?.[1] ?? "dashboard";
   const admin = ADMIN_PAGES.filter(([, , permission]) => permissions.includes(permission));
   return (
     <>
@@ -139,6 +140,7 @@ function Page({ hash, permissions, me }: { hash: string; permissions: Permission
   if (hash.startsWith("#/privacy") && permissions.includes("privacy:manage")) return <Privacy />;
   if (hash.startsWith("#/access") && permissions.includes("identity.roles:manage")) return <Access />;
   if (hash.startsWith("#/settings") && permissions.includes("settings:manage")) return <Settings />;
+  if (hash.startsWith("#/ai-provider") && permissions.includes("aiproviders:manage")) return <AiProvider />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;
@@ -182,6 +184,7 @@ export function initials(name: string): string {
 /** The pages for running the account, under "Admin" in the top bar: path, label, the permission needed. */
 const ADMIN_PAGES: [string, string, Permission][] = [
   ["settings", "Settings", "settings:manage"],
+  ["ai-provider", "AI provider", "aiproviders:manage"],
   ["access", "Roles and access", "identity.roles:manage"],
   ["privacy", "Data protection", "privacy:manage"],
   ["team", "Team", "identity.team:manage"],

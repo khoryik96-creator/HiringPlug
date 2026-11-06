@@ -153,12 +153,23 @@ sees only their own.
   model to answer only from the data, say when something is missing, never
   judge or guess race, religion, age, gender, marital status, health or
   nationality, and to ignore instructions written inside a CV.
-- **Provider.** Any OpenAI-compatible chat API: DeepSeek's own API, a host
-  running DeepSeek's open model in a region you choose, or your own server
-  (vLLM, Ollama). DeepSeek's own API stores data in China, which matters under
-  Malaysia's PDPA, so the choice is yours (settings `HP_AI_PROVIDER`,
-  `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL`). While
-  `HP_AI_PROVIDER=off` the panel says the assistant is off.
+- **Provider.** Chosen per company in **Admin > AI provider** (owners and
+  admins, `aiproviders:manage`): DeepSeek, Claude (Anthropic) or ChatGPT
+  (OpenAI) with the company's own API key and model, the server's own
+  provider, or off. Each provider keeps its key and model, so switching back
+  and forth needs no retyping; saving a key sends the provider a tiny request
+  and shows whether it works (key refused, no credit, unknown model...). Keys
+  are sealed (AES-256-GCM, `HP_AI_KEYS_SECRET`) when saved, never shown again
+  (only the last four characters), never logged or audited, and opened only by
+  the AI worker. The calls follow CV Studio's provider layer: Claude and
+  DeepSeek through the Messages API (DeepSeek's Anthropic-compatible endpoint,
+  thinking off), ChatGPT through the Responses API; a request is sent again
+  only on 429/529 (the provider did no work), never after an error that might
+  have billed. The server's own provider (`HP_AI_PROVIDER`,
+  `HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY`, `HP_AI_MODEL`: any
+  OpenAI-compatible chat API, e.g. a host running DeepSeek's open model in a
+  region you choose) serves companies that chose none. Data location matters
+  under Malaysia's PDPA: DeepSeek's own API stores data in China.
 - **Costs.** Tokens are recorded per answer; each company has a monthly
   allowance (`HP_AI_MONTHLY_TOKENS`, default 2,000,000) for the assistant and
   CV vs job matching together, shown in the panel. Once used, asking is
@@ -166,8 +177,7 @@ sees only their own.
 - **Flow.** Browser → Go API (permission check, context, allowance) → job
   queue → Python AI worker → provider → result job → Go saves it; the page
   polls while an answer is on its way. Questions and answers are never logged.
-- **Later:** a per-company choice of provider (and switching it off for one
-  company), streaming answers, notes in the context (with the sensitive-notes
+- **Later:** streaming answers, notes in the context (with the sensitive-notes
   permission).
 
 ## 3.6 CV vs job match ✅ (off until an AI provider is set up)

@@ -4,6 +4,63 @@
  */
 
 export interface paths {
+    "/v1/ai-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The AI provider in use, and each provider's model and key (only its last characters) */
+        get: operations["getAiProviders"];
+        /** Switch the AI provider the company uses */
+        put: operations["chooseAiProvider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai-providers/{aiProvider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aiProvider: components["parameters"]["AiProviderPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Save a provider's model and (new) API key, and check them */
+        put: operations["saveAiProvider"];
+        post?: never;
+        /** Remove a provider's API key (the AI is switched off if it was in use) */
+        delete: operations["removeAiProviderKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai-providers/{aiProvider}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aiProvider: components["parameters"]["AiProviderPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check a provider's saved key and model again */
+        post: operations["checkAiProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/assistant": {
         parameters: {
             query?: never;
@@ -2264,11 +2321,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2306,6 +2363,68 @@ export interface components {
          * @example 8500.00
          */
         DecimalAmount: string;
+        /**
+         * @description deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI).
+         * @enum {string}
+         */
+        AiProviderName: "deepseek" | "claude" | "openai";
+        /**
+         * @description A provider, "server" (the server's own HP_AI_* provider) or "off".
+         * @enum {string}
+         */
+        AiProviderChoice: "server" | "off" | "deepseek" | "claude" | "openai";
+        AiProviders: {
+            active: components["schemas"]["AiProviderChoice"];
+            /** @description The server has its own AI provider set up (HP_AI_*). */
+            serverAvailable: boolean;
+            /** @description The server can store API keys (HP_AI_KEYS_SECRET is set). */
+            keysSupported: boolean;
+            /** @description Every provider, in the order deepseek, claude, openai. */
+            providers: components["schemas"]["AiProviderEntry"][];
+        };
+        AiProviderEntry: {
+            provider: components["schemas"]["AiProviderName"];
+            model: string | null;
+            /** @description The key's last four characters, e.g. "…a1b2"; null: no key. */
+            keyHint: string | null;
+            /** Format: date-time */
+            updatedAt: string | null;
+            check: components["schemas"]["AiProviderCheck"] | null;
+        };
+        AiProviderCheck: {
+            /** @enum {string} */
+            status: "queued" | "ok" | "failed";
+            /** @description Why it failed: the key was refused, no credit left, an unknown model... */
+            message: string | null;
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        AiProviderChoiceInput: {
+            provider: components["schemas"]["AiProviderChoice"];
+        };
+        AiProviderInput: {
+            /** @description e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5 */
+            model: string;
+            /** @description Leave out to keep the saved key. */
+            apiKey?: string;
+        };
+        /** @description The provider the company chose, for the AI worker. The key is sealed (AES-256-GCM with a key derived from HP_AI_KEYS_SECRET, the provider as associated data); only the AI worker opens it. */
+        AiAccess: {
+            provider: components["schemas"]["AiProviderName"];
+            model: string;
+            sealedKey: string;
+        };
+        AiProviderCheckJob: {
+            provider: components["schemas"]["AiProviderName"];
+            access: components["schemas"]["AiAccess"];
+        };
+        AiProviderCheckedJob: {
+            provider: components["schemas"]["AiProviderName"];
+            /** @description The key checked (a check of a key since replaced is dropped). */
+            sealedKey: string;
+            ok: boolean;
+            message: string | null;
+        };
         /** @example ask_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         AssistantAnswerId: string;
         /**
@@ -2374,6 +2493,8 @@ export interface components {
             question: string | null;
             /** @description What the asking user may see, without contact details or salary. */
             sections: components["schemas"]["AssistantSection"][];
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
         };
         AssistantAnsweredJob: {
             answerId: components["schemas"]["AssistantAnswerId"];
@@ -3023,6 +3144,8 @@ export interface components {
             useAi?: boolean;
             /** @description What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text. */
             aiText?: string;
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
         };
         DocumentCvParsedJob: {
             documentId: components["schemas"]["DocumentId"];
@@ -4110,6 +4233,8 @@ export interface components {
             job: string;
             /** @description The CV's text, without names, contact details or salary. */
             cv: string;
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
         };
         MatchClaim: {
             /** @description Quoted from the job's text. */
@@ -4815,6 +4940,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Keys cannot be stored (AI_KEYS_NOT_SET_UP), or the provider has no key (AI_PROVIDER_NO_KEY). */
+        AiProviderConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Switched off (ASSISTANT_OFF). */
         AssistantOff: {
             headers: {
@@ -4952,6 +5086,7 @@ export interface components {
         };
     };
     parameters: {
+        AiProviderPath: components["schemas"]["AiProviderName"];
         CandidateIdPath: components["schemas"]["CandidateId"];
         CareersSlugPath: string;
         CompanyIdPath: components["schemas"]["CompanyId"];
@@ -4977,6 +5112,135 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getAiProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviders"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    chooseAiProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiProviderChoiceInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviders"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["AiProviderConflict"];
+        };
+    };
+    saveAiProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aiProvider: components["parameters"]["AiProviderPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiProviderInput"];
+            };
+        };
+        responses: {
+            /** @description Saved; the check runs in the background */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviders"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["AiProviderConflict"];
+        };
+    };
+    removeAiProviderKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aiProvider: components["parameters"]["AiProviderPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviders"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    checkAiProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                aiProvider: components["parameters"]["AiProviderPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check runs in the background */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiProviders"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["AiProviderConflict"];
+        };
+    };
     getAssistant: {
         parameters: {
             query?: never;

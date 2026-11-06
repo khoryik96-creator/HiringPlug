@@ -15,6 +15,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from ..contracts import (
+    AiAccess,
+    AiProviderCheckJob,
     AssistantAskJob,
     DocumentExtractTextJob,
     DocumentParseCvJob,
@@ -24,9 +26,9 @@ from ..contracts import (
     MatchScoreJob,
 )
 from ..extraction import Limits, OcrEngine
-from ..provider import Provider
+from ..providers import Provider, ProviderError
 from ..queue import FollowUp
-from . import assistant_ask, extract_text, match_score, parse_cv, read_jd, render_pdf
+from . import ai_check, assistant_ask, extract_text, match_score, parse_cv, read_jd, render_pdf
 
 
 @dataclass(frozen=True)
@@ -37,7 +39,19 @@ class Deps:
     ocr: OcrEngine | None
     limits: Limits
     max_download_bytes: int
-    ai: Provider | None = None  # None: the AI provider is off
+    ai: Provider | None = None  # the server's own provider (HP_AI_*); None: off
+    # Builds the provider a company chose in Settings (opens its sealed key).
+    connect: Callable[[AiAccess], Provider] | None = None
+
+    def provider(self, access: AiAccess | None) -> Provider | None:
+        """The provider a job was queued for: the company's choice, or the
+        server's own when it chose none. Raises ProviderError when the
+        company's key cannot be opened."""
+        if access is None:
+            return self.ai
+        if self.connect is None:
+            raise ProviderError("the AI worker cannot open saved AI keys (HP_AI_KEYS_SECRET is not set)")
+        return self.connect(access)
 
 
 @dataclass(frozen=True)
@@ -53,4 +67,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),
     JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
+    JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),
 }

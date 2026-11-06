@@ -25,7 +25,7 @@ from .contracts import JobKind
 from .download import download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
 from .jobs import HANDLERS, Deps
-from .provider import OpenAICompatible
+from .providers import OpenAICompatible, connect
 from .queue import ClaimedJob, LeaseLostError, Queue
 
 log = logging.getLogger("hiringplug_ai.worker")
@@ -69,7 +69,16 @@ def main() -> None:
         else None
     )
     deps = Deps(
-        download=download, ocr=ocr, limits=DEFAULT_LIMITS, max_download_bytes=config.max_download_bytes, ai=ai
+        download=download,
+        ocr=ocr,
+        limits=DEFAULT_LIMITS,
+        max_download_bytes=config.max_download_bytes,
+        ai=ai,
+        connect=(
+            (lambda access: connect(access, config.ai_keys_secret, config.ai_timeout_seconds))
+            if config.ai_keys_secret
+            else None
+        ),
     )
     queue = Queue(config.database_url, config.worker_id)
 
@@ -83,6 +92,7 @@ def main() -> None:
             "worker_id": config.worker_id,
             "ocr": ocr.name if ocr else "off",
             "ai": config.ai_model or "off",
+            "company_keys": "on" if config.ai_keys_secret else "off",
         },
     )
     while not stop.is_set():

@@ -32,6 +32,14 @@ x-roles:
   hiring_manager: Reviews candidates for their jobs; no salary details.
   viewer: Read-only access; no salary details.
 x-error-codes:
+  AI_KEYS_NOT_SET_UP:
+    module: aiproviders
+    status: 409
+    description: The server cannot store API keys yet (HP_AI_KEYS_SECRET is not set).
+  AI_PROVIDER_NO_KEY:
+    module: aiproviders
+    status: 409
+    description: That provider has no API key yet; save one first.
   APPLICATION_EXISTS:
     module: pipeline
     status: 409
@@ -181,6 +189,93 @@ x-error-codes:
     status: 400
     description: The request is invalid. `details` says which fields and why.
 paths:
+  /v1/ai-providers:
+    get:
+      operationId: getAiProviders
+      tags: [aiproviders]
+      summary: The AI provider in use, and each provider's model and key (only its last characters)
+      x-permission: aiproviders:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiProviders'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: chooseAiProvider
+      tags: [aiproviders]
+      summary: Switch the AI provider the company uses
+      x-permission: aiproviders:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AiProviderChoiceInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiProviders'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/AiProviderConflict'}
+  /v1/ai-providers/{aiProvider}:
+    parameters:
+      - $ref: '#/components/parameters/AiProviderPath'
+    put:
+      operationId: saveAiProvider
+      tags: [aiproviders]
+      summary: Save a provider's model and (new) API key, and check them
+      x-permission: aiproviders:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AiProviderInput'}
+      responses:
+        '200':
+          description: Saved; the check runs in the background
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiProviders'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/AiProviderConflict'}
+    delete:
+      operationId: removeAiProviderKey
+      tags: [aiproviders]
+      summary: Remove a provider's API key (the AI is switched off if it was in use)
+      x-permission: aiproviders:manage
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiProviders'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/ai-providers/{aiProvider}/check:
+    parameters:
+      - $ref: '#/components/parameters/AiProviderPath'
+    post:
+      operationId: checkAiProvider
+      tags: [aiproviders]
+      summary: Check a provider's saved key and model again
+      x-permission: aiproviders:manage
+      responses:
+        '202':
+          description: The check runs in the background
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AiProviders'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/AiProviderConflict'}
   /v1/assistant:
     get:
       operationId: getAssistant
@@ -3303,6 +3398,11 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    AiProviderConflict:
+      description: Keys cannot be stored (AI_KEYS_NOT_SET_UP), or the provider has no key (AI_PROVIDER_NO_KEY).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     AssistantOff:
       description: Switched off (ASSISTANT_OFF).
       content:
@@ -3391,6 +3491,7 @@ components:
     Permission:
       type: string
       enum:
+        - aiproviders:manage
         - assistant:use
         - candidates.compensation:read
         - candidates.compensation:update
@@ -3453,6 +3554,8 @@ components:
     ErrorCode:
       type: string
       enum:
+        - AI_KEYS_NOT_SET_UP
+        - AI_PROVIDER_NO_KEY
         - APPLICATION_EXISTS
         - ASSISTANT_LIMIT_REACHED
         - ASSISTANT_OFF
@@ -3493,6 +3596,8 @@ components:
     JobKind:
       type: string
       enum:
+        - aiprovider.check
+        - aiprovider.checked
         - assistant.answered
         - assistant.ask
         - company.autofill
@@ -3556,6 +3661,88 @@ components:
       description: A non-negative amount with up to 2 decimal places, as a string so no precision is lost.
       pattern: '^(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$'
       example: '8500.00'
+    AiProviderName:
+      type: string
+      description: deepseek = DeepSeek, claude = Claude (Anthropic), openai = ChatGPT (OpenAI).
+      enum: [deepseek, claude, openai]
+    AiProviderChoice:
+      type: string
+      description: A provider, "server" (the server's own HP_AI_* provider) or "off".
+      enum: [server, off, deepseek, claude, openai]
+    AiProviders:
+      type: object
+      required: [active, serverAvailable, keysSupported, providers]
+      properties:
+        active: {$ref: '#/components/schemas/AiProviderChoice'}
+        serverAvailable: {type: boolean, description: The server has its own AI provider set up (HP_AI_*).}
+        keysSupported: {type: boolean, description: The server can store API keys (HP_AI_KEYS_SECRET is set).}
+        providers:
+          type: array
+          description: Every provider, in the order deepseek, claude, openai.
+          items: {$ref: '#/components/schemas/AiProviderEntry'}
+    AiProviderEntry:
+      type: object
+      required: [provider, model, keyHint, updatedAt, check]
+      properties:
+        provider: {$ref: '#/components/schemas/AiProviderName'}
+        model: {type: string, nullable: true}
+        keyHint: {type: string, nullable: true, description: 'The key''s last four characters, e.g. "…a1b2"; null: no key.'}
+        updatedAt: {type: string, format: date-time, nullable: true}
+        check:
+          allOf: [{$ref: '#/components/schemas/AiProviderCheck'}]
+          nullable: true
+    AiProviderCheck:
+      type: object
+      required: [status, message, checkedAt]
+      properties:
+        status: {type: string, enum: [queued, ok, failed]}
+        message: {type: string, nullable: true, description: "Why it failed: the key was refused, no credit left, an unknown model..."}
+        checkedAt: {type: string, format: date-time}
+    AiProviderChoiceInput:
+      type: object
+      additionalProperties: false
+      required: [provider]
+      properties:
+        provider: {$ref: '#/components/schemas/AiProviderChoice'}
+    AiProviderInput:
+      type: object
+      additionalProperties: false
+      required: [model]
+      properties:
+        model: {type: string, minLength: 1, maxLength: 100, description: 'e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5'}
+        apiKey:
+          type: string
+          minLength: 8
+          maxLength: 500
+          writeOnly: true
+          description: Leave out to keep the saved key.
+    AiAccess:
+      type: object
+      additionalProperties: false
+      description: >
+        The provider the company chose, for the AI worker. The key is sealed (AES-256-GCM with a key derived from HP_AI_KEYS_SECRET, the provider as associated data); only the AI worker opens it.
+
+      required: [provider, model, sealedKey]
+      properties:
+        provider: {$ref: '#/components/schemas/AiProviderName'}
+        model: {type: string}
+        sealedKey: {type: string}
+    AiProviderCheckJob:
+      type: object
+      additionalProperties: false
+      required: [provider, access]
+      properties:
+        provider: {$ref: '#/components/schemas/AiProviderName'}
+        access: {$ref: '#/components/schemas/AiAccess'}
+    AiProviderCheckedJob:
+      type: object
+      additionalProperties: false
+      required: [provider, sealedKey, ok, message]
+      properties:
+        provider: {$ref: '#/components/schemas/AiProviderName'}
+        sealedKey: {type: string, description: The key checked (a check of a key since replaced is dropped).}
+        ok: {type: boolean}
+        message: {type: string, nullable: true}
     AssistantAnswerId:
       type: string
       pattern: '^ask_[0-9a-hjkmnp-tv-z]{26}$'
@@ -3631,6 +3818,9 @@ components:
           type: array
           description: What the asking user may see, without contact details or salary.
           items: {$ref: '#/components/schemas/AssistantSection'}
+        ai:
+          allOf: [{$ref: '#/components/schemas/AiAccess'}]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     AssistantAnsweredJob:
       type: object
       additionalProperties: false
@@ -4623,6 +4813,9 @@ components:
           description: >
             What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text.
 
+        ai:
+          allOf: [{$ref: '#/components/schemas/AiAccess'}]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     DocumentCvParsedJob:
       type: object
       additionalProperties: false
@@ -6086,6 +6279,9 @@ components:
         matchId: {$ref: '#/components/schemas/MatchId'}
         job: {type: string, description: "The job's title, details, description and ad, without salary."}
         cv: {type: string, description: "The CV's text, without names, contact details or salary."}
+        ai:
+          allOf: [{$ref: '#/components/schemas/AiAccess'}]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     MatchClaim:
       type: object
       additionalProperties: false
@@ -6911,6 +7107,11 @@ components:
           type: array
           items: {$ref: '#/components/schemas/MandatoryField'}
   parameters:
+    AiProviderPath:
+      name: aiProvider
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/AiProviderName'}
     CandidateIdPath:
       name: candidateId
       in: path
@@ -7002,6 +7203,11 @@ components:
       required: true
       schema: {$ref: '#/components/schemas/PlacementId'}
 x-permissions:
+  aiproviders:manage:
+    module: aiproviders
+    description: Choose the AI provider and enter its API keys.
+    sensitive: false
+    roles: [owner, admin]
   assistant:use:
     module: assistant
     description: Ask the AI assistant about candidates, jobs and applications you may see.
@@ -7298,6 +7504,16 @@ x-permissions:
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
 x-jobs:
+  aiprovider.check:
+    module: aiproviders
+    queue: ai
+    payload: AiProviderCheckJob
+    description: Send a provider a tiny request to check its key and model (Python AI worker).
+  aiprovider.checked:
+    module: aiproviders
+    queue: core
+    payload: AiProviderCheckedJob
+    description: Save whether the check worked (Go worker).
   assistant.answered:
     module: assistant
     queue: core
@@ -7384,6 +7600,8 @@ x-jobs:
     payload: WebhookDeliverJob
     description: POST one webhook delivery to its address (Go worker); a failure is retried later.
 x-modules:
+  - name: aiproviders
+    description: 'The AI provider a company uses for the assistant, CV vs job matching, market insights and reading CVs: DeepSeek, Claude (Anthropic) or ChatGPT (OpenAI) with the company''s own API key, the server''s own provider (HP_AI_*), or none. Keys are sealed (encrypted) when saved, never shown again, and opened only by the AI worker. Each provider keeps its key and model, so switching back and forth needs no retyping.'
   - name: assistant
     description: The AI assistant. Go gathers what the asking user may see (never contact details, never salary), queues it for the Python AI worker, which asks the AI provider; the answer comes back on the queue. Answers are shown only to the person who asked. Off until an AI provider is set up; each company has a monthly token limit.
   - name: candidates

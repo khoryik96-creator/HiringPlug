@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ..contracts import DocumentCvParsedJob, DocumentParseCvJob, JobKind, ParsedProfile
 from ..parsing import parse_cv
+from ..providers import ProviderError
 from ..queue import FollowUp
 from . import cv_ai
 
@@ -22,9 +23,15 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
     tokens = 0
     try:
         profile = parse_cv(payload.text)
-        if payload.useAi and payload.aiText and deps.ai is not None:
+        ai = None
+        if payload.useAi and payload.aiText:
             try:
-                filled = cv_ai.fill(profile, payload.aiText, deps.ai)  # never the salary figures
+                ai = deps.provider(payload.ai)
+            except ProviderError:
+                log.warning("ai key could not be opened", extra={"document_id": payload.documentId.root})
+        if ai is not None and payload.aiText:
+            try:
+                filled = cv_ai.fill(profile, payload.aiText, ai)  # never the salary figures
                 profile, tokens = filled.profile, filled.tokens
             except Exception:  # an AI-step bug must not lose the rules' reading
                 log.warning("ai fill failed", exc_info=True, extra={"document_id": payload.documentId.root})

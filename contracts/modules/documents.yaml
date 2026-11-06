@@ -415,6 +415,9 @@ components:
           description: >
             What the AI may read: the text with salary figures taken out (salary
             never goes to the AI). Sent with useAi; quotes still come from text.
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     DocumentCvParsedJob:
       type: object
       additionalProperties: false

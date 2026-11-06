@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from ..contracts import ParsedJob, ParsedProfile, SourcedText
 from ..parsing.industry import RULES_INDUSTRIES
-from ..provider import Provider, ProviderError
+from ..providers import Provider, ProviderError
 
 MAX_CV_CHARS = 12000
 

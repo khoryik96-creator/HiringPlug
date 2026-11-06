@@ -37,9 +37,6 @@ func (m *Module) WhenAdded(ctx context.Context, tx pgx.Tx, tenantID string, a Ap
 // WhenCVRead scores a candidate's open jobs again once a new CV of theirs
 // has been read, in the caller's transaction (a hook of the documents module).
 func (m *Module) WhenCVRead(ctx context.Context, tx pgx.Tx, tenantID, candidateID string) error {
-	if !m.service.settings.Enabled {
-		return nil
-	}
 	apps, err := m.service.deps.Applications.OpenOfCandidate(ctx, tx, candidateID)
 	if err != nil {
 		return err
@@ -52,8 +49,12 @@ func (m *Module) WhenCVRead(ctx context.Context, tx pgx.Tx, tenantID, candidateI
 // already waiting, consent withdrawn, no CV text yet, no job text. Only a
 // database failure is an error (it undoes what triggered it).
 func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, apps []Application) error {
-	if !s.settings.Enabled || len(apps) == 0 {
+	if len(apps) == 0 {
 		return nil
+	}
+	ai, on, err := s.deps.AI.Access(ctx, tx)
+	if err != nil || !on {
+		return err
 	}
 	if err := s.withinAllowance(ctx, tx); err != nil {
 		return skipIfExpected(err)
@@ -91,7 +92,7 @@ func (s *Service) autoScore(ctx context.Context, tx pgx.Tx, tenantID string, app
 		if cv == "" {
 			continue // scored once a CV has been read
 		}
-		if _, err := s.queue(ctx, tx, p, a, job, cv); err != nil {
+		if _, err := s.queue(ctx, tx, p, ai, a, job, cv); err != nil {
 			return err
 		}
 	}

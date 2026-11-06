@@ -33,9 +33,12 @@ type Status struct {
 
 // Status returns whether the assistant is on, and this month's use.
 func (s *Service) Status(ctx context.Context, p authz.Principal) (Status, error) {
-	out := Status{Enabled: s.settings.Enabled, MonthlyTokens: s.settings.MonthlyTokens}
+	out := Status{MonthlyTokens: s.settings.MonthlyTokens}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
+		if _, out.Enabled, err = s.deps.AI.Access(ctx, tx); err != nil {
+			return err
+		}
 		out.UsedTokens, err = s.used(ctx, tx)
 		return err
 	})
@@ -56,10 +59,6 @@ func (s *Service) List(ctx context.Context, p authz.Principal, subjectType, subj
 // Ask queues a question for the AI, with what the user may see of its
 // subject.
 func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store.AssistantAnswer, error) {
-	if !s.settings.Enabled {
-		return store.AssistantAnswer{}, apperr.New(api.ErrorCodeASSISTANTOFF,
-			"The AI assistant is switched off: no AI provider is set up yet.")
-	}
 	q, err := CheckQuestion(q)
 	if err != nil {
 		return store.AssistantAnswer{}, err
@@ -67,6 +66,13 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 	var out store.AssistantAnswer
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		qs := store.New(tx)
+		ai, on, err := s.deps.AI.Access(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if !on {
+			return apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
+		}
 		used, err := s.used(ctx, tx)
 		if err != nil {
 			return err
@@ -86,7 +92,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 			return err
 		}
 		job := api.AssistantAskJob{
-			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), Question: apiconv.OrNull(q.Question), Sections: toAPISections(sections),
+			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), Question: apiconv.OrNull(q.Question), Sections: toAPISections(sections), Ai: ai,
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindAssistantAsk, job); err != nil {
 			return err

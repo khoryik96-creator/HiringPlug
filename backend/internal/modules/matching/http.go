@@ -17,7 +17,11 @@ func (h *HTTP) ListMatches(ctx context.Context, req api.ListMatchesRequestObject
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListMatches200JSONResponse{Enabled: h.svc.Enabled(), Items: make([]api.Match, len(items))}
+	on, err := h.svc.Enabled(ctx, authz.MustFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListMatches200JSONResponse{Enabled: on, Items: make([]api.Match, len(items))}
 	for i, m := range items {
 		out.Items[i] = toAPI(m)
 	}

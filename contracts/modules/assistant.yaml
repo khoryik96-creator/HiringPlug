@@ -182,6 +182,9 @@ components:
           type: array
           description: What the asking user may see, without contact details or salary.
           items: { $ref: '#/components/schemas/AssistantSection' }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     AssistantAnsweredJob:
       type: object
       additionalProperties: false

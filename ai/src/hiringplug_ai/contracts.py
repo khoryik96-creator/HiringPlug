@@ -18,6 +18,7 @@ class Role(StrEnum):
 
 
 class Permission(StrEnum):
+    aiproviders_manage = "aiproviders:manage"
     assistant_use = "assistant:use"
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
@@ -80,6 +81,8 @@ class Permission(StrEnum):
 
 
 class ErrorCode(StrEnum):
+    AI_KEYS_NOT_SET_UP = "AI_KEYS_NOT_SET_UP"
+    AI_PROVIDER_NO_KEY = "AI_PROVIDER_NO_KEY"
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
     ASSISTANT_OFF = "ASSISTANT_OFF"
@@ -120,6 +123,8 @@ class ErrorCode(StrEnum):
 
 
 class JobKind(StrEnum):
+    aiprovider_check = "aiprovider.check"
+    aiprovider_checked = "aiprovider.checked"
     assistant_answered = "assistant.answered"
     assistant_ask = "assistant.ask"
     company_autofill = "company.autofill"
@@ -198,6 +203,84 @@ class DecimalAmount(RootModel[str]):
             pattern="^(0|[1-9][0-9]{0,11})(\\.[0-9]{1,2})?$",
         ),
     ]
+
+
+class AiProviderName(StrEnum):
+    deepseek = "deepseek"
+    claude = "claude"
+    openai = "openai"
+
+
+class AiProviderChoice(StrEnum):
+    server = "server"
+    off = "off"
+    deepseek = "deepseek"
+    claude = "claude"
+    openai = "openai"
+
+
+class Status(StrEnum):
+    queued = "queued"
+    ok = "ok"
+    failed = "failed"
+
+
+class AiProviderCheck(BaseModel):
+    status: Status
+    message: Annotated[
+        str | None,
+        Field(description="Why it failed: the key was refused, no credit left, an unknown model..."),
+    ]
+    checkedAt: AwareDatetime
+
+
+class AiProviderChoiceInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: AiProviderChoice
+
+
+class AiProviderInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    model: Annotated[
+        str,
+        Field(description="e.g. deepseek-v4-flash, claude-opus-5-5, gpt-5.5", max_length=100, min_length=1),
+    ]
+    apiKey: Annotated[
+        str | None, Field(description="Leave out to keep the saved key.", max_length=500, min_length=8)
+    ] = None
+
+
+class AiAccess(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: AiProviderName
+    model: str
+    sealedKey: str
+
+
+class AiProviderCheckJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: AiProviderName
+    access: AiAccess
+
+
+class AiProviderCheckedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: AiProviderName
+    sealedKey: Annotated[
+        str, Field(description="The key checked (a check of a key since replaced is dropped).")
+    ]
+    ok: bool
+    message: Annotated[str | None, Field(...)]
 
 
 class AssistantAnswerId(RootModel[str]):
@@ -281,6 +364,10 @@ class AssistantAskJob(BaseModel):
         list[AssistantSection],
         Field(description="What the asking user may see, without contact details or salary."),
     ]
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
 
 
 class AssistantAnsweredJob(BaseModel):
@@ -1139,6 +1226,10 @@ class DocumentParseCvJob(BaseModel):
             description="What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text.\n",
             pattern="^[^\\x00]*$",
         ),
+    ] = None
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
     ] = None
 
 
@@ -2346,6 +2437,10 @@ class MatchScoreJob(BaseModel):
     matchId: MatchId
     job: Annotated[str, Field(description="The job's title, details, description and ad, without salary.")]
     cv: Annotated[str, Field(description="The CV's text, without names, contact details or salary.")]
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
 
 
 class MatchClaim(BaseModel):
@@ -3105,6 +3200,16 @@ class FieldSettings(BaseModel):
     mandatory: list[MandatoryField]
 
 
+class AiProviderEntry(BaseModel):
+    provider: AiProviderName
+    model: Annotated[str | None, Field(...)]
+    keyHint: Annotated[
+        str | None, Field(description='The key\'s last four characters, e.g. "…a1b2"; null: no key.')
+    ]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+    check: Annotated[AiProviderCheck | None, Field(...)]
+
+
 class ScreeningCallResult(BaseModel):
     candidate: Candidate
     noteId: Annotated[NoteId | None, Field(...)]
@@ -3514,6 +3619,19 @@ class TimeToFill(BaseModel):
         int | None, Field(description="From a candidate being added to the job to being placed.")
     ]
     jobs: Annotated[list[JobFill], Field(description="Jobs with a placement in the period, slowest first.")]
+
+
+class AiProviders(BaseModel):
+    active: AiProviderChoice
+    serverAvailable: Annotated[
+        bool, Field(description="The server has its own AI provider set up (HP_AI_*).")
+    ]
+    keysSupported: Annotated[
+        bool, Field(description="The server can store API keys (HP_AI_KEYS_SECRET is set).")
+    ]
+    providers: Annotated[
+        list[AiProviderEntry], Field(description="Every provider, in the order deepseek, claude, openai.")
+    ]
 
 
 class CareersPage(BaseModel):

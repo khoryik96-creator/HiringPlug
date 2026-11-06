@@ -79,6 +79,9 @@ type AI struct {
 	// MonthlyTokens is what each company may use in a calendar month
 	// (question and answer together).
 	MonthlyTokens int64 // HP_AI_MONTHLY_TOKENS
+	// KeysSecret seals the API keys companies enter in Settings (the AI
+	// worker has the same one to open them). Empty: keys cannot be saved.
+	KeysSecret []byte // HP_AI_KEYS_SECRET
 }
 
 // SMTP is how to reach the mail server.
@@ -122,6 +125,10 @@ func Load(getenv func(string) string) (Config, error) {
 	c.AI = AI{
 		Enabled:       r.oneOf("HP_AI_PROVIDER", "off", "off", "openai_compatible") != "off",
 		MonthlyTokens: r.int64("HP_AI_MONTHLY_TOKENS", 2_000_000),
+		KeysSecret:    []byte(r.str("HP_AI_KEYS_SECRET", "")),
+	}
+	if n := len(c.AI.KeysSecret); n > 0 && n < 32 {
+		r.fail("HP_AI_KEYS_SECRET must be at least 32 characters (or empty: companies cannot save AI keys)")
 	}
 	if c.AI.MonthlyTokens < 0 {
 		r.fail("HP_AI_MONTHLY_TOKENS must not be negative")
@@ -166,6 +173,9 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 		if string(c.FilesURLSecret) == devSecret {
 			r.fail("HP_FILES_URL_SECRET must be set to a real secret in production")
+		}
+		if strings.HasPrefix(string(c.AI.KeysSecret), "dev-only-") {
+			r.fail("HP_AI_KEYS_SECRET must be a real secret in production (or empty)")
 		}
 	}
 	if len(r.problems) > 0 {

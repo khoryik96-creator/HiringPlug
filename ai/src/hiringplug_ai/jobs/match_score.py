@@ -28,7 +28,7 @@ from ..contracts import (
     MatchVerdict,
     Strength,
 )
-from ..provider import ProviderError
+from ..providers import ProviderError
 from ..queue import FollowUp
 
 if TYPE_CHECKING:
@@ -195,17 +195,18 @@ def run(payload: MatchScoreJob, deps: Deps) -> list[FollowUp]:
     reading = Reading()
     error = model = None
     input_tokens = output_tokens = 0
-    if deps.ai is None:
-        error = "matching is switched off in the AI worker (HP_AI_PROVIDER is off)"
-    else:
-        try:
-            done = deps.ai.complete(SYSTEM, prompt(payload), max_tokens=MAX_ANSWER_TOKENS)
+    try:
+        ai = deps.provider(payload.ai)
+        if ai is None:
+            error = "matching is switched off in the AI worker (HP_AI_PROVIDER is off)"
+        else:
+            done = ai.complete(SYSTEM, prompt(payload), max_tokens=MAX_ANSWER_TOKENS)
             model, input_tokens, output_tokens = done.model, done.input_tokens, done.output_tokens
             reading = parse(done.text)
-        except ProviderError as exc:
-            error = str(exc)
-        except UnreadableAnswerError:
-            error = "the AI's answer could not be read (it was not the JSON asked for)"
+    except ProviderError as exc:
+        error = str(exc)
+    except UnreadableAnswerError:
+        error = "the AI's answer could not be read (it was not the JSON asked for)"
     # Never the texts, the quotes or the summary: they are about a person.
     log.info(
         "match scored",

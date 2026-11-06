@@ -64,6 +64,10 @@ type Deps struct {
 	Jobs interface {
 		ForMatching(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Job, error)
 	}
+	// AI is the AI provider the company uses (aiproviders).
+	AI interface {
+		Access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+	}
 	// OtherAIUse is the company's other use of the AI (the assistant): one
 	// monthly allowance covers both. Nil: none.
 	OtherAIUse interface {
@@ -73,7 +77,6 @@ type Deps struct {
 
 // Settings is how matching may be used.
 type Settings struct {
-	Enabled       bool
 	MonthlyTokens int64
 	TimeZone      *time.Location // months start on the 1st here
 }

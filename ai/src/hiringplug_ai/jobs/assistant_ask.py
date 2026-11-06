@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..contracts import AssistantAnsweredJob, AssistantAskJob, AssistantKind, JobKind
-from ..provider import ProviderError
+from ..providers import ProviderError
 from ..queue import FollowUp
 
 if TYPE_CHECKING:
@@ -79,12 +79,13 @@ def prompt(payload: AssistantAskJob) -> str:
 def run(payload: AssistantAskJob, deps: Deps) -> list[FollowUp]:
     answer = error = model = None
     input_tokens = output_tokens = 0
-    if deps.ai is None:
-        error = "the AI assistant is switched off in the AI worker (HP_AI_PROVIDER is off)"
-    else:
-        try:
+    try:
+        ai = deps.provider(payload.ai)
+        if ai is None:
+            error = "the AI assistant is switched off in the AI worker (HP_AI_PROVIDER is off)"
+        else:
             market = payload.kind == AssistantKind.market_map
-            done = deps.ai.complete(
+            done = ai.complete(
                 SYSTEM_MARKET if market else SYSTEM,
                 prompt(payload),
                 max_tokens=MAX_MARKET_TOKENS if market else MAX_ANSWER_TOKENS,
@@ -93,8 +94,8 @@ def run(payload: AssistantAskJob, deps: Deps) -> list[FollowUp]:
             input_tokens, output_tokens = done.input_tokens, done.output_tokens
             if answer is None:
                 error = "the AI gave an empty answer"
-        except ProviderError as exc:
-            error = str(exc)
+    except ProviderError as exc:
+        error = str(exc)
     # Never the question or the answer: they are about a person.
     log.info(
         "assistant answered",

@@ -10,7 +10,7 @@ from hiringplug_ai.config import ConfigError, load_config
 from hiringplug_ai.contracts import AssistantAnsweredJob, AssistantAskJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps, assistant_ask
-from hiringplug_ai.provider import Completion, OpenAICompatible, ProviderError
+from hiringplug_ai.providers import Completion, OpenAICompatible, ProviderError
 
 ANSWER_ID = "ask_01jbz6w0m0k8q9x2r3s4t5v6w7"
 
@@ -134,7 +134,7 @@ def test_openai_compatible_request_and_reply() -> None:
 
 @pytest.mark.parametrize(
     ("status", "message"),
-    [(401, "refused the key"), (429, "busy"), (500, "HTTP 500"), (200, "could not be read")],
+    [(401, "refused the API key"), (429, "busy"), (500, "HTTP 500"), (200, "could not be read")],
 )
 def test_provider_failures_are_readable(status: int, message: str) -> None:
     transport = httpx.MockTransport(lambda r: httpx.Response(status, json={"nothing": True}))

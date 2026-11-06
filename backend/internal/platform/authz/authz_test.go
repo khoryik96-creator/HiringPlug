@@ -71,5 +71,5 @@ func TestTheCatalogHasEveryPermissionWithItsWords(t *testing.T) {
 		assert.NotEmpty(t, p.Description, p.Permission)
 		assert.NotEmpty(t, p.Module, p.Permission)
 	}
-	assert.Equal(t, "assistant", c[0].Module, "sorted by module")
+	assert.Equal(t, "aiproviders", c[0].Module, "sorted by module")
 }

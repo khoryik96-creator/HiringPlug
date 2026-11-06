@@ -10,6 +10,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 )
@@ -34,19 +36,21 @@ func (u aiUse) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int
 	return total, nil
 }
 
-// cvReadingAI lets the documents module use the AI when it is on and the
-// company has allowance left this month.
+// cvReadingAI lets the documents module use the AI when the company has
+// one and allowance left this month.
 type cvReadingAI struct {
 	all aiUse
+	ai  *aiproviders.Module
 	cfg config.AI
 	tz  *time.Location
 	now func() time.Time
 }
 
-func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx) (bool, error) {
-	if !a.cfg.Enabled {
-		return false, nil
+func (a cvReadingAI) Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error) {
+	access, on, err := a.ai.Access(ctx, tx)
+	if err != nil || !on {
+		return nil, false, err
 	}
 	used, err := a.all.TokensSince(ctx, tx, assistant.MonthStart(a.now(), a.tz))
-	return used < a.cfg.MonthlyTokens, err
+	return access, used < a.cfg.MonthlyTokens, err
 }

@@ -159,3 +159,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/intake/internal/store
+  - <<: *module
+    queries: db/queries/aiproviders.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/aiproviders/internal/store

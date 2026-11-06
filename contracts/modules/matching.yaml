@@ -286,6 +286,9 @@ components:
         matchId: { $ref: '#/components/schemas/MatchId' }
         job: { type: string, description: "The job's title, details, description and ad, without salary." }
         cv: { type: string, description: "The CV's text, without names, contact details or salary." }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
     MatchClaim:
       type: object
       additionalProperties: false

@@ -1,9 +1,17 @@
-"""The AI provider, behind one small interface.
+"""The AI providers, behind one small interface (`complete`).
 
-`OpenAICompatible` speaks the OpenAI-style chat API that DeepSeek's own API,
-hosts running DeepSeek's open model (in a region you choose) and self-hosted
-servers (vLLM, Ollama) all offer. Another provider is one more class with a
-`complete` method. The provider's key is never logged.
+- `connect` builds the provider a company chose in Settings > AI provider
+  (DeepSeek, Claude or ChatGPT, with its own sealed key), following CV Studio's
+  provider layer: Claude and DeepSeek through the Anthropic Messages API
+  (DeepSeek's Anthropic-compatible endpoint, thinking off), ChatGPT through
+  OpenAI's Responses API.
+- `OpenAICompatible` is the server's own provider (HP_AI_*): the OpenAI-style
+  chat API of DeepSeek, a host running its open model, or your own server.
+
+A paid request is sent again only when the provider says it did no work
+(429 rate limit, 529 overloaded): anything else might bill twice. Keys are
+never logged, and provider error texts (which can echo part of a key) are
+never passed on: users see fixed messages.
 """
 
 from __future__ import annotations
@@ -12,6 +20,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import httpx
+
+from ..contracts import AiAccess, AiProviderName
+from ..keys import SealedKeyError, open_key
 
 
 @dataclass(frozen=True)
@@ -63,7 +74,7 @@ class OpenAICompatible:
         if response.status_code == httpx.codes.TOO_MANY_REQUESTS:
             raise ProviderError("the AI provider is busy (rate limited); try again in a minute")
         if response.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
-            raise ProviderError("the AI provider refused the key (check HP_AI_PROVIDER_KEY)")
+            raise ProviderError("the AI provider refused the API key (check HP_AI_PROVIDER_KEY)")
         if response.status_code != httpx.codes.OK:
             raise ProviderError(f"the AI provider answered with HTTP {response.status_code}")
         try:
@@ -78,3 +89,17 @@ class OpenAICompatible:
             )
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise ProviderError("the AI provider's answer could not be read") from exc
+
+
+def connect(access: AiAccess, secret: str, timeout_seconds: float) -> Provider:
+    """The provider a company chose, with its key opened."""
+    from .messages import Messages  # noqa: PLC0415 - keeps the SDK out of the env-only path
+    from .responses import Responses  # noqa: PLC0415
+
+    try:
+        key = open_key(access.sealedKey, access.provider.value, secret)
+    except SealedKeyError as exc:
+        raise ProviderError(str(exc)) from exc
+    if access.provider == AiProviderName.openai:
+        return Responses(key, access.model, timeout_seconds)
+    return Messages(access.provider.value, key, access.model, timeout_seconds)

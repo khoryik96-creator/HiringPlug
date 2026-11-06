@@ -6,7 +6,7 @@ import pytest
 
 from hiringplug_ai.contracts import JobKind, MatchScoredJob, MatchScoreJob, MatchVerdict
 from hiringplug_ai.jobs import match_score
-from hiringplug_ai.provider import Completion, ProviderError
+from hiringplug_ai.providers import Completion, ProviderError
 
 from .test_assistant import FakeProvider, deps
 

@@ -7,7 +7,7 @@ from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentParseCvJob
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps, cv_ai, parse_cv
 from hiringplug_ai.parsing import parse_cv as rules
-from hiringplug_ai.provider import Completion, ProviderError
+from hiringplug_ai.providers import Completion, ProviderError
 
 FULL_CV = (
     "SITI AISYAH\nsiti@example.com | +60 12-345 6789\n\n"

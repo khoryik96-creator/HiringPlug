@@ -10,6 +10,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AiProvider struct {
+	TenantID     string
+	Provider     string
+	Model        string
+	SealedKey    string
+	KeyHint      string
+	CheckStatus  *string
+	CheckMessage *string
+	CheckedAt    *time.Time
+	UpdatedBy    string
+	UpdatedAt    time.Time
+}
+
+type AiProviderChoice struct {
+	TenantID  string
+	Provider  string
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
 type ApiKey struct {
 	ID         string
 	TenantID   string

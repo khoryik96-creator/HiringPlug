@@ -223,11 +223,19 @@ provider; the answer, the model and the tokens go back as
 `assistant.answered`. A provider failure becomes a readable error on the
 answer ("the AI provider did not answer in time"), not a retry loop.
 
-`provider.py` is the one interface (`complete(system, user, max_tokens)`);
-`OpenAICompatible` covers DeepSeek's API, hosts of its open model and
-self-hosted servers. Settings: `HP_AI_PROVIDER` (off / openai_compatible),
-`HP_AI_PROVIDER_URL`, `HP_AI_PROVIDER_KEY` (never logged or printed),
-`HP_AI_MODEL`, `HP_AI_TIMEOUT_SECONDS`. See
+`providers/` is the one interface (`complete(system, user, max_tokens)`).
+AI jobs carry the provider the company chose (`ai`: provider, model, sealed
+key); `Deps.provider` opens the key (`keys.py`, `HP_AI_KEYS_SECRET`) and
+builds `providers/messages.py` (Claude, and DeepSeek's Anthropic-compatible
+endpoint, with Anthropic's SDK) or `providers/responses.py` (ChatGPT, OpenAI's
+Responses API). A job without `ai` uses the server's own provider,
+`OpenAICompatible` (DeepSeek's API, hosts of its open model, self-hosted
+servers): `HP_AI_PROVIDER` (off / openai_compatible), `HP_AI_PROVIDER_URL`,
+`HP_AI_PROVIDER_KEY` (never logged or printed), `HP_AI_MODEL`,
+`HP_AI_TIMEOUT_SECONDS`. `aiprovider.check` sends a provider a tiny request
+when a company saves a key and reports back as `aiprovider.checked`. Paid
+requests are sent again only on 429/529; provider error texts (which can echo
+part of a key) are replaced by fixed messages. See
 [features.md](features.md#35-ai-assistant-sidebar--off-until-an-ai-provider-is-set-up).
 
 ## Adding a job to the AI worker

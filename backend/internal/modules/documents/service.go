@@ -34,10 +34,10 @@ type Service struct {
 	ai         AIAllowance // nil: the AI never fills in CV readings
 }
 
-// AIAllowance says whether the AI may be used now (it is on, and the
-// company has allowance left this month).
+// AIAllowance says whether the AI may be used now (the company has one,
+// and allowance left this month), and which (nil: the server's own).
 type AIAllowance interface {
-	Allowed(ctx context.Context, tx pgx.Tx) (bool, error)
+	Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
 }
 
 // ReadDoneHook runs when reading a document has ended, in the same

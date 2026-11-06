@@ -48,8 +48,16 @@ type JobResult struct{ Queued, AlreadyScored, WithoutCV, ConsentWithdrawn int }
 // maxBatch is how many candidates one "score them all" sends to the AI.
 const maxBatch = 100
 
-// Enabled reports whether matching is switched on.
-func (s *Service) Enabled() bool { return s.settings.Enabled }
+// Enabled reports whether matching is switched on (the company has an AI).
+func (s *Service) Enabled(ctx context.Context, p authz.Principal) (bool, error) {
+	var on bool
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		_, on, err = s.deps.AI.Access(ctx, tx)
+		return err
+	})
+	return on, err
+}
 
 // List returns the latest score of each of a job's applications, or of one
 // application (give exactly one of the IDs).
@@ -99,11 +107,12 @@ func (s *Service) List(ctx context.Context, p authz.Principal, jobID, applicatio
 // Score asks the AI how well an application's candidate fits its job. A
 // score already waiting for the AI is returned instead of asking again.
 func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID string) (Match, error) {
-	if err := s.on(); err != nil {
-		return Match{}, err
-	}
 	var out Match
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		ai, err := s.on(ctx, tx)
+		if err != nil {
+			return err
+		}
 		a, err := s.application(ctx, tx, p, applicationID)
 		if err != nil {
 			return err
@@ -138,7 +147,7 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 			return apperr.New(api.ErrorCodeMATCHNEEDSTEXT,
 				"This candidate has no CV with readable text yet: upload one, or wait until it has been read.")
 		}
-		out, err = s.queue(ctx, tx, p, a, job, cv)
+		out, err = s.queue(ctx, tx, p, ai, a, job, cv)
 		return err
 	})
 	return out, err
@@ -148,11 +157,12 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 // yet (all of them with rescore), at most maxBatch at a time. Candidates
 // without a CV with readable text are counted and left out.
 func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string, rescore bool) (JobResult, error) {
-	if err := s.on(); err != nil {
-		return JobResult{}, err
-	}
 	var res JobResult
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		ai, err := s.on(ctx, tx)
+		if err != nil {
+			return err
+		}
 		job, err := s.jobText(ctx, tx, p, jobID)
 		if err != nil {
 			return err
@@ -197,7 +207,7 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 				res.WithoutCV++
 				continue
 			}
-			if _, err := s.queue(ctx, tx, p, a, job, cv); err != nil {
+			if _, err := s.queue(ctx, tx, p, ai, a, job, cv); err != nil {
 				return err
 			}
 			res.Queued++
@@ -207,11 +217,13 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 	return res, err
 }
 
-func (s *Service) on() error {
-	if !s.settings.Enabled {
-		return apperr.New(api.ErrorCodeMATCHINGOFF, "Matching is switched off: no AI provider is set up yet.")
+// on returns the AI the company uses, or MATCHING_OFF when it has none.
+func (s *Service) on(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
+	ai, on, err := s.deps.AI.Access(ctx, tx)
+	if err == nil && !on {
+		err = apperr.New(api.ErrorCodeMATCHINGOFF, "Matching is switched off: no AI provider is set up yet.")
 	}
-	return nil
+	return ai, err
 }
 
 // withinAllowance refuses once the company used this month's AI allowance
@@ -275,13 +287,13 @@ func (s *Service) cvText(ctx context.Context, tx pgx.Tx, p authz.Principal, cand
 
 // queue saves a match waiting for the AI, with what it is sent, and queues
 // the question for the AI worker.
-func (s *Service) queue(ctx context.Context, tx pgx.Tx, p authz.Principal, a Application, job, cv string) (Match, error) {
+func (s *Service) queue(ctx context.Context, tx pgx.Tx, p authz.Principal, ai *api.AiAccess, a Application, job, cv string) (Match, error) {
 	hash := Hash(job)
 	row, err := store.New(tx).InsertMatch(ctx, store.InsertMatchParams{ApplicationID: a.ID, JobID: a.JobID, SentJob: &job, SentCv: &cv, JobHash: &hash})
 	if err != nil {
 		return Match{}, err
 	}
-	if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindMatchScore, api.MatchScoreJob{MatchId: row.ID, Job: job, Cv: cv}); err != nil {
+	if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindMatchScore, api.MatchScoreJob{MatchId: row.ID, Job: job, Cv: cv, Ai: ai}); err != nil {
 		return Match{}, err
 	}
 	if err := audit.Record(ctx, tx, audit.Entry{

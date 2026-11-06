@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
@@ -68,6 +69,7 @@ type Modules struct {
 	Settings     *settings.Module
 	Intake       *intake.Module
 	Market       *market.Module
+	AIProviders  *aiproviders.Module
 	// scaffold:fields
 }
 
@@ -78,6 +80,7 @@ func NewModules(d Deps) *Modules {
 	m := &Modules{}
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
 	m.Settings = settings.New(d.Pool)
+	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks)
@@ -119,13 +122,14 @@ func NewModules(d Deps) *Modules {
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
 		Applications: assistantApplications{m.Pipeline},
 		Market:       assistantMarket{m},
+		AI:           m.AIProviders,
 		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents} }},
-	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
-		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy,
+		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
 		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents} }},
-	}, matching.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
+	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
@@ -140,7 +144,7 @@ func NewModules(d Deps) *Modules {
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
 		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents} }},
-		cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	return m
 }
@@ -171,6 +175,7 @@ type (
 	settingsHTTP     = settings.HTTP
 	intakeHTTP       = intake.HTTP
 	marketHTTP       = market.HTTP
+	aiprovidersHTTP  = aiproviders.HTTP
 	// scaffold:aliases
 )
 
@@ -201,6 +206,7 @@ type Server struct {
 	*settingsHTTP
 	*intakeHTTP
 	*marketHTTP
+	*aiprovidersHTTP
 	// scaffold:embeds
 }
 
@@ -232,6 +238,7 @@ func (m *Modules) Server() *Server {
 		settingsHTTP:     m.Settings.HTTP,
 		intakeHTTP:       m.Intake.HTTP,
 		marketHTTP:       m.Market.HTTP,
+		aiprovidersHTTP:  m.AIProviders.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -249,6 +256,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Companies.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),
+		m.AIProviders.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {
