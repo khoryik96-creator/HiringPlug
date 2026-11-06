@@ -36,7 +36,7 @@ function setup(permissions: Permission[] = ALL) {
   }) as never);
   const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => {
     if (path === "/v1/email-previews") {
-      return Promise.resolve(ok({ subject: "Siti Aisyah for Auditor", bodyHtml: "<p>Expecting [Expected salary].</p>", missing: ["[Expected salary]"], salary: false, clientEmail: "hr@client.test" }));
+      return Promise.resolve(ok({ subject: "Siti Aisyah for Auditor", bodyHtml: "<p>Expecting [Expected salary].</p>", missing: ["[Expected salary]"], salary: false, clientEmail: "hr@client.test", fieldValues: { "[Full name]": "Siti Aisyah" } }));
     }
     if (path === "/v1/email-templates") return Promise.resolve(ok({ ...template, id: "etpl_2", name: "Mine" }));
     return Promise.resolve(ok({ id: "eml_1" }));
@@ -60,9 +60,10 @@ describe("emailing the client", () => {
     expect(within(panel).getByLabelText<HTMLInputElement>("Subject").value).toBe("[Full name] for [Job title]");
     const message = within(panel).getByRole("textbox", { name: "Message" });
     expect(message.innerHTML).toContain("Expecting [Expected salary].");
+    await waitFor(() => { expect(within(panel).getByRole("option", { name: "Expected salary (salary) — no value" })).toBeTruthy(); });
     fireEvent.change(within(panel).getByLabelText("Insert field"), { target: { value: "[Full name]" } });
-    expect(message.innerHTML).toContain("[Full name]");
-    expect(within(panel).getByRole("option", { name: "Expected salary (salary)" })).toBeTruthy();
+    // The value at once, marked with its field (editable; the record is not changed).
+    expect(message.innerHTML).toContain('<span data-field="candidate.fullName">Siti Aisyah</span>');
 
     fireEvent.change(within(panel).getByLabelText("To"), { target: { value: "hr@client.test, boss@client.test" } });
     fireEvent.change(within(panel).getByLabelText("CC"), { target: { value: "lead@agency.test" } });
@@ -81,7 +82,9 @@ describe("emailing the client", () => {
       subject: "[Full name] for [Job title]", candidateId: "cand_1", applicationId: "appl_1",
       attachmentIds: ["eat_1"], cvs: [{ documentId: "doc_1", asPdf: false }, { documentId: "doc_2", asPdf: true }],
     });
-    expect((sentBody(post, call) as { bodyHtml: string }).bodyHtml).toContain("[Full name]");
+    const sentHtml = (sentBody(post, call) as { bodyHtml: string }).bodyHtml;
+    expect(sentHtml).toContain('<span data-field="candidate.fullName">Siti Aisyah</span>');
+    expect(sentHtml).not.toContain("\u200b"); // the cursor mark is not sent
     expect(await screen.findByRole("status")).toBeTruthy();
   });
 

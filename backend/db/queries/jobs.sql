@@ -143,3 +143,20 @@ WHERE id = @id AND status = 'published' AND (closes_on IS NULL OR closes_on >= c
 
 -- name: SetJobOwner :execrows
 UPDATE job_order SET owner_id = sqlc.narg(owner_id), version = version + 1, updated_at = now() WHERE id = @id;
+
+-- Job descriptions uploaded to fill in an ad.
+-- name: InsertJdFile :one
+INSERT INTO job_description_file (id, tenant_id, job_id, file_name, content_type, size_bytes, storage_key, created_by, status, text, details)
+VALUES (@id, app_current_tenant(), @job_id, @file_name, @content_type, @size_bytes, @storage_key, app_current_user(), @status, sqlc.narg(text), sqlc.narg(details))
+RETURNING id, job_id, file_name, status, error, details, created_at;
+
+-- name: NewJdFileID :one
+SELECT new_id('jdf')::text;
+
+-- name: GetJdFile :one
+SELECT id, job_id, file_name, status, error, details, created_at FROM job_description_file WHERE id = @id;
+
+-- name: SaveJdRead :execrows
+UPDATE job_description_file
+SET status = @status, error = sqlc.narg(error), text = sqlc.narg(text), details = sqlc.narg(details)
+WHERE id = @id;

@@ -33,4 +33,37 @@ describe("the message box", () => {
     fireEvent.change(screen.getByLabelText("Insert field"), { target: { value: "[Expected salary]" } });
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Hi[Expected salary]");
   });
+
+  it("puts a field in as the candidate's value, editable, and fills a field typed in full", () => {
+    const onChange = vi.fn();
+    const values = { "[Expected salary]": "RM 12,000 per month" };
+    render(<RichEditor html="<p>Hi</p>" resetKey={0} onChange={onChange} fields={fields} banners={[]} bannerUrls={{}} values={values} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    fireEvent.change(screen.getByLabelText("Insert field"), { target: { value: "[Expected salary]" } });
+    expect(box.innerHTML).toContain('<span data-field="candidate.expectedSalary">RM 12,000 per month</span>');
+    // The cursor is after the value, not in it: what is typed next is not part of it.
+    const sel = window.getSelection();
+    expect(sel?.anchorNode?.parentElement?.closest("[data-field]")).toBeNull();
+
+    // Edited in the message: kept as typed.
+    const span = box.querySelector("span[data-field]");
+    if (!span) throw new Error("no value");
+    span.textContent = "RM 12,500 (negotiable)";
+    fireEvent.input(box);
+    expect(onChange).toHaveBeenLastCalledWith(expect.stringContaining(">RM 12,500 (negotiable)</span>"));
+
+    // Typed in full: becomes the value, any case.
+    box.insertAdjacentHTML("beforeend", "<p>Expects [expected SALARY] now</p>");
+    fireEvent.input(box);
+    expect(box.querySelectorAll("span[data-field]")).toHaveLength(2);
+    expect(box.textContent).toContain("Expects RM 12,000 per month\u200b now");
+  });
+
+  it("fills a template's fields when it is put in", () => {
+    const onChange = vi.fn();
+    render(<RichEditor html="<p>[Expected salary] and [Unknown]</p>" resetKey={1} onChange={onChange} fields={fields} banners={[]} bannerUrls={{}}
+      values={{ "[Expected salary]": "RM 9,000 per month" }} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("RM 9,000 per month\u200b and [Unknown]"); // the cursor mark goes when sent
+    expect(onChange).toHaveBeenCalled();
+  });
 });

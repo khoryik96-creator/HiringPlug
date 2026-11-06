@@ -114,7 +114,7 @@ func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObje
 	if err != nil {
 		return nil, err
 	}
-	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail)}, nil
+	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail), FieldValues: p.FieldValues}, nil
 }
 
 // DeleteEmailTemplate handles DELETE /v1/email-templates/{templateId}.

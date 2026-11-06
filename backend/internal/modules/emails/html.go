@@ -11,9 +11,14 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 var bannerIDRe = regexp.MustCompile(`^ebn_[0-9a-hjkmnp-tv-z]{26}$`)
+
+// fieldKeyRe: a field's key, as the composer marks a value it filled in
+// (<span data-field="candidate.expectedSalary">RM 12,000 / month</span>).
+var fieldKeyRe = regexp.MustCompile(`^[a-z]+\.[A-Za-z]+$`)
 
 // policy keeps text formatting, lists, alignment, links and banner images
 // (by their id: an image's address is never kept, so a message loads nothing
@@ -28,6 +33,7 @@ var policy = func() *bluemonday.Policy {
 	p.RequireParseableURLs(true)
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 	p.AllowAttrs("data-banner-id").Matching(bannerIDRe).OnElements("img")
+	p.AllowAttrs("data-field").Matching(fieldKeyRe).OnElements("span")
 	p.AllowAttrs("alt").OnElements("img")
 	p.AllowAttrs("color", "face", "size").OnElements("font")
 	p.AllowAttrs("align").OnElements("p", "div", "td", "th")
@@ -146,3 +152,56 @@ func attr(n *html.Node, key string) string {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+var fieldMarkRe = regexp.MustCompile(` data-field="([a-z]+\.[A-Za-z]+)"`)
+
+// ShowsSalaryField reports whether the message holds a salary value the
+// composer filled in (edited or not), so the email is treated as showing salary.
+func ShowsSalaryField(s string) bool {
+	for _, m := range fieldMarkRe.FindAllStringSubmatch(s, -1) {
+		if f, ok := fieldByKey(m[1]); ok && f.Salary {
+			return true
+		}
+	}
+	return false
+}
+
+// WithoutFieldMarks is the message as sent: the values stay, their marks go.
+func WithoutFieldMarks(s string) string { return fieldMarkRe.ReplaceAllString(s, "") }
+
+// FieldMarksToTokens turns each value the composer filled in back into its
+// field ("[Expected salary]"), so a template never keeps a candidate's details.
+func FieldMarksToTokens(s string) string {
+	nodes, err := html.ParseFragment(strings.NewReader(s), &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div})
+	if err != nil || !strings.Contains(s, "data-field") {
+		return s
+	}
+	var swap func(n *html.Node)
+	swap = func(n *html.Node) {
+		for c := n.FirstChild; c != nil; {
+			next := c.NextSibling
+			if c.Type == html.ElementNode && c.Data == "span" {
+				if f, ok := fieldByKey(attr(c, "data-field")); ok {
+					n.InsertBefore(&html.Node{Type: html.TextNode, Data: f.Token()}, c)
+					n.RemoveChild(c)
+					c = next
+					continue
+				}
+			}
+			swap(c)
+			c = next
+		}
+	}
+	var b strings.Builder
+	for _, n := range nodes {
+		root := &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div}
+		root.AppendChild(n)
+		swap(root)
+		for c := root.FirstChild; c != nil; c = c.NextSibling {
+			if err := html.Render(&b, c); err != nil {
+				return s
+			}
+		}
+	}
+	return b.String()
+}

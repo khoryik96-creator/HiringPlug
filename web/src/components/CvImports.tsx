@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
+import { DropZone } from "./DropZone";
 import { SourcePicker } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -38,7 +39,6 @@ export function CvImports() {
   const fs = useFieldSettings();
   const [source, setSource] = useState("linkedin");
   const [files, setFiles] = useState<File[]>([]);
-  const [picker, setPicker] = useState(0); // a new file input after each import, so the same files can be picked again
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
 
@@ -67,7 +67,6 @@ export function CvImports() {
     onSettled: () => {
       setSent(null);
       setFiles([]);
-      setPicker((n) => n + 1);
       void queryClient.invalidateQueries({ queryKey: cvImportsKey });
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
     },
@@ -82,12 +81,30 @@ export function CvImports() {
         On LinkedIn: open the profile, <em>More → Save to PDF</em>.
       </p>
       <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
+      <DropZone accept=".pdf,.docx,.doc" multiple disabled={start.isPending} label="Drop CVs here"
+        hint="PDF or Word, as many as you like"
+        onFiles={(dropped) => {
+          // Dropping more adds to the list; the same file twice is kept once.
+          setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
+        }} />
+      {files.length > 0 && (
+        <ul className="drop-files" aria-label="Files to import">
+          {files.map((f) => (
+            <li key={`${f.name}-${String(f.size)}`}>
+              {f.name}
+              {!start.isPending && (
+                <button type="button" className="link" aria-label={`Remove ${f.name}`}
+                  onClick={() => { setFiles(files.filter((x) => x !== f)); }}>×</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="row">
-        <input key={picker} type="file" multiple accept=".pdf,.docx,.doc" aria-label="CV files"
-          onChange={(e) => { setFiles([...(e.target.files ?? [])]); }} />
-        <button type="button" disabled={files.length === 0 || source === "" || start.isPending} onClick={() => { start.mutate(); }}>
+        <button type="button" className="primary" disabled={files.length === 0 || source === "" || start.isPending} onClick={() => { start.mutate(); }}>
           Import {files.length === 1 ? "1 file" : `${String(files.length)} files`}
         </button>
+        {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); }}>Clear</button>}
         {sent !== null && <span className="muted">Sent {sent} of {files.length}…</span>}
       </div>
       {start.error && <p className="error">{start.error.message}</p>}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobAdsKey } from "../api/keys";
@@ -10,6 +10,8 @@ import { AdText } from "./AdText";
 import { AdVersions } from "./AdVersions";
 import { ErrorMessage } from "./ErrorMessage";
 import { COUNTRIES } from "./forms";
+import { JdDrop, type JdDetails, JD_TYPES } from "./JdDrop";
+import { DropZone } from "./DropZone";
 import { SaveError } from "./SaveError";
 
 type Ad = Schemas["JobAd"];
@@ -20,6 +22,7 @@ const orNull = (v: string) => (v.trim() === "" ? null : v);
 export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Ad | "new" | null>(null);
+  const [dropped, setDropped] = useState<File | null>(null); // a job description dropped before writing the ad
   const ads = useQuery({
     queryKey: jobAdsKey(job.id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } } })).items,
@@ -48,7 +51,12 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
         </p>
       )}
       <ErrorMessage error={ads.error ?? setStatus.error} />
-      {editing && <AdForm job={job} ad={editing === "new" ? null : editing} onDone={() => { setEditing(null); }} />}
+      {canEdit && !editing && (
+        <DropZone accept={JD_TYPES} label="Drop the client's job description here to write an ad from it"
+          hint="PDF, Word or text" onFiles={([f]) => { if (f) { setDropped(f); setEditing("new"); } }} />
+      )}
+      {editing && <AdForm job={job} ad={editing === "new" ? null : editing} jd={dropped}
+        onDone={() => { setEditing(null); setDropped(null); }} />}
       {ads.data?.length === 0 && !editing && <p className="muted">No ads yet.</p>}
       {ads.data?.map((ad) => (
         <article key={ad.id} className="ad" aria-label={ad.title}>
@@ -77,7 +85,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
   );
 }
 
-function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () => void }) {
+function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: File | null; onDone: () => void }) {
   const queryClient = useQueryClient();
   // A new ad starts from the job; an edit saves with the version it was opened with.
   const [opened] = useState(() => ({
@@ -99,6 +107,16 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
   const [preview, setPreview] = useState(false);
   const fs = useFieldSettings();
   const set = (k: keyof typeof form, v: string) => { setForm({ ...form, [k]: v }); };
+  // What the job description says replaces what is there; what it does not say stays.
+  const fillFrom = useCallback((d: JdDetails) => {
+    setForm((f) => ({
+      ...f,
+      title: d.title ?? f.title, location: d.location ?? f.location, country: d.country ?? f.country,
+      workType: d.workType ?? f.workType, workArrangement: d.workArrangement ?? f.workArrangement,
+      salaryText: d.salaryText ?? f.salaryText, closesOn: d.closesOn ?? f.closesOn, description: d.description || f.description,
+    }));
+    setPreview(false);
+  }, []);
   const body = {
     title: form.title,
     location: orNull(form.location),
@@ -123,6 +141,7 @@ function AdForm({ job, ad, onDone }: { job: JobOrder; ad: Ad | null; onDone: () 
   });
   return (
     <form className="panel form-grid" aria-label={ad ? "Edit ad" : "New ad"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+      <div className="full"><JdDrop jobId={job.id} start={jd} onRead={fillFrom} /></div>
       <label className="field">Ad title<input value={form.title} onChange={(e) => { set("title", e.target.value); }} /></label>
       <label className="field">Location<input value={form.location} onChange={(e) => { set("location", e.target.value); }} /></label>
       <label className="field">Country

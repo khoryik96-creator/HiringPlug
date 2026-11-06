@@ -20,12 +20,13 @@ from ..contracts import (
     DocumentParseCvJob,
     DocumentRenderPdfJob,
     JobKind,
+    JobReadJdJob,
     MatchScoreJob,
 )
 from ..extraction import Limits, OcrEngine
 from ..provider import Provider
 from ..queue import FollowUp
-from . import assistant_ask, extract_text, match_score, parse_cv, render_pdf
+from . import assistant_ask, extract_text, match_score, parse_cv, read_jd, render_pdf
 
 
 @dataclass(frozen=True)
@@ -51,4 +52,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
     JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),
+    JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
 }

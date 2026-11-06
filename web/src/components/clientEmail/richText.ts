@@ -84,3 +84,83 @@ export function showBanners(root: HTMLElement | null, urls: Record<string, strin
     img.style.maxWidth = "100%";
   });
 }
+
+/**
+ * An invisible character after a value, so the cursor is outside it and what
+ * is typed next is not part of the value. Taken out before the message is
+ * previewed, sent or saved (withoutCaretMarks).
+ */
+const CARET = "\u200b";
+
+export function withoutCaretMarks(html: string): string {
+  return html.replaceAll(CARET, "");
+}
+
+/** Puts a field's value at the cursor (or the end), the cursor after it. */
+export function insertValue(editor: HTMLElement, key: string, value: string): void {
+  const span = document.createElement("span");
+  span.dataset.field = key;
+  span.textContent = value;
+  const after = document.createTextNode(CARET);
+  const sel = window.getSelection();
+  let range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  if (!range || !editor.contains(range.commonAncestorContainer)) {
+    range = document.createRange();
+    const last = editor.lastElementChild;
+    range.selectNodeContents(last && /^(P|DIV)$/.test(last.tagName) ? last : editor);
+    range.collapse(false);
+  }
+  range.deleteContents();
+  range.insertNode(after);
+  range.insertNode(span);
+  range.setStart(after, 1);
+  range.collapse(true);
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+/**
+ * Puts each typed field that has a value ("[Expected salary]") as its value,
+ * the cursor after it when it was just typed. False when there was none.
+ */
+export function fillTypedFields(editor: HTMLElement, fields: { token: string; key: string }[], values: Record<string, string>): boolean {
+  const known = fields.filter((f) => values[f.token]);
+  if (known.length === 0) return false;
+  const pattern = new RegExp(known.map((f) => f.token.replace(/[[\]]/g, "\\$&")).join("|"), "gi");
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest("[data-field]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const texts: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);
+  const sel = window.getSelection();
+  let changed = false;
+  for (const text of texts) {
+    const matches = [...text.data.matchAll(pattern)];
+    if (matches.length === 0) continue;
+    const hadCursor = sel?.anchorNode === text;
+    const parts = document.createDocumentFragment();
+    let at = 0;
+    for (const m of matches) {
+      const field = known.find((f) => f.token.toLowerCase() === m[0].toLowerCase());
+      if (!field) continue;
+      parts.append(text.data.slice(at, m.index));
+      const span = document.createElement("span");
+      span.dataset.field = field.key;
+      span.textContent = values[field.token] ?? "";
+      parts.append(span);
+      at = m.index + m[0].length;
+    }
+    const rest = document.createTextNode(CARET + text.data.slice(at));
+    parts.append(rest);
+    text.replaceWith(parts);
+    changed = true;
+    if (hadCursor) {
+      const range = document.createRange();
+      range.setStart(rest, 1);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+  return changed;
+}

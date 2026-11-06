@@ -58,7 +58,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
 
     const picker = screen.getByRole("group", { name: "Source of these candidates" });
     expect((await within(picker).findByRole("button", { name: /LinkedIn/ })).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.change(screen.getByLabelText("CV files"), {
+    fireEvent.change(screen.getByLabelText("Drop CVs here"), {
       target: { files: [new File(["%PDF"], "Siti Aisyah.pdf"), new File(["%PDF"], "huge.pdf")] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Import 2 files" }));
@@ -71,9 +71,24 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(url).toBe("/v1/cv-imports/cvi_01jbz6w0m0k8q9x2r3s4t5v6w7/files");
     expect(((init.body as FormData).get("file") as File).name).toBe("Siti Aisyah.pdf");
     expect(new Headers(init.headers).has("Authorization")).toBe(true);
-    // The picker is emptied, so the same files can be picked again.
-    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("CV files").files?.length ?? 0).toBe(0); });
-    expect(screen.getByRole("button", { name: "Import 0 files" })).toBeTruthy();
+    // The list is emptied once sent.
+    await waitFor(() => { expect(screen.getByRole("button", { name: "Import 0 files" })).toBeTruthy(); });
+    expect(screen.queryByRole("list", { name: "Files to import" })).toBeNull();
+  });
+
+  it("takes CVs dropped on it, in several drops, skipping other files and the same file twice", async () => {
+    reads([]);
+    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    const zone = (await screen.findByText("Drop CVs here")).closest(".drop-zone");
+    if (!zone) throw new Error("no drop zone");
+    const siti = new File(["%PDF"], "Siti.pdf");
+    fireEvent.drop(zone, { dataTransfer: { files: [siti, new File(["x"], "photo.png")] } });
+    expect(screen.getByText(/Skipped .*: photo.png/)).toBeTruthy();
+    fireEvent.drop(zone, { dataTransfer: { files: [siti, new File(["PK"], "Ahmad.docx")] } });
+    const list = screen.getByRole("list", { name: "Files to import" });
+    expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Siti.pdf×", "Ahmad.docx×"]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Siti.pdf" }));
+    expect(screen.getByRole("button", { name: "Import 1 file" })).toBeTruthy();
   });
 
   it("shows each file's result, with a link to its candidate", async () => {

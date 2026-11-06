@@ -1487,6 +1487,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/jd-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the client's job description (PDF, Word or text) to fill in an ad
+         * @description Its text is read (a text file at once; PDF and Word in a moment: follow GET /v1/jd-files/{jdFileId}), then the ad's details are read from it: title, location, country, work type and arrangement, salary, closing date and the ad text. Nothing is saved on the job or an ad: the composer puts the details in the ad form.
+         */
+        post: operations["uploadJobDescription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jd-files/{jdFileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jdFileId: components["schemas"]["JdFileId"];
+            };
+            cookie?: never;
+        };
+        /** An uploaded job description, and the ad details read from it once read */
+        get: operations["getJobDescriptionFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/lead-sources": {
         parameters: {
             query?: never;
@@ -2189,7 +2230,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
+        JobKind: "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -3001,6 +3042,10 @@ export interface components {
             timeZone: string;
         };
         EmailPreview: {
+            /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
+            fieldValues: {
+                [key: string]: string;
+            };
             /** @description The job's hiring contact, to send to (when an application is given and its job has one). */
             clientEmail: string | null;
             subject: string;
@@ -3018,7 +3063,7 @@ export interface components {
             subject: string;
             /** @description Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`. */
             body: string;
-            /** @description The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. */
+            /** @description The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. A value filled in from a candidate (<span data-field="...">) is saved as its field, never the value. */
             bodyHtml: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -3511,6 +3556,52 @@ export interface components {
              * @description When the interview was when the reminder was queued; a moved interview has a newer reminder.
              */
             startsAt: string;
+        };
+        /** @example jdf_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        JdFileId: string;
+        /** @enum {string} */
+        JdFileStatus: "reading" | "read" | "failed";
+        JdFile: {
+            id: components["schemas"]["JdFileId"];
+            jobId: components["schemas"]["JobOrderId"];
+            fileName: string;
+            status: components["schemas"]["JdFileStatus"];
+            /** @description Why it could not be read (a scan with no text, a damaged file...). */
+            error: string | null;
+            /** @description Once read. */
+            details: components["schemas"]["JdDetails"] | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @description An ad's details as read from a job description; each is null when the description does not say. */
+        JdDetails: {
+            title: string | null;
+            location: string | null;
+            country: components["schemas"]["CountryCode"] | null;
+            workType: components["schemas"]["WorkType"] | null;
+            workArrangement: components["schemas"]["WorkArrangement"] | null;
+            /** @description As the description gives it, e.g. "RM 8,000 - 10,000 per month". */
+            salaryText: string | null;
+            /** Format: date */
+            closesOn: string | null;
+            /** @description The ad text: the description's text, tidied, with its bullet points as lines starting with "- ". */
+            description: string;
+        };
+        JobReadJdJob: {
+            jdFileId: components["schemas"]["JdFileId"];
+            /** @description Short-lived signed URL to download the file from. */
+            downloadUrl: string;
+            contentType: string;
+            fileName: string;
+            /** Format: int64 */
+            sizeBytes: number;
+        };
+        JobJdReadJob: {
+            jdFileId: components["schemas"]["JdFileId"];
+            status: components["schemas"]["ExtractionStatus"];
+            /** @description The description's plain text, with NUL characters removed. */
+            text: string | null;
+            errorMessage: string | null;
         };
         /** @example ad_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         JobAdId: string;
@@ -7616,6 +7707,65 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadJobDescription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JdFile"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    getJobDescriptionFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jdFileId: components["schemas"]["JdFileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JdFile"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

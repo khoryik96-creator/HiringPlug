@@ -130,6 +130,8 @@ class JobKind(StrEnum):
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
     interview_remind = "interview.remind"
+    job_jd_read = "job.jd_read"
+    job_read_jd = "job.read_jd"
     lead_source_check = "lead_source.check"
     match_score = "match.score"
     match_scored = "match.scored"
@@ -1211,6 +1213,12 @@ class EmailCvAttachment(BaseModel):
 
 
 class EmailPreview(BaseModel):
+    fieldValues: Annotated[
+        dict[str, str],
+        Field(
+            description='Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate\'s record is not changed.'
+        ),
+    ]
     clientEmail: Annotated[
         str | None,
         Field(
@@ -1244,7 +1252,7 @@ class EmailTemplate(BaseModel):
     bodyHtml: Annotated[
         str | None,
         Field(
-            description="The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]."
+            description='The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. A value filled in from a candidate (<span data-field="...">) is saved as its field, never the value.'
         ),
     ]
     createdAt: AwareDatetime
@@ -1836,6 +1844,44 @@ class InterviewRemindJob(BaseModel):
             description="When the interview was when the reminder was queued; a moved interview has a newer reminder."
         ),
     ]
+
+
+class JdFileId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["jdf_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jdf_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class JdFileStatus(StrEnum):
+    reading = "reading"
+    read = "read"
+    failed = "failed"
+
+
+class JobReadJdJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jdFileId: JdFileId
+    downloadUrl: Annotated[str, Field(description="Short-lived signed URL to download the file from.")]
+    contentType: str
+    fileName: str
+    sizeBytes: int
+
+
+class JobJdReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jdFileId: JdFileId
+    status: ExtractionStatus
+    text: Annotated[
+        str | None,
+        Field(
+            description="The description's plain text, with NUL characters removed.", pattern="^[^\\x00]*$"
+        ),
+    ]
+    errorMessage: Annotated[str | None, Field(...)]
 
 
 class JobAdId(RootModel[str]):
@@ -3260,6 +3306,24 @@ class InterviewList(BaseModel):
     items: list[Interview]
 
 
+class JdDetails(BaseModel):
+    title: Annotated[str | None, Field(...)]
+    location: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
+    workType: Annotated[WorkType | None, Field(...)]
+    workArrangement: Annotated[WorkArrangement | None, Field(...)]
+    salaryText: Annotated[
+        str | None, Field(description='As the description gives it, e.g. "RM 8,000 - 10,000 per month".')
+    ]
+    closesOn: Annotated[date | None, Field(...)]
+    description: Annotated[
+        str,
+        Field(
+            description='The ad text: the description\'s text, tidied, with its bullet points as lines starting with "- ".'
+        ),
+    ]
+
+
 class JobAd(BaseModel):
     id: JobAdId
     version: int
@@ -3426,6 +3490,18 @@ class TimeToFill(BaseModel):
 class CareersPage(BaseModel):
     companyName: str
     ads: list[PublicJobAd]
+
+
+class JdFile(BaseModel):
+    id: JdFileId
+    jobId: JobOrderId
+    fileName: str
+    status: JdFileStatus
+    error: Annotated[
+        str | None, Field(description="Why it could not be read (a scan with no text, a damaged file...).")
+    ]
+    details: Annotated[JdDetails | None, Field(description="Once read.")]
+    createdAt: AwareDatetime
 
 
 class Report(BaseModel):

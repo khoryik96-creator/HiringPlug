@@ -41,7 +41,7 @@ func NormalizeTemplate(t Template) (Template, apperr.FieldErrors) {
 	t.Subject = strings.Join(strings.Fields(t.Subject), " ")
 	t.Body = strings.TrimSpace(t.Body)
 	if t.BodyHTML != "" {
-		t.BodyHTML = SanitizeHTML(t.BodyHTML)
+		t.BodyHTML = FieldMarksToTokens(SanitizeHTML(t.BodyHTML))
 		t.Body = TextFromHTML(t.BodyHTML)
 	}
 	if t.Name == "" {

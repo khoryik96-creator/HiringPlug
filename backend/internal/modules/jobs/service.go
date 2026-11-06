@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
@@ -22,7 +23,8 @@ type Service struct {
 	companies Companies
 	contacts  Contacts
 	users     Users
-	rules     FieldRules // the company's mandatory fields
+	rules     FieldRules  // the company's mandatory fields
+	files     *blob.Store // uploaded job descriptions
 }
 
 // Create adds a job.

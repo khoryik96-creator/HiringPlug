@@ -80,7 +80,7 @@ func NewModules(d Deps) *Modules {
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks)
 	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
-	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings)
+	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Pipeline.NameUsersWith(m.Identity)
 	m.Notes = notes.New(d.Pool, notes.Subjects{
@@ -232,6 +232,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	all := jobqueue.Handlers{}
 	for _, handlers := range []jobqueue.Handlers{
 		m.Documents.JobHandlers(),
+		m.Jobs.JobHandlers(),
 		m.Emails.JobHandlers(),
 		m.Interviews.JobHandlers(),
 		m.Integrations.JobHandlers(),

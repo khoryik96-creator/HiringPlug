@@ -1,7 +1,8 @@
 // Emailing the client about a candidate, laid out like CV Studio's composer:
 // templates (saved with the subject, the formatted message, its signature
 // and banner), To / CC / BCC, a formatted message with fields such as
-// [Expected salary] filled in when sent, and attachments.
+// [Expected salary] showing the candidate's value at once (editable, the
+// record untouched), and attachments.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -12,7 +13,7 @@ import { ErrorMessage } from "../ErrorMessage";
 import { fieldErrors } from "../forms";
 import { Attachments, type CvChoice } from "./Attachments";
 import { RichEditor } from "./RichEditor";
-import { plainToHtml, showBanners } from "./richText";
+import { plainToHtml, showBanners, withoutCaretMarks } from "./richText";
 import { useBanners } from "./useBanners";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -37,14 +38,14 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   const [sent, setSent] = useState(false);
   const previewBox = useRef<HTMLDivElement>(null);
 
-  // The job's hiring contact, to send to.
-  const client = useQuery({
-    queryKey: ["email-client", applicationId ?? candidateId],
+  // The job's hiring contact, to send to, and the candidate's value for each field.
+  const context = useQuery({
+    queryKey: ["email-context", applicationId ?? candidateId],
     queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
       body: { subject: "", bodyHtml: "", candidateId, applicationId, timeZone: timeZone() },
-    })).clientEmail,
+    })),
   });
-  const to = typedTo ?? client.data ?? "";
+  const to = typedTo ?? context.data?.clientEmail ?? "";
   useEffect(() => { showBanners(previewBox.current, urls); }, [preview, urls]);
 
   const selected = templates.data?.items.find((t) => t.id === picked);
@@ -57,7 +58,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   };
   const saveTemplate = useMutation({
     mutationFn: async (asNew: boolean) => {
-      const body = { name: name.trim(), subject: form.subject, bodyHtml: html };
+      const body = { name: name.trim(), subject: form.subject, bodyHtml: withoutCaretMarks(html) };
       if (asNew || !selected) return unwrap(await api.POST("/v1/email-templates", { body }));
       return unwrap(await api.PUT("/v1/email-templates/{templateId}", { params: { path: { templateId: selected.id } }, body: { ...body, version: selected.version } }));
     },
@@ -69,14 +70,14 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   });
   const show = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: form.subject, bodyHtml: html, candidateId, applicationId, timeZone: timeZone() },
+      body: { subject: form.subject, bodyHtml: withoutCaretMarks(html), candidateId, applicationId, timeZone: timeZone() },
     })),
     onSuccess: setPreview,
   });
   const send = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/emails", {
       body: {
-        to: addresses(to), cc: addresses(form.cc), bcc: addresses(form.bcc), subject: form.subject, bodyHtml: html,
+        to: addresses(to), cc: addresses(form.cc), bcc: addresses(form.bcc), subject: form.subject, bodyHtml: withoutCaretMarks(html),
         candidateId, applicationId, timeZone: timeZone(), attachmentIds: uploads.map((u) => u.id), cvs,
       },
     })),
@@ -129,10 +130,12 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
       <label className="field">Subject<input value={form.subject} onChange={set("subject")} placeholder="[Full name] for [Job title]" /></label>
 
       <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
-        bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined} />
+        bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
+        values={context.data?.fieldValues} />
       <ErrorMessage error={uploadBanner.error} />
       <p className="muted small">
-        Fields in brackets, such as [Expected salary], are filled from the candidate when you send.
+        A field such as [Expected salary] shows the candidate&apos;s value at once (highlighted): edit it as you like for this
+        email; their record is not changed. Templates keep the field, not the value.
         {!permissions.includes("candidates.compensation:read") && " Salary fields need a role that may see salaries."}
       </p>
 

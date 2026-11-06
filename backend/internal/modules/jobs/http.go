@@ -13,7 +13,10 @@ import (
 const defaultPageSize = 25
 
 // HTTP implements the jobs operations of the contract.
-type HTTP struct{ svc *Service }
+type HTTP struct {
+	svc            *Service
+	maxUploadBytes int64
+}
 
 // ListJobs handles GET /v1/jobs.
 func (h *HTTP) ListJobs(ctx context.Context, req api.ListJobsRequestObject) (api.ListJobsResponseObject, error) {

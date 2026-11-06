@@ -66,8 +66,8 @@ main.narrow { max-width: 440px; margin-top: 12vh; }
   background: var(--surface); font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s;
 }
 :where(button:hover:not(:disabled)) { background: var(--soft); border-color: #b9c1cc; }
-:where(button[type="submit"]) { background: var(--accent); border-color: var(--accent); color: #fff; }
-:where(button[type="submit"]:hover:not(:disabled)) { background: var(--accent-dark); border-color: var(--accent-dark); }
+:where(button[type="submit"], button.primary) { background: var(--accent); border-color: var(--accent); color: #fff; }
+:where(button[type="submit"]:hover:not(:disabled), button.primary:hover:not(:disabled)) { background: var(--accent-dark); border-color: var(--accent-dark); }
 :where(button:disabled) { opacity: 0.55; cursor: default; }
 :where(button:focus-visible, a:focus-visible) { outline: 3px solid var(--ring); outline-offset: 2px; }
 button.link { min-height: 0; background: none; border: none; color: var(--accent); font-weight: 500; cursor: pointer; padding: 0; }

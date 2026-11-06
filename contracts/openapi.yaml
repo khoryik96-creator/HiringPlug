@@ -2281,6 +2281,55 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/{jobId}/jd-files:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    post:
+      operationId: uploadJobDescription
+      tags: [jobs]
+      summary: Upload the client's job description (PDF, Word or text) to fill in an ad
+      description: "Its text is read (a text file at once; PDF and Word in a moment: follow GET /v1/jd-files/{jdFileId}), then the ad's details are read from it: title, location, country, work type and arrangement, salary, closing date and the ad text. Nothing is saved on the job or an ad: the composer puts the details in the ad form."
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Uploaded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JdFile'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/jd-files/{jdFileId}:
+    parameters:
+      - name: jdFileId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/JdFileId'}
+    get:
+      operationId: getJobDescriptionFile
+      tags: [jobs]
+      summary: An uploaded job description, and the ad details read from it once read
+      x-permission: jobs:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JdFile'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/lead-sources:
     get:
       operationId: listLeadSources
@@ -3410,6 +3459,8 @@ components:
         - document.text_extracted
         - email.send
         - interview.remind
+        - job.jd_read
+        - job.read_jd
         - lead_source.check
         - match.score
         - match.scored
@@ -4604,8 +4655,12 @@ components:
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
     EmailPreview:
       type: object
-      required: [subject, bodyHtml, missing, salary, clientEmail]
+      required: [subject, bodyHtml, missing, salary, clientEmail, fieldValues]
       properties:
+        fieldValues:
+          type: object
+          additionalProperties: {type: string}
+          description: "Each field that has a value for this candidate, by its token: \"[Expected salary]\" -> \"RM 12,000 / month\" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed."
         clientEmail:
           type: string
           nullable: true
@@ -4631,7 +4686,7 @@ components:
         bodyHtml:
           type: string
           nullable: true
-          description: The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary].
+          description: "The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. A value filled in from a candidate (<span data-field=\"...\">) is saved as its field, never the value."
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     EmailTemplateList:
@@ -5312,6 +5367,73 @@ components:
       properties:
         interviewId: {$ref: '#/components/schemas/InterviewId'}
         startsAt: {type: string, format: date-time, description: When the interview was when the reminder was queued; a moved interview has a newer reminder.}
+    JdFileId:
+      type: string
+      pattern: '^jdf_[0-9a-hjkmnp-tv-z]{26}$'
+      example: jdf_01jbz6w0m0k8q9x2r3s4t5v6w7
+    JdFileStatus:
+      type: string
+      enum: [reading, read, failed]
+    JdFile:
+      type: object
+      required: [id, jobId, fileName, status, error, details, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/JdFileId'}
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        fileName: {type: string}
+        status: {$ref: '#/components/schemas/JdFileStatus'}
+        error: {type: string, nullable: true, description: "Why it could not be read (a scan with no text, a damaged file...)."}
+        details:
+          allOf: [{$ref: '#/components/schemas/JdDetails'}]
+          nullable: true
+          description: Once read.
+        createdAt: {type: string, format: date-time}
+    JdDetails:
+      type: object
+      description: "An ad's details as read from a job description; each is null when the description does not say."
+      required: [title, location, country, workType, workArrangement, salaryText, closesOn, description]
+      properties:
+        title: {type: string, nullable: true}
+        location: {type: string, nullable: true}
+        country:
+          allOf: [{$ref: '#/components/schemas/CountryCode'}]
+          nullable: true
+        workType:
+          allOf: [{$ref: '#/components/schemas/WorkType'}]
+          nullable: true
+        workArrangement:
+          allOf: [{$ref: '#/components/schemas/WorkArrangement'}]
+          nullable: true
+        salaryText: {type: string, nullable: true, description: "As the description gives it, e.g. \"RM 8,000 - 10,000 per month\"."}
+        closesOn: {type: string, format: date, nullable: true}
+        description:
+          type: string
+          description: "The ad text: the description's text, tidied, with its bullet points as lines starting with \"- \"."
+    JobReadJdJob:
+      type: object
+      additionalProperties: false
+      required: [jdFileId, downloadUrl, contentType, fileName, sizeBytes]
+      properties:
+        jdFileId: {$ref: '#/components/schemas/JdFileId'}
+        downloadUrl:
+          type: string
+          description: Short-lived signed URL to download the file from.
+        contentType: {type: string}
+        fileName: {type: string}
+        sizeBytes: {type: integer, format: int64}
+    JobJdReadJob:
+      type: object
+      additionalProperties: false
+      required: [jdFileId, status, text, errorMessage]
+      properties:
+        jdFileId: {$ref: '#/components/schemas/JdFileId'}
+        status: {$ref: '#/components/schemas/ExtractionStatus'}
+        text:
+          type: string
+          nullable: true
+          pattern: '^[^\x00]*$'
+          description: The description's plain text, with NUL characters removed.
+        errorMessage: {type: string, nullable: true}
     JobAdId:
       type: string
       pattern: '^ad_[0-9a-hjkmnp-tv-z]{26}$'
@@ -7104,6 +7226,16 @@ x-jobs:
     queue: core
     payload: InterviewRemindJob
     description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
+  job.jd_read:
+    module: jobs
+    queue: core
+    payload: JobJdReadJob
+    description: 'Save a job description''s text and the ad details read from it: title, location, salary... (Go worker).'
+  job.read_jd:
+    module: jobs
+    queue: ai
+    payload: JobReadJdJob
+    description: Read the text of an uploaded job description (Python AI worker).
   lead_source.check:
     module: leads
     queue: core

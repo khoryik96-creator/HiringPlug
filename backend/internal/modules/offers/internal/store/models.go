@@ -466,6 +466,22 @@ type JobAd struct {
 	PublishBlind         bool
 }
 
+type JobDescriptionFile struct {
+	ID          string
+	TenantID    string
+	JobID       string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+	Status      string
+	Error       *string
+	Text        *string
+	Details     []byte
+	CreatedBy   string
+	CreatedAt   time.Time
+}
+
 type JobLead struct {
 	ID          string
 	TenantID    string

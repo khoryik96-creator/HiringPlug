@@ -23,6 +23,8 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Companies is what this module needs from the companies module.
@@ -60,9 +62,14 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users, rules FieldRules) *Module {
-	svc := &Service{pool: pool, companies: companies, contacts: contacts, users: users, rules: rules}
-	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users, rules FieldRules, files *blob.Store, maxUploadBytes int64) *Module {
+	svc := &Service{pool: pool, companies: companies, contacts: contacts, users: users, rules: rules, files: files}
+	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
+}
+
+// JobHandlers returns the handlers for this module's jobs on the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead}
 }
 
 // Exists reports whether a job exists in tx's tenant.

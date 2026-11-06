@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobKind
+from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobJdReadJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps
 from hiringplug_ai.jobs import parse_cv as parse_job
@@ -76,6 +76,27 @@ def test_extract_text_sends_the_text_back_to_the_go_worker() -> None:
     assert "Nur Aisyah binti Rahman" in result.text
     # The result must satisfy the contract the Go side validates against.
     DocumentTextExtractedJob.model_validate(result.model_dump(mode="json"))
+
+
+def test_read_jd_sends_the_job_description_text_back_to_the_go_worker() -> None:
+    queue = FakeQueue()
+    payload = {
+        "jdFileId": "jdf_01jbz6w0m0k8q9x2r3s4t5v6w7",
+        "downloadUrl": "http://api.test/internal/files/x?sig=1",
+        "contentType": "application/pdf",
+        "fileName": "Finance Manager JD.pdf",
+        "sizeBytes": 1000,
+    }
+    process(queue, job("job.read_jd", payload), deps(text_pdf(["Finance Manager", "Location: Kuala Lumpur"])))  # type: ignore[arg-type]
+    assert queue.failed == []
+    [[follow_up]] = queue.completed
+    assert (follow_up.queue, follow_up.kind) == ("core", JobKind.job_jd_read)
+    result = follow_up.payload
+    assert isinstance(result, JobJdReadJob)
+    assert result.status.value == "extracted"
+    assert result.text is not None
+    assert "Location: Kuala Lumpur" in result.text
+    JobJdReadJob.model_validate(result.model_dump(mode="json"))
 
 
 def test_an_unreadable_document_is_a_result_not_a_retry() -> None:

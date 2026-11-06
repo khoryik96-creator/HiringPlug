@@ -4,8 +4,9 @@
 import { useEffect, useRef } from "react";
 
 import type { Schemas } from "../../api/client";
-import { exec, insertHtml, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
+import { exec, fillTypedFields, insertHtml, insertValue, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
 
+const NONE: Record<string, string> = {};
 const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"];
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
 
@@ -18,9 +19,16 @@ type Props = {
   banners: Schemas["EmailBanner"][];
   bannerUrls: Record<string, string>;
   onUploadBanner?: (file: File) => void;
+  /**
+   * The candidate's value for each field, by token. A field is put in as its
+   * value (highlighted, editable; the candidate's record is not changed);
+   * a field without one stays as [Field] and is reported when sending.
+   */
+  values?: Record<string, string>;
 };
 
-export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner }: Props) {
+export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values }: Props) {
+  const vals = values ?? NONE;
   const box = useRef<HTMLDivElement>(null);
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
 
@@ -32,9 +40,18 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
   useEffect(() => { showBanners(box.current, bannerUrls); }, [bannerUrls]);
+  // A template's fields (and any typed before the values came) show their values.
+  useEffect(() => {
+    if (box.current && fillTypedFields(box.current, fields, vals)) onChange(box.current.innerHTML);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey, vals, fields]);
 
   const remember = () => { if (box.current) cursor.current = saveRange(box.current) ?? cursor.current; };
   const changed = () => { remember(); if (box.current) onChange(box.current.innerHTML); };
+  const typed = () => {
+    if (box.current) fillTypedFields(box.current, fields, vals); // "[Expected salary]" typed in full becomes its value
+    changed();
+  };
   const back = () => { if (box.current) restoreRange(box.current, cursor.current); };
   const run = (command: string, value?: string) => {
     back();
@@ -78,9 +95,17 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
           {SIZES.map((s) => <option key={s} value={s}>{s} pt</option>)}
         </select>
         <input type="color" aria-label="Text colour" defaultValue="#0b57a4" onChange={(e) => { run("foreColor", e.target.value); }} />
-        <select aria-label="Insert field" value="" onChange={(e) => { if (e.target.value) insert(e.target.value); }}>
+        <select aria-label="Insert field" value="" onChange={(e) => {
+          const field = fields.find((f) => f.token === e.target.value);
+          const value = field && vals[field.token];
+          if (!field || !box.current) return;
+          if (!value) { insert(field.token); return; } // no value: the field stays, and sending says so
+          back();
+          insertValue(box.current, field.key, value);
+          changed();
+        }}>
           <option value="">Insert field…</option>
-          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}</option>)}
+          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}{values && !values[f.token] ? " — no value" : ""}</option>)}
         </select>
         <select aria-label="Insert banner" value="" onChange={(e) => {
           if (e.target.value) insert(`<img data-banner-id="${e.target.value}" alt="banner"><br>`);
@@ -100,7 +125,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         )}
       </div>
       <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        aria-label="Message" tabIndex={0} onInput={changed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} />
+        aria-label="Message" tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} />
     </div>
   );
 }

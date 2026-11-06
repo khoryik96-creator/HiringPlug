@@ -44,6 +44,35 @@ func (q *Queries) DeleteJobSalary(ctx context.Context, arg DeleteJobSalaryParams
 	return result.RowsAffected(), nil
 }
 
+const getJdFile = `-- name: GetJdFile :one
+SELECT id, job_id, file_name, status, error, details, created_at FROM job_description_file WHERE id = $1
+`
+
+type GetJdFileRow struct {
+	ID        string
+	JobID     string
+	FileName  string
+	Status    string
+	Error     *string
+	Details   []byte
+	CreatedAt time.Time
+}
+
+func (q *Queries) GetJdFile(ctx context.Context, id string) (GetJdFileRow, error) {
+	row := q.db.QueryRow(ctx, getJdFile, id)
+	var i GetJdFileRow
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.FileName,
+		&i.Status,
+		&i.Error,
+		&i.Details,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getJobAd = `-- name: GetJobAd :one
 SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad WHERE id = $1
 `
@@ -172,6 +201,60 @@ func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) 
 		&i.BlindEdited,
 		&i.BlindSourceHash,
 		&i.PublishBlind,
+	)
+	return i, err
+}
+
+const insertJdFile = `-- name: InsertJdFile :one
+INSERT INTO job_description_file (id, tenant_id, job_id, file_name, content_type, size_bytes, storage_key, created_by, status, text, details)
+VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, app_current_user(), $7, $8, $9)
+RETURNING id, job_id, file_name, status, error, details, created_at
+`
+
+type InsertJdFileParams struct {
+	ID          string
+	JobID       string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+	Status      string
+	Text        *string
+	Details     []byte
+}
+
+type InsertJdFileRow struct {
+	ID        string
+	JobID     string
+	FileName  string
+	Status    string
+	Error     *string
+	Details   []byte
+	CreatedAt time.Time
+}
+
+// Job descriptions uploaded to fill in an ad.
+func (q *Queries) InsertJdFile(ctx context.Context, arg InsertJdFileParams) (InsertJdFileRow, error) {
+	row := q.db.QueryRow(ctx, insertJdFile,
+		arg.ID,
+		arg.JobID,
+		arg.FileName,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.StorageKey,
+		arg.Status,
+		arg.Text,
+		arg.Details,
+	)
+	var i InsertJdFileRow
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.FileName,
+		&i.Status,
+		&i.Error,
+		&i.Details,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -576,6 +659,17 @@ func (q *Queries) ListPublishedAds(ctx context.Context) ([]JobAd, error) {
 	return items, nil
 }
 
+const newJdFileID = `-- name: NewJdFileID :one
+SELECT new_id('jdf')::text
+`
+
+func (q *Queries) NewJdFileID(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, newJdFileID)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const openJobOrders = `-- name: OpenJobOrders :many
 SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
 `
@@ -604,6 +698,34 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 		return nil, err
 	}
 	return items, nil
+}
+
+const saveJdRead = `-- name: SaveJdRead :execrows
+UPDATE job_description_file
+SET status = $1, error = $2, text = $3, details = $4
+WHERE id = $5
+`
+
+type SaveJdReadParams struct {
+	Status  string
+	Error   *string
+	Text    *string
+	Details []byte
+	ID      string
+}
+
+func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveJdRead,
+		arg.Status,
+		arg.Error,
+		arg.Text,
+		arg.Details,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setJobOwner = `-- name: SetJobOwner :execrows

@@ -374,8 +374,12 @@ components:
         timeZone: { type: string, maxLength: 64, example: Asia/Kuala_Lumpur }
     EmailPreview:
       type: object
-      required: [subject, bodyHtml, missing, salary, clientEmail]
+      required: [subject, bodyHtml, missing, salary, clientEmail, fieldValues]
       properties:
+        fieldValues:
+          type: object
+          additionalProperties: { type: string }
+          description: "Each field that has a value for this candidate, by its token: \"[Expected salary]\" -> \"RM 12,000 / month\" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed."
         clientEmail:
           type: string
           nullable: true
@@ -401,7 +405,7 @@ components:
         bodyHtml:
           type: string
           nullable: true
-          description: The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary].
+          description: "The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. A value filled in from a candidate (<span data-field=\"...\">) is saved as its field, never the value."
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     EmailTemplateList:

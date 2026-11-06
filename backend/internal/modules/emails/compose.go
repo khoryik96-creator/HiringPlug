@@ -53,6 +53,20 @@ type Preview struct {
 	Missing           []string
 	Salary            bool
 	ClientEmail       *string // the job's hiring contact, for an application
+	// FieldValues: each field with a value, by token ("[Expected salary]"),
+	// for the composer to put in the message, where they can be edited.
+	FieldValues map[string]string
+}
+
+// fieldValues are the values by field token, for the composer.
+func fieldValues(values map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, f := range Fields {
+		if v, ok := values[f.Key]; ok && v != "" {
+			out[f.Token()] = v
+		}
+	}
+	return out
 }
 
 // Preview fills a message's fields for a candidate (and an application or
@@ -69,8 +83,12 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 			return err
 		}
 		sub := FillFields(strings.Join(strings.Fields(subject), " "), values, false)
-		body := FillFields(SanitizeHTML(bodyHTML), values, true)
-		out = Preview{Subject: sub.Text, BodyHTML: body.Text, Missing: union(sub.Missing, body.Missing), Salary: sub.Salary || body.Salary}
+		clean := SanitizeHTML(bodyHTML)
+		body := FillFields(clean, values, true)
+		out = Preview{
+			Subject: sub.Text, BodyHTML: WithoutFieldMarks(body.Text), Missing: union(sub.Missing, body.Missing),
+			Salary: sub.Salary || body.Salary || ShowsSalaryField(clean), FieldValues: fieldValues(values),
+		}
 		if appID != nil {
 			app, err := s.application(ctx, tx, *appID, nil)
 			if err != nil {
@@ -282,9 +300,11 @@ func fill(o Outgoing, values map[string]string) (filledEmail, error) {
 	out.Subject = sub.Text
 	missing, salary := sub.Missing, sub.Salary
 	if o.BodyHTML != "" {
+		// A value the composer filled in (and may have been edited) shows
+		// salary like a [salary] field does; its mark is not sent.
 		body := FillFields(o.BodyHTML, values, true)
-		out.BodyHTML, out.Body = body.Text, TextFromHTML(body.Text)
-		missing, salary = union(missing, body.Missing), salary || body.Salary
+		out.BodyHTML, out.Body = WithoutFieldMarks(body.Text), TextFromHTML(body.Text)
+		missing, salary = union(missing, body.Missing), salary || body.Salary || ShowsSalaryField(o.BodyHTML)
 	} else {
 		body := FillFields(o.Body, values, false)
 		out.Body = body.Text

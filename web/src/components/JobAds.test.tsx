@@ -55,6 +55,40 @@ describe("job ads", () => {
     });
   });
 
+  it("writes an ad from a job description dropped on the panel; a PDF is read first", async () => {
+    const details: Schemas["JdDetails"] = {
+      title: "Finance Manager", location: "Petaling Jaya", country: "MY", workType: "contract", workArrangement: "remote",
+      salaryText: "RM 12,000 - 15,000 per month", closesOn: "2026-12-31", description: "Maju Foods needs a Finance Manager.\n- Lead closing",
+    };
+    const jdFile = { id: "jdf_01jbz6w0m0k8q9x2r3s4t5v6w7", jobId: job.id, fileName: "JD.pdf", error: null, createdAt: "x" };
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+      path === "/v1/me" ? ok(testMe(RECRUITER)) : path === "/v1/settings/fields" ? ok(testFieldSettings())
+        : path === "/v1/jd-files/{jdFileId}" ? ok({ ...jdFile, status: "read", details }) : ok({ items: [] }),
+    )) as never);
+    const send = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...jdFile, status: "reading", details: null }), { status: 201 }));
+    vi.stubGlobal("fetch", send);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(draft));
+    renderWithClient(<JobAds job={job} canEdit />);
+
+    const zone = (await screen.findByText(/Drop the client's job description here to write an ad/)).closest(".drop-zone");
+    if (!zone) throw new Error("no drop zone");
+    fireEvent.drop(zone, { dataTransfer: { files: [new File(["%PDF"], "JD.pdf")] } });
+    const form = await screen.findByRole("form", { name: "New ad" });
+    expect(send.mock.calls[0]?.[0]).toBe(`/v1/jobs/${job.id}/jd-files`);
+    await waitFor(() => { expect(within(form).getByLabelText<HTMLInputElement>("Ad title").value).toBe("Finance Manager"); }, { timeout: 4000 });
+    expect(get).toHaveBeenCalledWith("/v1/jd-files/{jdFileId}", { params: { path: { jdFileId: jdFile.id } } });
+    expect(within(form).getByText(/Filled in from JD.pdf/)).toBeTruthy();
+
+    fireEvent.click(within(form).getByRole("button", { name: "Save as draft" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({
+      title: "Finance Manager", location: "Petaling Jaya", country: "MY", workType: "contract", workArrangement: "remote",
+      salaryText: "RM 12,000 - 15,000 per month", closesOn: "2026-12-31", description: "Maju Foods needs a Finance Manager.\n- Lead closing",
+      clientDescription: null, publishBlind: true,
+    });
+    vi.unstubAllGlobals();
+  });
+
   it("publishes with the ad's version and says why when it cannot", async () => {
     reads([draft]);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(
