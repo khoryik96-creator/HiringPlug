@@ -79,7 +79,7 @@ details get their own permissions.
 | `interviews:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `interviews:schedule` (and see all feedback) | ✓ | ✓ | ✓ | | | |
 | `interviews:feedback` (on interviews you are on) | ✓ | ✓ | ✓ | ✓ | ✓ | |
-| `emails:read` (emails sent about a candidate) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `emails:read` (emails sent about a candidate; one that shows salary only with `candidates.compensation:read`, unless Settings say everyone) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | `emails:send` | ✓ | ✓ | ✓ | ✓ | | |
 | `emails.templates:manage` | ✓ | ✓ | ✓ | | | |
 | `placements:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

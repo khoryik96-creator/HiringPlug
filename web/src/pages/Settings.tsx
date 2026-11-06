@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
-import { fieldSettingsKey } from "../api/keys";
+import { fieldSettingsKey, policiesKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { fieldErrors } from "../components/forms";
 import { NOTICE_UNIT, keysOf } from "../labels";
@@ -20,6 +20,7 @@ export function Settings() {
       {settings.data && (
         <>
           <MandatoryFields fields={settings.data.mandatory} />
+          <Policies />
           <h3>Dropdowns</h3>
           <p className="muted">
             Hidden options are no longer offered, but records that have them keep them. Options that come with the app can be
@@ -29,6 +30,38 @@ export function Settings() {
         </>
       )}
     </main>
+  );
+}
+
+const SALARY_CHOICES: Record<Schemas["EmailSalaryVisibility"], string> = {
+  salary_roles: "Only roles that may see salaries (recommended)",
+  everyone: "Everyone who may read emails",
+};
+
+/** Who sees a sent email that shows salary. */
+function Policies() {
+  const queryClient = useQueryClient();
+  const policies = useQuery({ queryKey: policiesKey, queryFn: async () => unwrap(await api.GET("/v1/settings/policies")) });
+  const save = useMutation({
+    mutationFn: async (v: Schemas["EmailSalaryVisibility"]) => unwrap(await api.PUT("/v1/settings/policies", { body: { emailSalaryVisibility: v } })),
+    onSuccess: (p) => { queryClient.setQueryData(policiesKey, p); },
+  });
+  return (
+    <section className="panel" aria-label="Salary in emails">
+      <h3>Salary in emails</h3>
+      <p className="muted">
+        Only people whose role may see salaries can fill [Current salary] and [Expected salary] in an email.
+        Who should see a sent email that shows salary, on the candidate&apos;s page?
+      </p>
+      <ErrorMessage error={policies.error ?? save.error} />
+      {policies.data && (
+        <select aria-label="Who sees emails that show salary" value={policies.data.emailSalaryVisibility} disabled={save.isPending}
+          onChange={(e) => { save.mutate(e.target.value as Schemas["EmailSalaryVisibility"]); }}>
+          {keysOf(SALARY_CHOICES).map((k) => <option key={k} value={k}>{SALARY_CHOICES[k]}</option>)}
+        </select>
+      )}
+      {save.isSuccess && <span role="status" className="muted"> Saved: emails sent from now on follow it.</span>}
+    </section>
   );
 }
 

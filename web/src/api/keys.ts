@@ -42,3 +42,5 @@ export const cvImportsKey = ["cv-imports"] as const;
 // Under applicationsKey: every add or move of an application refreshes the timeline
 // (so it caches { items }, like every list there: useMoveApplication updates them in place).
 export const stageMovesKey = (candidateId?: string) => ["applications", "moves", candidateId ?? "all"] as const;
+export const emailBannersKey = ["email-banners"] as const;
+export const policiesKey = ["settings", "policies"] as const;

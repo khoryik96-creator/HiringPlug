@@ -12,6 +12,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
@@ -22,6 +23,7 @@ type Service struct {
 	pool   *pgxpool.Pool
 	deps   Deps
 	sender mail.Sender
+	files  *blob.Store // banners and attachments
 }
 
 const templateNameIndex = "email_template_name_idx"
@@ -55,7 +57,7 @@ func (s *Service) CreateTemplate(ctx context.Context, p authz.Principal, t Templ
 	}
 	var out store.EmailTemplate
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		row, err := store.New(tx).InsertTemplate(ctx, store.InsertTemplateParams{Name: t.Name, Subject: t.Subject, Body: t.Body})
+		row, err := store.New(tx).InsertTemplate(ctx, store.InsertTemplateParams{Name: t.Name, Subject: t.Subject, Body: t.Body, BodyHtml: orNil(t.BodyHTML)})
 		if database.IsUniqueViolation(err, templateNameIndex) {
 			return nameTaken()
 		}
@@ -88,7 +90,7 @@ func (s *Service) UpdateTemplate(ctx context.Context, p authz.Principal, id stri
 			return err
 		}
 		row, err := q.UpdateTemplate(ctx, store.UpdateTemplateParams{
-			ID: id, ExpectedVersion: int32(version), Name: t.Name, Subject: t.Subject, Body: t.Body, //nolint:gosec // versions are small
+			ID: id, ExpectedVersion: int32(version), Name: t.Name, Subject: t.Subject, Body: t.Body, BodyHtml: orNil(t.BodyHTML), //nolint:gosec // versions are small
 		})
 		switch {
 		case database.IsNoRows(err):
@@ -109,6 +111,31 @@ func (s *Service) UpdateTemplate(ctx context.Context, p authz.Principal, id stri
 		return audit.Record(ctx, tx, audit.Entry{Action: "email_template.updated", EntityType: "email_template", EntityID: id, Changes: changes})
 	})
 	return out, err
+}
+
+// DeleteTemplate removes a template.
+func (s *Service) DeleteTemplate(ctx context.Context, p authz.Principal, id string) error {
+	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		old, err := q.GetTemplate(ctx, id)
+		if database.IsNoRows(err) {
+			return apperr.NotFound("email template")
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := q.DeleteTemplate(ctx, id); err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "email_template.deleted", EntityType: "email_template", EntityID: id, Changes: map[string]any{"name": old.Name}})
+	})
+}
+
+func orNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func nameTaken() error {
@@ -180,13 +207,9 @@ func (s *Service) context(ctx context.Context, tx pgx.Tx, p authz.Principal, can
 		return Context{}, err
 	}
 	c := Context{SenderName: p.Name, AgencyName: tenant}
-	cands, err := s.deps.Candidates.Briefs(ctx, tx, []string{candidateID})
+	cand, err := s.deps.Candidates.Detailed(ctx, tx, p, candidateID)
 	if err != nil {
 		return Context{}, err
-	}
-	cand, ok := cands[candidateID]
-	if !ok {
-		return Context{}, apperr.NotFound("candidate")
 	}
 	c.Candidate = cand
 	var errs apperr.FieldErrors
@@ -245,67 +268,39 @@ func union(a, b []string) []string {
 	return out
 }
 
-// Send records an email and queues it; the worker sends it.
-func (s *Service) Send(ctx context.Context, p authz.Principal, o Outgoing, candidateID, appID *string) (store.Email, error) {
-	o, errs := NormalizeOutgoing(o)
-	if err := errs.Err(); err != nil {
-		return store.Email{}, err
-	}
-	var out store.Email
+// EmailView is a sent email with its attachments.
+type EmailView struct {
+	store.Email
+	Attachments []store.EmailAttachment
+}
+
+// List returns the emails about a candidate the user may see, newest first.
+func (s *Service) List(ctx context.Context, p authz.Principal, candidateID string) ([]EmailView, error) {
+	var out []EmailView
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if appID != nil {
-			app, err := s.application(ctx, tx, *appID, candidateID)
-			if err != nil {
-				return err
-			}
-			candidateID = &app.CandidateID
-		}
-		if candidateID != nil {
-			found, err := s.deps.Candidates.Briefs(ctx, tx, []string{*candidateID})
-			if err != nil {
-				return err
-			}
-			if _, ok := found[*candidateID]; !ok {
-				return apperr.NotFound("candidate")
-			}
-			if s.deps.Consent != nil {
-				no, err := s.deps.Consent.DoNotContact(ctx, tx, *candidateID)
-				if err != nil {
-					return err
-				}
-				if no {
-					return apperr.New(api.ErrorCodeEMAILDONOTCONTACT,
-						"This candidate withdrew consent to be contacted, so no email is sent to them. See Data protection on their page.")
-				}
-			}
-		}
-		row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
-			CandidateID: candidateID, ApplicationID: appID, ToAddresses: o.To, CcAddresses: o.Cc,
-			Subject: o.Subject, Body: o.Body, SenderName: p.Name, ReplyTo: p.Email,
-		})
+		q := store.New(tx)
+		rows, err := q.ListCandidateEmails(ctx, &candidateID)
 		if err != nil {
 			return err
 		}
-		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+		ids := make([]string, len(rows))
+		for i, r := range rows {
+			ids[i] = r.ID
+		}
+		files, err := q.EmailAttachments(ctx, ids)
+		if err != nil {
 			return err
 		}
-		out = row
-		// The text is in the email record; the audit log keeps who and what about.
-		return audit.Record(ctx, tx, audit.Entry{
-			Action: "email.queued", EntityType: "email", EntityID: row.ID,
-			Changes: map[string]any{"candidateId": candidateID, "to": o.To, "cc": o.Cc, "subject": o.Subject},
-		})
-	})
-	return out, err
-}
-
-// List returns the emails about a candidate, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, candidateID string) ([]store.Email, error) {
-	var out []store.Email
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		var err error
-		out, err = store.New(tx).ListCandidateEmails(ctx, &candidateID)
-		return err
+		out = make([]EmailView, len(rows))
+		for i, r := range rows {
+			out[i] = EmailView{Email: r}
+			for _, f := range files {
+				if f.EmailID != nil && *f.EmailID == r.ID {
+					out[i].Attachments = append(out[i].Attachments, f)
+				}
+			}
+		}
+		return nil
 	})
 	return out, err
 }
@@ -317,7 +312,7 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		return err
 	}
 	row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
-		ApplicationID: n.ApplicationID, ToAddresses: o.To, CcAddresses: []string{},
+		ApplicationID: n.ApplicationID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
 		Subject: o.Subject, Body: o.Body, SenderName: "HiringPlug", ReplyTo: "",
 	})
 	if err != nil {

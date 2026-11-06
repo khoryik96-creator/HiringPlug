@@ -50,7 +50,7 @@ func TestEmailTemplatesAndDrafts(t *testing.T) {
 
 	t.Run("templates are checked and changed with a version", func(t *testing.T) {
 		res := a.request(http.MethodPost, "/v1/email-templates", recruiter.Token, map[string]any{"name": "Offer", "subject": "Your salary: {{candidate.salary}}", "body": "x"})
-		assert.Equal(t, []string{"subject"}, fieldNames(t, res.Error()), "only known placeholders (salary is not one)")
+		assert.Equal(t, []string{"subject"}, fieldNames(t, res.Error()), "only known placeholders")
 		res = a.request(http.MethodPost, "/v1/email-templates", recruiter.Token, map[string]any{"name": "interview INVITATION", "subject": "x", "body": "x"})
 		assert.Equal(t, []string{"name"}, fieldNames(t, res.Error()), "names are unique")
 		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/email-templates", sourcer.Token, map[string]any{"name": "Mine", "subject": "x", "body": "x"}).Status)

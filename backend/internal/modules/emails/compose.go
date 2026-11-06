@@ -1,0 +1,341 @@
+package emails
+
+// Sending an email from the composer: its fields filled from the candidate
+// and application, files attached (uploads, or the candidate's CVs), and
+// whether it shows salary (then hidden from roles that may not see salaries,
+// unless the company chose otherwise).
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+)
+
+// Attachment limits: per email, as most mail servers take them.
+const (
+	maxFiles     = 10
+	maxFileBytes = 10 << 20
+	maxAllBytes  = 10 << 20
+)
+
+const defaultZone = "Asia/Kuala_Lumpur"
+
+// CVRef is one of the candidate's CVs to attach.
+type CVRef struct {
+	DocumentID string
+	AsPDF      bool
+}
+
+// SendRequest is an email from the composer.
+type SendRequest struct {
+	Outgoing
+	CandidateID, ApplicationID *string
+	TimeZone                   string
+	AttachmentIDs              []string
+	CVs                        []CVRef
+}
+
+// Preview is a message with its fields filled, as it will be sent.
+type Preview struct {
+	Subject, BodyHTML string
+	Missing           []string
+	Salary            bool
+	ClientEmail       *string // the job's hiring contact, for an application
+}
+
+// Preview fills a message's fields for a candidate (and an application or
+// interview) without sending anything.
+func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID *string, zone string) (Preview, error) {
+	loc, err := location(zone)
+	if err != nil {
+		return Preview{}, err
+	}
+	var out Preview
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		values, err := s.values(ctx, tx, p, candidateID, appID, interviewID, loc)
+		if err != nil {
+			return err
+		}
+		sub := FillFields(strings.Join(strings.Fields(subject), " "), values, false)
+		body := FillFields(SanitizeHTML(bodyHTML), values, true)
+		out = Preview{Subject: sub.Text, BodyHTML: body.Text, Missing: union(sub.Missing, body.Missing), Salary: sub.Salary || body.Salary}
+		if appID != nil {
+			app, err := s.application(ctx, tx, *appID, nil)
+			if err != nil {
+				return err
+			}
+			out.ClientEmail = app.ClientEmail
+		}
+		return nil
+	})
+	return out, err
+}
+
+// values are the field values for an email: the candidate's (as p may see
+// them), the application's and the interview's, the sender's and the agency's.
+func (s *Service) values(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, appID, interviewID *string, loc *time.Location) (map[string]string, error) {
+	if candidateID == nil && appID != nil {
+		app, err := s.application(ctx, tx, *appID, nil)
+		if err != nil {
+			return nil, err
+		}
+		candidateID = &app.CandidateID
+	}
+	if candidateID == nil {
+		tenant, err := s.deps.Tenants.TenantName(ctx, tx, p.TenantID)
+		return map[string]string{"sender.name": p.Name, "agency.name": tenant}, err
+	}
+	dc, err := s.context(ctx, tx, p, *candidateID, appID, interviewID)
+	if err != nil {
+		return nil, err
+	}
+	dc.Location = loc
+	return Values(dc), nil
+}
+
+func location(zone string) (*time.Location, error) {
+	if zone == "" {
+		zone = defaultZone
+	}
+	loc, err := time.LoadLocation(zone)
+	if err != nil || zone == "Local" {
+		var errs apperr.FieldErrors
+		errs.Add("timeZone", "is not a time zone, e.g. Asia/Kuala_Lumpur")
+		return nil, errs.Err()
+	}
+	return loc, nil
+}
+
+// Send records an email and queues it; the worker sends it.
+func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (EmailView, error) {
+	o, errs := NormalizeOutgoing(r.Outgoing)
+	if len(r.AttachmentIDs)+len(r.CVs) > maxFiles {
+		errs.Add("attachments", "at most 10 files")
+	}
+	if err := errs.Err(); err != nil {
+		return EmailView{}, err
+	}
+	if len(r.CVs) > 0 && !p.Can(api.PermissionDocumentsRead) {
+		return EmailView{}, apperr.New(api.ErrorCodeFORBIDDEN, "Attaching CVs needs permission to see documents.")
+	}
+	loc, err := location(r.TimeZone)
+	if err != nil {
+		return EmailView{}, err
+	}
+	var out EmailView
+	var stored []string // files written for this email, removed if it is not saved
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		candidateID := r.CandidateID
+		if r.ApplicationID != nil {
+			app, err := s.application(ctx, tx, *r.ApplicationID, candidateID)
+			if err != nil {
+				return err
+			}
+			candidateID = &app.CandidateID
+		}
+		if candidateID != nil {
+			if err := s.contactable(ctx, tx, *candidateID); err != nil {
+				return err
+			}
+		}
+		values, err := s.values(ctx, tx, p, candidateID, r.ApplicationID, nil, loc)
+		if err != nil {
+			return err
+		}
+		filled, err := fill(o, values)
+		if err != nil {
+			return err
+		}
+		q := store.New(tx)
+		if err := s.checkBanners(ctx, q, filled.BodyHTML); err != nil {
+			return err
+		}
+		staged, err := q.StagedAttachments(ctx, r.AttachmentIDs)
+		if err != nil {
+			return err
+		}
+		if len(staged) != len(unique(r.AttachmentIDs)) {
+			var errs apperr.FieldErrors
+			errs.Add("attachmentIds", "a file is no longer there: upload it again")
+			return errs.Err()
+		}
+		total := 0
+		for _, a := range staged {
+			total += int(a.SizeBytes)
+		}
+		cvs := make([]CVFile, 0, len(r.CVs))
+		for _, ref := range r.CVs {
+			cv, err := s.deps.Documents.CVFile(ctx, tx, ref.DocumentID, ref.AsPDF)
+			if err != nil {
+				return err
+			}
+			if candidateID == nil || cv.CandidateID != *candidateID {
+				var errs apperr.FieldErrors
+				errs.Add("cvs", "is not this candidate's CV")
+				return errs.Err()
+			}
+			total += len(cv.Data)
+			cvs = append(cvs, cv)
+		}
+		if total > maxAllBytes {
+			return apperr.New(api.ErrorCodePAYLOADTOOLARGE, "The attachments come to more than 10 MB; leave some out.")
+		}
+		restricted := false
+		if filled.salary {
+			visibility, err := s.deps.Policy.EmailSalaryVisibility(ctx, tx)
+			if err != nil {
+				return err
+			}
+			restricted = visibility != "everyone"
+		}
+		row, err := q.InsertEmail(ctx, store.InsertEmailParams{
+			CandidateID: candidateID, ApplicationID: r.ApplicationID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
+			Subject: filled.Subject, Body: filled.Body, BodyHtml: orNil(filled.BodyHTML), Salary: filled.salary, SalaryRestricted: restricted,
+			SenderName: p.Name, ReplyTo: p.Email,
+		})
+		if err != nil {
+			return err
+		}
+		if err := q.AttachToEmail(ctx, store.AttachToEmailParams{EmailID: &row.ID, Ids: r.AttachmentIDs}); err != nil {
+			return err
+		}
+		for _, cv := range cvs {
+			key := p.TenantID + "/eat_" + newKey()
+			if err := s.files.Put(key, cv.Data); err != nil {
+				return err
+			}
+			stored = append(stored, key)
+			if _, err := q.InsertAttachment(ctx, store.InsertAttachmentParams{
+				EmailID: &row.ID, FileName: clip(cv.FileName, 255), ContentType: cv.ContentType, SizeBytes: int32(len(cv.Data)), StorageKey: key, //nolint:gosec // at most 10 MB
+			}); err != nil {
+				return err
+			}
+		}
+		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+			return err
+		}
+		files, err := q.EmailAttachments(ctx, []string{row.ID})
+		if err != nil {
+			return err
+		}
+		out = EmailView{Email: row, Attachments: files}
+		// The text stays in the email record; never the salary in the audit log.
+		return audit.Record(ctx, tx, audit.Entry{
+			Action: "email.queued", EntityType: "email", EntityID: row.ID,
+			Changes: map[string]any{"candidateId": candidateID, "to": filled.To, "cc": filled.Cc, "bcc": len(filled.Bcc),
+				"subject": "(see the email)", "attachments": len(files), "salary": filled.salary},
+		})
+	})
+	if err != nil {
+		for _, key := range stored {
+			_ = s.files.Delete(key)
+		}
+	}
+	return out, err
+}
+
+// contactable refuses candidates who asked not to be contacted.
+func (s *Service) contactable(ctx context.Context, tx pgx.Tx, candidateID string) error {
+	if s.deps.Consent == nil {
+		return nil
+	}
+	no, err := s.deps.Consent.DoNotContact(ctx, tx, candidateID)
+	if err != nil {
+		return err
+	}
+	if no {
+		return apperr.New(api.ErrorCodeEMAILDONOTCONTACT,
+			"This candidate withdrew consent to be contacted, so no email is sent to them. See Data protection on their page.")
+	}
+	return nil
+}
+
+type filledEmail struct {
+	Outgoing
+	salary bool
+}
+
+// fill fills the subject and message; a field with no value refuses the email.
+func fill(o Outgoing, values map[string]string) (filledEmail, error) {
+	sub := FillFields(o.Subject, values, false)
+	out := filledEmail{Outgoing: o}
+	out.Subject = sub.Text
+	missing, salary := sub.Missing, sub.Salary
+	if o.BodyHTML != "" {
+		body := FillFields(o.BodyHTML, values, true)
+		out.BodyHTML, out.Body = body.Text, TextFromHTML(body.Text)
+		missing, salary = union(missing, body.Missing), salary || body.Salary
+	} else {
+		body := FillFields(o.Body, values, false)
+		out.Body = body.Text
+		missing, salary = union(missing, body.Missing), salary || body.Salary
+	}
+	if len(missing) > 0 {
+		var errs apperr.FieldErrors
+		errs.Add("body", "no value for this candidate: "+strings.Join(missing, ", ")+" (fill it in, or take it out)")
+		return out, errs.Err()
+	}
+	if out.Body == "" {
+		out.Body = "(See the formatted message.)"
+	}
+	if len([]rune(out.Body)) > maxBody {
+		var errs apperr.FieldErrors
+		errs.Add("body", "is too long (at most 20,000 characters)")
+		return out, errs.Err()
+	}
+	out.salary = salary
+	return out, nil
+}
+
+// checkBanners refuses banners that are not the company's.
+func (s *Service) checkBanners(ctx context.Context, q *store.Queries, html string) error {
+	ids := BannerIDs(html)
+	if len(ids) == 0 {
+		return nil
+	}
+	found, err := q.GetBanners(ctx, ids)
+	if err != nil {
+		return err
+	}
+	live := 0
+	for _, b := range found {
+		if b.DeletedAt == nil {
+			live++
+		}
+	}
+	if live != len(ids) {
+		var errs apperr.FieldErrors
+		errs.Add("bodyHtml", "a banner in it was deleted: insert another one")
+		return errs.Err()
+	}
+	return nil
+}
+
+func unique(xs []string) []string {
+	return union(nil, xs)
+}
+
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+func newKey() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
+}

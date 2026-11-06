@@ -2,7 +2,12 @@ package mail_test
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"io"
+	"mime"
+	"mime/multipart"
+	stdmail "net/mail"
 	"strings"
 	"testing"
 	"time"
@@ -53,4 +58,54 @@ func TestStartTLSIsRequiredUnlessTurnedOff(t *testing.T) {
 	err := mail.NewSMTP(mail.Config{Addr: srv.Addr, From: "no-reply@hire.example"}).Send(context.Background(),
 		mail.Message{To: []string{"a@example.com"}, Subject: "x", Body: "x"})
 	assert.True(t, errors.Is(err, mail.ErrPermanent), "never sends in the clear by surprise: %v", err)
+}
+
+func TestFormattedEmailsWithABannerAttachmentsAndBcc(t *testing.T) {
+	srv := testutil.NewSMTPServer(t)
+	s := mail.NewSMTP(mail.Config{Addr: srv.Addr, From: "no-reply@hire.example", TLS: "none"})
+	err := s.Send(context.Background(), mail.Message{
+		To: []string{"hr@client.example"}, Bcc: []string{"me@contoh.example"}, Subject: "Candidate: Siti Aisyah",
+		Body: "Dear Ms Tan,\nPlease find Siti's CV.", HTML: `<p>Dear Ms Tan,</p><img src="cid:ebn_1"><p><b>Please</b> find Siti's CV.</p>`,
+		Inline: []mail.Part{{Name: "banner.png", ContentType: "image/png", ContentID: "ebn_1", Data: []byte("PNGDATA")}},
+		Attach: []mail.Part{{Name: "Siti Aisyah – CV.pdf", ContentType: "application/pdf", Data: []byte("%PDF-1.7 cv")}},
+	})
+	require.NoError(t, err)
+	msgs := srv.Messages()
+	require.Len(t, msgs, 1)
+	assert.Equal(t, []string{"hr@client.example", "me@contoh.example"}, msgs[0].To, "bcc gets it")
+	assert.NotContains(t, msgs[0].Data, "me@contoh.example", "but is not listed in it")
+
+	msg, err := stdmail.ReadMessage(strings.NewReader(msgs[0].Data))
+	require.NoError(t, err)
+	mixed, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	require.NoError(t, err)
+	assert.Equal(t, "multipart/mixed", mixed)
+	r := multipart.NewReader(msg.Body, params["boundary"])
+	first, err := r.NextPart()
+	require.NoError(t, err)
+	related, relParams, _ := mime.ParseMediaType(first.Header.Get("Content-Type"))
+	assert.Equal(t, "multipart/related", related, "the formatted text with its banner")
+	rr := multipart.NewReader(first, relParams["boundary"])
+	alt, err := rr.NextPart()
+	require.NoError(t, err)
+	altType, altParams, _ := mime.ParseMediaType(alt.Header.Get("Content-Type"))
+	assert.Equal(t, "multipart/alternative", altType)
+	ar := multipart.NewReader(alt, altParams["boundary"])
+	text, _ := ar.NextPart()
+	assert.Contains(t, text.Header.Get("Content-Type"), "text/plain")
+	html, _ := ar.NextPart()
+	htmlBody, _ := io.ReadAll(html) // multipart decodes quoted-printable
+	assert.Contains(t, string(htmlBody), `<img src="cid:ebn_1">`)
+	banner, err := rr.NextPart()
+	require.NoError(t, err)
+	assert.Equal(t, "<ebn_1>", banner.Header.Get("Content-Id"))
+	attached, err := r.NextPart()
+	require.NoError(t, err)
+	assert.Equal(t, "Siti Aisyah – CV.pdf", attached.FileName())
+	data, _ := io.ReadAll(base64.NewDecoder(base64.StdEncoding, attached))
+	assert.Equal(t, "%PDF-1.7 cv", string(data))
+
+	_, err = mail.Build("no-reply@hire.example", mail.Message{To: []string{"a@example.com"}, Subject: "x", Body: "x",
+		Attach: []mail.Part{{Name: "cv.pdf\r\nBcc: victim@example.com", ContentType: "application/pdf"}}}, time.Now())
+	assert.Error(t, err, "no headers through a file name")
 }

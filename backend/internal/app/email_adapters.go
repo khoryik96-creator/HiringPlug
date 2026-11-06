@@ -5,19 +5,92 @@ package app
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
 )
 
 type emailCandidates struct{ candidates *candidates.Module }
+
+// Detailed is a candidate with what fields show, as p may see them: salary
+// only with permission (row-level security leaves it out otherwise).
+func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (emails.Candidate, error) {
+	v, err := a.candidates.ViewIn(ctx, tx, p, id)
+	if err != nil {
+		return emails.Candidate{}, err
+	}
+	pr := v.Profile
+	d := &emails.Details{CurrentTitle: pr.CurrentTitle, CurrentCompany: pr.CurrentCompany}
+	if pr.Nationality != nil {
+		d.Nationality = ptr(countryName(*pr.Nationality))
+	}
+	if place := joinNonEmpty(pr.Location, mapPtr(pr.ResidenceCountry, countryName)); place != "" {
+		d.Residence = &place
+	}
+	if n := pr.NoticePeriod; n != nil {
+		d.NoticePeriod = ptr(emails.FormatNotice(n.Value, n.Unit))
+	}
+	if wa := pr.WorkAuthorization; wa != nil {
+		d.WorkAuthorization = ptr(emails.FormatWorkAuthorization(wa.Status, wa.Basis))
+	}
+	if c := v.Compensation; c != nil && !v.CompensationRestricted {
+		if c.Current != nil {
+			d.CurrentSalary = ptr(emails.FormatSalary(c.Current.Amount, c.Current.Currency, c.Current.Period))
+		}
+		if e := c.Expected; e != nil {
+			d.ExpectedSalary = ptr(emails.FormatRange(e.Min, e.Max, e.Currency, e.Period))
+		}
+	}
+	return emails.Candidate{
+		FullName: candidates.FullName(pr), FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Details: d,
+	}, nil
+}
+
+func ptr(s string) *string { return &s }
+
+func mapPtr(p *string, f func(string) string) *string {
+	if p == nil {
+		return nil
+	}
+	return ptr(f(*p))
+}
+
+func joinNonEmpty(parts ...*string) string {
+	var out []string
+	for _, p := range parts {
+		if p != nil && strings.TrimSpace(*p) != "" {
+			out = append(out, strings.TrimSpace(*p))
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+// countryName is a country's English name from its code ("MY" -> "Malaysia").
+func countryName(code string) string {
+	if name := country.Name(code); name != "" {
+		return name
+	}
+	return code
+}
+
+// emailDocuments gives the emails module a candidate's CVs to attach.
+type emailDocuments struct{ documents *documents.Module }
+
+func (a emailDocuments) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (emails.CVFile, error) {
+	doc, data, err := a.documents.CVFile(ctx, tx, id, asPDF)
+	return emails.CVFile{CandidateID: doc.CandidateID, FileName: doc.FileName, ContentType: doc.ContentType, Data: data}, err
+}
 
 func (a emailCandidates) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]emails.Candidate, error) {
 	briefs, err := a.candidates.Briefs(ctx, tx, ids)

@@ -3,6 +3,9 @@ package emails
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 
 	"github.com/jackc/pgx/v5"
 
@@ -44,10 +47,19 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err != nil {
 		return err
 	}
-	sendErr := s.sender.Send(ctx, mail.Message{
+	msg := mail.Message{
 		FromName: e.SenderName + " (" + agency + ")", ReplyTo: e.ReplyTo,
-		To: e.ToAddresses, Cc: e.CcAddresses, Subject: e.Subject, Body: e.Body,
-	})
+		To: e.ToAddresses, Cc: e.CcAddresses, Bcc: e.BccAddresses, Subject: e.Subject, Body: e.Body,
+	}
+	var sendErr error
+	switch partsErr := s.files2parts(ctx, q, e, &msg); {
+	case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help
+		sendErr = fmt.Errorf("%w: a banner or attached file of this email is missing", mail.ErrPermanent)
+	case partsErr != nil:
+		return partsErr
+	default:
+		sendErr = s.sender.Send(ctx, msg)
+	}
 	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
 		return sendErr
 	}
@@ -63,6 +75,57 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "email", EntityID: e.ID, Changes: changes})
+}
+
+// files2parts adds the formatted message with its banners, and the
+// attachments, to msg.
+func (s *Service) files2parts(ctx context.Context, q *store.Queries, e store.Email, msg *mail.Message) error {
+	if e.BodyHtml != nil && *e.BodyHtml != "" {
+		msg.HTML = WithBannerCIDs(*e.BodyHtml)
+		banners, err := q.GetBanners(ctx, BannerIDs(*e.BodyHtml))
+		if err != nil {
+			return err
+		}
+		for _, b := range banners {
+			data, err := s.read(b.StorageKey)
+			if err != nil {
+				return err
+			}
+			msg.Inline = append(msg.Inline, mail.Part{Name: "banner" + extension(b.ContentType), ContentType: b.ContentType, ContentID: b.ID, Data: data})
+		}
+	}
+	files, err := q.EmailAttachments(ctx, []string{e.ID})
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		data, err := s.read(f.StorageKey)
+		if err != nil {
+			return err
+		}
+		msg.Attach = append(msg.Attach, mail.Part{Name: f.FileName, ContentType: f.ContentType, Data: data})
+	}
+	return nil
+}
+
+func (s *Service) read(key string) ([]byte, error) {
+	f, err := s.files.Open(key)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	return io.ReadAll(f)
+}
+
+func extension(contentType string) string {
+	switch contentType {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/gif":
+		return ".gif"
+	default:
+		return ".png"
+	}
 }
 
 func truncate(s string, n int) string {

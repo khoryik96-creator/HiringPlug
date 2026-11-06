@@ -1150,6 +1150,135 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteEmailTemplate
+      tags: [emails]
+      summary: Delete a template
+      x-permission: emails.templates:manage
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/email-previews:
+    post:
+      operationId: previewEmail
+      tags: [emails]
+      summary: Fill an email's fields for a candidate (and a job or interview), to see before sending
+      description: >
+        Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them).
+
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailPreviewRequest'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailPreview'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/email-attachments:
+    post:
+      operationId: addEmailAttachment
+      tags: [emails]
+      summary: Upload a file from the computer, to attach to the next email you send
+      description: Up to 10 MB a file; an email takes up to 10 files and 10 MB in all.
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailAttachment'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/email-banners:
+    get:
+      operationId: listEmailBanners
+      tags: [emails]
+      summary: The company's email banners
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailBannerList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: addEmailBanner
+      tags: [emails]
+      summary: Upload a banner image (PNG, JPEG or GIF, up to 1 MB)
+      x-permission: emails.templates:manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                name: {type: string, maxLength: 100}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailBanner'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/email-banners/{bannerId}:
+    parameters:
+      - {name: bannerId, in: path, required: true, schema: {$ref: '#/components/schemas/EmailBannerId'}}
+    delete:
+      operationId: deleteEmailBanner
+      tags: [emails]
+      summary: Delete a banner (emails already sent keep it)
+      x-permission: emails.templates:manage
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/email-banners/{bannerId}/file:
+    parameters:
+      - {name: bannerId, in: path, required: true, schema: {$ref: '#/components/schemas/EmailBannerId'}}
+    get:
+      operationId: getEmailBannerFile
+      tags: [emails]
+      summary: A banner's image
+      x-permission: emails:send
+      responses:
+        '200':
+          description: The image
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/email-drafts:
     post:
       operationId: draftEmail
@@ -2998,6 +3127,39 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/policies:
+    get:
+      operationId: getPolicies
+      tags: [settings]
+      summary: The company's choices on how the app treats sensitive information
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Policies'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putPolicies
+      tags: [settings]
+      summary: Change those choices
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Policies'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Policies'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
 components:
   securitySchemes:
     bearerAuth:
@@ -4374,9 +4536,82 @@ components:
       type: string
       pattern: '^eml_[0-9a-hjkmnp-tv-z]{26}$'
       example: eml_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailBannerId:
+      type: string
+      pattern: '^ebn_[0-9a-hjkmnp-tv-z]{26}$'
+      example: ebn_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailAttachmentId:
+      type: string
+      pattern: '^eat_[0-9a-hjkmnp-tv-z]{26}$'
+      example: eat_01jbz6w0m0k8q9x2r3s4t5v6w7
+    EmailBanner:
+      type: object
+      required: [id, name, contentType, sizeBytes, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/EmailBannerId'}
+        name: {type: string}
+        contentType: {type: string}
+        sizeBytes: {type: integer}
+        createdAt: {type: string, format: date-time}
+    EmailBannerList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/EmailBanner'}
+    EmailAttachment:
+      type: object
+      required: [id, fileName, contentType, sizeBytes]
+      properties:
+        id: {$ref: '#/components/schemas/EmailAttachmentId'}
+        fileName: {type: string}
+        contentType: {type: string}
+        sizeBytes: {type: integer}
+    EmailField:
+      type: object
+      required: [token, key, label, salary]
+      properties:
+        token: {type: string, description: 'What to type or insert, e.g. "[Expected salary]".'}
+        key: {type: string, description: 'The same as a placeholder, e.g. "candidate.expectedSalary".'}
+        label: {type: string}
+        salary: {type: boolean, description: Fills only for senders who may see salaries.}
+    EmailCvAttachment:
+      type: object
+      additionalProperties: false
+      required: [documentId]
+      properties:
+        documentId: {$ref: '#/components/schemas/DocumentId'}
+        asPdf: {type: boolean, description: "A formatted CV's PDF instead of its Word file. Defaults to false."}
+    EmailPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [subject, bodyHtml, timeZone]
+      properties:
+        subject: {type: string, maxLength: 200}
+        bodyHtml: {type: string, maxLength: 100000}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        interviewId: {$ref: '#/components/schemas/InterviewId'}
+        timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
+    EmailPreview:
+      type: object
+      required: [subject, bodyHtml, missing, salary, clientEmail]
+      properties:
+        clientEmail:
+          type: string
+          nullable: true
+          description: "The job's hiring contact, to send to (when an application is given and its job has one)."
+        subject: {type: string}
+        bodyHtml: {type: string, description: "Formatted and made safe, as it will be sent."}
+        missing:
+          type: array
+          description: Fields with no value (sending refuses them), e.g. "[Expected salary]".
+          items: {type: string}
+        salary: {type: boolean, description: "The email shows salary, so it may be hidden from roles that may not see salaries."}
     EmailTemplate:
       type: object
-      required: [id, version, name, subject, body, createdAt, updatedAt]
+      required: [id, version, name, subject, body, bodyHtml, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/EmailTemplateId'}
         version: {type: integer}
@@ -4385,15 +4620,23 @@ components:
         body:
           type: string
           description: "Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`."
+        bodyHtml:
+          type: string
+          nullable: true
+          description: The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary].
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     EmailTemplateList:
       type: object
-      required: [items, placeholders]
+      required: [items, placeholders, fields]
       properties:
         items:
           type: array
           items: {$ref: '#/components/schemas/EmailTemplate'}
+        fields:
+          type: array
+          description: The fields a message may use, with their tokens.
+          items: {$ref: '#/components/schemas/EmailField'}
         placeholders:
           type: array
           description: The placeholders templates may use.
@@ -4401,20 +4644,24 @@ components:
     EmailTemplateInput:
       type: object
       additionalProperties: false
-      required: [name, subject, body]
+      required: [name, subject]
+      description: Give body (plain text), bodyHtml (formatted), or both.
       properties:
         name: {type: string, minLength: 1, maxLength: 100}
         subject: {type: string, minLength: 1, maxLength: 200}
-        body: {type: string, minLength: 1, maxLength: 20000}
+        body: {type: string, maxLength: 20000}
+        bodyHtml: {type: string, maxLength: 100000}
     EmailTemplateUpdate:
       type: object
       additionalProperties: false
-      required: [version, name, subject, body]
+      required: [version, name, subject]
+      description: Give body (plain text), bodyHtml (formatted), or both.
       properties:
         version: {type: integer, minimum: 1}
         name: {type: string, minLength: 1, maxLength: 100}
         subject: {type: string, minLength: 1, maxLength: 200}
-        body: {type: string, minLength: 1, maxLength: 20000}
+        body: {type: string, maxLength: 20000}
+        bodyHtml: {type: string, maxLength: 100000}
     EmailDraftRequest:
       type: object
       additionalProperties: false
@@ -4445,7 +4692,7 @@ components:
       enum: [queued, sent, failed]
     Email:
       type: object
-      required: [id, candidateId, applicationId, to, cc, subject, body, status, error, sentBy, sentByName, createdAt, sentAt]
+      required: [id, candidateId, applicationId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
       properties:
         id: {$ref: '#/components/schemas/EmailId'}
         candidateId:
@@ -4456,8 +4703,14 @@ components:
           nullable: true
         to: {type: array, items: {type: string}}
         cc: {type: array, items: {type: string}}
+        bcc: {type: array, items: {type: string}}
         subject: {type: string}
-        body: {type: string}
+        body: {type: string, description: The plain-text version.}
+        bodyHtml: {type: string, nullable: true, description: "The formatted version, if it had one."}
+        attachments:
+          type: array
+          items: {$ref: '#/components/schemas/EmailAttachment'}
+        salary: {type: boolean, description: "It shows salary (hidden from roles that may not see salaries, unless Settings say otherwise)."}
         status: {$ref: '#/components/schemas/EmailStatus'}
         error: {type: string, nullable: true}
         sentBy: {$ref: '#/components/schemas/UserId'}
@@ -4474,7 +4727,10 @@ components:
     EmailSend:
       type: object
       additionalProperties: false
-      required: [to, subject, body]
+      required: [to, subject]
+      description: >
+        Give body (plain text) or bodyHtml (formatted). Fields in the subject and the formatted message ([Expected salary], ...) are filled from the candidate and application; one with no value refuses the email.
+
       properties:
         to:
           type: array
@@ -4485,10 +4741,26 @@ components:
           type: array
           maxItems: 10
           items: {type: string, format: email, maxLength: 254}
+        bcc:
+          type: array
+          maxItems: 10
+          items: {type: string, format: email, maxLength: 254}
         subject: {type: string, minLength: 1, maxLength: 200}
-        body: {type: string, minLength: 1, maxLength: 20000}
+        body: {type: string, maxLength: 20000}
+        bodyHtml: {type: string, maxLength: 100000}
+        timeZone: {type: string, maxLength: 64, description: For interview times in fields (default Asia/Kuala_Lumpur).}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        attachmentIds:
+          type: array
+          maxItems: 10
+          description: Files you uploaded to /v1/email-attachments.
+          items: {$ref: '#/components/schemas/EmailAttachmentId'}
+        cvs:
+          type: array
+          maxItems: 10
+          description: The candidate's CVs from the ATS (needs documents:read).
+          items: {$ref: '#/components/schemas/EmailCvAttachment'}
     EmailSendJob:
       type: object
       additionalProperties: false
@@ -6290,6 +6562,18 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    EmailSalaryVisibility:
+      type: string
+      description: >
+        Who sees a sent email that shows salary: salary_roles = only roles that may see salaries (the default); everyone = everyone who may read emails. Either way only senders who may see salaries can fill salary fields.
+
+      enum: [salary_roles, everyone]
+    Policies:
+      type: object
+      additionalProperties: false
+      required: [emailSalaryVisibility]
+      properties:
+        emailSalaryVisibility: {$ref: '#/components/schemas/EmailSalaryVisibility'}
     FieldListName:
       type: string
       description: >
@@ -6848,7 +7132,7 @@ x-modules:
   - name: documents
     description: 'Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and formatted CVs. Uploading a CV queues text extraction in the Python AI worker.'
   - name: emails
-    description: 'Email from the app: templates with placeholders filled from the candidate, job, interview and sender; messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it.'
+    description: 'Email from the app: formatted templates with fields ([First name], [Expected salary], ...) filled from the candidate, job, interview and sender; cc and bcc; image banners; attachments (the candidate''s CVs or files from the computer); messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it. Salary fields fill only for senders who may see salaries, and by default an email with salary in it is hidden from roles that may not (Settings can show it to all).'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
   - name: intake

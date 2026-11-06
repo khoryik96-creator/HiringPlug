@@ -18,6 +18,17 @@ func (q *Queries) DeleteOptions(ctx context.Context, list string) error {
 	return err
 }
 
+const getPolicy = `-- name: GetPolicy :one
+SELECT value FROM tenant_policy WHERE key = $1
+`
+
+func (q *Queries) GetPolicy(ctx context.Context, key string) (string, error) {
+	row := q.db.QueryRow(ctx, getPolicy, key)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const insertOption = `-- name: InsertOption :exec
 INSERT INTO field_option (tenant_id, list, key, label, hidden, position)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5)
@@ -161,4 +172,19 @@ func (q *Queries) SavedLists(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const setPolicy = `-- name: SetPolicy :exec
+INSERT INTO tenant_policy (tenant_id, key, value) VALUES (app_current_tenant(), $1, $2)
+ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value
+`
+
+type SetPolicyParams struct {
+	Key   string
+	Value string
+}
+
+func (q *Queries) SetPolicy(ctx context.Context, arg SetPolicyParams) error {
+	_, err := q.db.Exec(ctx, setPolicy, arg.Key, arg.Value)
+	return err
 }

@@ -97,7 +97,8 @@ func NewModules(d Deps) *Modules {
 	m.Emails = emails.New(d.Pool, emails.Deps{
 		Candidates: emailCandidates{m.Candidates}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
-	}, d.Mail)
+		Documents: emailDocuments{m.Documents}, Policy: m.Settings,
+	}, d.Mail, d.Files)
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
 		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	m.Placements = placements.New(d.Pool, placementApplications{m.Pipeline}, m.Identity)

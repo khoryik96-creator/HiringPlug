@@ -683,6 +683,103 @@ export interface paths {
         /** Change a template */
         put: operations["updateEmailTemplate"];
         post?: never;
+        /** Delete a template */
+        delete: operations["deleteEmailTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fill an email's fields for a candidate (and a job or interview), to see before sending
+         * @description Fields ([Current salary], {{candidate.firstName}}, ...) are filled as sending would fill them; those without a value stay in brackets and are listed in `missing` (sending refuses them).
+         */
+        post: operations["previewEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a file from the computer, to attach to the next email you send
+         * @description Up to 10 MB a file; an email takes up to 10 files and 10 MB in all.
+         */
+        post: operations["addEmailAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-banners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's email banners */
+        get: operations["listEmailBanners"];
+        put?: never;
+        /** Upload a banner image (PNG, JPEG or GIF, up to 1 MB) */
+        post: operations["addEmailBanner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-banners/{bannerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bannerId: components["schemas"]["EmailBannerId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a banner (emails already sent keep it) */
+        delete: operations["deleteEmailBanner"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/email-banners/{bannerId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bannerId: components["schemas"]["EmailBannerId"];
+            };
+            cookie?: never;
+        };
+        /** A banner's image */
+        get: operations["getEmailBannerFile"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2063,6 +2160,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's choices on how the app treats sensitive information */
+        get: operations["getPolicies"];
+        /** Change those choices */
+        put: operations["putPolicies"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2841,6 +2956,61 @@ export interface components {
         EmailTemplateId: string;
         /** @example eml_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         EmailId: string;
+        /** @example ebn_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        EmailBannerId: string;
+        /** @example eat_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        EmailAttachmentId: string;
+        EmailBanner: {
+            id: components["schemas"]["EmailBannerId"];
+            name: string;
+            contentType: string;
+            sizeBytes: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EmailBannerList: {
+            items: components["schemas"]["EmailBanner"][];
+        };
+        EmailAttachment: {
+            id: components["schemas"]["EmailAttachmentId"];
+            fileName: string;
+            contentType: string;
+            sizeBytes: number;
+        };
+        EmailField: {
+            /** @description What to type or insert, e.g. "[Expected salary]". */
+            token: string;
+            /** @description The same as a placeholder, e.g. "candidate.expectedSalary". */
+            key: string;
+            label: string;
+            /** @description Fills only for senders who may see salaries. */
+            salary: boolean;
+        };
+        EmailCvAttachment: {
+            documentId: components["schemas"]["DocumentId"];
+            /** @description A formatted CV's PDF instead of its Word file. Defaults to false. */
+            asPdf?: boolean;
+        };
+        EmailPreviewRequest: {
+            subject: string;
+            bodyHtml: string;
+            candidateId?: components["schemas"]["CandidateId"];
+            applicationId?: components["schemas"]["ApplicationId"];
+            interviewId?: components["schemas"]["InterviewId"];
+            /** @example Asia/Kuala_Lumpur */
+            timeZone: string;
+        };
+        EmailPreview: {
+            /** @description The job's hiring contact, to send to (when an application is given and its job has one). */
+            clientEmail: string | null;
+            subject: string;
+            /** @description Formatted and made safe, as it will be sent. */
+            bodyHtml: string;
+            /** @description Fields with no value (sending refuses them), e.g. "[Expected salary]". */
+            missing: string[];
+            /** @description The email shows salary, so it may be hidden from roles that may not see salaries. */
+            salary: boolean;
+        };
         EmailTemplate: {
             id: components["schemas"]["EmailTemplateId"];
             version: number;
@@ -2848,6 +3018,8 @@ export interface components {
             subject: string;
             /** @description Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`. */
             body: string;
+            /** @description The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]. */
+            bodyHtml: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2855,19 +3027,25 @@ export interface components {
         };
         EmailTemplateList: {
             items: components["schemas"]["EmailTemplate"][];
+            /** @description The fields a message may use, with their tokens. */
+            fields: components["schemas"]["EmailField"][];
             /** @description The placeholders templates may use. */
             placeholders: string[];
         };
+        /** @description Give body (plain text), bodyHtml (formatted), or both. */
         EmailTemplateInput: {
             name: string;
             subject: string;
-            body: string;
+            body?: string;
+            bodyHtml?: string;
         };
+        /** @description Give body (plain text), bodyHtml (formatted), or both. */
         EmailTemplateUpdate: {
             version: number;
             name: string;
             subject: string;
-            body: string;
+            body?: string;
+            bodyHtml?: string;
         };
         EmailDraftRequest: {
             templateId: components["schemas"]["EmailTemplateId"];
@@ -2896,8 +3074,15 @@ export interface components {
             applicationId: components["schemas"]["ApplicationId"] | null;
             to: string[];
             cc: string[];
+            bcc: string[];
             subject: string;
+            /** @description The plain-text version. */
             body: string;
+            /** @description The formatted version, if it had one. */
+            bodyHtml: string | null;
+            attachments: components["schemas"]["EmailAttachment"][];
+            /** @description It shows salary (hidden from roles that may not see salaries, unless Settings say otherwise). */
+            salary: boolean;
             status: components["schemas"]["EmailStatus"];
             error: string | null;
             sentBy: components["schemas"]["UserId"];
@@ -2910,13 +3095,22 @@ export interface components {
         EmailList: {
             items: components["schemas"]["Email"][];
         };
+        /** @description Give body (plain text) or bodyHtml (formatted). Fields in the subject and the formatted message ([Expected salary], ...) are filled from the candidate and application; one with no value refuses the email. */
         EmailSend: {
             to: string[];
             cc?: string[];
+            bcc?: string[];
             subject: string;
-            body: string;
+            body?: string;
+            bodyHtml?: string;
+            /** @description For interview times in fields (default Asia/Kuala_Lumpur). */
+            timeZone?: string;
             candidateId?: components["schemas"]["CandidateId"];
             applicationId?: components["schemas"]["ApplicationId"];
+            /** @description Files you uploaded to /v1/email-attachments. */
+            attachmentIds?: components["schemas"]["EmailAttachmentId"][];
+            /** @description The candidate's CVs from the ATS (needs documents:read). */
+            cvs?: components["schemas"]["EmailCvAttachment"][];
         };
         EmailSendJob: {
             emailId: components["schemas"]["EmailId"];
@@ -4308,6 +4502,14 @@ export interface components {
             /** @description From the job being opened to its first placement in the period. */
             daysToFill: number;
             placements: number;
+        };
+        /**
+         * @description Who sees a sent email that shows salary: salary_roles = only roles that may see salaries (the default); everyone = everyone who may read emails. Either way only senders who may see salaries can fill salary fields.
+         * @enum {string}
+         */
+        EmailSalaryVisibility: "salary_roles" | "everyone";
+        Policies: {
+            emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
          * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed).
@@ -5830,6 +6032,190 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    deleteEmailTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                templateId: components["parameters"]["EmailTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    previewEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailPreview"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addEmailAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailAttachment"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    listEmailBanners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailBannerList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addEmailBanner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Added */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailBanner"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    deleteEmailBanner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bannerId: components["schemas"]["EmailBannerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getEmailBannerFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bannerId: components["schemas"]["EmailBannerId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     draftEmail: {
@@ -8346,6 +8732,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FieldSettings"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policies"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policies"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Policies"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

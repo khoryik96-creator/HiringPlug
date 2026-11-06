@@ -6,7 +6,9 @@
 //
 // Mail goes out from the configured address with the sender's name and
 // "(company)" as the display name, and replies go to the person who sent it.
-// Salary is never a placeholder.
+// Salary fields fill only for senders who may see salaries; an email that
+// shows salary is hidden from roles that may not (unless the company chose
+// otherwise in Settings).
 //
 // Layout (the same in every module):
 //
@@ -28,14 +30,25 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 )
 
 // Candidate is what this module needs to know about a candidate.
 type Candidate struct {
-	FullName, FirstName string
-	Email               *string
+	FullName, FirstName, LastName string
+	Email                         *string
+	Details                       *Details // for fields; nil when only a brief was read
+}
+
+// Details are a candidate's values for fields, written as an email shows them
+// (FormatSalary, FormatNotice, ...); nil when not known.
+type Details struct {
+	Nationality, Residence, CurrentTitle, CurrentCompany *string
+	NoticePeriod, WorkAuthorization                      *string
+	CurrentSalary, ExpectedSalary                        *string // nil also when the sender may not see salaries
 }
 
 // Application is what this module needs to know about an application.
@@ -45,6 +58,12 @@ type Application struct {
 	CompanyName   string
 	ClientEmail   *string // the job's hiring contact
 	ClientContact string  // their name
+}
+
+// CVFile is a candidate's CV as an attachment.
+type CVFile struct {
+	CandidateID, FileName, ContentType string
+	Data                               []byte
 }
 
 // Interview is what this module needs to know about an interview.
@@ -63,6 +82,19 @@ type Interview struct {
 type Deps struct {
 	Candidates interface {
 		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Candidate, error)
+		// Detailed is a candidate with Details, as p may see them (salary
+		// only with permission); NOT_FOUND when missing.
+		Detailed(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Candidate, error)
+	}
+	// Documents gives the candidate's CVs to attach (the user's transaction:
+	// only those they may see).
+	Documents interface {
+		CVFile(ctx context.Context, tx pgx.Tx, documentID string, asPDF bool) (CVFile, error)
+	}
+	// Policy is the company's choice on who sees emails that show salary
+	// (settings module): "salary_roles" or "everyone".
+	Policy interface {
+		EmailSalaryVisibility(ctx context.Context, tx pgx.Tx) (string, error)
 	}
 	Applications interface {
 		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
@@ -87,9 +119,10 @@ type Module struct {
 }
 
 // New wires the module. sender delivers mail (mail.Unconfigured when no mail
-// server is set up: every email then fails with that reason).
-func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender) *Module {
-	svc := &Service{pool: pool, deps: deps, sender: sender}
+// server is set up: every email then fails with that reason); files keeps
+// banners and attachments.
+func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender, files *blob.Store) *Module {
+	svc := &Service{pool: pool, deps: deps, sender: sender, files: files}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 

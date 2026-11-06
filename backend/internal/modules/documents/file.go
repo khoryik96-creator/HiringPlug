@@ -6,6 +6,8 @@ import (
 	"io"
 	"mime"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -53,4 +55,37 @@ func (h *HTTP) GetDocumentFile(ctx context.Context, req api.GetDocumentFileReque
 		Body: f, ContentLength: size,
 		Headers: api.GetDocumentFile200ResponseHeaders{ContentDisposition: &disposition},
 	}, nil
+}
+
+// CVFile reads a candidate's CV to attach to an email, in the caller's
+// transaction (row-level security: only documents the user may see). With
+// asPDF, a formatted CV's PDF (NOT_FOUND until it is made).
+func (m *Module) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (Document, []byte, error) {
+	row, err := store.New(tx).GetDocument(ctx, id)
+	if database.IsNoRows(err) {
+		return Document{}, nil, apperr.NotFound("document")
+	}
+	if err != nil {
+		return Document{}, nil, err
+	}
+	key := row.StorageKey
+	doc := fromRow(row)
+	if asPDF {
+		if row.PdfKey == nil {
+			return Document{}, nil, apperr.NotFound("PDF of this CV (make it first)")
+		}
+		key = *row.PdfKey
+		doc.FileName = strings.TrimSuffix(doc.FileName, filepath.Ext(doc.FileName)) + ".pdf"
+		doc.ContentType = "application/pdf"
+	}
+	f, err := m.service.files.Open(key)
+	if errors.Is(err, os.ErrNotExist) {
+		return Document{}, nil, apperr.NotFound("document file")
+	}
+	if err != nil {
+		return Document{}, nil, err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(f)
+	return doc, data, err
 }

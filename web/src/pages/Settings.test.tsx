@@ -66,4 +66,18 @@ describe("settings", () => {
       { form: "job", field: "location", mandatory: false },
     ] });
   });
+
+  it("chooses who sees emails that show salary", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) =>
+      Promise.resolve(ok(path === "/v1/settings/policies" ? { emailSalaryVisibility: "salary_roles" } : testFieldSettings()))) as never);
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ emailSalaryVisibility: "everyone" }));
+    renderWithClient(<Settings />);
+    const choice = await screen.findByLabelText<HTMLSelectElement>("Who sees emails that show salary");
+    expect(choice.value).toBe("salary_roles");
+    fireEvent.change(choice, { target: { value: "everyone" } });
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(put.mock.calls[0]?.[0]).toBe("/v1/settings/policies");
+    expect(sentBody(put)).toEqual({ emailSalaryVisibility: "everyone" });
+    expect(await screen.findByText(/Saved: emails sent from now on follow it/)).toBeTruthy();
+  });
 });

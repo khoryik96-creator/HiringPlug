@@ -46,6 +46,9 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
           </summary>
           {e.error && <p className="warning">Why: {e.error}</p>}
           {e.cc.length > 0 && <p className="muted">Cc {e.cc.join(", ")}</p>}
+          {e.bcc.length > 0 && <p className="muted">Bcc {e.bcc.join(", ")}</p>}
+          {e.attachments.length > 0 && <p className="muted">Attached: {e.attachments.map((a) => a.fileName).join(", ")}</p>}
+          {e.salary && <p className="muted small">Shows salary.</p>}
           <p className="email-body">{e.body}</p>
         </details>
       ))}

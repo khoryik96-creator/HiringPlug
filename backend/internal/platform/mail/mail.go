@@ -1,8 +1,10 @@
 // Package mail sends email through an SMTP server (the company's own, or a
 // service such as Amazon SES, SendGrid or Mailgun via their SMTP endpoints).
 //
-// Messages are plain text, UTF-8, quoted-printable. Addresses and the subject
-// are checked for line breaks, so nothing typed into an email can add headers.
+// Messages are UTF-8: plain text, or HTML with a plain-text version beside it,
+// inline images (a banner) and attachments. Addresses, the subject and file
+// names are checked for line breaks, so nothing typed into an email can add
+// headers. Bcc addresses get the message but never appear in it.
 package mail
 
 import (
@@ -10,10 +12,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
@@ -28,8 +32,20 @@ type Message struct {
 	FromName string   // shown as the sender, e.g. "Aina (Contoh Recruitment)"
 	ReplyTo  string   // where replies go: the person who sent it
 	To, Cc   []string // addresses
+	Bcc      []string // receive it, but are not listed in it
 	Subject  string
-	Body     string // plain text
+	Body     string // plain text (always: the version for mail apps that show no HTML)
+	HTML     string // optional formatted version; images in it refer to Inline parts by cid:
+	Inline   []Part // images the HTML shows (e.g. a banner)
+	Attach   []Part // attachments
+}
+
+// Part is a file in a message.
+type Part struct {
+	Name        string // file name
+	ContentType string // e.g. image/png, application/pdf
+	ContentID   string // for inline parts: what cid: in the HTML refers to
+	Data        []byte
 }
 
 // Sender delivers messages.
@@ -100,7 +116,7 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 	if err := c.Mail(s.cfg.From); err != nil {
 		return classify(err)
 	}
-	for _, rcpt := range append(append([]string{}, m.To...), m.Cc...) {
+	for _, rcpt := range append(append(append([]string{}, m.To...), m.Cc...), m.Bcc...) {
 		if err := c.Rcpt(rcpt); err != nil {
 			return classify(err)
 		}
@@ -129,9 +145,13 @@ func classify(err error) error {
 
 // Build renders m as an RFC 5322 message.
 func Build(from string, m Message, now time.Time) ([]byte, error) {
-	for _, v := range append(append([]string{from, m.ReplyTo, m.Subject, m.FromName}, m.To...), m.Cc...) {
+	values := append(append(append([]string{from, m.ReplyTo, m.Subject, m.FromName}, m.To...), m.Cc...), m.Bcc...)
+	for _, p := range append(append([]Part{}, m.Inline...), m.Attach...) {
+		values = append(values, p.Name, p.ContentType, p.ContentID)
+	}
+	for _, v := range values {
 		if strings.ContainsAny(v, "\r\n") {
-			return nil, errors.New("line breaks are not allowed in addresses or the subject")
+			return nil, errors.New("line breaks are not allowed in addresses, the subject or file names")
 		}
 	}
 	fromAddr, err := mail.ParseAddress(from)
@@ -155,11 +175,115 @@ func Build(from string, m Message, now time.Time) ([]byte, error) {
 	header("Date", now.Format(time.RFC1123Z))
 	header("Message-ID", "<"+randomID()+"@"+domainOf(fromAddr.Address)+">")
 	header("MIME-Version", "1.0")
-	header("Content-Type", `text/plain; charset="utf-8"`)
-	header("Content-Transfer-Encoding", "quoted-printable")
+	contentType, body, err := content(m)
+	if err != nil {
+		return nil, err
+	}
+	header("Content-Type", contentType)
+	if !strings.HasPrefix(contentType, "multipart/") {
+		header("Content-Transfer-Encoding", "quoted-printable")
+	}
 	b.WriteString("\r\n")
+	b.Write(body)
+	return b.Bytes(), nil
+}
+
+// content is the message's body and its type: plain text alone, or the
+// text and HTML versions as alternatives, with inline images and attachments
+// wrapped around them as needed.
+func content(m Message) (string, []byte, error) {
+	text, err := quoted(m.Body)
+	if err != nil {
+		return "", nil, err
+	}
+	ctype, body := `text/plain; charset="utf-8"`, text
+	if m.HTML != "" {
+		html, err := quoted(m.HTML)
+		if err != nil {
+			return "", nil, err
+		}
+		ctype, body, err = multipartOf("alternative", []part{
+			{header: qpHeader(`text/plain; charset="utf-8"`), body: text},
+			{header: qpHeader(`text/html; charset="utf-8"`), body: html},
+		})
+		if err != nil {
+			return "", nil, err
+		}
+		if len(m.Inline) > 0 {
+			parts := []part{{header: textproto.MIMEHeader{"Content-Type": {ctype}}, body: body}}
+			for _, p := range m.Inline {
+				parts = append(parts, filePart(p, "inline"))
+			}
+			if ctype, body, err = multipartOf("related", parts); err != nil {
+				return "", nil, err
+			}
+		}
+	}
+	if len(m.Attach) > 0 {
+		parts := []part{{header: textproto.MIMEHeader{"Content-Type": {ctype}}, body: body}}
+		if !strings.HasPrefix(ctype, "multipart/") {
+			parts[0].header.Set("Content-Transfer-Encoding", "quoted-printable")
+		}
+		for _, p := range m.Attach {
+			parts = append(parts, filePart(p, "attachment"))
+		}
+		return multipartOf("mixed", parts)
+	}
+	return ctype, body, nil
+}
+
+type part struct {
+	header textproto.MIMEHeader
+	body   []byte
+}
+
+func qpHeader(ctype string) textproto.MIMEHeader {
+	return textproto.MIMEHeader{"Content-Type": {ctype}, "Content-Transfer-Encoding": {"quoted-printable"}}
+}
+
+// filePart is a base64 part for a file, inline (with its Content-ID) or attached.
+func filePart(p Part, disposition string) part {
+	h := textproto.MIMEHeader{
+		"Content-Type":              {p.ContentType},
+		"Content-Transfer-Encoding": {"base64"},
+		"Content-Disposition":       {mime.FormatMediaType(disposition, map[string]string{"filename": p.Name})},
+	}
+	if p.ContentID != "" {
+		h.Set("Content-ID", "<"+p.ContentID+">")
+	}
+	enc := base64.StdEncoding.EncodeToString(p.Data)
+	var lines bytes.Buffer
+	for len(enc) > 76 {
+		lines.WriteString(enc[:76] + "\r\n")
+		enc = enc[76:]
+	}
+	lines.WriteString(enc + "\r\n")
+	return part{header: h, body: lines.Bytes()}
+}
+
+func multipartOf(kind string, parts []part) (string, []byte, error) {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	for _, p := range parts {
+		pw, err := w.CreatePart(p.header)
+		if err != nil {
+			return "", nil, err
+		}
+		if _, err := pw.Write(p.body); err != nil {
+			return "", nil, err
+		}
+	}
+	if err := w.Close(); err != nil {
+		return "", nil, err
+	}
+	return "multipart/" + kind + `; boundary="` + w.Boundary() + `"`, b.Bytes(), nil
+}
+
+// quoted is text with CRLF line ends, quoted-printable.
+func quoted(text string) ([]byte, error) {
+	var b bytes.Buffer
 	qp := quotedprintable.NewWriter(&b)
-	if _, err := qp.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(m.Body, "\r\n", "\n"), "\n", "\r\n"))); err != nil {
+	if _, err := qp.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\n", "\r\n"))); err != nil {
 		return nil, err
 	}
 	if err := qp.Close(); err != nil {

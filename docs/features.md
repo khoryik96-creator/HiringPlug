@@ -381,6 +381,31 @@ lead's company (with the built-in email check).
   how, where, who else, and a link to the candidate), with the time in the
   company's time zone (`HP_TIME_ZONE`); a moved interview is reminded of at
   its new time only, and a cancelled one not at all.
+- **Email the client** ✅ (CV Studio's composer): **Email client** on any
+  candidate on a job (the job's board, or the candidate's job list) opens a
+  composer addressed to the job's hiring contact, from you (replies come to
+  you). Templates keep the subject, the formatted message, its signature and
+  banner: pick one and **Use selected template**, or **Save changes**, **Save
+  as new**, **Delete template** (roles that manage templates). To, **CC** and
+  **BCC** (bcc addresses get it but are never listed in it). The message has a
+  toolbar: bold, italic, underline, strike, bullets, numbered list, left /
+  centre / right, link, clear format, font, size, colour, **Insert field** and
+  **Insert banner**. Fields are filled from the candidate and the job when it
+  is sent: [First name], [Last name], [Full name], [Current salary], [Expected
+  salary], [Notice period], [Expat status], [Nationality], [Lives in],
+  [Current title], [Current company], [Job title], [Client company], [Client
+  contact], [Your name], [Agency] (older `{{candidate.firstName}}`
+  placeholders work too). **Preview** shows it filled in; a field with no
+  value for this candidate refuses the email, naming it. **Salary**: only
+  people whose role may see salaries can fill the salary fields, and a sent
+  email that shows salary is hidden from roles that may not see salaries
+  (the database enforces it), unless Settings → Salary in emails says
+  everyone who may read emails sees it. **Attachments**: the candidate's CVs
+  from the ATS (a formatted CV as PDF once made) and files from your computer,
+  up to 10 files and 10 MB in all. **Banners** are images uploaded once (PNG,
+  JPEG or GIF, up to 1 MB) and shown inside the email, not linked. Only the
+  toolbar's formatting is kept (no scripts, no images loading from elsewhere),
+  and every email also carries a plain-text version.
 - **Email** ✅: write email from a candidate's page (or "Email candidate" on
   an interview). Pick a template, optionally for one of their jobs: it is
   filled from the candidate, the job and its company, the interview (time in
@@ -390,8 +415,7 @@ lead's company (with the built-in email check).
   name go to the job's hiring contact; others to the candidate. Every company
   starts with four templates (interview invitation, submit candidate to
   client, application received, unsuccessful application), changed or added
-  to on the templates page (`#/email-templates`). Salary is never a
-  placeholder. Sending is queued with the email's record and delivered in the
+  to on the templates page (`#/email-templates`). Sending is queued with the email's record and delivered in the
   background by the worker through your mail server (`HP_SMTP_*`): from your
   sending address, shown as "Sender (Company)", with replies going to the
   person who sent it. The candidate's page lists every email with its state

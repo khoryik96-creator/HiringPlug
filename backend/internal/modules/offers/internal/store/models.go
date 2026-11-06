@@ -306,21 +306,49 @@ type DocumentAiUse struct {
 }
 
 type Email struct {
-	ID            string
-	TenantID      string
-	CandidateID   *string
-	ApplicationID *string
-	ToAddresses   []string
-	CcAddresses   []string
-	Subject       string
-	Body          string
-	SentBy        string
-	SenderName    string
-	ReplyTo       string
-	Status        string
-	Error         *string
-	CreatedAt     time.Time
-	SentAt        *time.Time
+	ID               string
+	TenantID         string
+	CandidateID      *string
+	ApplicationID    *string
+	ToAddresses      []string
+	CcAddresses      []string
+	Subject          string
+	Body             string
+	SentBy           string
+	SenderName       string
+	ReplyTo          string
+	Status           string
+	Error            *string
+	CreatedAt        time.Time
+	SentAt           *time.Time
+	BodyHtml         *string
+	BccAddresses     []string
+	Salary           bool
+	SalaryRestricted bool
+}
+
+type EmailAttachment struct {
+	ID          string
+	TenantID    string
+	EmailID     *string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+	CreatedBy   string
+	CreatedAt   time.Time
+}
+
+type EmailBanner struct {
+	ID          string
+	TenantID    string
+	Name        string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+	CreatedBy   string
+	CreatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 type EmailTemplate struct {
@@ -333,6 +361,7 @@ type EmailTemplate struct {
 	CreatedBy string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	BodyHtml  *string
 }
 
 type FieldListSaved struct {
@@ -651,6 +680,12 @@ type Tenant struct {
 	Name        string
 	CreatedAt   time.Time
 	CareersSlug *string
+}
+
+type TenantPolicy struct {
+	TenantID string
+	Key      string
+	Value    string
 }
 
 type UserLink struct {

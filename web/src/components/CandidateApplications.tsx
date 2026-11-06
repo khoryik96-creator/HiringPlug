@@ -8,6 +8,7 @@ import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ApplicationPlacement } from "./ApplicationPlacement";
 import { ApplicationFit } from "./Fit";
 import { ApplicationOffers } from "./Offers";
+import { ClientEmail } from "./clientEmail/ClientEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { ApplicationInterviews } from "./Interviews";
 import { type Picked, SearchPicker } from "./SearchPicker";
@@ -22,6 +23,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
   });
   const move = useMoveApplication();
   const [job, setJob] = useState<Picked | null>(null);
+  const [emailing, setEmailing] = useState<string | null>(null); // the application the client email is about
   const add = useMutation({
     mutationFn: async (jobId: string) =>
       unwrap(await api.POST("/v1/jobs/{jobId}/applications", { params: { path: { jobId } }, body: { candidateId } })),
@@ -45,6 +47,9 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
               {a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}
             </span>{" "}
             {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+            {permissions.includes("emails:send") && (
+              <button type="button" className="link" onClick={() => { setEmailing(a.id); }}>Email client</button>
+            )}
             {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
             {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
             {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
@@ -54,6 +59,9 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
           </li>
         ))}
       </ul>
+      {emailing && (
+        <ClientEmail key={emailing} candidateId={candidateId} applicationId={emailing} permissions={permissions} onClose={() => { setEmailing(null); }} />
+      )}
       {canUpdate && (
         <div className="row">
           <SearchPicker

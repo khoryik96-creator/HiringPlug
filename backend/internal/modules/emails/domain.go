@@ -11,27 +11,49 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
 
-// Placeholders templates may use. Salary is deliberately not one of them.
-var Placeholders = []string{
-	"candidate.firstName", "candidate.fullName",
-	"job.title", "company.name",
-	"interview.title", "interview.when", "interview.length", "interview.how", "interview.where", "interview.instructions",
-	"sender.name", "agency.name",
-}
+// Placeholders templates may use: every field's ({{candidate.expectedSalary}}
+// is [Expected salary]) and the interview's details.
+var Placeholders = func() []string {
+	out := []string{"interview.title", "interview.length", "interview.how", "interview.instructions"}
+	for _, f := range Fields {
+		out = append(out, f.Key)
+	}
+	return out
+}()
 
 var placeholderRe = regexp.MustCompile(`\{\{\s*([a-zA-Z.]+)\s*\}\}`)
 
-// Template is a reusable email.
-type Template struct{ Name, Subject, Body string }
+// Template is a reusable email: plain text, or a formatted message (BodyHTML,
+// with its signature and banner) whose plain-text version is Body.
+type Template struct{ Name, Subject, Body, BodyHTML string }
 
-// NormalizeTemplate tidies a template and refuses placeholders that do not exist.
+// Limits, in characters.
+const (
+	maxBody = 20000
+	maxHTML = 100000
+)
+
+// NormalizeTemplate tidies a template, makes its formatted message safe (and
+// its plain-text version from it), and refuses placeholders that do not exist.
 func NormalizeTemplate(t Template) (Template, apperr.FieldErrors) {
 	var errs apperr.FieldErrors
 	t.Name = strings.Join(strings.Fields(t.Name), " ")
 	t.Subject = strings.Join(strings.Fields(t.Subject), " ")
 	t.Body = strings.TrimSpace(t.Body)
+	if t.BodyHTML != "" {
+		t.BodyHTML = SanitizeHTML(t.BodyHTML)
+		t.Body = TextFromHTML(t.BodyHTML)
+	}
 	if t.Name == "" {
 		errs.Add("name", "is required")
+	}
+	switch {
+	case t.Body == "":
+		errs.Add("body", "is required")
+	case len([]rune(t.Body)) > maxBody:
+		errs.Add("body", "is too long (at most 20,000 characters)")
+	case len(t.BodyHTML) > maxHTML:
+		errs.Add("bodyHtml", "is too long")
 	}
 	for field, text := range map[string]string{"subject": t.Subject, "body": t.Body} {
 		for _, m := range placeholderRe.FindAllStringSubmatch(text, -1) {
@@ -102,13 +124,15 @@ var Starters = []Template{
 	},
 }
 
-// Outgoing is an email to send.
+// Outgoing is an email to send: plain text, or a formatted message whose
+// plain-text version is made from it.
 type Outgoing struct {
-	To, Cc        []string
-	Subject, Body string
+	To, Cc, Bcc             []string
+	Subject, Body, BodyHTML string
 }
 
-// NormalizeOutgoing tidies an email and checks its addresses.
+// NormalizeOutgoing tidies an email, makes its formatted message safe and
+// checks its addresses.
 func NormalizeOutgoing(o Outgoing) (Outgoing, apperr.FieldErrors) {
 	var errs apperr.FieldErrors
 	clean := func(field string, list []string) []string {
@@ -126,16 +150,20 @@ func NormalizeOutgoing(o Outgoing) (Outgoing, apperr.FieldErrors) {
 		}
 		return out
 	}
-	o.To, o.Cc = clean("to", o.To), clean("cc", o.Cc)
+	o.To, o.Cc, o.Bcc = clean("to", o.To), clean("cc", o.Cc), clean("bcc", o.Bcc)
 	if len(o.To) == 0 {
 		errs.Add("to", "add at least one recipient")
 	}
 	o.Subject = strings.Join(strings.Fields(o.Subject), " ") // no line breaks in a subject
 	o.Body = strings.TrimSpace(o.Body)
+	if o.BodyHTML != "" {
+		o.BodyHTML = SanitizeHTML(o.BodyHTML)
+		o.Body = TextFromHTML(o.BodyHTML)
+	}
 	if o.Subject == "" {
 		errs.Add("subject", "is required")
 	}
-	if o.Body == "" {
+	if o.Body == "" && len(BannerIDs(o.BodyHTML)) == 0 {
 		errs.Add("body", "is required")
 	}
 	return o, errs

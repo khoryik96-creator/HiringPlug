@@ -5,6 +5,7 @@ import { api, ApiError, type Application, type Permission, type Schemas, unwrap 
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
 import { ApplicationCard, MoveMenu } from "./ApplicationCard";
+import { ClientEmail } from "./clientEmail/ClientEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
@@ -31,6 +32,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: s
   const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
   const [bestFirst, setBestFirst] = useState(false);
   const [fitShown, setFitShown] = useState<Application | null>(null);
+  const [emailing, setEmailing] = useState<Application | null>(null);
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
   const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
 
@@ -47,6 +49,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: s
         <label className="small">
           <input type="checkbox" checked={bestFirst} onChange={(e) => { setBestFirst(e.target.checked); }} /> Best fit first
         </label>
+      )}
+      {emailing && (
+        <ClientEmail key={emailing.id} candidateId={emailing.candidateId} applicationId={emailing.id} permissions={permissions}
+          onClose={() => { setEmailing(null); }} />
       )}
       {fitShown && shownMatch && (
         <section className="fit-panel" aria-label={`Fit of ${fitShown.candidateName}`}>
@@ -86,7 +92,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: s
               <h4>{STAGE[stage]} ({String(cards.length)})</h4>
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
-                  <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
+                  <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}
+                    onEmailClient={permissions.includes("emails:send") ? setEmailing : undefined} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
                 </div>
               ))}
             </div>

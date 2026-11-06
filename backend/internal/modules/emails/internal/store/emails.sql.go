@@ -9,8 +9,140 @@ import (
 	"context"
 )
 
+const attachToEmail = `-- name: AttachToEmail :exec
+UPDATE email_attachment SET email_id = $1 WHERE id = ANY($2::text[]) AND email_id IS NULL
+`
+
+type AttachToEmailParams struct {
+	EmailID *string
+	Ids     []string
+}
+
+func (q *Queries) AttachToEmail(ctx context.Context, arg AttachToEmailParams) error {
+	_, err := q.db.Exec(ctx, attachToEmail, arg.EmailID, arg.Ids)
+	return err
+}
+
+const deleteBanner = `-- name: DeleteBanner :execrows
+UPDATE email_banner SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) DeleteBanner(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteBanner, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStaleAttachments = `-- name: DeleteStaleAttachments :many
+DELETE FROM email_attachment WHERE email_id IS NULL AND created_at < now() - interval '1 day' RETURNING storage_key
+`
+
+// Uploads never sent, left for a day: removed (their files too).
+func (q *Queries) DeleteStaleAttachments(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, deleteStaleAttachments)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var storage_key string
+		if err := rows.Scan(&storage_key); err != nil {
+			return nil, err
+		}
+		items = append(items, storage_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const deleteTemplate = `-- name: DeleteTemplate :execrows
+DELETE FROM email_template WHERE id = $1
+`
+
+func (q *Queries) DeleteTemplate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTemplate, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const emailAttachments = `-- name: EmailAttachments :many
+SELECT id, tenant_id, email_id, file_name, content_type, size_bytes, storage_key, created_by, created_at FROM email_attachment WHERE email_id = ANY($1::text[]) ORDER BY created_at, id
+`
+
+func (q *Queries) EmailAttachments(ctx context.Context, emailIds []string) ([]EmailAttachment, error) {
+	rows, err := q.db.Query(ctx, emailAttachments, emailIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailAttachment
+	for rows.Next() {
+		var i EmailAttachment
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.EmailID,
+			&i.FileName,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.StorageKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getBanners = `-- name: GetBanners :many
+SELECT id, tenant_id, name, content_type, size_bytes, storage_key, created_by, created_at, deleted_at FROM email_banner WHERE id = ANY($1::text[])
+`
+
+// Banners an email shows, deleted ones too (they were in it when it was sent).
+func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, error) {
+	rows, err := q.db.Query(ctx, getBanners, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailBanner
+	for rows.Next() {
+		var i EmailBanner
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.StorageKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -32,12 +164,16 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.Error,
 		&i.CreatedAt,
 		&i.SentAt,
+		&i.BodyHtml,
+		&i.BccAddresses,
+		&i.Salary,
+		&i.SalaryRestricted,
 	)
 	return i, err
 }
 
 const getTemplate = `-- name: GetTemplate :one
-SELECT id, tenant_id, version, name, subject, body, created_by, created_at, updated_at FROM email_template WHERE id = $1
+SELECT id, tenant_id, version, name, subject, body, created_by, created_at, updated_at, body_html FROM email_template WHERE id = $1
 `
 
 func (q *Queries) GetTemplate(ctx context.Context, id string) (EmailTemplate, error) {
@@ -53,27 +189,105 @@ func (q *Queries) GetTemplate(ctx context.Context, id string) (EmailTemplate, er
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyHtml,
+	)
+	return i, err
+}
+
+const insertAttachment = `-- name: InsertAttachment :one
+INSERT INTO email_attachment (tenant_id, email_id, file_name, content_type, size_bytes, storage_key, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
+RETURNING id, tenant_id, email_id, file_name, content_type, size_bytes, storage_key, created_by, created_at
+`
+
+type InsertAttachmentParams struct {
+	EmailID     *string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+}
+
+func (q *Queries) InsertAttachment(ctx context.Context, arg InsertAttachmentParams) (EmailAttachment, error) {
+	row := q.db.QueryRow(ctx, insertAttachment,
+		arg.EmailID,
+		arg.FileName,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.StorageKey,
+	)
+	var i EmailAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.EmailID,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.StorageKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertBanner = `-- name: InsertBanner :one
+INSERT INTO email_banner (tenant_id, name, content_type, size_bytes, storage_key, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+RETURNING id, tenant_id, name, content_type, size_bytes, storage_key, created_by, created_at, deleted_at
+`
+
+type InsertBannerParams struct {
+	Name        string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+}
+
+func (q *Queries) InsertBanner(ctx context.Context, arg InsertBannerParams) (EmailBanner, error) {
+	row := q.db.QueryRow(ctx, insertBanner,
+		arg.Name,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.StorageKey,
+	)
+	var i EmailBanner
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Name,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.StorageKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const insertEmail = `-- name: InsertEmail :one
-INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body,
-                   sent_by, sender_name, reply_to)
+INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
+                   body_html, salary, salary_restricted, sent_by, sender_name, reply_to)
 VALUES (app_current_tenant(), $1, $2, $3::text[],
-        $4::text[], $5, $6, app_current_user(), $7, $8)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at
+        $4::text[], $5::text[], $6, $7, $8, $9, $10,
+        app_current_user(), $11, $12)
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted
 `
 
 type InsertEmailParams struct {
-	CandidateID   *string
-	ApplicationID *string
-	ToAddresses   []string
-	CcAddresses   []string
-	Subject       string
-	Body          string
-	SenderName    string
-	ReplyTo       string
+	CandidateID      *string
+	ApplicationID    *string
+	ToAddresses      []string
+	CcAddresses      []string
+	BccAddresses     []string
+	Subject          string
+	Body             string
+	BodyHtml         *string
+	Salary           bool
+	SalaryRestricted bool
+	SenderName       string
+	ReplyTo          string
 }
 
 func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email, error) {
@@ -82,8 +296,12 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		arg.ApplicationID,
 		arg.ToAddresses,
 		arg.CcAddresses,
+		arg.BccAddresses,
 		arg.Subject,
 		arg.Body,
+		arg.BodyHtml,
+		arg.Salary,
+		arg.SalaryRestricted,
 		arg.SenderName,
 		arg.ReplyTo,
 	)
@@ -104,24 +322,34 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.Error,
 		&i.CreatedAt,
 		&i.SentAt,
+		&i.BodyHtml,
+		&i.BccAddresses,
+		&i.Salary,
+		&i.SalaryRestricted,
 	)
 	return i, err
 }
 
 const insertTemplate = `-- name: InsertTemplate :one
-INSERT INTO email_template (tenant_id, name, subject, body, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
-RETURNING id, tenant_id, version, name, subject, body, created_by, created_at, updated_at
+INSERT INTO email_template (tenant_id, name, subject, body, body_html, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+RETURNING id, tenant_id, version, name, subject, body, created_by, created_at, updated_at, body_html
 `
 
 type InsertTemplateParams struct {
-	Name    string
-	Subject string
-	Body    string
+	Name     string
+	Subject  string
+	Body     string
+	BodyHtml *string
 }
 
 func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) (EmailTemplate, error) {
-	row := q.db.QueryRow(ctx, insertTemplate, arg.Name, arg.Subject, arg.Body)
+	row := q.db.QueryRow(ctx, insertTemplate,
+		arg.Name,
+		arg.Subject,
+		arg.Body,
+		arg.BodyHtml,
+	)
 	var i EmailTemplate
 	err := row.Scan(
 		&i.ID,
@@ -133,12 +361,47 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyHtml,
 	)
 	return i, err
 }
 
+const listBanners = `-- name: ListBanners :many
+SELECT id, tenant_id, name, content_type, size_bytes, storage_key, created_by, created_at, deleted_at FROM email_banner WHERE deleted_at IS NULL ORDER BY created_at, id LIMIT 100
+`
+
+func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
+	rows, err := q.db.Query(ctx, listBanners)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailBanner
+	for rows.Next() {
+		var i EmailBanner
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.StorageKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) ([]Email, error) {
@@ -166,6 +429,10 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.Error,
 			&i.CreatedAt,
 			&i.SentAt,
+			&i.BodyHtml,
+			&i.BccAddresses,
+			&i.Salary,
+			&i.SalaryRestricted,
 		); err != nil {
 			return nil, err
 		}
@@ -179,7 +446,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 
 const listTemplates = `-- name: ListTemplates :many
 
-SELECT id, tenant_id, version, name, subject, body, created_by, created_at, updated_at FROM email_template ORDER BY lower(name) LIMIT 200
+SELECT id, tenant_id, version, name, subject, body, created_by, created_at, updated_at, body_html FROM email_template ORDER BY lower(name) LIMIT 200
 `
 
 // Queries owned by the emails module. Run inside a tenant-scoped transaction.
@@ -202,6 +469,7 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]EmailTemplate, error) {
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BodyHtml,
 		); err != nil {
 			return nil, err
 		}
@@ -267,16 +535,53 @@ func (q *Queries) SeedTemplate(ctx context.Context, arg SeedTemplateParams) erro
 	return err
 }
 
+const stagedAttachments = `-- name: StagedAttachments :many
+SELECT id, tenant_id, email_id, file_name, content_type, size_bytes, storage_key, created_by, created_at FROM email_attachment WHERE id = ANY($1::text[]) AND email_id IS NULL AND created_by = app_current_user()
+`
+
+// Files the user uploaded and has not sent yet, among ids.
+func (q *Queries) StagedAttachments(ctx context.Context, ids []string) ([]EmailAttachment, error) {
+	rows, err := q.db.Query(ctx, stagedAttachments, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailAttachment
+	for rows.Next() {
+		var i EmailAttachment
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.EmailID,
+			&i.FileName,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.StorageKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTemplate = `-- name: UpdateTemplate :one
-UPDATE email_template SET name = $1, subject = $2, body = $3, version = version + 1, updated_at = now()
-WHERE id = $4 AND version = $5
-RETURNING id, tenant_id, version, name, subject, body, created_by, created_at, updated_at
+UPDATE email_template SET name = $1, subject = $2, body = $3, body_html = $4,
+  version = version + 1, updated_at = now()
+WHERE id = $5 AND version = $6
+RETURNING id, tenant_id, version, name, subject, body, created_by, created_at, updated_at, body_html
 `
 
 type UpdateTemplateParams struct {
 	Name            string
 	Subject         string
 	Body            string
+	BodyHtml        *string
 	ID              string
 	ExpectedVersion int32
 }
@@ -287,6 +592,7 @@ func (q *Queries) UpdateTemplate(ctx context.Context, arg UpdateTemplateParams) 
 		arg.Name,
 		arg.Subject,
 		arg.Body,
+		arg.BodyHtml,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -301,6 +607,7 @@ func (q *Queries) UpdateTemplate(ctx context.Context, arg UpdateTemplateParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyHtml,
 	)
 	return i, err
 }

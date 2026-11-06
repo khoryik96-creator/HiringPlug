@@ -1162,6 +1162,74 @@ class EmailId(RootModel[str]):
     ]
 
 
+class EmailBannerId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["ebn_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^ebn_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class EmailAttachmentId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["eat_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^eat_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class EmailBanner(BaseModel):
+    id: EmailBannerId
+    name: str
+    contentType: str
+    sizeBytes: int
+    createdAt: AwareDatetime
+
+
+class EmailBannerList(BaseModel):
+    items: list[EmailBanner]
+
+
+class EmailAttachment(BaseModel):
+    id: EmailAttachmentId
+    fileName: str
+    contentType: str
+    sizeBytes: int
+
+
+class EmailField(BaseModel):
+    token: Annotated[str, Field(description='What to type or insert, e.g. "[Expected salary]".')]
+    key: Annotated[str, Field(description='The same as a placeholder, e.g. "candidate.expectedSalary".')]
+    label: str
+    salary: Annotated[bool, Field(description="Fills only for senders who may see salaries.")]
+
+
+class EmailCvAttachment(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: DocumentId
+    asPdf: Annotated[
+        bool | None, Field(description="A formatted CV's PDF instead of its Word file. Defaults to false.")
+    ] = None
+
+
+class EmailPreview(BaseModel):
+    clientEmail: Annotated[
+        str | None,
+        Field(
+            description="The job's hiring contact, to send to (when an application is given and its job has one)."
+        ),
+    ]
+    subject: str
+    bodyHtml: Annotated[str, Field(description="Formatted and made safe, as it will be sent.")]
+    missing: Annotated[
+        list[str], Field(description='Fields with no value (sending refuses them), e.g. "[Expected salary]".')
+    ]
+    salary: Annotated[
+        bool,
+        Field(
+            description="The email shows salary, so it may be hidden from roles that may not see salaries."
+        ),
+    ]
+
+
 class EmailTemplate(BaseModel):
     id: EmailTemplateId
     version: int
@@ -1173,12 +1241,19 @@ class EmailTemplate(BaseModel):
             description="Plain text with placeholders such as {{candidate.firstName}}; see GET /v1/email-templates for the list in `placeholders`."
         ),
     ]
+    bodyHtml: Annotated[
+        str | None,
+        Field(
+            description="The formatted message (with its signature and banner), when the template has one; fields such as [Expected salary]."
+        ),
+    ]
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
 
 
 class EmailTemplateList(BaseModel):
     items: list[EmailTemplate]
+    fields: Annotated[list[EmailField], Field(description="The fields a message may use, with their tokens.")]
     placeholders: Annotated[list[str], Field(description="The placeholders templates may use.")]
 
 
@@ -1188,7 +1263,8 @@ class EmailTemplateInput(BaseModel):
     )
     name: Annotated[str, Field(max_length=100, min_length=1)]
     subject: Annotated[str, Field(max_length=200, min_length=1)]
-    body: Annotated[str, Field(max_length=20000, min_length=1)]
+    body: Annotated[str | None, Field(max_length=20000)] = None
+    bodyHtml: Annotated[str | None, Field(max_length=100000)] = None
 
 
 class EmailTemplateUpdate(BaseModel):
@@ -1198,7 +1274,8 @@ class EmailTemplateUpdate(BaseModel):
     version: Annotated[int, Field(ge=1)]
     name: Annotated[str, Field(max_length=100, min_length=1)]
     subject: Annotated[str, Field(max_length=200, min_length=1)]
-    body: Annotated[str, Field(max_length=20000, min_length=1)]
+    body: Annotated[str | None, Field(max_length=20000)] = None
+    bodyHtml: Annotated[str | None, Field(max_length=100000)] = None
 
 
 class EmailDraft(BaseModel):
@@ -1226,6 +1303,10 @@ class ToItem(RootModel[EmailStr]):
 
 
 class CcItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class BccItem(RootModel[EmailStr]):
     root: Annotated[EmailStr, Field(max_length=254)]
 
 
@@ -2856,6 +2937,18 @@ class JobFill(BaseModel):
     placements: int
 
 
+class EmailSalaryVisibility(StrEnum):
+    salary_roles = "salary_roles"
+    everyone = "everyone"
+
+
+class Policies(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emailSalaryVisibility: EmailSalaryVisibility
+
+
 class FieldListName(StrEnum):
     candidate_source = "candidate_source"
     notice_period = "notice_period"
@@ -3047,6 +3140,18 @@ class DocumentList(BaseModel):
     items: list[Document]
 
 
+class EmailPreviewRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    subject: Annotated[str, Field(max_length=200)]
+    bodyHtml: Annotated[str, Field(max_length=100000)]
+    candidateId: CandidateId | None = None
+    applicationId: ApplicationId | None = None
+    interviewId: InterviewId | None = None
+    timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+
+
 class EmailDraftRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3064,8 +3169,17 @@ class Email(BaseModel):
     applicationId: Annotated[ApplicationId | None, Field(...)]
     to: list[str]
     cc: list[str]
+    bcc: list[str]
     subject: str
-    body: str
+    body: Annotated[str, Field(description="The plain-text version.")]
+    bodyHtml: Annotated[str | None, Field(description="The formatted version, if it had one.")]
+    attachments: list[EmailAttachment]
+    salary: Annotated[
+        bool,
+        Field(
+            description="It shows salary (hidden from roles that may not see salaries, unless Settings say otherwise)."
+        ),
+    ]
     status: EmailStatus
     error: Annotated[str | None, Field(...)]
     sentBy: UserId
@@ -3084,10 +3198,24 @@ class EmailSend(BaseModel):
     )
     to: Annotated[list[ToItem], Field(max_length=10, min_length=1)]
     cc: Annotated[list[CcItem] | None, Field(max_length=10)] = None
+    bcc: Annotated[list[BccItem] | None, Field(max_length=10)] = None
     subject: Annotated[str, Field(max_length=200, min_length=1)]
-    body: Annotated[str, Field(max_length=20000, min_length=1)]
+    body: Annotated[str | None, Field(max_length=20000)] = None
+    bodyHtml: Annotated[str | None, Field(max_length=100000)] = None
+    timeZone: Annotated[
+        str | None,
+        Field(description="For interview times in fields (default Asia/Kuala_Lumpur).", max_length=64),
+    ] = None
     candidateId: CandidateId | None = None
     applicationId: ApplicationId | None = None
+    attachmentIds: Annotated[
+        list[EmailAttachmentId] | None,
+        Field(description="Files you uploaded to /v1/email-attachments.", max_length=10),
+    ] = None
+    cvs: Annotated[
+        list[EmailCvAttachment] | None,
+        Field(description="The candidate's CVs from the ATS (needs documents:read).", max_length=10),
+    ] = None
 
 
 class UserList(BaseModel):

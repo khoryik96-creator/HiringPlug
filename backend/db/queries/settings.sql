@@ -26,3 +26,10 @@ SELECT form, field, mandatory FROM field_rule;
 INSERT INTO field_rule (tenant_id, form, field, mandatory)
 VALUES (app_current_tenant(), @form, @field, @mandatory)
 ON CONFLICT (tenant_id, form, field) DO UPDATE SET mandatory = excluded.mandatory;
+
+-- name: GetPolicy :one
+SELECT value FROM tenant_policy WHERE key = @key;
+
+-- name: SetPolicy :exec
+INSERT INTO tenant_policy (tenant_id, key, value) VALUES (app_current_tenant(), @key, @value)
+ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value;

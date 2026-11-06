@@ -2,12 +2,16 @@ package emails
 
 import (
 	"context"
+	"errors"
+	"io"
+	"mime/multipart"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
 
@@ -20,7 +24,10 @@ func (h *HTTP) ListEmailTemplates(ctx context.Context, _ api.ListEmailTemplatesR
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListEmailTemplates200JSONResponse{Items: make([]api.EmailTemplate, len(rows)), Placeholders: Placeholders}
+	out := api.ListEmailTemplates200JSONResponse{Items: make([]api.EmailTemplate, len(rows)), Placeholders: Placeholders, Fields: make([]api.EmailField, len(Fields))}
+	for i, f := range Fields {
+		out.Fields[i] = api.EmailField{Token: f.Token(), Key: f.Key, Label: f.Label, Salary: f.Salary}
+	}
 	for i, r := range rows {
 		out.Items[i] = templateToAPI(r)
 	}
@@ -30,7 +37,7 @@ func (h *HTTP) ListEmailTemplates(ctx context.Context, _ api.ListEmailTemplatesR
 // CreateEmailTemplate handles POST /v1/email-templates.
 func (h *HTTP) CreateEmailTemplate(ctx context.Context, req api.CreateEmailTemplateRequestObject) (api.CreateEmailTemplateResponseObject, error) {
 	b := req.Body
-	row, err := h.svc.CreateTemplate(ctx, authz.MustFromContext(ctx), Template{Name: b.Name, Subject: b.Subject, Body: b.Body})
+	row, err := h.svc.CreateTemplate(ctx, authz.MustFromContext(ctx), Template{Name: b.Name, Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)})
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +47,7 @@ func (h *HTTP) CreateEmailTemplate(ctx context.Context, req api.CreateEmailTempl
 // UpdateEmailTemplate handles PUT /v1/email-templates/{templateId}.
 func (h *HTTP) UpdateEmailTemplate(ctx context.Context, req api.UpdateEmailTemplateRequestObject) (api.UpdateEmailTemplateResponseObject, error) {
 	b := req.Body
-	row, err := h.svc.UpdateTemplate(ctx, authz.MustFromContext(ctx), req.TemplateId, b.Version, Template{Name: b.Name, Subject: b.Subject, Body: b.Body})
+	row, err := h.svc.UpdateTemplate(ctx, authz.MustFromContext(ctx), req.TemplateId, b.Version, Template{Name: b.Name, Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)})
 	if err != nil {
 		return nil, err
 	}
@@ -75,28 +82,184 @@ func (h *HTTP) ListEmails(ctx context.Context, req api.ListEmailsRequestObject) 
 // SendEmail handles POST /v1/emails.
 func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (api.SendEmailResponseObject, error) {
 	b := req.Body
-	o := Outgoing{To: convert[string](b.To), Subject: b.Subject, Body: b.Body}
-	if b.Cc != nil {
-		o.Cc = convert[string](*b.Cc)
+	r := SendRequest{
+		Outgoing:    Outgoing{To: convert[string](b.To), Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)},
+		CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, TimeZone: deref(b.TimeZone),
 	}
-	row, err := h.svc.Send(ctx, authz.MustFromContext(ctx), o, b.CandidateId, b.ApplicationId)
+	if b.Cc != nil {
+		r.Cc = convert[string](*b.Cc)
+	}
+	if b.Bcc != nil {
+		r.Bcc = convert[string](*b.Bcc)
+	}
+	if b.AttachmentIds != nil {
+		r.AttachmentIDs = *b.AttachmentIds
+	}
+	if b.Cvs != nil {
+		for _, cv := range *b.Cvs {
+			r.CVs = append(r.CVs, CVRef{DocumentID: cv.DocumentId, AsPDF: deref(cv.AsPdf)})
+		}
+	}
+	row, err := h.svc.Send(ctx, authz.MustFromContext(ctx), r)
 	if err != nil {
 		return nil, err
 	}
 	return api.SendEmail202JSONResponse(emailToAPI(row)), nil
 }
 
+// PreviewEmail handles POST /v1/email-previews.
+func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObject) (api.PreviewEmailResponseObject, error) {
+	b := req.Body
+	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.TimeZone)
+	if err != nil {
+		return nil, err
+	}
+	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail)}, nil
+}
+
+// DeleteEmailTemplate handles DELETE /v1/email-templates/{templateId}.
+func (h *HTTP) DeleteEmailTemplate(ctx context.Context, req api.DeleteEmailTemplateRequestObject) (api.DeleteEmailTemplateResponseObject, error) {
+	if err := h.svc.DeleteTemplate(ctx, authz.MustFromContext(ctx), req.TemplateId); err != nil {
+		return nil, err
+	}
+	return api.DeleteEmailTemplate204Response{}, nil
+}
+
+// AddEmailAttachment handles POST /v1/email-attachments.
+func (h *HTTP) AddEmailAttachment(ctx context.Context, req api.AddEmailAttachmentRequestObject) (api.AddEmailAttachmentResponseObject, error) {
+	form, err := readForm(req.Body, maxFileBytes, "A file can be at most 10 MB.")
+	if err != nil {
+		return nil, err
+	}
+	row, err := h.svc.AddAttachment(ctx, authz.MustFromContext(ctx), form.fileName, form.data)
+	if err != nil {
+		return nil, err
+	}
+	return api.AddEmailAttachment201JSONResponse(attachmentToAPI(row)), nil
+}
+
+// ListEmailBanners handles GET /v1/email-banners.
+func (h *HTTP) ListEmailBanners(ctx context.Context, _ api.ListEmailBannersRequestObject) (api.ListEmailBannersResponseObject, error) {
+	rows, err := h.svc.Banners(ctx, authz.MustFromContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListEmailBanners200JSONResponse{Items: make([]api.EmailBanner, len(rows))}
+	for i, r := range rows {
+		out.Items[i] = bannerToAPI(r)
+	}
+	return out, nil
+}
+
+// AddEmailBanner handles POST /v1/email-banners.
+func (h *HTTP) AddEmailBanner(ctx context.Context, req api.AddEmailBannerRequestObject) (api.AddEmailBannerResponseObject, error) {
+	form, err := readForm(req.Body, maxBannerBytes, "A banner can be at most 1 MB.")
+	if err != nil {
+		return nil, err
+	}
+	row, err := h.svc.AddBanner(ctx, authz.MustFromContext(ctx), form.name, form.fileName, form.data)
+	if err != nil {
+		return nil, err
+	}
+	return api.AddEmailBanner201JSONResponse(bannerToAPI(row)), nil
+}
+
+// DeleteEmailBanner handles DELETE /v1/email-banners/{bannerId}.
+func (h *HTTP) DeleteEmailBanner(ctx context.Context, req api.DeleteEmailBannerRequestObject) (api.DeleteEmailBannerResponseObject, error) {
+	if err := h.svc.DeleteBanner(ctx, authz.MustFromContext(ctx), req.BannerId); err != nil {
+		return nil, err
+	}
+	return api.DeleteEmailBanner204Response{}, nil
+}
+
+// GetEmailBannerFile handles GET /v1/email-banners/{bannerId}/file.
+func (h *HTTP) GetEmailBannerFile(ctx context.Context, req api.GetEmailBannerFileRequestObject) (api.GetEmailBannerFileResponseObject, error) {
+	_, f, err := h.svc.BannerFile(ctx, authz.MustFromContext(ctx), req.BannerId)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetEmailBannerFile200ApplicationoctetStreamResponse{Body: f}, nil
+}
+
+type form struct {
+	name, fileName string
+	data           []byte
+}
+
+// readForm reads a multipart form with a "file" (at most limit bytes) and an
+// optional "name".
+func readForm(r *multipart.Reader, limit int64, tooLarge string) (form, error) {
+	var out form
+	for {
+		part, err := r.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return out, apperr.Validation(apperr.FieldErrors{{Field: "body", Message: "is not a valid multipart/form-data form"}})
+		}
+		switch part.FormName() {
+		case "file":
+			out.fileName = part.FileName()
+			if out.data, err = io.ReadAll(io.LimitReader(part, limit+1)); err != nil {
+				return out, apperr.Validation(apperr.FieldErrors{{Field: "file", Message: "could not be read"}})
+			}
+			if int64(len(out.data)) > limit {
+				return out, apperr.New(api.ErrorCodePAYLOADTOOLARGE, tooLarge)
+			}
+		case "name":
+			v, _ := io.ReadAll(io.LimitReader(part, 400))
+			out.name = string(v)
+		default:
+			return out, apperr.Validation(apperr.FieldErrors{{Field: part.FormName(), Message: "unexpected field"}})
+		}
+	}
+	if len(out.data) == 0 {
+		return out, apperr.Validation(apperr.FieldErrors{{Field: "file", Message: "is required and must not be empty"}})
+	}
+	return out, nil
+}
+
+func attachmentToAPI(r store.EmailAttachment) api.EmailAttachment {
+	return api.EmailAttachment{Id: r.ID, FileName: r.FileName, ContentType: r.ContentType, SizeBytes: int(r.SizeBytes)}
+}
+
+func bannerToAPI(r store.EmailBanner) api.EmailBanner {
+	return api.EmailBanner{Id: r.ID, Name: r.Name, ContentType: r.ContentType, SizeBytes: int(r.SizeBytes), CreatedAt: r.CreatedAt}
+}
+
+func deref[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
 func templateToAPI(r store.EmailTemplate) api.EmailTemplate {
 	return api.EmailTemplate{
-		Id: r.ID, Version: int(r.Version), Name: r.Name, Subject: r.Subject, Body: r.Body, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		Id: r.ID, Version: int(r.Version), Name: r.Name, Subject: r.Subject, Body: r.Body, BodyHtml: c.OrNull(r.BodyHtml),
+		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
 
-func emailToAPI(r store.Email) api.Email {
+func emailToAPI(v EmailView) api.Email {
+	r := v.Email
+	files := make([]api.EmailAttachment, len(v.Attachments))
+	for i, f := range v.Attachments {
+		files[i] = attachmentToAPI(f)
+	}
 	return api.Email{
 		Id: r.ID, CandidateId: c.OrNull(r.CandidateID), ApplicationId: c.OrNull(r.ApplicationID),
-		To: r.ToAddresses, Cc: r.CcAddresses, Subject: r.Subject, Body: r.Body,
-		Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
+		To: r.ToAddresses, Cc: r.CcAddresses, Bcc: r.BccAddresses, Subject: r.Subject, Body: r.Body, BodyHtml: c.OrNull(r.BodyHtml),
+		Attachments: files, Salary: r.Salary, Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
 		SentBy: r.SentBy, SentByName: r.SenderName, CreatedAt: r.CreatedAt, SentAt: c.OrNull(r.SentAt),
 	}
 }

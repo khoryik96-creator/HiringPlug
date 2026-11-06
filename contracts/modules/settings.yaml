@@ -83,8 +83,56 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/settings/policies:
+    get:
+      operationId: getPolicies
+      tags: [settings]
+      summary: The company's choices on how the app treats sensitive information
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Policies' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: putPolicies
+      tags: [settings]
+      summary: Change those choices
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Policies' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Policies' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   schemas:
+    EmailSalaryVisibility:
+      type: string
+      description: >
+        Who sees a sent email that shows salary: salary_roles = only roles
+        that may see salaries (the default); everyone = everyone who may read
+        emails. Either way only senders who may see salaries can fill salary
+        fields.
+      enum: [salary_roles, everyone]
+    Policies:
+      type: object
+      additionalProperties: false
+      required: [emailSalaryVisibility]
+      properties:
+        emailSalaryVisibility: { $ref: '#/components/schemas/EmailSalaryVisibility' }
     FieldListName:
       type: string
       description: >

@@ -62,10 +62,12 @@ export function timeInStage(app: Application, now = Date.now()): string {
 }
 
 /** A candidate's card on a job's board: drag it to another column, or use the menu. Its fit badge opens the reasons. */
-export function ApplicationCard({ app, match, onShowFit, canMove, onMove, busy, onDragStart }: {
+export function ApplicationCard({ app, match, onShowFit, onEmailClient, canMove, onMove, busy, onDragStart }: {
   app: Application;
   match?: Match;
   onShowFit?: (app: Application) => void;
+  /** Opens an email to the client about this candidate. */
+  onEmailClient?: (app: Application) => void;
   canMove: boolean;
   onMove: (m: MoveRequest) => void;
   busy: boolean;
@@ -87,6 +89,9 @@ export function ApplicationCard({ app, match, onShowFit, canMove, onMove, busy, 
         </button>
       )}
       {canMove && <MoveMenu app={app} onMove={onMove} busy={busy} />}
+      {onEmailClient && (
+        <button type="button" className="link" aria-label={`Email client about ${app.candidateName}`} onClick={() => { onEmailClient(app); }}>Email client</button>
+      )}
     </div>
   );
 }

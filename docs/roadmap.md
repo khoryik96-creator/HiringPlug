@@ -21,6 +21,7 @@ Status: ✅ done · 🔜 next · ⬜ later
 | ✅ | Pipeline: candidates on jobs, a drag-and-drop board per job, reasons for rejections |
 | ✅ | Notes (sensitive ones protected) and an activity timeline on every record; a dashboard |
 | ✅ | Import candidates, companies and contacts from CSV, with a report of rows to fix |
+| ✅ | Email the client about a candidate: formatted templates with fields (salary for permitted roles), cc/bcc, banners, CVs and files attached |
 | ✅ | The candidate page's banner: coloured by status (looking out, passive, not looking, placed), with a column coloured by work authorization, both picked in one click |
 | ✅ | A dashboard timeline of stage moves (who moved whom, when) and each candidate's stage history; fit stats with CV Studio's six ratings, strengths, gaps and a recommendation |
 | ✅ | Screening calls beside the CV, with the AI assistant: one save updates salary and currency, notice period, work authorization, nationality and (if empty) source, and keeps the notes |
