@@ -1,0 +1,42 @@
+{
+  "tested_on": "2026-11-06",
+  "source_version": "24.6.582",
+  "isolated_archive_test": true,
+  "python_tests_passed": 316,
+  "python_subtests_passed": 6941,
+  "javascript_checks": [
+    "date parity: 52 cases across browser and Node normalizers",
+    "DOCX frontend export regression",
+    "CV summary pay-filter frontend regression"
+  ],
+  "demo_generated_without_provider": true,
+  "sample_docx_opened_with_python_docx": true,
+  "all_example_payloads_match_derived_json_schema": true,
+  "sample_pdf_pages": 2,
+  "pdf_renderer": "LibreOffice on Linux; fonts can substitute; not a Microsoft Word pagination claim",
+  "template_sample_cv_removed": true,
+  "template_author_metadata_cleared": true,
+  "template_unreferenced_private_metadata_parts_and_dangling_relationships_removed": true,
+  "template_retains": [
+    "generic Hyppies corporate copyright footer",
+    "*Summary* marker",
+    "stock artwork and logo",
+    "styles, numbering, page geometry and needed relationships"
+  ],
+  "privacy": [
+    "no private uploaded candidate documents",
+    "no saved provider credentials or OAuth stores",
+    "no original source-document text fixtures used by the two removed test classes"
+  ],
+  "credential_pattern_scan": "passed; checks real provider-key/token/private-key patterns, not API field names",
+  "no_live_provider_calls": true,
+  "no_production_repository_edits": true,
+  "not_provided": [
+    "LLM provider adapter",
+    "full original Flask application",
+    "live ATS integration",
+    "native protected build",
+    "Windows Word rendering verification"
+  ],
+  "note": "Reference-only original application tests require the full original application. Portable integration assembly and derived schema are handover adaptations. See migration notes for inherited edge cases."
+}

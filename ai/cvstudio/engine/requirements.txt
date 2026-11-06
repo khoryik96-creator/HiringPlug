@@ -1,0 +1,5 @@
+# Core normalization/reconciliation/fidelity/masking use the Python standard library.
+# These extras support DOCX extraction and the portable tests.
+python-docx>=1.1,<2
+lxml>=5,<7
+pytest>=8,<10

@@ -1,0 +1,5 @@
+- All text: correct spelling, punctuation, and capitalization (capital/lowercase) so the CV reads cleanly, changing ONLY language mechanics and never the meaning:
+    * Fix obvious spelling mistakes and typos, punctuation, spacing, and sentence/heading capitalization (start sentences with a capital; lowercase words wrongly capitalized mid-sentence).
+    * Correct the casing of well-known technology, product, framework, and company names to their standard form, e.g. kafka -> Kafka, javascript -> JavaScript, github -> GitHub, sql -> SQL, mysql -> MySQL, aws -> AWS, .net -> .NET, nodejs -> Node.js, powerbi -> Power BI.
+    * Preserve people's names and any unfamiliar word or acronym exactly as written; when unsure whether a token is a misspelling or a real name/term, leave it unchanged. Never change a person's name to a similar common word.
+    * Do NOT rephrase, reword, embellish, translate, add, or remove content, and do NOT change any numbers, dates, currencies, URLs, emails, or the meaning of a sentence.

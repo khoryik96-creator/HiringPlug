@@ -1,0 +1,9 @@
+{
+  "name": "cvstudio-formatting-reference",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Owner-requested formatting transplant; Node renderer only",
+  "dependencies": {
+    "adm-zip": "0.6.0"
+  }
+}

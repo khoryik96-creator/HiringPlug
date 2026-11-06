@@ -1,0 +1,10 @@
+
+
+CANDIDATE GENDER NEUTRALIZATION — ENABLED BY THE USER:
+- Neutralize ONLY pronouns whose referent is the candidate. Do not change pronouns, gendered words, or stated gender for managers, colleagues, clients, referees, family members, or any other party.
+- Use "the candidate" for candidate-only he/she/him/her/they/them references and "the candidate's" for candidate-only possessive his/her/hers/their/theirs references. This includes candidate pronouns already present in the source.
+- Expand candidate-only contractions grammatically: he'll/she'll → "the candidate will"; he's/she's → "the candidate is" or "the candidate has" according to context; he'd/she'd → "the candidate would" or "the candidate had" according to context.
+- Replace candidate-only himself/herself with "the candidate" or "the candidate personally", whichever preserves the sentence meaning.
+- Never leave or introduce they, them, their, theirs, themself, or themselves when those words refer to the candidate.
+- Preserve all other wording and the JSON structure. Do not infer or alter another person's gender.
+

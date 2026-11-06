@@ -1,0 +1,90 @@
+{
+  "candidate": {
+    "name": "AVERY EXAMPLE",
+    "email": "avery@example.invalid",
+    "phone": "+60 10 000 0000",
+    "linkedin": "",
+    "industry": "Information Technology & Services",
+    "industry_sub": "",
+    "address": {
+      "city": "Example City",
+      "state": "",
+      "countryCode": "MY"
+    },
+    "notice_period": "1 month",
+    "current_position": "Senior Infrastructure Engineer",
+    "current_company": "Example Cloud Sdn Bhd",
+    "is_employed": true,
+    "languages": "English, Bm, Mandarin"
+  },
+  "summary_bullets": [
+    "Infrastructure engineer with **cloud operations** experience.",
+    "Delivered **automation** and disaster recovery improvements."
+  ],
+  "work_experiences": [
+    {
+      "date_range": "Jun 2022 to Present",
+      "company": "Example Cloud Sdn Bhd",
+      "roles": [
+        {
+          "title": "Senior Infrastructure Engineer",
+          "date_range": "",
+          "reason_for_leaving": "",
+          "bullets": [
+            "Managed hybrid cloud infrastructure.",
+            {
+              "heading": "Project: Disaster Recovery Automation",
+              "bullets": [
+                "Automated recovery checks with Ansible.",
+                "Reduced validation time by 30%."
+              ]
+            },
+            "Supported payroll application infrastructure."
+          ]
+        }
+      ]
+    },
+    {
+      "date_range": "Jul 2019 to May 2022",
+      "company": "Example Systems Sdn Bhd",
+      "roles": [
+        {
+          "title": "Systems Engineer",
+          "date_range": "",
+          "reason_for_leaving": "Career development",
+          "bullets": [
+            "Maintained Linux and Windows servers.",
+            "Improved infrastructure monitoring."
+          ]
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "date_range": "2015 to 2019",
+      "institution": "Example Technical University",
+      "degree": "Bachelor of Computer Science",
+      "cgpa": "CGPA 3.70/4.00",
+      "major": "Computer Systems",
+      "honors": "First Class Honours",
+      "description": "Final project: Automated infrastructure monitoring."
+    }
+  ],
+  "certifications": [
+    "Example Cloud Administrator Certification"
+  ],
+  "skills": [
+    {
+      "category": "Technical Skills",
+      "items": "Linux, Windows Server, AWS, Ansible"
+    },
+    {
+      "category": "Languages",
+      "items": "English, BM, Mandarin"
+    }
+  ],
+  "_document_alignment": "left",
+  "_summary_box_autofit": true,
+  "_bullet_levels": []
+}

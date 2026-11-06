@@ -1,0 +1,28 @@
+{
+  "product": "CV Studio CV formatting transplant",
+  "version": "24.6.582",
+  "source_commit": "5b10e54c12bc46011bb6d14d11e733669162b9b7",
+  "merged_master_commit": "4cd4a68023f5dd0e0d01e6145c0438f5e71d1afe",
+  "source_tree_clean": true,
+  "generated_on": "2026-11-06",
+  "formatting_scope": [
+    "CV parse",
+    "normalization",
+    "reconciliation",
+    "fidelity",
+    "DOCX extraction",
+    "summary",
+    "blind CV",
+    "DOCX renderer",
+    "frontend reference",
+    "tests"
+  ],
+  "excluded": [
+    "credentials",
+    "installation authorization/secrets",
+    "user data stores",
+    "private uploaded candidate CVs",
+    "unrelated ATS integrations",
+    "native protected executables"
+  ]
+}

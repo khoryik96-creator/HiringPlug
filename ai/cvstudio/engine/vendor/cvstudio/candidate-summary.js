@@ -1,0 +1,459 @@
+// ── Candidate Summary Generator ─────────────────────────────────────────────
+var _summaryFocus = 'general';
+window._summaryLastModifier = 'normal';
+window._summaryGeneratedBullets = [];
+window._summaryGeneratedSource = '';
+window._summaryGeneratedAnonymized = null;
+window._formatSummaryDraft = null;
+window._summarySourceDocxFile = null;
+window._summarySourceDocxText = '';
+function updateSummaryCharCount() {
+  var ta = document.getElementById('summaryCvText');
+  var el = document.getElementById('summaryCharCount');
+  if (ta && el) el.textContent = (ta.value || '').length.toLocaleString() + ' characters';
+}
+function updateSummaryRouteBadge() {
+  var el = document.getElementById('summaryRouteBadge');
+  if (!el) return;
+  try { var r = resolveAiRoute('summary'); el.textContent = 'Using: ' + r.display; }
+  catch(e) { el.textContent = 'Using: —'; }
+}
+function setSummaryFocus(btn) {
+  if (!btn) return;
+  document.querySelectorAll('#summaryFocusSection .summary-focus-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  _summaryFocus = btn.getAttribute('data-dir') || 'general';
+  var custom = document.getElementById('summaryCustomDir');
+  if (custom) custom.style.display = _summaryFocus === 'custom' ? 'block' : 'none';
+}
+function getSummaryFocusLabel() {
+  var map = { general:'General', technology:'Technology', leadership:'Leadership', commercial:'Commercial' };
+  if (_summaryFocus === 'custom') { var v = ((document.getElementById('summaryCustomDir') || {}).value || '').trim(); return v ? ('Custom — ' + v) : 'Custom'; }
+  return map[_summaryFocus] || 'General';
+}
+function getSummaryFocusPrompt() {
+  var map = {
+    general:'',
+    technology:'Strongly emphasise technical skills, programming languages, tech stack, engineering achievements, system design, data/AI/cloud/platform work, and software delivery.',
+    leadership:'Strongly emphasise leadership roles, team management, mentoring, stakeholder management, organisational impact, people development, and strategic initiatives.',
+    commercial:'Strongly emphasise commercial impact, revenue generation, P&L ownership, client relationships, business growth, measurable ROI, and business outcomes.'
+  };
+  if (_summaryFocus === 'custom') { var v = ((document.getElementById('summaryCustomDir') || {}).value || '').trim(); return v ? ('Strongly emphasise: ' + v + '.') : ''; }
+  return map[_summaryFocus] || '';
+}
+function boldSafeSummary(text) { return esc(text || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); }
+function summaryBulletLines(raw) {
+  raw = String(raw || '').replace(/```(?:text|markdown|md)?/gi,'').replace(/```/g,'').trim();
+  var lines = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  var bulletLines = lines.filter(function(l){ return /^[-•*]\s+/.test(l); });
+  return (bulletLines.length ? bulletLines : lines)
+    .map(function(l){ return l.replace(/^[-•*]\s+/, '').trim(); })
+    .filter(Boolean)
+    .slice(0, 20);
+}
+function renderSummaryText(raw) {
+  var src = summaryBulletLines(raw);
+  if (!src.length) src = ['No summary returned. Try regenerating or use a different provider.'];
+  return '<ul class="summary-list">' + src.map(function(t){ return '<li>' + boldSafeSummary(t) + '</li>'; }).join('') + '</ul>';
+}
+function getSummaryAnonymizationEnabled() {
+  var toggle = document.getElementById('summaryAnonymizeToggle');
+  return !!(toggle && toggle.checked);
+}
+function updateSummaryAnonymizeHint() {
+  var enabled = getSummaryAnonymizationEnabled();
+  var hint = document.getElementById('summaryAnonymizeHint');
+  if (hint) hint.textContent = enabled
+    ? 'On — candidate identity, contact details, employers, clients and education institutions will be generalized.'
+    : 'Off — the summary may use identifying details supported by the CV.';
+}
+function updateSummaryOutputTitle() {
+  var title = document.getElementById('summaryOutputTitle');
+  if (!title) return;
+  title.textContent = window._summaryGeneratedAnonymized === true
+    ? 'Anonymized CV Summary'
+    : 'CV Summary Output';
+}
+function formatSummaryBulletsFor(raw, blind) {
+  var draft = window._formatSummaryDraft;
+  if (!draft || String(draft.cv_text || '').trim() !== String(raw || '').trim()) return [];
+  return (Array.isArray(draft.bullets) ? draft.bullets : [])
+    .map(function(value){ return String(value || '').trim(); })
+    .filter(Boolean)
+    .slice(0, 20);
+}
+function applyFormatSummaryBullets(data, raw, blind) {
+  var bullets = formatSummaryBulletsFor(raw, blind);
+  if (data && typeof data === 'object' && bullets.length) data.summary_bullets = bullets.slice();
+  return data;
+}
+function updateFormatSummaryNote() {
+  var note = document.getElementById('formatSummaryNote');
+  if (!note) return;
+  var draft = window._formatSummaryDraft;
+  var count = draft && Array.isArray(draft.bullets) ? draft.bullets.length : 0;
+  note.style.display = count ? 'block' : 'none';
+  note.textContent = count ? ('Using ' + count + ' CV Summary bullet' + (count === 1 ? '' : 's') + ' in the formatted resume Summary placeholder. Editing or clearing the raw CV will unlink them.') : '';
+}
+function clearFormatSummaryDraft() {
+  window._formatSummaryDraft = null;
+  updateFormatSummaryNote();
+}
+function updateSummaryApplyDocxButton() {
+  var btn = document.getElementById('btnSummaryApplyDocx');
+  if (!btn) return;
+  var ta = document.getElementById('summaryCvText');
+  var current = ta ? String(ta.value || '').trim() : '';
+  var file = window._summarySourceDocxFile;
+  var sourceMatches = String(window._summaryGeneratedSource || '').trim() === current;
+  var uploadMatches = String(window._summarySourceDocxText || '').trim() === current;
+  var hasBullets = Array.isArray(window._summaryGeneratedBullets) && window._summaryGeneratedBullets.length > 0;
+  btn.disabled = !(file && /\.docx$/i.test(String(file.name || '')) && sourceMatches && uploadMatches && hasBullets);
+}
+async function formatSummaryResume() {
+  if (!requireSummaryUnlocked()) return;
+  var ta = document.getElementById('summaryCvText');
+  var cv = ta ? String(ta.value || '').trim() : '';
+  var sourceMatches = String(window._summaryGeneratedSource || '').trim() === cv;
+  var bullets = sourceMatches && Array.isArray(window._summaryGeneratedBullets) ? window._summaryGeneratedBullets.slice() : [];
+  if (!cv) { showToast('Paste or upload a CV first', 'err'); return; }
+  if (!bullets.length) { showToast(sourceMatches ? 'Generate a CV Summary first' : 'The CV changed — regenerate its summary first', 'err'); return; }
+  window._formatSummaryDraft = { cv_text: cv, bullets: bullets, anonymized: window._summaryGeneratedAnonymized === true };
+  var input = document.getElementById('cvInput');
+  if (input) input.value = cv;
+  var count = document.getElementById('charCount');
+  if (count) count.textContent = cv.length.toLocaleString() + ' characters';
+  switchInputTab('paste');
+  updateFormatSummaryNote();
+  switchTab('format');
+  showToast('CV Summary linked to the resume Summary placeholder', 'ok');
+  return startFormat(false);
+}
+async function applySummaryToUploadedDocx() {
+  if (!requireSummaryUnlocked()) return;
+  var file = window._summarySourceDocxFile;
+  var ta = document.getElementById('summaryCvText');
+  var current = ta ? String(ta.value || '').trim() : '';
+  var sourceMatches = String(window._summaryGeneratedSource || '').trim() === current;
+  var uploadMatches = String(window._summarySourceDocxText || '').trim() === current;
+  var bullets = sourceMatches && uploadMatches && Array.isArray(window._summaryGeneratedBullets)
+    ? window._summaryGeneratedBullets.slice()
+    : [];
+  if (!file || !/\.docx$/i.test(String(file.name || ''))) {
+    showToast('Upload a DOCX in CV Summary first', 'err');
+    return;
+  }
+  if (!bullets.length) {
+    showToast('Generate a Summary for the unchanged uploaded DOCX first', 'err');
+    return;
+  }
+  var btn = document.getElementById('btnSummaryApplyDocx');
+  if (btn) btn.disabled = true;
+  try {
+    var fd = new FormData();
+    fd.append('source_docx', file, file.name);
+    fd.append('summary_bullets', JSON.stringify(bullets));
+    fd.append('summary_box_autofit', getCvSummaryBoxAutoFit() ? 'true' : 'false');
+    var response = await fetchWithTimeout('/generate-docx', { method:'POST', body:fd }, 60000);
+    if (!response.ok) {
+      var errorPayload = await response.json().catch(function(){ return {}; });
+      throw new Error(errorPayload.error || 'Could not update the DOCX');
+    }
+    var blob = await response.blob();
+    var base = String(file.name || 'Hyppies CV.docx').replace(/\.docx$/i, '');
+    var summaryName = base + (window._summaryGeneratedAnonymized === true ? ' - Anonymized Summary.docx' : ' - Summary.docx');
+    var result = await cvStudioSaveDownloadBlob(blob, summaryName, 'summary');
+    cvStudioShowDownloadResult(result, 'Summary output');
+    // After the saved message, so it is the one left on screen.
+    var payRemoved = response.headers && response.headers.get ? response.headers.get('X-CV-Summary-Pay-Removed') : null;
+    if (payRemoved) showToast(cvSummaryPayNote(payRemoved, false), 'warn');
+  } catch(e) {
+    showToast('DOCX Summary failed: ' + (e.message || 'Unknown error'), 'err');
+  } finally {
+    updateSummaryApplyDocxButton();
+  }
+}
+async function handleSummaryFile(file) {
+  if (!file) return;
+  if (!requireSummaryUnlocked()) return;
+  var status = document.getElementById('summaryFileStatus');
+  var ta = document.getElementById('summaryCvText');
+  var ext = file.name.split('.').pop().toLowerCase();
+  var SUPPORTED = ['pdf','docx','doc','txt','rtf','odt','png','jpg','jpeg'];
+  if (SUPPORTED.indexOf(ext) < 0) { showToast('Supported: PDF, DOCX, DOC, TXT, RTF, ODT, PNG, JPG, JPEG', 'err'); return; }
+  window._summaryGeneratedBullets = [];
+  window._summaryGeneratedSource = '';
+  window._summarySourceDocxFile = null;
+  window._summarySourceDocxText = '';
+  var formatBtn = document.getElementById('btnSummaryFormat');
+  if (formatBtn) formatBtn.disabled = true;
+  updateSummaryApplyDocxButton();
+  var run = markTabRunning('summary');
+  if (status) status.textContent = 'Extracting ' + file.name + '…';
+  try {
+    var fd = new FormData(); fd.append('file', file);
+    var r = await fetchWithTimeout('/extract-text', { method:'POST', body:fd }, CV_EXTRACT_TEXT_TIMEOUT_MS);
+    var d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || 'Extraction failed');
+    var extractionWarning = cvShowExtractionWarning(d);
+    if (ta) ta.value = d.text || '';
+    if (ext === 'docx') {
+      window._summarySourceDocxFile = file;
+      window._summarySourceDocxText = String(d.text || '').trim();
+    }
+    updateSummaryCharCount();
+    if (status) status.textContent = (extractionWarning ? '⚠ ' : '✓ ') + file.name + ' (' + (d.text || '').length.toLocaleString() + ' chars extracted)' + (extractionWarning ? ' — partial extraction; review text' : (ext === 'docx' ? ' — generated Summary can fill this DOCX placeholder' : ''));
+    updateSummaryApplyDocxButton();
+    markTabDone('summary', run); if (!extractionWarning) showToast('CV ready for summary', 'ok');
+  } catch(e) {
+    if (status) status.textContent = '✗ ' + (e.message || 'Extraction failed');
+    markTabFailed('summary', run); showToast('CV Summary extraction failed: ' + (e.message || 'Unknown error'), 'err');
+  }
+}
+function cvSummaryPrompt(cv, modifier, focusNote, anonymize) {
+  modifier = modifier || 'normal';
+  var modNote = modifier === 'shorter' ? 'Use exactly 4-5 bullet points.' : modifier === 'longer' ? 'Use 8-10 detailed bullet points with useful metrics where available.' : 'Use 6-7 bullet points.';
+  var anonymizeRules = anonymize ? '\nANONYMIZATION — REQUIRED:\n- Refer to the candidate only as "the candidate". Do not output the candidate name or gendered candidate pronouns.\n- Do not output email addresses, phone numbers, URLs, personal websites, or precise home addresses.\n- Do not name any employer, client, customer, product brand, university, school, or education institution. Replace them with accurate generic descriptions such as "a leading regional bank", "a global technology company", or "an established university".\n- Preserve supported job titles, responsibilities, technologies, qualifications, dates, metrics and achievements unless a detail itself directly identifies the candidate or organization.\n- Do not rename or neutralize managers, colleagues, clients, referees, or other people; simply avoid unnecessary identifying references to them.\n' : '';
+  return 'You are a senior recruitment consultant. Produce a professional candidate summary.\n\nRULES:\n- Output ONLY bullet points, no intro, no headers.\n- Every bullet starts with "- ".\n- Bold the most important keyword or phrase per bullet using **double asterisks**.\n- Third-person, professional, concise.\n- Do not invent employers, dates, certifications, industries, metrics, or achievements that are not supported by the CV.\n- Never mention the candidate\'s salary or pay in any form: current, last drawn, expected or asking salary, remuneration, compensation, package, bonus, commission, allowances, EPF, or whether pay is negotiable. Leave it out even when the CV states it.\n- Keep the candidate marketable but accurate.\n- ' + modNote + '\n' + (focusNote ? ('- ' + focusNote + '\n') : '') + anonymizeRules + '\nCV:\n---\n' + cv + '\n---';
+}
+function cvSummaryModifierForPreference(preference) {
+  return String(preference || '').toLowerCase() === 'detailed' ? 'longer' : 'normal';
+}
+// The server removes the candidate's pay from a summary and says how much it
+// removed. The page always says so: the box may be emptier than expected, and a
+// removal nobody sees could hide a mistake.
+function cvSummaryPayNote(removed, emptied) {
+  var count = Number(removed) || 0;
+  if (count <= 0) return '';
+  if (emptied) return 'The CV Summary only described the candidate\'s pay, so the Summary box was left empty.';
+  return 'Removed ' + count + ' sentence' + (count === 1 ? '' : 's') + ' about the candidate\'s pay from the CV Summary. Check the Summary before sending.';
+}
+function cvJoinWarnings(first, second) {
+  return [String(first || '').trim(), String(second || '').trim()].filter(Boolean).join(' ');
+}
+async function requestFormattingSummary(raw, route, detailPreference) {
+  var response = await fetchWithTimeout('/generate-ai', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      api_key:route.api_key,
+      api_key_slot:route.api_key_slot,
+      provider:route.provider,
+      model:route.model,
+      prompt:cvSummaryPrompt(raw, cvSummaryModifierForPreference(detailPreference), ''),
+      max_tokens:1000,
+      use_tools:false,
+      strip_candidate_pay:true
+    })
+  }, 180000);
+  var data = await response.json().catch(function(){ return {}; });
+  if (!response.ok || data.error) {
+    recordPaidAiFailure('CV Summary during formatting failed', data, route.model, route.provider);
+    throw new Error(normalizeAiProviderError(data.error || ('API error ' + response.status), route));
+  }
+  var rawSummary = aiText(data);
+  var bullets = summaryBulletLines(rawSummary);
+  // The server removed every line as the candidate's pay. The call succeeded and
+  // is paid for, so the run carries on with an empty Summary box and its cost is
+  // counted with the run; it is not a provider failure. The caller keeps the
+  // warning on screen (cvSummaryPayNote).
+  if (!bullets.length && data.summary_pay_removed > 0) {
+    return {
+      bullets:[],
+      cost:responseCost(data, route.model, route.provider),
+      usage:data.usage || {},
+      data:data,
+      pay_only:true,
+      pay_removed:data.summary_pay_removed
+    };
+  }
+  if (!bullets.length) {
+    recordPaidAiFailure('CV Summary during formatting returned empty output', data, route.model, route.provider);
+    throw new Error('Empty CV Summary returned');
+  }
+  return {
+    bullets:bullets,
+    cost:responseCost(data, route.model, route.provider),
+    usage:data.usage || {},
+    data:data,
+    pay_removed:data.summary_pay_removed || 0
+  };
+}
+async function generateSummary(modifier) {
+  if (!requireSummaryUnlocked()) return;
+  modifier = modifier || 'normal'; window._summaryLastModifier = modifier;
+  var ta = document.getElementById('summaryCvText'); var cv = ta ? ta.value.trim() : '';
+  if (!cv) { showToast('Paste or upload a CV first', 'err'); return; }
+  var route = aiRoutePayload('summary');
+  if (!route.api_key) { showToast('Save an API key for CV Summary route', 'err'); return; }
+  var focusNote = getSummaryFocusPrompt();
+  var anonymize = getSummaryAnonymizationEnabled();
+  var prompt = cvSummaryPrompt(cv, modifier, focusNote, anonymize);
+  var output = document.getElementById('summaryOutput'), placeholder = document.getElementById('summaryPlaceholder'), costEl = document.getElementById('summaryCost'), btn = document.getElementById('btnSummaryGen');
+  var formatBtn = document.getElementById('btnSummaryFormat');
+  window._summaryGeneratedBullets = [];
+  window._summaryGeneratedSource = '';
+  window._summaryGeneratedAnonymized = null;
+  updateSummaryOutputTitle();
+  if (formatBtn) formatBtn.disabled = true;
+  updateSummaryApplyDocxButton();
+  var run = markTabRunning('summary');
+  if (output) { output.style.display = 'block'; output.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--text3);"><span class="spinner"></span><span>Generating summary with ' + esc(route.display) + '…</span></div>'; }
+  if (placeholder) placeholder.style.display = 'none'; if (btn) btn.disabled = true; updateSummaryRouteBadge();
+  try {
+    var summaryRequest = { api_key: route.api_key, api_key_slot: route.api_key_slot, provider: route.provider, model: route.model, prompt: prompt, max_tokens: modifier === 'longer' ? 1600 : 1000, use_tools:false, strip_candidate_pay:true };
+    if (anonymize) {
+      summaryRequest.feature = 'summary_anonymized';
+      summaryRequest.source_cv_text = cv;
+    }
+    var r = await fetchWithTimeout('/generate-ai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(summaryRequest) }, 180000);
+    var d = await r.json().catch(function(){ return {}; });
+    if (!r.ok || d.error) {
+      recordPaidAiFailure('CV Summary failed output', d, route.model, route.provider);
+      throw new Error(normalizeAiProviderError(d.error || ('API error ' + r.status), route));
+    }
+    var raw = aiText(d);
+    // Every line was the candidate's pay: the call succeeded and was paid for, so
+    // its cost is recorded like any summary and the tab is not marked failed; the
+    // page says what happened as a warning, not as a provider failure.
+    if (!summaryBulletLines(raw).length && d.summary_pay_removed > 0) {
+      statsRecord((anonymize ? 'Anonymized CV Summary — ' : 'CV Summary — ') + getSummaryFocusLabel(), 'summary', responseCost(d, route.model, route.provider), d.model || route.model, '', d.provider || route.provider, statsMetaFromResponse(d, route.model, route.provider));
+      // A summary linked earlier for formatting this CV is unlinked too, so
+      // formatting cannot quietly use a summary that is not the latest result.
+      var unlinked = !!(window._formatSummaryDraft && String(window._formatSummaryDraft.cv_text || '').trim() === cv);
+      if (unlinked) clearFormatSummaryDraft();
+      var payOnlyNote = 'The CV Summary only described the candidate\'s pay, which is never included. Generate it again for a new summary.' + (unlinked ? ' The summary linked earlier for formatting is no longer linked.' : '');
+      if (output) output.innerHTML = '<div class="cv-parse-warning" role="note">\u26a0 ' + esc(payOnlyNote) + '</div>';
+      markTabDone('summary', run);
+      showToast(payOnlyNote, 'warn');
+      return;
+    }
+    if (!raw) {
+      recordPaidAiFailure('CV Summary returned empty output', d, route.model, route.provider);
+      throw new Error('Empty summary returned');
+    }
+    window._summaryGeneratedBullets = summaryBulletLines(raw);
+    window._summaryGeneratedSource = cv;
+    window._summaryGeneratedAnonymized = anonymize;
+    if (!window._summaryGeneratedBullets.length) throw new Error('Empty summary returned');
+    var payNote = cvSummaryPayNote(d.summary_pay_removed, false);
+    if (output) output.innerHTML = renderSummaryText(raw) + (payNote ? '<div class="cv-parse-warning" role="note">\u26a0 ' + esc(payNote) + '</div>' : '');
+    updateSummaryOutputTitle();
+    if (formatBtn) formatBtn.disabled = !ta || String(ta.value || '').trim() !== cv;
+    updateSummaryApplyDocxButton();
+    var usage = normalizeUsageClient(d.usage || {}); var cost = responseCost(d, route.model, route.provider);
+    if (costEl) costEl.textContent = (cost > 0 ? ('$' + cost.toFixed(4) + ' · ') : '') + ((usage.input_tokens || 0) + (usage.output_tokens || 0)).toLocaleString() + ' tokens · ' + providerLabel(d.provider || route.provider, d.model || route.model);
+    statsRecord((anonymize ? 'Anonymized CV Summary — ' : 'CV Summary — ') + getSummaryFocusLabel(), 'summary', cost, d.model || route.model, '', d.provider || route.provider, statsMetaFromResponse(d, route.model, route.provider));
+    markTabDone('summary', run);
+    if (payNote) showToast(payNote, 'warn');
+    else showToast(anonymize ? 'Anonymized CV Summary generated' : 'CV Summary generated', 'ok');
+  } catch(e) {
+    if (output) output.innerHTML = '<div style="color:var(--red);font-size:13px;line-height:1.5;">⚠ ' + esc(e.message || 'CV Summary failed') + '</div>';
+    markTabFailed('summary', run); showToast('CV Summary failed: ' + (e.message || 'Unknown error').split('\n')[0], 'err');
+  } finally { if (btn) btn.disabled = false; }
+}
+function initSummaryTabUI() {
+  try {
+    updateSummaryLockUI();
+    updateSummaryRouteBadge();
+    var ta = document.getElementById('summaryCvText');
+    if (ta && !ta._summaryCharCountBound) {
+      ta.addEventListener('input', function(){
+        updateSummaryCharCount();
+        window._summaryGeneratedBullets = [];
+        window._summaryGeneratedSource = '';
+        window._summaryGeneratedAnonymized = null;
+        updateSummaryOutputTitle();
+        if (window._summarySourceDocxFile && String(ta.value || '').trim() !== String(window._summarySourceDocxText || '').trim()) {
+          window._summarySourceDocxFile = null;
+          window._summarySourceDocxText = '';
+          var status = document.getElementById('summaryFileStatus');
+          if (status) status.textContent = 'DOCX link cleared because the extracted CV text was edited. Re-upload the DOCX to fill its Summary placeholder.';
+        }
+        var formatBtn = document.getElementById('btnSummaryFormat');
+        if (formatBtn) formatBtn.disabled = true;
+        updateSummaryApplyDocxButton();
+      });
+      ta._summaryCharCountBound = true;
+    }
+    updateSummaryCharCount();
+    updateSummaryAnonymizeHint();
+    updateSummaryOutputTitle();
+  } catch(e) {}
+}
+function suppressSummaryTabAutoCaret() {
+  // v24.6.66: opening CV Summary should not leave a blinking text caret
+  // in the empty textarea/input. Users can still click/type normally after the tab is open.
+  try {
+    setTimeout(function(){
+      var view = document.getElementById('viewSummary');
+      if (!view || !view.classList.contains('active')) return;
+      var ae = document.activeElement;
+      if (ae && view.contains(ae) && /^(TEXTAREA|INPUT)$/i.test(ae.tagName || '')) ae.blur();
+    }, 0);
+  } catch(e) {}
+}
+function fallbackCopyRichSummary(el, plainText) {
+  try {
+    var sel = window.getSelection();
+    var prevRanges = [];
+    if (sel) {
+      for (var i = 0; i < sel.rangeCount; i++) prevRanges.push(sel.getRangeAt(i).cloneRange());
+      sel.removeAllRanges();
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      sel.addRange(range);
+    }
+    var ok = document.execCommand && document.execCommand('copy');
+    if (sel) {
+      sel.removeAllRanges();
+      prevRanges.forEach(function(r){ sel.addRange(r); });
+    }
+    if (ok) { showToast('CV Summary copied with formatting', 'ok'); return; }
+  } catch(e) {}
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(plainText).then(function(){ showToast('CV Summary copied as plain text', 'ok'); }).catch(function(){ showToast('Copy failed', 'err'); });
+  } else {
+    showToast('Copy failed', 'err');
+  }
+}
+async function copySummaryOutput() {
+  if (!requireSummaryUnlocked()) return;
+  var el = document.getElementById('summaryOutput');
+  if (!el || el.style.display === 'none' || !el.innerText.trim()) { showToast('Generate a summary first', 'err'); return; }
+  var plain = el.innerText.trim();
+  var html = '<meta charset="utf-8"><div>' + el.innerHTML + '</div>';
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' })
+      })]);
+      showToast('CV Summary copied with bold formatting', 'ok');
+      return;
+    }
+  } catch(e) {
+    // Fall through to selection-based rich-copy fallback.
+  }
+  fallbackCopyRichSummary(el, plain);
+}
+function clearSummaryTab() {
+  if (!requireSummaryUnlocked()) return;
+  clearTabRunState('summary');
+  var f = document.getElementById('summaryFileInput'); if (f) f.value = '';
+  var s = document.getElementById('summaryFileStatus'); if (s) s.textContent = '';
+  var t = document.getElementById('summaryCvText'); if (t) t.value = '';
+  var o = document.getElementById('summaryOutput'); if (o) { o.style.display = 'none'; o.innerHTML = ''; }
+  var p = document.getElementById('summaryPlaceholder'); if (p) p.style.display = 'flex';
+  var c = document.getElementById('summaryCost'); if (c) c.textContent = '';
+  window._summaryGeneratedBullets = [];
+  window._summaryGeneratedSource = '';
+  window._summaryGeneratedAnonymized = null;
+  window._summarySourceDocxFile = null;
+  window._summarySourceDocxText = '';
+  var formatBtn = document.getElementById('btnSummaryFormat'); if (formatBtn) formatBtn.disabled = true;
+  updateSummaryApplyDocxButton();
+  clearFormatSummaryDraft();
+  updateSummaryCharCount();
+  updateSummaryOutputTitle();
+}

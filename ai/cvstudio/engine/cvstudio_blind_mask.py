@@ -1,0 +1,2253 @@
+"""Blind CV/JD organisation-masking helpers (Phase 7B-6f).
+
+Behaviour-preserving extraction of the stateless organisation-masking logic
+from the legacy web shell: collecting employer/organisation mask terms,
+recursively walking parsed CV structures, and replacing or post-processing
+company mentions so a blinded CV/JD hides identifying employer names while
+keeping a curated technology allowlist.
+
+Pure functions and module-level data only - no Flask, no globals, no network.
+This module never imports ``app``.
+"""
+
+import copy
+import difflib
+import functools
+import re
+
+
+# Shared by source-summary recovery and the app's DOCX summary replacement.
+# Keep one vocabulary so both paths stop at every established CV section.
+_SUMMARY_DOCX_SECTION_HEADING_KEYS = frozenset({
+    "experience",
+    "professionalexperience",
+    "professionalexperiences",
+    "workexperience",
+    "workexperiences",
+    "workingexperience",
+    "relevantexperience",
+    "industryexperience",
+    "employment",
+    "employmentexperience",
+    "employmenthistory",
+    "careerhistory",
+    "careerbackground",
+    "workhistory",
+    "education",
+    "educationqualifications",
+    "academicbackground",
+    "academicqualifications",
+    "qualifications",
+    "skills",
+    "keyskills",
+    "technicalskills",
+    "professionalskills",
+    "coreskills",
+    "itskills",
+    "coreexpertise",
+    "expertise",
+    "competencies",
+    "corecompetencies",
+    "certification",
+    "certifications",
+    "license",
+    "licenses",
+    "licence",
+    "licences",
+    "accreditation",
+    "accreditations",
+    "project",
+    "projects",
+    "projecthistory",
+    "projectinvolvementhistory",
+    "achievement",
+    "achievements",
+    "careerhighlights",
+    "professionalhighlights",
+    "selectedaccomplishments",
+    "accomplishments",
+    "award",
+    "awards",
+    "honour",
+    "honours",
+    "honor",
+    "honors",
+    "reference",
+    "references",
+    "language",
+    "languages",
+    "publication",
+    "publications",
+    "interest",
+    "interests",
+    "membership",
+    "memberships",
+    "professionaldevelopment",
+    "training",
+    "trainingprogramme",
+    "participatedtrainingprogramme",
+    "volunteerexperience",
+    "volunteering",
+    "personaldetails",
+    "additionalinformation",
+})
+
+
+_BLIND_ORG_TECH_ALLOWLIST = {
+    "aws", "amazon web services", "azure", "microsoft azure", "gcp", "google cloud",
+    "python", "pyspark", "spark", "apache spark", "airflow", "apache airflow",
+    "sql", "mysql", "postgresql", "oracle sql", "redshift", "aws redshift",
+    "lambda", "aws lambda", "s3", "ec2", "emr", "rds", "glue", "aws glue",
+    "tableau", "power bi", "ssis", "ssrs", "ssas", "jenkins", "git", "github",
+    "kafka", "databricks", "snowflake", "talend", "dbeaver", "athena",
+    "salesforce", "sap", "oracle", "linux", "windows", "excel", "csv", "json",
+    # Ambiguous technology vendor/platform names: do not sweep these from free-text
+    # bullets because they are often tools rather than client identities. Employer
+    # fields are still handled by the AI prompt/company-field masking.
+    "microsoft", "amazon", "google", "apple", "adobe", "cisco", "huawei",
+    "workday", "servicenow", "ibm", "youtube", "dataiku",
+}
+
+
+_BLIND_CURATED_ORG_NAMES = {
+    "Maxis", "Celcom", "Digi", "CelcomDigi", "U Mobile", "Telekom Malaysia", "TM",
+    "Axiata", "Time dotCom", "YTL", "Yes", "Astro", "Unifi",
+    "Maybank", "CIMB", "RHB", "Hong Leong Bank", "Public Bank", "AmBank",
+    "Bank Islam", "Bank Muamalat", "Affin Bank", "Alliance Bank", "OCBC", "UOB",
+    "DBS", "Bank of Singapore", "HSBC", "Standard Chartered", "Citibank", "Citi", "JP Morgan",
+    "JPMorgan", "Goldman Sachs", "Morgan Stanley", "Credit Suisse", "UBS",
+    "IHH", "IHH Healthcare", "AIA", "Prudential", "Great Eastern", "Allianz",
+    "Etiqa", "Zurich", "FWD", "Tune Protect", "Sunway", "Sime Darby",
+    "Petronas", "Shell", "ExxonMobil", "BHP", "MISC", "Tenaga Nasional", "TNB",
+    "AirAsia", "Malaysia Airlines", "Batik Air", "Grab", "GrabPay", "Shopee",
+    "Lazada", "Zalora", "Foodpanda", "Touch 'n Go", "TNG", "Boost", "BigPay",
+    "Setel", "Carsome", "iFAST", "CTOS", "Experian", "Bursa Malaysia",
+    "PayNet", "DuitNow", "MyClear", "MDEC", "EPF", "KWSP", "SOCSO", "PERKESO",
+    "Accenture", "Deloitte", "PwC", "EY", "KPMG", "Capgemini", "Cognizant",
+    "TCS", "Infosys", "Wipro", "HCLTech", "IBM", "DXC", "NTT", "NTT DATA",
+    "Fujitsu", "Atos", "EPAM", "Avanade", "Dataiku", "YouTube", "Google",
+    "Meta", "Facebook", "Apple", "Amazon", "Netflix", "Microsoft", "SAP", "Oracle",
+    "Salesforce", "Workday", "ServiceNow", "Adobe", "Cisco", "Huawei", "Tencent",
+    "Alibaba", "ByteDance", "TikTok", "Genting", "Genting Group", "Resorts World",
+}
+
+
+# Given names and surnames that are also ordinary English words. A single name token
+# from this set is never swept across a whole CV, because "Will delivered the
+# migration", "Grace period", "Rose from 12% to 40%" and "Frank discussion" are prose,
+# not the candidate.
+_BLIND_COMMON_WORD_NAMES = frozenset({
+    "abbey", "amber", "angel", "april", "august", "autumn", "baker", "bill",
+    "bond", "brook", "brooke", "cash", "chance", "charity", "chase", "cliff",
+    "dawn", "dean", "drew", "duke", "earl", "faith", "field", "flint", "ford",
+    "frank", "grace", "grant", "gray", "green", "hope", "house", "hunter",
+    "june", "justice", "king", "lane", "long", "major", "mark", "mason", "mercy",
+    "january", "february", "march", "may", "july", "september", "october",
+    "november", "december",
+    "miles", "noble", "olive", "page", "paige", "parker", "pearl", "penny",
+    "pierce", "price", "prince", "rich", "rose", "royal", "sage", "sharp", "sonny",
+    "stone", "storm", "summer", "sunny", "swift", "victor", "ward", "wilder",
+    "will", "wisdom", "wood", "young",
+    # Words that read as ordinary nouns in a CV even when capitalised.
+    "church", "temple", "abbot", "bishop", "chapel", "cross", "east", "west",
+    "north", "south", "bright", "strong", "best", "first", "senior", "junior",
+})
+
+# Place names common in this market that are also surnames or given names. "Shah Alam",
+# "Petaling Jaya" and "Johor Bahru" appear in CVs as locations far more often than a
+# candidate's own name does.
+_BLIND_PLACE_WORD_NAMES = frozenset({
+    "alam", "jaya", "bahru", "baru", "lumpur", "pinang", "penang", "damansara",
+    "bangsar", "cheras", "klang", "subang", "puchong", "kajang", "seremban",
+    "ipoh", "kuching", "johor", "melaka", "malacca", "perak", "kedah", "kelantan",
+    "pahang", "sabah", "sarawak", "selangor", "putra", "putrajaya", "cyberjaya",
+    "sentral", "ampang", "setia", "utara", "selatan", "timur", "barat", "indah",
+    "permai", "singapore", "jakarta", "bandung", "surabaya", "manila", "bangkok",
+})
+
+# Lineage, honorific and nobiliary particles. They are part of a person's full name but
+# belong to many other people too, so sweeping one on its own - or sweeping a run that
+# begins or ends with one - rewrites unrelated names ("Siti binti Rahman" ->
+# "Siti the candidate").
+_BLIND_NAME_PARTICLES = frozenset({
+    "binti", "binte", "bint", "ibnu", "ibn", "anak", "abdul", "haji", "hajjah",
+    "syed", "sharifah", "tengku", "raja", "nik", "wan", "van", "von", "der",
+    "den", "del", "della", "dos", "das", "mac", "abu", "bin", "bte",
+    "a/p", "a/l",
+})
+
+# Titles that precede a name. "Mr Lariya" is the candidate with an honorific, not two
+# people, so an honorific is never evidence that a run names somebody else.
+_BLIND_HONORIFICS = frozenset({
+    "mr", "mrs", "ms", "miss", "mx", "dr", "prof", "professor",
+    "ir", "ts", "dato", "datuk", "datin", "sir", "madam", "puan", "encik", "tuan",
+})
+
+# A title left in front of the label once the name behind it is gone. The exact
+# full-name replacement runs before the bare-name pass, so "Dr Vinay Lariya" becomes
+# "Dr the candidate" there and the title has to be absorbed afterwards.
+_BLIND_HONORIFIC_LABEL_RE = re.compile(
+    r"(?<![A-Za-z0-9])(?:" + "|".join(sorted(_BLIND_HONORIFICS, key=len, reverse=True))
+    + r")\.?\s+the candidate\b",
+    re.I,
+)
+
+# Role and job-title vocabulary. A CV header reads "Name Senior Data Engineer", so
+# these Title Case words are not evidence that a capitalised run names somebody else.
+# Kept to role words only - place words such as Greater and Area must stay evidence, or
+# "Greater Victoria Area" loses its protection.
+_BLIND_JOB_TITLE_WORDS = frozenset({
+    "senior", "junior", "lead", "leader", "principal", "associate", "assistant",
+    "intern", "trainee", "head", "chief", "vice", "president", "director", "manager",
+    "engineer", "developer", "analyst", "consultant", "architect", "specialist",
+    "officer", "executive", "administrator", "coordinator", "supervisor", "technician",
+    "scientist", "designer", "strategist", "advisor", "adviser", "founder",
+    "data", "software", "systems", "business", "project", "product", "technical",
+    "engineering", "operations", "marketing", "sales", "finance", "delivery",
+    "platform", "cloud", "security", "quality", "network", "infrastructure",
+})
+
+# Technology, tool and platform names that are also given names. The module already
+# keeps _BLIND_ORG_TECH_ALLOWLIST for the organisation sweep; the name sweep needs the
+# same protection, or a candidate called Ruby turns "Ruby on Rails" into a placeholder.
+_BLIND_TECHNOLOGY_GIVEN_NAMES = frozenset({
+    "ruby", "java", "jade", "athena", "kafka", "scala", "chef", "puppet", "maven",
+    "django", "flask", "pandas", "angular", "ember", "grafana", "kibana", "hudson",
+    "jenkins", "jira", "nexus", "sage", "oracle", "aurora", "cassandra", "hadoop",
+})
+
+# Words the anonymiser itself emits. A fixture or placeholder name containing one of
+# these would otherwise make the sweep rewrite its own output.
+_BLIND_GENERIC_PLACEHOLDER_WORDS = frozenset({
+    "candidate", "company", "client", "customer", "employer", "organisation",
+    "organization", "institution", "university", "redacted", "anonymous", "person",
+})
+
+# Curated organisation names that are also ordinary English words. Only these get the
+# capitalisation rule, and only when the term was not collected from an employer field:
+# a company genuinely named Grab or Shell must be masked however it is written.
+_BLIND_AMBIGUOUS_ORG_WORDS = frozenset({"boost", "grab", "meta", "shell", "yes", "misc"})
+
+# A replaced name can open a line, a bullet or a sentence, so the generic label has to be
+# recapitalised there rather than exporting "- the candidate led delivery."
+_BLIND_GENERIC_LABEL_SENTENCE_RE = re.compile(
+    r"(\A[-*\u2022\u00b7]?\s*|[.!?]\s+|\n\s*[-*\u2022\u00b7]?\s*)the candidate\b"
+)
+# Substituting a noun phrase where a bare noun stood can double the article.
+_BLIND_DOUBLED_ARTICLE_RE = re.compile(r"\bthe\s+the candidate\b", re.I)
+# Pipeline, table and file names carry identity too, and have to go as a whole token.
+_BLIND_IDENTIFIER_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+")
+# The label anywhere in a header field, so "Name | Title" keeps its title.
+_BLIND_GENERIC_LABEL_ANY_RE = re.compile(r"(?<![A-Za-z0-9])the candidate(?![A-Za-z0-9])", re.I)
+# A stored bare domain leaves "https://[Link Redacted]" when the text spelled the scheme.
+_BLIND_LINK_SCHEME_LEFTOVER_RE = re.compile(r"(?:https?://|www\.)+\[Link Redacted\]", re.I)
+# The word immediately before or after a bare name match, used to tell "Alam led the
+# migration" (the person) from "Shah Alam" (a place).
+# One word of a name. Unicode-aware: Jose, Francois and Munoz are spelled with accented
+# letters, and an ASCII-only class would stop matching partway through and leak the name.
+_BLIND_NAME_RUN_WORD_RE = re.compile(r"[^\W\d_][\w'\u2019\-]*", re.UNICODE)
+# A number straight after a name-shaped word: "May 2023" is a date, not a person.
+_BLIND_TRAILING_NUMBER_RE = re.compile(r"[\s,\u2013\u2014-]*\d")
+_BLIND_WORD_BEFORE_RE = re.compile(r"([A-Za-z][A-Za-z'\u2019/-]*)(\s+)\Z")
+
+
+_BLIND_ORG_SUFFIX_RE = re.compile(
+    r"\b([A-Z][A-Za-z0-9&.'’\-]*(?:\s+[A-Za-z0-9&.'’\-]+){0,8}\s+"
+    r"(?i:Sdn\.?\s*Bhd\.?|Bhd\.?|Berhad|Pte\.?\s*Ltd\.?|Pvt\.?\s*Ltd\.?|Ltd\.?|Limited|Inc\.?|LLC|LLP|PLC|Corp\.?|Corporation|Company|Co\.?|Group|Holdings|Bank|Insurance|Assurance|Telecommunications|Telekom|Technologies|Technology|Solutions|Services|Consulting))\b"
+)
+# Units that mark a long decimal as a measurement rather than a dotted phone number.
+_BLIND_MEASUREMENT_BEFORE_RE = re.compile(
+    r"(?:[$\u00a3\u20ac]|\b(?:rm|usd|sgd|myr|idr|thb|php|eur|gbp|aud|jpy|inr"
+    r"|uptime|availability|accuracy|precision|ratio|rate|score|average|mean|median"
+    r"|version|latency|throughput|coverage|margin|yield)\s*)\Z",
+    re.I,
+)
+_BLIND_MEASUREMENT_AFTER_RE = re.compile(
+    r"\s*(?:%|\b(?:percent|pct|per\s*cent|million|billion|thousand|bn|mn|k"
+    r"|hours?|days?|weeks?|months?|years?|seconds?|ms|s|gb|tb|mb|kb|x|times"
+    r"|uptime|availability|accuracy|score|points?|units?)\b)",
+    re.I,
+)
+
+
+_BLIND_SUMMARY_EMAIL_RE = re.compile(
+    # The trailing guard deliberately omits "." - a full stop ends the sentence, and
+    # excluding it meant an address written last in a bullet was never redacted.
+    r"(?<![A-Za-z0-9._%+\-])[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}(?![A-Za-z0-9_%+\-])",
+    re.I,
+)
+_BLIND_SUMMARY_URL_RE = re.compile(
+    r"(?<![A-Za-z0-9@])(?:"
+    r"(?:https?://|www\.)[^\s<>()]+|"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?\.)+"
+    r"(?:com|net|org|io|dev|me|co|info|biz|ai|app|tech|site|online|xyz|"
+    r"cloud|digital|website|my|sg|uk)(?:/[^\s<>()]*)?"
+    r")",
+    re.I,
+)
+_BLIND_SUMMARY_BARE_DOMAIN_RE = re.compile(
+    r"(?<![A-Za-z0-9@])"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z]{2,63}(?:/[^\s<>()]*)?",
+    re.I,
+)
+_BLIND_SUMMARY_NON_DOMAIN_SUFFIXES = {
+    "css", "csv", "doc", "docx", "html", "ini", "java", "js", "json",
+    "log", "md", "pdf", "php", "ppt", "pptx", "py", "sql", "svg",
+    "ts", "txt", "xls", "xlsx", "xml", "yaml", "yml",
+}
+_BLIND_SUMMARY_DOTTED_DEGREE_RE = re.compile(
+    r"(?:[BM]\.(?:Arch|Com|Ed|Eng|Pharm|Sc|Tech)|D\.Phil)"
+)
+_BLIND_SUMMARY_PHONE_CANDIDATE_RE = re.compile(
+    r"(?<![A-Za-z0-9])\+?\d[\d\s().\-]{6,}\d(?![A-Za-z0-9])"
+)
+_BLIND_SUMMARY_PHONE_CONTEXT_RE = re.compile(
+    r"(?:\b(?:call|contact(?:\s+(?:number|no\.?))?|mobile(?:\s+(?:number|no\.?))?|"
+    r"phone(?:\s+(?:number|no\.?))?|tel(?:ephone)?|whatsapp)"
+    r"\s*(?:(?:number|no\.?)\s*)?(?::|#|-|is|at)?|"
+    r"(?<![A-Za-z0-9])(?:m|t)\s*[:#-])\s*$",
+    re.I,
+)
+_BLIND_SUMMARY_ADDRESS_LINE_RE = re.compile(
+    r"^(?:(?:home|residential|mailing|current|permanent)\s+)?address\s*[:|\-]\s*(.+)$",
+    re.I,
+)
+_BLIND_SUMMARY_INLINE_ADDRESS_RE = re.compile(
+    r"\b(?:(?:home|residential|mailing|current|permanent)\s+)?address\s*[:\-]\s*[^;|\n]+",
+    re.I,
+)
+_BLIND_SUMMARY_STREET_MARKER_RE = re.compile(
+    r"\b(?:jalan|jln|lorong|lrg|persiaran|lebuh|lebuhraya|street|st|road|rd|"
+    r"avenue|ave|lane|ln|drive|dr|boulevard|blvd|highway|suite|unit|block|blok|level|"
+    r"floor|tingkat|apartment|apt|residensi|residency|residence|condominium|"
+    r"menara|plaza)\b",
+    re.I,
+)
+_BLIND_SUMMARY_UNLABELED_ADDRESS_RE = re.compile(
+    r"^(?:(?:no\.?|unit|suite|block|blok|lot|floor|tingkat|level)\s*)?"
+    r"(?:[A-Za-z]{0,3}[-/]?)?\d+[A-Za-z]?(?:[-/]\d+[A-Za-z]?){0,3}"
+    r"(?:\s*,?\s*|\s+).+",
+    re.I,
+)
+_BLIND_SUMMARY_DATE_RANGE_RE = re.compile(
+    r"\b(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|"
+    r"dec(?:ember)?)\.?\s+)?(?:19|20)\d{2}\b\s*(?:[-–—]|to)\s*"
+    r"(?:(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|"
+    r"dec(?:ember)?)\.?\s+)?\b(?:19|20)\d{2}\b|present\b|current\b|now\b)",
+    re.I,
+)
+_BLIND_SUMMARY_SINGLE_YEAR_RE = re.compile(
+    r"(?:\(\s*)?\b(?:19|20)\d{2}\b(?:\s*\))?",
+    re.I,
+)
+_BLIND_SUMMARY_CATEGORY_RE = re.compile(
+    r"^(?:summary|professional summary|executive summary|profile|professional profile|career profile|objective|career objective|overview|about(?:\s+him(?:\s*/\s*her)?|\s+her|\s+the\s+candidate)?)$",
+    re.I,
+)
+_BLIND_SUMMARY_MARKER_RE = re.compile(
+    r"^\s*(?:(?:[-*•●▪◦‣⁃∙·‧])+\s+|(?:\(?\d{1,3}[.)])\s+)"
+)
+_BLIND_SUMMARY_CONTEXT_NAME_RE = re.compile(
+    r"\b(?i:client|customer|employer|company|organization|organisation|university|school|college|institution)"
+    r"(?:[ \t]+(?i:named|called))?[ \t]*[:\-]?[ \t]+(?:(?i:the)[ \t]+)?"
+    r"([A-Z][A-Za-z0-9&.'’\-]*(?:[ \t]+[A-Z][A-Za-z0-9&.'’\-]*){0,5})",
+)
+_BLIND_SUMMARY_BRAND_CONTEXT_RE = re.compile(
+    r"\b([A-Z][A-Za-z0-9&.'’\-]*(?:[ \t]+[A-Z][A-Za-z0-9&.'’\-]*){0,4})[ \t]+"
+    r"(?:product|platform|solution|system|rollout|implementation|application|programme|program|project)\b",
+)
+_BLIND_SUMMARY_BRAND_TOKEN_RE = re.compile(
+    r"\b([A-Z][A-Za-z0-9]{3,})\b"
+)
+_BLIND_INSTITUTION_SUFFIX_RE = re.compile(
+    r"\b([A-Z][A-Za-z0-9&.'’\-]*(?:\s+[A-Za-z0-9&.'’\-]+){0,8}\s+"
+    r"(?i:University|College|School|Institute|Polytechnic|Academy))\b"
+)
+_BLIND_INSTITUTION_PREFIX_RE = re.compile(
+    r"\b((?i:University|College|School|Institute|Polytechnic|Academy)[ \t]+"
+    r"(?:of[ \t]+)?[A-Z][A-Za-z0-9&.'’\-]*(?:[ \t]+[A-Za-z0-9&.'’\-]+){0,7})\b"
+)
+_BLIND_SUMMARY_ROLE_DESCRIPTOR_RE = re.compile(
+    r"\b(?:manager|engineer|consultant|director|analyst|officer|developer|architect|"
+    r"specialist|lead|head|executive|administrator|president|partner|coordinator|"
+    r"supervisor|designer|accountant|recruiter|intern|associate|owner)\b",
+    re.I,
+)
+_BLIND_SUMMARY_DEGREE_DESCRIPTOR_RE = re.compile(
+    r"\b(?:bachelor|master|doctorate|doctoral|phd|diploma|degree|certificate|"
+    r"foundation|a[- ]levels?|spm|stpm|mba|bsc|ba|msc|ma)\b",
+    re.I,
+)
+_BLIND_INLINE_MARKDOWN_MARKERS = frozenset("*_`")
+
+
+def _blind_identifier_pattern(value, *, case_sensitive_single=False):
+    exact = str(value or "").strip()
+    if not exact:
+        return None
+    flags = 0 if case_sensitive_single and not re.search(r"\s", exact) else re.I
+    return re.compile(
+        r"(?<![A-Za-z0-9])" + re.escape(exact) + r"(?![A-Za-z0-9])",
+        flags,
+    )
+
+
+def _blind_replace_identifier(
+    text, value, replacement, *, case_sensitive_single=False
+):
+    pattern = _blind_identifier_pattern(
+        value, case_sensitive_single=case_sensitive_single
+    )
+    if pattern is None:
+        return text
+    out = str(text or "")
+    # The Summary prompt deliberately asks providers to use Markdown bold.
+    # Match the visible text too, otherwise **Jane** Example or
+    # **Acme** Sdn Bhd bypasses exact identifier replacement.
+    visible = []
+    offsets = []
+    for index, character in enumerate(out):
+        if character in _BLIND_INLINE_MARKDOWN_MARKERS:
+            continue
+        visible.append(character)
+        offsets.append(index)
+    matches = list(pattern.finditer("".join(visible)))
+    if not matches:
+        # Preserve support for unusual literal identifiers that themselves
+        # contain one of the Markdown marker characters.
+        return pattern.sub(replacement, out)
+    for match in reversed(matches):
+        start = offsets[match.start()]
+        end = offsets[match.end() - 1] + 1
+        while start > 0 and out[start - 1] in _BLIND_INLINE_MARKDOWN_MARKERS:
+            start -= 1
+        while end < len(out) and out[end] in _BLIND_INLINE_MARKDOWN_MARKERS:
+            end += 1
+        out = out[:start] + replacement + out[end:]
+    return out
+
+
+def _blind_contains_identifier(text, value, *, case_sensitive_single=False):
+    pattern = _blind_identifier_pattern(
+        value, case_sensitive_single=case_sensitive_single
+    )
+    if pattern is None or pattern.search(str(text or "")):
+        return pattern is not None
+    visible = "".join(
+        character
+        for character in str(text or "")
+        if character not in _BLIND_INLINE_MARKDOWN_MARKERS
+    )
+    return bool(pattern.search(visible))
+
+
+def _blind_redact_phone_candidates(text):
+    def replace(match):
+        value = match.group(0)
+        digits = re.sub(r"\D", "", value)
+        # Preserve ordinary date ranges such as 2020 - 2023. Phone-like text
+        # must carry a prefix, formatting, a recognised local shape, or nearby
+        # contact wording. A long uninterrupted achievement metric is not a
+        # phone number merely because it contains nine or more digits.
+        if re.fullmatch(
+            r"\s*(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}\s*",
+            value,
+        ):
+            return value
+        nearby = match.string[max(0, match.start() - 48):match.start()]
+        if _BLIND_SUMMARY_PHONE_CONTEXT_RE.search(nearby):
+            return "[Phone Redacted]"
+        if not 8 <= len(digits) <= 15:
+            return value
+        if value.lstrip().startswith("+"):
+            return "[Phone Redacted]"
+        if (
+            (digits.startswith("0") and 9 <= len(digits) <= 11)
+            or (digits.startswith("60") and 10 <= len(digits) <= 12)
+        ):
+            return "[Phone Redacted]"
+        grouped_metric = bool(
+            re.fullmatch(r"\d{1,3}(?:(?:\s|\.)\d{3}){2,}", value.strip())
+        )
+        if grouped_metric:
+            return value
+        # A decimal is a measurement, not a dotted phone number - but only when it
+        # reads like one. Two or three decimal places is money or a plain figure
+        # ("250000.50"); a longer fraction needs a unit beside it ("99.9999999
+        # percent", "RM 12.345678"), because "65.91234567" on its own is a phone
+        # number with a country code.
+        decimal = re.fullmatch(r"\d+\.(\d+)", value.strip())
+        if decimal is not None:
+            if len(decimal.group(1)) <= 3:
+                return value
+            before = match.string[max(0, match.start() - 24):match.start()]
+            after = match.string[match.end():match.end() + 24]
+            if _BLIND_MEASUREMENT_BEFORE_RE.search(before) or _BLIND_MEASUREMENT_AFTER_RE.match(after):
+                return value
+        if re.search(r"[\s().-]", value):
+            return "[Phone Redacted]"
+        return value
+
+    return _BLIND_SUMMARY_PHONE_CANDIDATE_RE.sub(replace, text)
+
+
+def _blind_summary_plausible_identifier(value):
+    text = re.sub(r"\s+", " ", str(value or "")).strip(" .,:;|-/")
+    if not text or len(text) < 3:
+        return ""
+    low = text.casefold()
+    if low in _BLIND_ORG_TECH_ALLOWLIST:
+        return ""
+    if low in {
+        "candidate", "company", "client", "customer", "project", "programme",
+        "program", "platform", "system", "solution", "university", "college",
+        "school", "institution", "implementation", "current company",
+    }:
+        return ""
+    tokens = re.findall(r"[A-Za-z0-9]+", text)
+    safe_parts = {
+        *(_BLIND_ORG_TECH_ALLOWLIST),
+        "project", "system", "solution", "implementation", "application",
+        "program", "programme", "management", "accounting", "finance",
+        "controlling", "technology", "technologies", "engineering",
+    }
+    if tokens and all(token.casefold() in safe_parts for token in tokens):
+        return ""
+    if tokens and all(token.isupper() and len(token) <= 5 for token in tokens):
+        return ""
+    return text
+
+
+def _blind_trim_org_match(value):
+    """Remove sentence lead-ins accidentally consumed by the suffix regex."""
+    clean = re.sub(r"\s+", " ", str(value or "")).strip(" .,:;|-/")
+    clean = re.sub(
+        r"^(?:Organization|Organisation|Company|Client|Employer|Project|Project Name|Current Company)\s*[:\-]\s*",
+        "",
+        clean,
+        flags=re.I,
+    ).strip()
+    # The legal-suffix matcher intentionally accepts lower-case words inside a
+    # company name, but that also lets it start at "Worked" or "Delivered".
+    # Keep only the phrase following the final prose preposition.
+    clean = re.sub(
+        r"^.*\b(?:at|for|with|by|from)\s+(?=[A-Z0-9])",
+        "",
+        clean,
+        flags=re.I,
+    ).strip()
+    return clean
+
+
+def _blind_summary_context_replacements(text):
+    replacements = []
+    seen = set()
+
+    def add(value, replacement="[Company]"):
+        clean = _blind_summary_plausible_identifier(value)
+        key = clean.casefold()
+        if clean and key not in seen:
+            seen.add(key)
+            replacements.append((clean, replacement, False))
+
+    source = str(text or "")
+    for match in _BLIND_SUMMARY_CONTEXT_NAME_RE.finditer(source):
+        add(match.group(1))
+    for match in _BLIND_SUMMARY_BRAND_CONTEXT_RE.finditer(source):
+        add(match.group(1), "[Product]")
+    for match in _BLIND_SUMMARY_BRAND_TOKEN_RE.finditer(source):
+        token = match.group(1)
+        low = token.casefold()
+        has_brand_suffix = any(
+            low.endswith(suffix) and len(low) - len(suffix) >= 3
+            for suffix in (
+                "tech", "core", "soft", "pay", "bank", "labs",
+                "systems", "solutions", "digital", "global", "group",
+            )
+        )
+        # Internal capitals alone are not a company signal: PowerBI,
+        # JavaScript and NodeJS are ordinary technologies. Unknown brands are
+        # still recovered from labels, dated employment lines, legal suffixes,
+        # product contexts and the conservative brand suffixes below.
+        if has_brand_suffix:
+            add(token, "[Company]")
+    for match in _BLIND_INSTITUTION_SUFFIX_RE.finditer(source):
+        add(match.group(1), "[Institution]")
+    for match in _BLIND_INSTITUTION_PREFIX_RE.finditer(source):
+        add(match.group(1), "[Institution]")
+    return replacements
+
+
+def _blind_walk_strings(obj):
+    if isinstance(obj, dict):
+        for v in obj.values():
+            yield from _blind_walk_strings(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _blind_walk_strings(v)
+    elif isinstance(obj, str):
+        yield obj
+
+
+def _blind_summary_items(value, *, limit=20):
+    values = value if isinstance(value, list) else str(value or "").splitlines()
+    out = []
+    for item in values:
+        if not isinstance(item, str):
+            continue
+        clean = _BLIND_SUMMARY_MARKER_RE.sub("", item).strip()
+        if clean:
+            out.append(clean)
+    return out if limit is None else out[:limit]
+
+
+def _blind_source_summary_bullets(source_text):
+    """Read a unique source summary before masking; never repair from source after it."""
+    if not isinstance(source_text, str):
+        return []
+    # This is a layout correction, not another document parser. Refuse excessive
+    # inputs/sections rather than returning a silently truncated summary.
+    if len(source_text) > 1_000_000 or source_text.count("\n") > 12_000:
+        return []
+    lines = source_text.splitlines()
+    about_keys = {"abouthimher", "abouthim", "abouther", "aboutthecandidate"}
+    summary_keys = about_keys | {
+        "summary", "professionalsummary", "executivesummary", "profile",
+        "professionalprofile", "careerprofile", "objective", "careerobjective", "overview",
+    }
+    boundary_keys = summary_keys | _SUMMARY_DOCX_SECTION_HEADING_KEYS | {
+        "workexperience", "workexperiences", "workingexperience", "professionalexperience",
+        "employmenthistory", "careerhistory", "education", "educationalbackground",
+        "academicqualifications", "qualifications", "certifications", "certification",
+        "educationcertification", "educationcertifications", "educationandcertifications",
+        "educationsandtraining", "educationtraining", "educationandtraining",
+        "educationqualifications", "educationbackground", "academicbackground",
+        "professionalqualifications", "certificationstraining", "coursestraining",
+        "trainingcourses", "trainingdevelopment", "licenses", "licensescertifications",
+        "skills", "technicalskills", "softskills", "languages", "languageproficiency",
+        "skillsandcompetencies", "coreexpertise", "competencies", "competency",
+        "additionalinformation", "otherinformation", "personaldetails", "personalparticulars",
+        "achievements", "awards", "training", "projects", "references", "referees",
+        "hobbies", "interests", "professionaldevelopment",
+        "awardsachievements", "publications", "professionalaffiliations",
+        "professionalmemberships", "memberships", "volunteer", "volunteering",
+        "volunteerexperience", "volunteercommunity", "communityinvolvement",
+        "coreskills", "keyskills", "corecompetencies", "strengths", "keystrengths",
+        "areasofexpertise", "expertise", "specialties", "certificates", "accreditations",
+        "professionalcertifications", "trainings", "courses", "shortcourses", "workshops",
+        "reference", "referee", "refereedetails", "professionalreferences", "characterreferences",
+    }
+    marker_re = re.compile(r"^(?:[-*•●▪◦‣⁃∙·‧\ufffd]+\s+|\(?\d{1,3}[.)]\s+)")
+
+    def heading_key(line):
+        # Letter-spaced template headings and decorative underlines are layout.
+        # Reject digits/sentences instead of mistaking prose for a heading.
+        if (len(line) > 120 or re.search(r"[0-9.!?]", line)
+                or re.match(r"^[-*•●▪◦‣⁃∙·‧\ufffd]+\s+", line)):
+            return ""
+        return re.sub(r"[^a-z]", "", line.lower())
+
+    def section_key(line):
+        marker = marker_re.match(line)
+        if marker:
+            text = line[marker.end():].strip()
+            letters = [char for char in text if char.isalpha()]
+            numbered = bool(re.match(r"\(?\d", marker.group()))
+            if not (numbered or text.endswith(":") or (letters and all(char.isupper() for char in letters))):
+                return ""
+            return heading_key(text)
+        return heading_key(line)
+
+    starts = [(index, section_key(line.strip())) for index, line in enumerate(lines)
+              if section_key(line.strip()) in summary_keys]
+    about = [item for item in starts if item[1] in about_keys]
+    selected = about or starts
+    if len(selected) != 1:
+        return []
+    start = selected[0][0] + 1
+    items, current = [], []
+    marked_current = False
+    section_size = 0
+
+    def flush():
+        if current:
+            items.append(" ".join(current))
+            current.clear()
+
+    for index, raw in enumerate(lines[start:], start):
+        line = raw.strip()
+        section_size += len(raw)
+        if section_size > 32_000 or len(items) > 100:
+            return []
+        if re.match(r"^Private\s*&\s*Confidential\b", line, re.I):
+            following = next((value.strip() for value in lines[index + 1:]
+                              if value.strip()), "")
+            if following and section_key(following) not in boundary_keys:
+                # A footer alone cannot prove the summary ended: it may carry
+                # on onto the next page. Defer rather than retaining half of it.
+                return []
+            break
+        # Some searchable PDFs expose an undefined bullet glyph as U+FFFD.
+        marker = marker_re.match(line)
+        if section_key(line) in boundary_keys:
+            break
+        if not marker and re.search(
+            r"(?:^|\|)\s*(?:notice\s+period|current\s+(?:position|company)|languages)\s*:", line, re.I
+        ):
+            # Word's floating About box can precede the candidate-details table
+            # in XML order. Those labelled cells never belong to its last point.
+            break
+        if not line:
+            if not marked_current:
+                flush()
+            continue
+        if marker:
+            flush()
+            line = line[marker.end():].strip()
+            marked_current = True
+        elif re.match(r"^Note\s*:", line, re.I):
+            flush()
+            marked_current = False
+        if line:
+            if current and re.search(r"[A-Za-z]-$", current[-1]) and re.match(r"[a-z]", line):
+                current[-1] += line
+            else:
+                current.append(line)
+    flush()
+    return items if len(items) <= 100 else []
+
+
+def _blind_preserve_summary_corrections(parsed, source, *, correct_language=False):
+    """Keep grounded parsed mechanics while restoring the selected source section."""
+    original = list(source)
+    if not isinstance(parsed, dict) or not source:
+        return original
+
+    def key(value):
+        return re.sub(r"[\W_]+", "", value.casefold())
+
+    def matches(left, right):
+        if re.findall(r"\d+", left) != re.findall(r"\d+", right):
+            return False
+        if key(left) == key(right):
+            return True
+        if correct_language is not True or max(len(left), len(right)) > 2000:
+            return False
+        # Only small spelling changes are eligible. Dates/numbers, word order
+        # and short meaning-bearing words (e.g. not/now) must remain unchanged.
+        before = re.findall(r"\w+", left.casefold())
+        after = re.findall(r"\w+", right.casefold())
+        if len(before) != len(after):
+            return False
+        for old, new in zip(before, after):
+            if old == new:
+                continue
+            swapped = (len(old) == len(new) and len(old) >= 3
+                       and any(old[:i] + old[i+1] + old[i] + old[i+2:] == new
+                               for i in range(len(old)-1)))
+            if swapped:
+                continue
+            if (min(len(old), len(new)) < 4 or max(len(old), len(new)) > 80
+                    or old[0] != new[0]):
+                return False
+            edits = difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes()
+            if sum(max(i2-i1, j2-j1) for tag, i1, i2, j1, j2 in edits if tag != "equal") > 2:
+                return False
+        return True
+
+    candidates = [parsed.get("summary_bullets")]
+    for skill in parsed.get("skills") or []:
+        if isinstance(skill, dict) and _BLIND_SUMMARY_CATEGORY_RE.fullmatch(str(skill.get("category") or "").strip()):
+            candidates.append(skill.get("items"))
+    for value in candidates[:101]:
+        bullets = _blind_summary_items(value, limit=None)
+        if not bullets or len(bullets) > 100 or sum(map(len, bullets)) > 32_000:
+            continue
+        if len(bullets) == len(source) and all(matches(old, new) for old, new in zip(source, bullets)):
+            return bullets
+        # Unmarked DOCX/pasted lines can be genuinely ambiguous. Retain existing
+        # provider item boundaries only when every source character still matches.
+        if (len(source) == 1 and len(bullets) > 1
+                and key(source[0]) == key(" ".join(bullets))
+                and re.findall(r"\d+", source[0]) == re.findall(r"\d+", " ".join(bullets))):
+            return bullets
+    return original
+
+
+def _blind_prepare_summary_bullets(cv_data):
+    """Promote source Summary/About content before the provider blinds it."""
+    if not isinstance(cv_data, dict):
+        return cv_data
+    prepared = copy.deepcopy(cv_data)
+    direct = _blind_summary_items(prepared.get("summary_bullets"), limit=None)
+    skills = prepared.get("skills") if isinstance(prepared.get("skills"), list) else []
+    promoted = []
+    remaining = []
+    for item in skills:
+        if (
+            isinstance(item, dict)
+            and _BLIND_SUMMARY_CATEGORY_RE.fullmatch(
+                str(item.get("category") or "").strip()
+            )
+        ):
+            promoted.extend(_blind_summary_items(item.get("items"), limit=None))
+        else:
+            remaining.append(item)
+    summary = direct or promoted
+    if summary:
+        prepared["summary_bullets"] = summary
+        prepared["skills"] = remaining
+    return prepared
+
+
+def _blind_source_summary_text(original_cv):
+    if not isinstance(original_cv, dict):
+        return ""
+    values = original_cv.get("summary_bullets")
+    if not isinstance(values, list):
+        return ""
+    return "\n".join(value for value in values if isinstance(value, str))
+
+
+def _blind_replacement_contains_word(replacement, key):
+    """Report whether a replacement label contains the source as a whole word."""
+    text = str(replacement or "").casefold()
+    if not key or not text:
+        return False
+    return bool(
+        re.search(r"(?<![a-z0-9])" + re.escape(key) + r"(?![a-z0-9])", text)
+    )
+
+
+def _blind_replacement_collector():
+    """Return the (add, collected) pair the three identity collectors share.
+
+    All three normalise a source value identically, drop anything shorter than three
+    characters, deduplicate case-insensitively, refuse a replacement that contains its
+    own source, and finally sort longest-first so a full name is replaced before its
+    parts. Keeping one copy means a change to that rule cannot apply to two of the
+    three paths and silently diverge.
+    """
+    replacements = []
+    seen = set()
+
+    def add(value, replacement="[Company]", case_sensitive_single=False):
+        exact = re.sub(r"\s+", " ", str(value or "")).strip(" .,:;|-/")
+        key = exact.casefold()
+        if len(exact) < 3 or key in seen:
+            return
+        if _blind_replacement_contains_word(replacement, key):
+            # Replacing "Candidate" with "the candidate" would rewrite its own output.
+            # This has to be a whole-word test: "Andi" is a substring of "the candidate"
+            # but a perfectly ordinary name that must still be masked.
+            return
+        seen.add(key)
+        replacements.append((exact, replacement, case_sensitive_single))
+
+    def collected():
+        return sorted(replacements, key=lambda item: -len(item[0]))
+
+    return add, collected
+
+
+def _blind_collect_summary_identity_replacements(original_cv):
+    """Collect exact source identifiers that may not survive in a blind summary."""
+    if not isinstance(original_cv, dict):
+        return []
+    add, collected = _blind_replacement_collector()
+
+    candidate = (
+        original_cv.get("candidate")
+        if isinstance(original_cv.get("candidate"), dict)
+        else {}
+    )
+    candidate_name = str(candidate.get("name") or "").strip()
+    if candidate_name.casefold() not in {"", "candidate", "the candidate", "[candidate]"}:
+        add(candidate_name, "the candidate", True)
+    add(candidate.get("email"), "[Email Redacted]")
+    add(candidate.get("phone"), "[Phone Redacted]")
+    add(candidate.get("linkedin"), "[Link Redacted]")
+
+    for education in original_cv.get("education") or []:
+        if isinstance(education, dict):
+            add(education.get("institution"), "[Institution]", True)
+    for term in _blind_collect_org_mask_terms(original_cv):
+        add(term, "[Company]")
+    for term, replacement, case_sensitive_single in _blind_summary_context_replacements(
+        _blind_source_summary_text(original_cv)
+    ):
+        add(term, replacement, case_sensitive_single)
+
+    return collected()
+
+
+def _blind_summary_strip_name_honorifics(value):
+    clean = re.sub(r"\s+", " ", str(value or "")).strip()
+    clean = re.sub(r"^(?:tan\s+sri)\s+", "", clean, flags=re.I)
+    words = clean.split()
+    while words and re.sub(r"[^\w]+", "", words[0], flags=re.UNICODE).casefold() in _BLIND_HONORIFICS:
+        words.pop(0)
+    return " ".join(words)
+
+
+def _blind_summary_name_word(value):
+    token = str(value or "").strip()
+    token = token.strip(".")
+    if not token:
+        return False
+    if re.fullmatch(r"a/[pl]", token, re.I):
+        return True
+    parts = re.split(r"['’\-]", token)
+    return all(part and part.isalpha() for part in parts)
+
+
+def _blind_summary_lineage_name_variants(value):
+    """Return compact and spaced Malaysian lineage spellings for one name."""
+    original = re.sub(r"\s+", " ", str(value or "")).strip()
+    if not original:
+        return []
+    compact = re.sub(
+        r"\b([Aa])\s*/\s*([PpLl])\b",
+        lambda match: "{}/{}".format(match.group(1), match.group(2)),
+        original,
+    )
+    spaced = re.sub(
+        r"\b([Aa])\s*/\s*([PpLl])\b",
+        lambda match: "{} / {}".format(match.group(1), match.group(2)),
+        original,
+    )
+    return list(dict.fromkeys((original, compact, spaced)))
+
+
+def _blind_summary_bare_domain(value):
+    """Return a source-derived bare domain while rejecting common file/code names."""
+    candidate = str(value or "").rstrip(".,;:!?")
+    host = candidate.split("/", 1)[0].rstrip(".")
+    suffix = host.rsplit(".", 1)[-1].casefold() if "." in host else ""
+    if (
+        not suffix
+        or suffix in _BLIND_SUMMARY_NON_DOMAIN_SUFFIXES
+        or _BLIND_SUMMARY_DOTTED_DEGREE_RE.fullmatch(host)
+    ):
+        return ""
+    return candidate
+
+
+def _blind_redact_summary_urls(text):
+    """Redact links without treating supported dotted degree names as URLs."""
+    def replace(match):
+        value = match.group(0)
+        if re.match(r"(?:https?://|www\.)", value, re.I):
+            return "[Link Redacted]"
+        return "[Link Redacted]" if _blind_summary_bare_domain(value) else value
+
+    return _BLIND_SUMMARY_URL_RE.sub(replace, str(text or ""))
+
+
+def _blind_summary_candidate_name_from_text(source_text):
+    lines = [
+        _BLIND_SUMMARY_MARKER_RE.sub("", re.sub(r"\s+", " ", line)).strip()
+        for line in str(source_text or "").splitlines()
+        if str(line or "").strip()
+    ]
+    for line in lines[:30]:
+        match = re.match(r"^(?:candidate\s+)?name\s*[:|]\s*(.+)$", line, re.I)
+        if match:
+            return _blind_summary_strip_name_honorifics(
+                match.group(1).split("|", 1)[0]
+            )
+
+    excluded = {
+        "about him her", "about the candidate", "summary", "professional summary",
+        "profile", "professional profile", "curriculum vitae", "resume", "work experience",
+        "work experiences", "education", "skills", "technical skills",
+    }
+    title_words = {
+        "manager", "engineer", "consultant", "director", "analyst", "officer",
+        "developer", "architect", "specialist", "lead", "head", "executive",
+        "administrator", "president", "partner",
+    }
+    for original_line in lines[:8]:
+        # CV headers commonly keep the name and contact fields on one pipe row.
+        # Only inspect the first segment so the contact fields do not cause the
+        # candidate-name detector to discard the entire header.
+        line = _blind_summary_strip_name_honorifics(
+            original_line.split("|", 1)[0]
+        )
+        if len(line) > 80 or any(value in line for value in ("@", "http://", "https://", ":")):
+            continue
+        validation_line = re.sub(
+            r"\b([Aa])\s*/\s*([PpLl])\b",
+            lambda match: "{}/{}".format(match.group(1), match.group(2)),
+            line,
+        )
+        words = validation_line.split()
+        if not 1 <= len(words) <= 6:
+            continue
+        if re.sub(r"[^a-z]+", " ", line.casefold()).strip() in excluded:
+            continue
+        if not all(_blind_summary_name_word(word) for word in words):
+            continue
+        if any(word.strip(".'’-,").casefold() in title_words for word in words):
+            continue
+        if len(words) == 1 and line != lines[0]:
+            continue
+        if all(
+            word.isupper()
+            or word[:1].isupper()
+            or bool(re.fullmatch(r"a/[pl]", word, re.I))
+            for word in words
+        ):
+            return line
+    return ""
+
+
+def _blind_summary_standalone_org_candidate(value):
+    """Return a conservative employer candidate from a vertical CV row."""
+    raw = re.sub(r"\s+", " ", str(value or "")).strip()
+    if _BLIND_SUMMARY_MARKER_RE.match(raw):
+        return ""
+    line = raw
+    if not line or len(line) > 80 or "|" in line or ":" in line:
+        return ""
+    if any(marker in line.casefold() for marker in ("@", "http://", "https://", "www.")):
+        return ""
+    if (
+        _BLIND_SUMMARY_DATE_RANGE_RE.search(line)
+        or _BLIND_SUMMARY_ROLE_DESCRIPTOR_RE.search(line)
+        or _BLIND_SUMMARY_DEGREE_DESCRIPTOR_RE.search(line)
+        or _BLIND_SUMMARY_STREET_MARKER_RE.search(line)
+    ):
+        return ""
+    if re.search(r"[!?;]", line):
+        return ""
+    words = re.findall(r"[A-Za-z0-9&.'’\-]+", line)
+    if not 1 <= len(words) <= 8 or not re.search(r"[A-Za-z]", line):
+        return ""
+    section_names = {
+        "experience", "work experience", "employment history", "career history",
+        "professional experience", "education", "skills", "technical skills",
+        "responsibilities", "achievements", "projects", "project experience",
+    }
+    if line.casefold() in section_names or line.casefold() in _BLIND_ORG_TECH_ALLOWLIST:
+        return ""
+    connector_words = {"and", "of", "the", "for", "&"}
+    if not all(
+        word.casefold() in connector_words
+        or word.isupper()
+        or word[:1].isupper()
+        for word in words
+    ):
+        return ""
+    return line.strip(" .,:;|-/")
+
+
+def _blind_summary_section_replacement(lines, index):
+    """Classify a dated vertical row from its nearest preceding section."""
+    education_sections = {
+        "education", "education history", "academic background",
+        "academic qualifications", "educational qualifications",
+    }
+    work_sections = {
+        "experience", "work experience", "work experiences",
+        "employment", "employment history", "work history", "career history",
+        "professional experience", "career experience",
+    }
+    neutral_sections = {
+        "qualifications", "professional qualifications", "certifications",
+        "certificates", "training", "training courses", "courses", "skills",
+        "technical skills", "core expertise", "projects", "project experience",
+        "awards", "achievements",
+    }
+    for prior in range(index - 1, -1, -1):
+        heading = re.sub(
+            r"[^a-z]+",
+            " ",
+            str(lines[prior] or "").casefold(),
+        ).strip()
+        if heading in education_sections:
+            return "[Institution]"
+        if heading in work_sections:
+            return "[Company]"
+        if heading in neutral_sections:
+            return None
+    return "[Company]"
+
+
+def _blind_summary_dated_line_identity(line):
+    """Return an organization written on the same line as its employment date."""
+    raw = re.sub(r"\s+", " ", str(line or "")).strip()
+    has_date_range = bool(_BLIND_SUMMARY_DATE_RANGE_RE.search(raw))
+    has_single_year = bool(_BLIND_SUMMARY_SINGLE_YEAR_RE.search(raw))
+    if not (has_date_range or has_single_year) or "|" in raw:
+        return ""
+    without_date = _BLIND_SUMMARY_DATE_RANGE_RE.sub(" ", raw)
+    without_date = _BLIND_SUMMARY_SINGLE_YEAR_RE.sub(" ", without_date)
+    without_date = re.sub(r"[()\[\]{}]", " ", without_date)
+    without_date = without_date.strip(" .,:;|-/–—")
+    role_company = re.search(r"\b(?:at|for|with)\s+(.+)$", without_date, re.I)
+    if role_company:
+        candidate = _blind_summary_standalone_org_candidate(role_company.group(1))
+        if candidate:
+            return candidate
+    without_date = re.sub(r"^(?:at|for|with)\s+", "", without_date, flags=re.I)
+    return _blind_summary_standalone_org_candidate(without_date)
+
+
+def _blind_summary_vertical_identity_replacements(lines):
+    """Collect organizations beside dates with section-aware replacements."""
+    identities = []
+    cleaned = [re.sub(r"\s+", " ", str(line or "")).strip() for line in lines]
+    for index, line in enumerate(cleaned):
+        if not (
+            _BLIND_SUMMARY_DATE_RANGE_RE.search(line)
+            or _BLIND_SUMMARY_SINGLE_YEAR_RE.search(line)
+        ):
+            continue
+        section_replacement = _blind_summary_section_replacement(cleaned, index)
+        if section_replacement is None:
+            continue
+        pipe_value, pipe_replacement, _case_sensitive = _blind_summary_pipe_identity(line)
+        if pipe_value:
+            identities.append((pipe_value, pipe_replacement))
+            continue
+        same_line = _blind_summary_dated_line_identity(line)
+        if same_line:
+            identities.append((same_line, section_replacement))
+            continue
+        neighbor_indexes = (
+            list(range(index - 1, max(-1, index - 3), -1))
+            + list(range(index + 1, min(len(cleaned), index + 3)))
+        )
+        for neighbor_index in neighbor_indexes:
+            candidate = _blind_summary_standalone_org_candidate(cleaned[neighbor_index])
+            if candidate:
+                identities.append((candidate, section_replacement))
+                break
+    return identities
+
+
+def _blind_summary_pipe_identity(line):
+    """Return the likely organization/institution from a dated pipe row."""
+    parts = [part.strip() for part in str(line or "").split("|")]
+    if len(parts) < 2:
+        return "", "[Company]", False
+    date_indexes = [
+        index for index, part in enumerate(parts)
+        if re.search(r"\b(?:19|20)\d{2}\b", part)
+    ]
+    if not date_indexes:
+        return "", "[Company]", False
+    date_index = date_indexes[0]
+    if date_index == len(parts) - 1:
+        candidate_indexes = list(range(date_index - 1, -1, -1))
+    else:
+        candidate_indexes = list(range(date_index + 1, len(parts)))
+        candidate_indexes.extend(range(date_index - 1, -1, -1))
+    value = ""
+    for index in candidate_indexes:
+        candidate = parts[index]
+        if (
+            not candidate
+            or re.search(r"\b(?:19|20)\d{2}\b", candidate)
+            or _BLIND_SUMMARY_ROLE_DESCRIPTOR_RE.search(candidate)
+            or _BLIND_SUMMARY_DEGREE_DESCRIPTOR_RE.search(candidate)
+        ):
+            continue
+        value = candidate
+        break
+    if not value:
+        return "", "[Company]", False
+    is_institution = bool(
+        _BLIND_INSTITUTION_SUFFIX_RE.search(value)
+        or _BLIND_INSTITUTION_PREFIX_RE.search(value)
+        or any(_BLIND_SUMMARY_DEGREE_DESCRIPTOR_RE.search(part) for part in parts)
+    )
+    return (
+        value,
+        "[Institution]" if is_institution else "[Company]",
+        is_institution,
+    )
+
+
+def _blind_collect_plain_summary_identity_replacements(source_text):
+    """Collect conservative identity terms from an unparsed CV summary source."""
+    source = str(source_text or "")
+    add, collected = _blind_replacement_collector()
+
+    candidate_name = _blind_summary_candidate_name_from_text(source)
+    for name_variant in _blind_summary_lineage_name_variants(candidate_name):
+        add(name_variant, "the candidate", True)
+    label_pattern = re.compile(
+        r"^(current\s+company|company|employer|client|customer|organization|organisation|institution|university|school|college)\s*[:|]\s*(.+)$",
+        re.I,
+    )
+    institution_labels = {"institution", "university", "school", "college"}
+    source_lines = source.splitlines()
+    for line_index, raw_line in enumerate(source_lines):
+        line = re.sub(r"\s+", " ", raw_line).strip()
+        address_match = _BLIND_SUMMARY_ADDRESS_LINE_RE.match(line)
+        if address_match:
+            address_value = address_match.group(1).strip()
+            add(address_value, "[Address Redacted]", True)
+            street_value = address_value.split(",", 1)[0].strip()
+            if re.search(r"\d", street_value) and _BLIND_SUMMARY_STREET_MARKER_RE.search(street_value):
+                add(street_value, "[Address Redacted]", True)
+        elif (
+            _BLIND_SUMMARY_UNLABELED_ADDRESS_RE.match(line)
+            and _BLIND_SUMMARY_STREET_MARKER_RE.search(line)
+        ):
+            add(line, "[Address Redacted]", True)
+            add(line.split(",", 1)[0].strip(), "[Address Redacted]", True)
+        for phone_match in _BLIND_SUMMARY_PHONE_CANDIDATE_RE.finditer(line):
+            phone_value = phone_match.group(0).strip()
+            phone_digits = re.sub(r"\D", "", phone_value)
+            prefix = line[:phone_match.start()]
+            is_labeled = bool(_BLIND_SUMMARY_PHONE_CONTEXT_RE.search(prefix))
+            is_early_standalone = (
+                line_index < 12
+                and phone_match.start() == 0
+                and phone_match.end() == len(line)
+                and not _BLIND_SUMMARY_DATE_RANGE_RE.fullmatch(line)
+            )
+            if 8 <= len(phone_digits) <= 15 and (
+                is_labeled or is_early_standalone
+            ):
+                add(phone_value, "[Phone Redacted]", True)
+        for domain_match in _BLIND_SUMMARY_BARE_DOMAIN_RE.finditer(line):
+            domain_value = _blind_summary_bare_domain(domain_match.group(0))
+            if domain_value:
+                add(domain_value, "[Link Redacted]")
+                domain_host = domain_value.split("/", 1)[0].rstrip(".")
+                if domain_host != domain_value:
+                    add(domain_host, "[Link Redacted]")
+        match = label_pattern.match(line)
+        if match:
+            label = match.group(1).casefold()
+            value = re.split(r"\s+\|\s+", match.group(2), maxsplit=1)[0].strip()
+            add(value, "[Institution]" if label in institution_labels else "[Company]", True)
+        value, replacement, case_sensitive = _blind_summary_pipe_identity(line)
+        add(value, replacement, case_sensitive)
+        for suffix_match in _BLIND_ORG_SUFFIX_RE.finditer(line):
+            add(_blind_trim_org_match(suffix_match.group(1)), "[Company]")
+        for suffix_match in _BLIND_INSTITUTION_SUFFIX_RE.finditer(line):
+            add(suffix_match.group(1), "[Institution]", True)
+        for prefix_match in _BLIND_INSTITUTION_PREFIX_RE.finditer(line):
+            add(prefix_match.group(1), "[Institution]", True)
+
+    for identity, replacement in _blind_summary_vertical_identity_replacements(
+        source_lines
+    ):
+        add(identity, replacement, True)
+
+    compact = re.sub(r"\s+", " ", source)
+    for name in _BLIND_CURATED_ORG_NAMES:
+        if name.casefold() in _BLIND_ORG_TECH_ALLOWLIST:
+            continue
+        if _blind_identifier_pattern(name).search(compact):
+            add(name, "[Company]")
+    for term, replacement, case_sensitive_single in _blind_summary_context_replacements(source):
+        add(term, replacement, case_sensitive_single)
+
+    return collected()
+
+
+def _blind_apply_summary_replacements(text, replacements):
+    safe = _BLIND_SUMMARY_MARKER_RE.sub("", str(text or "")).strip()
+    # Redact explicit links before exact source identifiers so a provider that
+    # adds ``https://`` to a source bare domain cannot leave a malformed partial
+    # link such as ``https://[Link Redacted]`` for the later pass.
+    safe = _BLIND_SUMMARY_EMAIL_RE.sub("[Email Redacted]", safe)
+    safe = _blind_redact_summary_urls(safe)
+    for source_value, replacement, case_sensitive_single in replacements:
+        safe = _blind_replace_identifier(
+            safe,
+            source_value,
+            replacement,
+            case_sensitive_single=case_sensitive_single,
+        )
+    safe = _BLIND_SUMMARY_EMAIL_RE.sub("[Email Redacted]", safe)
+    safe = _blind_redact_summary_urls(safe)
+    safe = _blind_redact_phone_candidates(safe)
+    safe = _BLIND_SUMMARY_INLINE_ADDRESS_RE.sub("[Address Redacted]", safe)
+    return safe
+
+
+def _blind_generated_summary_items(raw_text):
+    raw = re.sub(r"```(?:text|markdown|md)?", "", str(raw_text or ""), flags=re.I)
+    raw = raw.replace("```", "").strip()
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    marked = [line for line in lines if _BLIND_SUMMARY_MARKER_RE.match(line)]
+    return _blind_summary_items(marked or lines)
+
+
+def _blind_finalize_generated_summary_text(raw_text, source_text):
+    """Fail closed and scrub the standalone anonymized-summary response."""
+    if not str(source_text or "").strip():
+        raise ValueError("Anonymized CV Summary requires the unchanged source CV")
+    bullets = _blind_generated_summary_items(raw_text)
+    if not bullets:
+        raise ValueError("Anonymized CV Summary returned no usable bullets")
+    replacements = _blind_collect_plain_summary_identity_replacements(source_text)
+    safe_bullets = []
+    for bullet in bullets:
+        safe = _blind_apply_summary_replacements(bullet, replacements)
+        if not safe:
+            raise ValueError("Anonymized CV Summary returned an empty bullet")
+        for source_value, _replacement, case_sensitive_single in replacements:
+            if _blind_contains_identifier(
+                safe,
+                source_value,
+                case_sensitive_single=case_sensitive_single,
+            ):
+                raise ValueError(
+                    "Anonymized CV Summary still contains a source identifier"
+                )
+        safe_bullets.append(safe)
+    return "\n".join("- " + bullet for bullet in safe_bullets)
+
+
+def _blind_add_mask_term(terms, value):
+    if not value:
+        return
+    text = re.sub(r"\s+", " ", str(value)).strip().strip(" .,:;|-/")
+    if not text or len(text) < 3:
+        return
+    low = text.lower().strip()
+    # Reject sentence-spanning regex overcaptures such as
+    # "Integrated Maybank2u ... Worked with Bank".
+    if re.search(r"[.!?]", text) and not re.search(r"\b(?:sdn|bhd|ltd|inc|corp|co)\.", low):
+        return
+    if low in _BLIND_ORG_TECH_ALLOWLIST:
+        return
+    # Do not collect generic descriptors already produced by the blind prompt.
+    generic_bits = ("leading ", "prominent ", "major ", "global ", "top-", "fortune ", "one of ", "government", "public sector")
+    if low.startswith(generic_bits) or low in {"candidate", "company", "client", "project", "organization", "organisation"}:
+        return
+    # Avoid over-masking common CV words/sections.
+    if low in {"summary", "technical skills", "work experience", "project experience", "education", "certification", "banking", "insurance", "telecommunications"}:
+        return
+    terms.add(text)
+
+
+def _blind_curated_name_present(name, compact_text, exact_pat, prefix_pat):
+    """Report whether a curated organisation name appears as a proper noun.
+
+    Single-token curated names such as Shell, Boost, Grab, Meta and Yes are also
+    ordinary CV vocabulary. Registering one from "shell scripting" alone would
+    put an everyday word on the mask list, so a single-token name has to appear
+    capitalised at least once before it is collected.
+    """
+    if name.casefold() not in _BLIND_AMBIGUOUS_ORG_WORDS:
+        return bool(exact_pat.search(compact_text) or prefix_pat.search(compact_text))
+    # "BOOSTED REVENUE" contains BOOST and "metadata" contains meta, so a
+    # case-insensitive prefix hit proves nothing. A standalone capitalised mention does,
+    # and so does an exactly-cased CamelCase compound: GrabFood and BoostPay are brands,
+    # while "boosted", "Boosted" and "BOOSTED" are not.
+    # A CamelCase compound is not evidence either: MetaTrader, MetaBase and MetaMask are
+    # unrelated products, and collecting "Meta" from one of them exports
+    # "[Company]Trader". An employer genuinely named Grab or Boost is collected from the
+    # employer field instead, and masked there whatever its casing.
+    return any(not match.group(0).islower() for match in exact_pat.finditer(compact_text))
+
+
+def _blind_collect_employer_terms(original_cv):
+    """Return the casefolded mask terms that came from an employer field.
+
+    These are real companies the candidate worked for, so the everyday-word rule that
+    protects prose from curated names like Grab or Shell must not apply to them.
+    """
+    employers = set()
+    if not isinstance(original_cv, dict):
+        return frozenset()
+    candidate = (
+        original_cv.get("candidate")
+        if isinstance(original_cv.get("candidate"), dict)
+        else {}
+    )
+    _blind_add_mask_term(employers, candidate.get("current_company"))
+    for experience in original_cv.get("work_experiences") or []:
+        if isinstance(experience, dict):
+            _blind_add_mask_term(employers, experience.get("company"))
+    return frozenset(term.casefold() for term in employers)
+
+
+def _blind_collect_org_mask_terms(original_cv):
+    terms = set()
+    if not isinstance(original_cv, dict):
+        return []
+
+    cand = original_cv.get("candidate") if isinstance(original_cv.get("candidate"), dict) else {}
+    _blind_add_mask_term(terms, cand.get("current_company"))
+
+    for exp in original_cv.get("work_experiences") or []:
+        if not isinstance(exp, dict):
+            continue
+        _blind_add_mask_term(terms, exp.get("company"))
+
+    # Exact curated org names found anywhere in the original CV, including
+    # bullets/project descriptions. This catches cases like "built for Maxis".
+    all_text = "\n".join(_blind_walk_strings(original_cv))
+    compact_text = re.sub(r"\s+", " ", all_text)
+    for name in sorted(_BLIND_CURATED_ORG_NAMES, key=len, reverse=True):
+        if not name or name.lower() in _BLIND_ORG_TECH_ALLOWLIST:
+            continue
+        exact_pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?![A-Za-z0-9])", re.I)
+        prefix_pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?=[A-Z0-9][A-Za-z0-9]{1,30})", re.I)
+        if _blind_curated_name_present(name, compact_text, exact_pat, prefix_pat):
+            _blind_add_mask_term(terms, name)
+
+    # Legal-suffix/company-pattern extraction from all text.
+    for m in _BLIND_ORG_SUFFIX_RE.finditer(compact_text):
+        candidate = _blind_trim_org_match(m.group(1))
+        _blind_add_mask_term(terms, candidate)
+
+    # Prefer longer phrases first so "Hong Leong Bank" is masked before "Bank"-ish fragments.
+    clean = sorted(terms, key=lambda x: (-len(x), x.lower()))
+    return clean[:250]
+
+
+@functools.lru_cache(maxsize=64)
+def _blind_org_term_specs(terms, employer_terms=()):
+    """Compile one matcher per mask term, as (pattern, ambiguous) pairs.
+
+    Cached because the sweep runs once per string of a parsed CV against a term
+    list that can hold 250 entries; recompiling those for every string thrashes
+    the regex cache for no benefit.
+    """
+    specs = []
+    for term in terms:
+        if not term or len(term) < 3:
+            continue
+        low = term.lower().strip()
+        if low in _BLIND_ORG_TECH_ALLOWLIST:
+            continue
+        # Two separate questions. Is this word also everyday CV vocabulary, which decides
+        # whether the brand-prefix rule has to stay strict? And should a lowercase match
+        # be masked, which provenance decides - a company the candidate actually worked
+        # for must be masked however it is written.
+        everyday = low in _BLIND_AMBIGUOUS_ORG_WORDS and not re.search(r"\s", term)
+        ambiguous = everyday and low not in employer_terms
+        # Preserve already-masked descriptors/placeholders.
+        specs.append((
+            re.compile(r"(?<![A-Za-z0-9])" + re.escape(term) + r"(?![A-Za-z0-9])", re.I),
+            ambiguous,
+        ))
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9&.'\u2019\- ]{2,40}", term):
+            continue
+        prefix = re.escape(term)
+        if everyday:
+            # Product/brand form for an everyday word has to be real CamelCase or carry
+            # a digit - GrabFood, Maybank2u - because a plain [A-Z0-9] under re.I also
+            # matches the lowercase inflections "boosted", "grabbing", "metadata" and
+            # "yesterday" and would eat their first syllable. This holds whether or not
+            # the word is also this candidate's employer. An ALL-CAPS compound such as
+            # GRABFOOD is genuinely indistinguishable from an ALL-CAPS ordinary word and
+            # is deliberately left alone.
+            lookahead = r"(?=(?-i:[A-Z][a-z]|[0-9]))"
+        else:
+            lookahead = r"(?=[A-Z0-9][A-Za-z0-9]{1,30})"
+        specs.append((
+            re.compile(r"(?<![A-Za-z0-9])(" + prefix + r")" + lookahead, re.I),
+            ambiguous,
+        ))
+    return tuple(specs)
+
+
+def _blind_mask_org_match(match, ambiguous):
+    # An organisation is a proper noun. For the handful of curated names that are
+    # also everyday words, an all-lowercase match is prose ("shell scripting",
+    # "boost revenue") and must survive.
+    if ambiguous and match.group(0).islower():
+        return match.group(0)
+    return "[Company]"
+
+
+def _blind_replace_org_terms_in_text(text, terms, employer_terms=()):
+    if not isinstance(text, str) or not text or not terms:
+        return text
+    out = text
+    for pattern, ambiguous in _blind_org_term_specs(
+        tuple(terms), tuple(sorted(employer_terms))
+    ):
+        out = pattern.sub(lambda match: _blind_mask_org_match(match, ambiguous), out)
+    return out
+
+
+def _blind_mask_org_terms_recursive(obj, terms, employer_terms=()):
+    if isinstance(obj, dict):
+        return {
+            k: _blind_mask_org_terms_recursive(v, terms, employer_terms)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_blind_mask_org_terms_recursive(v, terms, employer_terms) for v in obj]
+    if isinstance(obj, str):
+        return _blind_replace_org_terms_in_text(obj, terms, employer_terms)
+    return obj
+
+
+def _blind_role_bullet_texts(items):
+    """Flatten role bullet/section text without carrying source wording.
+
+    The blind provider is instructed to preserve JSON structure, but can turn a
+    valid section object into a run of plain strings.  This helper reads only the
+    provider's already-blinded response so repairing the shape cannot reintroduce
+    an employer or client name from the original CV.
+    """
+    out = []
+    source = items if isinstance(items, list) else []
+    for item in source:
+        if isinstance(item, str):
+            if item.strip():
+                out.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        heading = item.get("heading") or item.get("title") or ""
+        if str(heading).strip():
+            out.append(str(heading))
+        out.extend(_blind_role_bullet_texts(item.get("bullets") or item.get("items") or []))
+    return out
+
+
+def _blind_rebuild_role_bullets(template_items, blinded_items):
+    """Apply blinded text to the original bullet container shape when exact."""
+    if not isinstance(template_items, list) or not isinstance(blinded_items, list):
+        return None
+    if any(not isinstance(item, (str, dict)) for item in template_items):
+        return None
+    replacement = _blind_role_bullet_texts(blinded_items)
+    template_count = len(_blind_role_bullet_texts(template_items))
+    if not replacement or len(replacement) != template_count:
+        return None
+    cursor = 0
+
+    def rebuild(items):
+        nonlocal cursor
+        rebuilt = []
+        for item in items:
+            if isinstance(item, str):
+                rebuilt.append(replacement[cursor])
+                cursor += 1
+                continue
+            if not isinstance(item, dict):
+                return None
+            heading = item.get("heading") or item.get("title") or ""
+            children = item.get("bullets") or item.get("items") or []
+            if not str(heading).strip() or not isinstance(children, list):
+                return None
+            # Reconstruct only the documented structural keys.  Never copy an
+            # unknown value from the unblinded source object back into output.
+            group = {
+                "heading": replacement[cursor],
+                "bullets": [],
+                "kind": "section",
+            }
+            cursor += 1
+            group["bullets"] = rebuild(children)
+            if group["bullets"] is None:
+                return None
+            rebuilt.append(group)
+        return rebuilt
+
+    rebuilt = rebuild(template_items)
+    return rebuilt if cursor == len(replacement) else None
+
+
+def _blind_restore_cv_skill_headings(repaired, original_cv):
+    """Rebuild layout hints from visible blinded items, never source wording."""
+    output = repaired.get("skills")
+    if not isinstance(output, list):
+        return
+    # The provider can copy an unblinded label in this redundant field even
+    # when it correctly masks the visible items. Never trust that echo.
+    for skill in output:
+        if isinstance(skill, dict):
+            skill.pop("item_headings", None)
+            skill.pop("item_layout", None)
+    source = original_cv.get("skills")
+    if not isinstance(source, list) or len(source) != len(output):
+        return
+
+    def key(value):
+        return re.sub(r"[^a-z]+", " ", str(value or "").lower()).strip()
+
+    def lines(skill):
+        items = skill.get("items") or []
+        if isinstance(items, str):
+            items = items.splitlines()
+        if not isinstance(items, list) or any(not isinstance(s, str) for s in items):
+            return []
+        return [s.strip() for s in items if s.strip()]
+
+    for original, blinded in zip(source, output):
+        if not isinstance(original, dict) or not isinstance(blinded, dict):
+            continue
+        category = key(original.get("category"))
+        if category in {"project experience", "project experiences"}:
+            before, after = lines(original), lines(blinded)
+            layout = original.get("item_layout")
+            if (key(blinded.get("category")) == category and before
+                    and len(before) == len(after) and isinstance(layout, list)
+                    and len(layout) == len(before)
+                    and all(isinstance(style, str) and style in {"heading", "bullet", "nested"}
+                            for style in layout)
+                    and any(style != "bullet" for style in layout)
+                    and all(before[i] == after[i] for i, style in enumerate(layout) if style != "heading")
+                    and all(re.findall(r"\d+", a) == re.findall(r"\d+", b)
+                            for a, b in zip(before, after))):
+                blinded["item_layout"] = layout[:]
+            continue
+        if (category not in {"contribution towards projects taskforce", "awards",
+                             "awards achievements", "awards and achievements",
+                             "awards recognition", "awards and recognition"}
+                or key(blinded.get("category")) != category):
+            continue
+        hints = original.get("item_headings")
+        if not isinstance(hints, list) or not hints:
+            continue
+        hints = {value for value in hints if isinstance(value, str)}
+        before, after = lines(original), lines(blinded)
+        if not before or len(before) != len(after):
+            continue
+        occurrences, output_occurrences = {}, {}
+        for value in before:
+            occurrences[value] = occurrences.get(value, 0) + 1
+        for value in after:
+            output_occurrences[value] = output_occurrences.get(value, 0) + 1
+        positions = {i for i, value in enumerate(before)
+                     if value in hints and occurrences[value] == 1}
+        if not positions:
+            continue
+        # Years and all non-heading items anchor the correspondence. If the
+        # model reordered/rewrote them, leave the returned items unannotated.
+        if any(before[i] != after[i] for i in range(len(before))
+               if i not in positions or not re.search(r"[A-Za-z]", before[i])):
+            continue
+        headings = [after[i] for i in sorted(positions) if output_occurrences[after[i]] == 1]
+        if headings:
+            blinded["item_headings"] = headings
+
+
+def _blind_restore_cv_bullet_structure(blinded, original_cv):
+    """Restore role section/list containers when the model only flattened them.
+
+    Repair is deliberately bounded to corresponding work-experience/role indexes
+    whose flattened text counts match exactly.  A malformed or shortened response
+    is left untouched rather than guessing or copying unblinded source wording.
+    """
+    if not isinstance(blinded, dict) or not isinstance(original_cv, dict):
+        return blinded
+    # Copy only the provider response.  No source object is ever copied into it.
+    repaired = copy.deepcopy(blinded)
+    _blind_restore_cv_skill_headings(repaired, original_cv)
+    original_experiences = original_cv.get("work_experiences") or []
+    blinded_experiences = repaired.get("work_experiences") or []
+    if not isinstance(original_experiences, list) or not isinstance(
+        blinded_experiences, list
+    ):
+        return repaired
+    for exp_index, original_exp in enumerate(original_experiences):
+        if exp_index >= len(blinded_experiences):
+            break
+        blinded_exp = blinded_experiences[exp_index]
+        if not isinstance(original_exp, dict) or not isinstance(blinded_exp, dict):
+            continue
+        original_roles = original_exp.get("roles") or []
+        blinded_roles = blinded_exp.get("roles") or []
+        if not isinstance(original_roles, list) or not isinstance(
+            blinded_roles, list
+        ):
+            continue
+        for role_index, original_role in enumerate(original_roles):
+            if role_index >= len(blinded_roles):
+                break
+            blinded_role = blinded_roles[role_index]
+            if not isinstance(original_role, dict) or not isinstance(blinded_role, dict):
+                continue
+            identity_mismatch = any(
+                str(original_role.get(key) or "").strip()
+                and str(blinded_role.get(key) or "").strip()
+                and str(original_role.get(key)).strip().casefold()
+                != str(blinded_role.get(key)).strip().casefold()
+                for key in ("title", "date_range")
+            )
+            if identity_mismatch:
+                continue
+            template_items = original_role.get("bullets") or []
+            # No section object means there is no container shape to restore.
+            if not any(isinstance(item, dict) for item in template_items):
+                continue
+            rebuilt = _blind_rebuild_role_bullets(
+                template_items,
+                blinded_role.get("bullets") or [],
+            )
+            if rebuilt is not None:
+                blinded_role["bullets"] = rebuilt
+    return repaired
+
+
+def _blind_finalize_summary_bullets(blinded, original_cv):
+    """Preserve a populated blinded summary and scrub direct candidate PII."""
+    if not isinstance(blinded, dict) or not isinstance(original_cv, dict):
+        return blinded
+    source = original_cv.get("summary_bullets")
+    source_bullets = (
+        [value.strip() for value in source if isinstance(value, str) and value.strip()]
+        if isinstance(source, list)
+        else []
+    )
+    if not source_bullets:
+        return blinded
+    output = blinded.get("summary_bullets")
+    if not isinstance(output, list):
+        raise ValueError("Blind CV could not preserve the About Him / Her summary")
+    output_bullets = []
+    for value in output:
+        if not isinstance(value, str):
+            raise ValueError("Blind CV returned an invalid About Him / Her summary")
+        clean = _BLIND_SUMMARY_MARKER_RE.sub("", value).strip()
+        if not clean:
+            raise ValueError("Blind CV returned an invalid About Him / Her summary")
+        output_bullets.append(clean)
+    if len(output_bullets) != len(source_bullets):
+        raise ValueError("Blind CV could not preserve every About Him / Her summary bullet")
+
+    direct_replacements = _blind_collect_summary_identity_replacements(original_cv)
+    safe_bullets = []
+    for bullet in output_bullets:
+        safe = _blind_apply_summary_replacements(bullet, direct_replacements)
+        for source_value, _replacement, case_sensitive_single in direct_replacements:
+            if _blind_contains_identifier(
+                safe,
+                source_value,
+                case_sensitive_single=case_sensitive_single,
+            ):
+                raise ValueError(
+                    "Blind CV About Him / Her summary still contains a source identifier"
+                )
+        safe_bullets.append(safe)
+
+    repaired = copy.deepcopy(blinded)
+    repaired["summary_bullets"] = safe_bullets
+    return repaired
+
+
+def _blind_postprocess_company_mentions(blinded, original_cv):
+    """Final safety sweep for blind CV output.
+
+    The model may correctly mask employer fields but miss company/client names in
+    bullets, project descriptions, achievements or highlights.  Use the original
+    parsed CV to build a conservative organisation-name mask list, then sweep the
+    returned blinded JSON before it reaches preview/export.
+    """
+    terms = _blind_collect_org_mask_terms(original_cv)
+    if not terms:
+        return blinded
+    return _blind_mask_org_terms_recursive(
+        blinded, terms, _blind_collect_employer_terms(original_cv)
+    )
+
+
+def _blind_name_word_is_sweepable(word):
+    """Report whether one name word can stand alone as a sweep term."""
+    low = word.casefold()
+    if len(word) < 3:
+        # Two letters is too little to be sure of: Ng and Oh are surnames here, but the
+        # same letters open far too many ordinary words.
+        return False
+    return not (
+        low in _BLIND_COMMON_WORD_NAMES
+        or low in _BLIND_PLACE_WORD_NAMES
+        or low in _BLIND_GENERIC_PLACEHOLDER_WORDS
+        or low in _BLIND_NAME_PARTICLES
+        or low in _BLIND_TECHNOLOGY_GIVEN_NAMES
+        or low in _BLIND_ORG_TECH_ALLOWLIST
+    )
+
+
+def _blind_candidate_name_words(full_name):
+    """Split a full name into its clean alphabetic words."""
+    words = [
+        word.strip(".,;:|()[]")
+        for word in re.sub(r"\s+", " ", str(full_name or "")).strip().split()
+    ]
+    return [word for word in words if word and _blind_summary_name_word(word)]
+
+
+def _blind_candidate_name_runs(full_name):
+    """Return the multi-word runs inside a name that are safe to replace as a unit.
+
+    "Wei Ming" has to be replaced as one name, otherwise sweeping "Ming" alone leaves
+    the stranded fragment "Wei the candidate". A run must begin and end with a real
+    name word: "binti Rahman" and "van der" are shared by whole families, so sweeping
+    them rewrites other people ("Siti binti Rahman" -> "Siti the candidate").
+    """
+    words = _blind_candidate_name_words(full_name)
+    runs = []
+    for size in range(len(words) - 1, 1, -1):
+        for start in range(0, len(words) - size + 1):
+            run = words[start:start + size]
+            edges = (run[0].casefold(), run[-1].casefold())
+            if any(edge in _BLIND_NAME_PARTICLES for edge in edges):
+                continue
+            runs.append(" ".join(run))
+    return runs
+
+
+def _blind_candidate_name_tokens(full_name):
+    """Return the individual name words that are safe to sweep on their own."""
+    words = _blind_candidate_name_words(full_name)
+    # A compound surname stands alone in either form: "Smith-Jones" and plain "Jones".
+    for word in list(words):
+        for part in re.split(r"[-\u2010-\u2015]", word):
+            if part and part not in words:
+                words.append(part)
+    if len(words) == 1:
+        # A mononym is the candidate's entire identity. Nothing else in the document
+        # names them, so it is swept even when it is also an everyday word - the
+        # capitalisation rule still keeps "grace period" and "a sharp fall" intact.
+        return words
+    return [word for word in words if _blind_name_word_is_sweepable(word)]
+
+
+def _blind_is_sentence_initial(text, position):
+    """Report whether the word at ``position`` opens a sentence or a line."""
+    before = text[:position]
+    if not before.strip():
+        return True
+    return bool(re.search(r"[.!?]\s*\Z|\n\s*\Z", before))
+
+
+def _blind_name_word_is_person_like(word):
+    """Report whether a run word could be part of somebody else's name.
+
+    Title Case only - ETL and AWS are acronyms - and never role vocabulary, because a
+    CV header reads "Suharto Senior Data Engineer" and those words would otherwise
+    shield the candidate's own name standing right in front of them.
+    """
+    if not word[:1].isupper() or word.isupper():
+        return False
+    return word.casefold().strip(".") not in _BLIND_JOB_TITLE_WORDS
+
+
+def _blind_capitalised_runs(text):
+    """Group the text into runs of capitalised words joined by blanks on one line."""
+    runs = []
+    current = []
+    previous_end = None
+    for match in _BLIND_NAME_RUN_WORD_RE.finditer(text):
+        word = match.group(0)
+        if not word[:1].isupper():
+            if current:
+                runs.append(current)
+                current = []
+            previous_end = match.end()
+            continue
+        if current and not re.fullmatch(r"[ \t]+", text[previous_end:match.start()]):
+            # A newline or punctuation ends the run: "References\nVinay" is two runs.
+            runs.append(current)
+            current = []
+        current.append((word, match.start(), match.end()))
+        previous_end = match.end()
+    if current:
+        runs.append(current)
+    return runs
+
+
+def _blind_name_word_keys(word):
+    """Return the forms of one written word that could be a name.
+
+    A run word carries its punctuation - "Vinay's", "Vinay\u2019s", "Lariya-led" - so
+    comparing the written word against the name would miss every possessive and every
+    hyphenated compound, and the candidate's real name would survive.
+    """
+    keys = {word.casefold()}
+    bare = re.sub(r"['\u2019]s\Z", "", word, flags=re.I)
+    keys.add(bare.casefold())
+    for part in re.split(r"[-\u2010-\u2015]", bare):
+        if part:
+            keys.add(part.casefold())
+    return keys
+
+
+@functools.lru_cache(maxsize=64)
+def _blind_name_part_pattern(tokens):
+    """Match any name form inside a word, longest first, at letter boundaries."""
+    return re.compile(
+        r"(?<![^\W\d_])(?:"
+        + "|".join(re.escape(token) for token in sorted(tokens, key=len, reverse=True))
+        + r")(?![^\W\d_])",
+        re.I,
+    )
+
+
+def _blind_replace_name_within_word(word, tokens):
+    """Replace the name inside one written word, keeping the rest of it.
+
+    "Vinay's" becomes "the candidate's" and "Lariya-led" becomes "the candidate-led".
+    Longest form first, so a compound surname is taken whole: "Smith-Jones-led" must not
+    match "Smith" and "Jones" separately and produce "the candidate-the candidate-led".
+    """
+    bare = re.sub(r"['\u2019]s\Z", "", word, flags=re.I)
+    suffix = word[len(bare):]
+    return _blind_name_part_pattern(tokens).sub("the candidate", bare) + suffix
+
+
+def _blind_replace_name_tokens(text, tokens, name_words=(), mononym=False):
+    """Replace a bare given name or surname, but only where it reads as the person.
+
+    A single name word is the riskiest thing this module replaces: Alam, Church, Sharp,
+    May and Long are also places, months, nouns and adjectives, and no denylist can name
+    them all. Structural rules do the work instead, applied to the whole run of
+    capitalised words the match sits in rather than to one neighbouring word.
+
+    A lowercase word is never part of a run, so ordinary prose - "delivered long-term
+    value", "a sharp reduction", "the local church" - is untouched.
+
+    Inside a run, two of the candidate's own name words confirm the person, and
+    everything from the first to the last of them goes, which covers a middle name
+    ("Vinay Kumar Lariya") without swallowing a job title that follows ("Vinay Lariya
+    Senior Data Engineer"). Otherwise, if every other word in the run is a Title Case
+    word belonging to nobody in this name, the run is a different person or a larger
+    proper noun - "Vinay Kumar", "Greater Victoria Area", "Referee: Suresh Lariya" - and
+    is left alone. A word that merely opens a sentence or a line is not evidence of that
+    ("Contact Vinay"), and neither is an acronym ("Vinay AWS migration") or an ALL-CAPS
+    line, so those still lose the name.
+
+    A mononym is the candidate's entire identity and nothing else in the document names
+    them, so the everyday-word denylist does not veto it. The run rules still apply, and
+    a mononym that is also an everyday word is not taken when a number follows it, which
+    is what separates "May 2023 to June 2024" from "May led delivery".
+    """
+    if not text or not tokens:
+        return text
+    token_set = {token.casefold() for token in tokens}
+    token_key = tuple(sorted(token_set))
+    name_set = {
+        word.casefold()
+        for word in name_words
+        if word.casefold() not in _BLIND_NAME_PARTICLES
+    } or set(token_set)
+    everyday_mononym = mononym and any(
+        not _blind_name_word_is_sweepable(token) for token in tokens
+    )
+
+    out = text
+    for run in reversed(_blind_capitalised_runs(text)):
+        keys = [_blind_name_word_keys(word) for word, _start, _end in run]
+        is_token = [bool(key & token_set) for key in keys]
+        is_name = [bool(key & name_set) for key in keys]
+        if not any(is_token):
+            continue
+        start, end = run[0][1], run[-1][2]
+        preceding = _BLIND_WORD_BEFORE_RE.search(text[:start])
+        if preceding is not None and preceding.group(1).casefold() in _BLIND_NAME_PARTICLES:
+            # "binti Rahman" names the candidate's father, and every one of his other
+            # children shares it. The candidate's own full form was already replaced as
+            # a unit before this pass.
+            continue
+        if everyday_mononym and _BLIND_TRAILING_NUMBER_RE.match(text[end:]):
+            # "May 2023", "Long 2024": a date or a figure, not the person.
+            continue
+        if sum(1 for flag in is_name if flag) >= 2:
+            # Everything from the first name word to the last, so a middle name goes
+            # with them and a job title that follows does not.
+            first = is_name.index(True)
+            last = len(is_name) - 1 - is_name[::-1].index(True)
+            while first > 0 and run[first - 1][0].casefold().strip(".") in _BLIND_HONORIFICS:
+                first -= 1
+            out = out[:run[first][1]] + "the candidate" + out[run[last][2]:]
+            continue
+        others = [
+            word
+            for index, (word, word_start, _word_end) in enumerate(run)
+            if not is_name[index]
+            # An honorific belongs to whoever follows it, so it is ignored here rather
+            # than counted: "Dr Suresh Lariya" is still somebody else's full name.
+            and word.casefold().strip(".") not in _BLIND_HONORIFICS
+            and not (index == 0 and _blind_is_sentence_initial(text, word_start))
+        ]
+        # A mononym has no second name word to corroborate with, so a capitalised
+        # neighbour must not shield it - but only where the name leads the run. A person
+        # is referred to name-first ("Suharto Widodo led delivery"); a name sitting
+        # inside a longer run is part of a larger proper noun ("Greater Victoria Area").
+        mononym_leads = mononym and not everyday_mononym and is_name[0]
+        if (
+            not mononym_leads
+            and others
+            and all(_blind_name_word_is_person_like(word) for word in others)
+        ):
+            continue
+        first = is_token.index(True)
+        last = len(is_token) - 1 - is_token[::-1].index(True)
+        while first > 0 and run[first - 1][0].casefold().strip(".") in _BLIND_HONORIFICS:
+            first -= 1
+        span = range(first, last + 1)
+        honorifics_in_span = [
+            index
+            for index in span
+            if run[index][0].casefold().strip(".") in _BLIND_HONORIFICS
+        ]
+        if honorifics_in_span and all(
+            is_token[index] or index in honorifics_in_span for index in span
+        ):
+            # "Mr Lariya" and "Dr Vinay Lariya" are the candidate with a title in front,
+            # so the title goes with the name rather than being left stranded.
+            out = out[:run[first][1]] + "the candidate" + out[run[last][2]:]
+            continue
+        pieces = []
+        cursor = start
+        for word, word_start, word_end in run:
+            pieces.append(out[cursor:word_start])
+            pieces.append(_blind_replace_name_within_word(word, token_key))
+            cursor = word_end
+        out = out[:start] + "".join(pieces) + out[end:]
+    return out
+
+
+def _blind_redact_identifier_tokens(text, name_tokens):
+    """Replace a whole snake_case token that embeds the candidate's name.
+
+    Pipeline, table and file names carry identity too (``vinay_lariya_pipeline``).
+    Substituting inside the token would leave "the candidate_lariya_pipeline", so the
+    token is replaced as a unit. Ordinary snake_case has no capitals to judge by, so the
+    evidence has to come from the parts themselves.
+    """
+    if not name_tokens:
+        return text
+
+    def replace(match):
+        token = match.group(0)
+        matched = {part.casefold() for part in token.split("_")} & name_tokens
+        if len(matched) >= 2:
+            # Two name words in one identifier: vinay_lariya_pipeline.
+            return "the candidate"
+        if len(matched) == 1:
+            # One is weak evidence. "max_connections" and "thread_max_size" are ordinary
+            # configuration for a candidate called Max, and "ada_boost" is an algorithm.
+            # Only a distinctive name word carries an identifier on its own.
+            part = next(iter(matched))
+            if len(part) >= 4 and _blind_name_word_is_sweepable(part):
+                return "the candidate"
+        return token
+
+    return _BLIND_IDENTIFIER_TOKEN_RE.sub(replace, text)
+
+
+def _blind_link_variants(value):
+    """Return the spellings of one personal link that all mean the same address."""
+    raw = str(value or "").strip().rstrip("/")
+    if not raw or "." not in raw:
+        return []
+    without_scheme = re.sub(r"^[A-Za-z][A-Za-z0-9+.\-]*://", "", raw)
+    bare = re.sub(r"^www\.", "", without_scheme, flags=re.I)
+    return [item for item in dict.fromkeys((raw, without_scheme, bare)) if len(item) >= 6]
+
+
+def _blind_candidate_phone_digits(value):
+    """Return the candidate's phone as bare digits, or "" when it is not a number."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    return digits if len(digits) >= 7 else ""
+
+
+def _blind_redact_candidate_phone(text, digits):
+    """Redact any spelling of the candidate's own number, however it is punctuated.
+
+    An exact-string replacement only catches the stored spelling, so a CV storing
+    ``+60123456789`` keeps leaking when a bullet writes ``+60 12-345 6789``. Compare
+    digits instead, and only for this one candidate's number, so ordinary metrics are
+    never touched.
+    """
+    if not digits:
+        return text
+
+    def replace(match):
+        value = match.group(0)
+        found = re.sub(r"\D", "", value)
+        if len(found) < 7:
+            return value
+        if not (found == digits or found.endswith(digits) or digits.endswith(found)):
+            return value
+        stripped = value.strip()
+        # Sharing a digit tail is not enough. Only accept a run that is punctuated
+        # like a number, carries a country prefix, is the stored number exactly, or
+        # is the national form starting with 0. "Processed 123456789 records" shares
+        # nine digits with +60123456789 and is an achievement metric, not a phone.
+        if re.search(r"[\s+().-]", stripped) or stripped.startswith("+"):
+            return "[Phone Redacted]"
+        if found == digits or found.startswith("0"):
+            return "[Phone Redacted]"
+        return value
+
+    return _BLIND_SUMMARY_PHONE_CANDIDATE_RE.sub(replace, text)
+
+
+def _blind_collect_candidate_identity_replacements(original_cv):
+    """Collect candidate identifiers safe to sweep across a whole document.
+
+    Collects the candidate's full name (including Malaysian lineage spellings),
+    the multi-word runs inside it, the individual name words that cannot be
+    mistaken for prose, and their direct contact details. See
+    ``_blind_candidate_name_tokens`` for which single words are excluded.
+    """
+    if not isinstance(original_cv, dict):
+        return []
+    candidate = original_cv.get("candidate")
+    if not isinstance(candidate, dict):
+        return []
+
+    add, collected = _blind_replacement_collector()
+
+    raw_name = _blind_summary_strip_name_honorifics(candidate.get("name"))
+    if raw_name.casefold() not in {"", "candidate", "the candidate", "[candidate]"}:
+        for variant in _blind_summary_lineage_name_variants(raw_name):
+            # A single-word name is left to the bare-name pass, which applies the
+            # capitalisation and proper-noun rules an exact match cannot.
+            if re.search(r"\s", variant):
+                add(variant, "the candidate", True)
+        for run in _blind_candidate_name_runs(raw_name):
+            add(run, "the candidate", True)
+
+    add(candidate.get("email"), "[Email Redacted]")
+    add(candidate.get("phone"), "[Phone Redacted]")
+    for key in ("linkedin", "website", "github", "portfolio"):
+        # A stored "https://linkedin.com/in/x" must also match the bare
+        # "linkedin.com/in/x" and "www.linkedin.com/in/x" a provider may emit.
+        for variant in _blind_link_variants(candidate.get(key)):
+            add(variant, "[Link Redacted]")
+
+    return collected()
+
+
+def _blind_apply_candidate_identity(
+    text, replacements, phone_digits="", name_tokens=(), name_words=(), mononym=False
+):
+    """Replace exact candidate identifiers without reformatting the text.
+
+    Deliberately narrower than the summary scrub: a whole-document pass must not
+    strip Markdown, trim whitespace, or run heuristic address redaction over fields
+    that are mostly ordinary CV prose.
+    """
+    safe = str(text or "")
+    if not safe:
+        return safe
+    # E-mail first: "vinay_lariya@corp.com" is an address, not a snake_case identifier,
+    # and rewriting its local part would export "the [Email Redacted]".
+    safe = _BLIND_SUMMARY_EMAIL_RE.sub("[Email Redacted]", safe)
+    safe = _blind_redact_identifier_tokens(safe, frozenset(
+        token.casefold() for token in name_tokens
+    ))
+    lowered = safe.casefold()
+    # The same text with Markdown markers removed, because "**Vinay** Lariya" does not
+    # contain "vinay lariya" but still has to be matched. Replacements only ever remove
+    # identifiers, so filtering on the original text cannot miss a later one.
+    lowered_plain = "".join(
+        character
+        for character in lowered
+        if character not in _BLIND_INLINE_MARKDOWN_MARKERS
+    )
+    for source_value, replacement, case_sensitive_single in replacements:
+        # Cheap pre-filter: the identifier cannot be replaced if its letters are not
+        # present at all, and this pass runs over every string of the document.
+        source_lowered = source_value.casefold()
+        if source_lowered not in lowered and source_lowered not in lowered_plain:
+            continue
+        # The plain pass first. The Markdown-aware helper collapses _ * and ` to find
+        # matches and only falls back to the raw text when it found none at all, so on
+        # its own it silently skips a second occurrence written as Owner_Vinay.
+        pattern = _blind_identifier_pattern(
+            source_value, case_sensitive_single=case_sensitive_single
+        )
+        if pattern is not None:
+            safe = pattern.sub(replacement, safe)
+        # Then the Markdown-aware pass, for what is left: **Vinay** Lariya.
+        safe = _blind_replace_identifier(
+            safe,
+            source_value,
+            replacement,
+            case_sensitive_single=case_sensitive_single,
+        )
+    # Last, so a full name and its multi-word runs are replaced as units first.
+    safe = _blind_replace_name_tokens(safe, name_tokens, name_words, mononym)
+    safe = _blind_redact_candidate_phone(safe, phone_digits)
+    # Any email address surviving in a blind CV is a leak regardless of whose it
+    # is, and the pattern cannot match ordinary prose.
+    safe = _BLIND_SUMMARY_EMAIL_RE.sub("[Email Redacted]", safe)
+    # A stored bare domain leaves "https://[Link Redacted]" behind when the document
+    # spelled the link with a scheme.
+    safe = _BLIND_LINK_SCHEME_LEFTOVER_RE.sub("[Link Redacted]", safe)
+    safe = _BLIND_HONORIFIC_LABEL_RE.sub("the candidate", safe)
+    # Substituting a noun phrase where a bare noun stood can double the article.
+    safe = _BLIND_DOUBLED_ARTICLE_RE.sub("the candidate", safe)
+    # A replaced name can open a line, a bullet or a sentence, so restore the capital
+    # rather than exporting "the candidate led the migration" to a client.
+    return _BLIND_GENERIC_LABEL_SENTENCE_RE.sub(
+        lambda match: match.group(1) + "The candidate", safe
+    )
+
+
+def _blind_apply_candidate_identity_recursive(
+    obj, replacements, phone_digits="", name_tokens=(), name_words=(), mononym=False
+):
+    if isinstance(obj, dict):
+        return {
+            key: _blind_apply_candidate_identity_recursive(
+                value, replacements, phone_digits, name_tokens, name_words, mononym
+            )
+            for key, value in obj.items()
+        }
+    if isinstance(obj, list):
+        return [
+            _blind_apply_candidate_identity_recursive(
+                value, replacements, phone_digits, name_tokens, name_words, mononym
+            )
+            for value in obj
+        ]
+    if isinstance(obj, str):
+        return _blind_apply_candidate_identity(
+            obj, replacements, phone_digits, name_tokens, name_words, mononym
+        )
+    return obj
+
+
+def _blind_scrub_candidate_identity(blinded, original_cv):
+    """Deterministic last line of defence for the candidate's own identity.
+
+    The organisation sweep only masks employers. Without this pass the
+    candidate's name, email, phone and personal links survive anywhere the model
+    left them - work bullets, project descriptions, achievements, additional
+    information - and reach the client in the exported blind CV.
+    """
+    replacements = _blind_collect_candidate_identity_replacements(original_cv)
+    candidate = original_cv.get("candidate") if isinstance(original_cv, dict) else None
+    phone_digits = _blind_candidate_phone_digits(
+        candidate.get("phone") if isinstance(candidate, dict) else ""
+    )
+    clean_name = _blind_summary_strip_name_honorifics(
+        candidate.get("name") if isinstance(candidate, dict) else ""
+    )
+    name_tokens = tuple(_blind_candidate_name_tokens(clean_name))
+    # Every word of the name, including the short ones the sweep will not use on their
+    # own: "Tan" cannot be a sweep term, but it still confirms that "Ming Tan" is the
+    # candidate rather than somebody else.
+    name_words = tuple(_blind_candidate_name_words(clean_name))
+    mononym = len(name_words) == 1
+    if not replacements and not phone_digits and not name_tokens:
+        return blinded
+    scrubbed = _blind_apply_candidate_identity_recursive(
+        blinded, replacements, phone_digits, name_tokens, name_words, mononym
+    )
+    if isinstance(scrubbed, dict) and isinstance(scrubbed.get("candidate"), dict):
+        # The header must stay a clean noun even when the sweep, rather than the
+        # model, was what anonymised it - including headers a provider emitted as
+        # "Name | Title" or "[Name]", where the label is only part of the field.
+        name = str(scrubbed["candidate"].get("name") or "")
+        repaired = _BLIND_GENERIC_LABEL_ANY_RE.sub("Candidate", name).strip()
+        if repaired != name.strip():
+            scrubbed["candidate"]["name"] = repaired
+    return scrubbed

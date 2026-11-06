@@ -1,0 +1,1006 @@
+[
+  {
+    "original": "cvstudio_cv_normalize.py",
+    "bundled": "engine/cvstudio_cv_normalize.py",
+    "mode": "verbatim source",
+    "sha256": "2ecb82891a5169de1904504260a04b5bb28e4bb757b85b224503a5211dc25df1"
+  },
+  {
+    "original": "cvstudio_cv_reconcile.py",
+    "bundled": "engine/cvstudio_cv_reconcile.py",
+    "mode": "verbatim source",
+    "sha256": "fff007680def1722a89cebc78c3216d0b82c880615d8e031cc7b2cd36579ff19"
+  },
+  {
+    "original": "cvstudio_cv_fidelity.py",
+    "bundled": "engine/cvstudio_cv_fidelity.py",
+    "mode": "verbatim source",
+    "sha256": "593832c6edb7ef779a771445c5cec6f123c2715c82350d7a21cc96da85283d3f"
+  },
+  {
+    "original": "cvstudio_blind_mask.py",
+    "bundled": "engine/cvstudio_blind_mask.py",
+    "mode": "verbatim source",
+    "sha256": "3678b6481fc5d645af0da88133f161832a8562388ebab827ebb6807d5c6fe860"
+  },
+  {
+    "original": "cvstudio_document_safety.py",
+    "bundled": "engine/cvstudio_document_safety.py",
+    "mode": "verbatim source",
+    "sha256": "a1743ddfc3441eb765b96e07b7d211b0f8a1dfd59d993bbdaec2aca1df4ba0ab"
+  },
+  {
+    "original": "generate.js",
+    "bundled": "engine/generate.js",
+    "mode": "verbatim source",
+    "sha256": "66d6f3dd3322dd8b483d117dada645596f8daa1d121270d7a11f26be1bb01b16"
+  },
+  {
+    "original": "CV_SOURCE_CHECK_GUARDRAILS.md",
+    "bundled": "engine/CV_SOURCE_CHECK_GUARDRAILS.md",
+    "mode": "verbatim source",
+    "sha256": "130d28065fbd1f67d2bc35e996008ad983c88f91670232582d45f0da3e5195eb"
+  },
+  {
+    "original": "vendor/cvstudio/cv-format.js",
+    "bundled": "engine/vendor/cvstudio/cv-format.js",
+    "mode": "verbatim source",
+    "sha256": "bfc080aafb0a73f76c0295294bd0692be6107fcfd0c8f8149f035f5a0b284fb3"
+  },
+  {
+    "original": "vendor/cvstudio/batch-format.js",
+    "bundled": "engine/vendor/cvstudio/batch-format.js",
+    "mode": "verbatim source",
+    "sha256": "32d6699fb1812b81631fd20e4633ed5d5873c2236a4828184731ff588dba0b13"
+  },
+  {
+    "original": "vendor/cvstudio/candidate-summary.js",
+    "bundled": "engine/vendor/cvstudio/candidate-summary.js",
+    "mode": "verbatim source",
+    "sha256": "1c04dd69dc3619b24ec148bbeed4975e6e66bf7b45eda286214305fc4015c08d"
+  },
+  {
+    "original": "vendor/cvstudio/docx-export.js",
+    "bundled": "engine/vendor/cvstudio/docx-export.js",
+    "mode": "verbatim source",
+    "sha256": "ffc0ad96cecb3c507a349980c150508e882a259b65a2f7f407f1bdce2ae9f96f"
+  },
+  {
+    "original": "vendor/cvstudio/hyppies-export.js",
+    "bundled": "engine/vendor/cvstudio/hyppies-export.js",
+    "mode": "verbatim source",
+    "sha256": "ad4051d0ad86c666d84e03738834a0e58835df332ac2b8d53b396d8c023e8c2f"
+  },
+  {
+    "original": "vendor/cvstudio/fcv-upload.js",
+    "bundled": "engine/vendor/cvstudio/fcv-upload.js",
+    "mode": "verbatim source",
+    "sha256": "18f1bdb0362f3a1809133a5c72bd8bbf0a87b709d268553c25d48ccca49d0856"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_CV_BASE_TEXT_INSTRUCTION",
+    "line_start": 8753,
+    "line_end": 8753,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "CV_LANGUAGE_CORRECTION_INSTRUCTION",
+    "line_start": 8755,
+    "line_end": 8768,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_parse_system_prompt",
+    "line_start": 8771,
+    "line_end": 8781,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "parse_cv",
+    "line_start": 8784,
+    "line_end": 9181,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_generated_ai_text",
+    "line_start": 9184,
+    "line_end": 9190,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_with_generated_ai_text",
+    "line_start": 9193,
+    "line_end": 9197,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_cv_format_review_output_data",
+    "line_start": 9200,
+    "line_end": 9210,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "generate_ai",
+    "line_start": 9213,
+    "line_end": 9391,
+    "bundled": "reference/app_parse_and_summary_routes.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_normalize_cv_text_alignment",
+    "line_start": 11406,
+    "line_end": 11412,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_bullets",
+    "line_start": 11415,
+    "line_end": 11426,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_xml_element_span",
+    "line_start": 11429,
+    "line_end": 11449,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_DOCX_INVALID_XML_CHAR_RE",
+    "line_start": 11452,
+    "line_end": 11454,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_FIRST_PAGE_LINE_LIMIT",
+    "line_start": 11458,
+    "line_end": 11458,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_BULLET_SPACING_AFTER_TWIPS",
+    "line_start": 11459,
+    "line_end": 11459,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_MAX_POSITION_Y_EMU",
+    "line_start": 11460,
+    "line_end": 11460,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_MAX_HEIGHT_EMU",
+    "line_start": 11461,
+    "line_end": 11461,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_VML_MAX_MARGIN_TOP_PT",
+    "line_start": 11462,
+    "line_end": 11462,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_SUMMARY_BOX_VML_MAX_HEIGHT_PT",
+    "line_start": 11463,
+    "line_end": 11463,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_safe_text",
+    "line_start": 11466,
+    "line_end": 11470,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_box_autofit_enabled",
+    "line_start": 11473,
+    "line_end": 11480,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_run",
+    "line_start": 11483,
+    "line_end": 11490,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_paragraph_runs",
+    "line_start": 11493,
+    "line_end": 11502,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_visible_text",
+    "line_start": 11505,
+    "line_end": 11511,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_is_section_boundary",
+    "line_start": 11514,
+    "line_end": 11533,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_numbering_id",
+    "line_start": 11536,
+    "line_end": 11550,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_box_numbering_id",
+    "line_start": 11553,
+    "line_end": 11559,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_box_block",
+    "line_start": 11562,
+    "line_end": 11592,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_box_content_span",
+    "line_start": 11595,
+    "line_end": 11637,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_fill_boxes",
+    "line_start": 11640,
+    "line_end": 11676,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_autofit_mode",
+    "line_start": 11679,
+    "line_end": 11696,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_patch_max_geometry",
+    "line_start": 11699,
+    "line_end": 11789,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_patch_vml_autofit",
+    "line_start": 11792,
+    "line_end": 11834,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_relocate_max_box_after_details_table",
+    "line_start": 11837,
+    "line_end": 11887,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_apply_box_autofit",
+    "line_start": 11890,
+    "line_end": 11943,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_existing_block_span",
+    "line_start": 11946,
+    "line_end": 11973,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_placeholder_span",
+    "line_start": 11976,
+    "line_end": 11997,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_summary_docx_block",
+    "line_start": 12000,
+    "line_end": 12026,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_CV_SUMMARY_FILTER_MAX_ITEMS",
+    "line_start": 12032,
+    "line_end": 12032,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_CV_SUMMARY_FILTER_MAX_CHARS",
+    "line_start": 12033,
+    "line_end": 12033,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_bounded_summary_bullets",
+    "line_start": 12036,
+    "line_end": 12043,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_CV_SUMMARY_ONLY_PAY_ERROR",
+    "line_start": 12046,
+    "line_end": 12049,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_insert_summary_into_docx_bytes_counted",
+    "line_start": 12052,
+    "line_end": 12158,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_insert_summary_into_docx_bytes",
+    "line_start": 12161,
+    "line_end": 12167,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_validate_generated_docx_bytes",
+    "line_start": 12170,
+    "line_end": 12184,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "generate_docx",
+    "line_start": 12187,
+    "line_end": 12330,
+    "bundled": "reference/app_docx_generation_and_summary.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_cv_bullet_match_key",
+    "line_start": 12333,
+    "line_end": 12346,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_ROMAN_RE",
+    "line_start": 12349,
+    "line_end": 12349,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_LABEL_PAREN_RE",
+    "line_start": 12350,
+    "line_end": 12350,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_LABEL_NUM_RE",
+    "line_start": 12351,
+    "line_end": 12353,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_LABEL_BARE_RE",
+    "line_start": 12354,
+    "line_end": 12356,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_label_body_kind",
+    "line_start": 12359,
+    "line_end": 12364,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_bullet_label_style",
+    "line_start": 12367,
+    "line_end": 12385,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_infer_outline_levels",
+    "line_start": 12388,
+    "line_end": 12410,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_infer_label_bullet_levels",
+    "line_start": 12413,
+    "line_end": 12439,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_merge_bullet_level_lists",
+    "line_start": 12442,
+    "line_end": 12459,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_extract_docx_bullet_levels",
+    "line_start": 12462,
+    "line_end": 12498,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_PDF_BULLET_LEADIN_RE",
+    "line_start": 12501,
+    "line_end": 12504,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_pdf_bullet_levels_from_lines",
+    "line_start": 12507,
+    "line_end": 12548,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_extract_pdf_bullet_levels",
+    "line_start": 12551,
+    "line_end": 12580,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_extract_docx_textbox_lines",
+    "line_start": 12583,
+    "line_end": 12635,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_docx_paragraph_numbering_id",
+    "line_start": 12638,
+    "line_end": 12659,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_docx_paragraph_has_numbering",
+    "line_start": 12662,
+    "line_end": 12663,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_docx_cell_content_lines",
+    "line_start": 12666,
+    "line_end": 12702,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_extract_docx_text_preserve_tables",
+    "line_start": 12705,
+    "line_end": 12792,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_normalize_extracted_text_artifacts",
+    "line_start": 12794,
+    "line_end": 12879,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_find_soffice_binary",
+    "line_start": 12883,
+    "line_end": 12900,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_legacy_doc_word_powershell_candidates",
+    "line_start": 12903,
+    "line_end": 12938,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_converter_process_creation_options",
+    "line_start": 12941,
+    "line_end": 12953,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_terminate_converter_process_tree",
+    "line_start": 12956,
+    "line_end": 13013,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_recorded_converter_process_ids",
+    "line_start": 13016,
+    "line_end": 13025,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_run_converter_subprocess",
+    "line_start": 13028,
+    "line_end": 13059,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_convert_legacy_doc_with_microsoft_word",
+    "line_start": 13062,
+    "line_end": 13169,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_convert_legacy_doc_with_libreoffice",
+    "line_start": 13172,
+    "line_end": 13214,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_convert_legacy_doc_to_docx_bytes",
+    "line_start": 13217,
+    "line_end": 13249,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_iter_antiword_binaries",
+    "line_start": 13252,
+    "line_end": 13259,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_find_antiword_binary",
+    "line_start": 13261,
+    "line_end": 13263,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_antiword_env_for_binary",
+    "line_start": 13266,
+    "line_end": 13268,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_require_verified_antiword",
+    "line_start": 13271,
+    "line_end": 13275,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_run_verified_antiword",
+    "line_start": 13278,
+    "line_end": 13284,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_antiword_dependency_response",
+    "line_start": 13287,
+    "line_end": 13288,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_antiword_dependency_payload",
+    "line_start": 13291,
+    "line_end": 13326,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_office_bytes_to_pdf_preview",
+    "line_start": 13329,
+    "line_end": 13421,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_docx_bytes_to_preview_html",
+    "line_start": 13424,
+    "line_end": 13505,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "preview_file",
+    "line_start": 13508,
+    "line_end": 13601,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "extract_text",
+    "line_start": 13603,
+    "line_end": 14249,
+    "bundled": "reference/app_document_extraction_and_previews.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "",
+    "line_start": 14259,
+    "line_end": 14278,
+    "bundled": "reference/app_blind_cv_route.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "BLIND_SYSTEM_PROMPT",
+    "line_start": 14299,
+    "line_end": 14427,
+    "bundled": "reference/app_blind_cv_route.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION",
+    "line_start": 14430,
+    "line_end": 14439,
+    "bundled": "reference/app_blind_cv_route.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "_blind_system_prompt",
+    "line_start": 14442,
+    "line_end": 14445,
+    "bundled": "reference/app_blind_cv_route.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "app.py",
+    "symbol": "blind_cv",
+    "line_start": 14448,
+    "line_end": 14564,
+    "bundled": "reference/app_blind_cv_route.py",
+    "mode": "AST-selected reference excerpt"
+  },
+  {
+    "original": "template.docx",
+    "bundled": "engine/template.docx",
+    "mode": "sanitized design template: original CV body/text and author metadata removed; summary marker, generic corporate copyright footer, stock design artwork/logo and numbering retained",
+    "source_sha256": "b1d4afb15a24652eb52f387fc3fadfc70f6d953290f7b9c36025e4b11efb5b61",
+    "sha256": "f0d57e52190867864a70e50d4e2a649a3f598ad7978bc54a1492bd52aae9d0b3"
+  },
+  {
+    "original": "tests/test_phase7b_cv_normalize_characterization.py",
+    "bundled": "engine/tests/test_phase7b_cv_normalize_characterization.py",
+    "mode": "verbatim source",
+    "sha256": "09066a78bd2c4bdd25a48e375c4beb9a6505c357fef954383d0cea23e8177f42"
+  },
+  {
+    "original": "tests/test_cv_date_parity.py",
+    "bundled": "engine/tests/test_cv_date_parity.py",
+    "mode": "verbatim source",
+    "sha256": "032a6a564dc97a6f6750277de0da4d5eeb8f7148c5a219a45f1e69e73d1bd679"
+  },
+  {
+    "original": "tests/test_cv_earlier_career_collapse.py",
+    "bundled": "engine/tests/test_cv_earlier_career_collapse.py",
+    "mode": "adapted test: two source-document-fixture classes excluded; all other tests verbatim",
+    "sha256": "f2a0f906a635dd060099673adaa59d9a330c328806161f7ed9532bd520989a08"
+  },
+  {
+    "original": "tests/test_cv_fidelity.py",
+    "bundled": "engine/tests/test_cv_fidelity.py",
+    "mode": "verbatim source",
+    "sha256": "78877bef56af0d87876f7232d95f7951ac2303b5b1745f1dccb36de98339beee"
+  },
+  {
+    "original": "tests/test_cv_format_review_resolved.py",
+    "bundled": "engine/tests/test_cv_format_review_resolved.py",
+    "mode": "verbatim source",
+    "sha256": "60059c2e604cde9792d993caf678c1f770461111860788abfbab284b0aa4776c"
+  },
+  {
+    "original": "tests/test_cv_guardrail_cases.py",
+    "bundled": "engine/tests/test_cv_guardrail_cases.py",
+    "mode": "verbatim source",
+    "sha256": "d448ca1bac3fe12967a2a874a36c997ecfb38cc0a450f9c804ee381dfe79ec4c"
+  },
+  {
+    "original": "tests/test_cv_project_layout.py",
+    "bundled": "engine/tests/test_cv_project_layout.py",
+    "mode": "verbatim source",
+    "sha256": "fe83515f119a4526463a357a9925f3ad9c6aefd6fda4fe1a4aeedc4e3cf0e9a4"
+  },
+  {
+    "original": "tests/test_cv_source_work_dates.py",
+    "bundled": "engine/tests/test_cv_source_work_dates.py",
+    "mode": "verbatim source",
+    "sha256": "83185092546304b8a3ccbdcd98faf853a5e51072ae2b2e53193348df9057ac56"
+  },
+  {
+    "original": "tests/test_cv_summary_salary_generated.py",
+    "bundled": "engine/tests/test_cv_summary_salary_generated.py",
+    "mode": "verbatim source",
+    "sha256": "1777cd13b25c326e999c55a5009a091bc718d5f49b4ac474778fa1cfeefbf883"
+  },
+  {
+    "original": "tests/test_cv_year_first_dates_employer_safety.py",
+    "bundled": "engine/tests/test_cv_year_first_dates_employer_safety.py",
+    "mode": "verbatim source",
+    "sha256": "89d49452572bbb142cd90a65db084ae445d5050c12fb245fc3278f405cbc2f2e"
+  },
+  {
+    "original": "tests/fixtures/cv_date_cases.json",
+    "bundled": "engine/tests/fixtures/cv_date_cases.json",
+    "mode": "verbatim source",
+    "sha256": "23d4ed0b895860b54c57525e94976b6629be33f5c79ac1a70aaee42e414fff12"
+  },
+  {
+    "original": "tests/fixtures/cv_guardrail_cases.json",
+    "bundled": "engine/tests/fixtures/cv_guardrail_cases.json",
+    "mode": "verbatim source",
+    "sha256": "f8e8e6c7818ca2d5e0f2dbb6f2eb37247dec3298e9602e08906045b843ad5d84"
+  },
+  {
+    "original": "tests/test_cv_date_parity.js",
+    "bundled": "engine/tests/test_cv_date_parity.js",
+    "mode": "verbatim source",
+    "sha256": "4ccc5542c3f79cd3a6c7f1c36bbd52f218593391ca1d7f60b2fffaf1831172c0"
+  },
+  {
+    "original": "tests/test_docx_export_frontend.js",
+    "bundled": "engine/tests/test_docx_export_frontend.js",
+    "mode": "verbatim source",
+    "sha256": "f25dfcaef1a58c5dfdd519c930f8ab2eca7e225774af934bf720f191b39bde3b"
+  },
+  {
+    "original": "tests/test_cv_summary_pay_frontend.js",
+    "bundled": "engine/tests/test_cv_summary_pay_frontend.js",
+    "mode": "verbatim source",
+    "sha256": "eb26d2800be2a4342f54f0348c6fa40085fa81370dc96ef2ee0e07167c449b9f"
+  },
+  {
+    "original": "tests/test_cv_reference_section_omission.py",
+    "bundled": "reference/original_app_tests/test_cv_reference_section_omission.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "5721913dda4595d81e9454d05b9d6407ed66afc3457825609ef87cfe60fb754d"
+  },
+  {
+    "original": "tests/test_cv_label_table_reconciliation.py",
+    "bundled": "reference/original_app_tests/test_cv_label_table_reconciliation.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "67b4d8395e44fec41af3abbb431d77a2435a205b620d3114474f578b8d6f6633"
+  },
+  {
+    "original": "tests/test_cv_nested_tables.py",
+    "bundled": "reference/original_app_tests/test_cv_nested_tables.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "99272c8f5cd3f12059e5f77c76ad7cafc8e6370217bca1e776893260d53163f8"
+  },
+  {
+    "original": "tests/test_cv_source_detail_restore.py",
+    "bundled": "reference/original_app_tests/test_cv_source_detail_restore.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "043a0a62ced924683b6ada15e59f32bfb8212074feadcaf6738dd706db1fa376"
+  },
+  {
+    "original": "tests/test_cv_title_above_place_rows.py",
+    "bundled": "reference/original_app_tests/test_cv_title_above_place_rows.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "587d7ab0e41d568b34843a2be585a8b3470c0b3670e209f6c0609bc4c51b984d"
+  },
+  {
+    "original": "tests/test_cv_summary_salary_docx.py",
+    "bundled": "reference/original_app_tests/test_cv_summary_salary_docx.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "95b7ca23812d646ea846d6be6c1665cc79bed09c378ae637d347f2437ddf3107"
+  },
+  {
+    "original": "tests/test_cv_language_correction.py",
+    "bundled": "reference/original_app_tests/test_cv_language_correction.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "5f51902775d7d62d9ca4573aaf9084272079f23fd6bd953fef9c70f8d0f61fa9"
+  },
+  {
+    "original": "tests/test_cv_format_review.py",
+    "bundled": "reference/original_app_tests/test_cv_format_review.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "b64ae39ae7f16415b1ada129f4ad8f268c44edcc6b810ef8a64588fc0579066e"
+  },
+  {
+    "original": "tests/test_blind_identity_and_org_masking.py",
+    "bundled": "reference/original_app_tests/test_blind_identity_and_org_masking.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "25548a477e19cc95b2e60027eab15881019771f59e1ff48073b4749c0c59b841"
+  },
+  {
+    "original": "tests/test_bullet_nesting.py",
+    "bundled": "reference/original_app_tests/test_bullet_nesting.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "23fb0a8733dbdc7f5f83c77db4d6ccbbe6f283330a2edb305fb135af73442e62"
+  },
+  {
+    "original": "tests/test_long_cv_output_corrective.py",
+    "bundled": "reference/original_app_tests/test_long_cv_output_corrective.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "b5344467b3b234b023eb68cb58617d04801f28e251cd7501105ab70157d9d11d"
+  },
+  {
+    "original": "tests/test_cv_award_headings.py",
+    "bundled": "reference/original_app_tests/test_cv_award_headings.py",
+    "mode": "verbatim reference test; requires the full original app, not runnable in this bundle",
+    "sha256": "3a6c91aeda37fac91b5c1f476a7787d3b808bdee1faaf0098f0f139fa56861de"
+  },
+  {
+    "original": "tests/test_cv_earlier_career_collapse.py",
+    "bundled": "reference/original_app_tests/test_cv_earlier_career_collapse.py",
+    "mode": "verbatim reference; original source-document fixtures deliberately excluded"
+  },
+  {
+    "original": "app.py",
+    "symbol": "SYSTEM_PROMPT",
+    "line_start": 1367,
+    "line_end": 1511,
+    "bundled": "prompts/SYSTEM_PROMPT.txt",
+    "mode": "exact literal prompt value, not an executable app import"
+  },
+  {
+    "original": "app.py",
+    "symbol": "CV_LANGUAGE_CORRECTION_INSTRUCTION",
+    "line_start": 8755,
+    "line_end": 8768,
+    "bundled": "prompts/CV_LANGUAGE_CORRECTION_INSTRUCTION.txt",
+    "mode": "exact literal prompt value, not an executable app import"
+  },
+  {
+    "original": "app.py",
+    "symbol": "BLIND_SYSTEM_PROMPT",
+    "line_start": 14299,
+    "line_end": 14427,
+    "bundled": "prompts/BLIND_SYSTEM_PROMPT.txt",
+    "mode": "exact literal prompt value, not an executable app import"
+  },
+  {
+    "original": "app.py",
+    "symbol": "BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION",
+    "line_start": 14430,
+    "line_end": 14439,
+    "bundled": "prompts/BLIND_CANDIDATE_GENDER_NEUTRALIZATION_INSTRUCTION.txt",
+    "mode": "exact literal prompt value, not an executable app import"
+  }
+]
