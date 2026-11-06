@@ -195,3 +195,20 @@ SELECT count(*)::integer FROM candidate;
 -- see them, which a plain UPDATE would be refused for (row-level security).
 -- name: SetCandidateOwner :one
 SELECT app_set_candidate_owner(@id::text, sqlc.narg(owner_id)::text)::boolean AS changed;
+
+-- A job's market map: candidates whose current title has every word given
+-- (no names or contact details: only what the map counts).
+-- name: MarketPool :many
+SELECT id, current_company, location, residence_country, availability, work_authorization, work_authorization_basis,
+       notice_period_value, notice_period_unit
+FROM candidate
+WHERE current_title IS NOT NULL
+  AND app_normalize_text(current_title) LIKE ALL (app_search_patterns(@words::text))
+LIMIT 5000;
+
+-- Their pay, for roles that may see salaries (the table's policy enforces it too).
+-- name: MarketPay :many
+SELECT coalesce(current_amount::text, '')::text AS current_amount, current_currency, current_period,
+       coalesce(expected_min::text, '')::text AS expected_min, expected_currency, expected_period
+FROM candidate_compensation
+WHERE candidate_id = ANY(@ids::text[]);

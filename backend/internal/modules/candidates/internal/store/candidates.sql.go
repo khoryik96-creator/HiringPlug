@@ -548,6 +548,103 @@ func (q *Queries) ListWork(ctx context.Context, candidateID string) ([]Candidate
 	return items, nil
 }
 
+const marketPay = `-- name: MarketPay :many
+SELECT coalesce(current_amount::text, '')::text AS current_amount, current_currency, current_period,
+       coalesce(expected_min::text, '')::text AS expected_min, expected_currency, expected_period
+FROM candidate_compensation
+WHERE candidate_id = ANY($1::text[])
+`
+
+type MarketPayRow struct {
+	CurrentAmount    string
+	CurrentCurrency  *string
+	CurrentPeriod    *string
+	ExpectedMin      string
+	ExpectedCurrency *string
+	ExpectedPeriod   *string
+}
+
+// Their pay, for roles that may see salaries (the table's policy enforces it too).
+func (q *Queries) MarketPay(ctx context.Context, ids []string) ([]MarketPayRow, error) {
+	rows, err := q.db.Query(ctx, marketPay, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MarketPayRow
+	for rows.Next() {
+		var i MarketPayRow
+		if err := rows.Scan(
+			&i.CurrentAmount,
+			&i.CurrentCurrency,
+			&i.CurrentPeriod,
+			&i.ExpectedMin,
+			&i.ExpectedCurrency,
+			&i.ExpectedPeriod,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const marketPool = `-- name: MarketPool :many
+SELECT id, current_company, location, residence_country, availability, work_authorization, work_authorization_basis,
+       notice_period_value, notice_period_unit
+FROM candidate
+WHERE current_title IS NOT NULL
+  AND app_normalize_text(current_title) LIKE ALL (app_search_patterns($1::text))
+LIMIT 5000
+`
+
+type MarketPoolRow struct {
+	ID                     string
+	CurrentCompany         *string
+	Location               *string
+	ResidenceCountry       *string
+	Availability           *string
+	WorkAuthorization      *string
+	WorkAuthorizationBasis *string
+	NoticePeriodValue      *int32
+	NoticePeriodUnit       *string
+}
+
+// A job's market map: candidates whose current title has every word given
+// (no names or contact details: only what the map counts).
+func (q *Queries) MarketPool(ctx context.Context, words string) ([]MarketPoolRow, error) {
+	rows, err := q.db.Query(ctx, marketPool, words)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MarketPoolRow
+	for rows.Next() {
+		var i MarketPoolRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CurrentCompany,
+			&i.Location,
+			&i.ResidenceCountry,
+			&i.Availability,
+			&i.WorkAuthorization,
+			&i.WorkAuthorizationBasis,
+			&i.NoticePeriodValue,
+			&i.NoticePeriodUnit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveCompensation = `-- name: MoveCompensation :execrows
 UPDATE candidate_compensation SET candidate_id = $1 WHERE candidate_id = $2
 `

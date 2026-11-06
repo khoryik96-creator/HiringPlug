@@ -132,7 +132,7 @@ func Dates(j Job) string {
 	}
 	switch {
 	case start != "" && end != "":
-		return start + " – " + end
+		return start + " to " + end // as on the CVs sent to clients: "Jun 2022 to Present"
 	case start != "":
 		return "From " + start
 	default:

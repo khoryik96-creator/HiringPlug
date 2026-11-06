@@ -73,8 +73,19 @@ def test_the_answer_and_tokens_go_back_to_go() -> None:
 
 
 def test_every_kind_has_a_task() -> None:
-    for kind in ("summary", "red_flags", "fit", "question"):
+    for kind in ("summary", "red_flags", "fit", "question", "market_map"):
         assert assistant_ask.prompt(ask(kind)).startswith("Task: ")
+
+
+def test_market_insights_may_use_market_knowledge_marked_as_estimates() -> None:
+    ai = FakeProvider(Completion(text="Talent supply\n- Tight.", model="m", input_tokens=10, output_tokens=5))
+    r = result(assistant_ask.run(ask("market_map"), deps(ai)))
+    assert r.answer == "Talent supply\n- Tight."
+    [(system, user)] = ai.calls
+    assert "what you know of the job market" in system
+    assert "Mark anything that comes from your general knowledge as an estimate" in system
+    assert "Never name or describe individual people" in system
+    assert "Map the talent market for this job" in user
 
 
 @pytest.mark.parametrize(

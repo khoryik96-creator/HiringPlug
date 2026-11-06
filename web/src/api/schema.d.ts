@@ -1622,6 +1622,44 @@ export interface paths {
         patch: operations["updateJobLead"];
         trace?: never;
     };
+    "/v1/jobs/{jobId}/market-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A job's market map */
+        get: operations["getMarketMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/market-map/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The market map as a Word or PDF file */
+        get: operations["exportMarketMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/matches": {
         parameters: {
             query?: never;
@@ -2226,7 +2264,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
+        Permission: "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -2276,10 +2314,10 @@ export interface components {
          */
         AssistantSubjectType: "candidate" | "job" | "application";
         /**
-         * @description summary = a short summary; red_flags = gaps, red flags and what to ask about; fit = how well the candidate fits the job (applications only); question = your own question.
+         * @description summary = a short summary; red_flags = gaps, red flags and what to ask about; fit = how well the candidate fits the job (applications only); question = your own question; market_map = market insights for a job (jobs only): who to approach, where they work, other titles, skills, pay and difficulty, from what the AI knows of the market as well as the job (estimates, to check).
          * @enum {string}
          */
-        AssistantKind: "summary" | "red_flags" | "fit" | "question";
+        AssistantKind: "summary" | "red_flags" | "fit" | "question" | "market_map";
         /**
          * @description queued = waiting for the AI; done = answered; failed = the AI could not answer (see error).
          * @enum {string}
@@ -3908,6 +3946,59 @@ export interface components {
              * @description The check this job is for; an older one (replaced by a "check now") does nothing.
              */
             runAt: string;
+        };
+        MarketMap: {
+            jobId: components["schemas"]["JobOrderId"];
+            jobTitle: string;
+            /** @description The words of the job title a candidate's current title must have (seniority words left out), e.g. "finance". */
+            searchedFor: string;
+            pool: components["schemas"]["MarketPool"];
+            /** @description Your latest AI market insights for this job (none until you ask for them). */
+            insights: components["schemas"]["MarketInsights"] | null;
+        };
+        /** @description Candidates you may see whose current title has the words searched for. */
+        MarketPool: {
+            total: number;
+            /** @description How many are looking out, passive, placed, not looking, or not set ("unknown"). */
+            availability: components["schemas"]["MarketCount"][];
+            workAuthorization: components["schemas"]["MarketCount"][];
+            /** @description Where they work now, the most first (up to 10). */
+            companies: components["schemas"]["MarketCount"][];
+            /** @description Where they live, the most first (up to 8). */
+            locations: components["schemas"]["MarketCount"][];
+            medianNoticeDays: number | null;
+            /** @description Pay of the candidates with one recorded, by currency and period (the most common first); empty for roles that may not see salaries. */
+            salary: components["schemas"]["MarketPay"][];
+            /** @description Your role may not see salaries. */
+            salaryRestricted: boolean;
+        };
+        MarketCount: {
+            /** @description The value counted: a status, a company, a place... */
+            key: string;
+            count: number;
+        };
+        MarketPay: {
+            currency: string;
+            period: components["schemas"]["PayPeriod"];
+            current: components["schemas"]["MarketRange"] | null;
+            expected: components["schemas"]["MarketRange"] | null;
+        };
+        /** @description Amounts as exact decimal strings. */
+        MarketRange: {
+            count: number;
+            /** @description The 25th percentile. */
+            low: string;
+            median: string;
+            /** @description The 75th percentile. */
+            high: string;
+        };
+        MarketInsights: {
+            answerId: string;
+            status: components["schemas"]["AssistantAnswerStatus"];
+            text: string | null;
+            model: string | null;
+            /** Format: date-time */
+            askedAt: string;
         };
         /** @example mat_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         MatchId: string;
@@ -7985,6 +8076,61 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getMarketMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketMap"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportMarketMap: {
+        parameters: {
+            query: {
+                format: "docx" | "pdf";
+            };
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listMatches: {

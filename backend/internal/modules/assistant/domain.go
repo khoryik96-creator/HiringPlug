@@ -90,6 +90,9 @@ func CheckQuestion(q Question) (Question, error) {
 	if q.Kind == "fit" && q.SubjectType != "application" {
 		errs.Add("kind", "fit is for a candidate's job (an application)")
 	}
+	if q.Kind == "market_map" && q.SubjectType != "job" {
+		errs.Add("kind", "market_map is for a job")
+	}
 	if strings.TrimSpace(q.SubjectID) == "" {
 		errs.Add("subjectId", "is required")
 	}

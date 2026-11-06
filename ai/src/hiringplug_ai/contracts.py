@@ -52,6 +52,7 @@ class Permission(StrEnum):
     jobs_update = "jobs:update"
     leads_manage = "leads:manage"
     leads_read = "leads:read"
+    market_read = "market:read"
     matching_create = "matching:create"
     matching_read = "matching:read"
     notes_activity_read = "notes.activity:read"
@@ -216,6 +217,7 @@ class AssistantKind(StrEnum):
     red_flags = "red_flags"
     fit = "fit"
     question = "question"
+    market_map = "market_map"
 
 
 class AssistantAnswerStatus(StrEnum):
@@ -2182,6 +2184,26 @@ class LeadSourceCheckJob(BaseModel):
     ]
 
 
+class MarketCount(BaseModel):
+    key: Annotated[str, Field(description="The value counted: a status, a company, a place...")]
+    count: int
+
+
+class MarketRange(BaseModel):
+    count: int
+    low: Annotated[str, Field(description="The 25th percentile.")]
+    median: str
+    high: Annotated[str, Field(description="The 75th percentile.")]
+
+
+class MarketInsights(BaseModel):
+    answerId: str
+    status: AssistantAnswerStatus
+    text: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(...)]
+    askedAt: AwareDatetime
+
+
 class MatchId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["mat_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^mat_[0-9a-hjkmnp-tv-z]{26}$")
@@ -3425,6 +3447,13 @@ class JobAdUpdate(BaseModel):
     ] = None
 
 
+class MarketPay(BaseModel):
+    currency: str
+    period: PayPeriod
+    current: Annotated[MarketRange | None, Field(...)]
+    expected: Annotated[MarketRange | None, Field(...)]
+
+
 class Offer(BaseModel):
     id: OfferId
     version: int
@@ -3504,6 +3533,27 @@ class JdFile(BaseModel):
     createdAt: AwareDatetime
 
 
+class MarketPool(BaseModel):
+    total: int
+    availability: Annotated[
+        list[MarketCount],
+        Field(description='How many are looking out, passive, placed, not looking, or not set ("unknown").'),
+    ]
+    workAuthorization: list[MarketCount]
+    companies: Annotated[
+        list[MarketCount], Field(description="Where they work now, the most first (up to 10).")
+    ]
+    locations: Annotated[list[MarketCount], Field(description="Where they live, the most first (up to 8).")]
+    medianNoticeDays: Annotated[int | None, Field(...)]
+    salary: Annotated[
+        list[MarketPay],
+        Field(
+            description="Pay of the candidates with one recorded, by currency and period (the most common first); empty for roles that may not see salaries."
+        ),
+    ]
+    salaryRestricted: Annotated[bool, Field(description="Your role may not see salaries.")]
+
+
 class Report(BaseModel):
     from_: Annotated[date, Field(alias="from")]
     to: date
@@ -3525,3 +3575,19 @@ class Report(BaseModel):
     ]
     timeToFill: TimeToFill
     feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]
+
+
+class MarketMap(BaseModel):
+    jobId: JobOrderId
+    jobTitle: str
+    searchedFor: Annotated[
+        str,
+        Field(
+            description='The words of the job title a candidate\'s current title must have (seniority words left out), e.g. "finance".'
+        ),
+    ]
+    pool: MarketPool
+    insights: Annotated[
+        MarketInsights | None,
+        Field(description="Your latest AI market insights for this job (none until you ask for them)."),
+    ]

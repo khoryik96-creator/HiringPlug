@@ -30,6 +30,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/leads"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/market"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/matching"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/notes"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/offers"
@@ -66,6 +67,7 @@ type Modules struct {
 	Privacy      *privacy.Module
 	Settings     *settings.Module
 	Intake       *intake.Module
+	Market       *market.Module
 	// scaffold:fields
 }
 
@@ -116,6 +118,7 @@ func NewModules(d Deps) *Modules {
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
 		Applications: assistantApplications{m.Pipeline},
+		Market:       assistantMarket{m},
 		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents} }},
 	}, assistant.Settings{Enabled: d.Config.AI.Enabled, MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
@@ -127,6 +130,9 @@ func NewModules(d Deps) *Modules {
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
 	}, d.Config.MaxUploadBytes)
 	m.Documents.WhenReadDone(m.Intake.ReadDone) // imported CVs fill their candidates in
+	m.Market = market.New(d.Pool, market.Deps{
+		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
+	})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
@@ -164,6 +170,7 @@ type (
 	privacyHTTP      = privacy.HTTP
 	settingsHTTP     = settings.HTTP
 	intakeHTTP       = intake.HTTP
+	marketHTTP       = market.HTTP
 	// scaffold:aliases
 )
 
@@ -193,6 +200,7 @@ type Server struct {
 	*privacyHTTP
 	*settingsHTTP
 	*intakeHTTP
+	*marketHTTP
 	// scaffold:embeds
 }
 
@@ -223,6 +231,7 @@ func (m *Modules) Server() *Server {
 		privacyHTTP:      m.Privacy.HTTP,
 		settingsHTTP:     m.Settings.HTTP,
 		intakeHTTP:       m.Intake.HTTP,
+		marketHTTP:       m.Market.HTTP,
 		// scaffold:server-fields
 	}
 }

@@ -1,0 +1,144 @@
+# Module contract: market (market mapping for a job).
+# See contracts/README.md for the format.
+x-module:
+  name: market
+  description: >
+    A market map for a job: who in the company's own database does this kind
+    of work (how many, how available, where they work and live, their work
+    authorization, notice and, for roles that may see salaries, their pay),
+    and the AI assistant's market insights for it (an assistant answer of
+    kind market_map). Exported to Word or PDF. The module keeps no data of
+    its own: it reads other modules' records.
+  permissions:
+    market:read:
+      description: See and export a job's market map (pay in it needs candidates.compensation:read).
+      roles: [owner, admin, recruiter, sourcer]
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/jobs/{jobId}/market-map:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: getMarketMap
+      tags: [market]
+      summary: A job's market map
+      x-permission: market:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MarketMap' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/jobs/{jobId}/market-map/export:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: exportMarketMap
+      tags: [market]
+      summary: The market map as a Word or PDF file
+      x-permission: market:read
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [docx, pdf] }
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  schemas:
+    MarketMap:
+      type: object
+      required: [jobId, jobTitle, searchedFor, pool, insights]
+      properties:
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        jobTitle: { type: string }
+        searchedFor:
+          type: string
+          description: The words of the job title a candidate's current title must have (seniority words left out), e.g. "finance".
+        pool: { $ref: '#/components/schemas/MarketPool' }
+        insights:
+          allOf: [{ $ref: '#/components/schemas/MarketInsights' }]
+          nullable: true
+          description: Your latest AI market insights for this job (none until you ask for them).
+    MarketPool:
+      type: object
+      description: Candidates you may see whose current title has the words searched for.
+      required: [total, availability, workAuthorization, companies, locations, medianNoticeDays, salary, salaryRestricted]
+      properties:
+        total: { type: integer }
+        availability:
+          type: array
+          description: How many are looking out, passive, placed, not looking, or not set ("unknown").
+          items: { $ref: '#/components/schemas/MarketCount' }
+        workAuthorization:
+          type: array
+          items: { $ref: '#/components/schemas/MarketCount' }
+        companies:
+          type: array
+          description: Where they work now, the most first (up to 10).
+          items: { $ref: '#/components/schemas/MarketCount' }
+        locations:
+          type: array
+          description: Where they live, the most first (up to 8).
+          items: { $ref: '#/components/schemas/MarketCount' }
+        medianNoticeDays: { type: integer, nullable: true }
+        salary:
+          type: array
+          description: Pay of the candidates with one recorded, by currency and period (the most common first); empty for roles that may not see salaries.
+          items: { $ref: '#/components/schemas/MarketPay' }
+        salaryRestricted: { type: boolean, description: Your role may not see salaries. }
+    MarketCount:
+      type: object
+      required: [key, count]
+      properties:
+        key: { type: string, description: "The value counted: a status, a company, a place..." }
+        count: { type: integer }
+    MarketPay:
+      type: object
+      required: [currency, period, current, expected]
+      properties:
+        currency: { type: string }
+        period: { $ref: '#/components/schemas/PayPeriod' }
+        current:
+          allOf: [{ $ref: '#/components/schemas/MarketRange' }]
+          nullable: true
+        expected:
+          allOf: [{ $ref: '#/components/schemas/MarketRange' }]
+          nullable: true
+    MarketRange:
+      type: object
+      description: Amounts as exact decimal strings.
+      required: [count, low, median, high]
+      properties:
+        count: { type: integer }
+        low: { type: string, description: The 25th percentile. }
+        median: { type: string }
+        high: { type: string, description: The 75th percentile. }
+    MarketInsights:
+      type: object
+      required: [answerId, status, text, model, askedAt]
+      properties:
+        answerId: { type: string }
+        status: { $ref: '#/components/schemas/AssistantAnswerStatus' }
+        text: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        askedAt: { type: string, format: date-time }

@@ -137,7 +137,14 @@ func (s *Service) sections(ctx context.Context, tx pgx.Tx, p authz.Principal, q 
 		return CandidateSections(c, text), err
 	case "job":
 		j, err := job(q.SubjectID)
-		return JobSections(j), err
+		if err != nil || q.Kind != "market_map" || s.deps.Market == nil {
+			return JobSections(j), err
+		}
+		pool, err := s.deps.Market.PoolText(ctx, tx, p, q.SubjectID)
+		if err != nil || pool == "" {
+			return JobSections(j), err
+		}
+		return append(JobSections(j), Section{Title: "In our own database", Text: pool}), nil
 	default: // application
 		if !p.Can(api.PermissionPipelineRead) {
 			return nil, apperr.NotFound("application")

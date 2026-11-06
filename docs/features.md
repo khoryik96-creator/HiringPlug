@@ -565,6 +565,20 @@ Every stage change is recorded (by the database, whatever made it), so these
 figures come from what happened, not from where applications are now; the
 history before this was rebuilt from the audit log.
 
+## Market map ✅
+
+On each job (owners, admins, recruiters and sourcers), from the company's own
+database: the candidates whose current title has the job title's words (level
+words such as "Senior" and "Manager" left out, so "Senior Finance Manager"
+maps everyone in finance), how many are looking out or passive, where they work
+and live, their work authorization and median notice, and, for roles that may
+see salaries, current and expected pay (25th percentile, median, 75th). Like
+Kano's Owl, the AI assistant adds **market insights** (kind `market_map`):
+target companies, other titles to search, skills, typical pay, difficulty and
+where to find people, from what the AI knows of the market as well as the job
+and the counts above (never pay or names), marked as estimates. The map, with
+the insights, downloads as Word or PDF.
+
 ## Data protection (PDPA) ✅
 
 Malaysia's Personal Data Protection Act, for the candidates you hold. **HiringPlug

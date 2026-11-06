@@ -86,7 +86,7 @@ func TestTheStandardTemplate(t *testing.T) {
 	assert.NotContains(t, text, "salary", "salary only when asked")
 	assert.NotContains(t, text, "Summary", "an empty section goes with its heading")
 	assert.Contains(t, text, "Skills\nIFRS, SAP")
-	assert.Contains(t, text, "Experience\nSenior Accountant\nMaju Bhd\nMar 2021 – Present\nMonth-end close\nIFRS 16 & audits\nAccountant\nContoh <Holdings>\n2017 – Feb 2021")
+	assert.Contains(t, text, "Experience\nSenior Accountant\nMaju Bhd\nMar 2021 to Present\nMonth-end close\nIFRS 16 & audits\nAccountant\nContoh <Holdings>\n2017 to Feb 2021")
 	assert.Contains(t, text, "Education\nACCA\nACCA Global\n2019")
 	assert.NotContains(t, text, "{{")
 	assert.Contains(t, doc, "Contoh &lt;Holdings&gt;", "values are escaped")

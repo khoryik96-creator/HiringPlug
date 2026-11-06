@@ -114,8 +114,11 @@ components:
       description: >
         summary = a short summary; red_flags = gaps, red flags and what to ask
         about; fit = how well the candidate fits the job (applications only);
-        question = your own question.
-      enum: [summary, red_flags, fit, question]
+        question = your own question; market_map = market insights for a job
+        (jobs only): who to approach, where they work, other titles, skills,
+        pay and difficulty, from what the AI knows of the market as well as
+        the job (estimates, to check).
+      enum: [summary, red_flags, fit, question, market_map]
     AssistantAnswerStatus:
       type: string
       description: queued = waiting for the AI; done = answered; failed = the AI could not answer (see error).

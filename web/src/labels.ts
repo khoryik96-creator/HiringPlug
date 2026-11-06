@@ -98,6 +98,7 @@ export const ASSISTANT_KIND: Record<Schemas["AssistantKind"], string> = {
   red_flags: "Gaps and red flags",
   fit: "Fit for this job",
   question: "Your question",
+  market_map: "Market insights",
 };
 
 export const CONTACT_STATUS: Record<Schemas["ContactStatus"], string> = {

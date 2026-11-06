@@ -106,7 +106,7 @@ func TestFormattedCvs(t *testing.T) {
 	out, text := a.formatCv(recruiter, c.Id, map[string]any{}, http.StatusCreated)
 	assert.Equal(t, "Siti Aisyah - CV (Test tenant TestFormattedCvs).docx", out.FileName)
 	assert.Contains(t, text, "Siti Aisyah|Senior Accountant")
-	assert.Contains(t, text, "Experience|Senior Accountant|Maju Bhd|Mar 2021 – Present")
+	assert.Contains(t, text, "Experience|Senior Accountant|Maju Bhd|Mar 2021 to Present")
 	assert.NotContains(t, text, "siti@example.com", "contact hidden unless asked")
 	assert.NotContains(t, text, "8,500")
 	var doc api.Document

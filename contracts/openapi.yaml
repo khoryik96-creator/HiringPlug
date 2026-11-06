@@ -2477,6 +2477,50 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/jobs/{jobId}/market-map:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: getMarketMap
+      tags: [market]
+      summary: A job's market map
+      x-permission: market:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MarketMap'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/{jobId}/market-map/export:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: exportMarketMap
+      tags: [market]
+      summary: The market map as a Word or PDF file
+      x-permission: market:read
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema: {type: string, enum: [docx, pdf]}
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+            application/pdf:
+              schema: {type: string, format: binary}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/matches:
     get:
       operationId: listMatches
@@ -3381,6 +3425,7 @@ components:
         - jobs:update
         - leads:manage
         - leads:read
+        - market:read
         - matching:create
         - matching:read
         - notes.activity:read
@@ -3522,9 +3567,9 @@ components:
     AssistantKind:
       type: string
       description: >
-        summary = a short summary; red_flags = gaps, red flags and what to ask about; fit = how well the candidate fits the job (applications only); question = your own question.
+        summary = a short summary; red_flags = gaps, red flags and what to ask about; fit = how well the candidate fits the job (applications only); question = your own question; market_map = market insights for a job (jobs only): who to approach, where they work, other titles, skills, pay and difficulty, from what the AI knows of the market as well as the job (estimates, to check).
 
-      enum: [summary, red_flags, fit, question]
+      enum: [summary, red_flags, fit, question, market_map]
     AssistantAnswerStatus:
       type: string
       description: queued = waiting for the AI; done = answered; failed = the AI could not answer (see error).
@@ -5833,6 +5878,83 @@ components:
       properties:
         sourceId: {$ref: '#/components/schemas/LeadSourceId'}
         runAt: {type: string, format: date-time, description: The check this job is for; an older one (replaced by a "check now") does nothing.}
+    MarketMap:
+      type: object
+      required: [jobId, jobTitle, searchedFor, pool, insights]
+      properties:
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        jobTitle: {type: string}
+        searchedFor:
+          type: string
+          description: The words of the job title a candidate's current title must have (seniority words left out), e.g. "finance".
+        pool: {$ref: '#/components/schemas/MarketPool'}
+        insights:
+          allOf: [{$ref: '#/components/schemas/MarketInsights'}]
+          nullable: true
+          description: Your latest AI market insights for this job (none until you ask for them).
+    MarketPool:
+      type: object
+      description: Candidates you may see whose current title has the words searched for.
+      required: [total, availability, workAuthorization, companies, locations, medianNoticeDays, salary, salaryRestricted]
+      properties:
+        total: {type: integer}
+        availability:
+          type: array
+          description: How many are looking out, passive, placed, not looking, or not set ("unknown").
+          items: {$ref: '#/components/schemas/MarketCount'}
+        workAuthorization:
+          type: array
+          items: {$ref: '#/components/schemas/MarketCount'}
+        companies:
+          type: array
+          description: Where they work now, the most first (up to 10).
+          items: {$ref: '#/components/schemas/MarketCount'}
+        locations:
+          type: array
+          description: Where they live, the most first (up to 8).
+          items: {$ref: '#/components/schemas/MarketCount'}
+        medianNoticeDays: {type: integer, nullable: true}
+        salary:
+          type: array
+          description: Pay of the candidates with one recorded, by currency and period (the most common first); empty for roles that may not see salaries.
+          items: {$ref: '#/components/schemas/MarketPay'}
+        salaryRestricted: {type: boolean, description: Your role may not see salaries.}
+    MarketCount:
+      type: object
+      required: [key, count]
+      properties:
+        key: {type: string, description: "The value counted: a status, a company, a place..."}
+        count: {type: integer}
+    MarketPay:
+      type: object
+      required: [currency, period, current, expected]
+      properties:
+        currency: {type: string}
+        period: {$ref: '#/components/schemas/PayPeriod'}
+        current:
+          allOf: [{$ref: '#/components/schemas/MarketRange'}]
+          nullable: true
+        expected:
+          allOf: [{$ref: '#/components/schemas/MarketRange'}]
+          nullable: true
+    MarketRange:
+      type: object
+      description: Amounts as exact decimal strings.
+      required: [count, low, median, high]
+      properties:
+        count: {type: integer}
+        low: {type: string, description: The 25th percentile.}
+        median: {type: string}
+        high: {type: string, description: The 75th percentile.}
+    MarketInsights:
+      type: object
+      required: [answerId, status, text, model, askedAt]
+      properties:
+        answerId: {type: string}
+        status: {$ref: '#/components/schemas/AssistantAnswerStatus'}
+        text: {type: string, nullable: true}
+        model: {type: string, nullable: true}
+        askedAt: {type: string, format: date-time}
     MatchId:
       type: string
       pattern: '^mat_[0-9a-hjkmnp-tv-z]{26}$'
@@ -7050,6 +7172,11 @@ x-permissions:
     description: View hiring leads and their sources.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  market:read:
+    module: market
+    description: See and export a job's market map (pay in it needs candidates.compensation:read).
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   matching:create:
     module: matching
     description: Ask the AI to score how well candidates fit their jobs (uses the AI allowance).
@@ -7285,6 +7412,8 @@ x-modules:
     description: Job orders (agency) or requisitions (in-house), with an optional salary budget.
   - name: leads
     description: 'Hiring signals as leads. A source is a company''s public job board feed (Greenhouse, Lever, Ashby, SmartRecruiters) or a careers page with job markup (schema.org JobPosting, as for Google for Jobs; robots.txt is respected). Sources are checked every day: each opening becomes a lead, and one no longer listed is marked closed. Ads can also be saved by hand. No scraping of sites whose terms forbid it (LinkedIn, JobStreet).'
+  - name: market
+    description: 'A market map for a job: who in the company''s own database does this kind of work (how many, how available, where they work and live, their work authorization, notice and, for roles that may see salaries, their pay), and the AI assistant''s market insights for it (an assistant answer of kind market_map). Exported to Word or PDF. The module keeps no data of its own: it reads other modules'' records.'
   - name: matching
     description: CV vs job match. Go sends the job's text and the candidate's CV text (without names, contact details or salary) to the Python AI worker, which asks the AI provider for the job's requirements, whether the CV meets each, and a quote from both for every one. Go keeps a requirement only if its quote is in the job's text and counts it as met only if its evidence is in the CV, then works out the score from what is left. It suggests; the recruiter decides. Off until an AI provider is set up; it uses the company's monthly AI allowance, shared with the assistant.
   - name: notes

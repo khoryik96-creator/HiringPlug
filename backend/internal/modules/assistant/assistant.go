@@ -46,6 +46,12 @@ type Deps struct {
 	Applications interface {
 		ForAssistant(ctx context.Context, tx pgx.Tx, id string) (Application, error)
 	}
+	// Market describes who in the company's database does a job's kind of
+	// work (counts only: no names, contact details or pay), for market
+	// insights. Nil: not given.
+	Market interface {
+		PoolText(ctx context.Context, tx pgx.Tx, p authz.Principal, jobID string) (string, error)
+	}
 	// OtherAIUse is the company's other use of the AI (CV vs job matching):
 	// one monthly allowance covers both. Nil: none.
 	OtherAIUse interface {
@@ -85,4 +91,26 @@ func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (i
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindAssistantAnswered: m.service.answered}
+}
+
+// Insight is an answer for other modules (a job's market map).
+type Insight struct {
+	ID, Status  string
+	Text, Model *string
+	AskedAt     time.Time
+}
+
+// LatestMarketMap returns the user's newest market insights for a job (ok
+// is false when they have asked for none), in the caller's transaction.
+func (m *Module) LatestMarketMap(ctx context.Context, tx pgx.Tx, jobID string) (in Insight, ok bool, err error) {
+	rows, err := store.New(tx).ListAnswers(ctx, store.ListAnswersParams{SubjectType: "job", SubjectID: jobID})
+	if err != nil {
+		return Insight{}, false, err
+	}
+	for _, r := range rows {
+		if r.Kind == "market_map" {
+			return Insight{ID: r.ID, Status: r.Status, Text: r.Answer, Model: r.Model, AskedAt: r.CreatedAt}, true, nil
+		}
+	}
+	return Insight{}, false, nil
 }
