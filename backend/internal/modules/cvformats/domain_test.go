@@ -113,6 +113,30 @@ func TestWordSplitsPlaceholdersOverRuns(t *testing.T) {
 	assert.Contains(t, doc, "<w:tcPr/><w:p/></w:tc>", "a table cell keeps a paragraph")
 }
 
+// A branded template's summary box: a text box (a drawing anchored in a
+// paragraph) with a label and a placeholder, Word's modern copy and its
+// fallback. Each of the box's paragraphs is filled on its own: the label
+// stays, the drawing is not broken up, and an empty value leaves the box.
+func TestTextBoxesAreFilledParagraphByParagraph(t *testing.T) {
+	box := `<w:txbxContent><w:p><w:r><w:t>ABOUT HIM / HER</w:t></w:r></w:p><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>{{summary}}</w:t></w:r></w:p></w:txbxContent>`
+	tpl := docx(t, `<w:p><w:r><w:t>Anchor </w:t></w:r><w:r><mc:AlternateContent xmlns:mc="m"><mc:Choice><w:drawing><wps:txbx xmlns:wps="s">`+box+
+		`</wps:txbx></w:drawing></mc:Choice><mc:Fallback><w:pict><v:textbox xmlns:v="v">`+box+`</v:textbox></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>`+
+		`<w:p><w:r><w:t>{{candidate.fullName}}</w:t></w:r></w:p>`)
+	out, err := Render(tpl, Data{Values: map[string]string{"summary": "Ten years in audit.", "candidate.fullName": "Siti Aisyah"}})
+	require.NoError(t, err)
+	doc := part(t, out, "word/document.xml")
+	assert.Equal(t, 2, strings.Count(doc, `<w:p><w:r><w:t>ABOUT HIM / HER</w:t></w:r></w:p>`), "the label stays in both copies")
+	assert.Equal(t, 2, strings.Count(doc, `<w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Ten years in audit.</w:t>`), "the summary, once in each copy, with its formatting")
+	assert.Contains(t, doc, `<w:r><w:t>Anchor </w:t></w:r><w:r><mc:AlternateContent`, "the anchor's own text and the drawing are untouched")
+	assert.Contains(t, doc, "Siti Aisyah")
+
+	out, err = Render(tpl, Data{Values: map[string]string{"candidate.fullName": "Siti Aisyah"}})
+	require.NoError(t, err)
+	doc = part(t, out, "word/document.xml")
+	assert.Contains(t, doc, "<w:drawing>", "no summary: the box stays (a text box needs its paragraphs)")
+	assert.Equal(t, 2, strings.Count(doc, "ABOUT HIM / HER"))
+}
+
 func TestBadTemplates(t *testing.T) {
 	_, err := Inspect([]byte("not a zip"))
 	assert.ErrorContains(t, err, "not a Word")

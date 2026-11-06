@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import io
 
+import pytest
 from docx import Document
-from docx.oxml import parse_xml
+from docx.oxml import OxmlElement, parse_xml
 
 from hiringplug_ai.extraction import extract
 
@@ -75,3 +76,116 @@ def test_tables_inside_table_cells_are_read() -> None:
     text = extract(buffer.getvalue(), ocr=None).text or ""
     assert "Email | nur@example.com" in text
     assert "Mobile | 012-000 0001" in text
+
+
+# Layout-table CVs (from CV Studio's nested-table fix): the name, skills,
+# employers and duties sit in tables inside table cells, the dates in text
+# boxes anchored beside their employer. All fictional.
+def _layout_cv() -> bytes:
+    doc = Document()
+    outer = doc.add_table(rows=1, cols=2)
+    outer.cell(0, 0).text = ""
+    body = outer.cell(0, 1)
+    body.add_table(rows=1, cols=1).cell(0, 0).text = "Example Candidate"
+    body.add_paragraph("Hybrid Cloud Engineer with enterprise platform experience.")
+    skills = body.add_table(rows=2, cols=1)
+    skills.cell(0, 0).text = "SKILLS"
+    skills.cell(1, 0).text = "Linux, VMware, AWS and automation"
+    body.add_paragraph("WORK EXPERIENCE")
+    job = body.add_table(rows=1, cols=2)
+    date = job.cell(0, 0).paragraphs[0]
+    for _ in range(2):  # Word's modern copy and its fallback copy
+        box, p, r, t = (OxmlElement(x) for x in ("w:txbxContent", "w:p", "w:r", "w:t"))
+        t.text = "Sep 2024 to Present"
+        r.append(t)
+        p.append(r)
+        box.append(p)
+        run, pict = OxmlElement("w:r"), OxmlElement("w:pict")
+        pict.append(box)
+        run.append(pict)
+        date._p.append(run)
+    details = job.cell(0, 1).add_table(rows=1, cols=1).cell(0, 0)
+    details.text = "Example Cloud Services"
+    details.add_paragraph("Hybrid Cloud Engineer")
+    details.add_paragraph("Maintain production Linux clusters.", style="List Bullet")
+    body.add_paragraph("EDUCATION")
+    body.add_table(rows=1, cols=1).cell(0, 0).text = "Example University | Engineering degree"
+    out = io.BytesIO()
+    doc.save(out)
+    return out.getvalue()
+
+
+def _assert_layout_read(text: str) -> None:
+    order = [
+        "Example Candidate",
+        "Hybrid Cloud Engineer with",
+        "SKILLS",
+        "Linux, VMware",
+        "WORK EXPERIENCE",
+        "Sep 2024 to Present",
+        "Example Cloud Services",
+        "Maintain production Linux clusters.",
+        "EDUCATION",
+        "Example University",
+    ]
+    positions = [text.index(s) for s in order]
+    assert positions == sorted(positions), "read in document order: the date beside its employer"
+    assert text.count("Sep 2024 to Present") == 1, "the text box's fallback copy is not read twice"
+    assert "• Maintain production Linux clusters." in text
+
+
+def test_layout_tables_are_read_in_order_with_their_date_boxes() -> None:
+    result = extract(_layout_cv(), ocr=None)
+    assert result.status == "extracted"
+    assert result.text is not None
+    _assert_layout_read(result.text)
+
+
+@pytest.mark.parametrize("tag", ["sdt", "customXml", "ins", "moveTo"])
+def test_content_controls_and_tracked_insertions_are_read_through(tag: str) -> None:
+    doc = Document(io.BytesIO(_layout_cv()))
+    date = doc.element.body.xpath(".//w:tc/w:p[w:r/w:pict/w:txbxContent]")[0]
+    employer = doc.element.body.xpath(".//w:tbl")[4]
+    for child in (date, employer):
+        parent, wrapper = child.getparent(), OxmlElement("w:" + tag)
+        holder = OxmlElement("w:sdtContent") if tag == "sdt" else wrapper
+        if holder is not wrapper:
+            wrapper.append(holder)
+        parent.replace(child, wrapper)
+        holder.append(child)
+    out = io.BytesIO()
+    doc.save(out)
+    result = extract(out.getvalue(), ocr=None)
+    assert result.text is not None
+    _assert_layout_read(result.text)
+
+
+def test_deleted_revisions_are_not_read() -> None:
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    cell.text = "Kept text"
+    gone = cell.add_paragraph("Deleted text")._p
+    wrapper = OxmlElement("w:del")
+    gone.getparent().replace(gone, wrapper)
+    wrapper.append(gone)
+    out = io.BytesIO()
+    doc.save(out)
+    assert extract(out.getvalue(), ocr=None).text == "Kept text"
+
+
+def test_a_layout_nested_too_deeply_fails_clearly() -> None:
+    doc = Document()
+    cell = doc.add_table(rows=1, cols=1).cell(0, 0)
+    cell.text = "Fictional CV text"
+    child = cell.paragraphs[0]._p
+    for _ in range(34):
+        parent, wrapper, content = child.getparent(), OxmlElement("w:sdt"), OxmlElement("w:sdtContent")
+        wrapper.append(content)
+        parent.replace(child, wrapper)
+        content.append(child)
+        child = wrapper
+    out = io.BytesIO()
+    doc.save(out)
+    result = extract(out.getvalue(), ocr=None)
+    assert result.status == "failed"
+    assert "nested too deeply" in (result.error or "")

@@ -269,20 +269,44 @@ func escape(s string) string {
 
 // fill replaces a paragraph's placeholders; ok is false when it held some
 // and all were empty (the paragraph goes).
+//
+// A paragraph holding a text box (a drawing anchored in it) has the box's
+// paragraphs inside it: each of those is filled on its own, and kept even
+// when empty (a text box needs its paragraphs), so the box and its other
+// text (a label such as "ABOUT HIM / HER") stay as they are.
 func fill(p string, lookup func(string) string) (string, bool) {
 	text := paragraphText(p)
 	if !strings.Contains(text, "{{") {
 		return p, true
 	}
-	p = joinRuns(p)
 	found, filled := false, false
-	p = textRe.ReplaceAllStringFunc(p, func(m string) string {
+	if open := strings.IndexByte(p, '>') + 1; open > 0 && strings.HasSuffix(p, "</w:p>") && nextParagraph(p[open:len(p)-len("</w:p>")], 0) >= 0 {
+		var b strings.Builder
+		b.WriteString(p[:open])
+		for _, s := range segments(p[open : len(p)-len("</w:p>")]) {
+			if s.para {
+				inner, _ := fill(s.xml, lookup)
+				b.WriteString(inner)
+				continue
+			}
+			b.WriteString(replaceTexts(s.xml, lookup, &found, &filled)) // the paragraph's own runs, not joined
+		}
+		b.WriteString("</w:p>")
+		return b.String(), !found || filled
+	}
+	p = replaceTexts(joinRuns(p), lookup, &found, &filled)
+	return p, !found || filled
+}
+
+// replaceTexts fills the placeholders in each text element of xml.
+func replaceTexts(xml string, lookup func(string) string, found, filled *bool) string {
+	return textRe.ReplaceAllStringFunc(xml, func(m string) string {
 		parts := textRe.FindStringSubmatch(m)
 		body := placeholderRe.ReplaceAllStringFunc(html.UnescapeString(parts[2]), func(ph string) string {
-			found = true
+			*found = true
 			v := lookup(placeholderRe.FindStringSubmatch(ph)[2])
 			if strings.TrimSpace(v) != "" {
-				filled = true
+				*filled = true
 			}
 			return v
 		})
@@ -290,7 +314,6 @@ func fill(p string, lookup func(string) string) (string, bool) {
 		out := strings.ReplaceAll(escape(body), "\n", `</w:t><w:br/><w:t xml:space="preserve">`)
 		return parts[1] + out + parts[3]
 	})
-	return p, !found || filled
 }
 
 // fillPart fills one part: blocks first, then every paragraph.

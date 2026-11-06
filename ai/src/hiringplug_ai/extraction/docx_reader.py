@@ -6,8 +6,16 @@ Mechanism (from CV Studio):
   numbering separately from the text, including numbering inherited from styles).
 - Tables: a row of single-paragraph cells becomes "a | b | c"; cells holding
   several paragraphs (e.g. a list of duties) keep one line per paragraph.
+- Layout tables: CV templates put the name, skills, employers and duties in
+  tables inside table cells. A cell is read in document order (its paragraphs
+  and nested tables as they come), a merged cell once, and text boxes anchored
+  in a cell (often the dates beside an employer) stay beside it.
+- Content controls, custom XML and tracked insertions/moves wrap paragraphs
+  and tables without hiding them: they are read through (deleted text is not).
 - Text boxes (summary panels, sidebars) are read in place; Word stores each one
   twice (a modern copy and a fallback), so exact duplicates are dropped.
+- A layout nested more than 32 levels deep fails with a clear message rather
+  than being read partly.
 """
 
 from __future__ import annotations
@@ -43,26 +51,22 @@ def extract_docx(data: bytes, limits: Limits) -> Extraction:
     from docx.text.paragraph import Paragraph  # noqa: PLC0415
 
     document = docx.Document(io.BytesIO(data))
+    reader = _Reader(Paragraph, Table)
     lines: list[str] = []
-    seen_headers: set[str] = set()
-    for section in document.sections:
-        for header in (section.header, section.first_page_header, section.even_page_header):
-            for line in _container_lines(header):
-                if line not in seen_headers:
-                    seen_headers.add(line)
-                    lines.append(line)
-
-    seen_boxes: set[tuple[str, ...]] = set()
-    for child in document.element.body.iterchildren():
-        tag = child.tag.rsplit("}", 1)[-1]
-        if tag == "p":
-            line = _paragraph_line(Paragraph(child, document))
-            if line:
-                lines.append(line)
-            lines.extend(_textbox_lines(child, seen_boxes))
-        elif tag == "tbl":
-            for row in Table(child, document).rows:
-                lines.extend(_row_lines(row))
+    try:
+        seen_headers: set[str] = set()
+        for section in document.sections:
+            for header in (section.header, section.first_page_header, section.even_page_header):
+                for line in reader.content_lines(header._element, header, 0):
+                    if line not in seen_headers:
+                        seen_headers.add(line)
+                        lines.append(line)
+        lines.extend(reader.content_lines(document.element.body, document, 0))
+    except _TooDeepError:
+        message = (
+            "The Word document's layout is nested too deeply to read: save it as a simpler Word file or PDF."
+        )
+        return Extraction("failed", None, None, f"python-docx@{version('python-docx')}", error=message)
 
     text = clean_text("\n".join(lines))
     extractor = f"python-docx@{version('python-docx')}"
@@ -71,12 +75,74 @@ def extract_docx(data: bytes, limits: Limits) -> Extraction:
     return Extraction("extracted", text, None, extractor)
 
 
-def _container_lines(container: Any) -> list[str]:
-    out = [line for p in container.paragraphs if (line := _paragraph_line(p))]
-    for table in container.tables:
-        for row in table.rows:
-            out.extend(_row_lines(row))
-    return out
+# Wrappers read through; deleted text ("del", "moveFrom") is not.
+_CONTAINERS = {"sdt", "sdtContent", "customXml", "ins", "moveTo"}
+_MAX_DEPTH = 32
+
+
+class _TooDeepError(ValueError):
+    pass
+
+
+def _tag(element: Any) -> str:
+    return str(element.tag).rsplit("}", 1)[-1]
+
+
+def _blocks(element: Any, level: int) -> Any:
+    """The paragraphs and tables in element, in order, through any wrapping containers."""
+    if level > _MAX_DEPTH:
+        raise _TooDeepError
+    for child in element.iterchildren():
+        if _tag(child) in _CONTAINERS:
+            yield from _blocks(child, level + 1)
+        else:
+            yield child, level
+
+
+class _Reader:
+    """Reads bodies, headers and table cells in document order.
+
+    python-docx's Paragraph and Table are passed in: the library is imported lazily.
+    """
+
+    def __init__(self, paragraph: Any, table: Any) -> None:
+        self.paragraph, self.table = paragraph, table
+        self.seen_boxes: set[tuple[str, ...]] = set()
+
+    def content_lines(self, element: Any, parent: Any, depth: int) -> list[str]:
+        out: list[str] = []
+        for child, level in _blocks(element, depth):
+            tag = _tag(child)
+            if tag == "p":
+                line = _paragraph_line(self.paragraph(child, parent))
+                if line:
+                    out.append(line)
+                out.extend(_textbox_lines(child, self.seen_boxes))
+            elif tag == "tbl":
+                for row in self.table(child, parent).rows:
+                    out.extend(self.row_lines(row, level + 1))
+        return out
+
+    def row_lines(self, row: Any, depth: int) -> list[str]:
+        if depth > _MAX_DEPTH:
+            raise _TooDeepError
+        groups: list[list[str]] = []
+        seen_cells: set[Any] = set()
+        for cell in row.cells:  # a merged cell is listed once per column it spans: read it once
+            if cell._tc in seen_cells:
+                continue
+            seen_cells.add(cell._tc)
+            group: list[str] = []
+            for line in self.content_lines(cell._tc, cell, depth):
+                if not group or group[-1] != line:
+                    group.append(line)
+            if group:
+                groups.append(group)
+        if not groups:
+            return []
+        if all(len(g) == 1 for g in groups):
+            return [" | ".join(g[0] for g in groups)]
+        return [line for g in groups for line in g]
 
 
 def _paragraph_line(paragraph: Any) -> str:
@@ -99,31 +165,6 @@ def _numbering_id(paragraph: Any) -> str | None:
             return next((str(v) for v in inherited if str(v) != "0"), None)
         style = style.base_style
     return None
-
-
-def _row_lines(row: Any, depth: int = 0) -> list[str]:
-    groups: list[list[str]] = []
-    seen: set[tuple[str, ...]] = set()
-    for cell in row.cells:  # merged cells repeat; keep the first copy
-        group: list[str] = []
-        for paragraph in cell.paragraphs:
-            line = _paragraph_line(paragraph)
-            if line and (not group or group[-1] != line):
-                group.append(line)
-        # Tables inside a cell (layout tables, and old .doc files converted by
-        # LibreOffice) hold contact details often enough to matter.
-        if depth < 3:
-            for table in cell.tables:
-                for inner in table.rows:
-                    group.extend(_row_lines(inner, depth + 1))
-        if group and tuple(group) not in seen:
-            seen.add(tuple(group))
-            groups.append(group)
-    if not groups:
-        return []
-    if all(len(g) == 1 for g in groups):
-        return [" | ".join(g[0] for g in groups)]
-    return [line for g in groups for line in g]
 
 
 def _textbox_lines(paragraph_element: Any, seen: set[tuple[str, ...]]) -> list[str]:
