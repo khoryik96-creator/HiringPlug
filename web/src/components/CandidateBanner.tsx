@@ -40,7 +40,7 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
     if (k === "expat") { setChoosingPass(true); return; }
     save.mutate({ workAuthorization: waFor(k, c.workAuthorization) });
   };
-  const lives = [c.location, c.residenceCountry ? regionName(c.residenceCountry) ?? c.residenceCountry : null].filter(Boolean).join(", ");
+  const lives = livesIn(c.location, c.residenceCountry ? regionName(c.residenceCountry) ?? c.residenceCountry : null);
   const comp = c.compensation;
   const restricted = c.restrictedFields.includes("compensation");
   const current = comp?.currentSalary ? salaryText(comp.currentSalary) : null;
@@ -124,4 +124,10 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
       </div>
     </section>
   );
+}
+
+/** "Petaling Jaya, Malaysia"; the country once when the location already names it. */
+export function livesIn(location: string | null, country: string | null): string {
+  if (location && country && location.toLowerCase().includes(country.toLowerCase())) return location;
+  return [location, country].filter(Boolean).join(", ");
 }

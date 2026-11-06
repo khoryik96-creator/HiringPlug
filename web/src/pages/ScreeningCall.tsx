@@ -28,7 +28,7 @@ export function ScreeningCall({ candidateId, permissions }: { candidateId: strin
   const c = candidate.data;
   if (!c) return candidate.error ? <ErrorMessage error={candidate.error} /> : <p className="muted">Loading…</p>;
   return (
-    <main>
+    <main className="wide">
       <a href={`#/candidates/${candidateId}`}>← {c.fullName}</a>
       <h2>Screening call: {c.fullName}</h2>
       <div className="screening">

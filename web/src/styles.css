@@ -127,9 +127,15 @@ section[aria-label="Mandatory fields"] fieldset { border: 1px solid #e5e7eb; bor
 .source-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 4px; color: #fff; font-size: 0.65rem; font-weight: 700; }
 a.button { display: inline-block; padding: 0.4rem 0.6rem; border: 1px solid #9ca3af; border-radius: 3px; background: #f3f4f6; color: inherit; text-decoration: none; }
 /* Screening call: the CV beside the notes, the CV staying in view while the form scrolls. */
-.screening { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+main.wide { max-width: none; padding: 0 1rem; }
+main.roomy { max-width: 1200px; }
+.screening-side label.row { flex-wrap: nowrap; align-items: flex-start; }
+.screening-side label.row input[type="checkbox"] { margin-top: 0.25rem; }
+.screening { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); gap: 1rem; align-items: start; }
+.screening-cv .cv-frame { height: 85vh; }
+.screening-side .form-grid { grid-template-columns: 1fr; }
 .screening-cv { position: sticky; top: 0.5rem; }
-.screening-cv pre.extracted { max-height: 75vh; overflow: auto; }
+.screening-cv pre.extracted { max-height: 85vh; overflow: auto; }
 .screening-side textarea { width: 100%; box-sizing: border-box; }
 @media (max-width: 900px) { .screening { grid-template-columns: 1fr; } .screening-cv { position: static; } }
 /* Timeline of stage moves. */
@@ -154,12 +160,14 @@ a.button { display: inline-block; padding: 0.4rem 0.6rem; border: 1px solid #9ca
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .banner { display: flex; border-radius: 16px; overflow: hidden; margin: 0.75rem 0 1rem; color: #1B2230; }
 .banner-body { flex: 1; min-width: 0; padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1rem; }
-.banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap; }
+.banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; }
+.banner-who { flex: 1; min-width: 0; }
 .banner-who { min-width: 0; }
-.banner-name { margin: 0; font-size: 2.5rem; line-height: 1.05; font-weight: 800; font-stretch: condensed; letter-spacing: -0.01em; }
+.banner-name, .banner-status, .banner-strip .figure { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; }
+.banner-name { margin: 0; font-size: 3rem; line-height: 1; font-weight: 700; }
 .banner-status { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 6px; padding: 0.1rem 0.6rem; }
 .banner-job { margin: 0.35rem 0 0; font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
-.banner-facts { margin: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; font-size: 1rem; text-align: right; }
+.banner-facts { margin: 0; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; font-size: 1rem; text-align: right; }
 .banner-facts div { display: flex; gap: 0.4rem; }
 .banner-facts dt { color: #3A4352; }
 .banner-facts dd { margin: 0; font-weight: 700; }
@@ -172,13 +180,14 @@ a.button { display: inline-block; padding: 0.4rem 0.6rem; border: 1px solid #9ca
 .banner-strip > div { padding: 0.9rem 1.4rem; display: flex; flex-direction: column; gap: 0.2rem; }
 .banner-strip > div + div { border-left: 1px solid #E3E6EB; }
 .banner-strip .label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #4A5363; }
-.banner-strip .figure { font-size: 1.75rem; font-weight: 800; font-stretch: condensed; line-height: 1.15; }
+.banner-strip .figure { font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
 .banner-strip .figure.small { font-size: 1.1rem; }
 .banner-strip .figure small, .banner-strip .note { font-size: 0.82rem; font-weight: 400; color: #4A5363; }
 .banner-column { width: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .banner-column > span { writing-mode: vertical-rl; transform: rotate(180deg); color: #fff; font-weight: 800; font-size: 1.1rem; letter-spacing: 0.15em; text-transform: uppercase; }
 @media (max-width: 700px) {
   .banner-body { padding: 1rem; }
+  .banner-top { flex-direction: column; }
   .banner-facts { align-items: flex-start; text-align: left; }
   .banner-strip { grid-template-columns: 1fr; }
   .banner-strip > div + div { border-left: 0; border-top: 1px solid #E3E6EB; }

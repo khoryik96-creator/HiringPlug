@@ -60,12 +60,19 @@ web/src/                     the React app
     without the fix. Prefer integration tests through the real HTTP API and real
     PostgreSQL (`internal/app/*_test.go`) over mocks. Tests live next to the
     feature, never in version-named files.
-12. **No secrets in code or logs.** Settings come from `HP_*` variables, all
+12. **Look at what you built.** Every change to a screen is checked in the real
+    app before it is called done: run it (`task dev`, or the API plus `pnpm dev`)
+    with realistic data, take a screenshot of each changed screen (Playwright;
+    the browser is pre-installed), and compare it with the approved design or
+    mockup and with what was asked. Fix what differs, and show the screenshot
+    when reporting. Tests check behaviour; only a screenshot shows the result.
+13. **No secrets in code or logs.** Settings come from `HP_*` variables, all
     listed in `.env.example` (checked by a test).
 
 ## Definition of done
 
-`task verify` passes; the change has tests; docs in `docs/` are updated if the
+`task verify` passes; the change has tests; changed screens were checked in a
+screenshot against their design (rule 12); docs in `docs/` are updated if the
 architecture, a module's purpose or a workflow changed; the PR checklist is
 filled in.
 

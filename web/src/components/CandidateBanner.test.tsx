@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import { ok, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
-import { CandidateBanner } from "./CandidateBanner";
+import { CandidateBanner, livesIn } from "./CandidateBanner";
 import { raiseText, waColumnLabel, waFor, waKind } from "./candidateLook";
 
 afterEach(() => {
@@ -30,6 +30,10 @@ describe("work authorization colours", () => {
     expect(waFor("unknown", { status: "local" })).toBeNull();
     expect(raiseText(salary)).toBe("+26% on current");
     expect(raiseText({ ...salary, expectedSalary: { ...salary.expectedSalary, currency: "SGD" } })).toBeNull();
+    expect(raiseText({ ...salary, expectedSalary: { ...salary.expectedSalary, min: "9480.00" } })).toBe("About the same as current"); // not "+0%"
+    expect(livesIn("Malaysia", "Malaysia")).toBe("Malaysia"); // not "Malaysia, Malaysia"
+    expect(livesIn("Petaling Jaya", "Malaysia")).toBe("Petaling Jaya, Malaysia");
+    expect(livesIn(null, "Singapore")).toBe("Singapore");
   });
 });
 

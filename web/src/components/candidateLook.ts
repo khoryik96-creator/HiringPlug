@@ -73,7 +73,8 @@ export function raiseText(c: Compensation | null | undefined): string | null {
   const exp = c?.expectedSalary;
   if (!cur || !exp || cur.currency !== exp.currency || cur.period !== exp.period || Number(cur.amount) <= 0) return null;
   const pct = Math.round(((Number(exp.min) - Number(cur.amount)) / Number(cur.amount)) * 100);
-  return `${pct >= 0 ? "+" : ""}${String(pct)}% on current`;
+  if (pct === 0) return "About the same as current";
+  return `${pct > 0 ? "+" : ""}${String(pct)}% on current`;
 }
 
 /** Title and company as one line, whichever are known. */

@@ -51,7 +51,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   }
 
   return (
-    <main>
+    <main className="roomy">
       <a href="#/candidates">← Candidates</a>
       {/* A failed background refresh keeps the page (and any open form) and says so. */}
       {candidate.error && (
