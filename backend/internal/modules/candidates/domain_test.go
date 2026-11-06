@@ -120,3 +120,16 @@ func TestProfilesNotFromTheAPIKeepItsLimits(t *testing.T) {
 	_, errs = NormalizeProfile(Profile{FirstName: strings.Repeat("é", 100), CurrentTitle: ptr(strings.Repeat("x", 200))}, "MY")
 	assert.Empty(t, errs, "at the limit is fine; characters are counted, not bytes")
 }
+
+// A job's duties keep their lines (one duty each), so a formatted CV shows
+// them as bullets; spaces inside a line are still tidied.
+func TestHistoryKeepsDutiesOnTheirOwnLines(t *testing.T) {
+	title := "Accountant"
+	duties := "  Month-end   close \r\n\r\n\r\n- IFRS 16\n\n"
+	h, errs := NormalizeHistory(History{Work: []Job{{Title: &title, Description: &duties}}})
+	assert.Empty(t, errs)
+	assert.Equal(t, "Month-end close\n\n- IFRS 16", *h.Work[0].Description)
+	blank := " \n \n"
+	h, _ = NormalizeHistory(History{Work: []Job{{Title: &title, Description: &blank}}})
+	assert.Nil(t, h.Work[0].Description)
+}

@@ -322,6 +322,27 @@ func squeeze(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
+// linesOrNil tidies text kept line by line (a job's duties): spaces squeezed
+// in each line, blank lines between them at most one, none at the ends.
+func linesOrNil(s *string) *string {
+	if s == nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(strings.ReplaceAll(*s, "\r", ""), "\n") {
+		line = squeeze(line)
+		if line == "" && (len(out) == 0 || out[len(out)-1] == "") {
+			continue
+		}
+		out = append(out, line)
+	}
+	t := strings.TrimSpace(strings.Join(out, "\n"))
+	if t == "" {
+		return nil
+	}
+	return &t
+}
+
 func trimmedOrNil(s *string) *string {
 	if s == nil {
 		return nil
@@ -378,7 +399,7 @@ func NormalizeHistory(h History) (History, apperr.FieldErrors) {
 	out := History{Work: make([]Job, len(h.Work)), Education: make([]Qualification, len(h.Education))}
 	for i, j := range h.Work {
 		at := "experience[" + strconv.Itoa(i) + "]"
-		j.Title, j.Company, j.Description = trimmedOrNil(j.Title), trimmedOrNil(j.Company), trimmedOrNil(j.Description)
+		j.Title, j.Company, j.Description = trimmedOrNil(j.Title), trimmedOrNil(j.Company), linesOrNil(j.Description)
 		j.StartDate, j.EndDate = trimmedOrNil(j.StartDate), trimmedOrNil(j.EndDate)
 		if j.Title == nil && j.Company == nil {
 			errs.Add(at+".title", "enter a job title or a company")

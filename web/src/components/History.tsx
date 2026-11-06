@@ -26,7 +26,7 @@ export function History({ candidate, canEdit }: { candidate: Candidate; canEdit:
             <li key={i}>
               <strong>{j.title ?? "—"}</strong>{j.company && <> at {j.company}</>}{" "}
               <span className="muted">{formatPeriod(j.startDate, j.endDate, j.current)}</span>
-              {j.description && <p className="muted">{j.description}</p>}
+              {j.description && <p className="muted pre">{j.description}</p>}
             </li>
           ))}
         </ul>

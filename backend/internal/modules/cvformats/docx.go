@@ -294,6 +294,22 @@ func fill(p string, lookup func(string) string) (string, bool) {
 		b.WriteString("</w:p>")
 		return b.String(), !found || filled
 	}
+	// A paragraph holding just one placeholder whose value has several lines
+	// (a job's duties) is repeated for each line, so each keeps the
+	// paragraph's style: a bullet each, in a bulleted paragraph.
+	if m := placeholderRe.FindStringSubmatch(strings.TrimSpace(text)); m != nil && m[0] == strings.TrimSpace(text) && m[1] == "" {
+		if v := lookup(m[2]); strings.Contains(v, "\n") {
+			var b strings.Builder
+			for _, line := range strings.Split(v, "\n") {
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				one, _ := fill(p, func(string) string { return line })
+				b.WriteString(one)
+			}
+			return b.String(), true
+		}
+	}
 	p = replaceTexts(joinRuns(p), lookup, &found, &filled)
 	return p, !found || filled
 }

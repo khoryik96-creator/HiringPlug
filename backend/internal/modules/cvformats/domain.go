@@ -131,6 +131,8 @@ func Dates(j Job) string {
 		end = "Present"
 	}
 	switch {
+	case start != "" && start == end:
+		return start // "2018 to 2018" says one year
 	case start != "" && end != "":
 		return start + " to " + end // as on the CVs sent to clients: "Jun 2022 to Present"
 	case start != "":
@@ -192,7 +194,7 @@ func Values(c Candidate, x Context) Data {
 	}
 	v := map[string]string{
 		"candidate.fullName": full, "candidate.firstName": c.FirstName, "candidate.lastName": c.LastName,
-		"candidate.initials": initials, "candidate.reference": Reference(c.ID), "candidate.currentTitle": val(c.CurrentTitle), "candidate.currentCompany": val(c.CurrentCompany),
+		"candidate.initials": initials, "candidate.reference": Reference(c.ID), "candidate.currentTitle": SmartCase(val(c.CurrentTitle), false), "candidate.currentCompany": SmartCase(val(c.CurrentCompany), true),
 		"candidate.location": val(c.Location), "candidate.nationality": val(c.Nationality),
 		"candidate.skills": strings.Join(c.Skills, ", "), "summary": strings.TrimSpace(x.Summary),
 		"job.title": x.JobTitle, "company.name": x.CompanyName, "agency.name": x.AgencyName,
@@ -223,7 +225,7 @@ func Values(c Candidate, x Context) Data {
 	lists := map[string][]map[string]string{}
 	for _, j := range c.Work {
 		lists["experience"] = append(lists["experience"], map[string]string{
-			"title": val(j.Title), "company": val(j.Company), "dates": Dates(j), "description": val(j.Description),
+			"title": SmartCase(val(j.Title), false), "company": SmartCase(val(j.Company), true), "dates": Dates(j), "description": Duties(val(j.Description)),
 		})
 	}
 	for _, q := range c.Education {
@@ -232,7 +234,7 @@ func Values(c Candidate, x Context) Data {
 			year = fmt.Sprint(*q.EndYear)
 		}
 		lists["education"] = append(lists["education"], map[string]string{
-			"qualification": val(q.Qualification), "institution": val(q.Institution), "year": year,
+			"qualification": CleanQualification(val(q.Qualification)), "institution": SmartCase(val(q.Institution), true), "year": year,
 		})
 	}
 	return Data{Values: v, Lists: lists}

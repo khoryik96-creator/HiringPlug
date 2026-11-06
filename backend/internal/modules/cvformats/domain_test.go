@@ -90,7 +90,8 @@ func TestTheStandardTemplate(t *testing.T) {
 	assert.Contains(t, text, "Education\nACCA\nACCA Global\n2019")
 	assert.NotContains(t, text, "{{")
 	assert.Contains(t, doc, "Contoh &lt;Holdings&gt;", "values are escaped")
-	assert.Contains(t, doc, `Month-end close</w:t><w:br/><w:t xml:space="preserve">IFRS 16 &amp; audits`, "line breaks kept")
+	assert.Contains(t, doc, `Month-end close</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Normal"/></w:pPr><w:r><w:t xml:space="preserve">IFRS 16 &amp; audits`,
+		"each duty its own paragraph, in the paragraph's style")
 	assert.Contains(t, lines(part(t, out, "word/footer1.xml"))[0], "Presented by Contoh Recruitment: Aina, aina@contoh.my · 3 November 2026")
 
 	ctx.ShowContact, ctx.IncludeSalary, ctx.Summary = true, true, "Strong IFRS background."
