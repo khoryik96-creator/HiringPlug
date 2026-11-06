@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
@@ -27,6 +28,7 @@ type Service struct {
 	pool      *pgxpool.Pool
 	companies Companies
 	mail      MailServers
+	files     *blob.Store
 }
 
 // Create adds a contact. The email is checked before the transaction starts
@@ -318,9 +320,21 @@ func (s *Service) checkCompany(ctx context.Context, tx pgx.Tx, companyID string)
 	return nil
 }
 
+// withCompanyName adds the company's name and the latest employment check.
 func (s *Service) withCompanyName(ctx context.Context, tx pgx.Tx, c Contact) (Contact, error) {
 	names, err := s.companies.Names(ctx, tx, []string{c.Details.CompanyID})
+	if err != nil {
+		return c, err
+	}
 	c.CompanyName = names[c.Details.CompanyID]
+	check, err := store.New(tx).LatestEmploymentCheck(ctx, c.ID)
+	if database.IsNoRows(err) {
+		return c, nil
+	}
+	if err != nil {
+		return c, err
+	}
+	c.Employment, err = checkFrom(check, c)
 	return c, err
 }
 

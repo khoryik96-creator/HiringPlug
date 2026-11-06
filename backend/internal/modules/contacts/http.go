@@ -11,7 +11,10 @@ import (
 const defaultPageSize = 25
 
 // HTTP implements the contacts operations of the contract.
-type HTTP struct{ svc *Service }
+type HTTP struct {
+	svc            *Service
+	maxUploadBytes int64
+}
 
 // ListContacts handles GET /v1/contacts.
 func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObject) (api.ListContactsResponseObject, error) {
@@ -110,5 +113,9 @@ func toAPI(ct Contact) api.Contact {
 		check = &api.EmailCheck{Status: api.EmailCheckStatus(r.Status), Reasons: r.Reasons, CheckedAt: r.CheckedAt}
 	}
 	out.EmailCheck = c.OrNull(check)
+	out.Employment.SetNull()
+	if ct.Employment != nil {
+		out.Employment.Set(employmentToAPI(*ct.Employment))
+	}
 	return out
 }

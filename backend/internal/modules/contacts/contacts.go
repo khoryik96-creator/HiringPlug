@@ -18,6 +18,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Companies is what this module needs from the companies module.
@@ -39,10 +43,15 @@ type Module struct {
 	HTTP    *HTTP
 }
 
-// New wires the module.
-func New(pool *pgxpool.Pool, companies Companies, mail MailServers) *Module {
-	svc := &Service{pool: pool, companies: companies, mail: mail}
-	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+// New wires the module. files keeps LinkedIn PDFs until they are read.
+func New(pool *pgxpool.Pool, companies Companies, mail MailServers, files *blob.Store, maxUploadBytes int64) *Module {
+	svc := &Service{pool: pool, companies: companies, mail: mail, files: files}
+	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
+}
+
+// JobHandlers returns the handlers for this module's jobs on the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindContactLinkedinRead: m.service.saveLinkedinRead}
 }
 
 // Exists reports whether a contact exists in tx's tenant.

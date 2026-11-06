@@ -18,6 +18,7 @@ from ..contracts import (
     AiAccess,
     AiProviderCheckJob,
     AssistantAskJob,
+    ContactReadLinkedinJob,
     DocumentExtractTextJob,
     DocumentParseCvJob,
     DocumentRenderPdfJob,
@@ -28,7 +29,7 @@ from ..contracts import (
 from ..extraction import Limits, OcrEngine
 from ..providers import Provider, ProviderError
 from ..queue import FollowUp
-from . import ai_check, assistant_ask, extract_text, match_score, parse_cv, read_jd, render_pdf
+from . import ai_check, assistant_ask, extract_text, match_score, parse_cv, read_jd, read_linkedin, render_pdf
 
 
 @dataclass(frozen=True)
@@ -68,4 +69,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),
     JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
     JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),
+    JobKind.contact_read_linkedin: Handler(ContactReadLinkedinJob, read_linkedin.run),
 }

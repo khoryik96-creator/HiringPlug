@@ -36,6 +36,12 @@ export function describe(entry: ActivityEntry): string | null {
       return null;
     case "note.deleted":
       return "deleted a note";
+    case "contact.employment_check_started":
+      return `checked their LinkedIn profile (${show(entry.changes.fileName)})`;
+    case "contact.employment_checked":
+      return entry.changes.status !== "read"
+        ? "could not read their LinkedIn profile"
+        : `read their LinkedIn profile${"linkedinUrl" in entry.changes ? " and added their LinkedIn address" : ""}`;
   }
   if (verb === "created") return "added this record";
   const changes = Object.entries(entry.changes)

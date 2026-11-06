@@ -84,7 +84,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, m.Candidates, d.Config.MaxUploadBytes)
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks)
-	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers)
+	m.Contacts = contacts.New(d.Pool, m.Companies, d.MailServers, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Pipeline.NameUsersWith(m.Identity)
@@ -254,6 +254,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Integrations.JobHandlers(),
 		m.Leads.JobHandlers(),
 		m.Companies.JobHandlers(),
+		m.Contacts.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),
 		m.AIProviders.JobHandlers(),

@@ -259,6 +259,19 @@ type Contact struct {
 	PhoneDigits       *string
 }
 
+type ContactEmploymentCheck struct {
+	ID         string
+	TenantID   string
+	ContactID  string
+	FileName   string
+	StorageKey *string
+	Status     string
+	Error      *string
+	Result     []byte
+	CreatedBy  string
+	CreatedAt  time.Time
+}
+
 type CvImport struct {
 	ID        string
 	TenantID  string

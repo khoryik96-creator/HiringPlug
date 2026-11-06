@@ -526,6 +526,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contacts/{contactId}/linkedin-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check where the contact works now, from their LinkedIn profile saved as PDF
+         * @description LinkedIn cannot be read automatically, so drop the PDF LinkedIn makes (More > Save to PDF on their profile). It is read in the background, compared with the contact's company, and then deleted: only what it says about their jobs is kept (Contact.employment).
+         */
+        post: operations["checkContactEmployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cv-templates": {
         parameters: {
             query?: never;
@@ -2325,7 +2347,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -2922,6 +2944,8 @@ export interface components {
             linkedinUrl: string | null;
             status: components["schemas"]["ContactStatus"];
             notes: string | null;
+            /** @description The latest employment check (from their LinkedIn profile); null before the first. */
+            employment: components["schemas"]["ContactEmployment"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -2971,6 +2995,57 @@ export interface components {
             items: components["schemas"]["ContactSummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["ContactId"] | null;
+        };
+        /** @example cec_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        ContactEmploymentCheckId: string;
+        ContactEmployment: {
+            id: components["schemas"]["ContactEmploymentCheckId"];
+            /** @enum {string} */
+            status: "reading" | "read" | "failed";
+            /**
+             * @description same_company = their current job is at the contact's company; moved = their current job is somewhere else; no_current_job = the profile shows no current job; unknown = still reading, or not read.
+             * @enum {string}
+             */
+            verdict: "same_company" | "moved" | "no_current_job" | "unknown";
+            fileName: string;
+            error: string | null;
+            /** @description The name on the profile. */
+            profileName: string | null;
+            /** @description The LinkedIn address on the profile. */
+            profileUrl: string | null;
+            /** @description Their current job (the latest without an end date). */
+            current: components["schemas"]["ContactPosition"] | null;
+            /** @description Their jobs on the profile, the latest first (up to 10). */
+            positions: components["schemas"]["ContactPosition"][];
+            /** @description The profile's name is the contact's; null when not read. */
+            nameMatches: boolean | null;
+            /** @description The profile's address is the contact's LinkedIn; null when either is missing. */
+            urlMatches: boolean | null;
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        ContactPosition: {
+            title: string | null;
+            company: string | null;
+            /** @description YYYY-MM or YYYY. */
+            startDate: string | null;
+            /** @description YYYY-MM or YYYY; null when current. */
+            endDate: string | null;
+            current: boolean;
+        };
+        ContactReadLinkedinJob: {
+            checkId: components["schemas"]["ContactEmploymentCheckId"];
+            /** @description Short-lived signed URL to download the PDF from. */
+            downloadUrl: string;
+            fileName: string;
+            /** Format: int64 */
+            sizeBytes: number;
+        };
+        ContactLinkedinReadJob: {
+            checkId: components["schemas"]["ContactEmploymentCheckId"];
+            /** @description What the rules read from the profile (no AI); null when it could not be read. */
+            profile: components["schemas"]["ParsedProfile"] | null;
+            errorMessage: string | null;
         };
         /**
          * @description standard = the built-in template.
@@ -6102,6 +6177,40 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    checkContactEmployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Being read */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactEmployment"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
         };
     };
     listCvTemplates: {

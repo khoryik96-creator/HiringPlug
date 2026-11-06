@@ -967,6 +967,37 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/contacts/{contactId}/linkedin-profile:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    post:
+      operationId: checkContactEmployment
+      tags: [contacts]
+      summary: Check where the contact works now, from their LinkedIn profile saved as PDF
+      description: >
+        LinkedIn cannot be read automatically, so drop the PDF LinkedIn makes (More > Save to PDF on their profile). It is read in the background, compared with the contact's company, and then deleted: only what it says about their jobs is kept (Contact.employment).
+
+      x-permission: contacts:update
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202':
+          description: Being read
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContactEmployment'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
   /v1/cv-templates:
     get:
       operationId: listCvTemplates
@@ -3601,6 +3632,8 @@ components:
         - assistant.answered
         - assistant.ask
         - company.autofill
+        - contact.linkedin_read
+        - contact.read_linkedin
         - document.cv_parsed
         - document.extract_text
         - document.parse_cv
@@ -4466,7 +4499,7 @@ components:
         checkedAt: {type: string, format: date-time}
     Contact:
       type: object
-      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, notes, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, notes, employment, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactId'}
         version: {type: integer}
@@ -4486,6 +4519,10 @@ components:
         linkedinUrl: {type: string, nullable: true}
         status: {$ref: '#/components/schemas/ContactStatus'}
         notes: {type: string, nullable: true}
+        employment:
+          description: The latest employment check (from their LinkedIn profile); null before the first.
+          allOf: [{$ref: '#/components/schemas/ContactEmployment'}]
+          nullable: true
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     ContactCreate:
@@ -4547,6 +4584,66 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{$ref: '#/components/schemas/ContactId'}]
           nullable: true
+    ContactEmploymentCheckId:
+      type: string
+      pattern: '^cec_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cec_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ContactEmployment:
+      type: object
+      required: [id, status, verdict, fileName, error, profileName, profileUrl, current, positions, nameMatches, urlMatches, checkedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ContactEmploymentCheckId'}
+        status: {type: string, enum: [reading, read, failed]}
+        verdict:
+          type: string
+          description: >
+            same_company = their current job is at the contact's company; moved = their current job is somewhere else; no_current_job = the profile shows no current job; unknown = still reading, or not read.
+
+          enum: [same_company, moved, no_current_job, unknown]
+        fileName: {type: string}
+        error: {type: string, nullable: true}
+        profileName: {type: string, nullable: true, description: The name on the profile.}
+        profileUrl: {type: string, nullable: true, description: The LinkedIn address on the profile.}
+        current:
+          description: Their current job (the latest without an end date).
+          allOf: [{$ref: '#/components/schemas/ContactPosition'}]
+          nullable: true
+        positions:
+          type: array
+          description: Their jobs on the profile, the latest first (up to 10).
+          items: {$ref: '#/components/schemas/ContactPosition'}
+        nameMatches: {type: boolean, nullable: true, description: The profile's name is the contact's; null when not read.}
+        urlMatches: {type: boolean, nullable: true, description: The profile's address is the contact's LinkedIn; null when either is missing.}
+        checkedAt: {type: string, format: date-time}
+    ContactPosition:
+      type: object
+      required: [title, company, startDate, endDate, current]
+      properties:
+        title: {type: string, nullable: true}
+        company: {type: string, nullable: true}
+        startDate: {type: string, nullable: true, description: YYYY-MM or YYYY.}
+        endDate: {type: string, nullable: true, description: YYYY-MM or YYYY; null when current.}
+        current: {type: boolean}
+    ContactReadLinkedinJob:
+      type: object
+      additionalProperties: false
+      required: [checkId, downloadUrl, fileName, sizeBytes]
+      properties:
+        checkId: {$ref: '#/components/schemas/ContactEmploymentCheckId'}
+        downloadUrl: {type: string, description: Short-lived signed URL to download the PDF from.}
+        fileName: {type: string}
+        sizeBytes: {type: integer, format: int64}
+    ContactLinkedinReadJob:
+      type: object
+      additionalProperties: false
+      required: [checkId, profile, errorMessage]
+      properties:
+        checkId: {$ref: '#/components/schemas/ContactEmploymentCheckId'}
+        profile:
+          description: What the rules read from the profile (no AI); null when it could not be read.
+          allOf: [{$ref: '#/components/schemas/ParsedProfile'}]
+          nullable: true
+        errorMessage: {type: string, nullable: true}
     CvTemplateId:
       type: string
       description: standard = the built-in template.
@@ -7529,6 +7626,16 @@ x-jobs:
     queue: core
     payload: CompanyAutofillJob
     description: Read a company's own website for details to suggest (Go worker).
+  contact.linkedin_read:
+    module: contacts
+    queue: core
+    payload: ContactLinkedinReadJob
+    description: Save what the profile says about where the contact works now (Go worker).
+  contact.read_linkedin:
+    module: contacts
+    queue: ai
+    payload: ContactReadLinkedinJob
+    description: Read a contact's LinkedIn profile PDF and the jobs in it (Python AI worker).
   document.cv_parsed:
     module: documents
     queue: core

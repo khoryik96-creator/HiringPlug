@@ -70,3 +70,26 @@ LIMIT @row_limit;
 
 -- name: ContactBriefs :many
 SELECT id, first_name, last_name, company_id, email FROM contact WHERE id = ANY(@ids::text[]);
+
+-- name: NewEmploymentCheckID :one
+SELECT new_id('cec')::text;
+
+-- name: InsertEmploymentCheck :one
+INSERT INTO contact_employment_check (id, tenant_id, contact_id, file_name, storage_key, created_by)
+VALUES (@id, app_current_tenant(), @contact_id, @file_name, @storage_key, app_current_user())
+RETURNING *;
+
+-- name: LatestEmploymentCheck :one
+SELECT * FROM contact_employment_check WHERE contact_id = @contact_id ORDER BY created_at DESC, id DESC LIMIT 1;
+
+-- name: GetEmploymentCheck :one
+SELECT * FROM contact_employment_check WHERE id = @id;
+
+-- The read result; the stored PDF is no longer needed.
+-- name: SaveEmploymentCheck :execrows
+UPDATE contact_employment_check SET status = @status, error = @error, result = @result, storage_key = NULL
+WHERE id = @id AND status = 'reading';
+
+-- name: FillLinkedinURL :execrows
+UPDATE contact SET linkedin_url = @linkedin_url, version = version + 1, updated_at = now()
+WHERE id = @id AND linkedin_url IS NULL;

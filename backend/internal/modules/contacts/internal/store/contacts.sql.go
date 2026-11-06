@@ -59,6 +59,24 @@ func (q *Queries) ContactExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const fillLinkedinURL = `-- name: FillLinkedinURL :execrows
+UPDATE contact SET linkedin_url = $1, version = version + 1, updated_at = now()
+WHERE id = $2 AND linkedin_url IS NULL
+`
+
+type FillLinkedinURLParams struct {
+	LinkedinUrl *string
+	ID          string
+}
+
+func (q *Queries) FillLinkedinURL(ctx context.Context, arg FillLinkedinURLParams) (int64, error) {
+	result, err := q.db.Exec(ctx, fillLinkedinURL, arg.LinkedinUrl, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findContactIDByEmail = `-- name: FindContactIDByEmail :one
 SELECT id FROM contact WHERE email = $1
 `
@@ -100,6 +118,28 @@ func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
 		&i.UpdatedAt,
 		&i.NameText,
 		&i.PhoneDigits,
+	)
+	return i, err
+}
+
+const getEmploymentCheck = `-- name: GetEmploymentCheck :one
+SELECT id, tenant_id, contact_id, file_name, storage_key, status, error, result, created_by, created_at FROM contact_employment_check WHERE id = $1
+`
+
+func (q *Queries) GetEmploymentCheck(ctx context.Context, id string) (ContactEmploymentCheck, error) {
+	row := q.db.QueryRow(ctx, getEmploymentCheck, id)
+	var i ContactEmploymentCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.FileName,
+		&i.StorageKey,
+		&i.Status,
+		&i.Error,
+		&i.Result,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -180,6 +220,64 @@ func (q *Queries) InsertContact(ctx context.Context, arg InsertContactParams) (C
 	return i, err
 }
 
+const insertEmploymentCheck = `-- name: InsertEmploymentCheck :one
+INSERT INTO contact_employment_check (id, tenant_id, contact_id, file_name, storage_key, created_by)
+VALUES ($1, app_current_tenant(), $2, $3, $4, app_current_user())
+RETURNING id, tenant_id, contact_id, file_name, storage_key, status, error, result, created_by, created_at
+`
+
+type InsertEmploymentCheckParams struct {
+	ID         string
+	ContactID  string
+	FileName   string
+	StorageKey *string
+}
+
+func (q *Queries) InsertEmploymentCheck(ctx context.Context, arg InsertEmploymentCheckParams) (ContactEmploymentCheck, error) {
+	row := q.db.QueryRow(ctx, insertEmploymentCheck,
+		arg.ID,
+		arg.ContactID,
+		arg.FileName,
+		arg.StorageKey,
+	)
+	var i ContactEmploymentCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.FileName,
+		&i.StorageKey,
+		&i.Status,
+		&i.Error,
+		&i.Result,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const latestEmploymentCheck = `-- name: LatestEmploymentCheck :one
+SELECT id, tenant_id, contact_id, file_name, storage_key, status, error, result, created_by, created_at FROM contact_employment_check WHERE contact_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+func (q *Queries) LatestEmploymentCheck(ctx context.Context, contactID string) (ContactEmploymentCheck, error) {
+	row := q.db.QueryRow(ctx, latestEmploymentCheck, contactID)
+	var i ContactEmploymentCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.FileName,
+		&i.StorageKey,
+		&i.Status,
+		&i.Error,
+		&i.Result,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listContacts = `-- name: ListContacts :many
 SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, updated_at
 FROM contact
@@ -255,6 +353,43 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const newEmploymentCheckID = `-- name: NewEmploymentCheckID :one
+SELECT new_id('cec')::text
+`
+
+func (q *Queries) NewEmploymentCheckID(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, newEmploymentCheckID)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const saveEmploymentCheck = `-- name: SaveEmploymentCheck :execrows
+UPDATE contact_employment_check SET status = $1, error = $2, result = $3, storage_key = NULL
+WHERE id = $4 AND status = 'reading'
+`
+
+type SaveEmploymentCheckParams struct {
+	Status string
+	Error  *string
+	Result []byte
+	ID     string
+}
+
+// The read result; the stored PDF is no longer needed.
+func (q *Queries) SaveEmploymentCheck(ctx context.Context, arg SaveEmploymentCheckParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveEmploymentCheck,
+		arg.Status,
+		arg.Error,
+		arg.Result,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setEmailCheck = `-- name: SetEmailCheck :one

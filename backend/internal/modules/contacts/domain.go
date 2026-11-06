@@ -39,6 +39,7 @@ type Contact struct {
 	CompanyName string
 	Details     Details
 	EmailCheck  *EmailCheckResult // nil without an email
+	Employment  *EmploymentCheck  // the latest LinkedIn check; nil before the first
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

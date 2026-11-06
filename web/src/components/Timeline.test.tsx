@@ -35,6 +35,15 @@ describe("activity sentences", () => {
     expect(sentence({ ...change, action: "contact.updated", changes: { email: { changed: true, redacted: true } } })).toBe("changed email");
     expect(sentence({ ...change, action: "note.created", changes: {} })).toBeNull();
   });
+
+  it("tell what an employment check did", () => {
+    expect(sentence({ ...change, action: "contact.employment_check_started", changes: { fileName: "Profile.pdf" } }))
+      .toBe("checked their LinkedIn profile (Profile.pdf)");
+    expect(sentence({ ...change, action: "contact.employment_checked", changes: { status: "read", linkedinUrl: { from: null, to: "x" } } }))
+      .toBe("read their LinkedIn profile and added their LinkedIn address");
+    expect(sentence({ ...change, action: "contact.employment_checked", changes: { status: "failed" } }))
+      .toBe("could not read their LinkedIn profile");
+  });
 });
 
 describe("timeline", () => {

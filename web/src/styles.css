@@ -276,3 +276,10 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .ai-provider .warning { margin: 0; }
 .badge.in-use { background: var(--accent-soft); color: var(--accent-dark); }
 @media (max-width: 900px) { .ai-providers { grid-template-columns: 1fr; } }
+/* Contact employment check */
+.employment-verdict { margin: 0.25rem 0 0.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; }
+.employment-verdict.ok { background: #ecfdf3; color: #14532d; }
+.employment-verdict.moved { background: #fff7ed; color: #9a3412; }
+.employment-history { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.employment-history li { display: flex; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); padding: 0.3rem 0; }
+.employment-history li.current span:first-child { font-weight: 600; }

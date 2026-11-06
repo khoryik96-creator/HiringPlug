@@ -128,6 +128,8 @@ class JobKind(StrEnum):
     assistant_answered = "assistant.answered"
     assistant_ask = "assistant.ask"
     company_autofill = "company.autofill"
+    contact_linkedin_read = "contact.linkedin_read"
+    contact_read_linkedin = "contact.read_linkedin"
     document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
     document_parse_cv = "document.parse_cv"
@@ -935,28 +937,6 @@ class EmailCheck(BaseModel):
     checkedAt: AwareDatetime
 
 
-class Contact(BaseModel):
-    id: ContactId
-    version: int
-    companyId: CompanyId
-    companyName: str
-    firstName: str
-    lastName: str
-    fullName: str
-    title: Annotated[str | None, Field(description="Job title, e.g. HR Manager.")]
-    email: Annotated[str | None, Field(...)]
-    emailCheck: Annotated[
-        EmailCheck | None, Field(description="The latest check of `email`; null without an email.")
-    ]
-    phone: Annotated[str | None, Field(...)]
-    mobile: Annotated[str | None, Field(...)]
-    linkedinUrl: Annotated[str | None, Field(...)]
-    status: ContactStatus
-    notes: Annotated[str | None, Field(...)]
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
 class ContactCreate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -1009,6 +989,43 @@ class ContactPage(BaseModel):
     nextCursor: Annotated[
         ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
     ]
+
+
+class ContactEmploymentCheckId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cec_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cec_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class Status1(StrEnum):
+    reading = "reading"
+    read = "read"
+    failed = "failed"
+
+
+class Verdict(StrEnum):
+    same_company = "same_company"
+    moved = "moved"
+    no_current_job = "no_current_job"
+    unknown = "unknown"
+
+
+class ContactPosition(BaseModel):
+    title: Annotated[str | None, Field(...)]
+    company: Annotated[str | None, Field(...)]
+    startDate: Annotated[str | None, Field(description="YYYY-MM or YYYY.")]
+    endDate: Annotated[str | None, Field(description="YYYY-MM or YYYY; null when current.")]
+    current: bool
+
+
+class ContactReadLinkedinJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    checkId: ContactEmploymentCheckId
+    downloadUrl: Annotated[str, Field(description="Short-lived signed URL to download the PDF from.")]
+    fileName: str
+    sizeBytes: int
 
 
 class CvTemplateId(RootModel[str]):
@@ -3231,6 +3248,47 @@ class PublicJobAd(BaseModel):
     publishedAt: AwareDatetime
 
 
+class ContactEmployment(BaseModel):
+    id: ContactEmploymentCheckId
+    status: Status1
+    verdict: Annotated[
+        Verdict,
+        Field(
+            description="same_company = their current job is at the contact's company; moved = their current job is somewhere else; no_current_job = the profile shows no current job; unknown = still reading, or not read.\n"
+        ),
+    ]
+    fileName: str
+    error: Annotated[str | None, Field(...)]
+    profileName: Annotated[str | None, Field(description="The name on the profile.")]
+    profileUrl: Annotated[str | None, Field(description="The LinkedIn address on the profile.")]
+    current: Annotated[
+        ContactPosition | None, Field(description="Their current job (the latest without an end date).")
+    ]
+    positions: Annotated[
+        list[ContactPosition], Field(description="Their jobs on the profile, the latest first (up to 10).")
+    ]
+    nameMatches: Annotated[
+        bool | None, Field(description="The profile's name is the contact's; null when not read.")
+    ]
+    urlMatches: Annotated[
+        bool | None,
+        Field(description="The profile's address is the contact's LinkedIn; null when either is missing."),
+    ]
+    checkedAt: AwareDatetime
+
+
+class ContactLinkedinReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    checkId: ContactEmploymentCheckId
+    profile: Annotated[
+        ParsedProfile | None,
+        Field(description="What the rules read from the profile (no AI); null when it could not be read."),
+    ]
+    errorMessage: Annotated[str | None, Field(...)]
+
+
 class FormatCvInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -3637,6 +3695,34 @@ class AiProviders(BaseModel):
 class CareersPage(BaseModel):
     companyName: str
     ads: list[PublicJobAd]
+
+
+class Contact(BaseModel):
+    id: ContactId
+    version: int
+    companyId: CompanyId
+    companyName: str
+    firstName: str
+    lastName: str
+    fullName: str
+    title: Annotated[str | None, Field(description="Job title, e.g. HR Manager.")]
+    email: Annotated[str | None, Field(...)]
+    emailCheck: Annotated[
+        EmailCheck | None, Field(description="The latest check of `email`; null without an email.")
+    ]
+    phone: Annotated[str | None, Field(...)]
+    mobile: Annotated[str | None, Field(...)]
+    linkedinUrl: Annotated[str | None, Field(...)]
+    status: ContactStatus
+    notes: Annotated[str | None, Field(...)]
+    employment: Annotated[
+        ContactEmployment | None,
+        Field(
+            description="The latest employment check (from their LinkedIn profile); null before the first."
+        ),
+    ]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
 
 
 class JdFile(BaseModel):

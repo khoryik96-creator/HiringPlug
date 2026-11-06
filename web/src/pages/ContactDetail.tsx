@@ -5,6 +5,7 @@ import { api, type Permission, unwrap } from "../api/client";
 import { contactKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
+import { EmploymentCheck } from "../components/EmploymentCheck";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { CONTACT_STATUS } from "../labels";
@@ -16,6 +17,8 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
   const contact = useQuery({
     queryKey: contactKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId: id } } })),
+    // Follow an employment check still being read.
+    refetchInterval: (q) => (q.state.data?.employment?.status === "reading" ? 2000 : false),
   });
   const recheck = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/contacts/{contactId}/email-check", { params: { path: { contactId: id } } })),
@@ -70,6 +73,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
           <ErrorMessage error={recheck.error} />
         </section>
       )}
+      {!editing && <EmploymentCheck contact={c} canCheck={canEdit} />}
       <Timeline subjectType="contact" subjectId={c.id} permissions={permissions} />
     </main>
   );

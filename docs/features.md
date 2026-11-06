@@ -282,6 +282,17 @@ for each of their jobs, with **Score fit** / **Score again**.
   invalid or unknown. Mailbox checks need outbound port 25, which home ISPs and
   cloud providers often block, so a paid verification service can be plugged
   in instead. CV Studio's email verifier notes will be reused.
+- **Employment check** ✅: whether a contact still works at their company.
+  LinkedIn cannot be read automatically (it refuses automated access), so a
+  person drops the contact's LinkedIn profile saved as PDF (More > Save to PDF)
+  on the contact's page. The AI worker reads its text and jobs with the CV
+  rules (no AI, `contact.read_linkedin`); the jobs are kept, the PDF deleted.
+  The current job is compared with the contact's company, ignoring "Sdn Bhd",
+  "Berhad", "(M)" and the like: **still at** the company, **no longer at** it
+  (with where they are now and since when), or **no current job**. A profile
+  whose name, or LinkedIn address, is not the contact's is flagged as perhaps
+  someone else's; a missing LinkedIn address is filled in from it. The
+  comparison is made when shown, so it follows the contact's company.
 
 ## 1.5 Job ads puller ✅
 
