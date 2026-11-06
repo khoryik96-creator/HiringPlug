@@ -21,7 +21,7 @@ export function Reports() {
   const r = report.data;
   const top = r?.funnel[0]?.reached ?? 0;
   return (
-    <>
+    <main>
       <h2>Reports</h2>
       <div className="row">
         <label>From <input type="date" value={period.from} onChange={(e) => { setPeriod({ ...period, from: e.target.value }); }} /></label>
@@ -99,6 +99,6 @@ export function Reports() {
           </section>
         </>
       )}
-    </>
+    </main>
   );
 }

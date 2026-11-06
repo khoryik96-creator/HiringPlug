@@ -36,7 +36,7 @@ export function CvTemplates({ canManage }: { canManage: boolean }) {
     mutationFn: async (t: { id: string; name: string }) => { await downloadFrom(`/v1/cv-templates/${t.id}/file`, `${t.name}.docx`, DOCX); },
   });
   return (
-    <>
+    <main>
       <h2>CV templates</h2>
       <ErrorMessage error={list.error ?? remove.error ?? download.error} />
       {list.data && (
@@ -81,6 +81,6 @@ export function CvTemplates({ canManage }: { canManage: boolean }) {
           <div className="row full"><button type="submit" disabled={upload.isPending || !name.trim() || !file}>Upload</button></div>
         </form>
       )}
-    </>
+    </main>
   );
 }

@@ -14,7 +14,7 @@ export function EmailTemplates({ canManage }: { canManage: boolean }) {
   const list = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [editing, setEditing] = useState<string | null>(null); // a template id, or "new"
   return (
-    <>
+    <main>
       <h2>Email templates</h2>
       <ErrorMessage error={list.error} />
       {list.data && (
@@ -41,7 +41,7 @@ export function EmailTemplates({ canManage }: { canManage: boolean }) {
       {canManage && (editing === "new"
         ? <TemplateForm onDone={() => { setEditing(null); }} />
         : <button type="button" onClick={() => { setEditing("new"); }}>Add template</button>)}
-    </>
+    </main>
   );
 }
 

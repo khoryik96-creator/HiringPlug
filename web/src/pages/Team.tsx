@@ -17,7 +17,7 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
   const list = useQuery({ queryKey: teamKey, queryFn: async () => unwrap(await api.GET("/v1/team")).items });
   const groups = useQuery({ queryKey: teamsKey, queryFn: async () => unwrap(await api.GET("/v1/teams")).items });
   return (
-    <>
+    <main>
       <h2>Team</h2>
       {myRole === "owner" && <p className="muted">Choose what each role may do and which candidates it sees under <a href="#/access">Roles and access</a>.</p>}
       <ErrorMessage error={list.error ?? groups.error} />
@@ -29,7 +29,7 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
       )}
       <Teams groups={groups.data ?? []} />
       <Invite myRole={myRole} />
-    </>
+    </main>
   );
 }
 

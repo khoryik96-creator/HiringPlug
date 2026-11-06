@@ -29,7 +29,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
   const ending = list.data?.items.filter((p) => p.status === "active" && daysUntil(p.guaranteeEndsOn) >= 0 && daysUntil(p.guaranteeEndsOn) <= 14) ?? [];
   const owed = list.data?.items.filter((p) => p.replacement === "owed") ?? [];
   return (
-    <>
+    <main>
       <h2>Placements</h2>
       <div className="row">
         <label>What happened{" "}
@@ -89,6 +89,6 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
           </div>
         </article>
       ))}
-    </>
+    </main>
   );
 }

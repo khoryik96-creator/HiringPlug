@@ -21,7 +21,7 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
     })).items,
   });
   return (
-    <>
+    <main>
       <h2>Leads</h2>
       <section className="panel" aria-label="Hiring leads">
         <div className="row">
@@ -49,7 +49,7 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
         {canManage && <SaveAd />}
       </section>
       <LeadSources canManage={canManage} />
-    </>
+    </main>
   );
 }
 

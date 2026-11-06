@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@fontsource-variable/inter':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/barlow-condensed':
         specifier: 5.2.6
         version: 5.2.6
@@ -244,6 +247,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource-variable/inter@5.3.0':
+    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@fontsource/barlow-condensed@5.2.6':
     resolution: {integrity: sha512-VCZdIGxJtdcdDflOkodQcq+aT7CllW+3Fxcu1UraVbXQd67Cw+XPbl478ICTID48zzFPKmxg4sZ6MVyJPgx1yQ==}
@@ -1543,6 +1549,8 @@ snapshots:
       levn: 0.4.1
 
   '@exodus/bytes@1.16.0': {}
+
+  '@fontsource-variable/inter@5.3.0': {}
 
   '@fontsource/barlow-condensed@5.2.6': {}
 

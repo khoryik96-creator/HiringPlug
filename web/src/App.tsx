@@ -56,11 +56,12 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
 
   const permissions = me.data.permissions;
   const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|account)/.exec(hash)?.[1] ?? "dashboard";
+  const admin = ADMIN_PAGES.filter(([, , permission]) => permissions.includes(permission));
   return (
     <>
-      <header className="row spread">
-        <nav className="row" aria-label="Main">
-          <strong>HiringPlug</strong>
+      <header className="topbar">
+        <span className="brand">Hiring<span>Plug</span></span>
+        <nav aria-label="Main">
           <a href="#/" aria-current={section === "dashboard" ? "page" : undefined}>Dashboard</a>
           <a href="#/jobs" aria-current={section === "jobs" ? "page" : undefined}>Jobs</a>
           <a href="#/candidates" aria-current={section === "candidates" ? "page" : undefined}>Candidates</a>
@@ -76,28 +77,27 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             <a href="#/reports" aria-current={section === "reports" ? "page" : undefined}>Reports</a>
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
-          {permissions.includes("settings:manage") && (
-            <a href="#/settings" aria-current={section === "settings" ? "page" : undefined}>Settings</a>
-          )}
-          {permissions.includes("identity.roles:manage") && (
-            <a href="#/access" aria-current={section === "access" ? "page" : undefined}>Roles and access</a>
-          )}
-          {permissions.includes("privacy:manage") && (
-            <a href="#/privacy" aria-current={section === "privacy" ? "page" : undefined}>Data protection</a>
-          )}
-          {permissions.includes("identity.team:manage") && (
-            <a href="#/team" aria-current={section === "team" ? "page" : undefined}>Team</a>
-          )}
-          {permissions.includes("integrations:manage") && (
-            <a href="#/integrations" aria-current={section === "integrations" ? "page" : undefined}>Integrations</a>
-          )}
         </nav>
-        <span className="muted">
-          <a href="#/account" aria-current={section === "account" ? "page" : undefined}>{me.data.user.name}</a> · {me.data.role.replace("_", " ")} · {me.data.tenant.name}{" "}
+        {admin.length > 0 && (
+          <details className="admin-menu">
+            <summary aria-current={admin.some(([key]) => key === section) ? "true" : undefined}>Admin</summary>
+            <div className="admin-links">
+              {admin.map(([key, label]) => (
+                <a key={key} href={`#/${key}`} aria-current={section === key ? "page" : undefined}
+                  onClick={(e) => { e.currentTarget.closest("details")?.removeAttribute("open"); }}>{label}</a>
+              ))}
+            </div>
+          </details>
+        )}
+        <div className="who">
+          <a href="#/account" aria-current={section === "account" ? "page" : undefined}>
+            <span className="avatar" aria-hidden="true">{initials(me.data.user.name)}</span>
+            <span className="name"><strong>{me.data.user.name}</strong><small>{me.data.role.replace("_", " ")} · {me.data.tenant.name}</small></span>
+          </a>
           <button type="button" className="link" onClick={onSignOut}>
             Sign out
           </button>
-        </span>
+        </div>
       </header>
       <Page hash={hash} permissions={permissions} me={me.data} />
     </>
@@ -110,7 +110,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
  */
 function Page({ hash, permissions, me }: { hash: string; permissions: Permission[]; me: Me }) {
   if (hash.startsWith("#/team") && permissions.includes("identity.team:manage")) return <Team myRole={me.role} myId={me.user.id} />;
-  if (hash.startsWith("#/account")) return <><h2>Your account</h2><ChangePassword /></>;
+  if (hash.startsWith("#/account")) return <main><h2>Your account</h2><ChangePassword /></main>;
   const screening = /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/.exec(hash)?.[1];
   if (screening) return <ScreeningCall key={screening} candidateId={screening} permissions={permissions} />;
   const compare = /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/.exec(hash)?.[1];
@@ -172,3 +172,18 @@ export function App() {
     </QueryClientProvider>
   );
 }
+
+/** "Demo Recruiter" → "DR": the letters on the account button. */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+/** The pages for running the account, under "Admin" in the top bar: path, label, the permission needed. */
+const ADMIN_PAGES: [string, string, Permission][] = [
+  ["settings", "Settings", "settings:manage"],
+  ["access", "Roles and access", "identity.roles:manage"],
+  ["privacy", "Data protection", "privacy:manage"],
+  ["team", "Team", "identity.team:manage"],
+  ["integrations", "Integrations", "integrations:manage"],
+];
