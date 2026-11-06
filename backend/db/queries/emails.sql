@@ -75,7 +75,7 @@ RETURNING *;
 -- name: StagedAttachments :many
 SELECT * FROM email_attachment WHERE id = ANY(@ids::text[]) AND email_id IS NULL AND created_by = app_current_user();
 
--- name: AttachToEmail :exec
+-- name: AttachToEmail :execrows
 UPDATE email_attachment SET email_id = @email_id WHERE id = ANY(@ids::text[]) AND email_id IS NULL;
 
 -- name: EmailAttachments :many

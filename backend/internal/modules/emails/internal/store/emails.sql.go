@@ -9,7 +9,7 @@ import (
 	"context"
 )
 
-const attachToEmail = `-- name: AttachToEmail :exec
+const attachToEmail = `-- name: AttachToEmail :execrows
 UPDATE email_attachment SET email_id = $1 WHERE id = ANY($2::text[]) AND email_id IS NULL
 `
 
@@ -18,9 +18,12 @@ type AttachToEmailParams struct {
 	Ids     []string
 }
 
-func (q *Queries) AttachToEmail(ctx context.Context, arg AttachToEmailParams) error {
-	_, err := q.db.Exec(ctx, attachToEmail, arg.EmailID, arg.Ids)
-	return err
+func (q *Queries) AttachToEmail(ctx context.Context, arg AttachToEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, attachToEmail, arg.EmailID, arg.Ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteBanner = `-- name: DeleteBanner :execrows

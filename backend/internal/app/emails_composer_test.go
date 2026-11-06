@@ -1,12 +1,14 @@
 package app_test
 
 import (
+	"context"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	stdmail "net/mail"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -191,5 +193,38 @@ func TestSendingACandidateToTheClient(t *testing.T) {
 		assert.True(t, list.Fields[4].Salary)
 		assert.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, recruiter, nil).Status)
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, recruiter, nil).Status)
+	})
+
+	t.Run("an upload goes with one email, even when two are sent at the same moment", func(t *testing.T) {
+		for round := 0; round < 5; round++ {
+			var up api.EmailAttachment
+			a.upload("/v1/email-attachments", recruiter, "", "JD.pdf", minimalPDF).JSON(&up)
+			send := map[string]any{"to": []string{client}, "subject": "Race", "bodyHtml": "<p>Hi</p>", "attachmentIds": []string{up.Id}}
+			statuses := make(chan int, 2)
+			var wg sync.WaitGroup
+			for range 2 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					statuses <- a.request(http.MethodPost, "/v1/emails", recruiter, send).Status
+				}()
+			}
+			wg.Wait()
+			close(statuses)
+			var accepted int
+			for st := range statuses {
+				if st == http.StatusAccepted {
+					accepted++
+				} else {
+					assert.Equal(t, http.StatusBadRequest, st)
+				}
+			}
+			assert.Equal(t, 1, accepted, "never two emails, one of them without the file")
+			var withFile int
+			require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(),
+				`SELECT count(*) FROM email e WHERE e.subject = 'Race' AND e.tenant_id = $1 AND NOT EXISTS (
+				   SELECT 1 FROM email_attachment f WHERE f.email_id = e.id)`, tenant.ID).Scan(&withFile))
+			assert.Zero(t, withFile, "no email went out without its attachment")
+		}
 	})
 }

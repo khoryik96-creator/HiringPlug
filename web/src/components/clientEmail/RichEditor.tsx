@@ -4,7 +4,7 @@
 import { useEffect, useRef } from "react";
 
 import type { Schemas } from "../../api/client";
-import { exec, insertHtml, setFontSize, showBanners } from "./richText";
+import { exec, insertHtml, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
 
 const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"];
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
@@ -22,6 +22,7 @@ type Props = {
 
 export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner }: Props) {
   const box = useRef<HTMLDivElement>(null);
+  const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
 
   useEffect(() => {
     if (!box.current) return;
@@ -32,15 +33,17 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
   }, [resetKey]);
   useEffect(() => { showBanners(box.current, bannerUrls); }, [bannerUrls]);
 
-  const changed = () => { if (box.current) onChange(box.current.innerHTML); };
+  const remember = () => { if (box.current) cursor.current = saveRange(box.current) ?? cursor.current; };
+  const changed = () => { remember(); if (box.current) onChange(box.current.innerHTML); };
+  const back = () => { if (box.current) restoreRange(box.current, cursor.current); };
   const run = (command: string, value?: string) => {
-    box.current?.focus();
+    back();
     exec(command, value);
     changed();
   };
   const insert = (fragment: string) => {
     if (!box.current) return;
-    box.current.focus();
+    back();
     insertHtml(box.current, fragment);
     showBanners(box.current, bannerUrls);
     changed();
@@ -71,7 +74,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         <select aria-label="Font" defaultValue="Calibri" onChange={(e) => { run("fontName", e.target.value); }}>
           {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
-        <select aria-label="Size" defaultValue="12" onChange={(e) => { if (box.current) { box.current.focus(); setFontSize(box.current, e.target.value); changed(); } }}>
+        <select aria-label="Size" defaultValue="12" onChange={(e) => { if (box.current) { back(); setFontSize(box.current, e.target.value); changed(); } }}>
           {SIZES.map((s) => <option key={s} value={s}>{s} pt</option>)}
         </select>
         <input type="color" aria-label="Text colour" defaultValue="#0b57a4" onChange={(e) => { run("foreColor", e.target.value); }} />
@@ -97,7 +100,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         )}
       </div>
       <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        aria-label="Message" tabIndex={0} onInput={changed} onBlur={changed} />
+        aria-label="Message" tabIndex={0} onInput={changed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} />
     </div>
   );
 }

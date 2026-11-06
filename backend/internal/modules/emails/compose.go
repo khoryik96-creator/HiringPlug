@@ -208,8 +208,16 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err != nil {
 			return err
 		}
-		if err := q.AttachToEmail(ctx, store.AttachToEmailParams{EmailID: &row.ID, Ids: r.AttachmentIDs}); err != nil {
+		// Claimed only if still unsent: another email sent at the same moment
+		// with the same upload refuses this one rather than going without it.
+		claimed, err := q.AttachToEmail(ctx, store.AttachToEmailParams{EmailID: &row.ID, Ids: r.AttachmentIDs})
+		if err != nil {
 			return err
+		}
+		if int(claimed) != len(staged) {
+			var errs apperr.FieldErrors
+			errs.Add("attachmentIds", "a file was just sent with another email: upload it again")
+			return errs.Err()
 		}
 		for _, cv := range cvs {
 			key := p.TenantID + "/eat_" + newKey()
