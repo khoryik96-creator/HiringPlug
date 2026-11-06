@@ -53,4 +53,16 @@ describe("booking page", () => {
     expect(await screen.findByText(/This meeting was cancelled/)).toBeTruthy();
     expect(screen.queryByRole("radio")).toBeNull();
   });
+
+  it("drops a picked time that was taken meanwhile", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok(open));
+    vi.spyOn(api, "POST").mockResolvedValue({ data: undefined, error: { error: { code: "BOOKING_SLOT_TAKEN", message: "That time is no longer free: pick another.", requestId: "r" } }, response: new Response(null, { status: 409 }) });
+    renderWithClient(<BookingPage token={TOKEN} />);
+    const first = (await screen.findAllByRole("radio")).filter((r) => r.closest("[aria-label='Time']"))[0] as HTMLElement;
+    fireEvent.click(first);
+    get.mockResolvedValue(ok({ ...open, slots: open.slots.slice(1) })); // 02:00 was taken
+    fireEvent.click(screen.getByRole("button", { name: /^Book / }));
+    expect(await screen.findByText(/no longer free/)).toBeTruthy();
+    await waitFor(() => { expect(screen.getByRole("button", { name: "Pick a time" })).toHaveProperty("disabled", true); });
+  });
 });

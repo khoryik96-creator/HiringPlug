@@ -80,10 +80,13 @@ function Booked({ b, onChange }: { b: Booking; onChange: () => void }) {
 
 function Picker({ b, busy, onPick, onCancel }: { b: Booking; busy: boolean; onPick: (s: string) => void; onCancel?: () => void }) {
   const days = byDay(b.slots);
-  const [day, setDay] = useState(days[0]?.[0] ?? "");
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [picked, setDay] = useState(days[0]?.[0] ?? "");
+  const [choice, setChosen] = useState<string | null>(null);
   if (days.length === 0) return <p className="booking-note">No free times are left. Ask {b.hostName} for another link.</p>;
+  // After a refresh (someone took a time), a day or time no longer offered is not kept.
+  const day = days.some(([d]) => d === picked) ? picked : (days[0]?.[0] ?? "");
   const times = days.find(([d]) => d === day)?.[1] ?? [];
+  const chosen = choice !== null && times.includes(choice) ? choice : null;
   return (
     <>
       <h2 className="booking-step">Pick a day</h2>

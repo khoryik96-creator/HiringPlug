@@ -117,6 +117,21 @@ func TestAContactsLinkedInProfileShowsWhereTheyWorkNow(t *testing.T) {
 		assert.Equal(t, "It could not be read: no text was found in it", e.Error.MustGet())
 	})
 
+	t.Run("a check never read is given up after an hour, so the PDF can be dropped again", func(t *testing.T) {
+		other := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Lim"})
+		res := a.upload("/v1/contacts/"+other.Id+"/linkedin-profile", token, "", "Profile.pdf", minimalPDF)
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		var c3 api.ContactEmployment
+		res.JSON(&c3)
+		assert.Equal(t, api.ContactEmploymentStatusReading, a.contact(token, other.Id).Employment.MustGet().Status)
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE contact_employment_check SET created_at = now() - interval '2 hours' WHERE id = $1`, c3.Id)
+		require.NoError(t, err)
+		e := a.contact(token, other.Id).Employment.MustGet()
+		assert.Equal(t, api.ContactEmploymentStatusFailed, e.Status)
+		assert.Equal(t, "It was not read in time: drop the PDF again.", e.Error.MustGet())
+		claimAIJobWhere(t, aiConn, "checkId", c3.Id) // leave the queue tidy for other tests
+	})
+
 	t.Run("another company cannot check this contact", func(t *testing.T) {
 		other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 		assert.Equal(t, http.StatusNotFound, a.upload("/v1/contacts/"+ct.Id+"/linkedin-profile", other, "", "Profile.pdf", minimalPDF).Status)

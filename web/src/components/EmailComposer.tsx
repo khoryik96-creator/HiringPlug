@@ -39,12 +39,12 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "", body: "" });
   const [missing, setMissing] = useState<string[]>([]);
   const [booking, setBooking] = useState(false);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  /** Puts text where the cursor is in the message (at its end when it has none). */
+  // Where the cursor last was in the message: the button that inserts takes the focus away.
+  const caret = useRef<number | null>(null);
+  /** Puts text where the cursor was in the message (at its end when it had none). */
   const insert = (text: string) => {
-    const el = bodyRef.current;
     setForm((f) => {
-      const at = el && document.activeElement === el ? el.selectionStart : f.body.length;
+      const at = Math.min(caret.current ?? f.body.length, f.body.length);
       const before = f.body.slice(0, at);
       const sep = before && !before.endsWith("\n") ? "\n\n" : "";
       return { ...f, body: `${before}${sep}${text}\n${f.body.slice(at)}` };
@@ -112,7 +112,8 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
       <label className="field full">Subject<input value={form.subject} onChange={set("subject")} /></label>
-      <label className="field full">Message<textarea ref={bodyRef} rows={12} value={form.body} onChange={set("body")} /></label>
+      <label className="field full">Message<textarea rows={12} value={form.body} onChange={set("body")}
+        onSelect={(e) => { caret.current = e.currentTarget.selectionStart; }} /></label>
       {canBook && (booking
         ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>
         : <div className="full"><button type="button" className="link" onClick={() => { setBooking(true); }}>+ Booking link</button></div>)}

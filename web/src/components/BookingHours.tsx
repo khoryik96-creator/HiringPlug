@@ -25,11 +25,14 @@ export function BookingHours() {
   const schedule = useQuery({
     queryKey: scheduleKey,
     queryFn: async () => unwrap(await api.GET("/v1/scheduling/me")),
-    // Follow a calendar address still being read.
-    refetchInterval: (q) => (q.state.data?.calendar?.status === "pending" ? 2000 : false),
+    // Follow a calendar address still being read, for a couple of minutes at most.
+    refetchInterval: (q) => (q.state.data?.calendar?.status === "pending" && q.state.dataUpdateCount < 60 ? 2000 : false),
   });
-  if (!schedule.data) return <ErrorMessage error={schedule.error} />;
-  return <HoursForm key={schedule.dataUpdatedAt} schedule={schedule.data} onSaved={(s) => { queryClient.setQueryData(scheduleKey, s); }} />;
+  const s = schedule.data;
+  if (!s) return <ErrorMessage error={schedule.error} />;
+  // A fresh form only when the saved hours change, never on a background refresh (that would throw away typing).
+  const saved = JSON.stringify([s.set, s.timeZone, s.hours, s.bufferMinutes, s.minNoticeHours, s.maxDaysAhead]);
+  return <HoursForm key={saved} schedule={s} onSaved={(next) => { queryClient.setQueryData(scheduleKey, next); }} />;
 }
 
 function HoursForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (s: Schedule) => void }) {

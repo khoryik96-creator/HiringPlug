@@ -71,4 +71,23 @@ describe("candidate emails", () => {
   it("reads addresses however they are separated", () => {
     expect(addresses(" a@x.test, b@y.test;c@z.test  d@w.test ")).toEqual(["a@x.test", "b@y.test", "c@z.test", "d@w.test"]);
   });
+
+  it("puts a booking link where the cursor was in the message", async () => {
+    reads([]);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "bkl_1", url: "https://ats.example/book/abc", durationMinutes: 30 }));
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send", "scheduling:use"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    const message = screen.getByLabelText<HTMLTextAreaElement>("Message");
+    fireEvent.change(message, { target: { value: "Hi Siti,\nThanks, Aina" } });
+    message.setSelectionRange(9, 9); // after "Hi Siti,\n"
+    fireEvent.select(message);
+    fireEvent.click(screen.getByRole("button", { name: "+ Booking link" }));
+    const insertButton = screen.getByRole("button", { name: "Insert link" });
+    insertButton.focus(); // a click moves the focus to the button, as in a browser
+    fireEvent.click(insertButton);
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    await waitFor(() => {
+      expect(message.value).toBe("Hi Siti,\nPlease pick a time that suits you (30 minutes): https://ats.example/book/abc\nThanks, Aina");
+    });
+  });
 });

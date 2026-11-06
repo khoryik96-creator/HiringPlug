@@ -45,6 +45,22 @@ describe("booking hours", () => {
   });
 });
 
+describe("booking hours while the calendar is read", () => {
+  it("keep what is being typed when the status is refreshed", async () => {
+    const pending = { ...schedule, set: true, calendar: { host: "calendar.google.com", status: "pending", error: null, checkedAt: null, busyCount: 0 } };
+    vi.spyOn(api, "GET").mockResolvedValue(ok(pending));
+    const { client } = renderWithClient(<BookingHours />);
+    const gap = await screen.findByLabelText<HTMLInputElement>("Gap around meetings (minutes)");
+    fireEvent.change(gap, { target: { value: "25" } });
+    const before = client.getQueryState(["schedule", "me"])?.dataUpdatedAt ?? 0;
+    await new Promise((r) => setTimeout(r, 5)); // a later refresh time
+    await client.refetchQueries({ queryKey: ["schedule", "me"] }); // the polling refresh
+    expect(client.getQueryState(["schedule", "me"])?.dataUpdatedAt).toBeGreaterThan(before);
+    await new Promise((r) => setTimeout(r, 20)); // let it render
+    expect(screen.getByLabelText<HTMLInputElement>("Gap around meetings (minutes)").value).toBe("25");
+  });
+});
+
 describe("booking link in an email", () => {
   it("makes the link and hands back the text to insert", async () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "bkl_1", url: "https://ats.example/book/abc", durationMinutes: 45 }));

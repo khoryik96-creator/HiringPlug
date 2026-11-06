@@ -30,7 +30,12 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
-const profileLinkTTL = 30 * time.Minute
+const (
+	profileLinkTTL = 30 * time.Minute
+	// readingGivenUp is when a check still being read counts as failed: its
+	// job died (worker down, link expired), and the user can drop the PDF again.
+	readingGivenUp = time.Hour
+)
 
 // EmploymentCheck is a check and, once read, what it found.
 type EmploymentCheck struct {
@@ -45,6 +50,10 @@ func checkFrom(row store.ContactEmploymentCheck, ct Contact) (*EmploymentCheck, 
 	out := &EmploymentCheck{
 		ID: row.ID, Status: row.Status, FileName: row.FileName, Error: row.Error,
 		Employment: Employment{Verdict: "unknown"}, CheckedAt: row.CreatedAt,
+	}
+	if row.Status == "reading" && time.Since(row.CreatedAt) > readingGivenUp {
+		msg := "It was not read in time: drop the PDF again."
+		out.Status, out.Error = "failed", &msg
 	}
 	if len(row.Result) > 0 {
 		var p Profile

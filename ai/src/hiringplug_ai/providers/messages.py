@@ -80,13 +80,16 @@ class Messages:
             except anthropic.APIConnectionError as exc:
                 raise ProviderError("the AI provider could not be reached") from exc
 
-        message = with_retries(
-            send,
-            lambda: ProviderError(
-                "the AI provider is busy (rate limited or overloaded); try again in a minute"
-            ),
-            self.sleep,
-        )
+        # One client per request, closed after it: a worker must not keep a
+        # connection pool open for every call it ever made.
+        with client:
+            message = with_retries(
+                send,
+                lambda: ProviderError(
+                    "the AI provider is busy (rate limited or overloaded); try again in a minute"
+                ),
+                self.sleep,
+            )
         if message.stop_reason == "refusal":
             raise ProviderError("the AI declined to answer this request")
         if message.stop_reason == "max_tokens":

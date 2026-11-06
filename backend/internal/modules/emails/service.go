@@ -319,11 +319,9 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		return err
 	}
 	if n.Calendar != "" {
-		row.Calendar = &n.Calendar
-		err = store.New(tx).SetEmailCalendar(ctx, store.SetEmailCalendarParams{ID: row.ID, Calendar: &n.Calendar})
-	}
-	if err != nil {
-		return err
+		if err := store.New(tx).SetEmailCalendar(ctx, store.SetEmailCalendarParams{ID: row.ID, Calendar: &n.Calendar}); err != nil {
+			return err
+		}
 	}
 	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
 		return err

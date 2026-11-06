@@ -3,6 +3,7 @@ package scheduling
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -67,7 +68,7 @@ func (s *Service) readCalendar(ctx context.Context, address string, loc *time.Lo
 	if err != nil {
 		var status safehttp.StatusError
 		if errors.As(err, &status) {
-			return nil, errors.New("the calendar address answered " + status.Error() + ": check it, or make a new one")
+			return nil, fmt.Errorf("the calendar address gave HTTP %d: check it, or make a new one", int(status))
 		}
 		return nil, errors.New("the calendar could not be reached")
 	}

@@ -333,3 +333,9 @@ def test_the_check_reports_back(reply: Completion | ProviderError, ok: bool, mes
     assert f.kind == JobKind.aiprovider_checked
     r = AiProviderCheckedJob.model_validate(f.payload.model_dump(mode="json"))
     assert (r.ok, r.message, r.sealedKey, r.provider.value) == (ok, message, "v1.sealed", "openai")
+
+
+def test_each_request_closes_its_connections() -> None:
+    _, client = recording([message("fine")])
+    Messages("claude", KEY, "claude-opus-5-5", http_client=client).complete("s", "u", max_tokens=10)
+    assert client.is_closed, "a worker must not keep a connection pool open per call"
