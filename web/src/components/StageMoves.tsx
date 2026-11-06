@@ -33,14 +33,16 @@ export function byDay(moves: Move[], now = new Date()): [string, Move[]][] {
 export function StageMoves({ candidateId, title = "Recent moves", limit = 30 }: { candidateId?: string; title?: string; limit?: number }) {
   const moves = useQuery({
     queryKey: stageMovesKey(candidateId),
-    queryFn: async () => unwrap(await api.GET("/v1/pipeline/moves", { params: { query: { candidateId, limit } } })).items,
+    // The whole list ({ items }), as every query under applicationsKey: a move updates them all in place.
+    queryFn: async () => unwrap(await api.GET("/v1/pipeline/moves", { params: { query: { candidateId, limit } } })),
   });
+  const items = moves.data?.items;
   return (
     <section className="panel" aria-label={title}>
       <h3>{title}</h3>
       <ErrorMessage error={moves.error} />
-      {moves.data?.length === 0 && <p className="muted">No moves yet: candidates appear here when they are added to a job or change stage.</p>}
-      {moves.data && byDay(moves.data).map(([day, items]) => (
+      {items?.length === 0 && <p className="muted">No moves yet: candidates appear here when they are added to a job or change stage.</p>}
+      {items && byDay(items).map(([day, items]) => (
         <div key={day} className="timeline-day">
           <h4>{day}</h4>
           <ol className="timeline">

@@ -148,6 +148,8 @@ def test_ratings_keyed_by_cv_studios_names_are_read() -> None:
                     "Technical / Functional Skills": {"score": 70, "note": "Good."},
                     "Keyword & Requirement Match": 64.6,
                     "Leadership & Communication": True,
+                    "education": float("nan"),
+                    "industry": float("inf"),
                 },
             }
         )

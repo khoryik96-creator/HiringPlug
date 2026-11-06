@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -120,7 +121,7 @@ def _score(value: Any) -> int | None:
     if isinstance(value, str):
         m = re.match(r"\s*(\d{1,3}(?:\.\d+)?)", value)
         value = float(m.group(1)) if m else None
-    if not isinstance(value, int | float):
+    if not isinstance(value, int | float) or not math.isfinite(value):  # json reads NaN and Infinity
         return None
     return max(0, min(100, round(value)))
 

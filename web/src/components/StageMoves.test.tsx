@@ -1,9 +1,15 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient } from "../test-utils";
 import { byDay, dayLabel, StageMoves } from "./StageMoves";
+import { useMoveApplication } from "./useMoveApplication";
+
+function MoveButton({ app }: { app: Schemas["Application"] }) {
+  const move = useMoveApplication();
+  return <button type="button" onClick={() => { move.mutate({ app, stage: "interview" }); }}>{move.isSuccess ? "Moved" : move.isError ? "Failed" : "Move"}</button>;
+}
 
 afterEach(() => {
   cleanup();
@@ -54,5 +60,18 @@ describe("stage move timeline", () => {
     await within(panel).findByText("Auditor");
     expect(within(panel).queryByRole("link", { name: "Siti Aisyah" })).toBeNull();
     expect(get).toHaveBeenCalledWith("/v1/pipeline/moves", { params: { query: { candidateId: "cand_1", limit: 50 } } });
+  });
+
+  it("survives a move made while it is shown, and refreshes", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [move({})] }));
+    const app = { id: "appl_1", version: 2, stage: "screening" } as Schemas["Application"];
+    vi.spyOn(api, "POST").mockResolvedValue(ok({ ...app, version: 3, stage: "interview" }));
+    renderWithClient(<><StageMoves candidateId="cand_1" /><MoveButton app={app} /></>);
+    await screen.findByText("Auditor");
+    const calls = get.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Move" }));
+    expect(await screen.findByRole("button", { name: "Moved" })).toBeTruthy();
+    await waitFor(() => { expect(get.mock.calls.length).toBeGreaterThan(calls); }); // the timeline is fetched again
+    expect(screen.getByText("Auditor")).toBeTruthy();
   });
 });
