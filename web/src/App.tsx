@@ -22,6 +22,7 @@ import { Integrations } from "./pages/Integrations";
 import { Privacy } from "./pages/Privacy";
 import { Access } from "./pages/Access";
 import { AiProvider } from "./pages/AiProvider";
+import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { Settings } from "./pages/Settings";
 import { JobList } from "./pages/JobList";
 import { Leads } from "./pages/Leads";
@@ -100,7 +101,10 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           </button>
         </div>
       </header>
-      <Page hash={hash} permissions={permissions} me={me.data} />
+      {/* key: a new location starts with a fresh boundary */}
+      <PageErrorBoundary key={hash}>
+        <Page hash={hash} permissions={permissions} me={me.data} />
+      </PageErrorBoundary>
     </>
   );
 }

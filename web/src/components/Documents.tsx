@@ -87,7 +87,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       {(docs.data?.length ?? 0) >= 2 && <a href={`#/candidates/${candidateId}/compare`}>Compare CVs side by side</a>}
       <ul>
         {docs.data?.map((d: Document) => (
-          <li key={d.id}>
+          <li key={d.id} className="doc-row">
             <button type="button" className="link" onClick={() => { setOpen(open === d.id ? null : d.id); }}>
               {d.fileName}
             </button>{" "}

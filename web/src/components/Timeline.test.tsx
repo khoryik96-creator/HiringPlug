@@ -36,6 +36,17 @@ describe("activity sentences", () => {
     expect(sentence({ ...change, action: "note.created", changes: {} })).toBeNull();
   });
 
+  it("never break on entries of another shape (a merge's empty list broke candidate pages)", () => {
+    expect(sentence({ ...change, action: "candidate.merged", changes: { filled: null, duplicateId: "cand_2", duplicateName: "Mohd Faizal" } }))
+      .toBe("merged in a duplicate record (Mohd Faizal)");
+    expect(sentence({ ...change, action: "candidate.merged", changes: { filled: ["email", "currentTitle"], duplicateName: "A" } }))
+      .toBe("merged in a duplicate record (A), taking email, current title from it");
+    expect(sentence({ ...change, action: "candidate.filled_from_cv", changes: { email: { from: null, to: "a@b.c" }, phone: { from: null, to: "1" } } }))
+      .toBe("filled in from their CV: email, phone");
+    expect(sentence({ ...change, action: "thing.done", changes: { a: null, b: "x", c: ["p", "q"], d: { odd: 1 } } }))
+      .toBe("a: —; b: x; c: p, q; changed d");
+  });
+
   it("tell what an employment check did", () => {
     expect(sentence({ ...change, action: "contact.employment_check_started", changes: { fileName: "Profile.pdf" } }))
       .toBe("checked their LinkedIn profile (Profile.pdf)");
