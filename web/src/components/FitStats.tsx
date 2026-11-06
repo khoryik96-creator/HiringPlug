@@ -56,7 +56,6 @@ export function FitStats({ match }: { match: Match }) {
           )}
         </div>
       )}
-      <p className="muted small">Ratings and notes are the AI&apos;s opinion (CV Studio&apos;s CV scoring); the score is worked out from the quoted requirements.</p>
     </div>
   );
 }

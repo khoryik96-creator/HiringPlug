@@ -46,13 +46,13 @@ async function findJobs(q: string): Promise<Found> {
   };
 }
 
-type Box = { label: string; placeholder: string; list: string; key: readonly unknown[]; find: (q: string) => Promise<Found> };
+type Box = { label: string; list: string; key: readonly unknown[]; find: (q: string) => Promise<Found> };
 
 const BOXES: { permission: Permission; box: Box }[] = [
-  { permission: "candidates:read", box: { label: "Candidates", placeholder: "Name, email, phone, title or company", list: "#/candidates", key: candidatesKey, find: findCandidates } },
-  { permission: "jobs:read", box: { label: "Jobs", placeholder: "Title, client or location", list: "#/jobs", key: jobsKey, find: findJobs } },
-  { permission: "companies:read", box: { label: "Companies", placeholder: "Name, website or phone", list: "#/companies", key: companiesKey, find: findCompanies } },
-  { permission: "contacts:read", box: { label: "Contacts", placeholder: "Name, email, phone or title", list: "#/contacts", key: contactsKey, find: findContacts } },
+  { permission: "candidates:read", box: { label: "Candidates", list: "#/candidates", key: candidatesKey, find: findCandidates } },
+  { permission: "jobs:read", box: { label: "Jobs", list: "#/jobs", key: jobsKey, find: findJobs } },
+  { permission: "companies:read", box: { label: "Companies", list: "#/companies", key: companiesKey, find: findCompanies } },
+  { permission: "contacts:read", box: { label: "Contacts", list: "#/contacts", key: contactsKey, find: findContacts } },
 ];
 
 export function QuickSearch({ permissions }: { permissions: Permission[] }) {
@@ -95,7 +95,7 @@ function SearchBox({ box }: { box: Box }) {
       }}>
         <label>
           <span className="search-label">{box.label}</span>
-          <input type="search" value={text} placeholder={box.placeholder} aria-label={`Search ${box.label.toLowerCase()}`}
+          <input type="search" value={text} placeholder="Search" aria-label={`Search ${box.label.toLowerCase()}`}
             onChange={(e) => { setText(e.target.value); }} />
         </label>
       </form>

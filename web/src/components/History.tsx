@@ -77,8 +77,8 @@ function HistoryForm({ candidate, onDone }: { candidate: Candidate; onDone: () =
         <fieldset key={i} className="form-grid" aria-label={`Job ${String(i + 1)}`}>
           <label className="field">Job title<input value={j.title ?? ""} onChange={(e) => { setJob(i, { title: orNull(e.target.value) }); }} /></label>
           <label className="field">Company<input value={j.company ?? ""} onChange={(e) => { setJob(i, { company: orNull(e.target.value) }); }} /></label>
-          <label className="field">From (YYYY-MM)<input value={j.startDate ?? ""} placeholder="2020-01" onChange={(e) => { setJob(i, { startDate: orNull(e.target.value) }); }} /></label>
-          <label className="field">To (YYYY-MM)<input value={j.endDate ?? ""} disabled={j.current} placeholder="2023-06" onChange={(e) => { setJob(i, { endDate: orNull(e.target.value) }); }} /></label>
+          <label className="field">From (YYYY-MM)<input value={j.startDate ?? ""} onChange={(e) => { setJob(i, { startDate: orNull(e.target.value) }); }} /></label>
+          <label className="field">To (YYYY-MM)<input value={j.endDate ?? ""} disabled={j.current} onChange={(e) => { setJob(i, { endDate: orNull(e.target.value) }); }} /></label>
           <label className="row"><input type="checkbox" checked={j.current} onChange={(e) => { setJob(i, { current: e.target.checked, endDate: e.target.checked ? null : j.endDate }); }} /> Current job</label>
           <button type="button" className="link" onClick={() => { setWork(work.filter((_, k) => k !== i)); }}>Remove job</button>
         </fieldset>

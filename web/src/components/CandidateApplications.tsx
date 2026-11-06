@@ -68,7 +68,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
             value={job}
             onChange={(p) => { setJob(p); add.reset(); }}
             queryKey={jobsKey}
-            placeholder="Add to a job: type its title"
+            placeholder="Add to a job"
             noMatch="No open job matches."
             search={async (q) =>
               unwrap(await api.GET("/v1/jobs", { params: { query: { q, status: "open", limit: 8 } } })).items.map((j) => ({ id: j.id, name: j.title, detail: j.companyName }))}

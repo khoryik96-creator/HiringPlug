@@ -16,7 +16,7 @@ export function CompanyPicker(props: {
     <SearchPicker
       {...props}
       queryKey={companiesKey}
-      placeholder="Type to search companies"
+      placeholder="Search companies"
       noMatch="No company matches. Add it under Companies first."
       search={async (q) =>
         unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: c.name, detail: c.city }))}

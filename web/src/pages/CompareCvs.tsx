@@ -32,7 +32,7 @@ export function CompareCvs({ candidateId }: { candidateId: string }) {
     <main>
       <a href={`#/candidates/${candidateId}`}>← Candidate</a>
       <h2>Compare CVs</h2>
-      {list.length < 2 && <p className="muted">This candidate has only one CV. Upload another version to compare.</p>}
+      {list.length < 2 && <p className="muted">Only one CV: upload another to compare.</p>}
       <Differences a={left.data} b={right.data} />
       <div className="compare">
         {[leftId, rightId].map((id, side) => (
@@ -54,7 +54,7 @@ function Differences({ a, b }: { a: Document | undefined; b: Document | undefine
   const pa = a.parsedProfile ?? null;
   const pb = b.parsedProfile ?? null;
   if (!pa || !pb) {
-    return <p className="muted">Differences appear once details have been read from both CVs (Read details on the candidate page).</p>;
+    return <p className="muted">Read details from both CVs to compare them.</p>;
   }
   const fields = compareFields(pa, pb).filter((r) => r.differs);
   const jobs = compareJobs(pa, pb);

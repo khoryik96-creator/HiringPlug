@@ -27,11 +27,6 @@ export function Access() {
   return (
     <main>
       <h2>Roles and access</h2>
-      <p className="muted">
-        Choose what each role may do and which candidates it sees. A candidate someone may not see is hidden everywhere: lists, their page,
-        CVs, notes, emails, jobs, interviews, offers and placements. Put people in teams and give candidates and jobs an owner on the
-        Team page and on each candidate or job.
-      </p>
       <ErrorMessage error={settings.error} />
       {s?.roles.map((r) => <RoleCard key={`${r.role}-${String(r.version)}`} access={r} catalog={s.permissions} />)}
     </main>
@@ -58,7 +53,7 @@ function RoleCard({ access: a, catalog }: { access: RoleAccess; catalog: Info[] 
     return (
       <section className="panel" aria-label={ROLE[a.role]}>
         <h3>{ROLE[a.role]}</h3>
-        <p className="muted">Owners always have every permission and see all candidates, so the company can never lock itself out.</p>
+        <p className="muted">Owners always have every permission.</p>
       </section>
     );
   }

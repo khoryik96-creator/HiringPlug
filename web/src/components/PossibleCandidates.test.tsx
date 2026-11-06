@@ -34,7 +34,7 @@ describe("possible candidates", () => {
   it("ask for the job's text when there is none", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(failure("MATCH_NEEDS_TEXT", "No text.", undefined, 409));
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={SEE} />);
-    expect(await screen.findByText(/Add the job's description or an ad/)).toBeTruthy();
+    expect(await screen.findByText(/Add a description or an ad/)).toBeTruthy();
   });
 
   it("highlight only what is marked", () => {

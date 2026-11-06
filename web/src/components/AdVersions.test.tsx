@@ -33,7 +33,7 @@ describe("ad versions", () => {
     expect(written.textContent).not.toContain("On the careers page");
     expect(blind.textContent).toContain("On the careers page");
     expect(blind.textContent).toContain("A logistics firm is growing.");
-    expect(await within(blind).findByText(/Shah Alam, Malaysia \(MY\) · Full time · your own text/)).toBeTruthy();
+    expect(await within(blind).findByText(/Shah Alam, Malaysia \(MY\) · Full time · edited/)).toBeTruthy();
     expect(within(blind).getByRole("status").textContent).toContain("The ad changed after this blind text was written");
   });
 

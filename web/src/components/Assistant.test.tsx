@@ -36,7 +36,7 @@ describe("AI assistant", () => {
   it("says when it is off", async () => {
     reads({ ...on, enabled: false }, []);
     renderWithClient(<Assistant subjectType="job" subjectId="job_1" permissions={[...USE]} />);
-    expect(await screen.findByText(/The AI assistant is off/)).toBeTruthy();
+    expect(await screen.findByText(/no AI provider is set up/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Summary" })).toBeNull();
   });
 
@@ -46,7 +46,7 @@ describe("AI assistant", () => {
     renderWithClient(<Assistant subjectType="candidate" subjectId="cand_1" permissions={[...USE]} />);
     expect((await screen.findByRole("article", { name: "Summary" })).textContent).toContain("An experienced accountant.");
     expect(screen.getByRole("article", { name: "Why did she leave?" }).textContent).toContain("No answer: the AI provider did not answer in time");
-    expect(screen.getByText(/without names, contact details or salary/).textContent).toContain("1,500 of 2,000,000 tokens");
+    expect(screen.getByText(/tokens this month/).textContent).toContain("1,500 of 2,000,000 tokens");
 
     fireEvent.change(screen.getByLabelText("Ask a question"), { target: { value: "  What should I ask?  " } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));

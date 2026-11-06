@@ -41,7 +41,7 @@ export function StageMoves({ candidateId, title = "Recent moves", limit = 30 }: 
     <section className="panel" aria-label={title}>
       <h3>{title}</h3>
       <ErrorMessage error={moves.error} />
-      {items?.length === 0 && <p className="muted">No moves yet: candidates appear here when they are added to a job or change stage.</p>}
+      {items?.length === 0 && <p className="muted">No moves yet.</p>}
       {items && byDay(items).map(([day, items]) => (
         <div key={day} className="timeline-day">
           <h4>{day}</h4>

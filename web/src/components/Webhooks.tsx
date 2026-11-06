@@ -30,10 +30,6 @@ export function Webhooks() {
   return (
     <section className="panel" aria-label="Webhooks">
       <h3>Webhooks</h3>
-      <p className="muted">
-        When a chosen event happens, HiringPlug sends a JSON POST to your address, signed in the <code>X-HiringPlug-Signature</code> header
-        (<code>t=&lt;time&gt;,v1=&lt;HMAC-SHA256 of "time.body" with the secret&gt;</code>). A failed delivery is tried again later.
-      </p>
       {secret && (
         <div className="warning" role="status">
           <p>Copy the signing secret now: it is not shown again.</p>
@@ -44,7 +40,7 @@ export function Webhooks() {
       <ErrorMessage error={list.error} />
       {list.data?.items.map((w) => <WebhookItem key={w.id} webhook={w} />)}
       <form className="form-grid" aria-label="New webhook" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <label className="field full">Address<input value={form.url} placeholder="https://example.com/hooks/hiringplug" onChange={(e) => { setForm({ ...form, url: e.target.value }); }} /></label>
+        <label className="field full">Address<input value={form.url} onChange={(e) => { setForm({ ...form, url: e.target.value }); }} /></label>
         <fieldset className="full">
           <legend>Events</legend>
           {list.data?.events.map((e) => (

@@ -41,18 +41,15 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
         {canEdit && !editing && <button type="button" onClick={() => { setEditing("new"); }}>Write an ad</button>}
       </div>
       {me.data && (
-        <p className="muted">
-          Published ads appear on your careers page:{" "}
-          <a href={careersUrl(window.location.origin, me.data.tenant.careersSlug)} target="_blank" rel="noreferrer">
-            {careersUrl(window.location.origin, me.data.tenant.careersSlug)}
-          </a>
-          {" "}· job feed for boards that read one:{" "}
-          <code>{`${window.location.origin}/v1/public/careers/${me.data.tenant.careersSlug}/jobs.xml`}</code>
+        <p className="muted small">
+          <a href={careersUrl(window.location.origin, me.data.tenant.careersSlug)} target="_blank" rel="noreferrer">Careers page</a>
+          {" · "}
+          <a href={`${window.location.origin}/v1/public/careers/${me.data.tenant.careersSlug}/jobs.xml`} target="_blank" rel="noreferrer">Job feed</a>
         </p>
       )}
       <ErrorMessage error={ads.error ?? setStatus.error} />
       {canEdit && !editing && (
-        <DropZone accept={JD_TYPES} label="Drop the client's job description here to write an ad from it"
+        <DropZone accept={JD_TYPES} label="Drop the client's JD to write an ad"
           hint="PDF, Word or text" onFiles={([f]) => { if (f) { setDropped(f); setEditing("new"); } }} />
       )}
       {editing && <AdForm job={job} ad={editing === "new" ? null : editing} jd={dropped}
@@ -162,10 +159,10 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
           {fs.options("work_arrangement", form.workArrangement).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </label>
-      <label className="field">Salary shown on the ad<input value={form.salaryText} placeholder="e.g. RM 8,000 - 10,000 a month (leave empty to hide)" onChange={(e) => { set("salaryText", e.target.value); }} /></label>
+      <label className="field">Salary shown on the ad<input value={form.salaryText} onChange={(e) => { set("salaryText", e.target.value); }} /></label>
       <label className="field">Closes on<input type="date" value={form.closesOn} onChange={(e) => { set("closesOn", e.target.value); }} /></label>
       <label className="field">In the blind ad, the client is
-        <input value={form.clientDescription} placeholder="e.g. a leading Malaysian bank (else: our client)" maxLength={200}
+        <input value={form.clientDescription} placeholder="our client" maxLength={200}
           onChange={(e) => { set("clientDescription", e.target.value); }} />
       </label>
       <label className="field">The careers page shows
@@ -176,7 +173,7 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
       </label>
       <div className="full">
         <div className="row spread">
-          <span>Ad text <span className="muted">(lines starting with "- " become bullet points)</span></span>
+          <span>Ad text</span>
           <button type="button" className="link" onClick={() => { setPreview(!preview); }}>{preview ? "Write" : "Preview"}</button>
         </div>
         {preview ? <AdText text={form.description} /> : (

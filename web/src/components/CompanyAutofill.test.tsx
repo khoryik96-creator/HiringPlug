@@ -32,7 +32,7 @@ describe("company auto-fill", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(idle));
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ ...idle, status: "queued" }));
     renderWithClient(<CompanyAutofill companyId="comp_1" website={site} />);
-    await screen.findByText(/^Reads the name/);
+    await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>("button", { name: "Fill in from website" }).disabled).toBe(false); });
     fireEvent.click(screen.getByRole("button", { name: "Fill in from website" }));
     expect(await screen.findByText("Reading the website…")).toBeTruthy();
     expect(post.mock.calls[0]?.[0]).toBe("/v1/companies/{companyId}/autofill");

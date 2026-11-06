@@ -70,7 +70,7 @@ describe("job ads", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(draft));
     renderWithClient(<JobAds job={job} canEdit />);
 
-    const zone = (await screen.findByText(/Drop the client's job description here to write an ad/)).closest(".drop-zone");
+    const zone = (await screen.findByText(/Drop the client's JD to write an ad/)).closest(".drop-zone");
     if (!zone) throw new Error("no drop zone");
     fireEvent.drop(zone, { dataTransfer: { files: [new File(["%PDF"], "JD.pdf")] } });
     const form = await screen.findByRole("form", { name: "New ad" });
@@ -105,7 +105,7 @@ describe("job ads", () => {
     reads([draft]);
     renderWithClient(<JobAds job={job} canEdit={false} />);
     await screen.findByRole("article", { name: "Senior Auditor" });
-    expect((await screen.findByRole("link", { name: /\/careers\/demo-company$/ })).getAttribute("href")).toBe(`${window.location.origin}/careers/demo-company`);
+    expect((await screen.findByRole("link", { name: "Careers page" })).getAttribute("href")).toBe(`${window.location.origin}/careers/demo-company`);
     // They may download the ad (Word, PDF), not change it.
     expect(screen.queryAllByRole("button").map((b) => b.textContent)).toEqual(["Word", "PDF", "Word", "PDF"]);
   });

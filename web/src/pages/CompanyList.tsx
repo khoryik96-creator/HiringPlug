@@ -30,7 +30,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
       <div className="row spread">
         <h2>Companies</h2>
         <div className="row">
-          <input aria-label="Search companies" placeholder="Search name or website" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input aria-label="Search companies" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
           <select aria-label="Type" value={type} onChange={(e) => { setType(e.target.value as TypeFilter); }}>
             <option value="">All types</option>
             {keysOf(COMPANY_TYPE).map((t) => <option key={t} value={t}>{COMPANY_TYPE[t]}</option>)}

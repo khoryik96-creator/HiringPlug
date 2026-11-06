@@ -22,10 +22,6 @@ export function Settings() {
           <MandatoryFields fields={settings.data.mandatory} />
           <Policies />
           <h3>Dropdowns</h3>
-          <p className="muted">
-            Hidden options are no longer offered, but records that have them keep them. Options that come with the app can be
-            hidden but not removed. Work type and arrangement can only be renamed, reordered or hidden: job boards need their values.
-          </p>
           {settings.data.lists.map((l) => <ListEditor key={l.name} list={l} />)}
         </>
       )}
@@ -49,10 +45,7 @@ function Policies() {
   return (
     <section className="panel" aria-label="Salary in emails">
       <h3>Salary in emails</h3>
-      <p className="muted">
-        Only people whose role may see salaries can fill [Current salary] and [Expected salary] in an email.
-        Who should see a sent email that shows salary, on the candidate&apos;s page?
-      </p>
+      <p className="muted">Who sees sent emails that show salary?</p>
       <ErrorMessage error={policies.error ?? save.error} />
       {policies.data && (
         <select aria-label="Who sees emails that show salary" value={policies.data.emailSalaryVisibility} disabled={save.isPending}
@@ -92,7 +85,6 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
   return (
     <section className="panel" aria-label="Mandatory fields">
       <h3>Mandatory fields</h3>
-      <p className="muted">People must fill these in when they add a record (CSV imports too), and cannot empty them later. Older records stay editable.</p>
       <div className="row">{group("candidate", "Candidates")}{group("job", "Jobs")}</div>
       <button type="button" disabled={save.isPending} onClick={() => { save.mutate(); }}>Save mandatory fields</button>
       {save.isSuccess && <span className="muted" role="status"> Saved.</span>}

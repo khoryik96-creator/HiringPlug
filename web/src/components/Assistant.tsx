@@ -38,7 +38,7 @@ export function Assistant({ subjectType, subjectId, permissions }: { subjectType
       <h3>AI assistant</h3>
       <ErrorMessage error={status.error} />
       {s && !s.enabled && (
-        <p className="muted">The AI assistant is off. It turns on once an AI provider is set up for this app (HP_AI_PROVIDER).</p>
+        <p className="muted">Off: no AI provider is set up.</p>
       )}
       {s?.enabled && (
         <>
@@ -51,8 +51,7 @@ export function Assistant({ subjectType, subjectId, permissions }: { subjectType
           )}
           <Conversation key={subject.id} subject={subject} />
           <p className="muted small">
-            It sees what you may see of this record, without names, contact details or salary. AI can be wrong: check against the CV.
-            {" "}This month: {s.usedTokens.toLocaleString("en")} of {s.monthlyTokens.toLocaleString("en")} tokens.
+            {s.usedTokens.toLocaleString("en")} of {s.monthlyTokens.toLocaleString("en")} tokens this month
           </p>
         </>
       )}
@@ -90,7 +89,7 @@ function Conversation({ subject }: { subject: Subject }) {
         ))}
       </div>
       <form className="row" onSubmit={(e) => { e.preventDefault(); if (question.trim()) ask.mutate({ kind: "question", text: question.trim() }); }}>
-        <input aria-label="Ask a question" placeholder="Ask a question, e.g. what should I ask in the interview?" maxLength={1000}
+        <input aria-label="Ask a question" placeholder="Ask a question" maxLength={1000}
           value={question} onChange={(e) => { setQuestion(e.target.value); }} />
         <button type="submit" disabled={waiting || !question.trim()}>Ask</button>
       </form>

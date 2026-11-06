@@ -25,7 +25,7 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
       <h2>Leads</h2>
       <section className="panel" aria-label="Hiring leads">
         <div className="row">
-          <label>Search <input value={filters.q} placeholder="Company or job" onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} /></label>
+          <label>Search <input value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} /></label>
           <label>Status{" "}
             <select value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
               <option value="">Any</option>
@@ -103,7 +103,7 @@ function SaveAd() {
       <label className="field">Company<input value={form.companyName} onChange={set("companyName")} /></label>
       <label className="field">Job<input value={form.title} onChange={set("title")} /></label>
       <label className="field">Where<input value={form.location} onChange={set("location")} /></label>
-      <label className="field">Ad address<input value={form.url} placeholder="https://..." onChange={set("url")} /></label>
+      <label className="field">Ad address<input value={form.url} onChange={set("url")} /></label>
       <label className="field full">Notes<input value={form.notes} onChange={set("notes")} /></label>
       <SaveError error={save.error} shown={[]} onReload={() => undefined} />
       <div className="row full"><button type="submit" disabled={save.isPending || !form.companyName.trim() || !form.title.trim()}>Save lead</button></div>

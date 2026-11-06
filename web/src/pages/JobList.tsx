@@ -31,7 +31,7 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
       <div className="row spread">
         <h2>Jobs</h2>
         <div className="row">
-          <input aria-label="Search jobs" placeholder="Search title or location" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input aria-label="Search jobs" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
           <select aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value as StatusFilter); }}>
             <option value="">All statuses</option>
             {keysOf(JOB_STATUS).map((s) => <option key={s} value={s}>{JOB_STATUS[s]}</option>)}

@@ -19,7 +19,7 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
   return (
     <main>
       <h2>Team</h2>
-      {myRole === "owner" && <p className="muted">Choose what each role may do and which candidates it sees under <a href="#/access">Roles and access</a>.</p>}
+      {myRole === "owner" && <p className="muted small"><a href="#/access">Roles and access</a></p>}
       <ErrorMessage error={list.error ?? groups.error} />
       {list.data && (
         <table>
@@ -104,7 +104,6 @@ function Teams({ groups }: { groups: Group[] }) {
   return (
     <section className="panel" aria-label="Teams">
       <h3>Teams</h3>
-      <p className="muted small">Group people, e.g. by desk. A role can be set to see only its team&apos;s candidates.</p>
       <ul>
         {groups.map((g) => (
           <li key={g.id}>
@@ -115,7 +114,7 @@ function Teams({ groups }: { groups: Group[] }) {
         ))}
       </ul>
       <form className="row" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-        <input aria-label="New team" placeholder="New team, e.g. Finance desk" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); }} />
+        <input aria-label="New team" placeholder="New team" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); }} />
         <button type="submit" disabled={add.isPending || !name.trim()}>Add team</button>
       </form>
       <ErrorMessage error={add.error ?? remove.error} />

@@ -60,7 +60,6 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
               ))}
             </tbody>
           </table>
-          <p className="muted">Placements that fell through or did not start are not counted.</p>
         </section>
       )}
       {owed.length > 0 && (
@@ -71,7 +70,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
           Guarantee ending within two weeks: {ending.map((p) => p.candidateName).join(", ")}
         </p>
       )}
-      {list.data?.items.length === 0 && <p className="muted">No placements yet. Record one from a candidate&apos;s job at the offer stage.</p>}
+      {list.data?.items.length === 0 && <p className="muted">No placements yet.</p>}
       {list.data?.items.map((p) => editing === p.id ? (
         <PlacementForm key={p.id} applicationId={p.applicationId} placement={p} permissions={permissions} onDone={() => { setEditing(null); }} />
       ) : (

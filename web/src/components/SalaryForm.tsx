@@ -80,7 +80,7 @@ export function SalaryFields({ form, set, errors }: {
 }) {
   const amount = (key: "currentAmount" | "expectedMin" | "expectedMax", label: string) => (
     <Field label={label} error={errors[SALARY_PATHS[key]]}>
-      <input inputMode="decimal" placeholder="e.g. 8,500" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
+      <input inputMode="decimal" value={form[key]} onChange={(e) => { set(key, e.target.value); }} />
     </Field>
   );
   const currency = (key: "currentCurrency" | "expectedCurrency") => (

@@ -136,7 +136,7 @@ function RequestForm({ candidateId, onDone }: { candidateId: string; onDone: () 
         {keysOf(PRIVACY_KIND).map((k) => <option key={k} value={k}>{PRIVACY_KIND[k]}</option>)}
       </select>
       <input aria-label="Received on" type="date" value={receivedOn} max={todayISO()} onChange={(e) => { setReceivedOn(e.target.value); }} />
-      <input aria-label="Details (optional)" placeholder="Details, e.g. how they asked" maxLength={2000} value={details} onChange={(e) => { setDetails(e.target.value); }} />
+      <input aria-label="Details (optional)" placeholder="Details (optional)" maxLength={2000} value={details} onChange={(e) => { setDetails(e.target.value); }} />
       <button type="submit" disabled={save.isPending || !receivedOn}>Log request</button>
       <button type="button" className="link" onClick={onDone}>Cancel</button>
       <ErrorMessage error={save.error} />

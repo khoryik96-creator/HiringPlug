@@ -49,7 +49,6 @@ export function CvPane({ docs, doc, selected, onSelect }: {
       </div>
       {!doc ? <p className="muted">Loading…</p> : isPdf && view === "original" ? <Original doc={doc} /> : (
         <>
-          {!isPdf && <p className="muted">Word files cannot be shown in the browser; this is their text.</p>}
           <pre className="extracted">{doc.extractedText ?? doc.errorMessage ?? "No text has been read from this file yet."}</pre>
         </>
       )}

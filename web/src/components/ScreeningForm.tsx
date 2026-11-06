@@ -99,7 +99,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       {canNote && (
         <div className="full">
           <Field label="Notes" error={errors.body ?? errors.notes}>
-            <textarea rows={8} value={notes} placeholder="What they said: motivation, availability, salary talk…"
+            <textarea rows={8} value={notes}
               onChange={(e) => { setSaved(null); setNotes(e.target.value); }} />
           </Field>
           {permissions.includes("notes.sensitive:read") && (

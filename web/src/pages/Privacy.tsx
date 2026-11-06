@@ -19,10 +19,6 @@ export function Privacy() {
   return (
     <main>
       <h2>Data protection (PDPA)</h2>
-      <p className="muted">
-        HiringPlug keeps every record until you decide otherwise: it never deletes or anonymises anything by itself. Log requests on the
-        candidate&apos;s page; decide them here and say what you did. Access and correction requests must be answered within 21 days.
-      </p>
       <ErrorMessage error={overview.error} />
       {o && (
         <>
@@ -34,7 +30,7 @@ export function Privacy() {
           </div>
           <section className="panel" aria-label="Open requests">
             <h3>Open requests</h3>
-            {o.openRequests.length === 0 && <p className="muted">None. Requests logged on a candidate&apos;s page appear here.</p>}
+            {o.openRequests.length === 0 && <p className="muted">None.</p>}
             {o.openRequests.map((r) => <OpenRequest key={r.id} r={r} />)}
           </section>
           <section className="panel" aria-label="Do not contact">
@@ -97,7 +93,7 @@ function OpenRequest({ r }: { r: Request }) {
       {r.kind === "withdraw_consent" && <div className="muted small">Done also marks them do not contact (emails to them are refused).</div>}
       {r.kind === "removal" && <div className="muted small">HiringPlug does not delete anything: say below what you did.</div>}
       <form className="row" onSubmit={(e) => { e.preventDefault(); decide.mutate({ status: "done", outcome }); }}>
-        <input aria-label="What was done" placeholder="What was done, or why it is declined" maxLength={2000} value={outcome}
+        <input aria-label="What was done" placeholder="Outcome" maxLength={2000} value={outcome}
           onChange={(e) => { setOutcome(e.target.value); }} />
         <button type="submit" disabled={decide.isPending || !outcome.trim()}>Done</button>
         <button type="button" disabled={decide.isPending || !outcome.trim()} onClick={() => { decide.mutate({ status: "declined", outcome }); }}>Decline</button>

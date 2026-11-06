@@ -101,7 +101,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
         <fieldset className="form-grid full">
           <legend>Salary and fee</legend>
           <datalist id="placement-currencies">{CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
-          <Field label="Agreed salary"><input inputMode="decimal" placeholder="e.g. 8,500" value={form.salaryAmount} onChange={set("salaryAmount")} /></Field>
+          <Field label="Agreed salary"><input inputMode="decimal" value={form.salaryAmount} onChange={set("salaryAmount")} /></Field>
           <Field label="Currency"><input list="placement-currencies" className="code" value={form.salaryCurrency} onChange={set("salaryCurrency")} /></Field>
           <Field label="Per">
             <select value={form.salaryPeriod} onChange={set("salaryPeriod")}>
@@ -116,7 +116,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
           </Field>
           {form.feeKind === "percent" ? (
             <Field label="Fee %" error={errors["money.feePercent"]}>
-              <input inputMode="decimal" placeholder="e.g. 20" value={form.feePercent} onChange={set("feePercent")} />
+              <input inputMode="decimal" value={form.feePercent} onChange={set("feePercent")} />
             </Field>
           ) : (
             <>
@@ -126,7 +126,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
               <Field label="Fee currency"><input list="placement-currencies" className="code" value={form.feeCurrency} onChange={set("feeCurrency")} /></Field>
             </>
           )}
-          {preview && <p className="muted full" role="status">Fee: {formatMoney(preview, form.salaryCurrency.toUpperCase())} (a monthly salary counts 12 times)</p>}
+          {preview && <p className="muted full" role="status">Fee: {formatMoney(preview, form.salaryCurrency.toUpperCase())}</p>}
         </fieldset>
       )}
       <SaveError error={save.error} shown={shown} onReload={onDone} />

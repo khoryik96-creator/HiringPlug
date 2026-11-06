@@ -33,7 +33,6 @@ export function Reports() {
         <>
           <section className="panel" aria-label="Pipeline conversion">
             <h3>Pipeline conversion</h3>
-            <p className="muted">Applications made in the period, by the furthest stage they reached.</p>
             <table>
               <thead><tr><th>Stage</th><th>Reached</th><th>Of the stage before</th><th aria-hidden="true" /></tr></thead>
               <tbody>
@@ -65,7 +64,7 @@ export function Reports() {
           </section>
           <section className="panel" aria-label="Recruiters">
             <h3>Placements per recruiter</h3>
-            <p className="muted">Placements starting in the period.{r.feesHidden && " Fees are not shown to your role."}</p>
+            {r.feesHidden && <p className="muted">Fees are not shown to your role.</p>}
             {r.recruiters.length === 0 ? <p className="muted">No placements in this period.</p> : (
               <table>
                 <thead><tr><th>Recruiter</th><th>Placements</th><th>Fell through</th>{!r.feesHidden && <th>Fees</th>}</tr></thead>

@@ -58,9 +58,6 @@ export function CompanyAutofill({ companyId, website }: { companyId: string; web
       <ErrorMessage error={state.error ?? start.error ?? decide.error} />
       {busy && <p className="muted" role="status">Reading the website…</p>}
       {a?.status === "failed" && a.error && <p className="warning" role="status">{a.error}</p>}
-      {a?.status === "idle" && (
-        <p className="muted">Reads the name, phone, address, registration number, size and description the website publishes about the company, for you to accept or dismiss.</p>
-      )}
       {a?.status === "done" && a.suggestions.length === 0 && (
         <p className="muted">Nothing new on the website{a.checkedAt && <> (read {formatWhen(a.checkedAt)})</>}.</p>
       )}

@@ -104,7 +104,7 @@ export function OfferItem({ offer: o, permissions, showCandidate = false }: { of
       </div>
       {approver && o.status === "pending_approval" && o.requestedBy !== me.data?.user.id && (
         <div className="row" role="group" aria-label="Your decision">
-          <input aria-label="Note" placeholder="Note (why it goes back)" value={note} onChange={(e) => { setNote(e.target.value); }} />
+          <input aria-label="Note" placeholder="Note" value={note} onChange={(e) => { setNote(e.target.value); }} />
           <button type="button" disabled={decide.isPending} onClick={() => { decide.mutate(true); }}>Approve</button>
           <button type="button" className="link" disabled={decide.isPending} onClick={() => { decide.mutate(false); }}>Send back</button>
         </div>
@@ -157,7 +157,7 @@ function OfferForm({ applicationId, offer, permissions, onDone }: { applicationI
       {withSalary && (
         <>
           <datalist id="offer-currencies">{CURRENCIES.map((c) => <option key={c} value={c} />)}</datalist>
-          <Field label="Salary" error={errors["salary.amount"]}><input inputMode="decimal" placeholder="e.g. 9,000" value={form.amount} onChange={set("amount")} /></Field>
+          <Field label="Salary" error={errors["salary.amount"]}><input inputMode="decimal" value={form.amount} onChange={set("amount")} /></Field>
           <Field label="Currency"><input list="offer-currencies" className="code" value={form.currency} onChange={set("currency")} /></Field>
           <Field label="Per">
             <select value={form.period} onChange={set("period")}>
@@ -168,7 +168,7 @@ function OfferForm({ applicationId, offer, permissions, onDone }: { applicationI
       )}
       <Field label="Start date"><input type="date" value={form.startDate} onChange={set("startDate")} /></Field>
       <Field label="Answer by"><input type="date" value={form.expiresOn} onChange={set("expiresOn")} /></Field>
-      <label className="field full">Other terms<textarea rows={3} placeholder="Benefits, probation, notice period, ..." value={form.terms} onChange={set("terms")} /></label>
+      <label className="field full">Other terms<textarea rows={3} value={form.terms} onChange={set("terms")} /></label>
       {offer && ["pending_approval", "approved"].includes(offer.status) && (
         <p className="full warning">Changing it sends the offer back to draft: it needs approval again.</p>
       )}

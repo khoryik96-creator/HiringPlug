@@ -45,7 +45,6 @@ describe("fit stats (CV Studio's CV scoring)", () => {
     expect((skills.firstChild as HTMLElement).className).toBe("fit-bar-fill high");
     expect(screen.getByText("Hands-on SAP")).toBeTruthy();
     expect(screen.getByText("Few audit years")).toBeTruthy();
-    expect(screen.getByText(/AI's opinion/)).toBeTruthy();
   });
 
   it("are left out for a score made before them", () => {
@@ -70,7 +69,7 @@ describe("fit scores", () => {
     const items = screen.getAllByRole("listitem");
     expect(items[0]?.textContent).toBe("Meets: “Degree in Accounting”CV: “Bachelor of Accounting, UiTM”Accounting degree.");
     expect(items[1]?.textContent).toBe("Not in the CV: “5 years in audit”");
-    expect(screen.getByText(/1 requirement\(s\) it listed were left out/).textContent).toContain("by deepseek-chat");
+    expect(screen.getByText(/^Scored /).textContent).toContain("by deepseek-chat");
     cleanup();
     renderWithClient(<FitReasons match={match({ status: "failed", score: null, error: "the AI provider did not answer in time" })} />);
     expect(screen.getByText("No fit score: the AI provider did not answer in time")).toBeTruthy();
@@ -141,7 +140,8 @@ describe("fit on a job's board", () => {
   it("says when matching is off, and shows nothing without the permission", async () => {
     gets({ "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali")] }, "/v1/matches": { enabled: false, items: [] } });
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={SCORE} />);
-    expect(await screen.findByText(/Fit scores turn on once an AI provider is set up/)).toBeTruthy();
+    await screen.findByText("Ali");
+    expect(screen.queryByText(/Fit/)).toBeNull(); // off: no fit scores, and nothing said about it
     cleanup();
     vi.restoreAllMocks();
     const get = gets({ "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali")] } });

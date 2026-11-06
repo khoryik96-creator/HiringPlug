@@ -75,14 +75,9 @@ export function CvImports() {
   return (
     <section className="panel" aria-label="CV import">
       <h3>CVs and LinkedIn PDFs</h3>
-      <p className="muted">
-        Each file becomes a candidate, owned by you, filled in from the CV (name, email, phone, LinkedIn link, current job, work
-        history, education, skills, industry). A file whose email belongs to a candidate is added to that candidate instead.
-        On LinkedIn: open the profile, <em>More → Save to PDF</em>.
-      </p>
       <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
       <DropZone accept=".pdf,.docx,.doc" multiple disabled={start.isPending} label="Drop CVs here"
-        hint="PDF or Word, as many as you like"
+        hint="PDF or Word"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);

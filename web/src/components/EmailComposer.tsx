@@ -93,7 +93,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
           </select>
         </label>
       )}
-      <label className="field full">To<input value={form.to} onChange={set("to")} placeholder="name@example.com" /></label>
+      <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
       <label className="field full">Subject<input value={form.subject} onChange={set("subject")} /></label>
       <label className="field full">Message<textarea rows={12} value={form.body} onChange={set("body")} /></label>

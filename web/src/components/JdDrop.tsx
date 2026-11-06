@@ -53,10 +53,10 @@ export function JdDrop({ jobId, start, onRead }: { jobId: string; start?: File |
   const reading = upload.isPending || latest?.status === "reading";
   return (
     <div className="jd-drop">
-      <DropZone accept={JD_TYPES} disabled={reading} label="Drop the client's job description here"
-        hint="PDF, Word or text: the ad is filled in from it" onFiles={([f]) => { if (f) upload.mutate(f); }} />
+      <DropZone accept={JD_TYPES} disabled={reading} label="Drop the client's JD"
+        hint="PDF, Word or text" onFiles={([f]) => { if (f) upload.mutate(f); }} />
       {reading && <p className="muted small" role="status">Reading {latest?.fileName ?? "the file"}…</p>}
-      {latest?.status === "read" && <p className="small" role="status">Filled in from {latest.fileName}: check it, then save. The blind version is made from it when you save.</p>}
+      {latest?.status === "read" && <p className="small" role="status">Filled in from {latest.fileName}. Check it, then save.</p>}
       {latest?.status === "failed" && <p className="error small">{latest.fileName}: {latest.error ?? "it could not be read."}</p>}
       {upload.error && <p className="error small">{upload.error.message}</p>}
     </div>

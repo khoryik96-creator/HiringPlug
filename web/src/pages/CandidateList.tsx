@@ -35,7 +35,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
       <div className="row spread">
         <h2>Candidates</h2>
         <div className="row">
-          <input aria-label="Search candidates" placeholder="Search name or email" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input aria-label="Search candidates" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
           <label className="small"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine</label>
           <select aria-label="Skill" value={skill} onChange={(e) => { setSkill(e.target.value); }}>
             <option value="">Any skill</option>

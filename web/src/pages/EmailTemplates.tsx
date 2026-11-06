@@ -21,7 +21,6 @@ export function EmailTemplates({ canManage }: { canManage: boolean }) {
         <p className="muted">
           Placeholders are filled in when you write an email:{" "}
           {list.data.placeholders.map((p) => <code key={p}>{`{{${p}}}`} </code>)}
-          Templates with “client” or “submit” in their name are addressed to the job’s hiring contact.
         </p>
       )}
       {list.data?.items.map((t) =>

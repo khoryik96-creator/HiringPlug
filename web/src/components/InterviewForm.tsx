@@ -72,7 +72,6 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
       </label>
       <fieldset className="full">
         <legend>Interviewers</legend>
-        <p className="muted">They get an email reminder the day before.</p>
         {users.data?.filter((u) => u.canInterview || form.interviewerIds.includes(u.id)).map((u) => (
           <label key={u.id} className="row">
             <input type="checkbox" checked={form.interviewerIds.includes(u.id)} onChange={() => { toggle(u.id); }} /> {u.name}

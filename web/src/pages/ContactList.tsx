@@ -23,7 +23,7 @@ export function ContactList({ canCreate }: { canCreate: boolean }) {
       <div className="row spread">
         <h2>Contacts</h2>
         <div className="row">
-          <input aria-label="Search contacts" placeholder="Search name, email or title" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input aria-label="Search contacts" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
           {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add contact</button>}
         </div>
       </div>

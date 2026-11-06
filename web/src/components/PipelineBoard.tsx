@@ -137,7 +137,7 @@ function AddCandidate({ jobId }: { jobId: string }) {
         value={picked}
         onChange={(p) => { setPicked(p); add.reset(); }}
         queryKey={candidatesKey}
-        placeholder="Add a candidate: type a name"
+        placeholder="Add a candidate"
         noMatch="No candidate matches. Add them under Candidates first."
         search={async (q) =>
           unwrap(await api.GET("/v1/candidates", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: c.fullName, detail: c.currentTitle }))}

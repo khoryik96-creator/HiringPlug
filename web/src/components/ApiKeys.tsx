@@ -28,7 +28,7 @@ export function ApiKeys() {
   return (
     <section className="panel" aria-label="API keys">
       <h3>API keys</h3>
-      <p className="muted">Another system uses the API with a key, as the role you choose. Send it as <code>Authorization: Bearer &lt;key&gt;</code>; the API documentation is at <code>/docs</code>.</p>
+      <p className="muted small">Header: <code>Authorization: Bearer &lt;key&gt;</code> · docs at <code>/docs</code></p>
       {newKey && (
         <div className="warning" role="status">
           <p>Copy this key now: it is not shown again.</p>
@@ -59,7 +59,7 @@ export function ApiKeys() {
         </table>
       )}
       <form className="row" aria-label="New API key" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <label>Name <input value={form.name} placeholder="e.g. Payroll sync" onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
+        <label>Name <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
         <label>Acts as{" "}
           <select value={form.role} onChange={(e) => { setForm({ ...form, role: e.target.value as Schemas["ApiKeyRole"] }); }}>
             {keysOf(API_KEY_ROLE).map((r) => <option key={r} value={r}>{API_KEY_ROLE[r]}</option>)}

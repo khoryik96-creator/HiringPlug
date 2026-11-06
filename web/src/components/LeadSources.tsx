@@ -10,11 +10,11 @@ type Source = Schemas["LeadSource"];
 export const leadSourcesKey = ["lead-sources"] as const;
 
 const HINT: Record<Schemas["LeadSourceKind"], string> = {
-  greenhouse: "Board name or address, e.g. acme or boards.greenhouse.io/acme",
-  lever: "Board name or address, e.g. acme or jobs.lever.co/acme",
-  ashby: "Board name or address, e.g. acme or jobs.ashbyhq.com/acme",
-  smartrecruiters: "Company name on SmartRecruiters, e.g. Acme",
-  careers_page: "The careers page address, e.g. https://example.com/careers",
+  greenhouse: "acme or boards.greenhouse.io/acme",
+  lever: "acme or jobs.lever.co/acme",
+  ashby: "acme or jobs.ashbyhq.com/acme",
+  smartrecruiters: "Acme",
+  careers_page: "https://example.com/careers",
 };
 
 /** Where leads come from: add a source, check it now, turn it off, remove it. */
@@ -40,10 +40,6 @@ export function LeadSources({ canManage }: { canManage: boolean }) {
   return (
     <section className="panel" aria-label="Sources">
       <h3>Sources</h3>
-      <p className="muted">
-        Companies&apos; public job boards and careers pages, checked every day. Each opening becomes a lead; one no longer listed is
-        marked closed. Sites whose terms forbid it (LinkedIn, JobStreet) are not read: save their ads by hand below.
-      </p>
       <ErrorMessage error={list.error} />
       {list.data?.map((s) => <SourceItem key={s.id} source={s} canManage={canManage} onChange={refresh} />)}
       {canManage && (

@@ -118,26 +118,21 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
             onClick={() => { if (selected && window.confirm(`Delete the template "${selected.name}"?`)) deleteTemplate.mutate(selected.id); }}>Delete template</button>
         </div>
       )}
-      <p className="muted small">Templates save the subject, formatted message, signature and banner.</p>
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
 
-      <label className="field">To<input value={to} onChange={(e) => { setTypedTo(e.target.value); }} placeholder="client@company.com" /></label>
+      <label className="field">To<input value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
       {errors.to && <small className="error">{errors.to}</small>}
       <div className="two">
         <label className="field">CC<input value={form.cc} onChange={set("cc")} /></label>
         <label className="field">BCC<input value={form.bcc} onChange={set("bcc")} /></label>
       </div>
-      <label className="field">Subject<input value={form.subject} onChange={set("subject")} placeholder="[Full name] for [Job title]" /></label>
+      <label className="field">Subject<input value={form.subject} onChange={set("subject")} /></label>
 
       <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
         values={context.data?.fieldValues} />
       <ErrorMessage error={uploadBanner.error} />
-      <p className="muted small">
-        A field such as [Expected salary] shows the candidate&apos;s value at once (highlighted): edit it as you like for this
-        email; their record is not changed. Templates keep the field, not the value.
-        {!permissions.includes("candidates.compensation:read") && " Salary fields need a role that may see salaries."}
-      </p>
+      {!permissions.includes("candidates.compensation:read") && <p className="muted small">Salary fields need a role that may see salaries.</p>}
 
       <Attachments candidateId={candidateId} canSeeCvs={permissions.includes("documents:read")} cvs={cvs} onCvs={setCvs} uploads={uploads} onUploads={setUploads} />
 
@@ -149,7 +144,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
       {preview && (
         <div className="email-preview" aria-label="Preview">
           {preview.missing.length > 0 && <p className="warning">No value for this candidate: {preview.missing.join(", ")}. Fill it in or take it out before sending.</p>}
-          {preview.salary && <p className="muted small">It shows salary: only roles that may see salaries will see this email in the app.</p>}
+          {preview.salary && <p className="muted small">Shows salary: hidden from roles that may not see salaries.</p>}
           <p><strong>{preview.subject}</strong></p>
           {/* The server's preview: made safe by it (only the toolbar's formatting is kept). */}
           <div ref={previewBox} dangerouslySetInnerHTML={{ __html: preview.bodyHtml }} />

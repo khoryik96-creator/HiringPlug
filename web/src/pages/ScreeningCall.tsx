@@ -36,7 +36,7 @@ export function ScreeningCall({ candidateId, permissions }: { candidateId: strin
           {!permissions.includes("documents:read") ? <p className="muted">Your role may not see CVs.</p>
             : docs.error ? <ErrorMessage error={docs.error} />
             : !docs.data ? <p className="muted">Loading…</p>
-            : list.length === 0 ? <p className="panel muted">No CV yet: upload one on the candidate's page to read it during the call.</p>
+            : list.length === 0 ? <p className="panel muted">No CV yet.</p>
             : <CvPane docs={list} doc={doc.data} selected={selected} onSelect={setPicked} />}
         </div>
         <div className="screening-side">

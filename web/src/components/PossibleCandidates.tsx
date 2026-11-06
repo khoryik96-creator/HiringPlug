@@ -44,8 +44,7 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
   return (
     <section className="panel" aria-label="Possible candidates">
       <h3>Possible candidates</h3>
-      <p className="muted small">People not on this job whose CVs share the most words with its description and ad. Check their CV before adding them.</p>
-      {noText ? <p className="muted">Add the job&apos;s description or an ad to find possible candidates.</p> : <ErrorMessage error={list.error ?? add.error} />}
+      {noText ? <p className="muted">Add a description or an ad to see possible candidates.</p> : <ErrorMessage error={list.error ?? add.error} />}
       {list.data?.length === 0 && <p className="muted">No CV shares this job&apos;s words yet.</p>}
       <ul className="suggestions">
         {list.data?.map((s) => (

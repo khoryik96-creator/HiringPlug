@@ -75,7 +75,7 @@ function CsvImport({ permissions, cvs }: { permissions: Permission[]; cvs: boole
     <>
       <section className="panel" aria-label="CSV import">
         <h3>From a spreadsheet</h3>
-        <p>Import from a CSV file (in Excel: <em>File → Save As → CSV</em>). The first row must be the column names.</p>
+        <p className="muted small">CSV, with column names in the first row.</p>
         <div className="row">
           <label className="row">What: <select value={kind} onChange={(e) => { choose(e.target.value as ImportKind); }}>
             {allowed.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}

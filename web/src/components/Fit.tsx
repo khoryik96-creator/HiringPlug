@@ -57,12 +57,7 @@ export function FitReasons({ match, open = false }: { match: Match; open?: boole
         ))}
       </ul>
       {match.outdated && <p className="warning small">The job&apos;s description or ad changed after this score: score it again.</p>}
-      <p className="muted small">
-        Each requirement is quoted from the job and each “meets” from the CV; anything the AI could not quote does not count.
-        {match.dropped > 0 && ` ${String(match.dropped)} requirement(s) it listed were left out: they are not in the job's text.`}
-        {" "}AI can be wrong: check against the CV.
-        {match.scoredAt && <> Scored {formatWhen(match.scoredAt)}{match.model && <> by {match.model}</>}.</>}
-      </p>
+      {match.scoredAt && <p className="muted small">Scored {formatWhen(match.scoredAt)}{match.model && <> by {match.model}</>}</p>}
     </details>
   );
 }
@@ -74,7 +69,7 @@ export function ScoreJobFit({ jobId, enabled, anyScored }: { jobId: string; enab
     mutationFn: async (rescore: boolean) => unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: matchesKey }),
   });
-  if (!enabled) return <p className="muted small">Fit scores turn on once an AI provider is set up for this app.</p>;
+  if (!enabled) return null;
   const r = score.data;
   return (
     <div className="row">

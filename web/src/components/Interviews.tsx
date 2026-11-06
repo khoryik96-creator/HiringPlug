@@ -122,7 +122,7 @@ function FeedbackForm({ interview, current, onSaved }: { interview: Interview; c
           <label key={r}><input type="radio" name={`rec-${interview.id}`} checked={recommendation === r} onChange={() => { setRecommendation(r); }} /> {RECOMMENDATION[r]}</label>
         ))}
       </fieldset>
-      <textarea aria-label="Comments" rows={3} placeholder="Strengths, concerns, evidence" value={comments} onChange={(e) => { setComments(e.target.value); }} />
+      <textarea aria-label="Comments" rows={3} placeholder="Comments" value={comments} onChange={(e) => { setComments(e.target.value); }} />
       <button type="submit" disabled={!recommendation || save.isPending}>Save feedback</button>
       <ErrorMessage error={save.error} />
     </form>

@@ -102,7 +102,7 @@ function BlindText({ ad, canEdit, facts }: { ad: Ad; canEdit: boolean; facts: st
     <>
       <p className="muted">
         {facts}
-        {ad.blindEdited ? " · your own text" : " · made from the ad (client, contacts, emails, phones and links taken out)"}
+        {ad.blindEdited && " · edited"}
       </p>
       {ad.blindOutdated && <p className="warning" role="status">The ad changed after this blind text was written. Check it, or make it again from the ad.</p>}
       <strong>{ad.blindTitle}</strong>

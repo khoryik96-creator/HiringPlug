@@ -115,12 +115,12 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
 
       <div className="full">
         <Field label="Skills" error={errorFor("skills")}>
-          <LabelInput value={form.skills} onChange={(v) => { set("skills", v); }} suggestions={used.skills} placeholder="Type a skill, then Enter" />
+          <LabelInput value={form.skills} onChange={(v) => { set("skills", v); }} suggestions={used.skills} placeholder="Add a skill" />
         </Field>
       </div>
       <div className="full">
         <Field label="Tags" error={errorFor("tags")}>
-          <LabelInput value={form.tags} onChange={(v) => { set("tags", v); }} suggestions={used.tags} placeholder="e.g. relocate, then Enter" />
+          <LabelInput value={form.tags} onChange={(v) => { set("tags", v); }} suggestions={used.tags} placeholder="Add a tag" />
         </Field>
       </div>
 
