@@ -94,6 +94,35 @@ func (q *Queries) CompanyWebsite(ctx context.Context, id string) (string, error)
 	return column_1, err
 }
 
+const companyWordHits = `-- name: CompanyWordHits :many
+SELECT (w.n::text || ':' || c.id)::text AS hit
+FROM app_search_words($1::text) w
+JOIN company c ON strpos(c.search_text, w.word) > 0
+LIMIT 5000
+`
+
+// For each word of a job search (numbered as app_search_words numbers them),
+// the companies whose name or website has it: "n:companyId".
+func (q *Queries) CompanyWordHits(ctx context.Context, query string) ([]string, error) {
+	rows, err := q.db.Query(ctx, companyWordHits, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var hit string
+		if err := rows.Scan(&hit); err != nil {
+			return nil, err
+		}
+		items = append(items, hit)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const decideSuggestion = `-- name: DecideSuggestion :exec
 UPDATE company_suggestion SET status = $1 WHERE id = $2
 `
@@ -120,7 +149,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -149,6 +178,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.AutofillStatus,
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
@@ -188,7 +218,7 @@ INSERT INTO company (
   $6, $7, $8, $9,
   $10, $11, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits
 `
 
 type InsertCompanyParams struct {
@@ -245,6 +275,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.AutofillStatus,
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
@@ -276,7 +307,9 @@ SELECT id, name, type, industry, city, website, updated_at
 FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
-  AND ($3::text IS NULL OR search_text LIKE '%' || app_normalize_text($3::text) || '%')
+  AND ($3::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns($3::text))
+       OR phone_digits LIKE '%' || app_phone_key($3::text) || '%')
 ORDER BY id DESC
 LIMIT $4
 `
@@ -398,7 +431,7 @@ UPDATE company SET
   version = version + 1,
   updated_at = now()
 WHERE id = $12 AND version = $13
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits
 `
 
 type UpdateCompanyParams struct {
@@ -458,6 +491,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.AutofillStatus,
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
+		&i.PhoneDigits,
 	)
 	return i, err
 }

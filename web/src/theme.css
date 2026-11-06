@@ -4,24 +4,25 @@
    cards and pill buttons. Element styles sit inside :where() so any class
    (a banner pill, a toolbar button) still wins over them. */
 :root {
-  --ink: #11151b;
-  --text: #1f2633;
-  --muted: #5b6474;
-  --line: #e3e6eb;
-  --line-strong: #cfd5dd;
-  --bg: #f3f5f8;
+  /* Purple (the brand), on a light lavender page. */
+  --ink: #1d1530;
+  --text: #251f35;
+  --muted: #5f5a72;
+  --line: #e4def3;
+  --line-strong: #d0c7e8;
+  --bg: #f4f1fb;
   --surface: #fff;
-  --soft: #f7f8fa;
-  --accent: #2f5bea;
-  --accent-dark: #2147c4;
-  --accent-soft: #eef2ff;
-  --ring: rgba(47, 91, 234, 0.18);
-  --topbar: #fff;
-  --topbar-text: var(--muted);
-  --topbar-active: var(--ink);
-  --topbar-active-text: #fff;
+  --soft: #f7f5fc;
+  --accent: #7352d8;
+  --accent-dark: #5d3dc2;
+  --accent-soft: #ede7fc;
+  --ring: rgba(115, 82, 216, 0.22);
+  --topbar: linear-gradient(90deg, #6a49d3, #9278ec);
+  --topbar-text: rgba(255, 255, 255, 0.85);
+  --topbar-active: #fff;
+  --topbar-active-text: #5b3fc4;
   --radius: 12px;
-  --shadow: 0 1px 2px rgba(17, 21, 27, 0.05), 0 1px 3px rgba(17, 21, 27, 0.04);
+  --shadow: 0 1px 2px rgba(29, 21, 48, 0.05), 0 1px 3px rgba(29, 21, 48, 0.04);
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
   font-family: "Inter Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 15px;
@@ -75,19 +76,20 @@ a.button { display: inline-flex; align-items: center; min-height: 40px; box-sizi
 a.button:hover { background: var(--soft); }
 
 /* Top bar. */
-.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 1.5rem; padding: 0.6rem 2rem; background: var(--topbar); border-bottom: 1px solid var(--line); }
-.topbar .brand { font-family: var(--display); font-size: 1.6rem; font-weight: 800; color: var(--ink); letter-spacing: 0.01em; flex-shrink: 0; }
-.topbar .brand span { color: var(--accent); }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 1.5rem; padding: 0.6rem 2rem; background: var(--topbar); box-shadow: 0 2px 10px rgba(90, 60, 190, 0.25); }
+.topbar .brand { font-family: var(--display); font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: 0.01em; flex-shrink: 0; }
+.topbar .brand span { color: #e3d9ff; }
 .topbar nav { display: flex; gap: 0.15rem; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .topbar nav a { color: var(--topbar-text); font-weight: 550; white-space: nowrap; padding: 0.45rem 0.8rem; border-radius: 999px; text-decoration: none; }
-.topbar nav a:hover { color: var(--ink); background: var(--soft); }
+.topbar nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
 .topbar nav a[aria-current="page"] { color: var(--topbar-active-text); background: var(--topbar-active); }
 .topbar .who { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
-.topbar .who a { display: flex; align-items: center; gap: 0.6rem; color: var(--text); text-decoration: none; }
-.topbar .who .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 0.85rem; }
+.topbar .who a { display: flex; align-items: center; gap: 0.6rem; color: #fff; text-decoration: none; }
+.topbar .who button.link { color: #fff; }
+.topbar .who .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.22); color: #fff; font-weight: 700; font-size: 0.85rem; }
 .topbar .who .name { display: flex; flex-direction: column; line-height: 1.2; }
 .topbar .who .name strong { font-size: 0.9rem; }
-.topbar .who .name small { color: var(--muted); font-size: 0.78rem; text-transform: capitalize; }
+.topbar .who .name small { color: rgba(255, 255, 255, 0.8); font-size: 0.78rem; text-transform: capitalize; }
 
 /* Cards, tables and labels. */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 1.25rem 1.5rem; margin: 1rem 0; box-shadow: var(--shadow); }

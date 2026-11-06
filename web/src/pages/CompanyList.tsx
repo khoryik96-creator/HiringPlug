@@ -6,12 +6,13 @@ import { companiesKey } from "../api/keys";
 import { CompanyForm } from "../components/CompanyForm";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { COMPANY_TYPE, keysOf } from "../labels";
+import { hashParam } from "../hashQuery";
 
 type TypeFilter = "" | Schemas["CompanyType"];
 
 /** Search, filter and add companies. */
 export function CompanyList({ canCreate }: { canCreate: boolean }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [type, setType] = useState<TypeFilter>("");
   const [adding, setAdding] = useState(false);
   const list = useQuery({

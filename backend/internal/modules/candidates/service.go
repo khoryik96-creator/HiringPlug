@@ -107,6 +107,8 @@ type Page struct {
 type Filter struct {
 	Query, Tag, Skill *string
 	Owner             *string // a user id
+	// Similar: names like Query (typos), the closest first, one page only.
+	Similar bool
 }
 
 // List returns up to limit candidates matching f, starting after cursor (the
@@ -114,11 +116,18 @@ type Filter struct {
 func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		similar := f.Similar && f.Query != nil
+		if similar {
+			cursor = nil // ordered by likeness, not by id: one page
+		}
 		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
+		}
+		if similar && len(rows) > limit {
+			rows = rows[:limit]
 		}
 		if len(rows) > limit {
 			rows = rows[:limit]

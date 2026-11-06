@@ -7,13 +7,14 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { JobForm } from "../components/JobForm";
 import { JobTable } from "../components/JobTable";
 import { JOB_STATUS, keysOf } from "../labels";
+import { hashParam } from "../hashQuery";
 
 type StatusFilter = "" | Schemas["JobStatus"];
 
 /** Search, filter and add jobs. Shows open jobs first by default. */
 export function JobList({ canCreate }: { canCreate: boolean }) {
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("open");
+  const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
+  const [status, setStatus] = useState<StatusFilter>(() => (hashParam("q") ? "" : "open")); // a search looks at every job
   const [adding, setAdding] = useState(false);
   const list = useQuery({
     queryKey: [...jobsKey, q, status],

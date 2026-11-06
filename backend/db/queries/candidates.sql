@@ -56,16 +56,22 @@ WHERE id = @id AND version = @expected_version
 RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
+-- With @similar, names like the query (typos) instead, the closest first.
 -- name: ListCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company,
        location, work_authorization, tags, updated_at
 FROM candidate
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
-  AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
+  AND (sqlc.narg(query)::text IS NULL
+       OR CASE WHEN sqlc.arg(similar_names)::boolean
+            THEN app_normalize_text(sqlc.narg(query)::text) <% name_text
+            ELSE search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+              OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
+          END)
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR owner_id = sqlc.narg(owner)::text)
-ORDER BY id DESC
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), name_text) END DESC, id DESC
 LIMIT @row_limit;
 
 -- Amounts are numeric in the database; the Go code converts them to and

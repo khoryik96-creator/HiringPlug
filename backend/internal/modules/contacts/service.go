@@ -189,14 +189,22 @@ type Page struct {
 }
 
 // List returns up to limit contacts, optionally matching query or one company.
-func (s *Service) List(ctx context.Context, p authz.Principal, query, companyID, cursor *string, limit int) (Page, error) {
+// With similar, names like query (typos) instead, the closest first, one page only.
+func (s *Service) List(ctx context.Context, p authz.Principal, query, companyID, cursor *string, similar bool, limit int) (Page, error) {
 	var page Page
+	similar = similar && query != nil
+	if similar {
+		cursor = nil // ordered by likeness, not by id: one page
+	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: companyID, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, CompanyID: companyID, Query: query, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
+		}
+		if similar && len(rows) > limit {
+			rows = rows[:limit]
 		}
 		if len(rows) > limit {
 			rows = rows[:limit]

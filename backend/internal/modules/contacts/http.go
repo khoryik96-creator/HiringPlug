@@ -19,7 +19,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, req.Params.CompanyId, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, req.Params.CompanyId, req.Params.Cursor, req.Params.Similar != nil && *req.Params.Similar, limit)
 	if err != nil {
 		return nil, err
 	}

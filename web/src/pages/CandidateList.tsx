@@ -9,10 +9,11 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { useUsedValues } from "../components/useUsedValues";
 import { WORK_AUTH_STATUS } from "../labels";
+import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
 export function CandidateList({ canCreate }: { canCreate: boolean }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [tag, setTag] = useState("");
   const [skill, setSkill] = useState("");
   const [mine, setMine] = useState(false);

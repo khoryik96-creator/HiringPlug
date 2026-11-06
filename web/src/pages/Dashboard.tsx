@@ -6,6 +6,7 @@ import { timeInStage } from "../components/ApplicationCard";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
 import { OffersToApprove } from "../components/Offers";
+import { QuickSearch } from "../components/QuickSearch";
 import { StageMoves } from "../components/StageMoves";
 import { OPEN_STAGES, STAGE } from "../labels";
 
@@ -25,6 +26,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
   return (
     <main>
       <h2>Dashboard</h2>
+      <QuickSearch permissions={permissions} />
       <div className="stats">
         <div className="stat"><strong>{s.openJobs}</strong><span>open jobs</span></div>
         <div className="stat"><strong>{active(s.stageCounts)}</strong><span>candidates in progress</span></div>

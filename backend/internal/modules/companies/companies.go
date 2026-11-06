@@ -49,6 +49,13 @@ func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string
 	return m.service.Names(ctx, tx, ids)
 }
 
+// WordHits returns, for each word of a job search (numbered as the database's
+// app_search_words numbers them), the companies whose name or website has
+// it, as "n:companyId", so jobs can be found by their client's name.
+func (m *Module) WordHits(ctx context.Context, tx pgx.Tx, query string) ([]string, error) {
+	return store.New(tx).CompanyWordHits(ctx, query)
+}
+
 // Website returns a company's website ("" when none or no such company),
 // for other modules (e.g. blind job ads, which leave it out).
 func (m *Module) Website(ctx context.Context, tx pgx.Tx, companyID string) (string, error) {

@@ -33,7 +33,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches name or website, ignoring case and accents.
+          description: "Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written."
           schema: { type: string, minLength: 1, maxLength: 200 }
         - name: type
           in: query

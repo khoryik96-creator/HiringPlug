@@ -30,6 +30,8 @@ type Companies interface {
 	Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool, error)
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	Website(ctx context.Context, tx pgx.Tx, companyID string) (string, error)
+	// WordHits: "n:companyId" for each word n of a search found in a company's name.
+	WordHits(ctx context.Context, tx pgx.Tx, query string) ([]string, error)
 }
 
 // ContactInfo is what a job shows of its hiring contact.

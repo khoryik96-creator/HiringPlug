@@ -6,10 +6,11 @@ import { contactsKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { hashParam } from "../hashQuery";
 
 /** Search and add contacts across all companies. */
 export function ContactList({ canCreate }: { canCreate: boolean }) {
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [adding, setAdding] = useState(false);
   const list = useQuery({
     queryKey: [...contactsKey, q],

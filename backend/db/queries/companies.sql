@@ -46,7 +46,9 @@ SELECT id, name, type, industry, city, website, updated_at
 FROM company
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(type)::text IS NULL OR type = sqlc.narg(type)::text)
-  AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
+  AND (sqlc.narg(query)::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+       OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
 ORDER BY id DESC
 LIMIT @row_limit;
 
@@ -80,3 +82,11 @@ UPDATE company_suggestion SET status = @status WHERE id = @id;
 
 -- name: CompanyWebsite :one
 SELECT coalesce(website, '')::text FROM company WHERE id = @id;
+
+-- For each word of a job search (numbered as app_search_words numbers them),
+-- the companies whose name or website has it: "n:companyId".
+-- name: CompanyWordHits :many
+SELECT (w.n::text || ':' || c.id)::text AS hit
+FROM app_search_words(@query::text) w
+JOIN company c ON strpos(c.search_text, w.word) > 0
+LIMIT 5000;

@@ -40,8 +40,12 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches name or email, ignoring case and accents.
+          description: "Every word must appear in the name, email, current title or company (ignoring case and accents); or a phone number, however it is written."
           schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: similar
+          in: query
+          description: "With q: names like q (for typos), the closest first; no further pages."
+          schema: { type: boolean, default: false }
         - name: tag
           in: query
           description: Only candidates with this tag (ignoring case).

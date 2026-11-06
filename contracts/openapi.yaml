@@ -244,8 +244,12 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches name or email, ignoring case and accents.
+          description: "Every word must appear in the name, email, current title or company (ignoring case and accents); or a phone number, however it is written."
           schema: {type: string, minLength: 1, maxLength: 200}
+        - name: similar
+          in: query
+          description: "With q: names like q (for typos), the closest first; no further pages."
+          schema: {type: boolean, default: false}
         - name: tag
           in: query
           description: Only candidates with this tag (ignoring case).
@@ -614,7 +618,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches name or website, ignoring case and accents.
+          description: "Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written."
           schema: {type: string, minLength: 1, maxLength: 200}
         - name: type
           in: query
@@ -763,8 +767,12 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches name, email or job title, ignoring case and accents.
+          description: "Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written."
           schema: {type: string, minLength: 1, maxLength: 200}
+        - name: similar
+          in: query
+          description: "With q: names like q (for typos), the closest first; no further pages."
+          schema: {type: boolean, default: false}
         - name: companyId
           in: query
           description: Only this company's contacts.
@@ -2030,7 +2038,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Matches the title or location, ignoring case and accents.
+          description: "Every word must appear in the title, location or client company's name (ignoring case and accents)."
           schema: {type: string, minLength: 1, maxLength: 200}
         - name: status
           in: query

@@ -115,7 +115,6 @@ type Candidate struct {
 	CurrentCompany         *string
 	Location               *string
 	Source                 *string
-	SearchText             *string
 	CreatedBy              string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
@@ -125,6 +124,9 @@ type Candidate struct {
 	ResidenceCountry       *string
 	LinkedinUrl            *string
 	Availability           *string
+	SearchText             *string
+	NameText               *string
+	PhoneDigits            *string
 }
 
 type CandidateCompensation struct {
@@ -198,6 +200,7 @@ type Company struct {
 	AutofillStatus     string
 	AutofillError      *string
 	AutofillCheckedAt  *time.Time
+	PhoneDigits        *string
 }
 
 type CompanySuggestion struct {
@@ -232,6 +235,8 @@ type Contact struct {
 	CreatedBy         string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	NameText          *string
+	PhoneDigits       *string
 }
 
 type CvImport struct {

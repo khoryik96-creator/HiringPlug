@@ -195,8 +195,16 @@ type Page struct {
 func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		// A word of the search may be the client's name rather than in the title.
+		hits := []string{}
+		if query != nil {
+			var err error
+			if hits, err = s.companies.WordHits(ctx, tx, *query); err != nil {
+				return err
+			}
+		}
 		rows, err := store.New(tx).ListJobOrders(ctx, store.ListJobOrdersParams{
-			Cursor: cursor, Status: status, CompanyID: companyID, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Status: status, CompanyID: companyID, Query: query, CompanyHits: hits, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err

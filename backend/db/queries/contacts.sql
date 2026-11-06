@@ -53,13 +53,19 @@ WHERE id = @id AND email = @email
 RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
+-- With @similar, names like the query (typos) instead, the closest first.
 -- name: ListContacts :many
 SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, updated_at
 FROM contact
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
-  AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
-ORDER BY id DESC
+  AND (sqlc.narg(query)::text IS NULL
+       OR CASE WHEN sqlc.arg(similar_names)::boolean
+            THEN app_normalize_text(sqlc.narg(query)::text) <% name_text
+            ELSE search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+              OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
+          END)
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), name_text) END DESC, id DESC
 LIMIT @row_limit;
 
 -- name: ContactBriefs :many

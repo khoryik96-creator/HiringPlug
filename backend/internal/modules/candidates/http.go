@@ -30,7 +30,7 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	if owner != nil && *owner == "me" {
 		owner = &p.UserID
 	}
-	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner}, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner, Similar: req.Params.Similar != nil && *req.Params.Similar}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}

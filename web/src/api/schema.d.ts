@@ -4876,8 +4876,10 @@ export interface operations {
     listCandidates: {
         parameters: {
             query?: {
-                /** @description Matches name or email, ignoring case and accents. */
+                /** @description Every word must appear in the name, email, current title or company (ignoring case and accents); or a phone number, however it is written. */
                 q?: string;
+                /** @description With q: names like q (for typos), the closest first; no further pages. */
+                similar?: boolean;
                 /** @description Only candidates with this tag (ignoring case). */
                 tag?: string;
                 /** @description Only candidates with this skill (ignoring case). */
@@ -5320,7 +5322,7 @@ export interface operations {
     listCompanies: {
         parameters: {
             query?: {
-                /** @description Matches name or website, ignoring case and accents. */
+                /** @description Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written. */
                 q?: string;
                 type?: components["schemas"]["CompanyType"];
                 limit?: number;
@@ -5517,8 +5519,10 @@ export interface operations {
     listContacts: {
         parameters: {
             query?: {
-                /** @description Matches name, email or job title, ignoring case and accents. */
+                /** @description Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written. */
                 q?: string;
+                /** @description With q: names like q (for typos), the closest first; no further pages. */
+                similar?: boolean;
                 /** @description Only this company's contacts. */
                 companyId?: components["schemas"]["CompanyId"];
                 limit?: number;
@@ -7295,7 +7299,7 @@ export interface operations {
     listJobs: {
         parameters: {
             query?: {
-                /** @description Matches the title or location, ignoring case and accents. */
+                /** @description Every word must appear in the title, location or client company's name (ignoring case and accents). */
                 q?: string;
                 status?: components["schemas"]["JobStatus"];
                 /** @description Only this company's jobs. */

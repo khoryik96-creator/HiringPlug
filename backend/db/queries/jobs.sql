@@ -44,7 +44,10 @@ FROM job_order
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
-  AND (sqlc.narg(query)::text IS NULL OR search_text LIKE '%' || app_normalize_text(sqlc.narg(query)::text) || '%')
+  AND (sqlc.narg(query)::text IS NULL OR NOT EXISTS (
+         -- every word in the title or location, or in the client's name (@company_hits: "n:companyId")
+         SELECT 1 FROM app_search_words(sqlc.narg(query)::text) w
+         WHERE NOT (strpos(search_text, w.word) > 0 OR (w.n::text || ':' || company_id) = ANY(coalesce(@company_hits::text[], ARRAY[]::text[])))))
 ORDER BY id DESC
 LIMIT @row_limit;
 

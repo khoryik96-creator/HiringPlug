@@ -115,7 +115,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -141,7 +141,6 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.CurrentCompany,
 		&i.Location,
 		&i.Source,
-		&i.SearchText,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -151,6 +150,9 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
 		&i.Availability,
+		&i.SearchText,
+		&i.NameText,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
@@ -195,7 +197,7 @@ INSERT INTO candidate (
   $16, $17, $18, $19, $20, $21,
   $22, app_current_user()
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
 `
 
 type InsertCandidateParams struct {
@@ -271,7 +273,6 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.CurrentCompany,
 		&i.Location,
 		&i.Source,
-		&i.SearchText,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -281,6 +282,9 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
 		&i.Availability,
+		&i.SearchText,
+		&i.NameText,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
@@ -399,21 +403,27 @@ SELECT id, first_name, last_name, email, phone, current_title, current_company,
        location, work_authorization, tags, updated_at
 FROM candidate
 WHERE ($1::text IS NULL OR id < $1::text)
-  AND ($2::text IS NULL OR search_text LIKE '%' || app_normalize_text($2::text) || '%')
-  AND ($3::text IS NULL OR app_lower_array(tags) @> ARRAY[lower($3::text)])
-  AND ($4::text IS NULL OR app_lower_array(skills) @> ARRAY[lower($4::text)])
-  AND ($5::text IS NULL OR owner_id = $5::text)
-ORDER BY id DESC
-LIMIT $6
+  AND ($2::text IS NULL
+       OR CASE WHEN $3::boolean
+            THEN app_normalize_text($2::text) <% name_text
+            ELSE search_text LIKE ALL (app_search_patterns($2::text))
+              OR phone_digits LIKE '%' || app_phone_key($2::text) || '%'
+          END)
+  AND ($4::text IS NULL OR app_lower_array(tags) @> ARRAY[lower($4::text)])
+  AND ($5::text IS NULL OR app_lower_array(skills) @> ARRAY[lower($5::text)])
+  AND ($6::text IS NULL OR owner_id = $6::text)
+ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), name_text) END DESC, id DESC
+LIMIT $7
 `
 
 type ListCandidatesParams struct {
-	Cursor   *string
-	Query    *string
-	Tag      *string
-	Skill    *string
-	Owner    *string
-	RowLimit int32
+	Cursor       *string
+	Query        *string
+	SimilarNames bool
+	Tag          *string
+	Skill        *string
+	Owner        *string
+	RowLimit     int32
 }
 
 type ListCandidatesRow struct {
@@ -431,10 +441,12 @@ type ListCandidatesRow struct {
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
+// With @similar, names like the query (typos) instead, the closest first.
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listCandidates,
 		arg.Cursor,
 		arg.Query,
+		arg.SimilarNames,
 		arg.Tag,
 		arg.Skill,
 		arg.Owner,
@@ -678,7 +690,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
 `
 
 type TouchCandidateParams struct {
@@ -711,7 +723,6 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.CurrentCompany,
 		&i.Location,
 		&i.Source,
-		&i.SearchText,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -721,6 +732,9 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
 		&i.Availability,
+		&i.SearchText,
+		&i.NameText,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
@@ -751,7 +765,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $22 AND version = $23
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, search_text, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
 `
 
 type UpdateCandidateParams struct {
@@ -829,7 +843,6 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.CurrentCompany,
 		&i.Location,
 		&i.Source,
-		&i.SearchText,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -839,6 +852,9 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.ResidenceCountry,
 		&i.LinkedinUrl,
 		&i.Availability,
+		&i.SearchText,
+		&i.NameText,
+		&i.PhoneDigits,
 	)
 	return i, err
 }
