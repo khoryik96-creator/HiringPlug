@@ -285,3 +285,33 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .employment-history li.current span:first-child { font-weight: 600; }
 /* A document's name, status and actions: spaced, wrapping on narrow screens. */
 .doc-row > button.link + button.link, .doc-row > span + button.link { margin-left: 0.85rem; }
+/* Booking hours (Account) */
+.hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.6rem; margin: 0.5rem 0 1rem; }
+.hours-day { border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.65rem; display: flex; flex-direction: column; gap: 0.35rem; background: var(--soft); }
+.hours-day input[type="time"] { width: 8rem; padding: 0.25rem 0.35rem; }
+.hours-range { display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+.hours-toggle { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; }
+.calendar-help p { margin: 0.25rem 0; }
+.booking-hours form > .form-grid { margin-bottom: 0.75rem; }
+/* Booking links in the composer, and a candidate's bookings */
+.booking-link-form { display: grid; grid-template-columns: 2fr 1fr 2fr auto; gap: 0.6rem; align-items: end; padding: 0.75rem; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--soft); }
+.bookings ul { list-style: none; padding: 0; margin: 0.25rem 0 0.75rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.bookings li { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.badge.booking-booked { background: #dcfce7; } .badge.booking-open { background: #fef3c7; }
+.badge.booking-cancelled, .badge.booking-expired { background: #e5e7eb; }
+/* The public booking page */
+.booking-page { min-height: 100vh; background: var(--bg); display: flex; justify-content: center; align-items: flex-start; padding: 2.5rem 1rem; box-sizing: border-box; }
+.booking-card { box-sizing: border-box; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 1.75rem 2rem; width: 100%; max-width: 640px; margin: 0; }
+.booking-card h1 { margin: 0.1rem 0 0.2rem; }
+.booking-company { color: var(--accent-dark); font-weight: 650; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; }
+.booking-step { font-size: 1rem; margin: 1.25rem 0 0.5rem; font-family: inherit; }
+.booking-days { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.booking-days button { white-space: nowrap; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; min-width: 5.6rem; padding: 0.55rem 0.4rem; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); }
+.booking-days button small { color: var(--muted); font-size: 0.72rem; }
+.booking-days button.on, .booking-times button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); }
+.booking-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 0.45rem; margin-bottom: 1rem; }
+.booking-times button { padding: 0.5rem 0; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); font-variant-numeric: tabular-nums; }
+.booking-done { margin-top: 1rem; padding: 1rem 1.2rem; border-radius: 12px; background: #ecfdf3; }
+.booking-check { font-weight: 700; color: #14532d; margin: 0 0 0.25rem; font-size: 1.1rem; }
+.booking-note { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 12px; background: var(--soft); }
+@media (max-width: 700px) { .booking-link-form { grid-template-columns: 1fr; } .booking-card { padding: 1.25rem; } }

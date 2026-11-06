@@ -144,6 +144,10 @@ type Notice struct {
 	To            []string
 	Subject, Body string
 	ApplicationID *string
+	CandidateID   *string // shown with the candidate's emails
+	// Calendar is an iCalendar invitation (METHOD:REQUEST or CANCEL), sent
+	// so that Gmail, Outlook and Apple Mail offer it for the calendar.
+	Calendar string
 }
 
 // Notify records a notice and queues it for sending, in the caller's

@@ -460,6 +460,39 @@ lead's company (with the built-in email check).
 - **CV vs job match** ✅: a fit score per application with reasons quoting the
   job and the CV; see [3.6](#36-cv-vs-job-match--off-until-an-ai-provider-is-set-up).
 
+## Booking links (a small Calendly of our own) ✅
+
+- **Your hours** (Account > Booking hours): the days and hours you take calls,
+  your time zone, the gap kept around meetings, how soon and how far ahead a
+  candidate may book. Everyone with `scheduling:use` (all but viewers).
+- **Your calendar**, without connecting an account: paste the private address
+  your calendar gives (Google Calendar: Settings › your calendar › Integrate
+  calendar › *Secret address in iCal format*; Outlook: Settings › Calendar ›
+  Shared calendars › Publish a calendar › *ICS link*, "Can view when I'm
+  busy"). The Go worker reads it (`scheduling.refresh_calendar`, through the
+  guarded HTTP client) when saved and again when a booking page is opened and
+  it is older than 15 minutes; only **when** you are busy is kept, never what
+  the meetings are. Repeating meetings, skipped and moved occurrences, free
+  and cancelled events, all-day events and Outlook's Windows time-zone names
+  are understood (`platform/ical`). The address is never shown back (only its
+  host) nor written to the audit log.
+- **In an email to a candidate**: "+ Booking link" (title, length, where:
+  a meeting link, a phone number or an address) puts "Please pick a time
+  that suits you: …/book/<link>" in the message. One link, one meeting;
+  links last 30 days; only a hash of the link's secret is stored.
+- **The booking page** (`/book/<link>`, no sign-in) shows your free times in
+  the candidate's own time zone: your hours, less your calendar's busy times,
+  the interviews you are on and your other bookings (with the gap around
+  each). Booking locks your schedule, so two people cannot take one time.
+- **Both calendars are blocked**: the candidate and you each get an email
+  with a calendar invitation (`METHOD:REQUEST`, as Gmail, Outlook and Apple
+  Mail recognise, plus `invite.ics`), which they add to the calendar. The
+  candidate can move the time with the same link (the invitation is updated:
+  same UID, next SEQUENCE) until the minimum notice; you can cancel from the
+  candidate's page (a `METHOD:CANCEL` takes it off both calendars).
+- **Later**: connecting Google or Microsoft accounts directly (OAuth), to
+  write the event straight into the calendar and read busy times live.
+
 ## Offers ✅
 
 On a candidate's job (from submitted on), **Make offer** drafts an offer:

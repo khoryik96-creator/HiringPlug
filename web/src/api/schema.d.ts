@@ -2265,6 +2265,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/scheduling/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your hours for calls and your calendar's status */
+        get: operations["getMySchedule"];
+        /** Set your hours for calls, and your calendar address */
+        put: operations["putMySchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/booking-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A candidate's booking links and bookings, the newest first */
+        get: operations["listBookingLinks"];
+        put?: never;
+        /** A booking link for a candidate, to put in an email (one booking each) */
+        post: operations["createBookingLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/booking-links/{bookingLinkId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingLinkId: components["schemas"]["BookingLinkId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a booking link (and its meeting, with a cancellation to both calendars) */
+        post: operations["cancelBookingLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/bookings/{bookingToken}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingToken: components["parameters"]["BookingTokenPath"];
+            };
+            cookie?: never;
+        };
+        /** A booking page (no sign-in) with the free times */
+        get: operations["getPublicBooking"];
+        put?: never;
+        /** Book a time (or move the booked one); both calendars get an invitation */
+        post: operations["bookPublicBooking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings/fields": {
         parameters: {
             query?: never;
@@ -2343,11 +2418,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "scheduling.refresh_calendar" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -4885,6 +4960,111 @@ export interface components {
             daysToFill: number;
             placements: number;
         };
+        /** @example bkl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        BookingLinkId: string;
+        WeeklyHours: {
+            /** @description 1 = Monday ... 7 = Sunday. */
+            day: number;
+            /** @description e.g. 09:00 */
+            start: string;
+            /** @description e.g. 17:30; after start */
+            end: string;
+        };
+        Schedule: {
+            /** @description You have saved your hours (booking links need them). */
+            set: boolean;
+            /** @description An IANA time zone, e.g. Asia/Kuala_Lumpur. */
+            timeZone: string;
+            hours: components["schemas"]["WeeklyHours"][];
+            /** @description Free time kept before and after each meeting. */
+            bufferMinutes: number;
+            /** @description How soon a candidate may book. */
+            minNoticeHours: number;
+            /** @description How far ahead a candidate may book. */
+            maxDaysAhead: number;
+            /** @description Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none. */
+            calendar: components["schemas"]["CalendarFeed"] | null;
+        };
+        CalendarFeed: {
+            /** @description The address's host only, e.g. calendar.google.com (the address itself is private). */
+            host: string;
+            /** @enum {string} */
+            status: "pending" | "ok" | "failed";
+            error: string | null;
+            /** Format: date-time */
+            checkedAt: string | null;
+            /** @description Busy times found in the next weeks. */
+            busyCount: number;
+        };
+        ScheduleInput: {
+            timeZone: string;
+            hours: components["schemas"]["WeeklyHours"][];
+            bufferMinutes: number;
+            minNoticeHours: number;
+            maxDaysAhead: number;
+            /** @description Your calendar's private .ics address. Leave out to keep it; null removes it. */
+            calendarUrl?: string | null;
+        };
+        BookingLinkInput: {
+            candidateId: components["schemas"]["CandidateId"];
+            applicationId?: components["schemas"]["ApplicationId"];
+            /** @description e.g. Call with Aina */
+            title: string;
+            /** @enum {integer} */
+            durationMinutes: 15 | 30 | 45 | 60 | 90;
+            /** @description A meeting link, a phone number or an address. */
+            location?: string | null;
+        };
+        BookingLink: {
+            id: components["schemas"]["BookingLinkId"];
+            /** @description The address to send (only when just created; the link is not stored). */
+            url: string | null;
+            candidateId: components["schemas"]["CandidateId"];
+            candidateName: string;
+            hostName: string;
+            title: string;
+            durationMinutes: number;
+            location: string | null;
+            status: components["schemas"]["BookingStatus"];
+            /**
+             * Format: date-time
+             * @description The booked time.
+             */
+            startsAt: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /**
+         * @description open = waiting for the candidate; booked; cancelled; expired = not used in time.
+         * @enum {string}
+         */
+        BookingStatus: "open" | "booked" | "cancelled" | "expired";
+        PublicBooking: {
+            companyName: string;
+            hostName: string;
+            title: string;
+            durationMinutes: number;
+            /** @description Shown once booked. */
+            location: string | null;
+            /** @description The host's time zone (the page shows times in the visitor's). */
+            timeZone: string;
+            status: components["schemas"]["BookingStatus"];
+            /** Format: date-time */
+            startsAt: string | null;
+            /** @description The booked time may still be moved. */
+            canChange: boolean;
+            /** @description Free start times (open, or booked and movable). */
+            slots: string[];
+        };
+        PublicBookingInput: {
+            /** Format: date-time */
+            startsAt: string;
+        };
+        SchedulingRefreshCalendarJob: {
+            userId: string;
+        };
         /**
          * @description Who sees a sent email that shows salary: salary_roles = only roles that may see salaries (the default); everyone = everyone who may read emails. Either way only senders who may see salaries can fill salary fields.
          * @enum {string}
@@ -5159,6 +5339,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not set up (SCHEDULING_NOT_SET_UP), the time was taken (BOOKING_SLOT_TAKEN) or the link is closed (BOOKING_CLOSED). */
+        SchedulingConflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
         AiProviderPath: components["schemas"]["AiProviderName"];
@@ -5180,6 +5369,7 @@ export interface components {
         OfferIdPath: components["schemas"]["OfferId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
         PlacementIdPath: components["schemas"]["PlacementId"];
+        BookingTokenPath: string;
     };
     requestBodies: never;
     headers: never;
@@ -9332,6 +9522,196 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMySchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putMySchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listBookingLinks: {
+        parameters: {
+            query: {
+                candidateId: components["schemas"]["CandidateId"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["BookingLink"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createBookingLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingLinkInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingLink"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["SchedulingConflict"];
+        };
+    };
+    cancelBookingLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingLinkId: components["schemas"]["BookingLinkId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicBooking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingToken: components["parameters"]["BookingTokenPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBooking"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    bookPublicBooking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookingToken: components["parameters"]["BookingTokenPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicBookingInput"];
+            };
+        };
+        responses: {
+            /** @description Booked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBooking"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["SchedulingConflict"];
+            /** @description Too many tries from this address (BOOKING_TOO_MANY_TRIES). */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getFieldSettings: {

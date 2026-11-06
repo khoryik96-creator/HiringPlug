@@ -10,6 +10,43 @@ import (
 	"time"
 )
 
+const busyFor = `-- name: BusyFor :many
+SELECT starts_at, ends_at FROM interview
+WHERE status = 'scheduled' AND $1::text = ANY (interviewer_ids) AND ends_at > $2::timestamptz AND starts_at < $3::timestamptz
+`
+
+type BusyForParams struct {
+	UserID   string
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type BusyForRow struct {
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
+// The interviews a user is on between two times: they are busy then.
+func (q *Queries) BusyFor(ctx context.Context, arg BusyForParams) ([]BusyForRow, error) {
+	rows, err := q.db.Query(ctx, busyFor, arg.UserID, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BusyForRow
+	for rows.Next() {
+		var i BusyForRow
+		if err := rows.Scan(&i.StartsAt, &i.EndsAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clashes = `-- name: Clashes :many
 SELECT id, title, starts_at, ends_at, interviewer_ids FROM interview
 WHERE status = 'scheduled' AND id <> $1::text AND interviewer_ids && $2::text[]

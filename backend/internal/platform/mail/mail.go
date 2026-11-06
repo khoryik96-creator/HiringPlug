@@ -38,6 +38,11 @@ type Message struct {
 	HTML     string // optional formatted version; images in it refer to Inline parts by cid:
 	Inline   []Part // images the HTML shows (e.g. a banner)
 	Attach   []Part // attachments
+	// Calendar is an iCalendar invitation (RFC 5546: METHOD:REQUEST or
+	// CANCEL). It goes in as another version of the message, which is how
+	// Gmail, Outlook and Apple Mail recognise an invitation, and as an
+	// invite.ics attachment for the others.
+	Calendar string
 }
 
 // Part is a file in a message.
@@ -197,6 +202,30 @@ func content(m Message) (string, []byte, error) {
 		return "", nil, err
 	}
 	ctype, body := `text/plain; charset="utf-8"`, text
+	if m.Calendar != "" {
+		cal, method, err := calendarPart(m.Calendar)
+		if err != nil {
+			return "", nil, err
+		}
+		alt := []part{{header: qpHeader(`text/plain; charset="utf-8"`), body: text}}
+		if m.HTML != "" {
+			html, err := quoted(m.HTML)
+			if err != nil {
+				return "", nil, err
+			}
+			alt = append(alt, part{header: qpHeader(`text/html; charset="utf-8"`), body: html})
+		}
+		alt = append(alt, cal)
+		if ctype, body, err = multipartOf("alternative", alt); err != nil {
+			return "", nil, err
+		}
+		parts := []part{{header: textproto.MIMEHeader{"Content-Type": {ctype}}, body: body}}
+		parts = append(parts, filePart(Part{Name: "invite.ics", ContentType: "application/ics; method=" + method, Data: []byte(m.Calendar)}, "attachment"))
+		for _, p := range m.Attach {
+			parts = append(parts, filePart(p, "attachment"))
+		}
+		return multipartOf("mixed", parts)
+	}
 	if m.HTML != "" {
 		html, err := quoted(m.HTML)
 		if err != nil {
@@ -230,6 +259,33 @@ func content(m Message) (string, []byte, error) {
 		return multipartOf("mixed", parts)
 	}
 	return ctype, body, nil
+}
+
+// calendarPart is the invitation as a text/calendar part, with the METHOD
+// it declares (REQUEST, CANCEL...) in its content type, as RFC 6047 asks.
+func calendarPart(ics string) (part, string, error) {
+	method := ""
+	for _, line := range strings.Split(ics, "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "METHOD:"); ok {
+			method = strings.ToUpper(v)
+			break
+		}
+	}
+	if method == "" {
+		return part{}, "", errors.New("mail: a calendar invitation needs a METHOD")
+	}
+	h := textproto.MIMEHeader{
+		"Content-Type":              {`text/calendar; charset="utf-8"; method=` + method},
+		"Content-Transfer-Encoding": {"base64"},
+	}
+	enc := base64.StdEncoding.EncodeToString([]byte(ics))
+	var lines bytes.Buffer
+	for len(enc) > 76 {
+		lines.WriteString(enc[:76] + "\r\n")
+		enc = enc[76:]
+	}
+	lines.WriteString(enc + "\r\n")
+	return part{header: h, body: lines.Bytes()}, method, nil
 }
 
 type part struct {

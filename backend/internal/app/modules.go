@@ -39,6 +39,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/privacy"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/reports"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/scheduling"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	// scaffold:imports
@@ -70,6 +71,7 @@ type Modules struct {
 	Intake       *intake.Module
 	Market       *market.Module
 	AIProviders  *aiproviders.Module
+	Scheduling   *scheduling.Module
 	// scaffold:fields
 }
 
@@ -137,6 +139,13 @@ func NewModules(d Deps) *Modules {
 	m.Market = market.New(d.Pool, market.Deps{
 		Jobs: marketJobs{m.Jobs}, Candidates: marketCandidates{m.Candidates}, Insights: marketInsights{m.Assistant},
 	})
+	m.Scheduling = scheduling.New(d.Pool, scheduling.Deps{
+		Candidates: schedulingCandidates{m.Candidates}, Applications: schedulingApplications{m.Pipeline},
+		Users: schedulingUsers{m.Identity}, Interviews: m.Interviews, Mailer: schedulingMailer{m.Emails},
+	}, scheduling.Config{
+		PublicURL: d.Config.PublicURL, OrganizerEmail: d.Config.SMTP.From, DefaultTimeZone: d.Config.TimeZone,
+		AllowPrivateNetworks: d.Config.AllowPrivateNetworks,
+	})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
@@ -176,6 +185,7 @@ type (
 	intakeHTTP       = intake.HTTP
 	marketHTTP       = market.HTTP
 	aiprovidersHTTP  = aiproviders.HTTP
+	schedulingHTTP   = scheduling.HTTP
 	// scaffold:aliases
 )
 
@@ -207,6 +217,7 @@ type Server struct {
 	*intakeHTTP
 	*marketHTTP
 	*aiprovidersHTTP
+	*schedulingHTTP
 	// scaffold:embeds
 }
 
@@ -239,6 +250,7 @@ func (m *Modules) Server() *Server {
 		intakeHTTP:       m.Intake.HTTP,
 		marketHTTP:       m.Market.HTTP,
 		aiprovidersHTTP:  m.AIProviders.HTTP,
+		schedulingHTTP:   m.Scheduling.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -258,6 +270,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),
 		m.AIProviders.JobHandlers(),
+		m.Scheduling.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

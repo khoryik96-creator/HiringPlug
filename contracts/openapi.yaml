@@ -52,6 +52,18 @@ x-error-codes:
     module: assistant
     status: 409
     description: The AI assistant is switched off (no AI provider is set up).
+  BOOKING_CLOSED:
+    module: scheduling
+    status: 409
+    description: The booking link was cancelled or has expired, or the meeting is too close to move.
+  BOOKING_SLOT_TAKEN:
+    module: scheduling
+    status: 409
+    description: That time is no longer free; pick another.
+  BOOKING_TOO_MANY_TRIES:
+    module: scheduling
+    status: 429
+    description: Too many bookings from one address in a short time; try again later.
   CANDIDATE_DUPLICATE_EMAIL:
     module: candidates
     status: 409
@@ -152,6 +164,10 @@ x-error-codes:
     module: shared
     status: 404
     description: No such endpoint.
+  SCHEDULING_NOT_SET_UP:
+    module: scheduling
+    status: 409
+    description: Set your hours for calls (Account > Booking hours) before sending booking links.
   SERVICE_UNAVAILABLE:
     module: shared
     status: 503
@@ -3295,6 +3311,144 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/scheduling/me:
+    get:
+      operationId: getMySchedule
+      tags: [scheduling]
+      summary: Your hours for calls and your calendar's status
+      x-permission: scheduling:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putMySchedule
+      tags: [scheduling]
+      summary: Set your hours for calls, and your calendar address
+      x-permission: scheduling:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ScheduleInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Schedule'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/booking-links:
+    get:
+      operationId: listBookingLinks
+      tags: [scheduling]
+      summary: A candidate's booking links and bookings, the newest first
+      x-permission: scheduling:use
+      parameters:
+        - name: candidateId
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/CandidateId'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/BookingLink'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createBookingLink
+      tags: [scheduling]
+      summary: A booking link for a candidate, to put in an email (one booking each)
+      x-permission: scheduling:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BookingLinkInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BookingLink'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/SchedulingConflict'}
+  /v1/booking-links/{bookingLinkId}/cancel:
+    parameters:
+      - name: bookingLinkId
+        in: path
+        required: true
+        schema: {$ref: '#/components/schemas/BookingLinkId'}
+    post:
+      operationId: cancelBookingLink
+      tags: [scheduling]
+      summary: Cancel a booking link (and its meeting, with a cancellation to both calendars)
+      x-permission: scheduling:use
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BookingLink'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/public/bookings/{bookingToken}:
+    parameters:
+      - $ref: '#/components/parameters/BookingTokenPath'
+    get:
+      operationId: getPublicBooking
+      tags: [scheduling]
+      summary: A booking page (no sign-in) with the free times
+      x-permission: public
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicBooking'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: bookPublicBooking
+      tags: [scheduling]
+      summary: Book a time (or move the booked one); both calendars get an invitation
+      x-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublicBookingInput'}
+      responses:
+        '200':
+          description: Booked
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublicBooking'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/SchedulingConflict'}
+        '429':
+          description: Too many tries from this address (BOOKING_TOO_MANY_TRIES).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/settings/fields:
     get:
       operationId: getFieldSettings
@@ -3509,6 +3663,11 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    SchedulingConflict:
+      description: Not set up (SCHEDULING_NOT_SET_UP), the time was taken (BOOKING_SLOT_TAKEN) or the link is closed (BOOKING_CLOSED).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
   schemas:
     Role:
       type: string
@@ -3580,6 +3739,7 @@ components:
         - privacy:read
         - privacy:record
         - reports:read
+        - scheduling:use
         - settings:manage
         - settings:read
     ErrorCode:
@@ -3590,6 +3750,9 @@ components:
         - APPLICATION_EXISTS
         - ASSISTANT_LIMIT_REACHED
         - ASSISTANT_OFF
+        - BOOKING_CLOSED
+        - BOOKING_SLOT_TAKEN
+        - BOOKING_TOO_MANY_TRIES
         - CANDIDATE_DUPLICATE_EMAIL
         - CAREERS_TOO_MANY_APPLICATIONS
         - COMPANY_DUPLICATE_NAME
@@ -3615,6 +3778,7 @@ components:
         - PLACEMENT_NOT_ALLOWED
         - ROLE_NOT_EDITABLE
         - ROUTE_NOT_FOUND
+        - SCHEDULING_NOT_SET_UP
         - SERVICE_UNAVAILABLE
         - SIGN_IN_CHOOSE_COMPANY
         - SIGN_IN_FAILED
@@ -3647,6 +3811,7 @@ components:
         - lead_source.check
         - match.score
         - match.scored
+        - scheduling.refresh_calendar
         - webhook.deliver
     Error:
       type: object
@@ -7107,6 +7272,121 @@ components:
         jobTitle: {type: string}
         daysToFill: {type: integer, description: From the job being opened to its first placement in the period.}
         placements: {type: integer}
+    BookingLinkId:
+      type: string
+      pattern: '^bkl_[0-9a-hjkmnp-tv-z]{26}$'
+      example: bkl_01jbz6w0m0k8q9x2r3s4t5v6w7
+    WeeklyHours:
+      type: object
+      additionalProperties: false
+      required: [day, start, end]
+      properties:
+        day: {type: integer, minimum: 1, maximum: 7, description: 1 = Monday ... 7 = Sunday.}
+        start: {type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'e.g. 09:00'}
+        end: {type: string, pattern: '^([01][0-9]|2[0-4]):[0-5][0-9]$', description: 'e.g. 17:30; after start'}
+    Schedule:
+      type: object
+      required: [set, timeZone, hours, bufferMinutes, minNoticeHours, maxDaysAhead, calendar]
+      properties:
+        set: {type: boolean, description: You have saved your hours (booking links need them).}
+        timeZone: {type: string, description: 'An IANA time zone, e.g. Asia/Kuala_Lumpur.'}
+        hours:
+          type: array
+          items: {$ref: '#/components/schemas/WeeklyHours'}
+        bufferMinutes: {type: integer, description: Free time kept before and after each meeting.}
+        minNoticeHours: {type: integer, description: How soon a candidate may book.}
+        maxDaysAhead: {type: integer, description: How far ahead a candidate may book.}
+        calendar:
+          description: Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none.
+          allOf: [{$ref: '#/components/schemas/CalendarFeed'}]
+          nullable: true
+    CalendarFeed:
+      type: object
+      required: [host, status, error, checkedAt, busyCount]
+      properties:
+        host: {type: string, description: 'The address''s host only, e.g. calendar.google.com (the address itself is private).'}
+        status: {type: string, enum: [pending, ok, failed]}
+        error: {type: string, nullable: true}
+        checkedAt: {type: string, format: date-time, nullable: true}
+        busyCount: {type: integer, description: Busy times found in the next weeks.}
+    ScheduleInput:
+      type: object
+      additionalProperties: false
+      required: [timeZone, hours, bufferMinutes, minNoticeHours, maxDaysAhead]
+      properties:
+        timeZone: {type: string, minLength: 1, maxLength: 64}
+        hours:
+          type: array
+          maxItems: 21
+          items: {$ref: '#/components/schemas/WeeklyHours'}
+        bufferMinutes: {type: integer, minimum: 0, maximum: 120}
+        minNoticeHours: {type: integer, minimum: 0, maximum: 336}
+        maxDaysAhead: {type: integer, minimum: 1, maximum: 60}
+        calendarUrl:
+          type: string
+          nullable: true
+          maxLength: 2000
+          writeOnly: true
+          description: Your calendar's private .ics address. Leave out to keep it; null removes it.
+    BookingLinkInput:
+      type: object
+      additionalProperties: false
+      required: [candidateId, title, durationMinutes]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        title: {type: string, minLength: 1, maxLength: 120, description: 'e.g. Call with Aina'}
+        durationMinutes: {type: integer, enum: [15, 30, 45, 60, 90]}
+        location: {type: string, maxLength: 500, nullable: true, description: 'A meeting link, a phone number or an address.'}
+    BookingLink:
+      type: object
+      required: [id, url, candidateId, candidateName, hostName, title, durationMinutes, location, status, startsAt, expiresAt, createdAt]
+      properties:
+        id: {$ref: '#/components/schemas/BookingLinkId'}
+        url: {type: string, nullable: true, description: The address to send (only when just created; the link is not stored).}
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        candidateName: {type: string}
+        hostName: {type: string}
+        title: {type: string}
+        durationMinutes: {type: integer}
+        location: {type: string, nullable: true}
+        status: {$ref: '#/components/schemas/BookingStatus'}
+        startsAt: {type: string, format: date-time, nullable: true, description: The booked time.}
+        expiresAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    BookingStatus:
+      type: string
+      description: open = waiting for the candidate; booked; cancelled; expired = not used in time.
+      enum: [open, booked, cancelled, expired]
+    PublicBooking:
+      type: object
+      required: [companyName, hostName, title, durationMinutes, location, timeZone, status, startsAt, canChange, slots]
+      properties:
+        companyName: {type: string}
+        hostName: {type: string}
+        title: {type: string}
+        durationMinutes: {type: integer}
+        location: {type: string, nullable: true, description: Shown once booked.}
+        timeZone: {type: string, description: The host's time zone (the page shows times in the visitor's).}
+        status: {$ref: '#/components/schemas/BookingStatus'}
+        startsAt: {type: string, format: date-time, nullable: true}
+        canChange: {type: boolean, description: The booked time may still be moved.}
+        slots:
+          type: array
+          description: Free start times (open, or booked and movable).
+          items: {type: string, format: date-time}
+    PublicBookingInput:
+      type: object
+      additionalProperties: false
+      required: [startsAt]
+      properties:
+        startsAt: {type: string, format: date-time}
+    SchedulingRefreshCalendarJob:
+      type: object
+      additionalProperties: false
+      required: [userId]
+      properties:
+        userId: {type: string}
     EmailSalaryVisibility:
       type: string
       description: >
@@ -7299,6 +7579,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/PlacementId'}
+    BookingTokenPath:
+      name: bookingToken
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[A-Za-z0-9_-]{32,64}$'}
 x-permissions:
   aiproviders:manage:
     module: aiproviders
@@ -7590,6 +7875,11 @@ x-permissions:
     description: See the reports (fees in them need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
+  scheduling:use:
+    module: scheduling
+    description: Set your hours for calls and send candidates booking links.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager]
   settings:manage:
     module: settings
     description: Change dropdown options and mandatory fields.
@@ -7701,6 +7991,11 @@ x-jobs:
     queue: core
     payload: MatchScoredJob
     description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
+  scheduling.refresh_calendar:
+    module: scheduling
+    queue: core
+    payload: SchedulingRefreshCalendarJob
+    description: Read a user's calendar address and keep their busy times (Go worker).
   webhook.deliver:
     module: integrations
     queue: core
@@ -7753,5 +8048,7 @@ x-modules:
     description: 'Data protection (Malaysia''s PDPA). Each candidate''s consent (given on the careers form, or recorded by a recruiter; withdrawn means do not contact, and emails to them are refused), the requests candidates make about their data with how long each has been open, and a copy of everything held about a candidate for access requests. Nothing is ever deleted or anonymised by the app: people decide each request and record what they did.'
   - name: reports
     description: 'How the business is doing over a period: how far candidates get (pipeline conversion), which sources bring candidates who get hired, placements and fees per recruiter, and how long jobs take to fill. Reports keep no data of their own: they read other modules'' records.'
+  - name: scheduling
+    description: Booking links. Each user sets when they take calls (weekly hours in their time zone) and may give the private calendar address Google Calendar or Outlook offers, so their own meetings count as busy. A booking link, inserted into an email to a candidate, opens a public page with the free times; the candidate picks one, and both get a calendar invitation (an .ics invite that Gmail and Outlook add to the calendar), which blocks the time. Interviews the user is on and their other bookings count as busy too. The candidate can move the time with the same link; the user can cancel it.
   - name: settings
     description: 'Main settings. Dropdown lists a company can change: open lists (candidate source, notice period, industry) take new options; fixed lists (work type, work arrangement) can be renamed, reordered and hidden only, because other systems (job boards, Google for Jobs) need their values. Fields a company makes mandatory must be filled in when a person adds a record, and cannot be emptied later.'

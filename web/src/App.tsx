@@ -22,6 +22,8 @@ import { Integrations } from "./pages/Integrations";
 import { Privacy } from "./pages/Privacy";
 import { Access } from "./pages/Access";
 import { AiProvider } from "./pages/AiProvider";
+import { BookingPage, bookingRoute } from "./pages/BookingPage";
+import { BookingHours } from "./components/BookingHours";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
 import { Settings } from "./pages/Settings";
 import { JobList } from "./pages/JobList";
@@ -115,7 +117,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
  */
 function Page({ hash, permissions, me }: { hash: string; permissions: Permission[]; me: Me }) {
   if (hash.startsWith("#/team") && permissions.includes("identity.team:manage")) return <Team myRole={me.role} myId={me.user.id} />;
-  if (hash.startsWith("#/account")) return <main><h2>Your account</h2><ChangePassword /></main>;
+  if (hash.startsWith("#/account")) {
+    return <main><h2>Your account</h2>{permissions.includes("scheduling:use") && <BookingHours />}<ChangePassword /></main>;
+  }
   const screening = /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/.exec(hash)?.[1];
   if (screening) return <ScreeningCall key={screening} candidateId={screening} permissions={permissions} />;
   const compare = /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/.exec(hash)?.[1];
@@ -156,6 +160,8 @@ export function App() {
   const [signedIn, setSignedIn] = useState(getToken() !== null);
   // The public careers page: never behind sign-in. (hash re-renders on change.)
   const careers = careersRoute(window.location);
+  // A booking page: also public.
+  const booking = bookingRoute(window.location);
   // Invitation and password reset links: also never behind sign-in.
   const link = authLinkRoute(window.location.hash);
   const signOut = () => {
@@ -165,7 +171,9 @@ export function App() {
   };
   return (
     <QueryClientProvider client={queryClient}>
-      {careers ? (
+      {booking ? (
+        <BookingPage key={booking} token={booking} />
+      ) : careers ? (
         // Public: candidates are never asked to sign in.
         <Careers key={careers.slug} route={careers} pathStyle={!window.location.hash.startsWith("#/careers/")} />
       ) : link ? (

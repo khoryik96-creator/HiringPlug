@@ -57,3 +57,8 @@ DO UPDATE SET recommendation = EXCLUDED.recommendation, comments = EXCLUDED.comm
 
 -- name: MarkReminded :exec
 UPDATE interview SET reminded_for = @starts_at WHERE id = @id;
+
+-- The interviews a user is on between two times: they are busy then.
+-- name: BusyFor :many
+SELECT starts_at, ends_at FROM interview
+WHERE status = 'scheduled' AND @user_id::text = ANY (interviewer_ids) AND ends_at > @from_time::timestamptz AND starts_at < @to_time::timestamptz;

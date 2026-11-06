@@ -115,6 +115,32 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type BookingLink struct {
+	ID              string
+	TenantID        string
+	TokenHash       string
+	HostUserID      string
+	CandidateID     string
+	ApplicationID   *string
+	Title           string
+	DurationMinutes int32
+	Location        *string
+	Status          string
+	StartsAt        *time.Time
+	Sequence        int32
+	ExpiresAt       time.Time
+	CreatedBy       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type CalendarBusy struct {
+	TenantID string
+	UserID   string
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
 type Candidate struct {
 	ID                     string
 	TenantID               string
@@ -363,6 +389,7 @@ type Email struct {
 	BccAddresses     []string
 	Salary           bool
 	SalaryRestricted bool
+	Calendar         *string
 }
 
 type EmailAttachment struct {
@@ -717,6 +744,22 @@ type RoleSetting struct {
 	Version        int32
 	UpdatedBy      string
 	UpdatedAt      time.Time
+}
+
+type Schedule struct {
+	TenantID        string
+	UserID          string
+	TimeZone        string
+	Hours           []byte
+	BufferMinutes   int32
+	MinNoticeHours  int32
+	MaxDaysAhead    int32
+	CalendarUrl     *string
+	CalendarStatus  *string
+	CalendarError   *string
+	CalendarReadAt  *time.Time
+	CalendarAskedAt *time.Time
+	UpdatedAt       time.Time
 }
 
 type TeamGroup struct {

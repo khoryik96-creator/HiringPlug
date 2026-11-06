@@ -26,6 +26,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -88,4 +90,15 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 // Brief returns one interview for other modules, in the caller's transaction.
 func (m *Module) Brief(ctx context.Context, tx pgx.Tx, id string) (Brief, error) {
 	return m.service.BriefOf(ctx, tx, id)
+}
+
+// BusyFor returns when a user is in an interview between from and to, in
+// the caller's transaction (booking links leave these times out).
+func (m *Module) BusyFor(ctx context.Context, tx pgx.Tx, userID string, from, to time.Time) ([]ical.Interval, error) {
+	rows, err := store.New(tx).BusyFor(ctx, store.BusyForParams{UserID: userID, FromTime: from, ToTime: to})
+	out := make([]ical.Interval, len(rows))
+	for i, r := range rows {
+		out[i] = ical.Interval{Start: r.StartsAt, End: r.EndsAt}
+	}
+	return out, err
 }

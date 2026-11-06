@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
 )
 
 // Calendar renders an interview as an iCalendar (.ics) file, which Outlook,
@@ -33,42 +35,20 @@ func Calendar(id string, version int, d Details, candidate, job string, now time
 		"DTSTAMP:" + now.UTC().Format(stamp),
 		"DTSTART:" + d.StartsAt.UTC().Format(stamp),
 		"DTEND:" + d.Ends().UTC().Format(stamp),
-		"SUMMARY:" + escape(summary),
+		"SUMMARY:" + ical.Escape(summary),
 		"STATUS:" + status,
 	}
 	if location != "" {
-		lines = append(lines, "LOCATION:"+escape(location))
+		lines = append(lines, "LOCATION:"+ical.Escape(location))
 	}
 	if description != "" {
-		lines = append(lines, "DESCRIPTION:"+escape(description))
+		lines = append(lines, "DESCRIPTION:"+ical.Escape(description))
 	}
 	lines = append(lines, "END:VEVENT", "END:VCALENDAR")
 	var b strings.Builder
 	for _, l := range lines {
-		b.WriteString(fold(l))
+		b.WriteString(ical.Fold(l))
 		b.WriteString("\r\n")
-	}
-	return b.String()
-}
-
-// escape follows RFC 5545: backslashes, commas, semicolons and line breaks.
-func escape(s string) string {
-	return strings.NewReplacer(`\`, `\\`, ",", `\,`, ";", `\;`, "\r\n", `\n`, "\n", `\n`, "\r", "").Replace(s)
-}
-
-// fold breaks lines longer than 75 bytes, as the format requires, without
-// splitting a character.
-func fold(line string) string {
-	var b strings.Builder
-	width := 0
-	for _, r := range line {
-		n := len(string(r))
-		if width+n > 75 {
-			b.WriteString("\r\n ")
-			width = 1
-		}
-		b.WriteRune(r)
-		width += n
 	}
 	return b.String()
 }

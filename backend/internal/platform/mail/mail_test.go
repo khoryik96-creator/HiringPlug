@@ -109,3 +109,47 @@ func TestFormattedEmailsWithABannerAttachmentsAndBcc(t *testing.T) {
 		Attach: []mail.Part{{Name: "cv.pdf\r\nBcc: victim@example.com", ContentType: "application/pdf"}}}, time.Now())
 	assert.Error(t, err, "no headers through a file name")
 }
+
+func TestACalendarInvitationIsAVersionOfTheMessageAndAnAttachment(t *testing.T) {
+	ics := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nMETHOD:REQUEST\r\nBEGIN:VEVENT\r\nUID:x@hiringplug\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+	raw, err := mail.Build("no-reply@hire.example", mail.Message{
+		To: []string{"siti@example.com"}, Subject: "Call with Aina", Body: "Booked.\n", Calendar: ics,
+	}, time.Now())
+	require.NoError(t, err)
+	msg, err := stdmail.ReadMessage(strings.NewReader(string(raw)))
+	require.NoError(t, err)
+	mt, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	require.NoError(t, err)
+	require.Equal(t, "multipart/mixed", mt)
+	r := multipart.NewReader(msg.Body, params["boundary"])
+
+	alt, err := r.NextPart()
+	require.NoError(t, err)
+	mt, altParams, err := mime.ParseMediaType(alt.Header.Get("Content-Type"))
+	require.NoError(t, err)
+	require.Equal(t, "multipart/alternative", mt)
+	ar := multipart.NewReader(alt, altParams["boundary"])
+	var kinds []string
+	for {
+		p, err := ar.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		kinds = append(kinds, p.Header.Get("Content-Type"))
+		if strings.HasPrefix(p.Header.Get("Content-Type"), "text/calendar") {
+			data, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, p))
+			require.NoError(t, err)
+			assert.Equal(t, ics, string(data))
+		}
+	}
+	assert.Equal(t, []string{`text/plain; charset="utf-8"`, `text/calendar; charset="utf-8"; method=REQUEST`}, kinds)
+
+	att, err := r.NextPart()
+	require.NoError(t, err)
+	assert.Equal(t, "application/ics; method=REQUEST", att.Header.Get("Content-Type"))
+	assert.Equal(t, "invite.ics", att.FileName())
+
+	_, err = mail.Build("no-reply@hire.example", mail.Message{To: []string{"a@b.c"}, Subject: "x", Body: "x", Calendar: "BEGIN:VCALENDAR\r\n"}, time.Now())
+	assert.Error(t, err, "an invitation without a METHOD")
+}

@@ -36,6 +36,9 @@ VALUES (app_current_tenant(), sqlc.narg(candidate_id), sqlc.narg(application_id)
         app_current_user(), @sender_name, @reply_to)
 RETURNING *;
 
+-- name: SetEmailCalendar :exec
+UPDATE email SET calendar = @calendar WHERE id = @id;
+
 -- name: GetEmail :one
 SELECT * FROM email WHERE id = @id;
 

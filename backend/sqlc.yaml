@@ -165,3 +165,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/aiproviders/internal/store
+  - <<: *module
+    queries: db/queries/scheduling.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/scheduling/internal/store

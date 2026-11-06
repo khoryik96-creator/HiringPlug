@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, unwrap } from "../api/client";
 import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
+import { CandidateBookings } from "./CandidateBookings";
 import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 
@@ -33,9 +34,11 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
           candidateId={candidateId}
           applications={apps.data?.items.map((a) => ({ id: a.id, label: `${a.jobTitle} at ${a.companyName}` }))}
           canManageTemplates={permissions.includes("emails.templates:manage")}
+          canBook={permissions.includes("scheduling:use")}
           onDone={() => { setWriting(false); }}
         />
       )}
+      {permissions.includes("scheduling:use") && <CandidateBookings candidateId={candidateId} />}
       <ErrorMessage error={list.error} />
       {list.data?.length === 0 && <p className="muted">No emails sent from HiringPlug yet.</p>}
       {list.data?.map((e) => (

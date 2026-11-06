@@ -51,6 +51,9 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		FromName: e.SenderName + " (" + agency + ")", ReplyTo: e.ReplyTo,
 		To: e.ToAddresses, Cc: e.CcAddresses, Bcc: e.BccAddresses, Subject: e.Subject, Body: e.Body,
 	}
+	if e.Calendar != nil {
+		msg.Calendar = *e.Calendar
+	}
 	var sendErr error
 	switch partsErr := s.files2parts(ctx, q, e, &msg); {
 	case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help

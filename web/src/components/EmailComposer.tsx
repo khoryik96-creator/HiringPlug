@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, unwrap } from "../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../api/keys";
+import { BookingLinkForm } from "./CandidateBookings";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
 
@@ -21,6 +22,8 @@ type Props = {
   /** The template to start with, by name (e.g. "Interview invitation"). */
   template?: string;
   canManageTemplates: boolean;
+  /** The sender may put a booking link in (scheduling:use). */
+  canBook?: boolean;
   onDone: () => void;
 };
 
@@ -29,12 +32,25 @@ type Props = {
  * interview), check and change it, send. Placeholders without a value stay in
  * brackets, and sending waits until they are filled in.
  */
-export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, onDone }: Props) {
+export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, canBook = false, onDone }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [about, setAbout] = useState(applicationId ?? "");
   const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "", body: "" });
   const [missing, setMissing] = useState<string[]>([]);
+  const [booking, setBooking] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /** Puts text where the cursor is in the message (at its end when it has none). */
+  const insert = (text: string) => {
+    const el = bodyRef.current;
+    setForm((f) => {
+      const at = el && document.activeElement === el ? el.selectionStart : f.body.length;
+      const before = f.body.slice(0, at);
+      const sep = before && !before.endsWith("\n") ? "\n\n" : "";
+      return { ...f, body: `${before}${sep}${text}\n${f.body.slice(at)}` };
+    });
+    setBooking(false);
+  };
 
   const draft = useMutation({
     mutationFn: async ({ templateId, applicationId: app }: { templateId: string; applicationId: string }) =>
@@ -96,7 +112,10 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
       <label className="field full">Subject<input value={form.subject} onChange={set("subject")} /></label>
-      <label className="field full">Message<textarea rows={12} value={form.body} onChange={set("body")} /></label>
+      <label className="field full">Message<textarea ref={bodyRef} rows={12} value={form.body} onChange={set("body")} /></label>
+      {canBook && (booking
+        ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>
+        : <div className="full"><button type="button" className="link" onClick={() => { setBooking(true); }}>+ Booking link</button></div>)}
       {unfilled.length > 0 && (
         <p className="full warning" role="status">
           Fill in before sending: {unfilled.map((k) => `[${k}]`).join(", ")}

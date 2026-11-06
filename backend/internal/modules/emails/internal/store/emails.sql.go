@@ -145,7 +145,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -171,6 +171,7 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.BccAddresses,
 		&i.Salary,
 		&i.SalaryRestricted,
+		&i.Calendar,
 	)
 	return i, err
 }
@@ -275,7 +276,7 @@ INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_add
 VALUES (app_current_tenant(), $1, $2, $3::text[],
         $4::text[], $5::text[], $6, $7, $8, $9, $10,
         app_current_user(), $11, $12)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar
 `
 
 type InsertEmailParams struct {
@@ -329,6 +330,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.BccAddresses,
 		&i.Salary,
 		&i.SalaryRestricted,
+		&i.Calendar,
 	)
 	return i, err
 }
@@ -404,7 +406,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) ([]Email, error) {
@@ -436,6 +438,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.BccAddresses,
 			&i.Salary,
 			&i.SalaryRestricted,
+			&i.Calendar,
 		); err != nil {
 			return nil, err
 		}
@@ -535,6 +538,20 @@ type SeedTemplateParams struct {
 // (two people opening them at once add them once).
 func (q *Queries) SeedTemplate(ctx context.Context, arg SeedTemplateParams) error {
 	_, err := q.db.Exec(ctx, seedTemplate, arg.Name, arg.Subject, arg.Body)
+	return err
+}
+
+const setEmailCalendar = `-- name: SetEmailCalendar :exec
+UPDATE email SET calendar = $1 WHERE id = $2
+`
+
+type SetEmailCalendarParams struct {
+	Calendar *string
+	ID       string
+}
+
+func (q *Queries) SetEmailCalendar(ctx context.Context, arg SetEmailCalendarParams) error {
+	_, err := q.db.Exec(ctx, setEmailCalendar, arg.Calendar, arg.ID)
 	return err
 }
 

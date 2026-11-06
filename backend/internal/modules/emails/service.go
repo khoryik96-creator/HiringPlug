@@ -312,9 +312,16 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		return err
 	}
 	row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
-		ApplicationID: n.ApplicationID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
+		ApplicationID: n.ApplicationID, CandidateID: n.CandidateID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
 		Subject: o.Subject, Body: o.Body, SenderName: "HiringPlug", ReplyTo: "",
 	})
+	if err != nil {
+		return err
+	}
+	if n.Calendar != "" {
+		row.Calendar = &n.Calendar
+		err = store.New(tx).SetEmailCalendar(ctx, store.SetEmailCalendarParams{ID: row.ID, Calendar: &n.Calendar})
+	}
 	if err != nil {
 		return err
 	}

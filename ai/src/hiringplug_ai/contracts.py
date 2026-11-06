@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from typing import Annotated, Any
 from pydantic import AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, RootModel
 from datetime import date
@@ -76,6 +76,7 @@ class Permission(StrEnum):
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
     reports_read = "reports:read"
+    scheduling_use = "scheduling:use"
     settings_manage = "settings:manage"
     settings_read = "settings:read"
 
@@ -86,6 +87,9 @@ class ErrorCode(StrEnum):
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
     ASSISTANT_OFF = "ASSISTANT_OFF"
+    BOOKING_CLOSED = "BOOKING_CLOSED"
+    BOOKING_SLOT_TAKEN = "BOOKING_SLOT_TAKEN"
+    BOOKING_TOO_MANY_TRIES = "BOOKING_TOO_MANY_TRIES"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
@@ -111,6 +115,7 @@ class ErrorCode(StrEnum):
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROLE_NOT_EDITABLE = "ROLE_NOT_EDITABLE"
     ROUTE_NOT_FOUND = "ROUTE_NOT_FOUND"
+    SCHEDULING_NOT_SET_UP = "SCHEDULING_NOT_SET_UP"
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE"
     SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
     SIGN_IN_FAILED = "SIGN_IN_FAILED"
@@ -143,6 +148,7 @@ class JobKind(StrEnum):
     lead_source_check = "lead_source.check"
     match_score = "match.score"
     match_scored = "match.scored"
+    scheduling_refresh_calendar = "scheduling.refresh_calendar"
     webhook_deliver = "webhook.deliver"
 
 
@@ -3117,6 +3123,119 @@ class JobFill(BaseModel):
     placements: int
 
 
+class BookingLinkId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["bkl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^bkl_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class WeeklyHours(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    day: Annotated[int, Field(description="1 = Monday ... 7 = Sunday.", ge=1, le=7)]
+    start: Annotated[str, Field(description="e.g. 09:00", pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")]
+    end: Annotated[
+        str, Field(description="e.g. 17:30; after start", pattern="^([01][0-9]|2[0-4]):[0-5][0-9]$")
+    ]
+
+
+class Status2(StrEnum):
+    pending = "pending"
+    ok = "ok"
+    failed = "failed"
+
+
+class CalendarFeed(BaseModel):
+    host: Annotated[
+        str,
+        Field(
+            description="The address's host only, e.g. calendar.google.com (the address itself is private)."
+        ),
+    ]
+    status: Status2
+    error: Annotated[str | None, Field(...)]
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+    busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
+
+
+class ScheduleInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    timeZone: Annotated[str, Field(max_length=64, min_length=1)]
+    hours: Annotated[list[WeeklyHours], Field(max_length=21)]
+    bufferMinutes: Annotated[int, Field(ge=0, le=120)]
+    minNoticeHours: Annotated[int, Field(ge=0, le=336)]
+    maxDaysAhead: Annotated[int, Field(ge=1, le=60)]
+    calendarUrl: Annotated[
+        str | None,
+        Field(
+            description="Your calendar's private .ics address. Leave out to keep it; null removes it.",
+            max_length=2000,
+        ),
+    ] = None
+
+
+class DurationMinutes(IntEnum):
+    integer_15 = 15
+    integer_30 = 30
+    integer_45 = 45
+    integer_60 = 60
+    integer_90 = 90
+
+
+class BookingLinkInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId
+    applicationId: ApplicationId | None = None
+    title: Annotated[str, Field(description="e.g. Call with Aina", max_length=120, min_length=1)]
+    durationMinutes: DurationMinutes
+    location: Annotated[
+        str | None, Field(description="A meeting link, a phone number or an address.", max_length=500)
+    ] = None
+
+
+class BookingStatus(StrEnum):
+    open = "open"
+    booked = "booked"
+    cancelled = "cancelled"
+    expired = "expired"
+
+
+class PublicBooking(BaseModel):
+    companyName: str
+    hostName: str
+    title: str
+    durationMinutes: int
+    location: Annotated[str | None, Field(description="Shown once booked.")]
+    timeZone: Annotated[
+        str, Field(description="The host's time zone (the page shows times in the visitor's).")
+    ]
+    status: BookingStatus
+    startsAt: Annotated[AwareDatetime | None, Field(...)]
+    canChange: Annotated[bool, Field(description="The booked time may still be moved.")]
+    slots: Annotated[
+        list[AwareDatetime], Field(description="Free start times (open, or booked and movable).")
+    ]
+
+
+class PublicBookingInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    startsAt: AwareDatetime
+
+
+class SchedulingRefreshCalendarJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    userId: str
+
+
 class EmailSalaryVisibility(StrEnum):
     salary_roles = "salary_roles"
     everyone = "everyone"
@@ -3677,6 +3796,38 @@ class TimeToFill(BaseModel):
         int | None, Field(description="From a candidate being added to the job to being placed.")
     ]
     jobs: Annotated[list[JobFill], Field(description="Jobs with a placement in the period, slowest first.")]
+
+
+class Schedule(BaseModel):
+    set: Annotated[bool, Field(description="You have saved your hours (booking links need them).")]
+    timeZone: Annotated[str, Field(description="An IANA time zone, e.g. Asia/Kuala_Lumpur.")]
+    hours: list[WeeklyHours]
+    bufferMinutes: Annotated[int, Field(description="Free time kept before and after each meeting.")]
+    minNoticeHours: Annotated[int, Field(description="How soon a candidate may book.")]
+    maxDaysAhead: Annotated[int, Field(description="How far ahead a candidate may book.")]
+    calendar: Annotated[
+        CalendarFeed | None,
+        Field(
+            description="Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none."
+        ),
+    ]
+
+
+class BookingLink(BaseModel):
+    id: BookingLinkId
+    url: Annotated[
+        str | None, Field(description="The address to send (only when just created; the link is not stored).")
+    ]
+    candidateId: CandidateId
+    candidateName: str
+    hostName: str
+    title: str
+    durationMinutes: int
+    location: Annotated[str | None, Field(...)]
+    status: BookingStatus
+    startsAt: Annotated[AwareDatetime | None, Field(description="The booked time.")]
+    expiresAt: AwareDatetime
+    createdAt: AwareDatetime
 
 
 class AiProviders(BaseModel):
