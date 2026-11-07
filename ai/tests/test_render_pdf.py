@@ -61,6 +61,20 @@ def test_an_old_word_doc_becomes_a_pdf_too() -> None:
     assert base64.b64decode(result.pdfBase64).startswith(b"%PDF-")
 
 
+def test_a_cv_studio_cv_ending_on_a_frame_becomes_a_pdf() -> None:
+    """CV Studio pins its closing terms to the foot of the page with a frame;
+    LibreOffice cannot open a document that ends on one."""
+    data = (
+        Path(__file__).resolve().parents[1] / "cvstudio" / "examples" / "formatted-example.docx"
+    ).read_bytes()
+    [follow_up] = render_pdf.run(payload(), deps_for(data))
+    result = follow_up.payload
+    assert isinstance(result, DocumentPdfRenderedJob)
+    assert result.error is None
+    assert result.pdfBase64 is not None
+    assert base64.b64decode(result.pdfBase64).startswith(b"%PDF-")
+
+
 def test_without_libreoffice_the_reason_goes_back(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(office, "available", lambda: False)
     [follow_up] = render_pdf.run(payload(), deps_for(a_docx()))

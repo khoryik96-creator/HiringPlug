@@ -184,6 +184,36 @@ monthly allowance the assistant and matching share. The parser then reads
 - Options per export: hide contact details, hide salary, blind, include the
   recruiter's summary.
 
+### CV Studio's way (built: `cv.format_studio`)
+
+The other way to make a formatted CV: **from one of the candidate's own CVs**,
+with CV Studio's engine, vendored unchanged in `ai/cvstudio` (its rule modules,
+prompts, Node renderer and template; `src/hiringplug_ai/cvstudio.py` is the
+only code that touches it). In CV Studio's own order:
+
+1. The CV's text is read (PDF, Word or old .doc, with OCR), and **lines stating
+   the candidate's own pay are removed first** (CV Studio's pay filter, line by
+   line: payroll duties and other figures stay), so salary never reaches the AI
+   or the formatted CV.
+2. The AI reads it into CV Studio's structure with CV Studio's prompt. With
+   "correct spelling" the prompt's spelling line is swapped for CV Studio's
+   fuller language-correction instruction, as CV Studio does.
+3. CV Studio's rules tidy and reconcile it with the text and run its fidelity
+   check; anything that may be lost or changed comes back as a **warning** the
+   recruiter sees ("compare it with the CV before sending").
+4. For a blind CV the AI anonymises it with CV Studio's blind prompt (optionally
+   "the candidate" instead of he or she), then CV Studio's deterministic sweeps
+   run; Go checks the finished file for the candidate's name, email and phone
+   before saving it, and never saves one that shows them.
+5. CV Studio's renderer (`node generate.js`, a time limit) writes the Word file,
+   with the Word file's own bullet depth when the source was Word.
+
+Go saves it as the candidate's `formatted` CV (a PDF follows) and counts the
+tokens in the company's monthly allowance. Every failure comes back as a
+reason, never an exception. LibreOffice cannot open a document that ends on a
+framed paragraph (CV Studio pins its closing terms that way), so the PDF step
+retries with an empty paragraph after it; the Word file is kept as made.
+
 ## CV-to-job matching (built)
 
 `match.score` carries the job's text (title, details, description and its

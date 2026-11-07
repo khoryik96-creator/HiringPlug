@@ -89,3 +89,17 @@ func (m *Module) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (
 	data, err := io.ReadAll(f)
 	return doc, data, err
 }
+
+// SourceCV returns one of a candidate's documents and a signed link to its
+// file for a worker (the AI worker formatting it), in the caller's
+// transaction (row-level security: only documents the user may see).
+func (m *Module) SourceCV(ctx context.Context, tx pgx.Tx, id string) (Document, string, error) {
+	row, err := store.New(tx).GetDocument(ctx, id)
+	if database.IsNoRows(err) {
+		return Document{}, "", apperr.NotFound("document")
+	}
+	if err != nil {
+		return Document{}, "", err
+	}
+	return fromRow(row), m.service.files.SignedURL(row.StorageKey, downloadLinkTTL), nil
+}

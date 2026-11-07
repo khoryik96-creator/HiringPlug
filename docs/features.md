@@ -111,6 +111,20 @@ as it is; a Word file (.docx or old .doc) gets a PDF copy made by the AI worker
 with LibreOffice when it is uploaded (its text shows meanwhile). Word CVs from
 before this get their copy the first time the page is opened.
 
+**Formatted CVs, CV Studio's way ✅.** "Make formatted CV" offers two ways.
+**From their CV** formats one of the CVs the candidate sent with CV Studio's
+own engine: the AI reads it, CV Studio's rules tidy and check it, and its
+renderer lays it out in its template, in the background (a minute; the
+candidate's page shows its progress). Options: correct spelling, punctuation
+and capitals (never the meaning, numbers or dates); blind (no name or contact
+details, employers and schools described rather than named, optionally "the
+candidate" instead of he or she); paragraphs aligned left or justified. Lines
+stating the candidate's own salary are left out before the AI sees the CV. When
+CV Studio's check finds something the result may have lost or changed, the
+page says what, to compare before sending. It needs the AI (Settings > AI
+provider) and counts in the monthly AI allowance. **From their profile** is
+the template way below.
+
 **Formatted CVs ✅.** "Make formatted CV" (candidate page, CVs and documents)
 fills the candidate's profile, work history and education into a Word
 template and saves it as their `formatted` CV (read and compared with the

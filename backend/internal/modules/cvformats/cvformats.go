@@ -20,12 +20,15 @@ package cvformats
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Application is the job a CV is made for (pipeline module).
@@ -53,15 +56,35 @@ type Deps struct {
 	Users interface {
 		UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	}
+	// SourceCVs gives a CV to format CV Studio's way and a signed link to it (documents module).
+	SourceCVs interface {
+		SourceCV(ctx context.Context, tx pgx.Tx, id string) (SourceCV, string, error)
+	}
+	// AI is the company's AI provider, if it has one and allowance left this month.
+	AI interface {
+		Allowed(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
+	}
 }
 
 // Module is the cvformats module.
 type Module struct {
 	HTTP *HTTP
+	svc  *Service
+}
+
+// JobHandlers returns the handlers for this module's jobs on the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindCvStudioFormatted: m.svc.saveStudio}
+}
+
+// TokensSince is the AI tokens studio CVs used since a time (the company's
+// monthly allowance), in the caller's transaction.
+func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
+	return m.svc.TokensSince(ctx, tx, since)
 }
 
 // New wires the module. Templates are kept in files, up to maxUploadBytes.
 func New(pool *pgxpool.Pool, deps Deps, files *blob.Store, maxUploadBytes int64) *Module {
 	svc := &Service{pool: pool, deps: deps, files: files}
-	return &Module{HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
+	return &Module{HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}, svc: svc}
 }

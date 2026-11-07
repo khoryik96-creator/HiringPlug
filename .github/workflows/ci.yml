@@ -93,6 +93,8 @@ jobs:
       - uses: arduino/setup-task@v2
         with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
       - run: uv sync --frozen
+      - name: CV Studio's Word renderer (Node)
+        run: npm ci --prefix cvstudio/engine
       - name: Generated models are up to date
         run: task gen:py && git diff --exit-code -- src/hiringplug_ai/contracts.py
       - run: task lint:py

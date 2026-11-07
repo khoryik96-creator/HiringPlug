@@ -324,3 +324,14 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .cv-pane-title { margin: 0 0.5rem 0 0; }
 .candidate-cv .cv-frame { height: 80vh; border-radius: 10px; border-color: var(--line); }
 .candidate-cv .extracted { max-height: 70vh; overflow: auto; }
+/* Make formatted CV: from their CV (CV Studio) or from their profile; runs being made. */
+.format-cv .choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.6rem; margin-bottom: 0.9rem; }
+.format-cv .choice label { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.7rem 0.85rem; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); cursor: pointer; font-weight: 400; }
+.format-cv .choice label.on { border-color: var(--accent); background: var(--accent-soft); }
+.format-cv .choice label span { display: flex; flex-direction: column; gap: 0.15rem; }
+.format-cv .choice small { color: var(--muted); font-size: 0.82rem; }
+.format-cv .choice input:disabled + span { opacity: 0.5; }
+.studio-runs { list-style: none; padding: 0; margin: 0.75rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.studio-run { padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--soft); font-size: 0.92rem; }
+.studio-run.queued { background: var(--accent-soft); color: var(--accent-dark); }
+.studio-run p { margin: 0.3rem 0 0; }

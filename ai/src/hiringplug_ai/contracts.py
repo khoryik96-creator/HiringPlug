@@ -120,6 +120,8 @@ class ErrorCode(StrEnum):
     SIGN_IN_CHOOSE_COMPANY = "SIGN_IN_CHOOSE_COMPANY"
     SIGN_IN_FAILED = "SIGN_IN_FAILED"
     STAGE_MOVE_NOT_ALLOWED = "STAGE_MOVE_NOT_ALLOWED"
+    STUDIO_CV_OFF = "STUDIO_CV_OFF"
+    STUDIO_CV_SOURCE = "STUDIO_CV_SOURCE"
     TEAM_CHANGE_NOT_ALLOWED = "TEAM_CHANGE_NOT_ALLOWED"
     TOO_MANY_ATTEMPTS = "TOO_MANY_ATTEMPTS"
     UNAUTHENTICATED = "UNAUTHENTICATED"
@@ -135,6 +137,8 @@ class JobKind(StrEnum):
     company_autofill = "company.autofill"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
+    cv_format_studio = "cv.format_studio"
+    cv_studio_formatted = "cv.studio_formatted"
     document_cv_parsed = "document.cv_parsed"
     document_extract_text = "document.extract_text"
     document_parse_cv = "document.parse_cv"
@@ -1067,6 +1071,54 @@ class CvTemplateList(BaseModel):
             description="Repeating blocks: paragraphs between {{#experience}} and {{/experience}} (each on its own line) repeat for each job; inside, {{title}}, {{company}}, {{dates}}, {{description}}. Likewise {{#education}} with {{qualification}}, {{institution}}, {{year}}."
         ),
     ]
+
+
+class StudioCvId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^scv_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class StudioCvAlignment(StrEnum):
+    left = "left"
+    justify = "justify"
+
+
+class StudioCvStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class CvFormatStudioJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    studioCvId: StudioCvId
+    downloadUrl: Annotated[str, Field(description="A signed link to the CV (expires).")]
+    contentType: str
+    fileName: str
+    sizeBytes: int
+    blind: bool
+    neutralGender: bool
+    correctLanguage: bool
+    alignment: StudioCvAlignment
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class CvStudioFormattedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    studioCvId: StudioCvId
+    docxBase64: Annotated[str | None, Field(description="The formatted Word file.")]
+    error: Annotated[str | None, Field(max_length=2000)]
+    warning: Annotated[str | None, Field(max_length=4000)]
+    payStatementsRemoved: Annotated[int, Field(ge=0)]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class DocumentId(RootModel[str]):
@@ -3470,6 +3522,59 @@ class FormatCvInput(BaseModel):
             description="A blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and profile links removed from free text; checked before it is saved that none of them is left."
         ),
     ] = None
+
+
+class StudioCvInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    documentId: Annotated[
+        DocumentId, Field(description="The CV to format (one the candidate sent, PDF or Word).")
+    ]
+    blind: Annotated[
+        bool | None,
+        Field(
+            description="A blind CV: the AI anonymises it (no name, contact details, employers or schools named), then CV Studio's checks; checked again before it is saved."
+        ),
+    ] = None
+    neutralGender: Annotated[
+        bool | None,
+        Field(description='With blind: the candidate referred to as "the candidate" rather than he or she.'),
+    ] = None
+    correctLanguage: Annotated[
+        bool | None,
+        Field(
+            description="Correct spelling, punctuation and capitalisation (never the meaning, numbers or dates)."
+        ),
+    ] = None
+    alignment: StudioCvAlignment | None = None
+
+
+class StudioCv(BaseModel):
+    id: StudioCvId
+    candidateId: CandidateId
+    sourceDocumentId: DocumentId
+    status: StudioCvStatus
+    blind: bool
+    correctLanguage: bool
+    alignment: StudioCvAlignment
+    documentId: Annotated[DocumentId | None, Field(description="The formatted CV, once done.")]
+    fileName: Annotated[str | None, Field(...)]
+    error: Annotated[str | None, Field(description="Why it failed.")]
+    warning: Annotated[
+        str | None,
+        Field(
+            description="CV Studio's check found something in the CV that the result may have lost or changed: compare them before sending it."
+        ),
+    ]
+    payStatementsRemoved: Annotated[
+        int, Field(description="Statements of the candidate's own pay left out of the result.")
+    ]
+    createdAt: AwareDatetime
+
+
+class StudioCvList(BaseModel):
+    items: list[StudioCv]
 
 
 class FormattedCv(BaseModel):

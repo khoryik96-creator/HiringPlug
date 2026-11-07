@@ -626,6 +626,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/{candidateId}/studio-cvs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The candidate's latest CV Studio formatting runs, newest first */
+        get: operations["listStudioCvs"];
+        put?: never;
+        /** Format one of the candidate's CVs CV Studio's way (the AI reads it; done in the background) */
+        post: operations["startStudioCv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/{candidateId}/documents": {
         parameters: {
             query?: never;
@@ -2477,9 +2497,9 @@ export interface components {
         /** @enum {string} */
         Permission: "aiproviders:manage" | "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:read" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_HAS_NO_TEXT" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "scheduling.refresh_calendar" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "scheduling.refresh_calendar" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -3211,6 +3231,74 @@ export interface components {
             summary?: string;
             /** @description A blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and profile links removed from free text; checked before it is saved that none of them is left. */
             blind?: boolean;
+        };
+        StudioCvId: string;
+        /**
+         * @description How paragraphs are aligned in the Word file.
+         * @enum {string}
+         */
+        StudioCvAlignment: "left" | "justify";
+        StudioCvInput: {
+            /** @description The CV to format (one the candidate sent, PDF or Word). */
+            documentId: components["schemas"]["DocumentId"];
+            /** @description A blind CV: the AI anonymises it (no name, contact details, employers or schools named), then CV Studio's checks; checked again before it is saved. */
+            blind?: boolean;
+            /** @description With blind: the candidate referred to as "the candidate" rather than he or she. */
+            neutralGender?: boolean;
+            /** @description Correct spelling, punctuation and capitalisation (never the meaning, numbers or dates). */
+            correctLanguage?: boolean;
+            alignment?: components["schemas"]["StudioCvAlignment"];
+        };
+        /** @enum {string} */
+        StudioCvStatus: "queued" | "done" | "failed";
+        StudioCv: {
+            id: components["schemas"]["StudioCvId"];
+            candidateId: components["schemas"]["CandidateId"];
+            sourceDocumentId: components["schemas"]["DocumentId"];
+            status: components["schemas"]["StudioCvStatus"];
+            blind: boolean;
+            correctLanguage: boolean;
+            alignment: components["schemas"]["StudioCvAlignment"];
+            /** @description The formatted CV, once done. */
+            documentId: components["schemas"]["DocumentId"] | null;
+            fileName: string | null;
+            /** @description Why it failed. */
+            error: string | null;
+            /** @description CV Studio's check found something in the CV that the result may have lost or changed: compare them before sending it. */
+            warning: string | null;
+            /** @description Statements of the candidate's own pay left out of the result. */
+            payStatementsRemoved: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        StudioCvList: {
+            items: components["schemas"]["StudioCv"][];
+        };
+        CvFormatStudioJob: {
+            studioCvId: components["schemas"]["StudioCvId"];
+            /** @description A signed link to the CV (expires). */
+            downloadUrl: string;
+            contentType: string;
+            fileName: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            blind: boolean;
+            neutralGender: boolean;
+            correctLanguage: boolean;
+            alignment: components["schemas"]["StudioCvAlignment"];
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
+        };
+        CvStudioFormattedJob: {
+            studioCvId: components["schemas"]["StudioCvId"];
+            /** @description The formatted Word file. */
+            docxBase64: string | null;
+            error: string | null;
+            warning: string | null;
+            payStatementsRemoved: number;
+            model: string | null;
+            inputTokens: number;
+            outputTokens: number;
         };
         FormattedCv: {
             documentId: components["schemas"]["DocumentId"];
@@ -5325,6 +5413,24 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description No AI for it (STUDIO_CV_OFF). */
+        StudioCvOff: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Not a CV that can be formatted (STUDIO_CV_SOURCE). */
+        StudioCvSource: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Not blind (CV_NOT_BLIND). */
         CvNotBlind: {
             headers: {
@@ -6640,6 +6746,63 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["CvNotBlind"];
+        };
+    };
+    listStudioCvs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioCvList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startStudioCv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudioCvInput"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioCv"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["StudioCvOff"];
+            422: components["responses"]["StudioCvSource"];
         };
     };
     listCandidateDocuments: {

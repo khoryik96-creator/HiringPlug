@@ -7,8 +7,10 @@ x-module:
     Formatted CVs: the candidate's profile, work history and education filled
     into a Word template (the built-in standard one, or the company's own),
     with contact details hidden unless asked and salary only when asked by
-    someone who may see it. The result is saved as the candidate's formatted
-    CV (and compared with the original like any formatted CV).
+    someone who may see it. Or CV Studio's way: one of the candidate's own CVs
+    read by the AI and laid out by CV Studio's rules and renderer (studio CVs).
+    The result is saved as the candidate's formatted CV (and compared with the
+    original like any formatted CV).
   permissions:
     cvformats:create:
       description: Make formatted CVs.
@@ -20,7 +22,23 @@ x-module:
     CV_NOT_BLIND:
       status: 422
       description: A blind CV would still show something that identifies the candidate (usually text in the template itself); nothing was saved. The message says what kind of detail.
-  jobs: {}
+    STUDIO_CV_OFF:
+      status: 409
+      description: CV Studio formatting needs the AI, and no AI provider is set up (or this month's AI allowance is used up).
+    STUDIO_CV_SOURCE:
+      status: 422
+      description: The chosen document cannot be formatted (not this candidate's, not a CV they sent, or not a PDF or Word file).
+  jobs:
+    cv.format_studio:
+      queue: ai
+      payload: CvFormatStudioJob
+      priority: high
+      description: Read a CV with the AI and lay it out with CV Studio's rules and Word renderer (Python AI worker).
+    cv.studio_formatted:
+      queue: core
+      payload: CvStudioFormattedJob
+      priority: high
+      description: Save a CV Studio formatted CV with the candidate's documents, or why it failed (Go worker).
 
 paths:
   /v1/cv-templates:
@@ -126,8 +144,58 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/CvNotBlind' }
 
+  /v1/candidates/{candidateId}/studio-cvs:
+    parameters:
+      - $ref: '#/components/parameters/CandidateIdPath'
+    get:
+      operationId: listStudioCvs
+      tags: [cvformats]
+      summary: The candidate's latest CV Studio formatting runs, newest first
+      x-permission: cvformats:create
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioCvList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: startStudioCv
+      tags: [cvformats]
+      summary: Format one of the candidate's CVs CV Studio's way (the AI reads it; done in the background)
+      x-permission: cvformats:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudioCvInput' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioCv' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/StudioCvOff' }
+        '422': { $ref: '#/components/responses/StudioCvSource' }
+
 components:
   responses:
+    StudioCvOff:
+      description: No AI for it (STUDIO_CV_OFF).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    StudioCvSource:
+      description: Not a CV that can be formatted (STUDIO_CV_SOURCE).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     CvNotBlind:
       description: Not blind (CV_NOT_BLIND).
       content:
@@ -185,6 +253,85 @@ components:
         blind:
           type: boolean
           description: "A blind CV: a reference instead of the name; no contact details or nationality; names, emails, phone numbers and profile links removed from free text; checked before it is saved that none of them is left."
+    StudioCvId:
+      type: string
+      pattern: '^scv_[0-9a-hjkmnp-tv-z]{26}$'
+    StudioCvAlignment:
+      type: string
+      description: How paragraphs are aligned in the Word file.
+      enum: [left, justify]
+    StudioCvInput:
+      type: object
+      additionalProperties: false
+      required: [documentId]
+      properties:
+        documentId:
+          description: The CV to format (one the candidate sent, PDF or Word).
+          allOf: [{ $ref: '#/components/schemas/DocumentId' }]
+        blind: { type: boolean, description: "A blind CV: the AI anonymises it (no name, contact details, employers or schools named), then CV Studio's checks; checked again before it is saved." }
+        neutralGender: { type: boolean, description: "With blind: the candidate referred to as \"the candidate\" rather than he or she." }
+        correctLanguage: { type: boolean, description: "Correct spelling, punctuation and capitalisation (never the meaning, numbers or dates)." }
+        alignment: { $ref: '#/components/schemas/StudioCvAlignment' }
+    StudioCvStatus:
+      type: string
+      enum: [queued, done, failed]
+    StudioCv:
+      type: object
+      required: [id, candidateId, sourceDocumentId, status, blind, correctLanguage, alignment, documentId, fileName, error, warning, payStatementsRemoved, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/StudioCvId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        sourceDocumentId: { $ref: '#/components/schemas/DocumentId' }
+        status: { $ref: '#/components/schemas/StudioCvStatus' }
+        blind: { type: boolean }
+        correctLanguage: { type: boolean }
+        alignment: { $ref: '#/components/schemas/StudioCvAlignment' }
+        documentId:
+          description: The formatted CV, once done.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/DocumentId' }]
+        fileName: { type: string, nullable: true }
+        error: { type: string, nullable: true, description: Why it failed. }
+        warning: { type: string, nullable: true, description: "CV Studio's check found something in the CV that the result may have lost or changed: compare them before sending it." }
+        payStatementsRemoved: { type: integer, description: "Statements of the candidate's own pay left out of the result." }
+        createdAt: { type: string, format: date-time }
+    StudioCvList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StudioCv' }
+    CvFormatStudioJob:
+      type: object
+      additionalProperties: false
+      required: [studioCvId, downloadUrl, contentType, fileName, sizeBytes, blind, neutralGender, correctLanguage, alignment]
+      properties:
+        studioCvId: { $ref: '#/components/schemas/StudioCvId' }
+        downloadUrl: { type: string, description: A signed link to the CV (expires). }
+        contentType: { type: string }
+        fileName: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        blind: { type: boolean }
+        neutralGender: { type: boolean }
+        correctLanguage: { type: boolean }
+        alignment: { $ref: '#/components/schemas/StudioCvAlignment' }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    CvStudioFormattedJob:
+      type: object
+      additionalProperties: false
+      required: [studioCvId, docxBase64, error, warning, payStatementsRemoved, model, inputTokens, outputTokens]
+      properties:
+        studioCvId: { $ref: '#/components/schemas/StudioCvId' }
+        docxBase64: { type: string, nullable: true, description: The formatted Word file. }
+        error: { type: string, nullable: true, maxLength: 2000 }
+        warning: { type: string, nullable: true, maxLength: 4000 }
+        payStatementsRemoved: { type: integer, minimum: 0 }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }
     FormattedCv:
       type: object
       required: [documentId, fileName]

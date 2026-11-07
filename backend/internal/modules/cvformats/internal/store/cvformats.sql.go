@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 )
 
 const deleteTemplate = `-- name: DeleteTemplate :one
@@ -18,6 +19,86 @@ func (q *Queries) DeleteTemplate(ctx context.Context, id string) (string, error)
 	var storage_key string
 	err := row.Scan(&storage_key)
 	return storage_key, err
+}
+
+const finishStudioCv = `-- name: FinishStudioCv :one
+UPDATE studio_cv
+   SET status = $1, document_id = $2, file_name = $3,
+       error = $4, warning = $5, pay_removed = $6, finished_at = now()
+ WHERE id = $7 AND status = 'queued'
+RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at
+`
+
+type FinishStudioCvParams struct {
+	Status     string
+	DocumentID *string
+	FileName   *string
+	Error      *string
+	Warning    *string
+	PayRemoved int32
+	ID         string
+}
+
+func (q *Queries) FinishStudioCv(ctx context.Context, arg FinishStudioCvParams) (StudioCv, error) {
+	row := q.db.QueryRow(ctx, finishStudioCv,
+		arg.Status,
+		arg.DocumentID,
+		arg.FileName,
+		arg.Error,
+		arg.Warning,
+		arg.PayRemoved,
+		arg.ID,
+	)
+	var i StudioCv
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.SourceDocumentID,
+		&i.Status,
+		&i.Blind,
+		&i.NeutralGender,
+		&i.CorrectLanguage,
+		&i.Alignment,
+		&i.DocumentID,
+		&i.FileName,
+		&i.Error,
+		&i.Warning,
+		&i.PayRemoved,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const getStudioCv = `-- name: GetStudioCv :one
+SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at FROM studio_cv WHERE id = $1
+`
+
+func (q *Queries) GetStudioCv(ctx context.Context, id string) (StudioCv, error) {
+	row := q.db.QueryRow(ctx, getStudioCv, id)
+	var i StudioCv
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.SourceDocumentID,
+		&i.Status,
+		&i.Blind,
+		&i.NeutralGender,
+		&i.CorrectLanguage,
+		&i.Alignment,
+		&i.DocumentID,
+		&i.FileName,
+		&i.Error,
+		&i.Warning,
+		&i.PayRemoved,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
+	return i, err
 }
 
 const getTemplate = `-- name: GetTemplate :one
@@ -34,6 +115,55 @@ func (q *Queries) GetTemplate(ctx context.Context, id string) (CvTemplate, error
 		&i.StorageKey,
 		&i.UploadedBy,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertStudioCv = `-- name: InsertStudioCv :one
+INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by)
+VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, $7, app_current_user())
+RETURNING id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at
+`
+
+type InsertStudioCvParams struct {
+	ID               string
+	CandidateID      string
+	SourceDocumentID string
+	Blind            bool
+	NeutralGender    bool
+	CorrectLanguage  bool
+	Alignment        string
+}
+
+func (q *Queries) InsertStudioCv(ctx context.Context, arg InsertStudioCvParams) (StudioCv, error) {
+	row := q.db.QueryRow(ctx, insertStudioCv,
+		arg.ID,
+		arg.CandidateID,
+		arg.SourceDocumentID,
+		arg.Blind,
+		arg.NeutralGender,
+		arg.CorrectLanguage,
+		arg.Alignment,
+	)
+	var i StudioCv
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.SourceDocumentID,
+		&i.Status,
+		&i.Blind,
+		&i.NeutralGender,
+		&i.CorrectLanguage,
+		&i.Alignment,
+		&i.DocumentID,
+		&i.FileName,
+		&i.Error,
+		&i.Warning,
+		&i.PayRemoved,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
 	)
 	return i, err
 }
@@ -62,6 +192,48 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listStudioCvs = `-- name: ListStudioCvs :many
+SELECT id, tenant_id, candidate_id, source_document_id, status, blind, neutral_gender, correct_language, alignment, document_id, file_name, error, warning, pay_removed, created_by, created_at, finished_at FROM studio_cv WHERE candidate_id = $1 ORDER BY created_at DESC, id DESC LIMIT 10
+`
+
+func (q *Queries) ListStudioCvs(ctx context.Context, candidateID string) ([]StudioCv, error) {
+	rows, err := q.db.Query(ctx, listStudioCvs, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []StudioCv
+	for rows.Next() {
+		var i StudioCv
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CandidateID,
+			&i.SourceDocumentID,
+			&i.Status,
+			&i.Blind,
+			&i.NeutralGender,
+			&i.CorrectLanguage,
+			&i.Alignment,
+			&i.DocumentID,
+			&i.FileName,
+			&i.Error,
+			&i.Warning,
+			&i.PayRemoved,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTemplates = `-- name: ListTemplates :many
@@ -97,6 +269,17 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]CvTemplate, error) {
 	return items, nil
 }
 
+const newStudioCvID = `-- name: NewStudioCvID :one
+SELECT new_id('scv')::text
+`
+
+func (q *Queries) NewStudioCvID(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, newStudioCvID)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const newTemplateID = `-- name: NewTemplateID :one
 SELECT new_id('ctpl')::text
 `
@@ -104,6 +287,31 @@ SELECT new_id('ctpl')::text
 func (q *Queries) NewTemplateID(ctx context.Context) (string, error) {
 	row := q.db.QueryRow(ctx, newTemplateID)
 	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const recordStudioCvAIUse = `-- name: RecordStudioCvAIUse :exec
+INSERT INTO studio_cv_ai_use (tenant_id, studio_cv_id, tokens) VALUES (app_current_tenant(), $1, $2)
+`
+
+type RecordStudioCvAIUseParams struct {
+	StudioCvID string
+	Tokens     int32
+}
+
+func (q *Queries) RecordStudioCvAIUse(ctx context.Context, arg RecordStudioCvAIUseParams) error {
+	_, err := q.db.Exec(ctx, recordStudioCvAIUse, arg.StudioCvID, arg.Tokens)
+	return err
+}
+
+const studioCvTokensSince = `-- name: StudioCvTokensSince :one
+SELECT coalesce(sum(tokens), 0)::bigint FROM studio_cv_ai_use WHERE created_at >= $1
+`
+
+func (q *Queries) StudioCvTokensSince(ctx context.Context, since time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, studioCvTokensSince, since)
+	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
 }

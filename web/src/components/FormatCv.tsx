@@ -1,18 +1,101 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Permission, unwrap } from "../api/client";
+import { api, type Document, type Permission, unwrap } from "../api/client";
 import { candidateApplicationsKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
 
 export const cvTemplatesKey = ["cv-templates"] as const;
 
+export const studioCvsKey = (candidateId: string) => ["studio-cvs", candidateId] as const;
+
+const READABLE = new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"]);
+
 /**
- * Make a formatted CV: the candidate's profile in a Word template, saved with
- * their documents (a PDF follows). Contact details stay out unless asked.
+ * Make a formatted CV, saved with the candidate's documents (a PDF follows):
+ * from one of their own CVs, CV Studio's way (the AI reads it; done in the
+ * background), or from their profile in a Word template. Contact details stay
+ * out unless asked.
  */
 export function FormatCv({ candidateId, permissions, onDone }: { candidateId: string; permissions: Permission[]; onDone: () => void }) {
+  const docs = useQuery({
+    queryKey: ["documents", candidateId],
+    queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
+  });
+  const cvs = (docs.data ?? []).filter((d) => d.source !== "formatted" && READABLE.has(d.contentType));
+  const [picked, setPicked] = useState<"studio" | "template" | null>(null);
+  const mode = picked ?? (cvs.length > 0 ? "studio" : "template");
+  return (
+    <div className="panel format-cv">
+      <div className="choice" role="radiogroup" aria-label="Make it from">
+        <label className={mode === "studio" ? "on" : undefined}>
+          <input type="radio" name="format-mode" checked={mode === "studio"} disabled={cvs.length === 0} onChange={() => { setPicked("studio"); }} />
+          <span><strong>From their CV</strong><small>CV Studio&apos;s layout and rules; the AI reads the CV</small></span>
+        </label>
+        <label className={mode === "template" ? "on" : undefined}>
+          <input type="radio" name="format-mode" checked={mode === "template"} onChange={() => { setPicked("template"); }} />
+          <span><strong>From their profile</strong><small>The profile in a Word template</small></span>
+        </label>
+      </div>
+      {mode === "studio"
+        ? <StudioForm candidateId={candidateId} cvs={cvs} onDone={onDone} />
+        : <TemplateForm candidateId={candidateId} permissions={permissions} onDone={onDone} />}
+    </div>
+  );
+}
+
+function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Document[]; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify" });
+  const documentId = form.documentId || cvs[0]?.id || "";
+  const start = useMutation({
+    mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/studio-cvs", {
+      params: { path: { candidateId } },
+      body: { documentId, blind: form.blind, neutralGender: form.blind && form.neutralGender, correctLanguage: form.correctLanguage, alignment: form.alignment },
+    })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: studioCvsKey(candidateId) });
+      onDone();
+    },
+  });
+  return (
+    <form className="form-grid" aria-label="Format their CV" onSubmit={(e) => { e.preventDefault(); start.mutate(); }}>
+      <label className="field full">CV
+        <select value={documentId} onChange={(e) => { setForm({ ...form, documentId: e.target.value }); }}>
+          {cvs.map((d) => <option key={d.id} value={d.id}>{d.fileName} ({d.source}, {new Date(d.createdAt).toLocaleDateString("en-GB")})</option>)}
+        </select>
+      </label>
+      <label className="row full">
+        <input type="checkbox" checked={form.correctLanguage} onChange={(e) => { setForm({ ...form, correctLanguage: e.target.checked }); }} />{" "}
+        Correct spelling, punctuation and capitals (never the meaning, numbers or dates)
+      </label>
+      <label className="row full">
+        <input type="checkbox" checked={form.blind} onChange={(e) => { setForm({ ...form, blind: e.target.checked }); }} />{" "}
+        Blind CV (no name or contact details; employers and schools described, not named)
+      </label>
+      {form.blind && (
+        <label className="row full">
+          <input type="checkbox" checked={form.neutralGender} onChange={(e) => { setForm({ ...form, neutralGender: e.target.checked }); }} />{" "}
+          &ldquo;The candidate&rdquo; instead of he or she
+        </label>
+      )}
+      <label className="field">Paragraphs
+        <select value={form.alignment} onChange={(e) => { setForm({ ...form, alignment: e.target.value === "justify" ? "justify" : "left" }); }}>
+          <option value="left">Aligned left</option>
+          <option value="justify">Justified</option>
+        </select>
+      </label>
+      <ErrorMessage error={start.error} />
+      <div className="row full">
+        <button type="submit" disabled={start.isPending || !documentId}>Format CV</button>
+        <button type="button" className="link" onClick={onDone}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
+function TemplateForm({ candidateId, permissions, onDone }: { candidateId: string; permissions: Permission[]; onDone: () => void }) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: cvTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/cv-templates")).items });
   const apps = useQuery({
@@ -35,7 +118,7 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
     },
   });
   return (
-    <form className="panel form-grid" aria-label="Make formatted CV" onSubmit={(e) => { e.preventDefault(); make.mutate(); }}>
+    <form className="form-grid" aria-label="Make formatted CV" onSubmit={(e) => { e.preventDefault(); make.mutate(); }}>
       <ErrorMessage error={templates.error} />
       <label className="field">Template
         <select value={form.templateId} onChange={(e) => { setForm({ ...form, templateId: e.target.value }); }}>

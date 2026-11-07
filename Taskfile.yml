@@ -34,7 +34,9 @@ tasks:
 
   setup:py:
     dir: ai
-    cmds: [uv sync]
+    cmds:
+      - uv sync
+      - npm ci --prefix cvstudio/engine  # CV Studio's Word renderer (Node)
 
   setup:web:
     dir: web

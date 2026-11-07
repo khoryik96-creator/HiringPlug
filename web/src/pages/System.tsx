@@ -18,6 +18,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "company.autofill": "Filling in companies from their websites",
   "contact.read_linkedin": "Reading contacts' LinkedIn profiles",
   "contact.linkedin_read": "Saving contacts' LinkedIn profiles",
+  "cv.format_studio": "Formatting CVs CV Studio's way",
+  "cv.studio_formatted": "Saving CV Studio formatted CVs",
   "document.extract_text": "Reading CVs",
   "document.text_extracted": "Saving CV text",
   "document.parse_cv": "Reading details from CVs",

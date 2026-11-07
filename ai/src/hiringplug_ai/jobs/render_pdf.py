@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import base64
+import io
 import logging
+import re
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,11 +30,9 @@ def run(payload: DocumentRenderPdfJob, deps: Deps) -> list[FollowUp]:
     if not office.available():
         error = "LibreOffice is not installed in the AI worker, so no PDF can be made"
     else:
-        with tempfile.TemporaryDirectory(prefix="hp-pdf-") as tmp:
-            # An old Word .doc (an OLE file) is named as one, as LibreOffice expects.
-            path = Path(tmp) / ("cv.doc" if data.startswith(b"\xd0\xcf\x11\xe0") else "cv.docx")
-            path.write_bytes(data)
-            pdf = office.convert(path, Path(tmp), "pdf")
+        pdf = _convert(data)
+        if pdf is None and (patched := _end_after_frame(data)) is not None:
+            pdf = _convert(patched)  # the Word file itself is kept as it was made
         if pdf is None or not pdf.startswith(b"%PDF-"):
             pdf, error = None, "LibreOffice could not turn this document into a PDF"
     log.info("pdf rendered", extra={"document_id": payload.documentId.root, "ok": pdf is not None})
@@ -46,3 +47,39 @@ def run(payload: DocumentRenderPdfJob, deps: Deps) -> list[FollowUp]:
             ),
         )
     ]
+
+
+def _convert(data: bytes) -> bytes | None:
+    with tempfile.TemporaryDirectory(prefix="hp-pdf-") as tmp:
+        # An old Word .doc (an OLE file) is named as one, as LibreOffice expects.
+        path = Path(tmp) / ("cv.doc" if data.startswith(b"\xd0\xcf\x11\xe0") else "cv.docx")
+        path.write_bytes(data)
+        return office.convert(path, Path(tmp), "pdf")
+
+
+_LAST_PARAGRAPH = re.compile(
+    rb"<w:p\b(?:(?!<w:p\b).)*?</w:p>\s*(?=<w:sectPr\b(?:(?!<w:sectPr\b).)*</w:body>)", re.S
+)
+
+
+def _end_after_frame(data: bytes) -> bytes | None:
+    """A copy of a .docx whose last paragraph is a frame (CV Studio pins its
+    closing terms to the foot of the page that way) with an empty paragraph
+    after it: LibreOffice cannot open a document that ends on a frame, Word
+    can. None when the document does not end like that."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zin:
+            body = zin.read("word/document.xml")
+            last = _LAST_PARAGRAPH.search(body)
+            if last is None or b"<w:framePr" not in last.group(0):
+                return None
+            fixed = body[: last.end()] + b"<w:p/>" + body[last.end() :]
+            out = io.BytesIO()
+            with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    zout.writestr(
+                        item, fixed if item.filename == "word/document.xml" else zin.read(item.filename)
+                    )
+            return out.getvalue()
+    except (zipfile.BadZipFile, KeyError):
+        return None

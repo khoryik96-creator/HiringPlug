@@ -10,6 +10,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
@@ -58,4 +59,13 @@ func (a cvApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (ma
 		out[id] = cvformats.Application{CandidateID: b.CandidateID, JobTitle: b.JobTitle, CompanyName: b.CompanyName}
 	}
 	return out, err
+}
+
+// cvSources gives cvformats a CV to format CV Studio's way (documents module).
+type cvSources struct{ documents *documents.Module }
+
+func (a cvSources) SourceCV(ctx context.Context, tx pgx.Tx, id string) (cvformats.SourceCV, string, error) {
+	d, url, err := a.documents.SourceCV(ctx, tx, id)
+	return cvformats.SourceCV{ID: d.ID, CandidateID: d.CandidateID, Source: d.Source, FileName: d.FileName,
+		ContentType: d.ContentType, SizeBytes: d.SizeBytes}, url, err
 }

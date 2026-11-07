@@ -46,4 +46,25 @@ describe("formatted CVs", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toMatchObject({ blind: true, showContact: false });
   });
+
+  it("formats one of their own CVs CV Studio's way, never one the app made", async () => {
+    const doc = (id: string, source: string, contentType: string, fileName: string) => ({ id, source, contentType, fileName, createdAt: "2026-11-01T00:00:00Z" });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/candidates/{candidateId}/documents"
+      ? { items: [doc("doc_f", "formatted", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Siti - CV.docx"),
+        doc("doc_o", "original", "application/pdf", "siti.pdf")] }
+      : { items: [] }))) as never);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
+    const onDone = vi.fn();
+    renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={onDone} />);
+    const cv = await screen.findByLabelText<HTMLSelectElement>("CV");
+    expect(Array.from(cv.options).map((o) => o.value)).toEqual(["doc_o"]);
+    expect(screen.getByRole("radio", { name: /From their CV/ })).toHaveProperty("checked", true);
+    fireEvent.click(screen.getByLabelText(/Blind CV/));
+    fireEvent.click(screen.getByLabelText(/instead of he or she/));
+    fireEvent.change(screen.getByLabelText("Paragraphs"), { target: { value: "justify" } });
+    fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
+    await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
+    expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/studio-cvs");
+    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify" });
+  });
 });

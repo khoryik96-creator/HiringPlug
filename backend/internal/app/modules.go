@@ -118,19 +118,23 @@ func NewModules(d Deps) *Modules {
 	m.Leads = leads.New(d.Pool, m.Companies, d.Config.AllowPrivateNetworks)
 	m.Cvformats = cvformats.New(d.Pool, cvformats.Deps{
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
-		Tenants: m.Identity, Users: m.Identity,
+		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents},
+		AI: cvReadingAI{
+			all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats} }},
+			ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+		},
 	}, d.Files, d.Config.MaxUploadBytes)
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
 		Candidates: assistantCandidates{m.Candidates}, CVs: m.Documents, Jobs: assistantJobs{m.Jobs},
 		Applications: assistantApplications{m.Pipeline},
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
-		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents} }},
+		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats} }},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
-		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents} }},
+		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats} }},
 	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
@@ -152,7 +156,7 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
-		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents} }},
+		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats} }},
 		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	return m
@@ -260,6 +264,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	all := jobqueue.Handlers{}
 	for _, handlers := range []jobqueue.Handlers{
 		m.Documents.JobHandlers(),
+		m.Cvformats.JobHandlers(),
 		m.Jobs.JobHandlers(),
 		m.Emails.JobHandlers(),
 		m.Interviews.JobHandlers(),

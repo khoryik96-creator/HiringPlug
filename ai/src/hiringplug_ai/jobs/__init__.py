@@ -19,6 +19,7 @@ from ..contracts import (
     AiProviderCheckJob,
     AssistantAskJob,
     ContactReadLinkedinJob,
+    CvFormatStudioJob,
     DocumentExtractTextJob,
     DocumentParseCvJob,
     DocumentRenderPdfJob,
@@ -29,7 +30,17 @@ from ..contracts import (
 from ..extraction import Limits, OcrEngine
 from ..providers import Provider, ProviderError
 from ..queue import FollowUp
-from . import ai_check, assistant_ask, extract_text, match_score, parse_cv, read_jd, read_linkedin, render_pdf
+from . import (
+    ai_check,
+    assistant_ask,
+    extract_text,
+    format_studio,
+    match_score,
+    parse_cv,
+    read_jd,
+    read_linkedin,
+    render_pdf,
+)
 
 
 @dataclass(frozen=True)
@@ -70,4 +81,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
     JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),
     JobKind.contact_read_linkedin: Handler(ContactReadLinkedinJob, read_linkedin.run),
+    JobKind.cv_format_studio: Handler(CvFormatStudioJob, format_studio.run),
 }

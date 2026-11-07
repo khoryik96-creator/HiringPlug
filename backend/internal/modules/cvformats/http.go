@@ -121,3 +121,40 @@ func (h *HTTP) FormatCv(ctx context.Context, req api.FormatCvRequestObject) (api
 	}
 	return api.FormatCv201JSONResponse{DocumentId: id, FileName: name}, nil
 }
+
+// StartStudioCv handles POST /v1/candidates/{candidateId}/studio-cvs.
+func (h *HTTP) StartStudioCv(ctx context.Context, req api.StartStudioCvRequestObject) (api.StartStudioCvResponseObject, error) {
+	b := req.Body
+	o := StudioOptions{DocumentID: b.DocumentId, Blind: b.Blind != nil && *b.Blind,
+		NeutralGender: b.NeutralGender != nil && *b.NeutralGender, CorrectLanguage: b.CorrectLanguage != nil && *b.CorrectLanguage}
+	if b.Alignment != nil {
+		o.Alignment = string(*b.Alignment)
+	}
+	run, err := h.svc.StartStudio(ctx, authz.MustFromContext(ctx), req.CandidateId, o)
+	if err != nil {
+		return nil, err
+	}
+	return api.StartStudioCv202JSONResponse(studioToAPI(run)), nil
+}
+
+// ListStudioCvs handles GET /v1/candidates/{candidateId}/studio-cvs.
+func (h *HTTP) ListStudioCvs(ctx context.Context, req api.ListStudioCvsRequestObject) (api.ListStudioCvsResponseObject, error) {
+	runs, err := h.svc.ListStudio(ctx, authz.MustFromContext(ctx), req.CandidateId)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListStudioCvs200JSONResponse{Items: []api.StudioCv{}}
+	for _, r := range runs {
+		out.Items = append(out.Items, studioToAPI(r))
+	}
+	return out, nil
+}
+
+func studioToAPI(r StudioCV) api.StudioCv {
+	return api.StudioCv{
+		Id: r.ID, CandidateId: r.CandidateID, SourceDocumentId: r.SourceDocumentID, Status: api.StudioCvStatus(r.Status),
+		Blind: r.Blind, CorrectLanguage: r.CorrectLanguage, Alignment: api.StudioCvAlignment(r.Alignment),
+		DocumentId: c.OrNull(r.DocumentID), FileName: c.OrNull(r.FileName), Error: c.OrNull(r.Error), Warning: c.OrNull(r.Warning),
+		PayStatementsRemoved: int(r.PayRemoved), CreatedAt: r.CreatedAt,
+	}
+}

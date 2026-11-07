@@ -7,6 +7,7 @@ import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
 import { ErrorMessage } from "./ErrorMessage";
 import { FormatCv } from "./FormatCv";
+import { StudioCvRuns } from "./StudioCvRuns";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
 
@@ -83,6 +84,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         <button type="button" onClick={() => { setFormatting(true); }}>Make formatted CV</button>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
+      {permissions.includes("cvformats:create") && <StudioCvRuns candidateId={candidateId} />}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error} />
       {(docs.data?.length ?? 0) >= 2 && <a href={`#/candidates/${candidateId}/compare`}>Compare CVs side by side</a>}
       <ul>

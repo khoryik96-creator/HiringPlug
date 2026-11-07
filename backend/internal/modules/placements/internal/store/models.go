@@ -781,6 +781,33 @@ type Schedule struct {
 	UpdatedAt       time.Time
 }
 
+type StudioCv struct {
+	ID               string
+	TenantID         string
+	CandidateID      string
+	SourceDocumentID string
+	Status           string
+	Blind            bool
+	NeutralGender    bool
+	CorrectLanguage  bool
+	Alignment        string
+	DocumentID       *string
+	FileName         *string
+	Error            *string
+	Warning          *string
+	PayRemoved       int32
+	CreatedBy        string
+	CreatedAt        time.Time
+	FinishedAt       *time.Time
+}
+
+type StudioCvAiUse struct {
+	TenantID   string
+	StudioCvID string
+	Tokens     int32
+	CreatedAt  time.Time
+}
+
 type TeamGroup struct {
 	ID        string
 	TenantID  string
