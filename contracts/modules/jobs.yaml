@@ -30,10 +30,12 @@ x-module:
     job.read_jd:
       queue: ai
       payload: JobReadJdJob
+      priority: high
       description: Read the text of an uploaded job description (Python AI worker).
     job.jd_read:
       queue: core
       payload: JobJdReadJob
+      priority: high
       description: "Save a job description's text and the ad details read from it: title, location, salary... (Go worker)."
 
 paths:

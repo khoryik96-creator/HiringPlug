@@ -32,6 +32,9 @@ type Config struct {
 	HTTPAddr        string        // HP_HTTP_ADDR, e.g. :8080
 	ShutdownTimeout time.Duration // HP_SHUTDOWN_TIMEOUT, e.g. 15s
 
+	// WorkerConcurrency is how many core jobs the Go worker runs at once.
+	WorkerConcurrency int // HP_WORKER_CONCURRENCY, 1 to 32
+
 	// DatabaseURL connects as the restricted application role (row-level
 	// security applies). Migrations use a separate admin URL (see cmd/hp).
 	DatabaseURL string // HP_DATABASE_URL
@@ -101,21 +104,22 @@ const devSecret = "dev-only-secret-change-me-0123456789abcdef" //nolint:gosec //
 func Load(getenv func(string) string) (Config, error) {
 	r := reader{getenv: getenv}
 	c := Config{
-		Env:              r.oneOf("HP_ENV", EnvDevelopment, EnvDevelopment, EnvTest, EnvProduction),
-		HTTPAddr:         r.str("HP_HTTP_ADDR", ":8080"),
-		ShutdownTimeout:  r.duration("HP_SHUTDOWN_TIMEOUT", 15*time.Second),
-		DatabaseURL:      r.url("HP_DATABASE_URL", ""),
-		LogFormat:        r.oneOf("HP_LOG_FORMAT", "json", "json", "text"),
-		AuthJWTSecret:    []byte(r.str("HP_AUTH_JWT_SECRET", devSecret)),
-		AuthIssuer:       r.str("HP_AUTH_ISSUER", "hiringplug"),
-		AuthAudience:     r.str("HP_AUTH_AUDIENCE", "hiringplug-api"),
-		FilesDir:         r.str("HP_FILES_DIR", "./data/files"),
-		FilesURLSecret:   []byte(r.str("HP_FILES_URL_SECRET", devSecret)),
-		InternalBaseURL:  strings.TrimRight(r.url("HP_INTERNAL_BASE_URL", "http://localhost:8080"), "/"),
-		MaxUploadBytes:   r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
-		DefaultPhoneArea: strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),
-		ClientIPHeader:   r.str("HP_CLIENT_IP_HEADER", ""),
-		PublicURL:        strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
+		Env:               r.oneOf("HP_ENV", EnvDevelopment, EnvDevelopment, EnvTest, EnvProduction),
+		HTTPAddr:          r.str("HP_HTTP_ADDR", ":8080"),
+		ShutdownTimeout:   r.duration("HP_SHUTDOWN_TIMEOUT", 15*time.Second),
+		WorkerConcurrency: int(r.int64("HP_WORKER_CONCURRENCY", 4)),
+		DatabaseURL:       r.url("HP_DATABASE_URL", ""),
+		LogFormat:         r.oneOf("HP_LOG_FORMAT", "json", "json", "text"),
+		AuthJWTSecret:     []byte(r.str("HP_AUTH_JWT_SECRET", devSecret)),
+		AuthIssuer:        r.str("HP_AUTH_ISSUER", "hiringplug"),
+		AuthAudience:      r.str("HP_AUTH_AUDIENCE", "hiringplug-api"),
+		FilesDir:          r.str("HP_FILES_DIR", "./data/files"),
+		FilesURLSecret:    []byte(r.str("HP_FILES_URL_SECRET", devSecret)),
+		InternalBaseURL:   strings.TrimRight(r.url("HP_INTERNAL_BASE_URL", "http://localhost:8080"), "/"),
+		MaxUploadBytes:    r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
+		DefaultPhoneArea:  strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),
+		ClientIPHeader:    r.str("HP_CLIENT_IP_HEADER", ""),
+		PublicURL:         strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
 	c.AllowPrivateNetworks = r.oneOf("HP_ALLOW_PRIVATE_NETWORKS", "false", "false", "true") == "true"
@@ -129,6 +133,9 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if n := len(c.AI.KeysSecret); n > 0 && n < 32 {
 		r.fail("HP_AI_KEYS_SECRET must be at least 32 characters (or empty: companies cannot save AI keys)")
+	}
+	if c.WorkerConcurrency < 1 || c.WorkerConcurrency > 32 {
+		r.fail("HP_WORKER_CONCURRENCY must be 1 to 32")
 	}
 	if c.AI.MonthlyTokens < 0 {
 		r.fail("HP_AI_MONTHLY_TOKENS must not be negative")

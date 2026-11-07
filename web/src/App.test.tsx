@@ -74,7 +74,7 @@ describe("top bar", () => {
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
     // The profile is fetched again on each page load (an earlier test may have left another one cached).
     await waitFor(() => {
-      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "AI provider", "Team", "Your account"]);
+      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "AI provider", "Team", "System", "Your account"]);
     });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
     expect(screen.queryByText("Admin")).toBeNull();
@@ -91,5 +91,13 @@ describe("top bar", () => {
     signedIn(RECRUITER, "#/ai-provider");
     await screen.findByRole("navigation", { name: "Main" });
     await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
+  });
+
+  it("ends the session on the server when signing out", async () => {
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(undefined));
+    signedIn(RECRUITER);
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/auth/sign-out"); });
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
   });
 });

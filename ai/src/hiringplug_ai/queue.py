@@ -28,6 +28,8 @@ class ClaimedJob:
     attempts: int
     max_attempts: int
     request_id: str | None
+    # 1 (someone waits on screen) to 9 (background upkeep); its results inherit it.
+    priority: int = 5
 
 
 @dataclass(frozen=True)
@@ -64,7 +66,7 @@ class Queue:
         row = (
             self._connection()
             .execute(
-                "SELECT id, tenant_id, kind, payload, attempts, max_attempts, request_id"
+                "SELECT id, tenant_id, kind, payload, attempts, max_attempts, request_id, priority"
                 " FROM job_claim(%s, %s, %s)",
                 (queue, self.worker_id, lease_seconds),
             )
@@ -80,13 +82,14 @@ class Queue:
         with conn.transaction():
             for f in follow_ups:
                 conn.execute(
-                    "SELECT job_enqueue(%s, %s, %s, %s::jsonb, %s)",
+                    "SELECT job_enqueue(%s, %s, %s, %s::jsonb, %s, p_priority => %s::smallint)",
                     (
                         job.tenant_id,
                         f.queue,
                         f.kind.value,
                         json.dumps(f.payload.model_dump(mode="json")),
                         job.request_id,
+                        job.priority,  # a result is as urgent as the job that made it
                     ),
                 )
             row = conn.execute("SELECT job_complete(%s, %s)", (job.id, self.worker_id)).fetchone()

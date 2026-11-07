@@ -29,6 +29,7 @@ x-module:
     email.send:
       queue: core
       payload: EmailSendJob
+      priority: high
       description: Send one queued email through the mail server (Go worker).
 
 paths:

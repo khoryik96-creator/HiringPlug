@@ -554,6 +554,15 @@ func (q *Queries) ListTeamGroups(ctx context.Context) ([]ListTeamGroupsRow, erro
 	return items, nil
 }
 
+const pruneRevokedSessions = `-- name: PruneRevokedSessions :exec
+DELETE FROM revoked_session WHERE expires_at < now()
+`
+
+func (q *Queries) PruneRevokedSessions(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, pruneRevokedSessions)
+	return err
+}
+
 const renameTeamGroup = `-- name: RenameTeamGroup :one
 UPDATE team_group SET name = $1, version = version + 1, updated_at = now()
 WHERE id = $2 AND version = $3
@@ -577,6 +586,34 @@ func (q *Queries) RenameTeamGroup(ctx context.Context, arg RenameTeamGroupParams
 	var i RenameTeamGroupRow
 	err := row.Scan(&i.ID, &i.Version, &i.Name)
 	return i, err
+}
+
+const revokeSession = `-- name: RevokeSession :exec
+INSERT INTO revoked_session (id, tenant_id, user_id, expires_at)
+VALUES ($1, app_current_tenant(), $2, $3)
+ON CONFLICT (id) DO NOTHING
+`
+
+type RevokeSessionParams struct {
+	ID        string
+	UserID    string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) error {
+	_, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.UserID, arg.ExpiresAt)
+	return err
+}
+
+const sessionRevoked = `-- name: SessionRevoked :one
+SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = $1)
+`
+
+func (q *Queries) SessionRevoked(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, sessionRevoked, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const setPassword = `-- name: SetPassword :exec

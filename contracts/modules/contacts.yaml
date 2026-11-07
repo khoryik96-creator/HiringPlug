@@ -21,10 +21,12 @@ x-module:
     contact.read_linkedin:
       queue: ai
       payload: ContactReadLinkedinJob
+      priority: high
       description: Read a contact's LinkedIn profile PDF and the jobs in it (Python AI worker).
     contact.linkedin_read:
       queue: core
       payload: ContactLinkedinReadJob
+      priority: high
       description: Save what the profile says about where the contact works now (Go worker).
 
 paths:

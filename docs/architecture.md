@@ -153,11 +153,50 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   queue, each with its own companies and settings, and a test's worker must
   not run another test's jobs.
 - **Retried** with growing waits (10s, 20s, 40s, up to 1 hour), then marked
-  `dead` with its last error, so failures are visible, never silent.
+  `dead` with its last error, so failures are visible, never silent: owners
+  and admins see them in **Settings > System** and can try one again.
+- **Most urgent first.** Each job kind has a priority in the contract: `high`
+  when someone waits on screen (an assistant question, an email), `low` for
+  upkeep (PDF copies, webhooks, calendar refreshes), `normal` otherwise. A
+  result job inherits the priority of the job that made it.
+- **Several at once.** Each worker runs several jobs side by side
+  (`HP_WORKER_CONCURRENCY`, `HP_AI_CONCURRENCY`), each slot holding its own
+  leases, so one slow job (a webhook to a slow server, a long AI call) does
+  not hold up the rest.
+- **Nothing personal left behind.** A finished job's payload (CV text,
+  details read from CVs, PDFs) is emptied when it completes; finished and
+  dead jobs are deleted after 30 days (the Go worker prunes every hour).
 - **Declared in the contract** (`x-jobs`: queue and payload schema). Payloads
   are checked against the schema when queued (Go) and when read (Python).
   The Go worker refuses to start if a job on its queue has no handler, and
   tests fail for either worker if one is missing.
+
+## Backups
+
+`hp backup` copies the database (`pg_dump`) and the uploaded files into a
+folder of its own (`hiringplug-YYYYMMDD-HHMMSS`, written under a hidden name
+and renamed when complete) and keeps the newest `HP_BACKUP_KEEP`. Docker
+Compose runs it every night (the `backup` service, a PostgreSQL image with
+`hp` in it) into the `backups` folder next to the repository. `hp restore NAME
+-yes` puts one back. Each run is recorded; **Settings > System** shows the last
+one, and warns when it failed or is more than two days old.
+
+## Web app
+
+- **One route table** (`web/src/routes.tsx`): every page's address, the
+  permission it needs and where it is listed (the top bar or the Settings
+  menu). The router and both menus read it, so a page cannot be reachable but
+  missing from its menu, or listed for someone who may not open it.
+- **Pages load on first use** (one file each), so signing in downloads only
+  the app's frame.
+- **Security headers** (`deploy/security-headers.conf`, sent by nginx): a
+  Content-Security-Policy that runs only the app's own scripts, no framing by
+  other sites, no MIME sniffing. The browser smoke tests serve the app with
+  the same file, so a page the policy would break fails CI.
+- **Signing out ends the session on the server**: each token has an ID, and a
+  signed-out one is refused until it would have expired anyway.
+- **Browser smoke tests** (`web/e2e`, Playwright, in CI's end-to-end job):
+  every page and every part of Settings opens for each role without an error.
 
 ## Observability
 

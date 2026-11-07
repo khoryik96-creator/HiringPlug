@@ -188,20 +188,26 @@ func claimAIJobFor(t *testing.T, conn *pgx.Conn, documentID string) claimedJob {
 	return claimAIJobWhere(t, conn, "documentId", documentID)
 }
 
-// claimAIJobWhere claims the AI-queue job whose payload has key = value.
+// claimAIJobWhere claims the AI-queue job whose payload has key = value
+// (moved to the front of the queue: due long ago, most urgent).
 func claimAIJobWhere(t *testing.T, conn *pgx.Conn, key, value string) claimedJob {
 	t.Helper()
 	claimLock.Lock()
 	defer claimLock.Unlock()
 	ctx := context.Background()
 	_, err := testutil.Current.Admin.Exec(ctx,
-		`UPDATE job SET run_after = now() - interval '1 hour' WHERE queue = 'ai' AND payload->>$1 = $2`, key, value)
+		`UPDATE job SET run_after = now() - interval '1 hour', priority = 1 WHERE queue = 'ai' AND payload->>$1 = $2`, key, value)
 	require.NoError(t, err)
 	var j claimedJob
 	var reqID *string
 	err = conn.QueryRow(ctx, `SELECT id, tenant_id, kind, payload, request_id FROM job_claim('ai', 'python-test', 60)`).
 		Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID)
 	require.NoError(t, err, "no AI job found for %s", value)
+	// Others that matched (a Word CV's PDF copy has the same documentId) go
+	// back, so they do not jump ahead in another test's claim.
+	_, err = testutil.Current.Admin.Exec(ctx,
+		`UPDATE job SET run_after = now(), priority = 9 WHERE queue = 'ai' AND status = 'pending' AND payload->>$1 = $2`, key, value)
+	require.NoError(t, err)
 	require.Contains(t, string(j.Payload), value)
 	if reqID != nil {
 		j.RequestID = *reqID

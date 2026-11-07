@@ -21,6 +21,7 @@ x-module:
     company.autofill:
       queue: core
       payload: CompanyAutofillJob
+      priority: high
       description: Read a company's own website for details to suggest (Go worker).
 
 paths:

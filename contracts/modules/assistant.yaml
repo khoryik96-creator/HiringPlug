@@ -24,10 +24,12 @@ x-module:
     assistant.ask:
       queue: ai
       payload: AssistantAskJob
+      priority: high
       description: Ask the AI provider one question with the context Go gathered (Python AI worker).
     assistant.answered:
       queue: core
       payload: AssistantAnsweredJob
+      priority: high
       description: Save the provider's answer and the tokens used (Go worker).
 
 paths:

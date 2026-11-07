@@ -11,6 +11,12 @@ def test_defaults() -> None:
     assert config.ocr_languages == "eng"
     assert config.lease_seconds == 600
     assert config.worker_id.startswith("py:")
+    assert config.concurrency == 3, "a slow AI call does not hold up reading a new CV"
+
+
+def test_concurrency_is_bounded() -> None:
+    with pytest.raises(ConfigError, match="HP_AI_CONCURRENCY"):
+        load_config({"HP_AI_DATABASE_URL": "postgresql://x@localhost/h", "HP_AI_CONCURRENCY": "0"})
 
 
 def test_every_problem_is_reported_at_once() -> None:

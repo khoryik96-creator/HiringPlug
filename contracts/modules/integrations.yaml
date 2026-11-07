@@ -18,6 +18,7 @@ x-module:
     webhook.deliver:
       queue: core
       payload: WebhookDeliverJob
+      priority: low
       description: POST one webhook delivery to its address (Go worker); a failure is retried later.
 
 paths:

@@ -10,7 +10,7 @@ from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps
 from hiringplug_ai.jobs import parse_cv as parse_job
 from hiringplug_ai.queue import ClaimedJob, FollowUp, LeaseLostError
-from hiringplug_ai.worker import process
+from hiringplug_ai.worker import process, slot_id
 
 from .documents import CV_LINES, text_pdf
 
@@ -158,3 +158,8 @@ def test_a_parser_crash_is_reported_as_a_failed_parse(monkeypatch: pytest.Monkey
     assert isinstance(result, DocumentCvParsedJob)
     assert result.profile is None
     assert result.errorMessage == "The details could not be read from this CV."
+
+
+def test_each_slot_holds_its_own_leases() -> None:
+    assert slot_id("py:host:1", 0, 1) == "py:host:1"
+    assert [slot_id("py:host:1", i, 3) for i in range(3)] == ["py:host:1/1", "py:host:1/2", "py:host:1/3"]

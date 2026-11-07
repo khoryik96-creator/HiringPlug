@@ -90,8 +90,8 @@ func EnqueueAt(ctx context.Context, tx pgx.Tx, tenantID string, kind api.JobKind
 	if !runAfter.IsZero() {
 		after = &runAfter
 	}
-	err = tx.QueryRow(ctx, `SELECT job_enqueue($1, $2, $3, $4::jsonb, $5, coalesce($6, now()))`,
-		tenantID, info.Queue, string(kind), string(data), reqID, after).Scan(&id)
+	err = tx.QueryRow(ctx, `SELECT job_enqueue($1, $2, $3, $4::jsonb, $5, coalesce($6, now()), p_priority => $7::smallint)`,
+		tenantID, info.Queue, string(kind), string(data), reqID, after, info.Rank()).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("jobqueue: enqueue %s: %w", kind, err)
 	}
@@ -110,17 +110,40 @@ type Worker struct {
 	// Tenant, if set, limits the worker to one company's jobs (tests: each
 	// test's worker runs only its own companies' jobs). Empty: every company.
 	Tenant string
+	// Concurrency is how many jobs run at once (1 when zero): a slow job (a
+	// webhook to a slow server) does not hold up the others.
+	Concurrency int
 }
 
 var errLeaseLost = errors.New("lease lost: another worker took this job")
 
-// Run processes jobs until ctx is cancelled.
+// Run processes jobs until ctx is cancelled, Concurrency at a time.
 func (w *Worker) Run(ctx context.Context) error {
 	if err := w.checkHandlers(); err != nil {
 		return err
 	}
-	w.Logger.Info("worker started", "queue", w.Queue, "worker_id", w.ID)
-	wake := w.listen(ctx)
+	n := max(w.Concurrency, 1)
+	w.Logger.Info("worker started", "queue", w.Queue, "worker_id", w.ID, "concurrency", n)
+	wakes := make([]chan struct{}, n)
+	for i := range wakes {
+		wakes[i] = make(chan struct{}, 1)
+	}
+	w.listen(ctx, wakes)
+	var wg sync.WaitGroup
+	for i := range n {
+		slot := *w
+		if n > 1 {
+			slot.ID = fmt.Sprintf("%s/%d", w.ID, i+1) // each slot holds its own leases
+		}
+		wg.Go(func() { slot.loop(ctx, wakes[i]) })
+	}
+	wg.Wait()
+	w.Logger.Info("worker stopped", "queue", w.Queue, "worker_id", w.ID)
+	return nil
+}
+
+// loop runs jobs one after another until ctx is cancelled.
+func (w *Worker) loop(ctx context.Context, wake <-chan struct{}) {
 	for ctx.Err() == nil {
 		processed, err := w.RunOnce(ctx)
 		if err != nil {
@@ -135,8 +158,6 @@ func (w *Worker) Run(ctx context.Context) error {
 		case <-time.After(w.Idle):
 		}
 	}
-	w.Logger.Info("worker stopped", "queue", w.Queue, "worker_id", w.ID)
-	return nil
 }
 
 // RunOnce claims and processes at most one job. It reports whether a job was
@@ -232,11 +253,10 @@ func (w *Worker) fail(ctx context.Context, job Job, jobErr error) (string, error
 
 // listen wakes the loop as soon as a job is queued (Postgres NOTIFY), instead
 // of waiting for the next poll. Polling still runs as a fallback.
-func (w *Worker) listen(ctx context.Context) <-chan struct{} {
-	wake := make(chan struct{}, 1)
+func (w *Worker) listen(ctx context.Context, wakes []chan struct{}) {
 	go func() {
 		for ctx.Err() == nil {
-			if err := w.waitForNotifications(ctx, wake); err != nil && ctx.Err() == nil {
+			if err := w.waitForNotifications(ctx, wakes); err != nil && ctx.Err() == nil {
 				w.Logger.Warn("job notifications unavailable; polling only", "error", err)
 				select {
 				case <-ctx.Done():
@@ -245,10 +265,9 @@ func (w *Worker) listen(ctx context.Context) <-chan struct{} {
 			}
 		}
 	}()
-	return wake
 }
 
-func (w *Worker) waitForNotifications(ctx context.Context, wake chan<- struct{}) error {
+func (w *Worker) waitForNotifications(ctx context.Context, wakes []chan struct{}) error {
 	conn, err := w.Pool.Acquire(ctx)
 	if err != nil {
 		return err
@@ -261,9 +280,11 @@ func (w *Worker) waitForNotifications(ctx context.Context, wake chan<- struct{})
 		if _, err := conn.Conn().WaitForNotification(ctx); err != nil {
 			return err
 		}
-		select {
-		case wake <- struct{}{}:
-		default:
+		for _, wake := range wakes { // every idle slot looks; one of them gets it
+			select {
+			case wake <- struct{}{}:
+			default:
+			}
 		}
 	}
 }
@@ -280,9 +301,22 @@ func (w *Worker) checkHandlers() error {
 
 // KindInfo is what the contract declares about a job kind.
 type KindInfo struct {
-	Module  string `json:"module"`
-	Queue   string `json:"queue"`
-	Payload string `json:"payload"`
+	Module   string `json:"module"`
+	Queue    string `json:"queue"`
+	Payload  string `json:"payload"`
+	Priority string `json:"priority"` // high, normal or low
+}
+
+// Rank is the queue's number for the priority: lower runs first.
+func (k KindInfo) Rank() int {
+	switch k.Priority {
+	case "high":
+		return 1
+	case "low":
+		return 9
+	default:
+		return 5
+	}
 }
 
 // Kinds returns every job kind declared in the contract.

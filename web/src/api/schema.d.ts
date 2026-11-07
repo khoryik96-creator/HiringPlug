@@ -958,6 +958,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/sign-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out, ending this session on the server too (its token stops working at once) */
+        post: operations["signOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/password-resets": {
         parameters: {
             query?: never;
@@ -2409,6 +2426,42 @@ export interface paths {
         /** Change those choices */
         put: operations["putPolicies"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's background jobs (waiting, failed) and the server's last backup */
+        get: operations["getSystemStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/system/jobs/{jobId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try a job that failed for good again, from its first attempt */
+        post: operations["retryBackgroundJob"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5069,6 +5122,52 @@ export interface components {
         SchedulingRefreshCalendarJob: {
             userId: string;
         };
+        SystemStatus: {
+            /** @description The company's background jobs by kind, kinds with none left out. */
+            jobs: components["schemas"]["JobKindStatus"][];
+            /** @description Jobs that failed for good in the last 30 days, newest first (at most 50). */
+            failed: components["schemas"]["FailedJob"][];
+            /** @description The server's last backup; null when none was ever made. */
+            backup: components["schemas"]["BackupStatus"] | null;
+        };
+        JobKindStatus: {
+            /** @description e.g. email.send */
+            kind: string;
+            /** @description Not started yet. */
+            waiting: number;
+            running: number;
+            /** @description Failed at least once; tried again later. */
+            retrying: number;
+            /** @description Failed for good in the last 30 days. */
+            failed: number;
+            /**
+             * Format: date-time
+             * @description When the longest-waiting one was queued.
+             */
+            oldestWaitingSince: string | null;
+        };
+        FailedJob: {
+            id: string;
+            kind: string;
+            attempts: number;
+            /** @description The last attempt's error. */
+            error: string;
+            /** Format: date-time */
+            failedAt: string;
+        };
+        BackupStatus: {
+            /** @description The backup's folder, e.g. hiringplug-20261107-020000. */
+            name: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt: string | null;
+            /** @enum {string} */
+            status: "running" | "done" | "failed";
+            /** Format: int64 */
+            sizeBytes: number | null;
+            error: string | null;
+        };
         /**
          * @description Who sees a sent email that shows salary: salary_roles = only roles that may see salaries (the default); everyone = everyone who may read emails. Either way only senders who may see salaries can fill salary fields.
          * @enum {string}
@@ -7146,6 +7245,25 @@ export interface operations {
             401: components["responses"]["SignInFailed"];
             409: components["responses"]["ChooseCompany"];
             429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    signOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
         };
     };
     requestPasswordReset: {
@@ -9868,6 +9986,53 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getSystemStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    retryBackgroundJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued again; the new status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
 }

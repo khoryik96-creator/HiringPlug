@@ -17,18 +17,20 @@ func TestDefaultsAreUsableForDevelopment(t *testing.T) {
 	assert.Equal(t, "MY", c.DefaultPhoneArea)
 	assert.Equal(t, "Asia/Kuala_Lumpur", c.TimeZone.String())
 	assert.EqualValues(t, 10<<20, c.MaxUploadBytes)
+	assert.Equal(t, 4, c.WorkerConcurrency)
 }
 
 func TestEveryProblemIsReportedAtOnce(t *testing.T) {
 	_, err := Load(env(map[string]string{
-		"HP_ENV":              "staging",
-		"HP_LOG_LEVEL":        "loud",
-		"HP_MAX_UPLOAD_BYTES": "lots",
-		"HP_AUTH_JWT_SECRET":  "short",
-		"HP_TIME_ZONE":        "Mars/Base",
+		"HP_ENV":                "staging",
+		"HP_LOG_LEVEL":          "loud",
+		"HP_MAX_UPLOAD_BYTES":   "lots",
+		"HP_AUTH_JWT_SECRET":    "short",
+		"HP_TIME_ZONE":          "Mars/Base",
+		"HP_WORKER_CONCURRENCY": "0",
 	}))
 	require.Error(t, err)
-	for _, want := range []string{"HP_ENV", "HP_LOG_LEVEL", "HP_MAX_UPLOAD_BYTES", "HP_AUTH_JWT_SECRET", "HP_DATABASE_URL", "HP_TIME_ZONE"} {
+	for _, want := range []string{"HP_ENV", "HP_LOG_LEVEL", "HP_MAX_UPLOAD_BYTES", "HP_AUTH_JWT_SECRET", "HP_DATABASE_URL", "HP_TIME_ZONE", "HP_WORKER_CONCURRENCY"} {
 		assert.Contains(t, err.Error(), want)
 	}
 }

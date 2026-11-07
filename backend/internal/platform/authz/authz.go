@@ -14,6 +14,8 @@
 package authz
 
 import (
+	"time"
+
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,7 +40,24 @@ type Principal struct {
 	Role     api.Role
 	perms    map[api.Permission]bool
 	scope    Scope
+	session  Session
 }
+
+// Session is the sign-in a request came with: its token's ID and expiry
+// (zero for API keys and tokens without an ID).
+type Session struct {
+	ID      string
+	Expires time.Time
+}
+
+// WithSession returns p signed in with session s.
+func (p Principal) WithSession(s Session) Principal {
+	p.session = s
+	return p
+}
+
+// Session returns the sign-in the request came with.
+func (p Principal) Session() Session { return p.session }
 
 // Scope is which candidates a principal sees: all of them (Users nil), or
 // those owned by Users, and with Jobs also those on jobs Users own. The

@@ -76,11 +76,39 @@ in a region you pick, or your own server, keeps it where you choose.
 
 ## Backups
 
+With Docker, a backup of the database and the CVs is made every night into
+the `backups` folder next to this repository; the newest 14 are kept
+(`HP_BACKUP_KEEP`). **Settings > System** shows the last one. Copy that
+folder to another disk or cloud storage too: a backup on the same disk does
+not survive the disk. To make one now:
+
 ```bash
-docker compose -f deploy/docker-compose.yml exec postgres pg_dump -U postgres hiringplug > backup.sql
+docker compose -f deploy/docker-compose.yml run --rm backup /app/hp backup
 ```
 
-Also back up the `files` volume (the CVs). Test a restore regularly.
+To put one back (it replaces every company's data and files):
+
+```bash
+docker compose -f deploy/docker-compose.yml stop api worker ai-worker
+```
+
+```bash
+docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
+```
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+Test a restore now and then, on another machine.
+
+## Browser smoke tests
+
+With the API running (`task dev`) and the demo company (`hp dev-setup > devsetup.txt`):
+
+```bash
+cd web && pnpm build && HP_E2E_TOKENS_FILE=../devsetup.txt pnpm e2e
+```
 
 ## Upgrading
 

@@ -122,6 +122,8 @@ func NewWorker(d Deps, m *Modules) (*jobqueue.Worker, error) {
 		Logger:   d.Logger,
 		Lease:    5 * time.Minute,
 		Idle:     2 * time.Second,
+		// Tests run the worker step by step (RunOnce); Run uses this.
+		Concurrency: d.Config.WorkerConcurrency,
 	}, nil
 }
 
@@ -184,7 +186,27 @@ func RunWorker(ctx context.Context, getenv func(string) string, out io.Writer) e
 	if err != nil {
 		return err
 	}
+	go pruneJobs(ctx, d)
 	return w.Run(ctx)
+}
+
+// pruneJobs deletes finished and dead jobs after jobqueue.KeepFinished, every
+// hour (several workers doing it at once is harmless).
+func pruneJobs(ctx context.Context, d Deps) {
+	for {
+		if n, err := jobqueue.Prune(ctx, d.Pool, jobqueue.KeepFinished); err != nil {
+			if ctx.Err() == nil {
+				d.Logger.Warn("old jobs not pruned", "error", err)
+			}
+		} else if n > 0 {
+			d.Logger.Info("old jobs pruned", "count", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Hour):
+		}
+	}
 }
 
 // authenticate signs a request in: with an API key (integrations), or with a

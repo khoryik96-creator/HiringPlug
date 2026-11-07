@@ -20,6 +20,9 @@ class Config:
     log_level: str
     poll_seconds: float
     lease_seconds: int
+    # How many jobs run at once (threads, each with its own connection): a slow
+    # AI call or PDF does not hold up reading a newly uploaded CV.
+    concurrency: int
     ocr_enabled: bool
     ocr_languages: str  # e.g. "eng", or "eng+msa" for English and Malay
     max_download_bytes: int
@@ -81,6 +84,7 @@ def load_config(env: Mapping[str, str]) -> Config:
         log_level="WARNING" if level == "WARN" else level,
         poll_seconds=number("HP_AI_POLL_SECONDS", 2.0),
         lease_seconds=int(number("HP_AI_LEASE_SECONDS", 600)),
+        concurrency=int(number("HP_AI_CONCURRENCY", 3)),
         ocr_enabled=ocr == "on",
         ocr_languages=env.get("HP_AI_OCR_LANGUAGES", "eng").strip() or "eng",
         max_download_bytes=int(number("HP_MAX_UPLOAD_BYTES", 10 * 1024 * 1024)),
@@ -95,6 +99,8 @@ def load_config(env: Mapping[str, str]) -> Config:
         problems.append("HP_AI_KEYS_SECRET must be at least 32 characters (or empty)")
     if config.ai_timeout_seconds <= 0 or config.ai_timeout_seconds * 2 >= config.lease_seconds:
         problems.append("HP_AI_TIMEOUT_SECONDS must be positive and well under HP_AI_LEASE_SECONDS")
+    if not 1 <= config.concurrency <= 16:
+        problems.append("HP_AI_CONCURRENCY must be 1 to 16")
     if config.lease_seconds < 30:
         problems.append("HP_AI_LEASE_SECONDS must be at least 30")
     if problems:

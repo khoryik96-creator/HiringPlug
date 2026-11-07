@@ -114,7 +114,7 @@ jobs:
     name: End to end (API + Go worker + Python worker)
     needs: [backend, ai, web]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -153,6 +153,22 @@ jobs:
       - name: Run the end-to-end test
         working-directory: ai
         run: uv run pytest -m e2e tests/e2e
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: web/package.json }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Browser smoke tests (every page, every role, production security headers)
+        working-directory: web
+        env:
+          HP_E2E_TOKENS_FILE: ${{ runner.temp }}/devsetup.txt
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm build
+          pnpm e2e
       - name: Service logs
         if: always()
         run: tail -n 50 "$RUNNER_TEMP"/*.log
@@ -166,3 +182,12 @@ jobs:
       - run: docker build -f deploy/backend.Dockerfile -t hiringplug-backend .
       - run: docker build -f deploy/ai.Dockerfile -t hiringplug-ai .
       - run: docker build -f deploy/web.Dockerfile -t hiringplug-web .
+      - name: The web image sends the security headers
+        run: |
+          docker run -d --name web --add-host api:127.0.0.1 -p 3000:80 hiringplug-web
+          for i in $(seq 1 20); do curl -sf -o /dev/null localhost:3000 && break; sleep 1; done
+          curl -sI localhost:3000 | tee headers.txt
+          grep -qi "^content-security-policy: default-src 'self'; script-src 'self'" headers.txt
+          grep -qi "^x-frame-options: SAMEORIGIN" headers.txt
+          grep -qi "^x-content-type-options: nosniff" headers.txt
+      - run: docker build -f deploy/backup.Dockerfile -t hiringplug-backup .

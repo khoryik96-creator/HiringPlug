@@ -33,6 +33,7 @@ x-module:
     scheduling.refresh_calendar:
       queue: core
       payload: SchedulingRefreshCalendarJob
+      priority: low
       description: Read a user's calendar address and keep their busy times (Go worker).
 
 paths:

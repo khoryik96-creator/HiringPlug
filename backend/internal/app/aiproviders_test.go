@@ -49,7 +49,7 @@ func claimCheck(t *testing.T, conn *pgx.Conn, sealed string) claimedJob {
 	defer claimLock.Unlock()
 	ctx := context.Background()
 	_, err := testutil.Current.Admin.Exec(ctx,
-		`UPDATE job SET run_after = now() - interval '1 hour' WHERE queue = 'ai' AND payload->'access'->>'sealedKey' = $1`, sealed)
+		`UPDATE job SET run_after = now() - interval '1 hour', priority = 1 WHERE queue = 'ai' AND payload->'access'->>'sealedKey' = $1`, sealed)
 	require.NoError(t, err)
 	var j claimedJob
 	var reqID *string

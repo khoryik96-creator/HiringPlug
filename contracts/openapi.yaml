@@ -1553,6 +1553,15 @@ paths:
         '401': {$ref: '#/components/responses/SignInFailed'}
         '409': {$ref: '#/components/responses/ChooseCompany'}
         '429': {$ref: '#/components/responses/TooManyAttempts'}
+  /v1/auth/sign-out:
+    post:
+      operationId: signOut
+      tags: [identity]
+      summary: Sign out, ending this session on the server too (its token stops working at once)
+      x-permission: authenticated
+      responses:
+        '204': {description: Signed out}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
   /v1/auth/password-resets:
     post:
       operationId: requestPasswordReset
@@ -3556,6 +3565,40 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/system:
+    get:
+      operationId: getSystemStatus
+      tags: [settings]
+      summary: The company's background jobs (waiting, failed) and the server's last backup
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/settings/system/jobs/{jobId}/retry:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^job_[0-9a-hjkmnp-tv-z]{26}$'}
+    post:
+      operationId: retryBackgroundJob
+      tags: [settings]
+      summary: Try a job that failed for good again, from its first attempt
+      x-permission: settings:manage
+      responses:
+        '200':
+          description: Queued again; the new status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SystemStatus'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
 components:
   securitySchemes:
     bearerAuth:
@@ -7402,6 +7445,51 @@ components:
       required: [userId]
       properties:
         userId: {type: string}
+    SystemStatus:
+      type: object
+      required: [jobs, failed, backup]
+      properties:
+        jobs:
+          type: array
+          description: The company's background jobs by kind, kinds with none left out.
+          items: {$ref: '#/components/schemas/JobKindStatus'}
+        failed:
+          type: array
+          description: Jobs that failed for good in the last 30 days, newest first (at most 50).
+          items: {$ref: '#/components/schemas/FailedJob'}
+        backup:
+          description: The server's last backup; null when none was ever made.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/BackupStatus'}]
+    JobKindStatus:
+      type: object
+      required: [kind, waiting, running, retrying, failed, oldestWaitingSince]
+      properties:
+        kind: {type: string, description: "e.g. email.send"}
+        waiting: {type: integer, description: Not started yet.}
+        running: {type: integer}
+        retrying: {type: integer, description: Failed at least once; tried again later.}
+        failed: {type: integer, description: Failed for good in the last 30 days.}
+        oldestWaitingSince: {type: string, format: date-time, nullable: true, description: When the longest-waiting one was queued.}
+    FailedJob:
+      type: object
+      required: [id, kind, attempts, error, failedAt]
+      properties:
+        id: {type: string}
+        kind: {type: string}
+        attempts: {type: integer}
+        error: {type: string, description: The last attempt's error.}
+        failedAt: {type: string, format: date-time}
+    BackupStatus:
+      type: object
+      required: [name, startedAt, finishedAt, status, sizeBytes, error]
+      properties:
+        name: {type: string, description: "The backup's folder, e.g. hiringplug-20261107-020000."}
+        startedAt: {type: string, format: date-time}
+        finishedAt: {type: string, format: date-time, nullable: true}
+        status: {type: string, enum: [running, done, failed]}
+        sizeBytes: {type: integer, format: int64, nullable: true}
+        error: {type: string, nullable: true}
     EmailSalaryVisibility:
       type: string
       description: >
@@ -7910,111 +7998,133 @@ x-jobs:
     module: aiproviders
     queue: ai
     payload: AiProviderCheckJob
+    priority: high
     description: Send a provider a tiny request to check its key and model (Python AI worker).
   aiprovider.checked:
     module: aiproviders
     queue: core
     payload: AiProviderCheckedJob
+    priority: high
     description: Save whether the check worked (Go worker).
   assistant.answered:
     module: assistant
     queue: core
     payload: AssistantAnsweredJob
+    priority: high
     description: Save the provider's answer and the tokens used (Go worker).
   assistant.ask:
     module: assistant
     queue: ai
     payload: AssistantAskJob
+    priority: high
     description: Ask the AI provider one question with the context Go gathered (Python AI worker).
   company.autofill:
     module: companies
     queue: core
     payload: CompanyAutofillJob
+    priority: high
     description: Read a company's own website for details to suggest (Go worker).
   contact.linkedin_read:
     module: contacts
     queue: core
     payload: ContactLinkedinReadJob
+    priority: high
     description: Save what the profile says about where the contact works now (Go worker).
   contact.read_linkedin:
     module: contacts
     queue: ai
     payload: ContactReadLinkedinJob
+    priority: high
     description: Read a contact's LinkedIn profile PDF and the jobs in it (Python AI worker).
   document.cv_parsed:
     module: documents
     queue: core
     payload: DocumentCvParsedJob
+    priority: normal
     description: Save parsed CV details on the document, keeping only values whose quote is found in the CV (Go worker).
   document.extract_text:
     module: documents
     queue: ai
     payload: DocumentExtractTextJob
+    priority: normal
     description: Extract plain text from an uploaded document (Python AI worker).
   document.parse_cv:
     module: documents
     queue: ai
     payload: DocumentParseCvJob
+    priority: normal
     description: Read profile details out of a CV's extracted text (Python AI worker).
   document.pdf_rendered:
     module: documents
     queue: core
     payload: DocumentPdfRenderedJob
+    priority: low
     description: Save a formatted CV's PDF with it (Go worker).
   document.render_pdf:
     module: documents
     queue: ai
     payload: DocumentRenderPdfJob
+    priority: low
     description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
   document.text_extracted:
     module: documents
     queue: core
     payload: DocumentTextExtractedJob
+    priority: normal
     description: Save the result of text extraction on the document (Go worker).
   email.send:
     module: emails
     queue: core
     payload: EmailSendJob
+    priority: high
     description: Send one queued email through the mail server (Go worker).
   interview.remind:
     module: interviews
     queue: core
     payload: InterviewRemindJob
+    priority: normal
     description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
   job.jd_read:
     module: jobs
     queue: core
     payload: JobJdReadJob
+    priority: high
     description: 'Save a job description''s text and the ad details read from it: title, location, salary... (Go worker).'
   job.read_jd:
     module: jobs
     queue: ai
     payload: JobReadJdJob
+    priority: high
     description: Read the text of an uploaded job description (Python AI worker).
   lead_source.check:
     module: leads
     queue: core
     payload: LeadSourceCheckJob
+    priority: low
     description: Fetch a source's openings and update its leads (Go worker); queues the next check a day later.
   match.score:
     module: matching
     queue: ai
     payload: MatchScoreJob
+    priority: normal
     description: Ask the AI provider how well a CV meets a job's requirements, quoting both (Python AI worker).
   match.scored:
     module: matching
     queue: core
     payload: MatchScoredJob
+    priority: normal
     description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
   scheduling.refresh_calendar:
     module: scheduling
     queue: core
     payload: SchedulingRefreshCalendarJob
+    priority: low
     description: Read a user's calendar address and keep their busy times (Go worker).
   webhook.deliver:
     module: integrations
     queue: core
     payload: WebhookDeliverJob
+    priority: low
     description: POST one webhook delivery to its address (Go worker); a failure is retried later.
 x-modules:
   - name: aiproviders

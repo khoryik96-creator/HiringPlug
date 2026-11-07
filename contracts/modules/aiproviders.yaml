@@ -25,10 +25,12 @@ x-module:
     aiprovider.check:
       queue: ai
       payload: AiProviderCheckJob
+      priority: high
       description: Send a provider a tiny request to check its key and model (Python AI worker).
     aiprovider.checked:
       queue: core
       payload: AiProviderCheckedJob
+      priority: high
       description: Save whether the check worked (Go worker).
 
 paths:

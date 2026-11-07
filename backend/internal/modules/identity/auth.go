@@ -327,3 +327,22 @@ func (m *Module) PasswordLink(ctx context.Context, tenantID, userID string, vali
 	})
 	return link, err
 }
+
+// SignOut ends the request's session: its token is refused from now on.
+// Tokens without an ID (from before, or made by hp token) simply expire.
+func (m *Module) SignOut(ctx context.Context, p authz.Principal) error {
+	sess := p.Session()
+	if sess.ID == "" {
+		return nil
+	}
+	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		if err := q.PruneRevokedSessions(ctx); err != nil { // those past their expiry need no keeping
+			return err
+		}
+		if err := q.RevokeSession(ctx, store.RevokeSessionParams{ID: sess.ID, UserID: p.UserID, ExpiresAt: sess.Expires}); err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "user.signed_out", EntityType: "user", EntityID: p.UserID})
+	})
+}

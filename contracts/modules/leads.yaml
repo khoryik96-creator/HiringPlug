@@ -22,6 +22,7 @@ x-module:
     lead_source.check:
       queue: core
       payload: LeadSourceCheckJob
+      priority: low
       description: Fetch a source's openings and update its leads (Go worker); queues the next check a day later.
 
 paths:

@@ -125,3 +125,14 @@ RETURNING id, version, name;
 -- Its people stay, in no team (the foreign key clears their team_id).
 -- name: DeleteTeamGroup :execrows
 DELETE FROM team_group WHERE id = @id;
+
+-- name: RevokeSession :exec
+INSERT INTO revoked_session (id, tenant_id, user_id, expires_at)
+VALUES (@id, app_current_tenant(), @user_id, @expires_at)
+ON CONFLICT (id) DO NOTHING;
+
+-- name: PruneRevokedSessions :exec
+DELETE FROM revoked_session WHERE expires_at < now();
+
+-- name: SessionRevoked :one
+SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = @id);

@@ -75,7 +75,7 @@ def database() -> Iterator[dict[str, str]]:
         root.close()
 
 
-def enqueue_ai_job(admin_url: str, tenant: str) -> str:
+def enqueue_ai_job(admin_url: str, tenant: str, priority: int = 5) -> str:
     payload = {
         "documentId": "doc_01jbz6w0m0k8q9x2r3s4t5v6w7",
         "downloadUrl": "http://x",
@@ -86,8 +86,8 @@ def enqueue_ai_job(admin_url: str, tenant: str) -> str:
     with psycopg.connect(admin_url, autocommit=True) as conn:
         row = conn.execute(
             "SELECT job_enqueue(%s, 'ai', 'document.extract_text', %s::jsonb, 'req_pytest',"
-            " now() - interval '1 hour')",
-            (tenant, json.dumps(payload)),
+            " now() - interval '1 hour', p_priority => %s::smallint)",
+            (tenant, json.dumps(payload), priority),
         ).fetchone()
     assert row is not None
     return str(row[0])
@@ -127,6 +127,24 @@ def test_claim_then_complete_queues_the_result_for_go(database: dict[str, str]) 
             "SELECT queue, request_id, payload->>'status' FROM job WHERE kind = 'document.text_extracted'"
         ).fetchone()
     assert follow_up == ("core", "req_pytest", "extracted"), "the result carries the original request ID"
+    queue.close()
+
+
+def test_urgent_jobs_go_first_and_their_results_inherit_it(database: dict[str, str]) -> None:
+    with psycopg.connect(database["admin"], autocommit=True) as admin:  # a queue of only these two
+        admin.execute("DELETE FROM job")
+    enqueue_ai_job(database["admin"], database["tenant"], priority=9)
+    urgent = enqueue_ai_job(database["admin"], database["tenant"], priority=1)
+    queue = Queue(database["ai"], "pytest-worker")
+    job = queue.claim(lease_seconds=60)
+    assert job is not None
+    assert (job.id, job.priority) == (urgent, 1), "queued later, but someone is waiting for it"
+    queue.complete(job, [FollowUp("core", JobKind.document_text_extracted, result_payload())])
+    with psycopg.connect(database["admin"]) as conn:
+        result = conn.execute("SELECT priority FROM job WHERE kind = 'document.text_extracted'").fetchone()
+        done = conn.execute("SELECT payload FROM job WHERE id = %s", (urgent,)).fetchone()
+    assert result == (1,)
+    assert done == ({},), "a finished job keeps none of the CV it carried"
     queue.close()
 
 

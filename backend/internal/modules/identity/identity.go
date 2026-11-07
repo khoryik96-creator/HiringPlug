@@ -77,9 +77,24 @@ func (m *Module) Authenticate(ctx context.Context, token string) (authz.Principa
 		if u.TokensValidAfter != nil && claims.IssuedAt != nil && claims.IssuedAt.Before(*u.TokensValidAfter) {
 			return fmt.Errorf("%w: token issued before the user's sessions were ended", authn.ErrInvalidToken)
 		}
+		// Signed out on the server (this token only).
+		if claims.ID != "" {
+			revoked, err := store.New(tx).SessionRevoked(ctx, claims.ID)
+			if err != nil {
+				return err
+			}
+			if revoked {
+				return fmt.Errorf("%w: signed out", authn.ErrInvalidToken)
+			}
+		}
 		// Their company's settings for their role: permissions, and which candidates they see.
-		principal, err = principalOf(ctx, store.New(tx), u)
-		return err
+		if principal, err = principalOf(ctx, store.New(tx), u); err != nil {
+			return err
+		}
+		if claims.ID != "" && claims.ExpiresAt != nil {
+			principal = principal.WithSession(authz.Session{ID: claims.ID, Expires: claims.ExpiresAt.Time})
+		}
+		return nil
 	})
 	return principal, err
 }

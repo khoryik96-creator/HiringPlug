@@ -3236,6 +3236,40 @@ class SchedulingRefreshCalendarJob(BaseModel):
     userId: str
 
 
+class JobKindStatus(BaseModel):
+    kind: Annotated[str, Field(description="e.g. email.send")]
+    waiting: Annotated[int, Field(description="Not started yet.")]
+    running: int
+    retrying: Annotated[int, Field(description="Failed at least once; tried again later.")]
+    failed: Annotated[int, Field(description="Failed for good in the last 30 days.")]
+    oldestWaitingSince: Annotated[
+        AwareDatetime | None, Field(description="When the longest-waiting one was queued.")
+    ]
+
+
+class FailedJob(BaseModel):
+    id: str
+    kind: str
+    attempts: int
+    error: Annotated[str, Field(description="The last attempt's error.")]
+    failedAt: AwareDatetime
+
+
+class Status3(StrEnum):
+    running = "running"
+    done = "done"
+    failed = "failed"
+
+
+class BackupStatus(BaseModel):
+    name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
+    startedAt: AwareDatetime
+    finishedAt: Annotated[AwareDatetime | None, Field(...)]
+    status: Status3
+    sizeBytes: Annotated[int | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+
+
 class EmailSalaryVisibility(StrEnum):
     salary_roles = "salary_roles"
     everyone = "everyone"
@@ -3828,6 +3862,20 @@ class BookingLink(BaseModel):
     startsAt: Annotated[AwareDatetime | None, Field(description="The booked time.")]
     expiresAt: AwareDatetime
     createdAt: AwareDatetime
+
+
+class SystemStatus(BaseModel):
+    jobs: Annotated[
+        list[JobKindStatus],
+        Field(description="The company's background jobs by kind, kinds with none left out."),
+    ]
+    failed: Annotated[
+        list[FailedJob],
+        Field(description="Jobs that failed for good in the last 30 days, newest first (at most 50)."),
+    ]
+    backup: Annotated[
+        BackupStatus | None, Field(description="The server's last backup; null when none was ever made.")
+    ]
 
 
 class AiProviders(BaseModel):

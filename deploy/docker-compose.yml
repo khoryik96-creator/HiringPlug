@@ -91,6 +91,23 @@ services:
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 
+  # A backup of the database and the uploaded files every night, the newest
+  # 14 kept, in the backups folder next to this repository (copy them to
+  # another disk or the cloud too). Restore one with:
+  #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
+  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
+  #   docker compose -f deploy/docker-compose.yml up -d
+  backup:
+    build: { context: .., dockerfile: deploy/backup.Dockerfile }
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      HP_BACKUP_DIR: /backups
+      HP_BACKUP_KEEP: ${HP_BACKUP_KEEP:-14}
+    volumes: [files:/data/files, ../backups:/backups]
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
   # Catches email sent from the app (development): http://localhost:8025.
   mailpit:
     image: axllent/mailpit:v1.21

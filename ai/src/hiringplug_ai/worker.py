@@ -20,7 +20,7 @@ import time
 import psycopg
 
 from . import logs
-from .config import ConfigError, load_config
+from .config import Config, ConfigError, load_config
 from .contracts import JobKind
 from .download import download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
@@ -80,8 +80,6 @@ def main() -> None:
             else None
         ),
     )
-    queue = Queue(config.database_url, config.worker_id)
-
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
@@ -93,8 +91,32 @@ def main() -> None:
             "ocr": ocr.name if ocr else "off",
             "ai": config.ai_model or "off",
             "company_keys": "on" if config.ai_keys_secret else "off",
+            "concurrency": config.concurrency,
         },
     )
+    queues = [
+        Queue(config.database_url, slot_id(config.worker_id, i, config.concurrency))
+        for i in range(config.concurrency)
+    ]
+    slots = [
+        threading.Thread(target=run_slot, args=(q, deps, config, stop), name=f"slot-{i + 1}")
+        for i, q in enumerate(queues)
+    ]
+    for t in slots:
+        t.start()
+    while any(t.is_alive() for t in slots):
+        for t in slots:
+            t.join(timeout=0.5)  # wakes for signals
+    log.info("worker stopped")
+
+
+def slot_id(worker_id: str, i: int, n: int) -> str:
+    """Each slot holds its own leases, so it needs its own worker ID."""
+    return worker_id if n == 1 else f"{worker_id}/{i + 1}"
+
+
+def run_slot(queue: Queue, deps: Deps, config: Config, stop: threading.Event) -> None:
+    """Runs jobs one after another until stop is set (one of several slots)."""
     while not stop.is_set():
         try:
             job = queue.claim(config.lease_seconds)
@@ -107,7 +129,6 @@ def main() -> None:
             queue.close()
             stop.wait(config.poll_seconds)
     queue.close()
-    log.info("worker stopped")
 
 
 if __name__ == "__main__":

@@ -81,6 +81,16 @@ paths:
         '409': { $ref: '#/components/responses/ChooseCompany' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
+  /v1/auth/sign-out:
+    post:
+      operationId: signOut
+      tags: [identity]
+      summary: Sign out, ending this session on the server too (its token stops working at once)
+      x-permission: authenticated
+      responses:
+        '204': { description: Signed out }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
   /v1/auth/password-resets:
     post:
       operationId: requestPasswordReset

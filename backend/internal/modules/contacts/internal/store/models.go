@@ -115,6 +115,16 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type BackupRun struct {
+	ID         int64
+	Name       string
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	Status     string
+	SizeBytes  *int64
+	Error      *string
+}
+
 type BookingLink struct {
 	ID              string
 	TenantID        string
@@ -498,6 +508,7 @@ type Job struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	FinishedAt  *time.Time
+	Priority    int16
 }
 
 type JobAd struct {
@@ -733,6 +744,14 @@ type PrivacyRequest struct {
 	CreatedBy   string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type RevokedSession struct {
+	ID        string
+	TenantID  string
+	UserID    string
+	ExpiresAt time.Time
+	CreatedAt time.Time
 }
 
 type RoleSetting struct {

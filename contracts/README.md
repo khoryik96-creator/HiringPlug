@@ -30,6 +30,7 @@ x-module:
     note.summarize:                # entity.action
       queue: ai                    # ai = Python worker, core = Go worker
       payload: NoteSummarizeJob    # a schema in this file
+      priority: normal             # high (someone waits on screen), normal (default) or low (upkeep)
       description: Summarize a long note.
 
 paths:

@@ -683,8 +683,14 @@ One **Settings** button in the top bar leads to everything that is set up
 rather than worked on, with a menu of its parts on the left; each person sees
 the parts they may change: **General** (below), **AI provider**, **Team**,
 **Roles and access**, **Data protection**, **Integrations**, **CV templates**,
-**Email templates** and **Your account** (booking hours, password), which
-everyone has.
+**Email templates**, **System** and **Your account** (booking hours,
+password), which everyone has.
+
+**System** (owners and admins) shows the company's background work in plain
+words (sending emails, reading CVs, making PDF copies, ...): how much is
+waiting, running or being retried, what failed for good in the last 30 days
+and why, with **Try again**; and the server's last backup, with a warning
+when it failed or is more than two days old.
 
 **General** (owners and admins) has these parts.
 

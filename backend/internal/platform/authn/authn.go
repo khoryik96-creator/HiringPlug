@@ -7,6 +7,8 @@
 package authn
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
@@ -70,9 +72,14 @@ func (v *Verifier) Mint(tenantID, userID string, ttl time.Duration) (string, err
 
 // MintAt issues a token for a user, issued at now (signing in).
 func (v *Verifier) MintAt(tenantID, userID string, now time.Time, ttl time.Duration) (string, error) {
+	id := make([]byte, 16)
+	if _, err := rand.Read(id); err != nil {
+		return "", err
+	}
 	c := Claims{
 		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        base64.RawURLEncoding.EncodeToString(id), // ends one session at sign-out
 			Subject:   userID,
 			Issuer:    v.issuer,
 			Audience:  jwt.ClaimStrings{v.audience},

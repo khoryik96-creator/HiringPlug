@@ -36,10 +36,12 @@ x-module:
     document.render_pdf:
       queue: ai
       payload: DocumentRenderPdfJob
+      priority: low
       description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
     document.pdf_rendered:
       queue: core
       payload: DocumentPdfRenderedJob
+      priority: low
       description: Save a formatted CV's PDF with it (Go worker).
 
 paths:

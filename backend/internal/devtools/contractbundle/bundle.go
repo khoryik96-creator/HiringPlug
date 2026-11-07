@@ -39,6 +39,7 @@ var (
 	jobKindRe    = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$`)
 	httpMethods  = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 	queues       = []string{"core", "ai"}
+	priorities   = []string{"high", "normal", "low"}
 	// Permission values every operation may use without a module declaring them.
 	builtinPermissions = []string{"authenticated", "public"}
 )
@@ -63,8 +64,11 @@ type errorCodeMeta struct {
 }
 
 type jobMeta struct {
-	Queue       string `yaml:"queue"`
-	Payload     string `yaml:"payload"`
+	Queue   string `yaml:"queue"`
+	Payload string `yaml:"payload"`
+	// Priority: "high" (someone is waiting on screen), "normal" (the
+	// default) or "low" (background upkeep). Workers take higher first.
+	Priority    string `yaml:"priority"`
 	Description string `yaml:"description"`
 }
 
@@ -370,6 +374,12 @@ func (b *bundler) addJob(file, module, kind string, j jobMeta) {
 	if j.Payload == "" {
 		b.problem("%s: job %q needs a payload schema name", file, kind)
 	}
+	if j.Priority == "" {
+		j.Priority = "normal"
+	}
+	if !slices.Contains(priorities, j.Priority) {
+		b.problem("%s: job %q has priority %q; use one of %v", file, kind, j.Priority, priorities)
+	}
 	b.jobs[kind] = owned[jobMeta]{module: module, meta: j}
 }
 
@@ -433,8 +443,9 @@ func (b *bundler) writeGenerated() {
 			Module      string `yaml:"module"`
 			Queue       string `yaml:"queue"`
 			Payload     string `yaml:"payload"`
+			Priority    string `yaml:"priority"`
 			Description string `yaml:"description"`
-		}{j.module, j.meta.Queue, j.meta.Payload, j.meta.Description}))
+		}{j.module, j.meta.Queue, j.meta.Payload, j.meta.Priority, j.meta.Description}))
 	}
 	mapSet(b.root, "x-jobs", jobs)
 

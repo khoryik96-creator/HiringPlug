@@ -63,3 +63,11 @@ func (h *HTTP) ListUsers(ctx context.Context, _ api.ListUsersRequestObject) (api
 	}
 	return out, nil
 }
+
+// SignOut handles POST /v1/auth/sign-out.
+func (h *HTTP) SignOut(ctx context.Context, _ api.SignOutRequestObject) (api.SignOutResponseObject, error) {
+	if err := h.m.SignOut(ctx, authz.MustFromContext(ctx)); err != nil {
+		return nil, err
+	}
+	return api.SignOut204Response{}, nil
+}
