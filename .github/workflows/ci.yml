@@ -52,8 +52,16 @@ jobs:
       - name: Lint
         run: task lint:go
       - name: PostgreSQL 16 client tools (backups use the database's own version)
+        # The runner's Ubuntu no longer packages PostgreSQL 16, so its own
+        # pg_dump and pg_restore run from the postgres:16 image, where the
+        # backup code looks for a 16 server's tools.
         run: |
-          test -x /usr/lib/postgresql/16/bin/pg_dump || { sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends postgresql-client-16; }
+          sudo mkdir -p /usr/lib/postgresql/16/bin
+          for tool in pg_dump pg_restore; do
+            printf '#!/bin/sh\nexec docker run --rm --network host --user "$(id -u):$(id -g)" -v /tmp:/tmp -v "%s:%s" postgres:16 %s "$@"\n' \
+              "$RUNNER_TEMP" "$RUNNER_TEMP" "$tool" | sudo tee /usr/lib/postgresql/16/bin/$tool > /dev/null
+            sudo chmod +x /usr/lib/postgresql/16/bin/$tool
+          done
           /usr/lib/postgresql/16/bin/pg_dump --version
       - name: Test (unit and integration, real PostgreSQL)
         run: task test:go
