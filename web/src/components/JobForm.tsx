@@ -8,7 +8,8 @@ import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
-import { formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
+import { JdDrop } from "./JdDrop";
+import { fillFromJd, formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
 import { SaveError } from "./SaveError";
 
 /**
@@ -72,6 +73,11 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
         save.mutate();
       }}
     >
+      {!opened.id && (
+        <div className="full">
+          <JdDrop onRead={(d) => { setForm((f) => fillFromJd(f, d)); }} />
+        </div>
+      )}
       {text("title", req("Job title", "title"))}
       <Field label={req("Company", "companyId")} error={errors[JOB_PATHS.company]}>
         <CompanyPicker value={form.company} onChange={(c) => { setForm((f) => ({ ...f, company: c, contactId: "" })); }} />

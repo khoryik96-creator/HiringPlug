@@ -10,11 +10,11 @@ import { DropZone } from "./DropZone";
 export type JdDetails = Schemas["JdDetails"];
 export const JD_TYPES = ".pdf,.docx,.doc,.txt";
 
-/** Sends a job description (multipart, so not through the typed client). */
-async function sendJd(jobId: string, file: File): Promise<Schemas["JdFile"]> {
+/** Sends a job description (multipart, so not through the typed client); without a job, for one being added. */
+async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["JdFile"]> {
   const body = new FormData();
   body.append("file", file);
-  const res = await fetch(`/v1/jobs/${jobId}/jd-files`, { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+  const res = await fetch(jobId ? `/v1/jobs/${jobId}/jd-files` : "/v1/jd-files", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
   const json: unknown = await res.json();
   if (!res.ok) unwrap({ error: json, response: res });
   return json as Schemas["JdFile"];
@@ -24,7 +24,7 @@ async function sendJd(jobId: string, file: File): Promise<Schemas["JdFile"]> {
  * A drop zone for the job description; calls onRead once with what was read
  * from it. `start` is a file dropped before this was shown (on the ads panel).
  */
-export function JdDrop({ jobId, start, onRead }: { jobId: string; start?: File | null; onRead: (d: JdDetails, fileName: string) => void }) {
+export function JdDrop({ jobId, start, onRead }: { jobId?: string; start?: File | null; onRead: (d: JdDetails, fileName: string) => void }) {
   const upload = useMutation({ mutationFn: (file: File) => sendJd(jobId, file) });
   const uploaded = upload.data;
   // A PDF or Word file is read by the worker: follow it until it is done.

@@ -17,7 +17,7 @@ describe("the route table", () => {
   it("never opens a page the user may not open", () => {
     for (const r of ROUTES.filter((x) => x.permission && !RECRUITER.includes(x.permission))) {
       const href = r.menu?.href;
-      if (href) expect(resolve(href, RECRUITER).route.section, href).not.toBe(r.section);
+      if (href) expect(resolve(href, RECRUITER).route, href).not.toBe(r);
     }
   });
 
@@ -32,8 +32,17 @@ describe("the route table", () => {
     expect(resolve("", RECRUITER).route.section).toBe("candidates");
   });
 
+  it("shows everyone where the AI is set up; only owners and admins get the keys page", () => {
+    const forRecruiter = resolve("#/ai-provider", RECRUITER).route;
+    expect([forRecruiter.section, forRecruiter.unless]).toEqual(["ai-provider", "aiproviders:manage"]);
+    const forOwner = resolve("#/ai-provider", OWNERISH).route;
+    expect([forOwner.section, forOwner.permission]).toEqual(["ai-provider", "aiproviders:manage"]);
+    expect(menu("settings", OWNERISH).filter((r) => r.section === "ai-provider")).toHaveLength(1);
+  });
+
   it("lists only what the user may open, in order", () => {
     expect(menu("main", RECRUITER).map((r) => r.menu?.label)).toEqual(["Jobs", "Candidates", "Companies", "Contacts", "Import"]);
+    expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account"]);
     expect(menu("main", OWNERISH).map((r) => r.menu?.label)).toEqual(["Dashboard", "Jobs", "Candidates", "Companies", "Contacts", "Reports", "Import"]);
     expect(menu("settings", OWNERISH).map((r) => r.menu?.label)).toEqual(["General", "AI provider", "Email templates", "System", "Your account"]);
   });

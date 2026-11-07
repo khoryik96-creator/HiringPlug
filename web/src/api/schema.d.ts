@@ -1629,6 +1629,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jd-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload the client's job description (PDF, Word or text) to fill in a new job
+         * @description As for a job's ads, before the job exists: read it (follow GET /v1/jd-files/{jdFileId}), then the Add job form takes its details. Nothing is saved on a job.
+         */
+        post: operations["uploadNewJobDescription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jd-files/{jdFileId}": {
         parameters: {
             query?: never;
@@ -4019,7 +4039,8 @@ export interface components {
         JdFileStatus: "reading" | "read" | "failed";
         JdFile: {
             id: components["schemas"]["JdFileId"];
-            jobId: components["schemas"]["JobOrderId"];
+            /** @description The job it was uploaded for; null for one read before its job was added. */
+            jobId: components["schemas"]["JobOrderId"] | null;
             fileName: string;
             status: components["schemas"]["JdFileStatus"];
             /** @description Why it could not be read (a scan with no text, a damaged file...). */
@@ -8707,6 +8728,37 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    uploadNewJobDescription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JdFile"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             413: components["responses"]["PayloadTooLarge"];
         };
     };

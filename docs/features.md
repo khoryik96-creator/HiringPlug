@@ -353,6 +353,11 @@ lead's company (with the built-in email check).
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
   text) come in Phase 3.
+- **A job from the client's JD** ✅: drop the client's job description (PDF,
+  Word or text) on the Add job form, or on a job's ads to write an ad; the
+  title, location, country, work type and arrangement and the description are
+  read from it into the form (fields already typed are kept), to check and
+  save.
 - **Blind ads** ✅: every ad is shown in two columns, as written and blind.
   The blind version is made from the ad when it is read: the client's name
   (also without "Sdn Bhd", "Berhad" and the like, and however the JD writes

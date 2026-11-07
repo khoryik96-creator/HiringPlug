@@ -2523,6 +2523,32 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/jd-files:
+    post:
+      operationId: uploadNewJobDescription
+      tags: [jobs]
+      summary: Upload the client's job description (PDF, Word or text) to fill in a new job
+      description: "As for a job's ads, before the job exists: read it (follow GET /v1/jd-files/{jdFileId}), then the Add job form takes its details. Nothing is saved on a job."
+      x-permission: jobs:create
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: Uploaded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JdFile'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
   /v1/jd-files/{jdFileId}:
     parameters:
       - name: jdFileId
@@ -6077,7 +6103,10 @@ components:
       required: [id, jobId, fileName, status, error, details, createdAt]
       properties:
         id: {$ref: '#/components/schemas/JdFileId'}
-        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        jobId:
+          description: The job it was uploaded for; null for one read before its job was added.
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/JobOrderId'}]
         fileName: {type: string}
         status: {$ref: '#/components/schemas/JdFileStatus'}
         error: {type: string, nullable: true, description: "Why it could not be read (a scan with no text, a damaged file...)."}

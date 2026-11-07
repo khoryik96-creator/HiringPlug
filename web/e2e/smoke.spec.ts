@@ -60,11 +60,15 @@ for (const role of ["owner", "recruiter", "viewer"] as const) {
     const parts = await menu.getByRole("link").allTextContents();
     expect(parts).toContain("Your account");
     if (role === "owner") expect(parts).toEqual(expect.arrayContaining(["General", "AI provider", "Team", "System"]));
-    else expect(parts).not.toContain("AI provider");
+    else expect(parts).not.toContain("General");
     for (const part of parts) {
       await menu.getByRole("link", { name: part, exact: true }).click();
       await expect(page.getByText("This page could not be shown")).toHaveCount(0);
       await expect(menu.getByRole("link", { name: part, exact: true })).toHaveAttribute("aria-current", "page");
+    }
+    if (role !== "owner") { // where the AI is set up, and who may do it
+      await menu.getByRole("link", { name: "AI provider", exact: true }).click();
+      await expect(page.getByText("Only owners and admins choose the AI provider")).toBeVisible();
     }
     expect(errors).toEqual([]);
   });

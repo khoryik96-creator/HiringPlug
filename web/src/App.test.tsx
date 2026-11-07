@@ -83,12 +83,12 @@ describe("top bar", () => {
   it("opens the first part a recruiter may change, and leaves out the company's settings", async () => {
     signedIn(RECRUITER, "#/settings");
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
-    await waitFor(() => { expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["Your account"]); });
+    await waitFor(() => { expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["AI provider", "Your account"]); });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("does not open a part the user may not change", async () => {
-    signedIn(RECRUITER, "#/ai-provider");
+    signedIn(RECRUITER, "#/team");
     await screen.findByRole("navigation", { name: "Main" });
     await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
   });

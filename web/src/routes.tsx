@@ -54,6 +54,8 @@ export type Route = {
   path: RegExp;
   /** Needed to open it; none: everyone signed in. */
   permission?: Permission;
+  /** Left out for those who have this permission (they get the full page instead). */
+  unless?: Permission;
   /** Listed in the top bar or the Settings menu, with this label. */
   menu?: { in: "main" | "settings"; label: string; href: string };
   render: (c: PageContext) => ReactNode;
@@ -97,6 +99,17 @@ export const ROUTES: Route[] = [
     render: () => <Settings /> },
   { section: "ai-provider", path: /^#\/ai-provider/, permission: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
     render: () => <AiProvider /> },
+  // Everyone else sees where the AI is set up, and who may do it.
+  { section: "ai-provider", path: /^#\/ai-provider/, unless: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
+    render: (c) => (
+      <main>
+        <h2>AI provider</h2>
+        <section className="panel">
+          <p>Only owners and admins choose the AI provider and enter its API key (DeepSeek, Claude or ChatGPT).</p>
+          <p className="muted">You are signed in as {c.me.user.name}, {c.me.role.replace("_", " ")} at {c.me.tenant.name}. Ask an owner or admin, or sign in with their account.</p>
+        </section>
+      </main>
+    ) },
   { section: "team", path: /^#\/team/, permission: "identity.team:manage", menu: { in: "settings", label: "Team", href: "#/team" },
     render: (c) => <Team myRole={c.me.role} myId={c.me.user.id} /> },
   { section: "access", path: /^#\/access/, permission: "identity.roles:manage", menu: { in: "settings", label: "Roles and access", href: "#/access" },
@@ -115,7 +128,8 @@ export const ROUTES: Route[] = [
     render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
 ];
 
-const allowed = (r: Route, permissions: readonly Permission[]) => !r.permission || permissions.includes(r.permission);
+const allowed = (r: Route, permissions: readonly Permission[]) =>
+  (!r.permission || permissions.includes(r.permission)) && !(r.unless && permissions.includes(r.unless));
 
 /** The entries of a menu this user may open, in order. */
 export function menu(which: "main" | "settings", permissions: readonly Permission[]): Route[] {
@@ -133,7 +147,8 @@ export function resolve(hash: string, permissions: readonly Permission[]): { rou
     if (m && allowed(r, permissions)) return { route: r, id: m[1] ?? "" };
   }
   if (/^#\/settings/.test(hash)) {
-    const first = menu("settings", permissions)[0];
+    const parts = menu("settings", permissions);
+    const first = parts.find((r) => !r.unless) ?? parts[0]; // a part they can use, not one that says who can
     if (first) return { route: first, id: "" };
   }
   const start = ROUTES.find((r) => r.section === "dashboard" && allowed(r, permissions))

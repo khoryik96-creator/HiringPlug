@@ -4031,7 +4031,10 @@ class Contact(BaseModel):
 
 class JdFile(BaseModel):
     id: JdFileId
-    jobId: JobOrderId
+    jobId: Annotated[
+        JobOrderId | None,
+        Field(description="The job it was uploaded for; null for one read before its job was added."),
+    ]
     fileName: str
     status: JdFileStatus
     error: Annotated[

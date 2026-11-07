@@ -71,3 +71,21 @@ export function jobFields(f: JobFormState) {
     ...(f.intakeDate ? { intakeDate: f.intakeDate } : {}),
   };
 }
+
+/**
+ * The form with what a job description says, where the form is still empty
+ * (what someone typed is kept).
+ */
+export function fillFromJd(form: JobFormState, d: Schemas["JdDetails"]): JobFormState {
+  const pick = (current: string, read: string | null | undefined) => current.trim() ? current : read ?? current;
+  return {
+    ...form,
+    title: pick(form.title, d.title),
+    location: pick(form.location, d.location),
+    country: pick(form.country, d.country),
+    workType: form.workType || (d.workType ?? ""),
+    workArrangement: form.workArrangement || (d.workArrangement ?? ""),
+    description: pick(form.description, d.description),
+  };
+}
+

@@ -37,6 +37,24 @@ describe("job form", () => {
     expect(sentBody(post)).toMatchObject({ companyId: job.companyId, title: "Senior Auditor", openings: 2, workType: "full_time", status: "open", contactId: null });
   });
 
+  it("is filled in from a job description dropped on it, keeping what was typed", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: [], nextCursor: null }))) as never);
+    const details = { title: "Finance Manager", location: "Petaling Jaya, Selangor", country: "MY", workType: "full_time", workArrangement: "hybrid",
+      salaryText: "RM 12,000", closesOn: null, description: "Lead month-end closing." };
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      id: "jdf_1", jobId: null, fileName: "JD.txt", status: "read", error: null, details, createdAt: "2026-11-07T00:00:00Z",
+    }), { status: 201 }));
+    renderWithClient(<JobForm job={null} onDone={vi.fn()} />);
+    change("Location", "Kuala Lumpur");
+    const drop = screen.getByLabelText(/Drop the client's JD/);
+    fireEvent.change(drop, { target: { files: [new File(["Position: Finance Manager"], "JD.txt", { type: "text/plain" })] } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Job title").value).toBe("Finance Manager"); });
+    expect(fetch.mock.calls[0]?.[0]).toBe("/v1/jd-files");
+    expect(screen.getByLabelText<HTMLInputElement>("Location").value).toBe("Kuala Lumpur");
+    expect(screen.getByLabelText<HTMLSelectElement>("Where").value).toBe("hybrid");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Description").value).toBe("Lead month-end closing.");
+  });
+
   it("refuses a bad number of openings before sending", async () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(job));
     renderWithClient(<JobForm job={null} company={{ id: job.companyId, name: "Maybank" }} onDone={vi.fn()} />);

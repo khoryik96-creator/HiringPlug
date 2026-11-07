@@ -50,7 +50,7 @@ SELECT id, job_id, file_name, status, error, details, created_at FROM job_descri
 
 type GetJdFileRow struct {
 	ID        string
-	JobID     string
+	JobID     *string
 	FileName  string
 	Status    string
 	Error     *string
@@ -213,7 +213,7 @@ RETURNING id, job_id, file_name, status, error, details, created_at
 
 type InsertJdFileParams struct {
 	ID          string
-	JobID       string
+	JobID       *string
 	FileName    string
 	ContentType string
 	SizeBytes   int32
@@ -225,7 +225,7 @@ type InsertJdFileParams struct {
 
 type InsertJdFileRow struct {
 	ID        string
-	JobID     string
+	JobID     *string
 	FileName  string
 	Status    string
 	Error     *string

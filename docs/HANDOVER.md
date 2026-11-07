@@ -44,6 +44,14 @@ first (the rules, enforced by `task verify`), then `docs/README.md`.
 
 ## What was built most recently (newest first)
 
+0. **Last, after the merge of `a7a1e7c`** (on the branch, not merged yet when
+   this was written): the client's JD can be dropped on the **Add job** form
+   (`POST /v1/jd-files` without a job, migration 00057 makes
+   `job_description_file.job_id` nullable; `fillFromJd` keeps typed fields),
+   and **Settings shows "AI provider" to everyone**: owners and admins get the
+   keys page, others a page saying only owners and admins can set it (the
+   owner could not find it while signed in with another role).
+
 1. **Formatted CVs CV Studio's way** (`a7a1e7c`): "Make formatted CV" → "From
    their CV". CV Studio's engine is vendored **unchanged** in `ai/cvstudio`
    (rules, prompts, Node renderer `generate.js`, Hyppies template); only

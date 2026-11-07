@@ -540,7 +540,7 @@ type JobAd struct {
 type JobDescriptionFile struct {
 	ID          string
 	TenantID    string
-	JobID       string
+	JobID       *string
 	FileName    string
 	ContentType string
 	SizeBytes   int32

@@ -35,10 +35,11 @@ const jdLinkTTL = 30 * time.Minute
 
 // JDFile is an uploaded job description and, once read, the ad details in it.
 type JDFile struct {
-	ID, JobID, FileName, Status string
-	Error                       *string
-	Details                     *JDDetails
-	CreatedAt                   time.Time
+	ID, FileName, Status string
+	JobID                *string // nil: read before its job was added
+	Error                *string
+	Details              *JDDetails
+	CreatedAt            time.Time
 }
 
 // jdKind is what an uploaded file is, from its first bytes and name.
@@ -57,7 +58,8 @@ func jdKind(name string, data []byte) (contentType string, ok bool) {
 	return "", false
 }
 
-// UploadJD stores a job description for a job and starts reading it.
+// UploadJD stores a job description for a job (or, with jobID "", for a job
+// not added yet: the Add job form) and starts reading it.
 func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileName string, data []byte) (JDFile, error) {
 	ctype, ok := jdKind(fileName, data)
 	if !ok {
@@ -71,12 +73,16 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 	var out JDFile
 	var key string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		exists, err := s.Exists(ctx, tx, jobID)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return apperr.NotFound("job")
+		var job *string
+		if jobID != "" {
+			exists, err := s.Exists(ctx, tx, jobID)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return apperr.NotFound("job")
+			}
+			job = &jobID
 		}
 		q := store.New(tx)
 		id, err := q.NewJdFileID(ctx)
@@ -89,7 +95,7 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 			return err
 		}
 		params := store.InsertJdFileParams{
-			ID: id, JobID: jobID, FileName: name, ContentType: ctype, SizeBytes: int32(len(data)), //nolint:gosec // capped by the upload limit
+			ID: id, JobID: job, FileName: name, ContentType: ctype, SizeBytes: int32(len(data)), //nolint:gosec // capped by the upload limit
 			StorageKey: key, Status: string(api.JdFileStatusReading),
 		}
 		if ctype == "text/plain" { // nothing for the worker to do
@@ -111,8 +117,12 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 				return err
 			}
 		}
+		entity, entityID := "job", jobID
+		if job == nil {
+			entity, entityID = "jd_file", id
+		}
 		if err := audit.Record(ctx, tx, audit.Entry{
-			Action: "job.jd_uploaded", EntityType: "job", EntityID: jobID, Changes: map[string]any{"fileName": name},
+			Action: "job.jd_uploaded", EntityType: entity, EntityID: entityID, Changes: map[string]any{"fileName": name},
 		}); err != nil {
 			return err
 		}
@@ -175,7 +185,7 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	return err
 }
 
-func jdFrom(id, jobID, fileName, status string, errMsg *string, details []byte, created time.Time) (JDFile, error) {
+func jdFrom(id string, jobID *string, fileName, status string, errMsg *string, details []byte, created time.Time) (JDFile, error) {
 	out := JDFile{ID: id, JobID: jobID, FileName: fileName, Status: status, Error: errMsg, CreatedAt: created}
 	if len(details) > 0 {
 		var d JDDetails
@@ -198,6 +208,19 @@ func (h *HTTP) UploadJobDescription(ctx context.Context, req api.UploadJobDescri
 		return nil, err
 	}
 	return api.UploadJobDescription201JSONResponse(jdToAPI(f)), nil
+}
+
+// UploadNewJobDescription handles POST /v1/jd-files (the Add job form).
+func (h *HTTP) UploadNewJobDescription(ctx context.Context, req api.UploadNewJobDescriptionRequestObject) (api.UploadNewJobDescriptionResponseObject, error) {
+	name, data, err := readJDForm(req.Body, h.maxUploadBytes)
+	if err != nil {
+		return nil, err
+	}
+	f, err := h.svc.UploadJD(ctx, authz.MustFromContext(ctx), "", name, data)
+	if err != nil {
+		return nil, err
+	}
+	return api.UploadNewJobDescription201JSONResponse(jdToAPI(f)), nil
 }
 
 // GetJobDescriptionFile handles GET /v1/jd-files/{jdFileId}.
@@ -238,7 +261,7 @@ func readJDForm(r *multipart.Reader, limit int64) (string, []byte, error) {
 }
 
 func jdToAPI(f JDFile) api.JdFile {
-	out := api.JdFile{Id: f.ID, JobId: f.JobID, FileName: f.FileName, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error)}
+	out := api.JdFile{Id: f.ID, JobId: c.OrNull(f.JobID), FileName: f.FileName, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error)}
 	out.Details.SetNull()
 	if d := f.Details; d != nil {
 		v := api.JdDetails{

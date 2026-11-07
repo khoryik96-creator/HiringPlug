@@ -99,3 +99,40 @@ func TestJobDescriptionFillsTheAd(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, a.upload("/v1/jobs/"+job.Id+"/jd-files", other, "", "jd.txt", []byte(financeJD)).Status)
 	})
 }
+
+// Dropped on the Add job form: read before the job exists, to fill it in.
+func TestAJobDescriptionFillsInANewJob(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleViewer)
+	token := tenant.Users[api.RoleRecruiter].Token
+
+	res := a.upload("/v1/jd-files", token, "", "Finance Manager JD.txt", []byte(financeJD))
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var f api.JdFile
+	res.JSON(&f)
+	assert.True(t, f.JobId.IsNull(), "no job yet")
+	assert.Equal(t, api.JdFileStatusRead, f.Status)
+	assert.Equal(t, "Finance Manager", f.Details.MustGet().Title.MustGet())
+
+	res = a.upload("/v1/jd-files", token, "", "JD.pdf", minimalPDF)
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	res.JSON(&f)
+	ctx := context.Background()
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "jdFileId", f.Id), api.JobKindJobJdRead, api.JobJdReadJob{
+		JdFileId: f.Id, Status: api.ExtractionStatusExtracted, Text: nullable.NewNullableWithValue(financeJD),
+		ErrorMessage: nullable.NewNullNullable[string](),
+	})
+	var read api.JdFile
+	a.request(http.MethodGet, "/v1/jd-files/"+f.Id, token, nil).JSON(&read)
+	assert.Equal(t, api.JdFileStatusRead, read.Status)
+	assert.Equal(t, api.WorkArrangementHybrid, read.Details.MustGet().WorkArrangement.MustGet())
+
+	assert.Equal(t, http.StatusForbidden, a.upload("/v1/jd-files", tenant.Users[api.RoleViewer].Token, "", "jd.txt", []byte(financeJD)).Status,
+		"only those who may add jobs")
+	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/jd-files/"+f.Id, other, nil).Status, "only your company's")
+}
