@@ -200,17 +200,22 @@ main.roomy { max-width: 1200px; }
 /* The file picker's button, like the other buttons. */
 input[type="file"]::file-selector-button { font: inherit; font-weight: 600; min-height: 40px; padding: 0.45rem 1rem; margin-right: 0.75rem; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); cursor: pointer; }
 input[type="file"]::file-selector-button:hover { background: var(--soft); }
-/* The top bar's Admin menu. */
-.admin-menu { position: relative; flex-shrink: 0; }
-.admin-menu summary { list-style: none; cursor: pointer; color: var(--topbar-text); font-weight: 550; padding: 0.45rem 0.8rem; border-radius: 999px; }
-.admin-menu summary::-webkit-details-marker { display: none; }
-.admin-menu summary::after { content: ""; display: inline-block; width: 0.4rem; height: 0.4rem; margin-left: 0.45rem; border: solid currentColor; border-width: 0 1.6px 1.6px 0; transform: translateY(-0.2rem) rotate(45deg); }
-.admin-menu summary:hover, .admin-menu[open] summary { color: #fff; background: rgba(255, 255, 255, 0.16); }
-.admin-menu summary[aria-current] { color: var(--topbar-active-text); background: var(--topbar-active); }
-.admin-links { position: absolute; right: 0; top: calc(100% + 0.4rem); min-width: 13rem; display: flex; flex-direction: column; padding: 0.35rem; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(17, 21, 27, 0.12); }
-.admin-links a { color: var(--text); padding: 0.5rem 0.75rem; border-radius: 8px; text-decoration: none; }
-.admin-links a:hover { background: var(--soft); }
-.admin-links a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* The top bar's Settings button, and Settings: a menu of its parts beside the part open. */
+.settings-link { display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0; color: var(--topbar-text); font-weight: 550; padding: 0.45rem 0.8rem; border-radius: 999px; text-decoration: none; }
+.settings-link:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
+.settings-link[aria-current="page"] { color: var(--topbar-active-text); background: var(--topbar-active); }
+.settings-layout { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 1.75rem; max-width: 1280px; margin: 0 auto; padding: 0 2rem; align-items: start; }
+.settings-layout > .settings-body > main { max-width: none; margin: 1.5rem 0 3rem; padding: 0; }
+.settings-nav { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); margin-top: 1.5rem; }
+.settings-nav h2 { font-size: 0.74rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0.35rem 0.75rem 0.4rem; }
+.settings-nav a { color: var(--text); padding: 0.5rem 0.75rem; border-radius: 8px; text-decoration: none; }
+.settings-nav a:hover { background: var(--soft); }
+.settings-nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+@media (max-width: 760px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; }
+  .settings-nav h2 { width: 100%; }
+}
 section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 /* The dashboard's search boxes. */
 .quick-search { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; margin: 0 0 1.25rem; align-items: start; }
@@ -315,3 +320,7 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .booking-check { font-weight: 700; color: #14532d; margin: 0 0 0.25rem; font-size: 1.1rem; }
 .booking-note { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 12px; background: var(--soft); }
 @media (max-width: 700px) { .booking-link-form { grid-template-columns: 1fr; } .booking-card { padding: 1.25rem; } }
+/* The CV on a candidate's page */
+.cv-pane-title { margin: 0 0.5rem 0 0; }
+.candidate-cv .cv-frame { height: 80vh; border-radius: 10px; border-color: var(--line); }
+.candidate-cv .extracted { max-height: 70vh; overflow: auto; }

@@ -1,8 +1,8 @@
 package documents
 
-// Formatted CVs made by the app also come as a PDF: the Python worker turns
-// the .docx into one with LibreOffice, and the Go worker saves it with the
-// document.
+// Word documents also come as a PDF (formatted CVs to send, CVs sent as Word
+// to preview): the Python worker turns the Word file into one with
+// LibreOffice, and the Go worker saves it with the document.
 
 import (
 	"context"
@@ -102,9 +102,46 @@ func (h *HTTP) GetDocumentPdf(ctx context.Context, req api.GetDocumentPdfRequest
 	if err != nil {
 		return nil, err
 	}
-	name := strings.TrimSuffix(doc.FileName, ".docx") + ".pdf"
+	name := strings.TrimSuffix(strings.TrimSuffix(doc.FileName, ".docx"), ".doc") + ".pdf"
 	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": name})
 	return api.GetDocumentPdf200ApplicationoctetStreamResponse{
 		Body: f, Headers: api.GetDocumentPdf200ResponseHeaders{ContentDisposition: &disposition},
 	}, nil
+}
+
+// MakePdf queues a Word document's PDF copy when it has none (one uploaded
+// before previews began); anything else is returned as it is.
+func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Document, error) {
+	var out Document
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		row, err := q.GetDocument(ctx, id)
+		if database.IsNoRows(err) {
+			return apperr.NotFound("document")
+		}
+		if err != nil {
+			return err
+		}
+		word := row.ContentType == ContentTypeDOCX || row.ContentType == ContentTypeDOC
+		if word && row.PdfStatus == nil { // a failed copy is not tried again on every view
+			if err := s.queuePdf(ctx, tx, p.TenantID, fromRow(row), row.StorageKey); err != nil {
+				return err
+			}
+			if row, err = q.GetDocument(ctx, id); err != nil {
+				return err
+			}
+		}
+		out = fromRow(row)
+		return nil
+	})
+	return out, err
+}
+
+// MakeDocumentPdf handles POST /v1/documents/{documentId}/pdf.
+func (h *HTTP) MakeDocumentPdf(ctx context.Context, req api.MakeDocumentPdfRequestObject) (api.MakeDocumentPdfResponseObject, error) {
+	doc, err := h.svc.MakePdf(ctx, authz.MustFromContext(ctx), req.DocumentId)
+	if err != nil {
+		return nil, err
+	}
+	return api.MakeDocumentPdf202JSONResponse(documentToAPI(doc, false)), nil
 }

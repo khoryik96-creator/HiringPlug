@@ -65,3 +65,49 @@ func TestAdDocAndFileName(t *testing.T) {
 	assert.Equal(t, "Finance Manager (blind).pdf", ExportFileName("Finance Manager", "blind", "pdf"))
 	assert.Equal(t, "C Developer.docx", ExportFileName("C++ / Developer", "original", "docx"))
 }
+
+func TestTheJDsOwnWayOfWritingTheNameIsBlindedWhole(t *testing.T) {
+	jd := str("About Maju Foods Berhad\nMaju Foods Berhad is one of Malaysia's leading FMCG makers. Maju Foods (M) Sdn. Bhd. is hiring.")
+	for _, record := range []string{"Maju Foods Berhad", "MAJU FOODS BHD", "Maju Foods Sdn Bhd", "Maju"} {
+		b := Blind(AdDetails{Title: "Finance Manager", Description: jd}, Client{Name: record})
+		assert.Equal(t, "About our client\nOur client is one of Malaysia's leading FMCG makers. Our client is hiring.",
+			*b.Description, "client on record: %s", record)
+	}
+	b0 := Blind(AdDetails{Title: "Analyst", Description: str("Maju is a co-founder of the guild.")}, Client{Name: "Maju"})
+	assert.Equal(t, "Our client is a co-founder of the guild.", *b0.Description, "no ending taken from lowercase words")
+	b := Blind(AdDetails{Title: "Analyst", Description: str("Maju Holdings Berhad owns Maju.")}, Client{Name: "Maju"})
+	assert.Equal(t, "Our client owns our client.", *b.Description, "a word before the ending is the company's name")
+	b = Blind(AdDetails{Title: "Analyst", Description: str("Maju and Contoh Bhd are partners.")}, Client{Name: "Maju"})
+	assert.Equal(t, "Our client and Contoh Bhd are partners.", *b.Description, "lowercase words are not taken")
+}
+
+func TestTheClientsShortNameAndPluralPossessiveAreBlinded(t *testing.T) {
+	jd := str("About MAJU FOODS BHD\nMaju Foods (M) Sdn. Bhd. is a food maker.\n- Lead HR for Maju Foods' plants\n- Report to Maju's HR Director\n- MAJU culture: kita maju bersama")
+	b := Blind(AdDetails{Title: "HR Manager", Description: jd}, Client{Name: "Maju Foods Berhad"})
+	assert.Equal(t, "About our client\nOur client is a food maker.\n- Lead HR for our client's plants\n- Report to our client's HR Director\n- Our client culture: kita maju bersama",
+		*b.Description, "the Malay word maju stays")
+	assert.True(t, NamesClient("Join Maju today", Client{Name: "Maju Foods Berhad"}))
+
+	t.Run("a common first word is not the company", func(t *testing.T) {
+		b := Blind(AdDetails{Title: "HR Manager", Description: str("Global Logistics Sdn Bhd hires a Global Head of HR.")}, Client{Name: "Global Logistics Sdn Bhd"})
+		assert.Equal(t, "Our client hires a Global Head of HR.", *b.Description)
+		assert.Empty(t, ShortName(Client{Name: "Maju"}), "a one-word name is already matched whole")
+		assert.Empty(t, ShortName(Client{Name: "ABC Sdn Bhd"}), "too short to stand alone")
+	})
+
+	t.Run("a closing quote is not a possessive", func(t *testing.T) {
+		b := Blind(AdDetails{Title: "HR Manager", Description: str("Join 'Maju' today.")}, Client{Name: "Maju"})
+		assert.Equal(t, "Join 'our client' today.", *b.Description)
+	})
+}
+
+func TestADescriptionMidSentenceStartsInLowerCase(t *testing.T) {
+	b := Blind(AdDetails{Title: "HR", Description: str("About Maju\nMaju is hiring.")}, Client{Name: "Maju", Website: ""})
+	assert.Equal(t, "About our client\nOur client is hiring.", *b.Description)
+	d := "A leading food maker"
+	b = Blind(AdDetails{Title: "HR", Description: str("About Maju\nMaju is hiring."), ClientDescription: &d}, Client{Name: "Maju"})
+	assert.Equal(t, "About a leading food maker\nOur client is hiring.", *b.Description)
+	d = "Leading food maker"
+	b = Blind(AdDetails{Title: "HR", Description: str("Join Maju."), ClientDescription: &d}, Client{Name: "Maju"})
+	assert.Equal(t, "Join Leading food maker.", *b.Description, "only an article is lowered")
+}

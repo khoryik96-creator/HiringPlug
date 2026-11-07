@@ -108,6 +108,15 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	}); err != nil {
 		return Document{}, key, err
 	}
+	// A Word CV also gets a PDF copy, so it can be previewed as it looks
+	// (formatted CVs queue theirs in AddFormatted).
+	if (contentType == ContentTypeDOCX || contentType == ContentTypeDOC) && source != "formatted" {
+		if err := s.queuePdf(ctx, tx, tenantID, Document{ID: id}, key); err != nil {
+			return Document{}, key, err
+		}
+		queued := string(api.PdfStatusQueued)
+		row.PdfStatus = &queued
+	}
 	if err := audit.Record(ctx, tx, audit.Entry{
 		Action: "document.uploaded", EntityType: "document", EntityID: id,
 		Changes: map[string]any{"candidateId": candidateID, "source": source, "fileName": row.FileName},

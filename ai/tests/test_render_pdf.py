@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+from pathlib import Path
 
 import docx
 import pytest
@@ -42,6 +43,17 @@ def test_a_formatted_cv_becomes_a_pdf() -> None:
     [follow_up] = render_pdf.run(payload(), deps_for(a_docx()))
     assert follow_up.queue == "core"
     assert follow_up.kind == JobKind.document_pdf_rendered
+    result = follow_up.payload
+    assert isinstance(result, DocumentPdfRenderedJob)
+    assert result.error is None
+    assert result.pdfBase64 is not None
+    assert base64.b64decode(result.pdfBase64).startswith(b"%PDF-")
+
+
+def test_an_old_word_doc_becomes_a_pdf_too() -> None:
+    """CVs sent as old Word .doc files are previewed as well."""
+    data = (Path(__file__).parent / "fixtures" / "old-word.doc").read_bytes()
+    [follow_up] = render_pdf.run(payload(), deps_for(data))
     result = follow_up.payload
     assert isinstance(result, DocumentPdfRenderedJob)
     assert result.error is None

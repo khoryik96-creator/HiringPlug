@@ -702,10 +702,14 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Download a formatted CV as PDF */
+        /** Download a Word document (a formatted CV, or a CV sent as Word) as PDF */
         get: operations["getDocumentPdf"];
         put?: never;
-        post?: never;
+        /**
+         * Make a Word document's PDF copy (for previewing it), if it has none yet
+         * @description Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+         */
+        post: operations["makeDocumentPdf"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6671,6 +6675,31 @@ export interface operations {
                 };
                 content: {
                     "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    makeDocumentPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Being made (or already there) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

@@ -261,3 +261,56 @@ func TestDownloadingADocumentFile(t *testing.T) {
 		"another company's document does not exist for them")
 	assert.Equal(t, http.StatusUnauthorized, a.request(http.MethodGet, "/v1/documents/"+doc.Id+"/file", "", nil).Status)
 }
+
+// A CV sent as Word is previewed as it looks: it gets a PDF copy, made by the
+// AI worker. One uploaded before that began gets it on request, once.
+func TestAWordCVGetsAPDFCopyToPreview(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "Lim"})
+	path := "/v1/candidates/" + c.Id + "/documents"
+	pdfJobs := func(id string) int {
+		var n int
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx,
+			`SELECT count(*) FROM job WHERE kind = 'document.render_pdf' AND payload->>'documentId' = $1`, id).Scan(&n))
+		return n
+	}
+
+	res := a.upload(path, token, "original", "cv.docx", minimalDOCX(t))
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var word api.Document
+	res.JSON(&word)
+	assert.Equal(t, 1, pdfJobs(word.Id), "a Word CV gets its PDF copy")
+	status, _ := word.PdfStatus.Get()
+	assert.Equal(t, api.PdfStatusQueued, status)
+
+	res = a.upload(path, token, "original", "cv.pdf", minimalPDF)
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var pdf api.Document
+	res.JSON(&pdf)
+	assert.Equal(t, 0, pdfJobs(pdf.Id), "a PDF is its own preview")
+
+	t.Run("asking for a copy queues one only when there is none", func(t *testing.T) {
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE document SET pdf_status = NULL WHERE id = $1`, word.Id)
+		require.NoError(t, err)
+		res := a.request(http.MethodPost, "/v1/documents/"+word.Id+"/pdf", token, nil)
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		assert.Equal(t, 2, pdfJobs(word.Id))
+		require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/documents/"+word.Id+"/pdf", token, nil).Status)
+		assert.Equal(t, 2, pdfJobs(word.Id), "not again while one is queued")
+		require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/documents/"+pdf.Id+"/pdf", token, nil).Status)
+		assert.Equal(t, 0, pdfJobs(pdf.Id))
+	})
+
+	t.Run("another company cannot ask", func(t *testing.T) {
+		other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+		assert.Equal(t, http.StatusNotFound, a.request(http.MethodPost, "/v1/documents/"+word.Id+"/pdf", other, nil).Status)
+	})
+
+	// Leave the AI queue tidy for other tests.
+	_, err := testutil.Current.Admin.Exec(ctx, `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
+	require.NoError(t, err)
+}

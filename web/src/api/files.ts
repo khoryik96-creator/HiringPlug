@@ -10,6 +10,13 @@ export async function fetchDocumentFile(doc: Pick<Document, "id" | "contentType"
   return new Blob([await res.arrayBuffer()], { type: doc.contentType });
 }
 
+/** A Word document's PDF copy (for previewing it as it looks). */
+export async function fetchDocumentPdf(id: string): Promise<Blob> {
+  const res = await fetch(`/v1/documents/${id}/pdf`, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+  if (!res.ok) unwrap({ error: await res.json(), response: res });
+  return new Blob([await res.arrayBuffer()], { type: "application/pdf" });
+}
+
 /** Saves a file the API serves (e.g. an interview's calendar entry) under the given name. */
 export async function downloadFrom(path: string, fileName: string, type: string): Promise<void> {
   const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });

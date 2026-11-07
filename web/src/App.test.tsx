@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./api/client";
 import { App, initials } from "./App";
 import { setToken } from "./auth";
-import { ok, RECRUITER, testCandidate, testMe } from "./test-utils";
+import { ok, RECRUITER, testCandidate, testFieldSettings, testMe } from "./test-utils";
 
 afterEach(() => {
   cleanup();
@@ -55,30 +55,41 @@ describe("account button", () => {
 });
 
 describe("top bar", () => {
-  const signedIn = (permissions: Parameters<typeof testMe>[0]) => {
+  const signedIn = (permissions: Parameters<typeof testMe>[0], hash = "#/account") => {
     vi.spyOn(api, "GET").mockImplementation((path: string) => {
       if (path === "/v1/me") return Promise.resolve(ok(testMe(permissions)));
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
       return Promise.resolve(ok({ items: [] }));
     });
     setToken("test-token");
-    window.location.hash = "#/account";
+    window.location.hash = hash;
     render(<App />);
   };
 
-  it("puts the pages for running the account under Admin, only for those allowed", async () => {
-    signedIn([...RECRUITER, "settings:manage", "identity.team:manage"]);
-    const admin = await screen.findByText("Admin");
-    const menu = admin.closest("details");
-    expect(menu).toBeTruthy();
-    const links = Array.from(menu?.querySelectorAll("a") ?? []).map((a) => a.textContent);
-    expect(links).toEqual(["Settings", "Team"]);
-    expect(screen.getByRole("navigation", { name: "Main" }).textContent).not.toContain("Settings");
+  it("has one Settings button, leading to every part of Settings the user may open", async () => {
+    signedIn([...RECRUITER, "settings:manage", "aiproviders:manage", "identity.team:manage"]);
+    const button = await screen.findByRole("link", { name: "Settings" });
+    expect(button.getAttribute("href")).toBe("#/settings");
+    expect(button.getAttribute("aria-current")).toBe("page"); // the account is part of Settings
+    const menu = () => screen.getByRole("navigation", { name: "Settings" });
+    // The profile is fetched again on each page load (an earlier test may have left another one cached).
+    await waitFor(() => {
+      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "AI provider", "Team", "Your account"]);
+    });
+    expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByText("Admin")).toBeNull();
   });
 
-  it("shows no Admin menu to a recruiter", async () => {
-    signedIn(RECRUITER);
+  it("opens the first part a recruiter may change, and leaves out the company's settings", async () => {
+    signedIn(RECRUITER, "#/settings");
+    const menu = () => screen.getByRole("navigation", { name: "Settings" });
+    await waitFor(() => { expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["Your account"]); });
+    expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("does not open a part the user may not change", async () => {
+    signedIn(RECRUITER, "#/ai-provider");
     await screen.findByRole("navigation", { name: "Main" });
-    // The profile is fetched again on each page load (an earlier test may have left another one cached).
-    await waitFor(() => { expect(screen.queryByText("Admin")).toBeNull(); });
+    await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
   });
 });

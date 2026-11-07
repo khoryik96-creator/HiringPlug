@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, type Document, unwrap } from "../api/client";
-import { downloadDocument, fetchDocumentFile } from "../api/files";
+import { downloadDocument, fetchDocumentFile, fetchDocumentPdf } from "../api/files";
 import { ErrorMessage } from "./ErrorMessage";
 
 export const SOURCE: Record<Document["source"], string> = {
@@ -26,17 +26,21 @@ export function latestCv(docs: Document[]): Document | undefined {
   return [...(theirs.length > 0 ? theirs : docs)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
 
-export function CvPane({ docs, doc, selected, onSelect }: {
+export function CvPane({ docs, doc, selected, onSelect, title }: {
   docs: Document[];
   doc: Document | undefined;
   selected: string | undefined;
   onSelect: (id: string) => void;
+  /** A heading for the pane (on the candidate's page). */
+  title?: string;
 }) {
   const [view, setView] = useState<"original" | "text">("original");
-  const isPdf = doc?.contentType === "application/pdf";
+  // A PDF shows itself; a Word file shows its PDF copy once made.
+  const isPdf = doc?.contentType === "application/pdf" || doc?.pdfStatus === "ready";
   return (
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
       <div className="row">
+        {title && <h3 className="cv-pane-title">{title}</h3>}
         <select aria-label="CV version" value={selected ?? ""} onChange={(e) => { onSelect(e.target.value); }}>
           {docs.map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
         </select>
@@ -49,6 +53,7 @@ export function CvPane({ docs, doc, selected, onSelect }: {
       </div>
       {!doc ? <p className="muted">Loading…</p> : isPdf && view === "original" ? <Original doc={doc} /> : (
         <>
+          {doc.pdfStatus === "queued" && <p className="muted small" role="status">Making a preview of the Word file… its text meanwhile:</p>}
           <pre className="extracted">{doc.extractedText ?? doc.errorMessage ?? "No text has been read from this file yet."}</pre>
         </>
       )}
@@ -63,7 +68,7 @@ function Original({ doc }: { doc: Document }) {
   useEffect(() => {
     let current: string | null = null;
     let cancelled = false;
-    fetchDocumentFile({ id, contentType }).then(
+    (contentType === "application/pdf" ? fetchDocumentFile({ id, contentType }) : fetchDocumentPdf(id)).then(
       (blob) => {
         if (cancelled) return;
         current = URL.createObjectURL(blob);

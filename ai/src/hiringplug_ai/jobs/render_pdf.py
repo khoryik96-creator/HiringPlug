@@ -28,7 +28,8 @@ def run(payload: DocumentRenderPdfJob, deps: Deps) -> list[FollowUp]:
         error = "LibreOffice is not installed in the AI worker, so no PDF can be made"
     else:
         with tempfile.TemporaryDirectory(prefix="hp-pdf-") as tmp:
-            path = Path(tmp) / "cv.docx"
+            # An old Word .doc (an OLE file) is named as one, as LibreOffice expects.
+            path = Path(tmp) / ("cv.doc" if data.startswith(b"\xd0\xcf\x11\xe0") else "cv.docx")
             path.write_bytes(data)
             pdf = office.convert(path, Path(tmp), "pdf")
         if pdf is None or not pdf.startswith(b"%PDF-"):

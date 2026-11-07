@@ -10,12 +10,12 @@ import { NOTICE_UNIT, keysOf } from "../labels";
 type List = Schemas["FieldList"];
 type Row = { key?: string; label: string; hidden: boolean; builtIn: boolean };
 
-/** Main settings: the company's dropdown options and mandatory fields. */
+/** General settings: the company's mandatory fields, salary in emails and dropdown options. */
 export function Settings() {
   const settings = useQuery({ queryKey: fieldSettingsKey, queryFn: async () => unwrap(await api.GET("/v1/settings/fields")) });
   return (
     <main>
-      <h2>Settings</h2>
+      <h2>General</h2>
       <ErrorMessage error={settings.error} />
       {settings.data && (
         <>

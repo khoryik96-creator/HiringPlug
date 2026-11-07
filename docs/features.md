@@ -105,6 +105,12 @@ Design:
 
 ![Reviewing details read from a CV (an invented CV)](images/cv-review.png)
 
+**CV preview ✅.** The candidate's page shows their CV as it looks, near the
+top: the newest CV they sent, with their other CVs to pick from. A PDF is shown
+as it is; a Word file (.docx or old .doc) gets a PDF copy made by the AI worker
+with LibreOffice when it is uploaded (its text shows meanwhile). Word CVs from
+before this get their copy the first time the page is opened.
+
 **Formatted CVs ✅.** "Make formatted CV" (candidate page, CVs and documents)
 fills the candidate's profile, work history and education into a Word
 template and saves it as their `formatted` CV (read and compared with the
@@ -153,7 +159,7 @@ sees only their own.
   model to answer only from the data, say when something is missing, never
   judge or guess race, religion, age, gender, marital status, health or
   nationality, and to ignore instructions written inside a CV.
-- **Provider.** Chosen per company in **Admin > AI provider** (owners and
+- **Provider.** Chosen per company in **Settings > AI provider** (owners and
   admins, `aiproviders:manage`): DeepSeek, Claude (Anthropic) or ChatGPT
   (OpenAI) with the company's own API key and model, the server's own
   provider, or off. Each provider keeps its key and model, so switching back
@@ -335,7 +341,11 @@ lead's company (with the built-in email check).
   text) come in Phase 3.
 - **Blind ads** ✅: every ad is shown in two columns, as written and blind.
   The blind version is made from the ad when it is read: the client's name
-  (also without "Sdn Bhd", "Berhad" and the like), its website and the name
+  (also without "Sdn Bhd", "Berhad" and the like, and however the JD writes
+  its ending: "MAJU FOODS BHD", "Maju Foods (M) Sdn. Bhd." for Maju Foods
+  Berhad on record), its first word alone when the JD shortens it ("Maju's HR
+  Director"; only with a capital, and not common words such as Global or
+  Asia), its website and the name
   part of its address (acme from careers.acme.com.my), and the hiring contact
   are replaced in the title, text, location and salary line, and every email,
   phone number and link removed. The client description itself may not name
@@ -669,7 +679,14 @@ decide otherwise**: it shows you what needs deciding and records what you did.
 
 ## Main settings ✅
 
-**Settings** (owners and admins) has two parts.
+One **Settings** button in the top bar leads to everything that is set up
+rather than worked on, with a menu of its parts on the left; each person sees
+the parts they may change: **General** (below), **AI provider**, **Team**,
+**Roles and access**, **Data protection**, **Integrations**, **CV templates**,
+**Email templates** and **Your account** (booking hours, password), which
+everyone has.
+
+**General** (owners and admins) has these parts.
 
 - **Dropdowns.** Candidate source, notice period and industry are the
   company's own lists: add options, rename, reorder, hide. Options that come

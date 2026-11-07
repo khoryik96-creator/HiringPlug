@@ -38,7 +38,7 @@ export function Assistant({ subjectType, subjectId, permissions }: { subjectType
       <h3>AI assistant</h3>
       <ErrorMessage error={status.error} />
       {s && !s.enabled && (
-        <p className="muted">Off: no AI provider is set up.</p>
+        <p className="muted">Off: no AI provider is set up.{permissions.includes("aiproviders:manage") && <> <a href="#/ai-provider">Set one up</a></>}</p>
       )}
       {s?.enabled && (
         <>

@@ -51,7 +51,7 @@ and put HTTPS in front (e.g. Caddy).
 ## Turning on the AI assistant and matching
 
 Both are off until an AI provider is set up. The simplest way: sign in as an
-owner or admin, open **Admin > AI provider**, paste a DeepSeek, Claude or
+owner or admin, open **Settings > AI provider**, paste a DeepSeek, Claude or
 ChatGPT API key and pick it as the one in use. That needs `HP_AI_KEYS_SECRET`
 (at least 32 characters, the same for the API and the AI worker; Docker sets a
 development one: set a real one for production, and keep it, or saved keys

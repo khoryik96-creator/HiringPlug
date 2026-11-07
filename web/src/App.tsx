@@ -25,6 +25,7 @@ import { AiProvider } from "./pages/AiProvider";
 import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { BookingHours } from "./components/BookingHours";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
+import { SETTINGS_PAGES, SettingsLayout, settingsPages } from "./components/SettingsLayout";
 import { Settings } from "./pages/Settings";
 import { JobList } from "./pages/JobList";
 import { Leads } from "./pages/Leads";
@@ -59,8 +60,8 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   if (!me.data) return me.error ? <ErrorMessage error={me.error} /> : <p className="muted">Loading…</p>;
 
   const permissions = me.data.permissions;
-  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|ai-provider|account)/.exec(hash)?.[1] ?? "dashboard";
-  const admin = ADMIN_PAGES.filter(([, , permission]) => permissions.includes(permission));
+  const section = /^#\/(jobs|companies|contacts|candidates|placements|reports|leads|import|integrations|privacy|access|team|settings|ai-provider|account|cv-templates|email-templates)/.exec(hash)?.[1] ?? "dashboard";
+  const inSettings = SETTINGS_PAGES.some(([key]) => key === section);
   return (
     <>
       <header className="topbar">
@@ -82,17 +83,13 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           )}
           <a href="#/import" aria-current={section === "import" ? "page" : undefined}>Import</a>
         </nav>
-        {admin.length > 0 && (
-          <details className="admin-menu">
-            <summary aria-current={admin.some(([key]) => key === section) ? "true" : undefined}>Admin</summary>
-            <div className="admin-links">
-              {admin.map(([key, label]) => (
-                <a key={key} href={`#/${key}`} aria-current={section === key ? "page" : undefined}
-                  onClick={(e) => { e.currentTarget.closest("details")?.removeAttribute("open"); }}>{label}</a>
-              ))}
-            </div>
-          </details>
-        )}
+        <a className="settings-link" href="#/settings" aria-current={inSettings ? "page" : undefined}>
+          <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+          </svg>
+          Settings
+        </a>
         <div className="who">
           <a href="#/account" aria-current={section === "account" ? "page" : undefined}>
             <span className="avatar" aria-hidden="true">{initials(me.data.user.name)}</span>
@@ -116,9 +113,9 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
  * a fresh page, so no edit state carries over.
  */
 function Page({ hash, permissions, me }: { hash: string; permissions: Permission[]; me: Me }) {
-  if (hash.startsWith("#/team") && permissions.includes("identity.team:manage")) return <Team myRole={me.role} myId={me.user.id} />;
-  if (hash.startsWith("#/account")) {
-    return <main><h2>Your account</h2>{permissions.includes("scheduling:use") && <BookingHours />}<ChangePassword /></main>;
+  const setting = settingsSection(hash, permissions);
+  if (setting) {
+    return <SettingsLayout section={setting} permissions={permissions}><SettingsPage section={setting} permissions={permissions} me={me} /></SettingsLayout>;
   }
   const screening = /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/.exec(hash)?.[1];
   if (screening) return <ScreeningCall key={screening} candidateId={screening} permissions={permissions} />;
@@ -135,24 +132,39 @@ function Page({ hash, permissions, me }: { hash: string; permissions: Permission
   if (contact) return <ContactDetail key={contact} id={contact} permissions={permissions} />;
   if (hash.startsWith("#/contacts")) return <ContactList canCreate={permissions.includes("contacts:create")} />;
   if (hash.startsWith("#/companies")) return <CompanyList canCreate={permissions.includes("companies:create")} />;
-  if (hash.startsWith("#/cv-templates") && permissions.includes("cvformats:create")) {
-    return <CvTemplates canManage={permissions.includes("cvformats.templates:manage")} />;
-  }
-  if (hash.startsWith("#/email-templates") && permissions.includes("emails:send")) {
-    return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
-  }
   if (hash.startsWith("#/placements") && permissions.includes("placements:read")) return <Placements permissions={permissions} />;
   if (hash.startsWith("#/leads") && permissions.includes("leads:read")) return <Leads permissions={permissions} />;
   if (hash.startsWith("#/reports") && permissions.includes("reports:read")) return <Reports />;
-  if (hash.startsWith("#/integrations") && permissions.includes("integrations:manage")) return <Integrations />;
-  if (hash.startsWith("#/privacy") && permissions.includes("privacy:manage")) return <Privacy />;
-  if (hash.startsWith("#/access") && permissions.includes("identity.roles:manage")) return <Access />;
-  if (hash.startsWith("#/settings") && permissions.includes("settings:manage")) return <Settings />;
-  if (hash.startsWith("#/ai-provider") && permissions.includes("aiproviders:manage")) return <AiProvider />;
   if (hash.startsWith("#/import")) return <ImportPage permissions={permissions} />;
   if (hash.startsWith("#/candidates")) return <CandidateList canCreate={permissions.includes("candidates:create")} />;
   if (permissions.includes("pipeline:read")) return <Dashboard permissions={permissions} />;
   return <CandidateList canCreate={permissions.includes("candidates:create")} />;
+}
+
+/**
+ * The part of Settings a location opens, if the user may open it. Settings
+ * itself opens its first part they may open (everyone has their account).
+ */
+function settingsSection(hash: string, permissions: Permission[]): string | null {
+  const key = /^#\/([a-z-]+)/.exec(hash)?.[1];
+  if (!SETTINGS_PAGES.some(([k]) => k === key)) return null;
+  const allowed = settingsPages(permissions);
+  if (allowed.some(([k]) => k === key)) return key ?? null;
+  return key === "settings" ? allowed[0]?.[0] ?? null : null;
+}
+
+function SettingsPage({ section, permissions, me }: { section: string; permissions: Permission[]; me: Me }) {
+  switch (section) {
+    case "settings": return <Settings />;
+    case "ai-provider": return <AiProvider />;
+    case "team": return <Team myRole={me.role} myId={me.user.id} />;
+    case "access": return <Access />;
+    case "privacy": return <Privacy />;
+    case "integrations": return <Integrations />;
+    case "cv-templates": return <CvTemplates canManage={permissions.includes("cvformats.templates:manage")} />;
+    case "email-templates": return <EmailTemplates canManage={permissions.includes("emails.templates:manage")} />;
+    default: return <main><h2>Your account</h2>{permissions.includes("scheduling:use") && <BookingHours />}<ChangePassword /></main>;
+  }
 }
 
 export function App() {
@@ -192,13 +204,3 @@ export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
 }
-
-/** The pages for running the account, under "Admin" in the top bar: path, label, the permission needed. */
-const ADMIN_PAGES: [string, string, Permission][] = [
-  ["settings", "Settings", "settings:manage"],
-  ["ai-provider", "AI provider", "aiproviders:manage"],
-  ["access", "Roles and access", "identity.roles:manage"],
-  ["privacy", "Data protection", "privacy:manage"],
-  ["team", "Team", "identity.team:manage"],
-  ["integrations", "Integrations", "integrations:manage"],
-];

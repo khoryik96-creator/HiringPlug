@@ -6,6 +6,7 @@ import { candidateKey, candidatesKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateBanner } from "../components/CandidateBanner";
+import { CandidateCv } from "../components/CandidateCv";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
 import { Documents } from "../components/Documents";
@@ -95,6 +96,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </dl>
         </section>
       )}
+      {permissions.includes("documents:read") && <CandidateCv candidateId={c.id} />}
       <History candidate={c} canEdit={permissions.includes("candidates:update")} />
       {permissions.includes("pipeline:read") && <CandidateApplications candidateId={c.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
       {permissions.includes("pipeline:read") && <StageMoves candidateId={c.id} title="Stage history" limit={50} />}

@@ -90,7 +90,8 @@ export function MarketMap({ jobId, permissions }: { jobId: string; permissions: 
             </div>
           )}
           {m.pool.salaryRestricted ? <p className="muted small">🔒 Pay is restricted for your role.</p> : m.pool.salary.length > 0 && <PayTable pay={m.pool.salary} />}
-          <Insights insights={m.insights} enabled={ai.data?.enabled === true} canAsk={canAsk} asking={ask.isPending} onAsk={() => { ask.mutate(); }} />
+          <Insights insights={m.insights} enabled={ai.data?.enabled === true} canAsk={canAsk} canSetUp={permissions.includes("aiproviders:manage")}
+            asking={ask.isPending} onAsk={() => { ask.mutate(); }} />
         </>
       )}
     </section>
@@ -137,8 +138,8 @@ function PayTable({ pay }: { pay: Pay[] }) {
   );
 }
 
-function Insights({ insights, enabled, canAsk, asking, onAsk }: {
-  insights: Schemas["MarketInsights"] | null; enabled: boolean; canAsk: boolean; asking: boolean; onAsk: () => void;
+function Insights({ insights, enabled, canAsk, canSetUp, asking, onAsk }: {
+  insights: Schemas["MarketInsights"] | null; enabled: boolean; canAsk: boolean; canSetUp: boolean; asking: boolean; onAsk: () => void;
 }) {
   const queued = insights?.status === "queued";
   return (
@@ -149,7 +150,7 @@ function Insights({ insights, enabled, canAsk, asking, onAsk }: {
           <button type="button" className="primary" disabled={asking || queued} onClick={onAsk}>{insights ? "Refresh insights" : "Get insights"}</button>
         )}
       </div>
-      {!enabled && <p className="muted small">Off: no AI provider is set up.</p>}
+      {!enabled && <p className="muted small">Off: no AI provider is set up.{canSetUp && <> <a href="#/ai-provider">Set one up</a></>}</p>}
       {queued && <p className="muted small" role="status">Writing…</p>}
       {insights?.status === "failed" && <p className="warning small">No insights this time: try again.</p>}
       {insights?.status === "done" && insights.text && (

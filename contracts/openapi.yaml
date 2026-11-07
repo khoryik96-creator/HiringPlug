@@ -1212,7 +1212,7 @@ paths:
     get:
       operationId: getDocumentPdf
       tags: [documents]
-      summary: Download a formatted CV as PDF
+      summary: Download a Word document (a formatted CV, or a CV sent as Word) as PDF
       x-permission: documents:read
       responses:
         '200':
@@ -1223,6 +1223,21 @@ paths:
           content:
             application/octet-stream:
               schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: makeDocumentPdf
+      tags: [documents]
+      summary: Make a Word document's PDF copy (for previewing it), if it has none yet
+      description: Word CVs uploaded since previews began get one at once; this makes one for older ones. A PDF, or a document whose copy is made or being made, is left as it is.
+      x-permission: documents:read
+      responses:
+        '202':
+          description: Being made (or already there)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Document'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
