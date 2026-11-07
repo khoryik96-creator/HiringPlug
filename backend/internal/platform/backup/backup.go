@@ -39,6 +39,14 @@ type Options struct {
 	Dir      string // where backups go (HP_BACKUP_DIR)
 	Keep     int    // how many backups to keep (older ones are deleted)
 	Now      func() time.Time
+	finder   *toolFinder // tests
+}
+
+func (o Options) tools() toolFinder {
+	if o.finder != nil {
+		return *o.finder
+	}
+	return systemTools
 }
 
 var nameRe = regexp.MustCompile(`^hiringplug-\d{8}-\d{6}$`)
@@ -115,8 +123,16 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 			_ = os.RemoveAll(tmp)
 		}
 	}()
+	major, err := serverMajor(ctx, o.AdminURL)
+	if err != nil {
+		return "", 0, err
+	}
+	pgDump, err := o.tools().tool("pg_dump", major)
+	if err != nil {
+		return "", 0, err
+	}
 	dump := filepath.Join(tmp, "database.dump")
-	if out, err := exec.CommandContext(ctx, "pg_dump", "--format=custom", "--file", dump, "--dbname", o.AdminURL).CombinedOutput(); err != nil { //nolint:gosec // fixed program; the URL is our own setting
+	if out, err := exec.CommandContext(ctx, pgDump, "--format=custom", "--file", dump, "--dbname", o.AdminURL).CombinedOutput(); err != nil { //nolint:gosec // a PostgreSQL tool; the URL is our own setting
 		return "", 0, fmt.Errorf("pg_dump: %w: %s", err, hidePassword(string(out), o.AdminURL))
 	}
 	if err := os.Chmod(dump, 0o600); err != nil { // it holds every company's data

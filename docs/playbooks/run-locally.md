@@ -100,7 +100,9 @@ docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiri
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-Test a restore now and then, on another machine.
+Test a restore now and then, on another machine. Without Docker, `hp backup`
+needs the PostgreSQL client tools of the database's own version (it refuses
+newer ones: their backup could not be put back).
 
 ## Browser smoke tests
 

@@ -145,3 +145,16 @@ func freshDatabase(t *testing.T) string {
 	u.Path = "/" + strings.TrimPrefix(name, "/")
 	return u.String()
 }
+
+func TestTheToolsMatchTheDatabasesVersion(t *testing.T) {
+	p, err := backup.FindTool("pg_dump", 16, "/usr/bin", "17.2", 16, 17)
+	require.NoError(t, err)
+	assert.Equal(t, "/usr/lib/postgresql/16/bin/pg_dump", p, "the server's own version first")
+	p, err = backup.FindTool("pg_restore", 16, "/usr/bin", "16.4")
+	require.NoError(t, err)
+	assert.Equal(t, "/usr/bin/pg_restore", p)
+	_, err = backup.FindTool("pg_dump", 16, "/usr/bin", "17.2")
+	assert.ErrorContains(t, err, "install the PostgreSQL 16 client tools", "a newer pg_dump's backup could not be put back")
+	_, err = backup.FindTool("pg_dump", 16, "", "")
+	assert.ErrorContains(t, err, "not installed")
+}

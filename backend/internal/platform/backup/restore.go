@@ -26,7 +26,15 @@ func Restore(ctx context.Context, o Options, name string) error {
 			return fmt.Errorf("backup %s is incomplete: %w", name, err)
 		}
 	}
-	out, err := exec.CommandContext(ctx, "pg_restore", "--clean", "--if-exists", "--single-transaction", //nolint:gosec // fixed program; our own setting and file
+	major, err := serverMajor(ctx, o.AdminURL)
+	if err != nil {
+		return err
+	}
+	pgRestore, err := o.tools().tool("pg_restore", major)
+	if err != nil {
+		return err
+	}
+	out, err := exec.CommandContext(ctx, pgRestore, "--clean", "--if-exists", "--single-transaction", //nolint:gosec // a PostgreSQL tool; our own setting and file
 		"--dbname", o.AdminURL, filepath.Join(dir, "database.dump")).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("pg_restore (the database is unchanged): %w: %s", err, hidePassword(string(out), o.AdminURL))
