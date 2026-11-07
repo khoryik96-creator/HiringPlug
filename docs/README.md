@@ -17,6 +17,8 @@ Read in this order. Each page is short and links to the next.
    verifier, email, calendars, job boards, public API.
 8. **[Roadmap](roadmap.md)**: the milestones, in order.
 
+- [HANDOVER.md](HANDOVER.md): where the work stands and what is next (read first when picking the project up).
+
 ## How-to guides
 
 - [Add a module](playbooks/add-a-module.md)
