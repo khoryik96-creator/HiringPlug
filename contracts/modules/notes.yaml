@@ -124,7 +124,7 @@ components:
       enum: [candidate, job, company, contact]
     NoteKind:
       type: string
-      enum: [general, screening, interview, call]
+      enum: [general, screening, interview, call, reference]
     Note:
       type: object
       required: [id, subjectType, subjectId, kind, body, sensitive, authorId, authorName, createdAt]

@@ -2757,6 +2757,7 @@ class NoteKind(StrEnum):
     screening = "screening"
     interview = "interview"
     call = "call"
+    reference = "reference"
 
 
 class Note(BaseModel):
@@ -3510,6 +3511,8 @@ class FieldListName(StrEnum):
     industry = "industry"
     work_type = "work_type"
     work_arrangement = "work_arrangement"
+    screening_call = "screening_call"
+    reference_check = "reference_check"
 
 
 class FieldListKind(StrEnum):

@@ -32,7 +32,8 @@ func builtIns(name string) []OptionInput {
 
 func TestDefaultsUntilACompanySaves(t *testing.T) {
 	all := Lists(map[string][]Option{"candidate_source": {{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true}}})
-	require.Len(t, all, 5)
+	require.Len(t, all, 7)
+	assert.Equal(t, []string{"RFL", "LF", "CS", "ES", "NP"}, labelsOf(all[5].Options), "a screening call's items, ready to change")
 	assert.Equal(t, "candidate_source", all[0].Name)
 	assert.Equal(t, []Option{{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true, BuiltIn: true}}, all[0].Options)
 	assert.Len(t, all[2].Options, 10, "Kano's industries")
@@ -93,4 +94,25 @@ func TestMandatoryFields(t *testing.T) {
 	assert.NoError(t, CheckRules([]RuleInput{{Form: "candidate", Field: "phone", Mandatory: true}}))
 	err := CheckRules([]RuleInput{{Form: "candidate", Field: "salary", Mandatory: true}, {Form: "job", Field: "title", Mandatory: false}})
 	assert.Equal(t, []string{"fields[0].field", "fields[1].mandatory"}, fieldsOf(t, err))
+}
+
+func labelsOf(options []Option) []string {
+	out := make([]string, len(options))
+	for i, o := range options {
+		out[i] = o.Label
+	}
+	return out
+}
+
+func TestCallItemsCanBeAddedRenamedAndHidden(t *testing.T) {
+	in := []OptionInput{{Key: "referee", Label: "Referee"}, {Key: "rehire", Label: "Rehire?", Hidden: true}, {Label: "Attendance and punctuality"}}
+	for _, k := range []string{"relationship", "role", "strengths", "improve", "reason_left"} {
+		in = append(in, OptionInput{Key: k, Label: k})
+	}
+	got, err := CheckList("reference_check", in)
+	require.NoError(t, err)
+	assert.Equal(t, "attendance_and_punctuality", got[2].Key)
+	assert.True(t, got[1].Hidden)
+	_, err = CheckList("screening_call", []OptionInput{{Key: "rfl", Label: "RFL"}})
+	require.Error(t, err, "the app's items are hidden, not removed")
 }

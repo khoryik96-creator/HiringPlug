@@ -20,6 +20,12 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
   ].map((i) => [i, i])),
   work_type: WORK_TYPE,
   work_arrangement: WORK_ARRANGEMENT,
+  screening_call: { rfl: "RFL", lf: "LF", cs: "CS", es: "ES", np: "NP" },
+  reference_check: {
+    referee: "Referee (name, title, company, contact)", relationship: "How they worked together, and for how long",
+    role: "Role and responsibilities", strengths: "Strengths", improve: "Areas to improve", reason_left: "Reason for leaving",
+    rehire: "Would you rehire them?",
+  },
 };
 
 /** A notice period key (2_week) in words, for one no longer in the list. */

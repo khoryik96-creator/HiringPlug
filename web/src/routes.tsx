@@ -40,6 +40,7 @@ const Placements = page(() => import("./pages/Placements"), "Placements");
 const Privacy = page(() => import("./pages/Privacy"), "Privacy");
 const Reports = page(() => import("./pages/Reports"), "Reports");
 const ScreeningCall = page(() => import("./pages/ScreeningCall"), "ScreeningCall");
+const ReferenceCheck = page(() => import("./pages/ReferenceCheck"), "ReferenceCheck");
 const Settings = page(() => import("./pages/Settings"), "Settings");
 const System = page(() => import("./pages/System"), "System");
 const Team = page(() => import("./pages/Team"), "Team");
@@ -72,6 +73,8 @@ export const ROUTES: Route[] = [
     render: (c) => <JobList canCreate={can(c, "jobs:create")} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/,
     render: (c) => <ScreeningCall key={c.id} candidateId={c.id} permissions={c.permissions} /> },
+  { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/reference-check$/,
+    render: (c) => <ReferenceCheck key={c.id} candidateId={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/compare$/, render: (c) => <CompareCvs key={c.id} candidateId={c.id} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },

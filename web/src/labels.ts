@@ -166,6 +166,7 @@ export const NOTE_KIND: Record<Schemas["NoteKind"], string> = {
   screening: "Screening",
   interview: "Interview",
   call: "Call",
+  reference: "Reference check",
 };
 
 /** The values of a label map, in its order: the options of a select. */

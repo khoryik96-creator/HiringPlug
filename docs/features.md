@@ -611,6 +611,17 @@ one part is refused (e.g. a salary range that runs backwards, or someone saved
 the profile meanwhile), nothing is saved, and the notes typed are kept. The
 audit log records that a call was saved, never the salary.
 
+The notes are asked item by item, as the company sets them in **Settings >
+Screening call** (starting with RFL, LF, CS, ES, NP; add, rename, reorder or
+hide them): a box per item, then "Other notes"; the note reads "RFL: better
+prospects", one line per item answered.
+
+✅ **Reference check** (candidate page: *Reference check*): the questions set
+in **Settings > Reference check** (referee, how they worked together, role,
+strengths, areas to improve, reason for leaving, would you rehire them; all
+changeable), a box each; saved as a *Reference check* note on the candidate's
+timeline, each answer after its question. One referee per note.
+
 ## Import
 
 ✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick

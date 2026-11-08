@@ -7,6 +7,7 @@ import { useState } from "react";
 import { api, type Candidate, type Permission, type Schemas, unwrap } from "../api/client";
 import { activityKey, candidateKey, candidatesKey, notesKey } from "../api/keys";
 import { regionName } from "../labels";
+import { CallItems, type CallAnswers, callNote, useCallItems } from "./CallItems";
 import { type CandidateFormState, formFromCandidate, toUpdateBody } from "./candidateFormState";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
@@ -53,7 +54,9 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   const [base, setBase] = useState(() => baseOf(candidate));
   const [profile, setProfile] = useState(base.profile);
   const [salary, setSalary] = useState(base.salary);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(""); // other notes, after the items
+  const [answers, setAnswers] = useState<CallAnswers>({});
+  const items = useCallItems("screening_call");
   const [sensitive, setSensitive] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
   const salaryShown = permissions.includes("candidates.compensation:update") && !candidate.restrictedFields.includes("compensation");
@@ -69,7 +72,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
     mutationFn: async () => {
       const problems = salaryShown ? salaryProblems(salary) : {};
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
-      const body = screeningBody(base, profile, salary, notes.trim(), sensitive, salaryShown);
+      const body = screeningBody(base, profile, salary, callNote(items, answers, notes), sensitive, salaryShown);
       return unwrap(await api.POST("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId: candidate.id } }, body }));
     },
     onSuccess: (res) => {
@@ -79,6 +82,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       void queryClient.invalidateQueries({ queryKey: activityKey("candidate", candidate.id) });
       startFrom(res.candidate);
       setNotes("");
+      setAnswers({});
       setSensitive(false); // each note is marked on its own
       setSaved(`Saved to ${res.candidate.fullName}'s profile${res.noteId ? ", with the notes" : ""}.${res.sourceKept ? " Their source was kept." : ""}`);
     },
@@ -98,8 +102,10 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       <h3 className="full">Screening call</h3>
       {canNote && (
         <div className="full">
-          <Field label="Notes" error={errors.body ?? errors.notes}>
-            <textarea rows={8} value={notes}
+          <p className="muted small">What to ask is set in Settings &gt; Screening call. Each answer is saved in the notes after its label (&ldquo;RFL: &hellip;&rdquo;).</p>
+          <CallItems list="screening_call" answers={answers} onChange={(a) => { setSaved(null); setAnswers(a); }} />
+          <Field label="Other notes" error={errors.body ?? errors.notes}>
+            <textarea rows={4} value={notes}
               onChange={(e) => { setSaved(null); setNotes(e.target.value); }} />
           </Field>
           {permissions.includes("notes.sensitive:read") && (

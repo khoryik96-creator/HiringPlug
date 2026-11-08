@@ -70,6 +70,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         {permissions.includes("candidates:update") && !editing && (
           <span className="row">
             <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
+            {permissions.includes("notes:create") && <a className="button" href={`#/candidates/${c.id}/reference-check`}>Reference check</a>}
             <button type="button" onClick={() => { setEditing(true); }}>Edit profile</button>
           </span>
         )}

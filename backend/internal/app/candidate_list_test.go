@@ -73,3 +73,28 @@ func TestTheStatusRemembersWhenItWasSet(t *testing.T) {
 	c = patch(map[string]any{"availability": nil})
 	assert.True(t, c.AvailabilitySince.IsNull(), "no status, no date")
 }
+
+func TestAReferenceCheckIsANoteWithTheCompanysQuestions(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	var fields api.FieldSettings
+	a.request(http.MethodGet, "/v1/settings/fields", token, nil).JSON(&fields)
+	lists := map[api.FieldListName][]string{}
+	for _, l := range fields.Lists {
+		for _, o := range l.Options {
+			lists[l.Name] = append(lists[l.Name], o.Label)
+		}
+	}
+	assert.Equal(t, []string{"RFL", "LF", "CS", "ES", "NP"}, lists[api.FieldListNameScreeningCall])
+	assert.Contains(t, lists[api.FieldListNameReferenceCheck], "Would you rehire them?")
+
+	c := a.createCandidate(token, map[string]any{"firstName": "Siti"})
+	res := a.request(http.MethodPost, "/v1/notes", token, map[string]any{
+		"subjectType": "candidate", "subjectId": c.Id, "kind": "reference", "body": "Referee: Ahmad\nWould you rehire them?: Yes",
+	})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var note api.Note
+	res.JSON(&note)
+	assert.Equal(t, api.NoteKindReference, note.Kind)
+}

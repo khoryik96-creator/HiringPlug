@@ -69,6 +69,14 @@ var lists = []listDef{
 		"full_time", "Full time", "part_time", "Part time", "contract", "Contract", "temporary", "Temporary", "internship", "Internship")},
 	{name: "work_arrangement", label: "Work arrangement", fixed: true, defaults: opts(
 		"onsite", "On site", "hybrid", "Hybrid", "remote", "Remote")},
+	// What to ask on a screening call, in order; each label is written before
+	// its answer in the call's note ("RFL: better prospects").
+	{name: "screening_call", label: "Screening call", defaults: opts(
+		"rfl", "RFL", "lf", "LF", "cs", "CS", "es", "ES", "np", "NP")},
+	{name: "reference_check", label: "Reference check", defaults: opts(
+		"referee", "Referee (name, title, company, contact)", "relationship", "How they worked together, and for how long",
+		"role", "Role and responsibilities", "strengths", "Strengths", "improve", "Areas to improve",
+		"reason_left", "Reason for leaving", "rehire", "Would you rehire them?")},
 }
 
 func def(name string) (listDef, bool) {

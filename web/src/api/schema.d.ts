@@ -4724,7 +4724,7 @@ export interface components {
         /** @enum {string} */
         NoteSubjectType: "candidate" | "job" | "company" | "contact";
         /** @enum {string} */
-        NoteKind: "general" | "screening" | "interview" | "call";
+        NoteKind: "general" | "screening" | "interview" | "call" | "reference";
         Note: {
             id: components["schemas"]["NoteId"];
             subjectType: components["schemas"]["NoteSubjectType"];
@@ -5430,10 +5430,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects").
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}
