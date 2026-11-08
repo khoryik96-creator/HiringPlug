@@ -53,10 +53,16 @@ work authorization and says which: **Local** (green), **PR** (purple),
 known** (grey). A click saves at once, with the lost-update protection below.
 Next to the status it says since when ("since 27 Oct 2026 · 12 days"), set
 each time the status changes. **Notes and activity** come right under the
-banner. **The candidate list** shows, besides name, role, work authorization
-and email, each one's status with since when, notice period and current and
-expected salary ("Restricted" for roles without salary access, enforced by the
-database).
+banner. **The candidate list** marks each name with a bar in its work
+authorization colour (Local, PR, Spousal / RP-T, Needs pass, Not known; a
+legend sits above the table) and, by default, shows role, status with since
+when, notice period, current and expected salary ("Restricted" for roles
+without salary access, enforced by the database), work authorization (the
+pass for an expat: RP-T, Spouse visa) and email. "Columns" lets each person
+choose and order their own from these and nationality, residence, location,
+source, industry, tags, phone and last updated; the choice is saved for them
+(`/v1/me/preferences`, readable only by them) and "Back to the default"
+undoes it.
 
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
@@ -492,7 +498,10 @@ lead's company (with the built-in email check).
   indent and outdent, alignment, links, font, size, colour, banners) with an
   "Insert field" list for the message and one for the subject (the
   candidate's name, expected salary...; salary fields fill only for senders
-  who may see salaries). Sending is queued with the email's record and delivered in the
+  who may see salaries). "Preview with a candidate" under the editor shows
+  the subject and message with one candidate's values as you write (a field
+  just put in shows its value at once), while the template keeps the fields;
+  writing an email to a client puts the values straight in. Sending is queued with the email's record and delivered in the
   background by the worker through your mail server (`HP_SMTP_*`): from your
   sending address, shown as "Sender (Company)", with replies going to the
   person who sent it. The candidate's page lists every email with its state

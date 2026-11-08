@@ -699,6 +699,14 @@ class CandidateUpdate(BaseModel):
 
 
 class CandidateSummary(BaseModel):
+    nationality: Annotated[str | None, Field(description="ISO country code.")]
+    residenceCountry: Annotated[str | None, Field(description="ISO country code.")]
+    source: Annotated[str | None, Field(...)]
+    industry: Annotated[str | None, Field(...)]
+    workAuthorizationBasis: Annotated[
+        WorkAuthorizationBasis | None,
+        Field(description="The pass an expat holds (or permanent resident), as on their page."),
+    ]
     availability: Annotated[CandidateAvailability | None, Field(...)]
     availabilitySince: Annotated[AwareDatetime | None, Field(description="When the status was last set.")]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
@@ -1606,6 +1614,24 @@ class UserSummary(BaseModel):
     id: UserId
     name: str
     role: Role
+
+
+class CandidateColumn(StrEnum):
+    currentRole = "currentRole"
+    status = "status"
+    noticePeriod = "noticePeriod"
+    currentSalary = "currentSalary"
+    expectedSalary = "expectedSalary"
+    workAuthorization = "workAuthorization"
+    nationality = "nationality"
+    residence = "residence"
+    location = "location"
+    source = "source"
+    industry = "industry"
+    tags = "tags"
+    email = "email"
+    phone = "phone"
+    updated = "updated"
 
 
 class User(BaseModel):
@@ -3883,6 +3909,19 @@ class EmailSend(BaseModel):
 
 class UserList(BaseModel):
     items: list[UserSummary]
+
+
+class Preferences(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateColumns: Annotated[
+        list[CandidateColumn] | None,
+        Field(
+            description="The candidate list's columns, in order, after the name (null: the default ones).",
+            max_length=20,
+        ),
+    ]
 
 
 class Me(BaseModel):

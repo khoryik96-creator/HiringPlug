@@ -341,3 +341,18 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 
 .status-dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1.5px solid; margin-right: 0.35rem; vertical-align: -0.05rem; }
 .candidates-table .small { display: block; }
+/* The candidate list: a bar beside each name coloured by work authorization, and the column picker. */
+.wa-bar { display: inline-block; width: 4px; height: 1.15em; border-radius: 2px; margin-right: 0.45rem; vertical-align: -0.2em; }
+.candidates-table .name-cell { white-space: nowrap; }
+.wa-legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin: 0.4rem 0; }
+.column-picker { position: relative; }
+.column-menu { position: absolute; right: 0; top: 2.6rem; z-index: 5; min-width: 17rem; margin: 0; padding-top: 0.6rem; }
+.column-menu > p { margin: 0 0 0.4rem; }
+.column-choice { display: grid; grid-template-columns: 1fr auto auto; gap: 0.25rem; align-items: center; min-height: 2rem; }
+.column-choice .tool { padding: 0 0.45rem; }
+.table-scroll { overflow-x: auto; }
+.candidates-table .col-status { min-width: 10rem; }
+/* An email template previewed with one candidate's values. */
+.template-preview { border-top: 1px solid var(--border, #d0d7de); padding-top: 0.6rem; }
+.template-preview .preview-hits { list-style: none; padding: 0; margin: 0.3rem 0; }
+.template-preview .email-preview { background: var(--panel-alt, #f8fafc); border: 1px solid var(--border, #d0d7de); border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; }

@@ -144,6 +144,38 @@ paths:
         '410': { $ref: '#/components/responses/LinkNotValid' }
         '429': { $ref: '#/components/responses/TooManyAttempts' }
 
+  /v1/me/preferences:
+    get:
+      operationId: getMyPreferences
+      tags: [identity]
+      summary: Your own settings, such as the columns of your candidate list
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    put:
+      operationId: putMyPreferences
+      tags: [identity]
+      summary: Change your own settings (no one else's)
+      x-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Preferences' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Preferences' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
   /v1/me/password:
     put:
       operationId: changePassword
@@ -502,6 +534,22 @@ components:
         id: { $ref: '#/components/schemas/UserId' }
         name: { type: string }
         role: { $ref: '#/components/schemas/Role' }
+    Preferences:
+      type: object
+      additionalProperties: false
+      required: [candidateColumns]
+      properties:
+        candidateColumns:
+          type: array
+          nullable: true
+          maxItems: 20
+          uniqueItems: true
+          description: "The candidate list's columns, in order, after the name (null: the default ones)."
+          items: { $ref: '#/components/schemas/CandidateColumn' }
+    CandidateColumn:
+      type: string
+      description: A column the candidate list can show.
+      enum: [currentRole, status, noticePeriod, currentSalary, expectedSalary, workAuthorization, nationality, residence, location, source, industry, tags, email, phone, updated]
     Me:
       type: object
       required: [user, tenant, role, permissions]

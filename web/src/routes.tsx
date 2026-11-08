@@ -124,7 +124,7 @@ export const ROUTES: Route[] = [
   { section: "cv-templates", path: /^#\/cv-templates/, permission: "cvformats:create", menu: { in: "settings", label: "CV templates", href: "#/cv-templates" },
     render: (c) => <CvTemplates canManage={can(c, "cvformats.templates:manage")} /> },
   { section: "email-templates", path: /^#\/email-templates/, permission: "emails:send", menu: { in: "settings", label: "Email templates", href: "#/email-templates" },
-    render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} /> },
+    render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} canPreview={can(c, "emails:send") && can(c, "candidates:read")} /> },
   { section: "system", path: /^#\/system/, permission: "settings:manage", menu: { in: "settings", label: "System", href: "#/system" },
     render: () => <System /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },

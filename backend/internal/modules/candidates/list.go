@@ -24,6 +24,11 @@ type Summary struct {
 	CurrentCompany          *string
 	Location                *string
 	WorkAuthorizationStatus *string
+	WorkAuthorizationBasis  *string
+	Nationality             *string
+	ResidenceCountry        *string
+	Source                  *string
+	Industry                *string
 	Tags                    []string
 	UpdatedAt               time.Time
 	Availability            *string
@@ -77,7 +82,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 			page.Items[i] = Summary{
 				ID: r.ID, FullName: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}),
 				Email: r.Email, Phone: r.Phone, CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
-				Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, Tags: r.Tags, UpdatedAt: r.UpdatedAt,
+				Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, WorkAuthorizationBasis: r.WorkAuthorizationBasis,
+				Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, Source: r.Source, Industry: r.Industry,
+				Tags: r.Tags, UpdatedAt: r.UpdatedAt,
 				Availability: r.Availability, AvailabilitySince: r.AvailabilitySince, SalaryRestricted: !canSeeSalary(p),
 			}
 			if r.NoticePeriodValue != nil && r.NoticePeriodUnit != nil {

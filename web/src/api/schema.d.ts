@@ -1035,6 +1035,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own settings, such as the columns of your candidate list */
+        get: operations["getMyPreferences"];
+        /** Change your own settings (no one else's) */
+        put: operations["putMyPreferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/password": {
         parameters: {
             query?: never;
@@ -2913,6 +2931,14 @@ export interface components {
             skills?: string[];
         };
         CandidateSummary: {
+            /** @description ISO country code. */
+            nationality: string | null;
+            /** @description ISO country code. */
+            residenceCountry: string | null;
+            source: string | null;
+            industry: string | null;
+            /** @description The pass an expat holds (or permanent resident), as on their page. */
+            workAuthorizationBasis: components["schemas"]["WorkAuthorizationBasis"] | null;
             availability: components["schemas"]["CandidateAvailability"] | null;
             /**
              * Format: date-time
@@ -3748,6 +3774,15 @@ export interface components {
             name: string;
             role: components["schemas"]["Role"];
         };
+        Preferences: {
+            /** @description The candidate list's columns, in order, after the name (null: the default ones). */
+            candidateColumns: components["schemas"]["CandidateColumn"][] | null;
+        };
+        /**
+         * @description A column the candidate list can show.
+         * @enum {string}
+         */
+        CandidateColumn: "currentRole" | "status" | "noticePeriod" | "currentSalary" | "expectedSalary" | "workAuthorization" | "nationality" | "residence" | "location" | "source" | "industry" | "tags" | "email" | "phone" | "updated";
         Me: {
             user: components["schemas"]["User"];
             tenant: components["schemas"]["Tenant"];
@@ -7687,6 +7722,53 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             410: components["responses"]["LinkNotValid"];
             429: components["responses"]["TooManyAttempts"];
+        };
+    };
+    getMyPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    putMyPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Preferences"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
         };
     };
     changePassword: {

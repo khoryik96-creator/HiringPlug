@@ -63,7 +63,8 @@ RETURNING *;
 -- name: ListCandidates :many
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
-       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry
 FROM candidate c
 WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL

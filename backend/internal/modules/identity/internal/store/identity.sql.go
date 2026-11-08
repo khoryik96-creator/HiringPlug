@@ -181,6 +181,18 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 	return err
 }
 
+const getPreferences = `-- name: GetPreferences :one
+SELECT candidate_columns FROM user_preference WHERE user_id = app_current_user()
+`
+
+// The signed-in person's own settings (none until they change one).
+func (q *Queries) GetPreferences(ctx context.Context) ([]string, error) {
+	row := q.db.QueryRow(ctx, getPreferences)
+	var candidate_columns []string
+	err := row.Scan(&candidate_columns)
+	return candidate_columns, err
+}
+
 const getRoleSetting = `-- name: GetRoleSetting :one
 SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at FROM role_setting WHERE role = $1
 `
@@ -588,6 +600,15 @@ func (q *Queries) RenameTeamGroup(ctx context.Context, arg RenameTeamGroupParams
 	return i, err
 }
 
+const resetCandidateColumns = `-- name: ResetCandidateColumns :exec
+UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE user_id = app_current_user()
+`
+
+func (q *Queries) ResetCandidateColumns(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, resetCandidateColumns)
+	return err
+}
+
 const revokeSession = `-- name: RevokeSession :exec
 INSERT INTO revoked_session (id, tenant_id, user_id, expires_at)
 VALUES ($1, app_current_tenant(), $2, $3)
@@ -614,6 +635,17 @@ func (q *Queries) SessionRevoked(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const setCandidateColumns = `-- name: SetCandidateColumns :exec
+INSERT INTO user_preference (tenant_id, user_id, candidate_columns)
+VALUES (app_current_tenant(), app_current_user(), $1::text[])
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET candidate_columns = EXCLUDED.candidate_columns, updated_at = now()
+`
+
+func (q *Queries) SetCandidateColumns(ctx context.Context, candidateColumns []string) error {
+	_, err := q.db.Exec(ctx, setCandidateColumns, candidateColumns)
+	return err
 }
 
 const setPassword = `-- name: SetPassword :exec

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { emailTemplatesKey } from "../api/keys";
 import { RichEditor } from "../components/clientEmail/RichEditor";
+import { TemplatePreview } from "../components/clientEmail/TemplatePreview";
 import { plainToHtml, showBanners, withoutCaretMarks } from "../components/clientEmail/richText";
 import { useBanners } from "../components/clientEmail/useBanners";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -14,13 +15,13 @@ type Template = Schemas["EmailTemplate"];
 type Field = Schemas["EmailField"];
 
 /** The company's email templates, formatted as CV Studio's email client does: change them, or add one. */
-export function EmailTemplates({ canManage }: { canManage: boolean }) {
+export function EmailTemplates({ canManage, canPreview = false }: { canManage: boolean; canPreview?: boolean }) {
   const list = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const { banners, urls, upload } = useBanners();
   const [editing, setEditing] = useState<string | null>(null); // a template id, or "new"
   const fields = list.data?.fields ?? [];
   const editor = (template?: Template) => (
-    <TemplateForm key={template?.id ?? "new"} template={template} fields={fields} banners={banners} bannerUrls={urls}
+    <TemplateForm key={template?.id ?? "new"} template={template} canPreview={canPreview} fields={fields} banners={banners} bannerUrls={urls}
       onUploadBanner={(f) => { upload.mutate(f); }} onDone={() => { setEditing(null); }} />
   );
   return (
@@ -57,6 +58,7 @@ function FormattedBody({ html, bannerUrls }: { html: string; bannerUrls: Record<
 
 type FormProps = {
   template?: Template;
+  canPreview: boolean;
   fields: Field[];
   banners: Schemas["EmailBanner"][];
   bannerUrls: Record<string, string>;
@@ -64,7 +66,7 @@ type FormProps = {
   onDone: () => void;
 };
 
-function TemplateForm({ template, fields, banners, bannerUrls, onUploadBanner, onDone }: FormProps) {
+function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUploadBanner, onDone }: FormProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: template?.name ?? "", subject: template?.subject ?? "" });
   const [html, setHtml] = useState(() => template?.bodyHtml ?? plainToHtml(template?.body ?? ""));
@@ -111,6 +113,7 @@ function TemplateForm({ template, fields, banners, bannerUrls, onUploadBanner, o
           onUploadBanner={onUploadBanner} />
         {(errors.body ?? errors.bodyHtml) && <span className="warning">{errors.body ?? errors.bodyHtml}</span>}
       </div>
+      {canPreview && <TemplatePreview subject={form.subject} html={html} bannerUrls={bannerUrls} />}
       <SaveError error={save.error} shown={["name", "subject", "body", "bodyHtml"]}
         onReload={() => { void queryClient.invalidateQueries({ queryKey: emailTemplatesKey }); onDone(); }} />
       <div className="row full">

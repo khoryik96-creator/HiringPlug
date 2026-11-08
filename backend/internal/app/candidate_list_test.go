@@ -18,7 +18,8 @@ func TestTheListShowsStatusNoticeAndSalaryToThoseWhoMaySeeIt(t *testing.T) {
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleSourcer)
 	recruiter, sourcer := tenant.Users[api.RoleRecruiter].Token, tenant.Users[api.RoleSourcer].Token
 	c := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "availability": "not_looking",
-		"noticePeriod": map[string]any{"value": 1, "unit": "month"}})
+		"noticePeriod": map[string]any{"value": 1, "unit": "month"}, "nationality": "SG", "residenceCountry": "MY",
+		"workAuthorization": map[string]any{"status": "expat_eligible", "basis": "rp_t"}, "industry": "Banking", "source": "referral"})
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/candidates/"+c.Id+"/compensation", recruiter, map[string]any{
 		"expectedVersion": 0, "currentSalary": map[string]any{"amount": "8500", "currency": "MYR", "period": "month"},
 		"expectedSalary": map[string]any{"min": "10000", "max": "12000", "currency": "MYR", "period": "month"},
@@ -42,6 +43,10 @@ func TestTheListShowsStatusNoticeAndSalaryToThoseWhoMaySeeIt(t *testing.T) {
 	assert.Equal(t, "8500.00", got.CurrentSalary.MustGet().Amount)
 	assert.Equal(t, "12000.00", got.ExpectedSalary.MustGet().Max.MustGet())
 	assert.False(t, got.SalaryRestricted)
+	assert.Equal(t, "SG", got.Nationality.MustGet())
+	assert.Equal(t, "MY", got.ResidenceCountry.MustGet())
+	assert.Equal(t, api.WorkAuthorizationBasisRpT, got.WorkAuthorizationBasis.MustGet(), "for the colour beside the name")
+	assert.Equal(t, "Banking", got.Industry.MustGet())
 
 	hidden := find(sourcer)
 	assert.True(t, hidden.SalaryRestricted, "a sourcer may not see salaries")

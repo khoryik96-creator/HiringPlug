@@ -46,6 +46,7 @@ tenant ─┬─ app_user (role)
 | `job_lead` | source (kept when it is removed) and the opening's id there, company name and record, title, location, address, posted, first and last seen, closed, status (new/contacted/client/ignored), notes, `version` |
 | `team_group` | a team of users (e.g. a desk): name (unique per company, ignoring case), `version` |
 | `role_setting` | a company's own settings for a role (none: the defaults): permissions, candidate scope (all/team/own), also candidates on owned jobs, `version`; never for the owner |
+| `user_preference` | one per user: their own settings, such as the candidate list's columns in order (none: the default); only that user reads or changes it (row-level security on user too) |
 | `app_user` (sign-in) | password hash (Argon2id), invited (not joined yet), sessions ended at, last signed in |
 | `user_link` | user, kind (invite/reset), SHA-256 of the link token, expires, used; looked up before any company is known by `app_user_link`, accounts by `app_accounts_by_email` |
 | `assistant_answer` | a question to the AI assistant: who asked, about what (candidate/job/application + id), kind, question, status (queued/done/failed), answer or error, model, input and output tokens, asked and answered; shown only to the asker |

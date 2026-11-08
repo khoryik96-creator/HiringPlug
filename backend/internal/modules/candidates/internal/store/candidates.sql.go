@@ -401,7 +401,8 @@ func (q *Queries) InsertWork(ctx context.Context, arg InsertWorkParams) error {
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
-       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry
 FROM candidate c
 WHERE ($1::text IS NULL OR c.id < $1::text)
   AND ($2::text IS NULL
@@ -428,21 +429,26 @@ type ListCandidatesParams struct {
 }
 
 type ListCandidatesRow struct {
-	ID                string
-	FirstName         string
-	LastName          string
-	Email             *string
-	Phone             *string
-	CurrentTitle      *string
-	CurrentCompany    *string
-	Location          *string
-	WorkAuthorization *string
-	Tags              []string
-	UpdatedAt         time.Time
-	Availability      *string
-	AvailabilitySince *time.Time
-	NoticePeriodValue *int32
-	NoticePeriodUnit  *string
+	ID                     string
+	FirstName              string
+	LastName               string
+	Email                  *string
+	Phone                  *string
+	CurrentTitle           *string
+	CurrentCompany         *string
+	Location               *string
+	WorkAuthorization      *string
+	Tags                   []string
+	UpdatedAt              time.Time
+	Availability           *string
+	AvailabilitySince      *time.Time
+	NoticePeriodValue      *int32
+	NoticePeriodUnit       *string
+	WorkAuthorizationBasis *string
+	Nationality            *string
+	ResidenceCountry       *string
+	Source                 *string
+	Industry               *string
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -480,6 +486,11 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.AvailabilitySince,
 			&i.NoticePeriodValue,
 			&i.NoticePeriodUnit,
+			&i.WorkAuthorizationBasis,
+			&i.Nationality,
+			&i.ResidenceCountry,
+			&i.Source,
+			&i.Industry,
 		); err != nil {
 			return nil, err
 		}

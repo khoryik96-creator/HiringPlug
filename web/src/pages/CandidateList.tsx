@@ -8,8 +8,7 @@ import { DuplicateEmail } from "../components/DuplicateEmail";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { useUsedValues } from "../components/useUsedValues";
-import { AVAILABILITY, rangeText, salaryText, sinceText } from "../components/candidateLook";
-import { formatNotice, WORK_AUTH_STATUS } from "../labels";
+import { COLUMNS, ColumnPicker, DEFAULT_COLUMNS, useCandidateColumns, WaBar, WaLegend } from "../components/candidateColumns";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
@@ -19,6 +18,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
   const [skill, setSkill] = useState("");
   const [mine, setMine] = useState(false);
   const used = useUsedValues();
+  const cols = useCandidateColumns();
   const list = useQuery({
     queryKey: [...candidatesKey, q, tag, skill, mine],
     queryFn: async () => {
@@ -32,7 +32,7 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
   });
 
   return (
-    <main>
+    <main className={cols.columns.length > DEFAULT_COLUMNS.length ? "wide" : undefined}>
       <div className="row spread">
         <h2>Candidates</h2>
         <div className="row">
@@ -46,52 +46,34 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
             <option value="">Any tag</option>
             {used.tags.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
         </div>
       </div>
       {canCreate && <AddCandidate />}
-      <ErrorMessage error={list.error} />
-      <table className="candidates-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Current role</th>
-            <th>Status</th>
-            <th>Notice period</th>
-            <th>Current salary</th>
-            <th>Expected salary</th>
-            <th>Work authorization</th>
-            <th>Email</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.data?.items.map((c) => {
-            const status = c.availability ? AVAILABILITY[c.availability] : null;
-            const current = c.currentSalary ? salaryText(c.currentSalary) : null;
-            const expected = c.expectedSalary ? rangeText(c.expectedSalary) : null;
-            return (
+      <ErrorMessage error={list.error ?? cols.save.error} />
+      <WaLegend />
+      <div className="table-scroll">
+        <table className="candidates-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              {cols.columns.map((col) => <th key={col}>{COLUMNS[col].header}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {list.data?.items.map((c) => (
               <tr key={c.id}>
-                <td>
-                  <a href={`#/candidates/${c.id}`}>{c.fullName}</a> {c.tags.length > 0 && <Chips labels={c.tags} />}
+                <td className="name-cell">
+                  <WaBar c={c} />
+                  <a href={`#/candidates/${c.id}`}>{c.fullName}</a>{" "}
+                  {!cols.columns.includes("tags") && c.tags.length > 0 && <Chips labels={c.tags} />}
                 </td>
-                <td>{[c.currentTitle, c.currentCompany].filter(Boolean).join(", ")}</td>
-                <td>
-                  {status && (
-                    <>
-                      <span className="status-dot" style={{ background: status.bg, borderColor: status.edge }} />{status.label}
-                      {sinceText(c.availabilitySince) && <span className="muted small">{sinceText(c.availabilitySince)}</span>}
-                    </>
-                  )}
-                </td>
-                <td>{c.noticePeriod ? formatNotice(c.noticePeriod) : ""}</td>
-                <td>{c.salaryRestricted ? <span className="muted">Restricted</span> : current && <>{current[0]} <span className="muted small">{current[1]}</span></>}</td>
-                <td>{c.salaryRestricted ? <span className="muted">Restricted</span> : expected && <>{expected[0]} <span className="muted small">{expected[1]}</span></>}</td>
-                <td>{c.workAuthorizationStatus ? WORK_AUTH_STATUS[c.workAuthorizationStatus] : ""}</td>
-                <td>{c.email}</td>
+                {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }

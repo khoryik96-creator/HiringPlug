@@ -678,8 +678,17 @@ components:
     CandidateSummary:
       type: object
       required: [tags, id, fullName, email, phone, currentTitle, currentCompany, location, workAuthorizationStatus, updatedAt,
-        availability, availabilitySince, noticePeriod, currentSalary, expectedSalary, salaryRestricted]
+        availability, availabilitySince, noticePeriod, currentSalary, expectedSalary, salaryRestricted, workAuthorizationBasis,
+        nationality, residenceCountry, source, industry]
       properties:
+        nationality: { type: string, nullable: true, description: ISO country code. }
+        residenceCountry: { type: string, nullable: true, description: ISO country code. }
+        source: { type: string, nullable: true }
+        industry: { type: string, nullable: true }
+        workAuthorizationBasis:
+          description: The pass an expat holds (or permanent resident), as on their page.
+          allOf: [{ $ref: '#/components/schemas/WorkAuthorizationBasis' }]
+          nullable: true
         availability:
           allOf: [{ $ref: '#/components/schemas/CandidateAvailability' }]
           nullable: true

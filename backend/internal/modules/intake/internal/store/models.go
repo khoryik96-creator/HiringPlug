@@ -861,6 +861,13 @@ type UserLink struct {
 	CreatedAt time.Time
 }
 
+type UserPreference struct {
+	TenantID         string
+	UserID           string
+	CandidateColumns []string
+	UpdatedAt        time.Time
+}
+
 type Webhook struct {
 	ID          string
 	TenantID    string
