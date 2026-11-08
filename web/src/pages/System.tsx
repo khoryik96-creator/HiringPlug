@@ -35,6 +35,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "lead_source.check": "Checking job boards for leads",
   "match.score": "CV vs job fit scores",
   "match.scored": "Saving fit scores",
+  "talent.rank": "AI candidate search: ranking the candidates",
+  "talent.ranked": "AI candidate search: saving the ranking",
   "scheduling.refresh_calendar": "Reading busy times from calendars",
   "webhook.deliver": "Sending webhooks to your other systems",
 };

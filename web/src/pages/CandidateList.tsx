@@ -13,7 +13,7 @@ import { COLUMNS, ColumnPicker, useCandidateColumns, WaBar, WaLegend } from "../
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: boolean; canSeeSalary?: boolean }) {
+export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
@@ -51,7 +51,10 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
     <main className="candidates-page wide">
       <div className="page-head">
         <h2>Candidates</h2>
-        {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
+        <div className="row">
+          {canAiSearch && <a className="doc-btn ai-link" href="#/candidates/ai-search">✦ AI search</a>}
+          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
+        </div>
       </div>
       {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
       <div className="list-toolbar">

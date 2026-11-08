@@ -25,6 +25,7 @@ const CandidateList = page(() => import("./pages/CandidateList"), "CandidateList
 const ChangePassword = page(() => import("./pages/Team"), "ChangePassword");
 const CompanyDetail = page(() => import("./pages/CompanyDetail"), "CompanyDetail");
 const CompanyList = page(() => import("./pages/CompanyList"), "CompanyList");
+const AiSearch = page(() => import("./pages/AiSearch"), "AiSearch");
 const CompareCvs = page(() => import("./pages/CompareCvs"), "CompareCvs");
 const ContactDetail = page(() => import("./pages/ContactDetail"), "ContactDetail");
 const ContactList = page(() => import("./pages/ContactList"), "ContactList");
@@ -71,6 +72,8 @@ export const ROUTES: Route[] = [
   { section: "jobs", path: /^#\/jobs\/(jo_[0-9a-z]+)$/, render: (c) => <JobDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "jobs", path: /^#\/jobs/, menu: { in: "main", label: "Jobs", href: "#/jobs" },
     render: (c) => <JobList canCreate={can(c, "jobs:create")} /> },
+  { section: "candidates", path: /^#\/candidates\/ai-search$/, permission: "matching:create",
+    render: (c) => <AiSearch canSeeSalary={can(c, "candidates.compensation:read")} canReadJd={can(c, "jobs:create")} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/screening$/,
     render: (c) => <ScreeningCall key={c.id} candidateId={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)\/reference-check$/,
@@ -79,7 +82,7 @@ export const ROUTES: Route[] = [
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
-    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} canSeeSalary={can(c, "candidates.compensation:read")} /> },
+    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "companies", path: /^#\/companies/, menu: { in: "main", label: "Companies", href: "#/companies" },

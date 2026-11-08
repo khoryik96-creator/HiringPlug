@@ -55,7 +55,7 @@ func TalentRequirements(jd string, s api.CandidateSearch) string {
 		b.WriteString("- Location: " + strings.TrimSpace(*s.Location) + "\n")
 	}
 	if s.NoticeMaxDays != nil {
-		b.WriteString(fmt.Sprintf("- Notice period: at most %d days\n", *s.NoticeMaxDays))
+		fmt.Fprintf(&b, "- Notice period: at most %d days\n", *s.NoticeMaxDays)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

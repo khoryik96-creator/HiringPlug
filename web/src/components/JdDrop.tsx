@@ -24,7 +24,13 @@ async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["J
  * A drop zone for the job description; calls onRead once with what was read
  * from it. `start` is a file dropped before this was shown (on the ads panel).
  */
-export function JdDrop({ jobId, start, onRead }: { jobId?: string; start?: File | null; onRead: (d: JdDetails, fileName: string) => void }) {
+export function JdDrop({ jobId, start, onRead, readText = "Check it, then save." }: {
+  jobId?: string;
+  start?: File | null;
+  onRead: (d: JdDetails, fileName: string) => void;
+  /** What to say once it is read (after "Filled in from <file>."). */
+  readText?: string;
+}) {
   const upload = useMutation({ mutationFn: (file: File) => sendJd(jobId, file) });
   const uploaded = upload.data;
   // A PDF or Word file is read by the worker: follow it until it is done.
@@ -56,7 +62,7 @@ export function JdDrop({ jobId, start, onRead }: { jobId?: string; start?: File 
       <DropZone accept={JD_TYPES} disabled={reading} label="Drop the client's JD"
         hint="PDF, Word or text" onFiles={([f]) => { if (f) upload.mutate(f); }} />
       {reading && <p className="muted small" role="status">Reading {latest?.fileName ?? "the file"}…</p>}
-      {latest?.status === "read" && <p className="small" role="status">Filled in from {latest.fileName}. Check it, then save.</p>}
+      {latest?.status === "read" && <p className="small" role="status">Filled in from {latest.fileName}. {readText}</p>}
       {latest?.status === "failed" && <p className="error small">{latest.fileName}: {latest.error ?? "it could not be read."}</p>}
       {upload.error && <p className="error small">{upload.error.message}</p>}
     </div>

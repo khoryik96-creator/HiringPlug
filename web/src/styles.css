@@ -461,3 +461,41 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .candidates-page .candidates-table .col-currentSalary, .candidates-page .candidates-table .col-expectedSalary, .candidates-page .candidates-table .col-noticePeriod { white-space: nowrap; }
 .snippet-row td { padding-left: 2.2rem; }
 main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto; padding: 0 1.5rem; }
+/* AI candidate search: what you need on the left, the shortlist on the right. */
+.ai-link { border-color: #c4b5fd; color: #6d28d9; }
+.ai-search .page-head p { margin: 0.2rem 0 0; }
+.ai-layout { display: grid; grid-template-columns: minmax(22rem, 2fr) minmax(24rem, 3fr); gap: 1rem; align-items: start; }
+@media (max-width: 1000px) { .ai-layout { grid-template-columns: 1fr; } }
+.ai-form { display: grid; gap: 0.8rem; }
+.ai-form h3, .ai-out h3 { margin: 0; }
+.ai-form textarea { width: 100%; resize: vertical; }
+.ai-form .adv-grid { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+.ai-options { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.ai-out { display: grid; gap: 0.75rem; position: sticky; top: 1rem; }
+.ai-wait { background: #f5f3ff; border-radius: 10px; padding: 0.8rem 1rem; }
+.ai-notes { background: #f8fafc; border-left: 3px solid var(--accent); border-radius: 6px; padding: 0.6rem 0.8rem; margin: 0; }
+.ai-needs { display: grid; gap: 0.4rem; }
+.ai-needs .chip { margin: 0 0.25rem 0.25rem 0; }
+.chip.soft { background: #f1f5f9; color: inherit; }
+.ai-boolean { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.ai-boolean code { background: #fef9c3; border-radius: 4px; padding: 0.1rem 0.4rem; }
+.fit-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+.fit-card { display: flex; gap: 0.8rem; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 0.7rem 0.8rem; }
+.fit-score { flex: none; width: 2.8rem; height: 2.8rem; border-radius: 50%; display: grid; place-items: center; font-weight: 750; color: #fff; }
+.fit-score.strong { background: #15803d; }
+.fit-score.possible { background: #d97706; }
+.fit-score.weak { background: #94a3b8; }
+.fit-main { flex: 1; min-width: 0; }
+.fit-head a { font-weight: 650; }
+.fit-verdict { margin-left: 0.5rem; font-size: 0.72rem; font-weight: 650; border-radius: 999px; padding: 0.05rem 0.5rem; }
+.fit-verdict.strong { background: #dcfce7; color: #15803d; }
+.fit-verdict.possible { background: #fef3c7; color: #b45309; }
+.fit-verdict.weak { background: #f1f5f9; color: #475569; }
+.fit-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.35rem; font-size: 0.85rem; }
+@media (max-width: 700px) { .fit-notes { grid-template-columns: 1fr; } }
+.fit-notes ul { margin: 0; padding-left: 1.1rem; }
+.fit-good li::marker { content: "✓  "; color: #15803d; }
+.fit-gap li::marker { content: "–  "; color: #b45309; }
+.ai-filters { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 0.55rem 0.75rem; }
+.ai-filters summary { cursor: pointer; font-weight: 600; }
+.ai-filters[open] summary { margin-bottom: 0.7rem; }

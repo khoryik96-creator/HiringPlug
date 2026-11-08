@@ -83,6 +83,23 @@ text with the words marked ("4 places for ...", "Go to the first", "Stop
 marking"). Words are matched in their other forms (manager, managers), as
 CVs are indexed; symbols are not searchable (C++ is C, .NET is NET).
 
+**AI candidate search** (Candidates, "AI search"; CV Studio's AI Crawler, on
+the company's own candidates): drop the client's JD (PDF, Word or text; it is
+read as for a new job) or paste it, and/or write a boolean; the same filters
+as the advanced search narrow who may be considered. With a JD, those found
+(up to 300) are ordered by how many words their CVs share with it; the first
+10, 15 or 20 are sent to the AI by reference (C1, C2...) with their profile
+and CV, without names, contact details or salary, and none who withdrew
+consent. The AI reads what the job needs as CV Studio's Job Fit does
+(responsibilities, requirements, tech stack, nice to have; not the company,
+location, benefits or culture), gives each a fit from 0 to 100 (strong 75+,
+possible 50-74, weak) with reasons and gaps, and writes sourcing notes, the
+must-haves and nice-to-haves it read, and a boolean for the job ("Use it"
+puts it in the search). "Strict must-haves" caps anyone missing one at 50.
+The shortlist is best first; opening a candidate marks the boolean's words in
+their CV. Searches are personal ("Earlier searches"), use the monthly AI
+allowance, and one with no answer after 30 minutes shows as failed.
+
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
 are protected against lost updates (`version`): a form saves with the version

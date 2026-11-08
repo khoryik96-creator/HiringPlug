@@ -286,6 +286,21 @@ the prompt against CV Studio's own example, byte for byte, and its offline
 checks (`check_jd.cjs`) run in the tests. Go (`jd.blinded`) makes the result
 the ad's blind version and refuses one that still names the client.
 
+## AI candidate search (built)
+
+`talent.rank` carries what the job needs (the JD without salary, or the
+recruiter's boolean and filters when there is none) and up to 20 candidates
+by reference (C1, C2...), each with a profile line and their CV's text cut to
+3,500 characters, without names, contact details or salary.
+`jobs/talent_rank.py` asks, as CV Studio's AI Crawler and Job Fit do, to read
+the responsibilities, requirements, tech stack and nice-to-haves (not the
+company, benefits or culture) and to rate every candidate 0-100 with at most
+4 reasons and 4 gaps, plus sourcing notes, must-haves, nice-to-haves and a
+boolean for the job; "strict" caps a candidate missing a must-have at 50. It
+reads the answer into the contract's shape (unknown references skipped,
+fits held to 0-100, a missing verdict taken from the fit). Go checks every
+reference against who it sent before saving (`talent.ranked`).
+
 ## CV-to-job matching (built)
 
 `match.score` carries the job's text (title, details, description and its

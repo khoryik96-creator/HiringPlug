@@ -13,7 +13,7 @@ func TestTheAIsRankingIsCheckedAgainstWhoItWasSent(t *testing.T) {
 	got := TalentResults(sent, []api.TalentRanked{
 		{Ref: "C2", Fit: 140, Verdict: "strong", Reasons: []string{"  SAP BW   upgrades "}, Gaps: []string{}},
 		{Ref: "c1", Fit: 40, Verdict: "nonsense", Reasons: []string{""}, Gaps: []string{"No BPC"}},
-		{Ref: "C2", Fit: 10, Verdict: "weak"},  // repeated
+		{Ref: "C2", Fit: 10, Verdict: "weak"},   // repeated
 		{Ref: "C9", Fit: 99, Verdict: "strong"}, // never sent
 		{Ref: "Siti", Fit: 99, Verdict: "strong"},
 	})
