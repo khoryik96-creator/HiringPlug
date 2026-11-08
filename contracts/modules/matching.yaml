@@ -41,6 +41,15 @@ x-module:
       payload: MatchScoredJob
       description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
 
+    talent.rank:
+      queue: ai
+      payload: TalentRankJob
+      description: "AI candidate search (CV Studio's AI Crawler way): read what a job needs and rank the candidates sent, with fit reasons and gaps (Python AI worker)."
+    talent.ranked:
+      queue: core
+      payload: TalentRankedJob
+      description: Save the AI's ranking and sourcing notes on the search (Go worker).
+
 paths:
   /v1/matches:
     get:
@@ -137,6 +146,70 @@ paths:
         '409': { $ref: '#/components/responses/MatchingUnavailable' }
         '429': { $ref: '#/components/responses/MatchingLimitReached' }
 
+  /v1/talent-searches:
+    get:
+      operationId: listTalentSearches
+      tags: [matching]
+      summary: Your latest AI candidate searches
+      x-permission: matching:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TalentSearchList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: startTalentSearch
+      tags: [matching]
+      summary: AI candidate search - find candidates by a JD, a boolean and filters, then have the AI rank the best
+      description: >
+        CV Studio's AI Crawler, on your own candidates. The boolean and filters
+        (as the advanced search) choose who may be considered; with a job
+        description, they are ordered by how much their CVs share with it. The
+        first ones (rank, 15 by default) are sent to the AI - their CVs
+        without names, contact details or salary; none who withdrew consent -
+        which reads what the job needs (responsibilities, requirements, tech
+        stack, nice to have; not the company or benefits) and gives each a fit
+        score with reasons and gaps, and sourcing notes. Uses the monthly AI
+        allowance. Follow GET /v1/talent-searches/{searchId}.
+      x-permission: matching:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TalentSearchInput' }
+      responses:
+        '202':
+          description: Started (or done at once when nobody matches)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TalentSearch' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/MatchingUnavailable' }
+        '429': { $ref: '#/components/responses/MatchingLimitReached' }
+
+  /v1/talent-searches/{searchId}:
+    get:
+      operationId: getTalentSearch
+      tags: [matching]
+      summary: An AI candidate search, and once done its ranking
+      x-permission: matching:read
+      parameters:
+        - { name: searchId, in: path, required: true, schema: { $ref: '#/components/schemas/TalentSearchId' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TalentSearch' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   responses:
     MatchingUnavailable:
@@ -151,6 +224,110 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    TalentSearchId:
+      type: string
+      pattern: '^tsr_[0-9a-hjkmnp-tv-z]{26}$'
+      example: tsr_01jbz6w0m0k8q9x2r3s4t5v6w7
+    TalentSearchInput:
+      type: object
+      additionalProperties: false
+      required: [search]
+      properties:
+        jd: { type: string, maxLength: 20000, description: "The job description (optional when the search has a boolean)." }
+        search: { $ref: '#/components/schemas/CandidateSearch' }
+        strict: { type: boolean, default: false, description: "Must-haves are strict: a candidate missing one cannot score above 50." }
+        rank: { type: integer, minimum: 3, maximum: 20, default: 15, description: How many candidates the AI ranks. }
+    TalentSearchStatus:
+      type: string
+      enum: [queued, done, failed]
+    TalentFit:
+      type: object
+      required: [candidateId, name, currentTitle, fit, verdict, reasons, gaps]
+      properties:
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        name: { type: string }
+        currentTitle: { type: string, nullable: true }
+        fit: { type: integer, minimum: 0, maximum: 100 }
+        verdict: { $ref: '#/components/schemas/TalentVerdict' }
+        reasons: { type: array, items: { type: string } }
+        gaps: { type: array, items: { type: string } }
+    TalentVerdict:
+      type: string
+      enum: [strong, possible, weak]
+    TalentSearch:
+      type: object
+      required: [id, status, jd, boolean, strict, considered, sent, error, summary, mustHaves, niceToHaves, suggestedBoolean, results, createdAt, finishedAt]
+      properties:
+        id: { $ref: '#/components/schemas/TalentSearchId' }
+        status: { $ref: '#/components/schemas/TalentSearchStatus' }
+        jd: { type: string, nullable: true }
+        boolean: { type: string, nullable: true }
+        strict: { type: boolean }
+        considered: { type: integer, description: How many candidates the boolean and filters found. }
+        sent: { type: integer, description: How many the AI was asked to rank. }
+        error: { type: string, nullable: true }
+        summary: { type: string, nullable: true, description: "The AI's sourcing notes." }
+        mustHaves: { type: array, items: { type: string } }
+        niceToHaves: { type: array, items: { type: string } }
+        suggestedBoolean: { type: string, nullable: true, description: "A boolean for the job, to search with next (and to mark CVs)." }
+        results:
+          type: array
+          description: Best fit first (candidates the user may no longer see are left out).
+          items: { $ref: '#/components/schemas/TalentFit' }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    TalentSearchList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/TalentSearch' } }
+    TalentCandidate:
+      type: object
+      additionalProperties: false
+      required: [ref, profile, cv]
+      properties:
+        ref: { type: string, maxLength: 10, description: "C1, C2...: how the AI names them (not their name)." }
+        profile: { type: string, maxLength: 2000, description: "Title, company, skills, industry, notice, work authorization - no name, contact or salary." }
+        cv: { type: string, maxLength: 8000, description: "Their CV's text, without names, contact details or salary (may be empty)." }
+    TalentRankJob:
+      type: object
+      additionalProperties: false
+      required: [searchId, requirements, strict, candidates]
+      properties:
+        searchId: { $ref: '#/components/schemas/TalentSearchId' }
+        requirements: { type: string, maxLength: 24000, description: "The JD (without salary), or the boolean and filters when there is none." }
+        strict: { type: boolean }
+        candidates: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/TalentCandidate' } }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    TalentRanked:
+      type: object
+      additionalProperties: false
+      required: [ref, fit, verdict, reasons, gaps]
+      properties:
+        ref: { type: string, maxLength: 10 }
+        fit: { type: integer, minimum: 0, maximum: 100 }
+        verdict: { $ref: '#/components/schemas/TalentVerdict' }
+        reasons: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/TalentNote' } }
+        gaps: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/TalentNote' } }
+    TalentNote: { type: string, maxLength: 400, description: "A reason or a gap, in a sentence." }
+    TalentRequirement: { type: string, maxLength: 200, description: "A must-have or nice-to-have the AI read in the job." }
+    TalentRankedJob:
+      type: object
+      additionalProperties: false
+      required: [searchId, summary, mustHaves, niceToHaves, suggestedBoolean, results, error, model, inputTokens, outputTokens]
+      properties:
+        searchId: { $ref: '#/components/schemas/TalentSearchId' }
+        summary: { type: string, nullable: true, maxLength: 3000 }
+        mustHaves: { type: array, maxItems: 12, items: { $ref: '#/components/schemas/TalentRequirement' } }
+        niceToHaves: { type: array, maxItems: 12, items: { $ref: '#/components/schemas/TalentRequirement' } }
+        suggestedBoolean: { type: string, nullable: true, maxLength: 1000 }
+        results: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/TalentRanked' } }
+        error: { type: string, nullable: true, maxLength: 2000 }
+        model: { type: string, nullable: true, maxLength: 200 }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }
     MatchId:
       type: string
       pattern: '^mat_[0-9a-hjkmnp-tv-z]{26}$'

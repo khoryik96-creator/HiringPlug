@@ -18,20 +18,7 @@ func (h *HTTP) SearchCandidates(ctx context.Context, req api.SearchCandidatesReq
 	if b.Limit != nil {
 		limit = *b.Limit
 	}
-	f := SearchFilter{
-		Query: blankNil(b.Q), Boolean: blankNil(b.Boolean), Location: blankNil(b.Location),
-		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
-		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
-		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
-		Owner: blankNil(b.Owner),
-	}
-	if f.Owner != nil && *f.Owner == "me" {
-		f.Owner = &p.UserID
-	}
-	if s := b.ExpectedSalaryMax; s != nil {
-		amount, currency := s.Amount, s.Currency
-		f.SalaryMax, f.SalaryCurrency = &amount, &currency
-	}
+	f := FilterOf(*b, p)
 	page, err := h.svc.Search(ctx, p, f, b.Cursor, limit)
 	if err != nil {
 		return nil, err
@@ -74,4 +61,23 @@ func strs[T ~string](in *[]T) []string {
 		out[i] = string(v)
 	}
 	return out
+}
+
+// FilterOf is an advanced search as the API takes it ("me" as owner is the user).
+func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
+	f := SearchFilter{
+		Query: blankNil(b.Q), Boolean: blankNil(b.Boolean), Location: blankNil(b.Location),
+		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
+		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
+		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
+		Owner: blankNil(b.Owner),
+	}
+	if f.Owner != nil && *f.Owner == "me" {
+		f.Owner = &p.UserID
+	}
+	if s := b.ExpectedSalaryMax; s != nil {
+		amount, currency := s.Amount, s.Currency
+		f.SalaryMax, f.SalaryCurrency = &amount, &currency
+	}
+	return f
 }

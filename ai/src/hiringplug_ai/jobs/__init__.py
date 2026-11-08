@@ -28,6 +28,7 @@ from ..contracts import (
     JobKind,
     JobReadJdJob,
     MatchScoreJob,
+    TalentRankJob,
 )
 from ..extraction import Limits, OcrEngine
 from ..providers import Provider, ProviderError
@@ -43,6 +44,7 @@ from . import (
     read_jd,
     read_linkedin,
     render_pdf,
+    talent_rank,
 )
 
 
@@ -96,6 +98,7 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
     JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),
+    JobKind.talent_rank: Handler(TalentRankJob, talent_rank.run),
     JobKind.jd_blind: Handler(JdBlindJob, blind_jd.run),
     JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
     JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),

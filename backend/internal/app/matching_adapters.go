@@ -4,9 +4,12 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
@@ -63,7 +66,43 @@ func (a matchingCandidates) Briefs(ctx context.Context, tx pgx.Tx, ids []string)
 	return out, err
 }
 
+// Pool runs the user's advanced search for the AI candidate search: who to
+// consider, and what the AI may read of their profile (no name, contact or salary).
+func (a matchingCandidates) Pool(ctx context.Context, tx pgx.Tx, p authz.Principal, search api.CandidateSearch, limit int) ([]matching.PoolCandidate, error) {
+	page, err := a.candidates.SearchIn(ctx, tx, p, candidates.FilterOf(search, p), limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]matching.PoolCandidate, len(page.Items))
+	for i, h := range page.Items {
+		out[i] = matching.PoolCandidate{ID: h.ID, Profile: poolProfile(h.Summary)}
+	}
+	return out, nil
+}
+
+func poolProfile(s candidates.Summary) string {
+	var parts []string
+	add := func(label string, v *string) {
+		if v != nil && strings.TrimSpace(*v) != "" {
+			parts = append(parts, label+": "+strings.TrimSpace(*v))
+		}
+	}
+	add("Current title", s.CurrentTitle)
+	add("Current company", s.CurrentCompany)
+	add("Location", s.Location)
+	add("Industry", s.Industry)
+	add("Work authorization", s.WorkAuthorizationStatus)
+	if s.NoticePeriod != nil {
+		parts = append(parts, fmt.Sprintf("Notice period: %d %s", s.NoticePeriod.Value, s.NoticePeriod.Unit))
+	}
+	return strings.Join(parts, "; ")
+}
+
 type matchingCVs struct{ documents *documents.Module }
+
+func (a matchingCVs) RankCVsByText(ctx context.Context, tx pgx.Tx, text string, ids []string, limit int) ([]string, error) {
+	return a.documents.RankCVsByText(ctx, tx, text, ids, limit)
+}
 
 func (a matchingCVs) LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error) {
 	return a.documents.LatestCVText(ctx, tx, candidateID)

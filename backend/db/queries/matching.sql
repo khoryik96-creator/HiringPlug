@@ -41,4 +41,29 @@ WHERE id = @id AND status = 'queued';
 
 -- Tokens the company used for matching since the start of the month.
 -- name: TokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM job_match WHERE created_at >= @since;
+SELECT ((SELECT coalesce(sum(m.input_tokens + m.output_tokens), 0) FROM job_match m WHERE m.created_at >= @since::timestamptz)
+      + (SELECT coalesce(sum(t.tokens), 0) FROM talent_search t WHERE t.created_at >= @since::timestamptz))::bigint;
+
+-- AI candidate searches (CV Studio's AI Crawler). A user sees only their own.
+-- name: InsertTalentSearch :one
+INSERT INTO talent_search (tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, summary, finished_at)
+VALUES (app_current_tenant(), app_current_user(), @status, sqlc.narg(jd), sqlc.narg(boolean), @filters, @strict, @considered, @sent,
+        sqlc.narg(summary), CASE WHEN @status::text = 'queued' THEN NULL ELSE now() END)
+RETURNING *;
+
+-- name: GetTalentSearch :one
+SELECT * FROM talent_search WHERE id = @id AND created_by = app_current_user();
+
+-- name: ListTalentSearches :many
+SELECT * FROM talent_search WHERE created_by = app_current_user() ORDER BY created_at DESC, id DESC LIMIT 10;
+
+-- The AI's answer (in the Go worker: no user, so by id).
+-- name: TalentSearchForAnswer :one
+SELECT * FROM talent_search WHERE id = @id;
+
+-- name: FinishTalentSearch :execrows
+UPDATE talent_search
+   SET status = @status, results = @results, summary = sqlc.narg(summary), must_haves = @must_haves,
+       nice_to_haves = @nice_to_haves, suggested_boolean = sqlc.narg(suggested_boolean), error = sqlc.narg(error),
+       model = sqlc.narg(model), tokens = @tokens, finished_at = now()
+ WHERE id = @id AND status = 'queued';

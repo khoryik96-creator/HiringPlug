@@ -10,6 +10,46 @@ import (
 	"time"
 )
 
+const finishTalentSearch = `-- name: FinishTalentSearch :execrows
+UPDATE talent_search
+   SET status = $1, results = $2, summary = $3, must_haves = $4,
+       nice_to_haves = $5, suggested_boolean = $6, error = $7,
+       model = $8, tokens = $9, finished_at = now()
+ WHERE id = $10 AND status = 'queued'
+`
+
+type FinishTalentSearchParams struct {
+	Status           string
+	Results          []byte
+	Summary          *string
+	MustHaves        []string
+	NiceToHaves      []string
+	SuggestedBoolean *string
+	Error            *string
+	Model            *string
+	Tokens           int32
+	ID               string
+}
+
+func (q *Queries) FinishTalentSearch(ctx context.Context, arg FinishTalentSearchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishTalentSearch,
+		arg.Status,
+		arg.Results,
+		arg.Summary,
+		arg.MustHaves,
+		arg.NiceToHaves,
+		arg.SuggestedBoolean,
+		arg.Error,
+		arg.Model,
+		arg.Tokens,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getQueuedForUpdate = `-- name: GetQueuedForUpdate :one
 SELECT id, sent_job, sent_cv FROM job_match
 WHERE id = $1 AND status = 'queued'
@@ -27,6 +67,38 @@ func (q *Queries) GetQueuedForUpdate(ctx context.Context, id string) (GetQueuedF
 	row := q.db.QueryRow(ctx, getQueuedForUpdate, id)
 	var i GetQueuedForUpdateRow
 	err := row.Scan(&i.ID, &i.SentJob, &i.SentCv)
+	return i, err
+}
+
+const getTalentSearch = `-- name: GetTalentSearch :one
+SELECT id, tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, results, summary, must_haves, nice_to_haves, suggested_boolean, error, model, tokens, created_at, finished_at FROM talent_search WHERE id = $1 AND created_by = app_current_user()
+`
+
+func (q *Queries) GetTalentSearch(ctx context.Context, id string) (TalentSearch, error) {
+	row := q.db.QueryRow(ctx, getTalentSearch, id)
+	var i TalentSearch
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CreatedBy,
+		&i.Status,
+		&i.Jd,
+		&i.Boolean,
+		&i.Filters,
+		&i.Strict,
+		&i.Considered,
+		&i.Sent,
+		&i.Results,
+		&i.Summary,
+		&i.MustHaves,
+		&i.NiceToHaves,
+		&i.SuggestedBoolean,
+		&i.Error,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
 	return i, err
 }
 
@@ -93,6 +165,62 @@ func (q *Queries) InsertMatch(ctx context.Context, arg InsertMatchParams) (Inser
 		&i.Dimensions,
 		&i.Strengths,
 		&i.Gaps,
+	)
+	return i, err
+}
+
+const insertTalentSearch = `-- name: InsertTalentSearch :one
+INSERT INTO talent_search (tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, summary, finished_at)
+VALUES (app_current_tenant(), app_current_user(), $1, $2, $3, $4, $5, $6, $7,
+        $8, CASE WHEN $1::text = 'queued' THEN NULL ELSE now() END)
+RETURNING id, tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, results, summary, must_haves, nice_to_haves, suggested_boolean, error, model, tokens, created_at, finished_at
+`
+
+type InsertTalentSearchParams struct {
+	Status     string
+	Jd         *string
+	Boolean    *string
+	Filters    []byte
+	Strict     bool
+	Considered int32
+	Sent       []string
+	Summary    *string
+}
+
+// AI candidate searches (CV Studio's AI Crawler). A user sees only their own.
+func (q *Queries) InsertTalentSearch(ctx context.Context, arg InsertTalentSearchParams) (TalentSearch, error) {
+	row := q.db.QueryRow(ctx, insertTalentSearch,
+		arg.Status,
+		arg.Jd,
+		arg.Boolean,
+		arg.Filters,
+		arg.Strict,
+		arg.Considered,
+		arg.Sent,
+		arg.Summary,
+	)
+	var i TalentSearch
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CreatedBy,
+		&i.Status,
+		&i.Jd,
+		&i.Boolean,
+		&i.Filters,
+		&i.Strict,
+		&i.Considered,
+		&i.Sent,
+		&i.Results,
+		&i.Summary,
+		&i.MustHaves,
+		&i.NiceToHaves,
+		&i.SuggestedBoolean,
+		&i.Error,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedAt,
+		&i.FinishedAt,
 	)
 	return i, err
 }
@@ -229,6 +357,51 @@ func (q *Queries) LatestForJob(ctx context.Context, jobID string) ([]LatestForJo
 	return items, nil
 }
 
+const listTalentSearches = `-- name: ListTalentSearches :many
+SELECT id, tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, results, summary, must_haves, nice_to_haves, suggested_boolean, error, model, tokens, created_at, finished_at FROM talent_search WHERE created_by = app_current_user() ORDER BY created_at DESC, id DESC LIMIT 10
+`
+
+func (q *Queries) ListTalentSearches(ctx context.Context) ([]TalentSearch, error) {
+	rows, err := q.db.Query(ctx, listTalentSearches)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TalentSearch
+	for rows.Next() {
+		var i TalentSearch
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CreatedBy,
+			&i.Status,
+			&i.Jd,
+			&i.Boolean,
+			&i.Filters,
+			&i.Strict,
+			&i.Considered,
+			&i.Sent,
+			&i.Results,
+			&i.Summary,
+			&i.MustHaves,
+			&i.NiceToHaves,
+			&i.SuggestedBoolean,
+			&i.Error,
+			&i.Model,
+			&i.Tokens,
+			&i.CreatedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const saveScore = `-- name: SaveScore :execrows
 UPDATE job_match
 SET status = $1, score = $2, summary = $3, reasons = $4, dropped = $5,
@@ -276,8 +449,42 @@ func (q *Queries) SaveScore(ctx context.Context, arg SaveScoreParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const talentSearchForAnswer = `-- name: TalentSearchForAnswer :one
+SELECT id, tenant_id, created_by, status, jd, boolean, filters, strict, considered, sent, results, summary, must_haves, nice_to_haves, suggested_boolean, error, model, tokens, created_at, finished_at FROM talent_search WHERE id = $1
+`
+
+// The AI's answer (in the Go worker: no user, so by id).
+func (q *Queries) TalentSearchForAnswer(ctx context.Context, id string) (TalentSearch, error) {
+	row := q.db.QueryRow(ctx, talentSearchForAnswer, id)
+	var i TalentSearch
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CreatedBy,
+		&i.Status,
+		&i.Jd,
+		&i.Boolean,
+		&i.Filters,
+		&i.Strict,
+		&i.Considered,
+		&i.Sent,
+		&i.Results,
+		&i.Summary,
+		&i.MustHaves,
+		&i.NiceToHaves,
+		&i.SuggestedBoolean,
+		&i.Error,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
 const tokensSince = `-- name: TokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM job_match WHERE created_at >= $1
+SELECT ((SELECT coalesce(sum(m.input_tokens + m.output_tokens), 0) FROM job_match m WHERE m.created_at >= $1::timestamptz)
+      + (SELECT coalesce(sum(t.tokens), 0) FROM talent_search t WHERE t.created_at >= $1::timestamptz))::bigint
 `
 
 // Tokens the company used for matching since the start of the month.

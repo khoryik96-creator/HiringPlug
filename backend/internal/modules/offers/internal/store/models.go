@@ -828,6 +828,29 @@ type StudioCvAiUse struct {
 	CreatedAt  time.Time
 }
 
+type TalentSearch struct {
+	ID               string
+	TenantID         string
+	CreatedBy        string
+	Status           string
+	Jd               *string
+	Boolean          *string
+	Filters          []byte
+	Strict           bool
+	Considered       int32
+	Sent             []string
+	Results          []byte
+	Summary          *string
+	MustHaves        []string
+	NiceToHaves      []string
+	SuggestedBoolean *string
+	Error            *string
+	Model            *string
+	Tokens           int32
+	CreatedAt        time.Time
+	FinishedAt       *time.Time
+}
+
 type TeamGroup struct {
 	ID        string
 	TenantID  string

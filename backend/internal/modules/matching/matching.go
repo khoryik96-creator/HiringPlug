@@ -49,12 +49,16 @@ type Deps struct {
 		ForMatching(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Candidate, error)
 		// Briefs returns the given candidates the user may see (others are left out).
 		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]CandidateBrief, error)
+		// Pool returns the first candidates an advanced search finds, as the user may see them.
+		Pool(ctx context.Context, tx pgx.Tx, p authz.Principal, search api.CandidateSearch, limit int) ([]PoolCandidate, error)
 	}
 	// CVs returns the text of the candidate's newest CV ("" if none), and
 	// finds CVs sharing words with a text (possible candidates).
 	CVs interface {
 		LatestCVText(ctx context.Context, tx pgx.Tx, candidateID string) (string, error)
 		SearchCVs(ctx context.Context, tx pgx.Tx, text string, exclude []string, limit int) ([]CVHit, error)
+		// RankCVsByText orders candidates by how many words their CVs share with a text, best first.
+		RankCVsByText(ctx context.Context, tx pgx.Tx, text string, candidateIDs []string, limit int) ([]string, error)
 	}
 	// Consent says whether a candidate withdrew consent (privacy module):
 	// their data is then not sent to the AI or suggested. Nil: nobody did.
@@ -98,7 +102,7 @@ func New(pool *pgxpool.Pool, deps Deps, settings Settings) *Module {
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindMatchScored: m.service.scored}
+	return jobqueue.Handlers{api.JobKindMatchScored: m.service.scored, api.JobKindTalentRanked: m.service.talentRanked}
 }
 
 // TokensSince returns the AI tokens the company used for matching since the

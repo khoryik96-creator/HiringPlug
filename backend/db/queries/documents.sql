@@ -120,3 +120,18 @@ FROM best b JOIN document d ON d.id = b.document_id, q;
 SELECT ts_headline('english', coalesce(extracted_text, ''), to_tsquery('english', @ts::text),
          'HighlightAll=true, StartSel=' || chr(1) || ', StopSel=' || chr(2))::text AS marked
 FROM document WHERE id = @id;
+
+-- AI candidate search: the given candidates ordered by how many words their
+-- CVs share with a job description (each candidate's best CV), best first.
+-- Those whose CVs share none are left out.
+-- name: RankCVsByText :many
+WITH q AS (
+  SELECT string_agg(quote_literal(l), ' | ')::tsquery AS query
+  FROM unnest(tsvector_to_array(to_tsvector('english', @job_text::text))) AS l
+)
+SELECT s.candidate_id::text AS candidate_id, max(ts_rank_cd(s.terms, q.query, 32))::real AS rank
+FROM cv_search s, q
+WHERE q.query IS NOT NULL AND s.candidate_id = ANY (@candidate_ids::text[]) AND s.terms @@ q.query
+GROUP BY s.candidate_id
+ORDER BY rank DESC, s.candidate_id
+LIMIT @row_limit;

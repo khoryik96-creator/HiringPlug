@@ -157,6 +157,8 @@ class JobKind(StrEnum):
     match_score = "match.score"
     match_scored = "match.scored"
     scheduling_refresh_calendar = "scheduling.refresh_calendar"
+    talent_rank = "talent.rank"
+    talent_ranked = "talent.ranked"
     webhook_deliver = "webhook.deliver"
 
 
@@ -2627,6 +2629,77 @@ class MarketInsights(BaseModel):
     askedAt: AwareDatetime
 
 
+class TalentSearchId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["tsr_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^tsr_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class TalentSearchStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class TalentVerdict(StrEnum):
+    strong = "strong"
+    possible = "possible"
+    weak = "weak"
+
+
+class TalentCandidate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ref: Annotated[
+        str, Field(description="C1, C2...: how the AI names them (not their name).", max_length=10)
+    ]
+    profile: Annotated[
+        str,
+        Field(
+            description="Title, company, skills, industry, notice, work authorization - no name, contact or salary.",
+            max_length=2000,
+        ),
+    ]
+    cv: Annotated[
+        str,
+        Field(
+            description="Their CV's text, without names, contact details or salary (may be empty).",
+            max_length=8000,
+        ),
+    ]
+
+
+class TalentRankJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    searchId: TalentSearchId
+    requirements: Annotated[
+        str,
+        Field(
+            description="The JD (without salary), or the boolean and filters when there is none.",
+            max_length=24000,
+        ),
+    ]
+    strict: bool
+    candidates: Annotated[list[TalentCandidate], Field(max_length=20)]
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class TalentNote(RootModel[str]):
+    root: Annotated[str, Field(description="A reason or a gap, in a sentence.", max_length=400)]
+
+
+class TalentRequirement(RootModel[str]):
+    root: Annotated[
+        str, Field(description="A must-have or nice-to-have the AI read in the job.", max_length=200)
+    ]
+
+
 class MatchId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["mat_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^mat_[0-9a-hjkmnp-tv-z]{26}$")
@@ -4233,6 +4306,85 @@ class MarketPay(BaseModel):
     period: PayPeriod
     current: Annotated[MarketRange | None, Field(...)]
     expected: Annotated[MarketRange | None, Field(...)]
+
+
+class TalentSearchInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jd: Annotated[
+        str | None,
+        Field(description="The job description (optional when the search has a boolean).", max_length=20000),
+    ] = None
+    search: CandidateSearch
+    strict: Annotated[
+        bool, Field(description="Must-haves are strict: a candidate missing one cannot score above 50.")
+    ] = False
+    rank: Annotated[int, Field(description="How many candidates the AI ranks.", ge=3, le=20)] = 15
+
+
+class TalentFit(BaseModel):
+    candidateId: CandidateId
+    name: str
+    currentTitle: Annotated[str | None, Field(...)]
+    fit: Annotated[int, Field(ge=0, le=100)]
+    verdict: TalentVerdict
+    reasons: list[str]
+    gaps: list[str]
+
+
+class TalentSearch(BaseModel):
+    id: TalentSearchId
+    status: TalentSearchStatus
+    jd: Annotated[str | None, Field(...)]
+    boolean: Annotated[str | None, Field(...)]
+    strict: bool
+    considered: Annotated[int, Field(description="How many candidates the boolean and filters found.")]
+    sent: Annotated[int, Field(description="How many the AI was asked to rank.")]
+    error: Annotated[str | None, Field(...)]
+    summary: Annotated[str | None, Field(description="The AI's sourcing notes.")]
+    mustHaves: list[str]
+    niceToHaves: list[str]
+    suggestedBoolean: Annotated[
+        str | None, Field(description="A boolean for the job, to search with next (and to mark CVs).")
+    ]
+    results: Annotated[
+        list[TalentFit],
+        Field(description="Best fit first (candidates the user may no longer see are left out)."),
+    ]
+    createdAt: AwareDatetime
+    finishedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class TalentSearchList(BaseModel):
+    items: list[TalentSearch]
+
+
+class TalentRanked(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ref: Annotated[str, Field(max_length=10)]
+    fit: Annotated[int, Field(ge=0, le=100)]
+    verdict: TalentVerdict
+    reasons: Annotated[list[TalentNote], Field(max_length=5)]
+    gaps: Annotated[list[TalentNote], Field(max_length=5)]
+
+
+class TalentRankedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    searchId: TalentSearchId
+    summary: Annotated[str | None, Field(max_length=3000)]
+    mustHaves: Annotated[list[TalentRequirement], Field(max_length=12)]
+    niceToHaves: Annotated[list[TalentRequirement], Field(max_length=12)]
+    suggestedBoolean: Annotated[str | None, Field(max_length=1000)]
+    results: Annotated[list[TalentRanked], Field(max_length=20)]
+    error: Annotated[str | None, Field(max_length=2000)]
+    model: Annotated[str | None, Field(max_length=200)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class Offer(BaseModel):

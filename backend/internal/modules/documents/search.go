@@ -38,6 +38,18 @@ func (m *Module) CVSnippets(ctx context.Context, tx pgx.Tx, ts string, candidate
 	return out, nil
 }
 
+// RankCVsByText orders the given candidates by how many words their CVs
+// share with a text (a job description), best first, up to limit; those
+// sharing none are left out.
+func (m *Module) RankCVsByText(ctx context.Context, tx pgx.Tx, text string, candidateIDs []string, limit int) ([]string, error) {
+	rows, err := store.New(tx).RankCVsByText(ctx, store.RankCVsByTextParams{JobText: text, CandidateIds: candidateIDs, RowLimit: int32(limit)}) //nolint:gosec // small
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.CandidateID
+	}
+	return out, err
+}
+
 // Highlights splits text marked by the database (each match between \x01
 // and \x02) into parts.
 func Highlights(marked string) ([]api.DocumentHighlightPart, int) {

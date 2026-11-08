@@ -427,6 +427,53 @@ func (q *Queries) QueuePdf(ctx context.Context, id string) error {
 	return err
 }
 
+const rankCVsByText = `-- name: RankCVsByText :many
+WITH q AS (
+  SELECT string_agg(quote_literal(l), ' | ')::tsquery AS query
+  FROM unnest(tsvector_to_array(to_tsvector('english', $3::text))) AS l
+)
+SELECT s.candidate_id::text AS candidate_id, max(ts_rank_cd(s.terms, q.query, 32))::real AS rank
+FROM cv_search s, q
+WHERE q.query IS NOT NULL AND s.candidate_id = ANY ($1::text[]) AND s.terms @@ q.query
+GROUP BY s.candidate_id
+ORDER BY rank DESC, s.candidate_id
+LIMIT $2
+`
+
+type RankCVsByTextParams struct {
+	CandidateIds []string
+	RowLimit     int32
+	JobText      string
+}
+
+type RankCVsByTextRow struct {
+	CandidateID string
+	Rank        float32
+}
+
+// AI candidate search: the given candidates ordered by how many words their
+// CVs share with a job description (each candidate's best CV), best first.
+// Those whose CVs share none are left out.
+func (q *Queries) RankCVsByText(ctx context.Context, arg RankCVsByTextParams) ([]RankCVsByTextRow, error) {
+	rows, err := q.db.Query(ctx, rankCVsByText, arg.CandidateIds, arg.RowLimit, arg.JobText)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RankCVsByTextRow
+	for rows.Next() {
+		var i RankCVsByTextRow
+		if err := rows.Scan(&i.CandidateID, &i.Rank); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordAIUse = `-- name: RecordAIUse :exec
 INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current_tenant(), $1, $2)
 `
