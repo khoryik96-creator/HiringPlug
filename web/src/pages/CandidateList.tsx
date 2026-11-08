@@ -9,7 +9,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
-import { COLUMNS, ColumnPicker, DEFAULT_COLUMNS, useCandidateColumns, WaBar, WaLegend } from "../components/candidateColumns";
+import { COLUMNS, ColumnPicker, useCandidateColumns, WaBar, WaLegend } from "../components/candidateColumns";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
@@ -18,6 +18,7 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
+  const [adding, setAdding] = useState(false);
   const cols = useCandidateColumns();
   const advanced = !isEmpty(adv);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
@@ -47,17 +48,22 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
   const width = cols.columns.length + 1;
 
   return (
-    <main className={cols.columns.length > DEFAULT_COLUMNS.length ? "wide" : undefined}>
-      <div className="row spread">
+    <main className="candidates-page wide">
+      <div className="page-head">
         <h2>Candidates</h2>
-        <div className="row">
-          <input aria-label="Search candidates" placeholder="Name, email, phone, title…" value={q} onChange={(e) => { setQ(e.target.value); }} />
-          <label className="small"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine</label>
-          <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
-            Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
-          </button>
-          <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
+        {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
+      </div>
+      {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
+      <div className="list-toolbar">
+        <div className="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input aria-label="Search candidates" placeholder="Search by name, email, phone, title or company" value={q} onChange={(e) => { setQ(e.target.value); }} />
         </div>
+        <label className={`toggle-chip${mine ? " on" : ""}`}><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine only</label>
+        <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
+          Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
+        </button>
+        <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && chips.length > 0 && (
@@ -71,15 +77,15 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
           <button type="button" className="link small" onClick={() => { apply(EMPTY); }}>Clear all</button>
         </div>
       )}
-      {canCreate && !panel && !advanced && <AddCandidate />}
       <ErrorMessage error={(advanced ? found.error : list.error) ?? cols.save.error} />
-      {advanced && found.data && (
-        <p className="muted small" role="status">
-          {hits.length === 0 ? "No candidates match." : `${String(hits.length)}${found.hasNextPage ? "+" : ""} found`}
-          {terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark> where their CV has {terms.join(", ")}</>}
-        </p>
-      )}
-      <WaLegend />
+      <div className="list-meta">
+        <span role="status">
+          {(advanced ? found.data : list.data) && (hits.length === 0 ? "No candidates match."
+            : `${String(hits.length)}${(advanced ? found.hasNextPage : Boolean(list.data?.nextCursor)) ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
+          {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
+        </span>
+        <WaLegend />
+      </div>
       <div className="table-scroll">
         <table className="candidates-table">
           <thead>
@@ -103,7 +109,7 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
                 {cvSnippet && (
                   <tr className="snippet-row">
                     <td colSpan={width}>
-                      <span className="snippet-label">CV</span>
+                      <span className="snippet-label">CV</span>…
                       {snippetParts(cvSnippet).map((p, i) => (p.match ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>))}
                     </td>
                   </tr>
@@ -122,7 +128,7 @@ export function CandidateList({ canCreate, canSeeSalary = false }: { canCreate: 
 
 type Hit = Schemas["CandidateSearchHit"];
 
-function AddCandidate() {
+function AddCandidate({ onCancel }: { onCancel: () => void }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [extras, setExtras] = useState<Record<string, string>>({});
@@ -154,20 +160,25 @@ function AddCandidate() {
   );
   return (
     <form
-      className="row panel"
+      className="panel add-candidate"
+      aria-label="Add a candidate"
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate();
       }}
     >
-      {field("firstName", "First name")}
-      {field("lastName", "Last name")}
-      {field("email", "Email")}
-      {field("phone", "Phone")}
-      <CandidateExtras values={extras} onChange={setExtras} />
-      <button type="submit" disabled={!form.firstName.trim() || create.isPending}>
-        Add candidate
-      </button>
+      <h3>Add a candidate</h3>
+      <div className="add-fields">
+        {field("firstName", "First name")}
+        {field("lastName", "Last name")}
+        {field("email", "Email")}
+        {field("phone", "Phone")}
+        <CandidateExtras values={extras} onChange={setExtras} />
+      </div>
+      <div className="row">
+        <button type="submit" disabled={!form.firstName.trim() || create.isPending}>Add candidate</button>
+        <button type="button" className="link" onClick={onCancel}>Cancel</button>
+      </div>
       <ErrorMessage error={create.error}><DuplicateEmail error={create.error} /></ErrorMessage>
     </form>
   );

@@ -83,13 +83,15 @@ export function jobLine(c: Candidate): string {
 }
 
 /** "since 3 Nov 2026 · 5 days": when a status was set and how long ago (whole days). */
-export function sinceText(iso: string | null | undefined, now: Date = new Date()): string | null {
+export function sinceText(iso: string | null | undefined, now: Date = new Date(), short = false): string | null {
   if (!iso) return null;
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return null;
   // Calendar days between the dates (here, in local time), as the date shown.
   const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
   const days = Math.max(0, Math.round((day(now) - day(at)) / 86_400_000));
-  const date = at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  // short (in lists): the year only when it is not this year
+  const date = at.toLocaleDateString("en-GB", short && at.getFullYear() === now.getFullYear()
+    ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
   return `since ${date} · ${days === 0 ? "today" : days === 1 ? "1 day" : `${String(days)} days`}`;
 }

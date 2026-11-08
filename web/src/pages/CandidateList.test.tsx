@@ -62,7 +62,6 @@ describe("candidate list", () => {
     const link = await screen.findByRole("link", { name: "Aina" });
     expect(link.getAttribute("href")).toBe("#/candidates/cand_01jbz6w0m0k8q9x2r3s4t5v6w7?hl=" + encodeURIComponent("SAP AND (BW OR BPC) NOT internship"));
     expect(screen.getAllByText(/^(SAP|BW)$/).filter((el) => el.tagName === "MARK")).toHaveLength(2);
-    expect(screen.queryByPlaceholderText("First name")).toBeNull(); // adding waits while searching
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Status: Looking out" }));
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });

@@ -27,12 +27,12 @@ export function workAuth(c: Summary): Schemas["WorkAuthorization"] | null {
 }
 
 export const COLUMNS: Record<Column, { header: string; cell: (c: Summary, look: Look) => ReactNode }> = {
-  currentRole: { header: "Current role", cell: (c) => [c.currentTitle, c.currentCompany].filter(Boolean).join(", ") },
+  currentRole: { header: "Current role", cell: (c) => <>{c.currentTitle ?? c.currentCompany}{c.currentTitle && c.currentCompany && <span className="muted small">{c.currentCompany}</span>}</> },
   status: {
     header: "Status",
     cell: (c) => {
       const s = c.availability ? AVAILABILITY[c.availability] : null;
-      const since = sinceText(c.availabilitySince);
+      const since = sinceText(c.availabilitySince, new Date(), true);
       return s && <><span className="status-dot" style={{ background: s.bg, borderColor: s.edge }} />{s.label}{since && <span className="muted small">{since}</span>}</>;
     },
   },

@@ -438,3 +438,26 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1rem; }
 .marking { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 0.45rem 0.75rem; margin: 0.5rem 0; font-size: 0.88rem; }
 .marking code { background: #fff; border-radius: 4px; padding: 0 0.3rem; }
+/* The candidates page: a header, one toolbar, then the list. */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
+.page-head h2 { margin: 0; }
+.list-toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 14px; padding: 0.55rem 0.65rem; margin-bottom: 0.75rem; }
+.search-box { flex: 1; min-width: 16rem; display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border, #d0d7de); border-radius: 10px; padding: 0 0.7rem; background: #fff; }
+.search-box span { color: var(--muted); font-size: 1.1rem; }
+.search-box input { border: 0; outline: none; flex: 1; padding: 0.5rem 0; background: transparent; box-shadow: none; }
+.search-box:focus-within { border-color: var(--accent); }
+.toggle-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; font-size: 0.85rem; font-weight: 550; cursor: pointer; }
+.toggle-chip.on { border-color: var(--accent); background: var(--accent-soft); }
+.toggle-chip input { margin: 0; }
+.list-toolbar .column-picker > button { border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.85rem; }
+.list-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin: 0.25rem 0 0.5rem; }
+.list-meta .wa-legend { margin: 0; }
+.add-candidate { display: grid; gap: 0.75rem; margin-bottom: 0.9rem; }
+.add-candidate h3 { margin: 0; }
+.add-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.6rem; }
+.candidates-page .candidates-table td { vertical-align: middle; }
+.candidates-page .candidates-table .col-currentRole { min-width: 11rem; }
+.candidates-page .candidates-table .col-email { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.candidates-page .candidates-table .col-currentSalary, .candidates-page .candidates-table .col-expectedSalary, .candidates-page .candidates-table .col-noticePeriod { white-space: nowrap; }
+.snippet-row td { padding-left: 2.2rem; }
+main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto; padding: 0 1.5rem; }
