@@ -2836,6 +2836,11 @@ export interface components {
             linkedinUrl: string | null;
             /** @description Whether they are open to a move (colours their page); null = not set. */
             availability: components["schemas"]["CandidateAvailability"] | null;
+            /**
+             * Format: date-time
+             * @description When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.
+             */
+            availabilitySince: string | null;
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;
@@ -2908,6 +2913,19 @@ export interface components {
             skills?: string[];
         };
         CandidateSummary: {
+            availability: components["schemas"]["CandidateAvailability"] | null;
+            /**
+             * Format: date-time
+             * @description When the status was last set.
+             */
+            availabilitySince: string | null;
+            noticePeriod: components["schemas"]["NoticePeriod"] | null;
+            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            currentSalary: components["schemas"]["SalaryAmount"] | null;
+            /** @description Needs candidates.compensation:read (see salaryRestricted). */
+            expectedSalary: components["schemas"]["SalaryRange"] | null;
+            /** @description true: you may not see salaries, so both are left out. */
+            salaryRestricted: boolean;
             id: components["schemas"]["CandidateId"];
             fullName: string;
             email: string | null;

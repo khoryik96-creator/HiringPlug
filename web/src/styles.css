@@ -150,6 +150,7 @@ main.roomy { max-width: 1200px; }
 .banner-who { min-width: 0; }
 .banner-name, .banner-status, .banner-strip .figure { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; }
 .banner-name { margin: 0; font-size: 3rem; line-height: 1; font-weight: 700; }
+.banner-since { font-size: 0.85rem; font-weight: 600; opacity: 0.8; }
 .banner-status { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase; border: 1.5px solid currentColor; border-radius: 6px; padding: 0.1rem 0.6rem; }
 .banner-job { margin: 0.35rem 0 0; font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
 .banner-facts { margin: 0; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; font-size: 1rem; text-align: right; }
@@ -337,3 +338,6 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .studio-run { padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--soft); font-size: 0.92rem; }
 .studio-run.queued { background: var(--accent-soft); color: var(--accent-dark); }
 .studio-run p { margin: 0.3rem 0 0; }
+
+.status-dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1.5px solid; margin-right: 0.35rem; vertical-align: -0.05rem; }
+.candidates-table .small { display: block; }

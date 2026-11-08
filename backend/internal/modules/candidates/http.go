@@ -42,12 +42,26 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 }
 
 func summaryToAPI(s Summary) api.CandidateSummary {
-	return api.CandidateSummary{
+	out := api.CandidateSummary{
 		Id: s.ID, FullName: s.FullName, Email: orNull(s.Email), Phone: orNull(s.Phone),
 		CurrentTitle: orNull(s.CurrentTitle), CurrentCompany: orNull(s.CurrentCompany), Location: orNull(s.Location),
 		WorkAuthorizationStatus: orNull(convertPtr[api.WorkAuthorizationStatus](s.WorkAuthorizationStatus)),
 		Tags:                    nonNil(s.Tags), UpdatedAt: s.UpdatedAt,
+		Availability:      orNull(convertPtr[api.CandidateAvailability](s.Availability)),
+		AvailabilitySince: orNull(s.AvailabilitySince),
+		NoticePeriod:      nullable.NewNullNullable[api.NoticePeriod](),
+		CurrentSalary:     nullable.NewNullNullable[api.SalaryAmount](),
+		ExpectedSalary:    nullable.NewNullNullable[api.SalaryRange](),
+		SalaryRestricted:  s.SalaryRestricted,
 	}
+	if np := s.NoticePeriod; np != nil {
+		out.NoticePeriod = nullable.NewNullableWithValue(api.NoticePeriod{Value: np.Value, Unit: api.NoticePeriodUnit(np.Unit)})
+	}
+	if s.Compensation != nil {
+		c := compensationToAPI(*s.Compensation)
+		out.CurrentSalary, out.ExpectedSalary = c.CurrentSalary, c.ExpectedSalary
+	}
+	return out
 }
 
 func nonNil(s []string) []string {
@@ -171,6 +185,7 @@ func candidateToAPI(v View) api.Candidate {
 		ResidenceCountry:  orNull(p.ResidenceCountry),
 		LinkedinUrl:       orNull(p.LinkedinURL),
 		Availability:      orNull(convertPtr[api.CandidateAvailability](p.Availability)),
+		AvailabilitySince: orNull(v.AvailabilitySince),
 		WorkAuthorization: nullable.NewNullNullable[api.WorkAuthorization](),
 		NoticePeriod:      nullable.NewNullNullable[api.NoticePeriod](),
 		Industry:          orNull(p.Industry),

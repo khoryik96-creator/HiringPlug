@@ -115,7 +115,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -153,6 +153,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.SearchText,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.AvailabilitySince,
 	)
 	return i, err
 }
@@ -161,8 +162,6 @@ const getCompensation = `-- name: GetCompensation :one
 SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at FROM candidate_compensation WHERE candidate_id = $1
 `
 
-// Amounts are numeric in the database; the Go code converts them to and
-// from exact decimal strings, so no precision is ever lost.
 func (q *Queries) GetCompensation(ctx context.Context, candidateID string) (CandidateCompensation, error) {
 	row := q.db.QueryRow(ctx, getCompensation, candidateID)
 	var i CandidateCompensation
@@ -189,15 +188,15 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, owner_id, created_by
+  current_title, current_company, location, source, tags, skills, owner_id, created_by, availability_since
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8,
   $9, $10, $11,
   $12, $13, $14, $15,
   $16, $17, $18, $19, $20, $21,
-  $22, app_current_user()
+  $22, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
 `
 
 type InsertCandidateParams struct {
@@ -285,6 +284,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.SearchText,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.AvailabilitySince,
 	)
 	return i, err
 }
@@ -399,20 +399,21 @@ func (q *Queries) InsertWork(ctx context.Context, arg InsertWorkParams) error {
 }
 
 const listCandidates = `-- name: ListCandidates :many
-SELECT id, first_name, last_name, email, phone, current_title, current_company,
-       location, work_authorization, tags, updated_at
-FROM candidate
-WHERE ($1::text IS NULL OR id < $1::text)
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit
+FROM candidate c
+WHERE ($1::text IS NULL OR c.id < $1::text)
   AND ($2::text IS NULL
        OR CASE WHEN $3::boolean
-            THEN app_normalize_text($2::text) <% name_text
-            ELSE search_text LIKE ALL (app_search_patterns($2::text))
-              OR phone_digits LIKE '%' || app_phone_key($2::text) || '%'
+            THEN app_normalize_text($2::text) <% c.name_text
+            ELSE c.search_text LIKE ALL (app_search_patterns($2::text))
+              OR c.phone_digits LIKE '%' || app_phone_key($2::text) || '%'
           END)
-  AND ($4::text IS NULL OR app_lower_array(tags) @> ARRAY[lower($4::text)])
-  AND ($5::text IS NULL OR app_lower_array(skills) @> ARRAY[lower($5::text)])
-  AND ($6::text IS NULL OR owner_id = $6::text)
-ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), name_text) END DESC, id DESC
+  AND ($4::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($4::text)])
+  AND ($5::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($5::text)])
+  AND ($6::text IS NULL OR c.owner_id = $6::text)
+ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC, c.id DESC
 LIMIT $7
 `
 
@@ -438,6 +439,10 @@ type ListCandidatesRow struct {
 	WorkAuthorization *string
 	Tags              []string
 	UpdatedAt         time.Time
+	Availability      *string
+	AvailabilitySince *time.Time
+	NoticePeriodValue *int32
+	NoticePeriodUnit  *string
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -470,6 +475,51 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.Location,
 			&i.WorkAuthorization,
 			&i.Tags,
+			&i.UpdatedAt,
+			&i.Availability,
+			&i.AvailabilitySince,
+			&i.NoticePeriodValue,
+			&i.NoticePeriodUnit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCompensations = `-- name: ListCompensations :many
+SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at FROM candidate_compensation WHERE candidate_id = ANY($1::text[])
+`
+
+// Amounts are numeric in the database; the Go code converts them to and
+// from exact decimal strings, so no precision is ever lost.
+// A page of candidates' salaries. Row-level security shows them only to
+// those with candidates.compensation:read: none for others.
+func (q *Queries) ListCompensations(ctx context.Context, candidateIds []string) ([]CandidateCompensation, error) {
+	rows, err := q.db.Query(ctx, listCompensations, candidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CandidateCompensation
+	for rows.Next() {
+		var i CandidateCompensation
+		if err := rows.Scan(
+			&i.CandidateID,
+			&i.TenantID,
+			&i.Version,
+			&i.CurrentAmount,
+			&i.CurrentCurrency,
+			&i.CurrentPeriod,
+			&i.ExpectedMin,
+			&i.ExpectedMax,
+			&i.ExpectedCurrency,
+			&i.ExpectedPeriod,
+			&i.UpdatedBy,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -787,7 +837,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
 `
 
 type TouchCandidateParams struct {
@@ -832,6 +882,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.SearchText,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.AvailabilitySince,
 	)
 	return i, err
 }
@@ -846,6 +897,9 @@ UPDATE candidate SET
   residence_country = $6,
   linkedin_url = $7,
   availability = $8,
+  availability_since = CASE WHEN availability IS DISTINCT FROM $8 THEN
+                         CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
+                       ELSE availability_since END,
   work_authorization = $9,
   work_authorization_basis = $10,
   work_authorization_note = $11,
@@ -862,7 +916,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $22 AND version = $23
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
 `
 
 type UpdateCandidateParams struct {
@@ -952,6 +1006,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.SearchText,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.AvailabilitySince,
 	)
 	return i, err
 }

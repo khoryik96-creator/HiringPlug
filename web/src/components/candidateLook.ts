@@ -81,3 +81,13 @@ export function raiseText(c: Compensation | null | undefined): string | null {
 export function jobLine(c: Candidate): string {
   return [c.currentTitle, c.currentCompany].filter(Boolean).join(" · ");
 }
+
+/** "since 3 Nov 2026 · 5 days": when a status was set and how long ago (whole days). */
+export function sinceText(iso: string | null | undefined, now: Date = new Date()): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const days = Math.max(0, Math.floor((now.getTime() - at.getTime()) / 86_400_000));
+  const date = at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return `since ${date} · ${days === 0 ? "today" : days === 1 ? "1 day" : `${String(days)} days`}`;
+}

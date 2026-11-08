@@ -8,7 +8,8 @@ import { DuplicateEmail } from "../components/DuplicateEmail";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { useUsedValues } from "../components/useUsedValues";
-import { WORK_AUTH_STATUS } from "../labels";
+import { AVAILABILITY, rangeText, salaryText, sinceText } from "../components/candidateLook";
+import { formatNotice, WORK_AUTH_STATUS } from "../labels";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
@@ -49,26 +50,46 @@ export function CandidateList({ canCreate }: { canCreate: boolean }) {
       </div>
       {canCreate && <AddCandidate />}
       <ErrorMessage error={list.error} />
-      <table>
+      <table className="candidates-table">
         <thead>
           <tr>
             <th>Name</th>
             <th>Current role</th>
-            <th>Email</th>
+            <th>Status</th>
+            <th>Notice period</th>
+            <th>Current salary</th>
+            <th>Expected salary</th>
             <th>Work authorization</th>
+            <th>Email</th>
           </tr>
         </thead>
         <tbody>
-          {list.data?.items.map((c) => (
-            <tr key={c.id}>
-              <td>
-                <a href={`#/candidates/${c.id}`}>{c.fullName}</a> {c.tags.length > 0 && <Chips labels={c.tags} />}
-              </td>
-              <td>{[c.currentTitle, c.currentCompany].filter(Boolean).join(", ")}</td>
-              <td>{c.email}</td>
-              <td>{c.workAuthorizationStatus ? WORK_AUTH_STATUS[c.workAuthorizationStatus] : ""}</td>
-            </tr>
-          ))}
+          {list.data?.items.map((c) => {
+            const status = c.availability ? AVAILABILITY[c.availability] : null;
+            const current = c.currentSalary ? salaryText(c.currentSalary) : null;
+            const expected = c.expectedSalary ? rangeText(c.expectedSalary) : null;
+            return (
+              <tr key={c.id}>
+                <td>
+                  <a href={`#/candidates/${c.id}`}>{c.fullName}</a> {c.tags.length > 0 && <Chips labels={c.tags} />}
+                </td>
+                <td>{[c.currentTitle, c.currentCompany].filter(Boolean).join(", ")}</td>
+                <td>
+                  {status && (
+                    <>
+                      <span className="status-dot" style={{ background: status.bg, borderColor: status.edge }} />{status.label}
+                      {sinceText(c.availabilitySince) && <span className="muted small">{sinceText(c.availabilitySince)}</span>}
+                    </>
+                  )}
+                </td>
+                <td>{c.noticePeriod ? formatNotice(c.noticePeriod) : ""}</td>
+                <td>{c.salaryRestricted ? <span className="muted">Restricted</span> : current && <>{current[0]} <span className="muted small">{current[1]}</span></>}</td>
+                <td>{c.salaryRestricted ? <span className="muted">Restricted</span> : expected && <>{expected[0]} <span className="muted small">{expected[1]}</span></>}</td>
+                <td>{c.workAuthorizationStatus ? WORK_AUTH_STATUS[c.workAuthorizationStatus] : ""}</td>
+                <td>{c.email}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </main>

@@ -51,6 +51,12 @@ authorization buttons. A column down the banner's right edge is coloured by
 work authorization and says which: **Local** (green), **PR** (purple),
 **Spousal / RP-T** (blue: it asks which pass), **Needs pass** (red), **Not
 known** (grey). A click saves at once, with the lost-update protection below.
+Next to the status it says since when ("since 27 Oct 2026 · 12 days"), set
+each time the status changes. **Notes and activity** come right under the
+banner. **The candidate list** shows, besides name, role, work authorization
+and email, each one's status with since when, notice period and current and
+expected salary ("Restricted" for roles without salary access, enforced by the
+database).
 
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits

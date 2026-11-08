@@ -9,7 +9,7 @@ import { ApiError, api, type Candidate, type Schemas, unwrap } from "../api/clie
 import { candidateKey, candidatesKey } from "../api/keys";
 import { formatNotice, regionName } from "../labels";
 import {
-  AVAILABILITY, type Availability, jobLine, NO_STATUS_BG, raiseText, rangeText, salaryText,
+  AVAILABILITY, type Availability, jobLine, NO_STATUS_BG, raiseText, rangeText, salaryText, sinceText,
   WA_KIND, waColumnLabel, waFor, waKind, type WaKind,
 } from "./candidateLook";
 import { ErrorMessage } from "./ErrorMessage";
@@ -54,6 +54,7 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
             <div className="row">
               <h2 className="banner-name">{c.fullName}</h2>
               {status && <span className="banner-status">{status.label}</span>}
+              {status && sinceText(c.availabilitySince) && <span className="banner-since">{sinceText(c.availabilitySince)}</span>}
             </div>
             {jobLine(c) && <p className="banner-job">{jobLine(c)}</p>}
           </div>

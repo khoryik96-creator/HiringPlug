@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { ok, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
 import { CandidateBanner, livesIn } from "./CandidateBanner";
-import { raiseText, waColumnLabel, waFor, waKind } from "./candidateLook";
+import { raiseText, sinceText, waColumnLabel, waFor, waKind } from "./candidateLook";
 
 afterEach(() => {
   cleanup();
@@ -54,6 +54,16 @@ describe("candidate banner", () => {
     expect(banner.textContent).toContain("RM 12,000 / month");
     expect(banner.textContent).toContain("+26% on current");
     expect(within(banner).queryByRole("group", { name: "Status" })).toBeNull(); // no buttons without candidates:update
+  });
+
+  it("says since when the status is set, and for how many days", () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    const since = new Date(Date.now() - 12 * 86_400_000).toISOString();
+    renderWithClient(<CandidateBanner candidate={testCandidate({ availability: "not_looking", availabilitySince: since })} canEdit={false} />);
+    expect(screen.getByText(/^since .* · 12 days$/)).toBeTruthy();
+    expect(sinceText("2026-11-03T02:00:00Z", new Date("2026-11-03T09:00:00Z"))).toBe("since 3 Nov 2026 · today");
+    expect(sinceText("2026-11-02T02:00:00Z", new Date("2026-11-03T09:00:00Z"))).toBe("since 2 Nov 2026 · 1 day");
+    expect(sinceText(null)).toBeNull();
   });
 
   it("says when the salary is restricted for the role", () => {

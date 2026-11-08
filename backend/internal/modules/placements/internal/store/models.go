@@ -183,6 +183,7 @@ type Candidate struct {
 	SearchText             *string
 	NameText               *string
 	PhoneDigits            *string
+	AvailabilitySince      *time.Time
 }
 
 type CandidateCompensation struct {

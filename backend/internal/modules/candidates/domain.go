@@ -62,12 +62,14 @@ type NoticePeriod struct {
 
 // Candidate is a stored candidate.
 type Candidate struct {
-	ID        string
-	Version   int
-	Profile   Profile
-	OwnerID   *string // the recruiter they belong to; nil for none
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID      string
+	Version int
+	Profile Profile
+	OwnerID *string // the recruiter they belong to; nil for none
+	// AvailabilitySince is when the status (Profile.Availability) was last set.
+	AvailabilitySince *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 // View is a candidate as one particular user may see it.

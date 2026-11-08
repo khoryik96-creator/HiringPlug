@@ -75,6 +75,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         )}
       </div>
       <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")} />
+      {/* Notes (and the timeline) right under the card: the first thing read after it. */}
+      <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
@@ -105,7 +107,6 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       {permissions.includes("emails:read") && <CandidateEmails candidateId={c.id} permissions={permissions} />}
       <Documents candidate={c} canUpload={permissions.includes("documents:create")} canEdit={permissions.includes("candidates:update")} permissions={permissions} />
       <PrivacyPanel candidateId={c.id} candidateName={c.fullName} permissions={permissions} />
-      <Timeline subjectType="candidate" subjectId={c.id} permissions={permissions} />
     </main>
   );
 }

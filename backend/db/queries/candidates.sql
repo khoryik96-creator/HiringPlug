@@ -6,13 +6,13 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, owner_id, created_by
+  current_title, current_company, location, source, tags, skills, owner_id, created_by, availability_since
 ) VALUES (
   app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality), sqlc.narg(residence_country), sqlc.narg(linkedin_url), sqlc.narg(availability),
   sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
   sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
   sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills,
-  sqlc.narg(owner_id), app_current_user()
+  sqlc.narg(owner_id), app_current_user(), CASE WHEN sqlc.narg(availability)::text IS NULL THEN NULL ELSE now() END
 )
 RETURNING *;
 
@@ -37,6 +37,9 @@ UPDATE candidate SET
   residence_country = sqlc.narg(residence_country),
   linkedin_url = sqlc.narg(linkedin_url),
   availability = sqlc.narg(availability),
+  availability_since = CASE WHEN availability IS DISTINCT FROM sqlc.narg(availability) THEN
+                         CASE WHEN sqlc.narg(availability)::text IS NULL THEN NULL ELSE now() END
+                       ELSE availability_since END,
   work_authorization = sqlc.narg(work_authorization),
   work_authorization_basis = sqlc.narg(work_authorization_basis),
   work_authorization_note = sqlc.narg(work_authorization_note),
@@ -58,24 +61,30 @@ RETURNING *;
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- With @similar, names like the query (typos) instead, the closest first.
 -- name: ListCandidates :many
-SELECT id, first_name, last_name, email, phone, current_title, current_company,
-       location, work_authorization, tags, updated_at
-FROM candidate
-WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit
+FROM candidate c
+WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL
        OR CASE WHEN sqlc.arg(similar_names)::boolean
-            THEN app_normalize_text(sqlc.narg(query)::text) <% name_text
-            ELSE search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
-              OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
+            THEN app_normalize_text(sqlc.narg(query)::text) <% c.name_text
+            ELSE c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+              OR c.phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
           END)
-  AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
-  AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
-  AND (sqlc.narg(owner)::text IS NULL OR owner_id = sqlc.narg(owner)::text)
-ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), name_text) END DESC, id DESC
+  AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
+  AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
+  AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC, c.id DESC
 LIMIT @row_limit;
 
 -- Amounts are numeric in the database; the Go code converts them to and
 -- from exact decimal strings, so no precision is ever lost.
+-- A page of candidates' salaries. Row-level security shows them only to
+-- those with candidates.compensation:read: none for others.
+-- name: ListCompensations :many
+SELECT * FROM candidate_compensation WHERE candidate_id = ANY(@candidate_ids::text[]);
+
 -- name: GetCompensation :one
 SELECT * FROM candidate_compensation WHERE candidate_id = @candidate_id;
 

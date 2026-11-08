@@ -576,6 +576,12 @@ class Candidate(BaseModel):
         CandidateAvailability | None,
         Field(description="Whether they are open to a move (colours their page); null = not set."),
     ]
+    availabilitySince: Annotated[
+        AwareDatetime | None,
+        Field(
+            description='When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.'
+        ),
+    ]
     workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
@@ -693,6 +699,18 @@ class CandidateUpdate(BaseModel):
 
 
 class CandidateSummary(BaseModel):
+    availability: Annotated[CandidateAvailability | None, Field(...)]
+    availabilitySince: Annotated[AwareDatetime | None, Field(description="When the status was last set.")]
+    noticePeriod: Annotated[NoticePeriod | None, Field(...)]
+    currentSalary: Annotated[
+        SalaryAmount | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+    ]
+    expectedSalary: Annotated[
+        SalaryRange | None, Field(description="Needs candidates.compensation:read (see salaryRestricted).")
+    ]
+    salaryRestricted: Annotated[
+        bool, Field(description="true: you may not see salaries, so both are left out.")
+    ]
     id: CandidateId
     fullName: str
     email: Annotated[str | None, Field(...)]

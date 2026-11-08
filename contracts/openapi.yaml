@@ -4402,6 +4402,7 @@ components:
         - residenceCountry
         - linkedinUrl
         - availability
+        - availabilitySince
         - workAuthorization
         - noticePeriod
         - industry
@@ -4450,6 +4451,11 @@ components:
           description: Whether they are open to a move (colours their page); null = not set.
           allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
           nullable: true
+        availabilitySince:
+          type: string
+          format: date-time
+          nullable: true
+          description: "When the status was last set (the page shows \"Not looking since 3 Nov, 5 days\"); null without a status."
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true
@@ -4573,8 +4579,24 @@ components:
           items: {type: string, minLength: 1, maxLength: 60}
     CandidateSummary:
       type: object
-      required: [tags, id, fullName, email, phone, currentTitle, currentCompany, location, workAuthorizationStatus, updatedAt]
+      required: [tags, id, fullName, email, phone, currentTitle, currentCompany, location, workAuthorizationStatus, updatedAt, availability, availabilitySince, noticePeriod, currentSalary, expectedSalary, salaryRestricted]
       properties:
+        availability:
+          allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
+          nullable: true
+        availabilitySince: {type: string, format: date-time, nullable: true, description: When the status was last set.}
+        noticePeriod:
+          allOf: [{$ref: '#/components/schemas/NoticePeriod'}]
+          nullable: true
+        currentSalary:
+          description: Needs candidates.compensation:read (see salaryRestricted).
+          allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
+          nullable: true
+        expectedSalary:
+          description: Needs candidates.compensation:read (see salaryRestricted).
+          allOf: [{$ref: '#/components/schemas/SalaryRange'}]
+          nullable: true
+        salaryRestricted: {type: boolean, description: "true: you may not see salaries, so both are left out."}
         id: {$ref: '#/components/schemas/CandidateId'}
         fullName: {type: string}
         email: {type: string, nullable: true}
