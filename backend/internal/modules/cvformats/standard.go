@@ -73,14 +73,15 @@ var Standard = sync.OnceValue(func() []byte {
 		`<w:r><w:t xml:space="preserve">Presented by {{agency.name}}: {{recruiter.name}}, {{recruiter.email}} · {{date}}</w:t></w:r></w:p></w:ftr>`
 
 	style := func(id, name, based string, size int, bold bool, color string, spaceBefore int) string {
-		rpr := `<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="` + itoa(size) + `"/>`
+		// In the schema's order (rFonts, b, color, sz), or Word reports unreadable content.
+		rpr := `<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>`
 		if bold {
 			rpr += `<w:b/>`
 		}
 		if color != "" {
 			rpr += `<w:color w:val="` + color + `"/>`
 		}
-		rpr += `</w:rPr>`
+		rpr += `<w:sz w:val="` + itoa(size) + `"/></w:rPr>`
 		based2 := ""
 		if based != "" {
 			based2 = `<w:basedOn w:val="` + based + `"/>`

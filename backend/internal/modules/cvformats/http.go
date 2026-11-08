@@ -130,6 +130,9 @@ func (h *HTTP) StartStudioCv(ctx context.Context, req api.StartStudioCvRequestOb
 	if b.Alignment != nil {
 		o.Alignment = string(*b.Alignment)
 	}
+	if b.Summary != nil {
+		o.Summary = string(*b.Summary)
+	}
 	run, err := h.svc.StartStudio(ctx, authz.MustFromContext(ctx), req.CandidateId, o)
 	if err != nil {
 		return nil, err

@@ -35,7 +35,7 @@ func TestBlindCv(t *testing.T) {
 	leaks, err := Leaks(out, IdentityOf(c))
 	require.NoError(t, err)
 	assert.Empty(t, leaks)
-	assert.Equal(t, "Candidate "+Reference(c.ID)+" - Blind CV (Contoh).docx", FileName(c, "Contoh", true))
+	assert.Equal(t, "Contoh CV - Candidate "+Reference(c.ID)+" (Blinded).docx", FileName(c, "Contoh", true))
 }
 
 func TestLeaksAreFoundAnywhere(t *testing.T) {

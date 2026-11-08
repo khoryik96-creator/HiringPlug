@@ -15,8 +15,9 @@ from typing import Any
 import docx
 import pytest
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from lxml import etree
 
-from hiringplug_ai import cvstudio
+from hiringplug_ai import cvstudio, docx_repair
 from hiringplug_ai.contracts import CvFormatStudioJob, CvStudioFormattedJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps, format_studio
@@ -65,6 +66,7 @@ def job(**over: object) -> CvFormatStudioJob:
         "neutralGender": False,
         "correctLanguage": False,
         "alignment": "left",
+        "summary": "none",
     }
     values.update(over)
     return CvFormatStudioJob.model_validate(values)
@@ -325,3 +327,68 @@ def test_a_long_answer_gets_the_long_time_limit() -> None:
     assert isinstance(long, OpenAICompatible)
     assert (long.timeout_seconds, server.timeout_seconds) == (300, 90)
     assert deps.provider(None) is server
+
+
+SUMMARY = (
+    "- **Cloud operations** engineer with automation depth.\n"
+    "- Delivered **disaster recovery** improvements.\n"
+    "- Expected salary RM 9,000"
+)
+
+
+def test_the_about_him_her_summary_is_written_cv_studios_way() -> None:
+    ai = FakeAI(json.dumps(PARSED), SUMMARY)
+    result = run(ai, job(summary="normal"))
+    assert result.error is None
+    system, prompt = ai.calls[1]
+    assert system == "", "CV Studio sends its summary prompt alone"
+    assert prompt.startswith(
+        "You are a senior recruitment consultant. Produce a professional candidate summary."
+    )
+    assert "Use 6-7 bullet points." in prompt
+    assert "9,000" not in prompt, "the CV's pay never reaches the AI"
+    assert result.docxBase64 is not None
+    text = word_text(result.docxBase64)
+    assert "Cloud operations" in text
+    assert "disaster recovery" in text
+    assert "*Summary*" not in text, "the template's placeholder is filled"
+    assert "9,000" not in text
+    assert result.payStatementsRemoved == 2, "the CV's pay line and the summary's"
+    detailed = FakeAI(json.dumps(PARSED), SUMMARY)
+    run(detailed, job(summary="detailed"))
+    assert "Use 8-10 detailed bullet points" in detailed.calls[1][1]
+
+
+def test_a_blind_cv_never_gets_a_written_summary() -> None:
+    ai = FakeAI(json.dumps(PARSED), anonymise)
+    assert run(ai, job(blind=True, summary="normal")).error is None
+    assert len(ai.calls) == 2, "read, then anonymised: no summary call"
+
+
+def test_an_empty_summary_fails_as_cv_studios_does() -> None:
+    result = run(FakeAI(json.dumps(PARSED), "   "), job(summary="normal"))
+    assert result.error == "the AI wrote no About Him / Her summary"
+
+
+def test_the_word_file_is_valid_by_the_schema() -> None:
+    """Word refuses settings out of the schema's order and empty properties
+    ("Word found unreadable content"); CV Studio's renderer writes both."""
+    result = run(FakeAI(json.dumps(PARSED), SUMMARY), job(summary="normal"))
+    assert result.docxBase64 is not None
+    with zipfile.ZipFile(io.BytesIO(base64.b64decode(result.docxBase64))) as z:
+        doc = etree.fromstring(z.read("word/document.xml"))
+        app = etree.fromstring(z.read("docProps/app.xml"))
+    w = "{" + docx_repair.W + "}"
+    for local, order in (("pPr", docx_repair.PPR_ORDER), ("rPr", docx_repair.RPR_ORDER),
+                         ("tcBorders", docx_repair.BORDER_ORDER)):  # fmt: skip
+        for element in doc.iter(w + local):
+            ranks = [
+                order.index(c.tag[len(w) :])
+                for c in element
+                if c.tag.startswith(w) and c.tag[len(w) :] in order
+            ]
+            assert ranks == sorted(ranks), f"{local}: {[c.tag[len(w) :] for c in element]}"
+    assert not list(doc.iter(w + "trHeight")) or all(
+        w + "type" not in h.attrib for h in doc.iter(w + "trHeight")
+    )
+    assert all((c.text or "").strip() or len(c) for c in app), "no empty document properties"

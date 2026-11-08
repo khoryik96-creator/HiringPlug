@@ -1086,6 +1086,12 @@ class StudioCvAlignment(StrEnum):
     justify = "justify"
 
 
+class StudioCvSummary(StrEnum):
+    none = "none"
+    normal = "normal"
+    detailed = "detailed"
+
+
 class StudioCvStatus(StrEnum):
     queued = "queued"
     done = "done"
@@ -1105,6 +1111,7 @@ class CvFormatStudioJob(BaseModel):
     neutralGender: bool
     correctLanguage: bool
     alignment: StudioCvAlignment
+    summary: StudioCvSummary
     ai: Annotated[
         AiAccess | None,
         Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
@@ -3693,6 +3700,7 @@ class StudioCvInput(BaseModel):
         ),
     ] = None
     alignment: StudioCvAlignment | None = None
+    summary: StudioCvSummary | None = None
 
 
 class StudioCv(BaseModel):

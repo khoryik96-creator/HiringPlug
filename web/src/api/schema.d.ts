@@ -3291,7 +3291,13 @@ export interface components {
             /** @description Correct spelling, punctuation and capitalisation (never the meaning, numbers or dates). */
             correctLanguage?: boolean;
             alignment?: components["schemas"]["StudioCvAlignment"];
+            summary?: components["schemas"]["StudioCvSummary"];
         };
+        /**
+         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none, normal (6-7 bullets, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary.
+         * @enum {string}
+         */
+        StudioCvSummary: "none" | "normal" | "detailed";
         /** @enum {string} */
         StudioCvStatus: "queued" | "done" | "failed";
         StudioCv: {
@@ -3329,6 +3335,7 @@ export interface components {
             neutralGender: boolean;
             correctLanguage: boolean;
             alignment: components["schemas"]["StudioCvAlignment"];
+            summary: components["schemas"]["StudioCvSummary"];
             /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
             ai?: components["schemas"]["AiAccess"];
         };

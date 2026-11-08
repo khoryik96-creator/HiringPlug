@@ -13,6 +13,7 @@ dependencies = [
   "pytesseract>=0.3.13,<0.4",
   "pillow>=12.3,<13",
   "python-docx>=1.2,<2",
+  "lxml>=6,<7",  # Word file repair (docx_repair.py); python-docx brings it too
   "cryptography>=50,<51",
   "anthropic>=1,<2",
 ]
@@ -66,7 +67,7 @@ mypy_path = "src"
 exclude = ["src/hiringplug_ai/contracts\\.py$"]
 
 [[tool.mypy.overrides]]
-module = ["pytesseract", "pytesseract.*", "pdfplumber", "pdfplumber.*", "pypdfium2", "pypdfium2.*", "docx", "docx.*", "reportlab", "reportlab.*"]
+module = ["pytesseract", "pytesseract.*", "pdfplumber", "pdfplumber.*", "pypdfium2", "pypdfium2.*", "docx", "docx.*", "reportlab", "reportlab.*", "lxml", "lxml.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

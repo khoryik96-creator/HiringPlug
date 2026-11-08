@@ -37,7 +37,7 @@ describe("formatted CVs", () => {
 
   it("a blind CV never shows contact details", async () => {
     reads();
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ documentId: "doc_2", fileName: "Candidate C-1 - Blind CV.docx" }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ documentId: "doc_2", fileName: "Contoh CV - Candidate C-1 (Blinded).docx" }));
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
     fireEvent.click(await screen.findByLabelText("Show email and phone"));
     fireEvent.click(screen.getByLabelText(/Blind CV/));
@@ -65,6 +65,22 @@ describe("formatted CVs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/studio-cvs");
-    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify" });
+    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify", summary: "none" });
+  });
+
+  it("writes the About Him / Her summary unless asked not to, and never for a blind CV", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/candidates/{candidateId}/documents"
+      ? { items: [{ id: "doc_o", source: "original", contentType: "application/pdf", fileName: "siti.pdf", createdAt: "2026-11-01T00:00:00Z" }] }
+      : { items: [] }))) as never);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
+    renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
+    const summary = await screen.findByLabelText<HTMLSelectElement>("About Him / Her");
+    expect(summary.value).toBe("normal");
+    fireEvent.change(summary, { target: { value: "detailed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ blind: false, summary: "detailed" });
+    fireEvent.click(screen.getByLabelText(/Blind CV/));
+    expect(screen.queryByLabelText("About Him / Her")).toBeNull();
   });
 });

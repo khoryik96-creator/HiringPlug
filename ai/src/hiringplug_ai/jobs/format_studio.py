@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import base64
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from .. import cvstudio
+from .. import cvstudio, cvstudio_summary
 from ..contracts import CvFormatStudioJob, CvStudioFormattedJob, JobKind
 from ..extraction import extract
 from ..providers import ProviderError
@@ -87,13 +88,16 @@ def _format(
     text, removed = cvstudio.without_pay(read.text[:MAX_SOURCE_CHARS])
     source = cvstudio.prepare_source(text)
 
-    def ask(system: str, user: str, max_tokens: int) -> dict[str, object]:
+    def ask_text(system: str, user: str, max_tokens: int) -> str:
         deps.keep_alive()  # this job stays ours for the call: no second worker pays for it again
         done = ai.complete(system, user, max_tokens=max_tokens)
         tokens["in"] += done.input_tokens
         tokens["out"] += done.output_tokens
         model.append(done.model)
-        value = cvstudio.answer_json(done.text)
+        return done.text
+
+    def ask(system: str, user: str, max_tokens: int) -> dict[str, object]:
+        value = cvstudio.answer_json(ask_text(system, user, max_tokens))
         if value is None:
             raise _FailedError("the AI's answer could not be read")
         return value
@@ -107,8 +111,8 @@ def _format(
         log.exception("cv studio rules failed")
         raise _FailedError("CV Studio's rules could not use the AI's reading") from exc
     cv = checked["data"]
-    removed += int(checked.get("summary_pay_removed") or 0)
     warning = checked.get("warning") if checked.get("degraded") else None
+    removed += _with_summary(payload, cv, checked, ask_text, text)
 
     identity: dict[str, object] | None = None
     if payload.blind:
@@ -148,3 +152,37 @@ def _blind(prepared: dict[str, object], answer: dict[str, object]) -> dict[str, 
             log.exception("cv studio blind checks failed")
             reason = "CV Studio's blind checks could not use the AI's answer"
         raise _FailedError(reason) from exc
+
+
+def _with_summary(
+    payload: CvFormatStudioJob,
+    cv: dict[str, object],
+    checked: dict[str, object],
+    ask_text: Callable[[str, str, int], str],
+    cv_text: str,
+) -> int:
+    """CV Studio's About Him / Her, written from the CV (its pay already
+    removed), replacing the summary read from it; never for a blind CV.
+    Returns the lines stating pay removed from the summary."""
+    if payload.summary.value == "none" or payload.blind:
+        return int(str(checked.get("summary_pay_removed") or 0))
+    cv["summary_bullets"], pay = _summary(ask_text, cv_text, detailed=payload.summary.value == "detailed")
+    return pay
+
+
+def _summary(
+    ask_text: Callable[[str, str, int], str], cv_text: str, *, detailed: bool
+) -> tuple[list[str], int]:
+    """CV Studio's About Him / Her: its prompt sent alone, its reading of the
+    answer, then lines stating the candidate's pay removed. An answer with no
+    bullets fails the run (as CV Studio's does), unless pay was all it said."""
+    try:
+        prompt = cvstudio_summary.prompt(cv_text, detailed=detailed)
+        answer = ask_text("", prompt, cvstudio_summary.MAX_TOKENS)
+        bullets, pay = cvstudio_summary.bullets(answer)
+    except cvstudio_summary.SummaryError as exc:
+        log.exception("cv studio summary helpers failed")
+        raise _FailedError("CV Studio's summary could not be written") from exc
+    if not bullets and not pay:
+        raise _FailedError("the AI wrote no About Him / Her summary")
+    return bullets, pay

@@ -240,15 +240,19 @@ func Values(c Candidate, x Context) Data {
 	return Data{Values: v, Lists: lists}
 }
 
-// FileName names a formatted CV: "Siti Aisyah - CV (Contoh Recruitment).docx",
-// or for a blind one "Candidate C-4F2K9Q - Blind CV (Contoh Recruitment).docx".
+// FileName names a formatted CV CV Studio's way: "Contoh Recruitment CV -
+// Siti Aisyah.docx" (CV Studio: "Hyppies CV - Name.docx"); a blind one
+// "Contoh Recruitment CV - Candidate C-4F2K9Q (Blinded).docx". CV Studio puts
+// the real name in its blind file names too; here the reference stands in
+// for it, so a file sent to a client does not name the candidate.
 func FileName(c Candidate, agency string, blind bool) string {
-	name, kind := strings.TrimSpace(c.FirstName+" "+c.LastName), "CV"
+	name, suffix := strings.TrimSpace(c.FirstName+" "+c.LastName), ""
 	if blind {
-		name, kind = "Candidate "+Reference(c.ID), "Blind CV"
+		name, suffix = "Candidate "+Reference(c.ID), " (Blinded)"
 	}
-	if agency == "" {
-		return name + " - " + kind + ".docx"
+	prefix := "CV"
+	if agency = strings.TrimSpace(agency); agency != "" {
+		prefix = agency + " CV"
 	}
-	return name + " - " + kind + " (" + agency + ").docx"
+	return prefix + " - " + name + suffix + ".docx"
 }

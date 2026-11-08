@@ -219,8 +219,28 @@ only code that touches it). In CV Studio's own order:
    them) and refuses it when the sweep would still change anything; Go then
    checks it for the candidate's name, email and phone as HiringPlug holds
    them, by the same name rules (below), and never saves one that shows them.
-   Its file name carries a reference (`Candidate C-1A2B3C - Blind CV`), never
-   the name.
+   File names follow CV Studio's ("Hyppies CV - Name.docx"): "Contoh
+   Recruitment CV - Siti Aisyah.docx", and for a blind CV "Contoh Recruitment
+   CV - Candidate C-1A2B3C (Blinded).docx" (CV Studio keeps the real name
+   there; the reference stands in for it so a file sent to a client does not
+   name the candidate).
+
+**About Him / Her.** As CV Studio does while formatting (cv-format.js,
+`requestFormattingSummary`), the summary box is written by the AI from the
+CV unless the person chooses "Only the CV's own summary": normal (6-7
+points) or detailed (8-10), with CV Studio's own prompt and its reading of
+the answer, both run from its unchanged `candidate-summary.js` by Node
+(`engine/summary_cli.cjs`), sent alone, 1,000 tokens; lines stating pay are
+then removed. Never for a blind CV (it keeps the CV's own summary). Without
+it the template's `*Summary*` placeholder was left in the box.
+
+**Valid Word files.** CV Studio's renderer writes some settings in an order
+the Office Open XML schema forbids, and the privacy-cleaned template keeps
+empty document properties: LibreOffice opens such files, Word says "Word
+found unreadable content". `docx_repair.py` puts them in the schema's order
+after rendering (no text changes); Microsoft's Open XML SDK validator found 61
+errors in a formatted CV before and none after. The built-in template of
+CVs made from the profile had the same fault in its styles (fixed).
 
 **Names follow CV Studio's rules everywhere** (`platform/redact`, used by the
 blind checks, blind CVs from the profile, blind job ads and what the AI

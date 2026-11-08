@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Document, type Permission, unwrap } from "../api/client";
+import { api, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateApplicationsKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
@@ -47,12 +47,18 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
 
 function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Document[]; onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify" });
+  const [form, setForm] = useState({
+    documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify",
+    summary: "normal" as Schemas["StudioCvSummary"],
+  });
   const documentId = form.documentId || cvs[0]?.id || "";
   const start = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/studio-cvs", {
       params: { path: { candidateId } },
-      body: { documentId, blind: form.blind, neutralGender: form.blind && form.neutralGender, correctLanguage: form.correctLanguage, alignment: form.alignment },
+      body: {
+        documentId, blind: form.blind, neutralGender: form.blind && form.neutralGender, correctLanguage: form.correctLanguage,
+        alignment: form.alignment, summary: form.blind ? "none" : form.summary,
+      },
     })),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: studioCvsKey(candidateId) });
@@ -78,6 +84,15 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
         <label className="row full">
           <input type="checkbox" checked={form.neutralGender} onChange={(e) => { setForm({ ...form, neutralGender: e.target.checked }); }} />{" "}
           &ldquo;The candidate&rdquo; instead of he or she
+        </label>
+      )}
+      {!form.blind && (
+        <label className="field">About Him / Her
+          <select value={form.summary} onChange={(e) => { setForm({ ...form, summary: e.target.value as Schemas["StudioCvSummary"] }); }}>
+            <option value="normal">Written by the AI (6-7 points)</option>
+            <option value="detailed">Written by the AI, detailed (8-10 points)</option>
+            <option value="none">Only the CV&apos;s own summary</option>
+          </select>
         </label>
       )}
       <label className="field">Paragraphs

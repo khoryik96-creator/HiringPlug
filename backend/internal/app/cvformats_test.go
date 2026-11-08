@@ -104,7 +104,7 @@ func TestFormattedCvs(t *testing.T) {
 	assert.Contains(t, list.Placeholders, "candidate.fullName")
 
 	out, text := a.formatCv(recruiter, c.Id, map[string]any{}, http.StatusCreated)
-	assert.Equal(t, "Siti Aisyah - CV (Test tenant TestFormattedCvs).docx", out.FileName)
+	assert.Equal(t, "Test tenant TestFormattedCvs CV - Siti Aisyah.docx", out.FileName)
 	assert.Contains(t, text, "Siti Aisyah|Senior Accountant")
 	assert.Contains(t, text, "Experience|Senior Accountant|Maju Bhd|Mar 2021 to Present")
 	assert.NotContains(t, text, "siti@example.com", "contact hidden unless asked")
@@ -128,7 +128,7 @@ func TestFormattedCvs(t *testing.T) {
 		res := a.request(http.MethodGet, "/v1/documents/"+out.DocumentId+"/pdf", recruiter, nil)
 		require.Equal(t, http.StatusOK, res.Status)
 		assert.Equal(t, "%PDF-1.7 test pdf", string(res.Body))
-		assert.Contains(t, res.Header.Get("Content-Disposition"), "Siti Aisyah - CV")
+		assert.Contains(t, res.Header.Get("Content-Disposition"), "CV - Siti Aisyah.pdf")
 	})
 
 	t.Run("contact and salary when asked, salary only for those who may see it", func(t *testing.T) {
@@ -156,7 +156,7 @@ func TestFormattedCvs(t *testing.T) {
 	t.Run("blind: no name, contact or nationality, and checked before saving", func(t *testing.T) {
 		out, text := a.formatCv(recruiter, c.Id, map[string]any{"blind": true, "showContact": true, "summary": "Siti is strong in IFRS."}, http.StatusCreated)
 		assert.NotContains(t, out.FileName, "Siti")
-		assert.Contains(t, out.FileName, "Blind CV")
+		assert.Contains(t, out.FileName, "(Blinded).docx")
 		assert.Contains(t, text, "Candidate C-")
 		assert.NotContains(t, text, "Siti")
 		assert.NotContains(t, text, "Aisyah")

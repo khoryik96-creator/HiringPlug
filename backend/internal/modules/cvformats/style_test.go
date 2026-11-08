@@ -1,6 +1,7 @@
 package cvformats
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,4 +38,19 @@ func TestPlaceholderDegreesAndOneYearDates(t *testing.T) {
 	assert.Equal(t, "Bachelor of Arts", CleanQualification("Bachelor of Arts"))
 	y := "2018"
 	assert.Equal(t, "2018", Dates(Job{StartDate: &y, EndDate: &y}))
+}
+
+// Word refuses run settings out of the schema's order ("unreadable content").
+func TestTheStandardTemplatesStylesAreInTheSchemasOrder(t *testing.T) {
+	styles := part(t, Standard(), "word/styles.xml")
+	for _, rpr := range regexp.MustCompile(`<w:rPr>(.*?)</w:rPr>`).FindAllStringSubmatch(styles, -1) {
+		order := map[string]int{"rFonts": 0, "b": 1, "color": 2, "sz": 3}
+		last := -1
+		for _, tag := range regexp.MustCompile(`<w:(\w+)`).FindAllStringSubmatch(rpr[1], -1) {
+			if rank, ok := order[tag[1]]; ok {
+				assert.GreaterOrEqual(t, rank, last, rpr[1])
+				last = rank
+			}
+		}
+	}
 }

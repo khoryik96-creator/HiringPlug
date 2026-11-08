@@ -41,6 +41,7 @@ type StudioOptions struct {
 	DocumentID                            string
 	Blind, NeutralGender, CorrectLanguage bool
 	Alignment                             string // left or justify
+	Summary                               string // the About Him / Her summary: none, normal or detailed
 }
 
 // StudioCV is a formatting run and, once done, its result.
@@ -53,6 +54,12 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 	}
 	if !o.Blind {
 		o.NeutralGender = false
+	}
+	switch {
+	case o.Blind: // CV Studio keeps a blind CV's own summary, never writes one
+		o.Summary = "none"
+	case o.Summary != "none" && o.Summary != "detailed":
+		o.Summary = "normal"
 	}
 	var out StudioCV
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -88,12 +95,12 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCvFormatStudio, api.CvFormatStudioJob{
 			StudioCvId: id, DownloadUrl: url, ContentType: src.ContentType, FileName: src.FileName, SizeBytes: src.SizeBytes,
 			Blind: o.Blind, NeutralGender: o.NeutralGender, CorrectLanguage: o.CorrectLanguage,
-			Alignment: api.StudioCvAlignment(o.Alignment), Ai: access,
+			Alignment: api.StudioCvAlignment(o.Alignment), Summary: api.StudioCvSummary(o.Summary), Ai: access,
 		}); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "cv.studio_started", EntityType: "candidate", EntityID: candidateID, Changes: map[string]any{
-			"studioCvId": id, "sourceDocumentId": src.ID, "blind": o.Blind, "correctLanguage": o.CorrectLanguage,
+			"studioCvId": id, "sourceDocumentId": src.ID, "blind": o.Blind, "correctLanguage": o.CorrectLanguage, "summary": o.Summary,
 		}})
 	})
 	return out, err

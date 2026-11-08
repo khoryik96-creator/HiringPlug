@@ -20,6 +20,8 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from . import docx_repair
+
 ROOT = Path(os.environ.get("HP_AI_CVSTUDIO_DIR") or Path(__file__).resolve().parents[2] / "cvstudio")
 ENGINE = ROOT / "engine"
 if str(ENGINE) not in sys.path:
@@ -160,7 +162,8 @@ def render(data: dict[str, Any], *, alignment: str, bullet_levels: list[Any]) ->
         )
         if done.returncode != 0 or not output.exists():
             raise RuntimeError("CV Studio's renderer failed: " + done.stderr.decode(errors="replace")[-500:])
-        return output.read_bytes()
+        # Valid by the schema, so Word opens it without "unreadable content".
+        return docx_repair.repair(output.read_bytes())
 
 
 def answer_json(text: str) -> dict[str, Any] | None:
