@@ -356,3 +356,41 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .template-preview { border-top: 1px solid var(--border, #d0d7de); padding-top: 0.6rem; }
 .template-preview .preview-hits { list-style: none; padding: 0; margin: 0.3rem 0; }
 .template-preview .email-preview { background: var(--panel-alt, #f8fafc); border: 1px solid var(--border, #d0d7de); border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; }
+/* A candidate's CVs and documents: actions at the top right, one card per file. */
+.docs-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.docs-head h3 { margin: 0; }
+.docs-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.doc-btn { display: inline-flex; align-items: center; padding: 0.3rem 0.75rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; background: #fff; color: inherit; font-size: 0.85rem; font-weight: 550; text-decoration: none; cursor: pointer; }
+.doc-btn:hover { border-color: var(--accent); color: var(--accent); }
+.doc-btn.primary-soft { background: var(--accent-soft); border-color: transparent; color: #1e3a8a; }
+.docs-upload { margin-top: 0.8rem; display: grid; gap: 0.6rem; }
+.doc-kind { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.doc-kind legend { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; }
+.doc-kind label { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.7rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; font-size: 0.85rem; cursor: pointer; }
+.doc-kind label.on { border-color: var(--accent); background: var(--accent-soft); }
+.doc-kind input { position: absolute; opacity: 0; pointer-events: none; }
+.doc-group h4 { margin: 1rem 0 0.4rem; font-size: 0.74rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.doc-list { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.5rem; }
+.doc-card { border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 0.6rem 0.75rem; }
+.doc-line { display: flex; align-items: center; gap: 0.75rem; }
+.doc-icon { flex: none; width: 2.6rem; height: 2.6rem; border-radius: 8px; display: grid; place-items: center; font-size: 0.66rem; font-weight: 750; letter-spacing: 0.03em; color: #fff; background: #2563eb; }
+.doc-icon.pdf { background: #dc2626; }
+.doc-main { flex: 1; min-width: 0; }
+.doc-name { all: unset; cursor: pointer; font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-name:hover, .doc-name:focus-visible { color: var(--accent); text-decoration: underline; }
+.doc-meta { font-size: 0.8rem; color: var(--muted); margin-top: 0.1rem; }
+.doc-busy { color: #b45309; }
+.doc-problem { color: #b91c1c; }
+.doc-buttons { display: flex; gap: 0.4rem; align-items: center; flex: none; }
+.doc-more { position: relative; }
+.doc-more summary { list-style: none; cursor: pointer; padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid var(--border, #d0d7de); font-weight: 700; line-height: 1.4; }
+.doc-more summary::-webkit-details-marker { display: none; }
+.doc-menu { position: absolute; right: 0; top: 2rem; z-index: 5; min-width: 13rem; background: #fff; border: 1px solid var(--border, #d0d7de); border-radius: 10px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12); padding: 0.3rem; display: grid; }
+.doc-menu button { all: unset; cursor: pointer; padding: 0.45rem 0.6rem; border-radius: 6px; font-size: 0.88rem; }
+.doc-menu button:hover { background: var(--accent-soft); }
+.doc-menu button:disabled { opacity: 0.5; cursor: default; }
+.doc-menu p { margin: 0.3rem 0.6rem; }
+.doc-card .extracted { margin-top: 0.6rem; }
+@media (max-width: 640px) { .doc-line { flex-wrap: wrap; } .doc-buttons { width: 100%; justify-content: flex-end; } }
+.doc-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.doc-btn.primary:hover { color: #fff; filter: brightness(1.08); }
