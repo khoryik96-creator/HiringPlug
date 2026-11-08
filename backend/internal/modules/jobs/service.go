@@ -25,6 +25,7 @@ type Service struct {
 	users     Users
 	rules     FieldRules  // the company's mandatory fields
 	files     *blob.Store // uploaded job descriptions
+	ai        AI          // the company's AI, for blind ad rewrites (nil: off)
 }
 
 // Create adds a job.

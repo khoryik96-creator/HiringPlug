@@ -53,11 +53,9 @@ class Messages:
             max_retries=0,  # retries are ours: only when no work was done
             http_client=self.http_client,
         )
-        params: dict[str, Any] = {
-            "model": model,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
-        }
+        params: dict[str, Any] = {"model": model, "messages": [{"role": "user", "content": user}]}
+        if system:  # CV Studio sends some prompts alone, with no system prompt
+            params["system"] = system
         if deepseek:
             # DeepSeek V4 thinks by default: slow (30-160 s seen by CV Studio)
             # and no better at these extraction tasks.

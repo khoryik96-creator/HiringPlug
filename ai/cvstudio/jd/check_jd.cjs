@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const guards=require('./jd_guardrails.cjs');
+const raw='Example Systems Sdn Bhd is hiring a Senior Engineer in Kuala Lumpur, Hybrid. You need 5 years of experience with Python, AWS, Kubernetes and Terraform. You will build reliable delivery pipelines and mentor engineers through production migrations.';
+const input={job_title:'Senior Engineer',about_client:'Example Systems Sdn Bhd builds enterprise platforms.',about_role:'Deliver reliable software.',location:'Kuala Lumpur',work_mode:'Hybrid',industry:'Technology',tech_stack:[],requirements:['5 years of experience'],responsibilities:['Deliver robust systems.'],nice_to_have:[],why_join:[],alt_titles:[],exp_range:null};
+const saved=JSON.stringify(input),result=guards.finalizeJD(input,raw,'Example Systems Sdn Bhd');
+assert.equal(JSON.stringify(input),saved);
+assert(!JSON.stringify(result.data).includes('Example Systems'));
+for(const term of ['Python','AWS','Kubernetes','Terraform'])assert(JSON.stringify(result.data.tech_stack).includes(term));
+assert(result.data.requirements.includes('5 years of experience'));
+assert.equal(result.missingAfter.length,0);
+assert(guards.jdAnonNeedsParaphraseRetry({responsibilities:['You will build reliable delivery pipelines and mentor engineers through production migrations.']},raw));
+assert.equal(guards.scrubAnonCompanyNameText('Oracle Database and PL/SQL expertise','Oracle'),'Oracle Database and PL/SQL expertise');
+assert.equal(guards.jdAnonExtractPreserveTerms('Plan the go-live launch and excel in a fabric workshop.','').length,0);
+assert(!guards.softenAnonScaleText('Fortune 200 organisation operating in 100 countries').includes('100 countries'));
+assert.equal(guards.jdAnonExtractPreserveTerms('Use malicious <script> text safely','').length,0);
+console.log('PASS: JD local guards, tech preservation, identity scrub, role facts, copy detection, ambiguous terms, scale generalization; no provider calls.');

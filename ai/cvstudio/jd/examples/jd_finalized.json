@@ -1,0 +1,34 @@
+{
+  "data": {
+    "job_title": "Senior Engineer",
+    "about_client": "the client delivers enterprise software.",
+    "about_role": "Build reliable systems.",
+    "work_mode": "Hybrid",
+    "location": "Kuala Lumpur",
+    "industry": "Technology",
+    "exp_range": null,
+    "tech_stack": [
+      "Kubernetes",
+      "Terraform",
+      "Python",
+      "AWS"
+    ],
+    "responsibilities": [
+      "Deliver robust systems."
+    ],
+    "requirements": [
+      "5 years of experience"
+    ],
+    "nice_to_have": [],
+    "why_join": [],
+    "alt_titles": []
+  },
+  "missingBefore": [
+    "Kubernetes",
+    "Terraform",
+    "Python",
+    "AWS"
+  ],
+  "missingAfter": [],
+  "paraphraseIssues": []
+}

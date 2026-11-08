@@ -120,7 +120,7 @@ func NewModules(d Deps) *Modules {
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
 		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents},
 		AI: cvReadingAI{
-			all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats} }},
+			all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
 			ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 		},
 	}, d.Files, d.Config.MaxUploadBytes)
@@ -129,12 +129,12 @@ func NewModules(d Deps) *Modules {
 		Applications: assistantApplications{m.Pipeline},
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
-		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats} }},
+		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
-		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats} }},
+		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs} }},
 	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
@@ -156,7 +156,11 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
-		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats} }},
+		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
+		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+	})
+	m.Jobs.UseAI(cvReadingAI{ // blind ad rewrites, in the same monthly allowance
+		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
 		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	return m

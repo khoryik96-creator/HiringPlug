@@ -112,6 +112,14 @@ x-error-codes:
     module: interviews
     status: 422
     description: The interview cannot be scheduled or changed like this (closed application, feedback from someone who is not an interviewer, ...). The message says why.
+  JOB_AD_BLIND_AI_OFF:
+    module: jobs
+    status: 409
+    description: Rewriting a blind ad needs the AI, and no AI provider is set up (or this month's AI allowance is used up).
+  JOB_AD_BLIND_TOO_SHORT:
+    module: jobs
+    status: 422
+    description: The ad has too little text to rewrite (CV Studio asks for at least 80 characters of job description).
   JOB_AD_NOT_PUBLISHABLE:
     module: jobs
     status: 422
@@ -2494,6 +2502,48 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/job-ads/{adId}/blind-rewrites:
+    parameters:
+      - $ref: '#/components/parameters/JobAdIdPath'
+    get:
+      operationId: listBlindRewrites
+      tags: [jobs]
+      summary: The latest AI rewrites of an ad's blind version, newest first
+      x-permission: jobs:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BlindRewriteList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: rewriteBlindAd
+      tags: [jobs]
+      summary: Rewrite the ad's blind version with the AI, CV Studio's way (done in the background)
+      description: >
+        The AI rewrites the ad as written into a candidate-facing job description without the client's identity: names, brands, addresses, links and contacts removed, company size and reach described broadly, the wording paraphrased (copied wording is retried once), the tech stack and requirements kept. When it is done it becomes the ad's blind version (as if a person had written it: changes to the ad no longer remake it). Its tokens count in the monthly AI allowance.
+
+      x-permission: jobs:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BlindRewriteInput'}
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BlindRewrite'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/BlindAiOff'}
+        '422': {$ref: '#/components/responses/BlindTooShort'}
   /v1/jobs/{jobId}/jd-files:
     parameters:
       - $ref: '#/components/parameters/JobOrderIdPath'
@@ -3784,6 +3834,16 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    BlindAiOff:
+      description: No AI for it (JOB_AD_BLIND_AI_OFF).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    BlindTooShort:
+      description: Too little text to rewrite (JOB_AD_BLIND_TOO_SHORT).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     MatchingUnavailable:
       description: Switched off (MATCHING_OFF), nothing to compare yet (MATCH_NEEDS_TEXT), or the candidate withdrew consent (MATCH_CONSENT_WITHDRAWN).
       content:
@@ -3906,6 +3966,8 @@ components:
         - INTERNAL
         - INTERVIEW_CLASH
         - INTERVIEW_NOT_ALLOWED
+        - JOB_AD_BLIND_AI_OFF
+        - JOB_AD_BLIND_TOO_SHORT
         - JOB_AD_NOT_PUBLISHABLE
         - LINK_NOT_VALID
         - MATCHING_LIMIT_REACHED
@@ -3951,6 +4013,8 @@ components:
         - document.text_extracted
         - email.send
         - interview.remind
+        - jd.blind
+        - jd.blinded
         - job.jd_read
         - job.read_jd
         - lead_source.check
@@ -6091,6 +6155,102 @@ components:
       properties:
         interviewId: {$ref: '#/components/schemas/InterviewId'}
         startsAt: {type: string, format: date-time, description: When the interview was when the reminder was queued; a moved interview has a newer reminder.}
+    BlindRewriteId:
+      type: string
+      pattern: '^jbr_[0-9a-hjkmnp-tv-z]{26}$'
+      example: jbr_01jbz6w0m0k8q9x2r3s4t5v6w7
+    BlindRewriteTone:
+      type: string
+      description: "CV Studio's tones: professional (formal, third person), conversational (warm, \"we are looking for\"), concise (direct, bullet-heavy)."
+      enum: [professional, conversational, concise]
+    BlindRewriteStrength:
+      type: string
+      description: "How much the wording changes: low (light), medium (balanced), high (bullets may be merged, split or reordered; nothing weakened)."
+      enum: [low, medium, high]
+    BlindRewriteInput:
+      type: object
+      additionalProperties: false
+      required: [tone, strength]
+      properties:
+        tone: {$ref: '#/components/schemas/BlindRewriteTone'}
+        strength: {$ref: '#/components/schemas/BlindRewriteStrength'}
+        removeAlso: {type: string, nullable: true, maxLength: 1000, description: "Anything else to take out (names of products, projects, people), besides the client's name, website and hiring contact."}
+        whyJoinUs: {type: string, nullable: true, maxLength: 2000, description: 'Points for "Why join us".'}
+        context: {type: string, nullable: true, maxLength: 2000, description: "Anything the AI should know (team, reporting line...)."}
+    BlindRewrite:
+      type: object
+      required: [id, adId, status, tone, strength, error, warnings, retried, model, tokens, createdAt, finishedAt]
+      properties:
+        id: {$ref: '#/components/schemas/BlindRewriteId'}
+        adId: {$ref: '#/components/schemas/JobAdId'}
+        status: {type: string, enum: [queued, done, failed], description: "done: it is now the ad's blind version."}
+        tone: {$ref: '#/components/schemas/BlindRewriteTone'}
+        strength: {$ref: '#/components/schemas/BlindRewriteStrength'}
+        error: {type: string, nullable: true, description: "Why there is no rewrite."}
+        warnings: {type: array, items: {type: string}, description: "What to check before using it (tech stack terms missing, wording still close to the ad)."}
+        retried: {type: boolean, description: "The AI was asked once more because its wording was still too close to the ad."}
+        model: {type: string, nullable: true}
+        tokens: {type: integer, minimum: 0, description: "AI tokens used (both calls when retried)."}
+        createdAt: {type: string, format: date-time}
+        finishedAt: {type: string, format: date-time, nullable: true}
+    BlindRewriteList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/BlindRewrite'}}
+    JdBlindJob:
+      type: object
+      additionalProperties: false
+      required: [rewriteId, raw, companyName, industry, location, workMode, clientDescription, context, removeAlso, whyJoinUs, tone, strength]
+      properties:
+        rewriteId: {$ref: '#/components/schemas/BlindRewriteId'}
+        raw: {type: string, maxLength: 40000, description: "The ad as written: its title, then its text."}
+        companyName: {type: string, description: "The client's name (taken out of the result, and its industry worked out from it)."}
+        industry: {type: string, nullable: true}
+        location: {type: string, nullable: true, description: "The blind ad's location (without the client's name)."}
+        workMode: {type: string, nullable: true, description: "e.g. Hybrid, Remote, On-site."}
+        clientDescription: {type: string, nullable: true, description: 'What the blind ad says instead of the client''s name, e.g. "a leading Malaysian bank".'}
+        context: {type: string, nullable: true}
+        removeAlso: {type: string, nullable: true, description: "Also explicitly remove: the person's own list, the client's website and hiring contact."}
+        whyJoinUs: {type: string, nullable: true}
+        tone: {$ref: '#/components/schemas/BlindRewriteTone'}
+        strength: {$ref: '#/components/schemas/BlindRewriteStrength'}
+        ai:
+          allOf: [{$ref: '#/components/schemas/AiAccess'}]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    BlindJd:
+      type: object
+      additionalProperties: false
+      description: "CV Studio's blind job description, after its checks."
+      required: [jobTitle, aboutClient, aboutRole, workMode, location, industry, techStack, responsibilities, requirements, niceToHave, whyJoin, altTitles]
+      properties:
+        jobTitle: {type: string, maxLength: 200}
+        aboutClient: {type: string, maxLength: 4000}
+        aboutRole: {type: string, maxLength: 4000}
+        workMode: {type: string, maxLength: 200}
+        location: {type: string, maxLength: 200}
+        industry: {type: string, maxLength: 200}
+        techStack: {type: array, maxItems: 80, items: {type: string, maxLength: 200}}
+        responsibilities: {type: array, maxItems: 60, items: {type: string, maxLength: 2000}}
+        requirements: {type: array, maxItems: 60, items: {type: string, maxLength: 2000}}
+        niceToHave: {type: array, maxItems: 60, items: {type: string, maxLength: 2000}}
+        whyJoin: {type: array, maxItems: 60, items: {type: string, maxLength: 2000}}
+        altTitles: {type: array, maxItems: 20, items: {type: string, maxLength: 200}}
+    JdBlindedJob:
+      type: object
+      additionalProperties: false
+      required: [rewriteId, jd, error, warnings, retried, model, inputTokens, outputTokens]
+      properties:
+        rewriteId: {$ref: '#/components/schemas/BlindRewriteId'}
+        jd:
+          allOf: [{$ref: '#/components/schemas/BlindJd'}]
+          nullable: true
+        error: {type: string, nullable: true, maxLength: 2000}
+        warnings: {type: array, maxItems: 10, items: {type: string, maxLength: 1000}}
+        retried: {type: boolean}
+        model: {type: string, nullable: true}
+        inputTokens: {type: integer, minimum: 0}
+        outputTokens: {type: integer, minimum: 0}
     JdFileId:
       type: string
       pattern: '^jdf_[0-9a-hjkmnp-tv-z]{26}$'
@@ -8265,6 +8425,18 @@ x-jobs:
     payload: InterviewRemindJob
     priority: normal
     description: Email the interviewers a reminder the day before (Go worker). Skipped if the interview was cancelled or moved since.
+  jd.blind:
+    module: jobs
+    queue: ai
+    payload: JdBlindJob
+    priority: high
+    description: 'Rewrite an ad as a blind job description CV Studio''s way: the AI paraphrases it without the client''s identity, then CV Studio''s checks (Python AI worker).'
+  jd.blinded:
+    module: jobs
+    queue: core
+    payload: JdBlindedJob
+    priority: high
+    description: Save the AI's blind job description as the ad's blind version, or why there is none (Go worker).
   job.jd_read:
     module: jobs
     queue: core

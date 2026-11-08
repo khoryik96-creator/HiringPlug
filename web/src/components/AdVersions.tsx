@@ -6,6 +6,7 @@ import { downloadFrom } from "../api/files";
 import { jobAdsKey } from "../api/keys";
 import { countryName } from "../labels";
 import { AdText } from "./AdText";
+import { BlindRewrite } from "./BlindRewrite";
 import { ErrorMessage } from "./ErrorMessage";
 import { fieldErrors } from "./forms";
 import { useFieldSettings } from "./useFieldSettings";
@@ -62,6 +63,7 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
           <Exports ad={ad} version="blind" title={ad.blindTitle} />
         </div>
         <BlindText ad={ad} canEdit={canEdit} facts={factsOf(ad.blindLocation, ad.blindSalaryText)} />
+        <BlindRewrite adId={ad.id} jobId={ad.jobId} canEdit={canEdit} />
       </section>
     </div>
   );

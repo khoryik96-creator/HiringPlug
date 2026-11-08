@@ -160,3 +160,38 @@ SELECT id, job_id, file_name, status, error, details, created_at FROM job_descri
 UPDATE job_description_file
 SET status = @status, error = sqlc.narg(error), text = sqlc.narg(text), details = sqlc.narg(details)
 WHERE id = @id;
+
+-- AI rewrites of an ad's blind version (CV Studio's way).
+-- name: InsertBlindRewrite :one
+INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, created_by)
+VALUES (app_current_tenant(), @ad_id, @tone, @strength, app_current_user())
+RETURNING *;
+
+-- name: GetBlindRewrite :one
+SELECT * FROM job_ad_blind_rewrite WHERE id = @id;
+
+-- name: ListBlindRewrites :many
+SELECT * FROM job_ad_blind_rewrite WHERE ad_id = @ad_id ORDER BY created_at DESC, id DESC LIMIT 5;
+
+-- name: FinishBlindRewrite :one
+UPDATE job_ad_blind_rewrite
+   SET status = @status, error = sqlc.narg(error), warnings = @warnings, retried = @retried,
+       model = sqlc.narg(model), tokens = @tokens, finished_at = now()
+ WHERE id = @id AND status = 'queued'
+RETURNING *;
+
+-- name: BlindRewriteTokensSince :one
+SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= @since;
+
+-- The AI's rewrite becomes the ad's blind version, as a person's edit would
+-- (the ad's version moves on, so an open edit form sees the change).
+-- name: SetAdBlindText :one
+UPDATE job_ad SET
+  blind_edited = true,
+  blind_title_edit = @blind_title_edit,
+  blind_description_edit = sqlc.narg(blind_description_edit),
+  blind_source_hash = @blind_source_hash,
+  version = version + 1,
+  updated_at = now()
+WHERE id = @id
+RETURNING *;

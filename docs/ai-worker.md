@@ -245,6 +245,27 @@ reason, never an exception. LibreOffice cannot open a document that ends on a
 framed paragraph (CV Studio pins its closing terms that way), so the PDF step
 retries with an empty paragraph after it; the Word file is kept as made.
 
+### Blind job ads, CV Studio's way (built: `jd.blind`)
+
+CV Studio's JD blinding is browser JavaScript; its code is vendored unchanged
+in `ai/cvstudio/jd` (its local checks, `jd_guardrails.cjs`, and the exact
+prompt assembly from `generateAnonJD`, `prompts/JD_PROMPT_BUILDER.js.txt`)
+and run by Node through a small adapter, `jd_cli.cjs`, as its Word renderer
+is. `src/hiringplug_ai/cvstudio_jd.py` calls it; `jobs/blind_jd.py` follows
+CV Studio's order: repair PDF damage in the text (at least 80 characters
+needed), build its prompt from the ad (title and text), the client's name,
+the blind location, work mode, client description and what else to remove
+(the client's website and hiring contact are added), send it alone (no
+system prompt, 4,000 tokens, as CV Studio does), read the JSON, ask once more
+when responsibilities or requirements copy long runs of the ad (the second
+answer kept only when it copies less), then CV Studio's checks: tech terms
+from the ad put back in the stack, company scale softened, the client's name
+scrubbed. An answer that is not JSON fails (CV Studio would show plain text;
+a blind ad needs its structure). `test_the_prompt_is_cv_studios_own` checks
+the prompt against CV Studio's own example, byte for byte, and its offline
+checks (`check_jd.cjs`) run in the tests. Go (`jd.blinded`) makes the result
+the ad's blind version and refuses one that still names the client.
+
 ## CV-to-job matching (built)
 
 `match.score` carries the job's text (title, details, description and its

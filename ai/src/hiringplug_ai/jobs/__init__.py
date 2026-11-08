@@ -24,6 +24,7 @@ from ..contracts import (
     DocumentExtractTextJob,
     DocumentParseCvJob,
     DocumentRenderPdfJob,
+    JdBlindJob,
     JobKind,
     JobReadJdJob,
     MatchScoreJob,
@@ -34,6 +35,7 @@ from ..queue import FollowUp
 from . import (
     ai_check,
     assistant_ask,
+    blind_jd,
     extract_text,
     format_studio,
     match_score,
@@ -94,6 +96,7 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
     JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),
+    JobKind.jd_blind: Handler(JdBlindJob, blind_jd.run),
     JobKind.job_read_jd: Handler(JobReadJdJob, read_jd.run),
     JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),
     JobKind.contact_read_linkedin: Handler(ContactReadLinkedinJob, read_linkedin.run),

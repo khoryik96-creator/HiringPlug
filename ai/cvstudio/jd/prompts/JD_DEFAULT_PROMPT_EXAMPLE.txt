@@ -1,0 +1,36 @@
+You are a senior recruitment consultant. Produce a polished, anonymised version of this job description - safe to share with candidates with zero identifying information about the client.
+
+MANDATORY IDENTITY STRIPPING: Remove employer/client name, brands, proprietary products that identify the employer, office addresses, URLs, emails, phone numbers, internal codes, recruiter names. Do NOT remove tech stack, tools, frameworks, programming languages, cloud services, enterprise systems, certifications, methodologies, or any role requirements.
+
+MANDATORY PARAPHRASING: Do not merely anonymise by deleting names. Rewrite the job description into fresh candidate-facing wording. Responsibilities, requirements, nice-to-have items, why-join points, about_client, and about_role must be paraphrased and polished, not copied sentence-for-sentence from the original JD.
+Avoid preserving long verbatim phrases from the original JD. Change sentence structure, verbs, and phrasing while keeping the meaning, seniority, business context, reporting scope, technologies, certifications, role-critical numbers, and candidate requirements accurate. Paraphrase the prose, not the tech stack. Job title, technology names, certifications, acronyms, methodologies, and exact years of experience should remain exact.
+PARAPHRASE STRENGTH: MEDIUM. Use a balanced rewrite: change sentence structure, verbs, and phrasing while preserving all responsibilities, requirements, seniority, business context, tech stack, tools, platforms, certifications, methodologies, years of experience, location/work mode, and candidate-critical requirements.
+
+OUTPUT STYLE: Make the final JD readable and candidate-friendly. Use concise but polished bullet points. Responsibilities should sound like what the person will do; requirements should sound like what the person needs to succeed. Do not repeat the same wording across sections.
+
+ANONYMITY SCALE GENERALISATION: Do NOT preserve exact company scale figures that can identify the client. Generalise revenue, turnover, AUM, market share, ranking, employee count, office count, country count, continent count, customer count, transaction volume, factory/store/fleet count, and similar metrics. Replace exact figures with broad phrases such as multi-billion-dollar global organisation, large global workforce, broad international footprint, major regional player, or large-scale enterprise transformation.
+Do not write searchable combinations like $50 billion, 20,000 professionals, 100 countries, six continents, Fortune 200, top 3, or world's largest. Keep candidate requirements such as years of experience, team size requirements, technical versions, certifications, and role-related numbers.
+
+TECH STACK PRESERVATION: Preserve every genuine technology/tool/platform/system from the original JD exactly, including acronyms and version numbers. Include them in tech_stack and keep them visible in the final output. Only generalise technology-like names if they are clearly proprietary employer product/platform names that would identify the client. Paraphrase responsibilities/requirements around these terms, but do not delete the terms themselves.
+
+INDUSTRY: Company name provided: "Example Systems Sdn Bhd". Determine their primary industry from the JD content and company name.
+
+Write a compelling 2-3 sentence About Our Client paragraph using JD signals WITHOUT naming them.
+
+
+
+
+
+
+
+TONE: formal, professional, third-person where appropriate
+
+Return ONLY a raw JSON object:
+{"job_title":"","about_client":"","about_role":"","work_mode":"refer to JD","location":"refer to JD","industry":"","exp_range":null,"tech_stack":[],"responsibilities":[],"requirements":[],"nice_to_have":[],"why_join":[],"alt_titles":[]}
+
+Before returning JSON, self-check that responsibilities and requirements are not copied from the original JD. If a bullet sounds identical, rewrite it.
+
+ORIGINAL JD:
+---
+Example Systems Sdn Bhd is hiring a Senior Engineer in Kuala Lumpur, Hybrid. You need 5 years of experience with Python, AWS, Kubernetes and Terraform. You will build reliable delivery pipelines and mentor engineers through production migrations.
+---

@@ -12,6 +12,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const blindRewriteTokensSince = `-- name: BlindRewriteTokensSince :one
+SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= $1
+`
+
+func (q *Queries) BlindRewriteTokensSince(ctx context.Context, since time.Time) (int64, error) {
+	row := q.db.QueryRow(ctx, blindRewriteTokensSince, since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const closeJobAds = `-- name: CloseJobAds :execrows
 UPDATE job_ad SET status = 'closed', version = version + 1, updated_at = now()
 WHERE job_order_id = $1 AND status = 'published'
@@ -42,6 +53,80 @@ func (q *Queries) DeleteJobSalary(ctx context.Context, arg DeleteJobSalaryParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const finishBlindRewrite = `-- name: FinishBlindRewrite :one
+UPDATE job_ad_blind_rewrite
+   SET status = $1, error = $2, warnings = $3, retried = $4,
+       model = $5, tokens = $6, finished_at = now()
+ WHERE id = $7 AND status = 'queued'
+RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at
+`
+
+type FinishBlindRewriteParams struct {
+	Status   string
+	Error    *string
+	Warnings []string
+	Retried  bool
+	Model    *string
+	Tokens   int32
+	ID       string
+}
+
+func (q *Queries) FinishBlindRewrite(ctx context.Context, arg FinishBlindRewriteParams) (JobAdBlindRewrite, error) {
+	row := q.db.QueryRow(ctx, finishBlindRewrite,
+		arg.Status,
+		arg.Error,
+		arg.Warnings,
+		arg.Retried,
+		arg.Model,
+		arg.Tokens,
+		arg.ID,
+	)
+	var i JobAdBlindRewrite
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.AdID,
+		&i.Status,
+		&i.Tone,
+		&i.Strength,
+		&i.Error,
+		&i.Warnings,
+		&i.Retried,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const getBlindRewrite = `-- name: GetBlindRewrite :one
+SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at FROM job_ad_blind_rewrite WHERE id = $1
+`
+
+func (q *Queries) GetBlindRewrite(ctx context.Context, id string) (JobAdBlindRewrite, error) {
+	row := q.db.QueryRow(ctx, getBlindRewrite, id)
+	var i JobAdBlindRewrite
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.AdID,
+		&i.Status,
+		&i.Tone,
+		&i.Strength,
+		&i.Error,
+		&i.Warnings,
+		&i.Retried,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
+	)
+	return i, err
 }
 
 const getJdFile = `-- name: GetJdFile :one
@@ -201,6 +286,41 @@ func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) 
 		&i.BlindEdited,
 		&i.BlindSourceHash,
 		&i.PublishBlind,
+	)
+	return i, err
+}
+
+const insertBlindRewrite = `-- name: InsertBlindRewrite :one
+INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
+RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at
+`
+
+type InsertBlindRewriteParams struct {
+	AdID     string
+	Tone     string
+	Strength string
+}
+
+// AI rewrites of an ad's blind version (CV Studio's way).
+func (q *Queries) InsertBlindRewrite(ctx context.Context, arg InsertBlindRewriteParams) (JobAdBlindRewrite, error) {
+	row := q.db.QueryRow(ctx, insertBlindRewrite, arg.AdID, arg.Tone, arg.Strength)
+	var i JobAdBlindRewrite
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.AdID,
+		&i.Status,
+		&i.Tone,
+		&i.Strength,
+		&i.Error,
+		&i.Warnings,
+		&i.Retried,
+		&i.Model,
+		&i.Tokens,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.FinishedAt,
 	)
 	return i, err
 }
@@ -491,6 +611,45 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 	return items, nil
 }
 
+const listBlindRewrites = `-- name: ListBlindRewrites :many
+SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at FROM job_ad_blind_rewrite WHERE ad_id = $1 ORDER BY created_at DESC, id DESC LIMIT 5
+`
+
+func (q *Queries) ListBlindRewrites(ctx context.Context, adID string) ([]JobAdBlindRewrite, error) {
+	rows, err := q.db.Query(ctx, listBlindRewrites, adID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JobAdBlindRewrite
+	for rows.Next() {
+		var i JobAdBlindRewrite
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.AdID,
+			&i.Status,
+			&i.Tone,
+			&i.Strength,
+			&i.Error,
+			&i.Warnings,
+			&i.Retried,
+			&i.Model,
+			&i.Tokens,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJobAds = `-- name: ListJobAds :many
 SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad WHERE job_order_id = $1 ORDER BY id DESC LIMIT 100
 `
@@ -726,6 +885,63 @@ func (q *Queries) SaveJdRead(ctx context.Context, arg SaveJdReadParams) (int64, 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setAdBlindText = `-- name: SetAdBlindText :one
+UPDATE job_ad SET
+  blind_edited = true,
+  blind_title_edit = $1,
+  blind_description_edit = $2,
+  blind_source_hash = $3,
+  version = version + 1,
+  updated_at = now()
+WHERE id = $4
+RETURNING id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind
+`
+
+type SetAdBlindTextParams struct {
+	BlindTitleEdit       *string
+	BlindDescriptionEdit *string
+	BlindSourceHash      *string
+	ID                   string
+}
+
+// The AI's rewrite becomes the ad's blind version, as a person's edit would
+// (the ad's version moves on, so an open edit form sees the change).
+func (q *Queries) SetAdBlindText(ctx context.Context, arg SetAdBlindTextParams) (JobAd, error) {
+	row := q.db.QueryRow(ctx, setAdBlindText,
+		arg.BlindTitleEdit,
+		arg.BlindDescriptionEdit,
+		arg.BlindSourceHash,
+		arg.ID,
+	)
+	var i JobAd
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.Title,
+		&i.Location,
+		&i.WorkType,
+		&i.WorkArrangement,
+		&i.SalaryText,
+		&i.Description,
+		&i.ClosesOn,
+		&i.Status,
+		&i.PublishedAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Country,
+		&i.ClientDescription,
+		&i.BlindTitleEdit,
+		&i.BlindDescriptionEdit,
+		&i.BlindEdited,
+		&i.BlindSourceHash,
+		&i.PublishBlind,
+	)
+	return i, err
 }
 
 const setJobOwner = `-- name: SetJobOwner :execrows

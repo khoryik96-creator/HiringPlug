@@ -1,8 +1,8 @@
 package app
 
 // The AI allowance shared by the modules that use the AI: one monthly
-// allowance per company covers the assistant, CV vs job matching and
-// reading CVs.
+// allowance per company covers the assistant, CV vs job matching, reading
+// and formatting CVs, and rewriting blind ads.
 
 import (
 	"context"

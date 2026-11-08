@@ -67,9 +67,19 @@ func New(pool *pgxpool.Pool, companies Companies, contacts Contacts, users Users
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 
+// UseAI gives the module the company's AI (blind ad rewrites), once the
+// modules it is built from exist.
+func (m *Module) UseAI(ai AI) { m.service.ai = ai }
+
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead}
+	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead, api.JobKindJdBlinded: m.service.saveBlindRewrite}
+}
+
+// TokensSince is the AI tokens blind ad rewrites used since a time (the
+// company's monthly allowance), in the caller's transaction.
+func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (int64, error) {
+	return m.service.TokensSince(ctx, tx, since)
 }
 
 // Exists reports whether a job exists in tx's tenant.

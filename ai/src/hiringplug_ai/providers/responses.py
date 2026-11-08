@@ -28,13 +28,14 @@ class Responses:
     sleep: Callable[[float], None] = time.sleep
 
     def complete(self, system: str, user: str, *, max_tokens: int) -> Completion:
-        body = {
+        body: dict[str, object] = {
             "model": self.model,
-            "instructions": system,
             "input": user,
             "max_output_tokens": max_tokens + REASONING_ROOM,
             "store": False,  # CVs are not kept at OpenAI for later retrieval
         }
+        if system:  # CV Studio sends some prompts alone, with no instructions
+            body["instructions"] = system
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"}
 
         def send() -> httpx.Response:

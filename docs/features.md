@@ -377,8 +377,24 @@ lead's company (with the built-in email check).
   version, ads published before keep showing the ad as written. Either version
   downloads as **Word or PDF** (title, a line of facts, the text with its bullet
   points; the PDF uses a standard font, so characters beyond Western European
-  ones, such as Chinese, print as "?"). Later: an AI rewrite like CV Studio's
-  Blind JD (tone, paraphrase strength), once the AI is on.
+  ones, such as Chinese, print as "?").
+- **Blind ads rewritten by the AI, CV Studio's way** ✅ ("Rewrite with AI" under
+  the blind version, once the AI is on): a pattern can take out names, but
+  not "40 hubs across 12 countries", which finds the client just as well. CV
+  Studio's Blind JD prompt rewrites the ad into a candidate-facing job
+  description without the client's identity (names, brands, addresses,
+  links, contacts and anything listed under "Also take out"), with company
+  size and reach described broadly and the wording paraphrased, in one of
+  its tones (professional, conversational, concise) and rewording strengths
+  (light, balanced, strong); responsibilities and requirements that still
+  copy long runs of the ad are sent back once. CV Studio's checks then put
+  back genuine tech terms from the ad (SAP, Python, Power BI...; "Go" and
+  "Excel" only as tools), soften company scale and scrub the client's name.
+  The result becomes the blind version in sections (About our client, Tech
+  stack, What you will do, What you need to succeed, Nice to have, Why join
+  us), as a person's edit would; Go refuses one that still names the client.
+  What to check (tech terms missing, wording still close) is shown with it.
+  Its tokens count in the monthly AI allowance.
 - **Job ads** ✅: the advertised text of a job, separate from the internal job
   order (a job can have several), with its own country (the job's unless chosen). Each has its own title, location, work type
   and arrangement, an optional salary line shown as written (separate from the

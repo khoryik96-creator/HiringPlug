@@ -55,7 +55,9 @@ class OpenAICompatible:
             headers["Authorization"] = f"Bearer {self.api_key}"
         body = {
             "model": self.model,
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            # No system message when there is none (CV Studio sends some prompts alone).
+            "messages": ([{"role": "system", "content": system}] if system else [])
+            + [{"role": "user", "content": user}],
             "max_tokens": max_tokens,
             "temperature": 0.2,
             "stream": False,

@@ -102,6 +102,8 @@ class ErrorCode(StrEnum):
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
     INTERVIEW_NOT_ALLOWED = "INTERVIEW_NOT_ALLOWED"
+    JOB_AD_BLIND_AI_OFF = "JOB_AD_BLIND_AI_OFF"
+    JOB_AD_BLIND_TOO_SHORT = "JOB_AD_BLIND_TOO_SHORT"
     JOB_AD_NOT_PUBLISHABLE = "JOB_AD_NOT_PUBLISHABLE"
     LINK_NOT_VALID = "LINK_NOT_VALID"
     MATCHING_LIMIT_REACHED = "MATCHING_LIMIT_REACHED"
@@ -147,6 +149,8 @@ class JobKind(StrEnum):
     document_text_extracted = "document.text_extracted"
     email_send = "email.send"
     interview_remind = "interview.remind"
+    jd_blind = "jd.blind"
+    jd_blinded = "jd.blinded"
     job_jd_read = "job.jd_read"
     job_read_jd = "job.read_jd"
     lead_source_check = "lead_source.check"
@@ -2014,6 +2018,147 @@ class InterviewRemindJob(BaseModel):
     ]
 
 
+class BlindRewriteId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["jbr_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jbr_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class BlindRewriteTone(StrEnum):
+    professional = "professional"
+    conversational = "conversational"
+    concise = "concise"
+
+
+class BlindRewriteStrength(StrEnum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class BlindRewriteInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    tone: BlindRewriteTone
+    strength: BlindRewriteStrength
+    removeAlso: Annotated[
+        str | None,
+        Field(
+            description="Anything else to take out (names of products, projects, people), besides the client's name, website and hiring contact.",
+            max_length=1000,
+        ),
+    ] = None
+    whyJoinUs: Annotated[str | None, Field(description='Points for "Why join us".', max_length=2000)] = None
+    context: Annotated[
+        str | None,
+        Field(description="Anything the AI should know (team, reporting line...).", max_length=2000),
+    ] = None
+
+
+class Status2(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class JdBlindJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    rewriteId: BlindRewriteId
+    raw: Annotated[str, Field(description="The ad as written: its title, then its text.", max_length=40000)]
+    companyName: Annotated[
+        str,
+        Field(
+            description="The client's name (taken out of the result, and its industry worked out from it)."
+        ),
+    ]
+    industry: Annotated[str | None, Field(...)]
+    location: Annotated[str | None, Field(description="The blind ad's location (without the client's name).")]
+    workMode: Annotated[str | None, Field(description="e.g. Hybrid, Remote, On-site.")]
+    clientDescription: Annotated[
+        str | None,
+        Field(
+            description='What the blind ad says instead of the client\'s name, e.g. "a leading Malaysian bank".'
+        ),
+    ]
+    context: Annotated[str | None, Field(...)]
+    removeAlso: Annotated[
+        str | None,
+        Field(
+            description="Also explicitly remove: the person's own list, the client's website and hiring contact."
+        ),
+    ]
+    whyJoinUs: Annotated[str | None, Field(...)]
+    tone: BlindRewriteTone
+    strength: BlindRewriteStrength
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class TechStackItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=200)]
+
+
+class Responsibility(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000)]
+
+
+class Requirement(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000)]
+
+
+class NiceToHaveItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000)]
+
+
+class WhyJoinItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000)]
+
+
+class AltTitle(RootModel[str]):
+    root: Annotated[str, Field(max_length=200)]
+
+
+class BlindJd(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jobTitle: Annotated[str, Field(max_length=200)]
+    aboutClient: Annotated[str, Field(max_length=4000)]
+    aboutRole: Annotated[str, Field(max_length=4000)]
+    workMode: Annotated[str, Field(max_length=200)]
+    location: Annotated[str, Field(max_length=200)]
+    industry: Annotated[str, Field(max_length=200)]
+    techStack: Annotated[list[TechStackItem], Field(max_length=80)]
+    responsibilities: Annotated[list[Responsibility], Field(max_length=60)]
+    requirements: Annotated[list[Requirement], Field(max_length=60)]
+    niceToHave: Annotated[list[NiceToHaveItem], Field(max_length=60)]
+    whyJoin: Annotated[list[WhyJoinItem], Field(max_length=60)]
+    altTitles: Annotated[list[AltTitle], Field(max_length=20)]
+
+
+class Warning1(RootModel[str]):
+    root: Annotated[str, Field(max_length=1000)]
+
+
+class JdBlindedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    rewriteId: BlindRewriteId
+    jd: Annotated[BlindJd | None, Field(...)]
+    error: Annotated[str | None, Field(max_length=2000)]
+    warnings: Annotated[list[Warning1], Field(max_length=10)]
+    retried: bool
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
+
+
 class JdFileId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["jdf_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^jdf_[0-9a-hjkmnp-tv-z]{26}$")
@@ -3192,7 +3337,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -3205,7 +3350,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status2
+    status: Status3
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -3307,7 +3452,7 @@ class FailedJob(BaseModel):
     failedAt: AwareDatetime
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -3317,7 +3462,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status3
+    status: Status4
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -3747,6 +3892,33 @@ class Interview(BaseModel):
 
 class InterviewList(BaseModel):
     items: list[Interview]
+
+
+class BlindRewrite(BaseModel):
+    id: BlindRewriteId
+    adId: JobAdId
+    status: Annotated[Status2, Field(description="done: it is now the ad's blind version.")]
+    tone: BlindRewriteTone
+    strength: BlindRewriteStrength
+    error: Annotated[str | None, Field(description="Why there is no rewrite.")]
+    warnings: Annotated[
+        list[str],
+        Field(
+            description="What to check before using it (tech stack terms missing, wording still close to the ad)."
+        ),
+    ]
+    retried: Annotated[
+        bool,
+        Field(description="The AI was asked once more because its wording was still too close to the ad."),
+    ]
+    model: Annotated[str | None, Field(...)]
+    tokens: Annotated[int, Field(description="AI tokens used (both calls when retried).", ge=0)]
+    createdAt: AwareDatetime
+    finishedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class BlindRewriteList(BaseModel):
+    items: list[BlindRewrite]
 
 
 class JdDetails(BaseModel):

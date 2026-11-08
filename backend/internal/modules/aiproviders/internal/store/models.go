@@ -537,6 +537,23 @@ type JobAd struct {
 	PublishBlind         bool
 }
 
+type JobAdBlindRewrite struct {
+	ID         string
+	TenantID   string
+	AdID       string
+	Status     string
+	Tone       string
+	Strength   string
+	Error      *string
+	Warnings   []string
+	Retried    bool
+	Model      *string
+	Tokens     int32
+	CreatedBy  string
+	CreatedAt  time.Time
+	FinishedAt *time.Time
+}
+
 type JobDescriptionFile struct {
 	ID          string
 	TenantID    string
