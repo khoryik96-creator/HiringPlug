@@ -81,7 +81,7 @@ describe("owners of candidates and jobs", () => {
   it("filter the candidate list to your own", async () => {
     const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null, tags: [], skills: [], industries: [], specializations: [] }));
     renderWithClient(<CandidateList canCreate={false} />);
-    fireEvent.click(await screen.findByLabelText("Mine"));
+    fireEvent.click(await screen.findByLabelText("Mine only"));
     await waitFor(() => {
       const calls = get.mock.calls as unknown as [string, { params?: { query?: { owner?: string } } }][];
       expect(calls.some(([path, init]) => path === "/v1/candidates" && init.params?.query?.owner === "me")).toBe(true);
