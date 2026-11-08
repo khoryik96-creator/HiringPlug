@@ -60,7 +60,7 @@ UPDATE job_ad_blind_rewrite
    SET status = $1, error = $2, warnings = $3, retried = $4,
        model = $5, tokens = $6, finished_at = now()
  WHERE id = $7 AND status = 'queued'
-RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at
+RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at, source_hash
 `
 
 type FinishBlindRewriteParams struct {
@@ -99,12 +99,13 @@ func (q *Queries) FinishBlindRewrite(ctx context.Context, arg FinishBlindRewrite
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.SourceHash,
 	)
 	return i, err
 }
 
 const getBlindRewrite = `-- name: GetBlindRewrite :one
-SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at FROM job_ad_blind_rewrite WHERE id = $1
+SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at, source_hash FROM job_ad_blind_rewrite WHERE id = $1
 `
 
 func (q *Queries) GetBlindRewrite(ctx context.Context, id string) (JobAdBlindRewrite, error) {
@@ -125,6 +126,7 @@ func (q *Queries) GetBlindRewrite(ctx context.Context, id string) (JobAdBlindRew
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.SourceHash,
 	)
 	return i, err
 }
@@ -291,20 +293,26 @@ func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) 
 }
 
 const insertBlindRewrite = `-- name: InsertBlindRewrite :one
-INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
-RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at
+INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, source_hash, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+RETURNING id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at, source_hash
 `
 
 type InsertBlindRewriteParams struct {
-	AdID     string
-	Tone     string
-	Strength string
+	AdID       string
+	Tone       string
+	Strength   string
+	SourceHash *string
 }
 
 // AI rewrites of an ad's blind version (CV Studio's way).
 func (q *Queries) InsertBlindRewrite(ctx context.Context, arg InsertBlindRewriteParams) (JobAdBlindRewrite, error) {
-	row := q.db.QueryRow(ctx, insertBlindRewrite, arg.AdID, arg.Tone, arg.Strength)
+	row := q.db.QueryRow(ctx, insertBlindRewrite,
+		arg.AdID,
+		arg.Tone,
+		arg.Strength,
+		arg.SourceHash,
+	)
 	var i JobAdBlindRewrite
 	err := row.Scan(
 		&i.ID,
@@ -321,6 +329,7 @@ func (q *Queries) InsertBlindRewrite(ctx context.Context, arg InsertBlindRewrite
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.FinishedAt,
+		&i.SourceHash,
 	)
 	return i, err
 }
@@ -612,7 +621,7 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 }
 
 const listBlindRewrites = `-- name: ListBlindRewrites :many
-SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at FROM job_ad_blind_rewrite WHERE ad_id = $1 ORDER BY created_at DESC, id DESC LIMIT 5
+SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at, source_hash FROM job_ad_blind_rewrite WHERE ad_id = $1 ORDER BY created_at DESC, id DESC LIMIT 5
 `
 
 func (q *Queries) ListBlindRewrites(ctx context.Context, adID string) ([]JobAdBlindRewrite, error) {
@@ -639,6 +648,7 @@ func (q *Queries) ListBlindRewrites(ctx context.Context, adID string) ([]JobAdBl
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.FinishedAt,
+			&i.SourceHash,
 		); err != nil {
 			return nil, err
 		}

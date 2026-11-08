@@ -14,6 +14,7 @@ type Summary = Schemas["CandidateSummary"];
 type Look = { label: (list: "candidate_source", key: string) => string };
 
 export const preferencesKey = ["me", "preferences"] as const;
+const saveColumnsKey = ["save-candidate-columns"] as const;
 
 /** What a list shows until its person chooses. */
 export const DEFAULT_COLUMNS: Column[] = ["currentRole", "status", "noticePeriod", "currentSalary", "expectedSalary", "workAuthorization", "email"];
@@ -57,16 +58,19 @@ export function useCandidateColumns() {
   const queryClient = useQueryClient();
   const prefs = useQuery({ queryKey: preferencesKey, queryFn: async () => unwrap(await api.GET("/v1/me/preferences")), staleTime: 60_000 });
   const save = useMutation({
+    mutationKey: saveColumnsKey,
+    // Saves run one after another, so the last choice is the one kept.
+    scope: { id: "candidate-columns" },
     mutationFn: async (candidateColumns: Column[] | null) => unwrap(await api.PUT("/v1/me/preferences", { body: { candidateColumns } })),
-    // The list changes at once; a failed save puts the earlier choice back.
+    // The list changes at once.
     onMutate: async (candidateColumns) => {
       await queryClient.cancelQueries({ queryKey: preferencesKey });
-      const before = queryClient.getQueryData<Schemas["Preferences"]>(preferencesKey);
       queryClient.setQueryData(preferencesKey, { candidateColumns });
-      return { before };
     },
-    onError: (_e, _v, context) => { queryClient.setQueryData(preferencesKey, context?.before); },
-    onSuccess: (p) => { queryClient.setQueryData(preferencesKey, p); },
+    // Once the last save is done (or one failed), show what is saved.
+    onSettled: async () => {
+      if (queryClient.isMutating({ mutationKey: saveColumnsKey }) <= 1) await queryClient.invalidateQueries({ queryKey: preferencesKey });
+    },
   });
   const fs = useFieldSettings();
   return { columns: prefs.data?.candidateColumns ?? DEFAULT_COLUMNS, chosen: prefs.data?.candidateColumns != null, save, look: fs };

@@ -107,6 +107,19 @@ func TestABlindAdIsRewrittenByTheAICVStudiosWay(t *testing.T) {
 		assert.Equal(t, got.BlindDescription.MustGet(), after.BlindDescription.MustGet(), "the blind ad is unchanged")
 	})
 
+	t.Run("changes to the ad while the AI works still mark the blind version out of date", func(t *testing.T) {
+		var again api.BlindRewrite
+		a.request(http.MethodPost, rewrites, token, map[string]any{"tone": "professional", "strength": "medium"}).JSON(&again)
+		claimed := claimAIJobWhere(t, aiConn, "rewriteId", again.Id)
+		current := a.adRequest(http.MethodGet, "/v1/job-ads/"+ad.Id, token, nil, http.StatusOK)
+		a.adRequest(http.MethodPatch, "/v1/job-ads/"+ad.Id, token, map[string]any{
+			"version": current.Version, "description": longAd + "\n- Also run the Penang hub",
+		}, http.StatusOK)
+		answerAIJob(t, a, aiConn, claimed, api.JobKindJdBlinded, rewriteAnswer(again.Id, &jd, ""))
+		after := a.adRequest(http.MethodGet, "/v1/job-ads/"+ad.Id, token, nil, http.StatusOK)
+		assert.True(t, after.BlindOutdated, "the AI rewrote the ad as it was before the Penang hub was added")
+	})
+
 	t.Run("a failed rewrite says why, and its tokens count", func(t *testing.T) {
 		var again api.BlindRewrite
 		a.request(http.MethodPost, rewrites, token, map[string]any{"tone": "professional", "strength": "low"}).JSON(&again)

@@ -18,10 +18,10 @@ const summary = {
 };
 
 /** The list's requests: the candidates, the values in use, the person's columns (default unless given) and the settings. */
-function answer(items: unknown[], columns: string[] | null = null) {
+function answer(items: unknown[], columns: string[] | null | (() => string[] | null) = null) {
   return ((path: string) => {
     if (path === "/v1/candidates") return Promise.resolve(ok({ items, nextCursor: null }));
-    if (path === "/v1/me/preferences") return Promise.resolve(ok({ candidateColumns: columns }));
+    if (path === "/v1/me/preferences") return Promise.resolve(ok({ candidateColumns: typeof columns === "function" ? columns() : columns }));
     if (path === "/v1/settings/fields") return Promise.resolve(ok({ lists: [] }));
     return Promise.resolve(ok({ tags: ["relocate"], skills: ["SAP"], industries: [], specializations: [] }));
   }) as never;
@@ -77,8 +77,12 @@ describe("candidate list", () => {
 
   it("shows the columns the person chose, and saves a new choice for them", async () => {
     const row = { ...summary, nationality: "SG", residenceCountry: "MY", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "spouse_visa" };
-    vi.spyOn(api, "GET").mockImplementation(answer([row], ["nationality", "residence", "workAuthorization"]));
-    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] }));
+    let saved = ["nationality", "residence", "workAuthorization"];
+    vi.spyOn(api, "GET").mockImplementation(answer([row], () => saved));
+    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { candidateColumns: string[] } }) => {
+      saved = init.body.candidateColumns;
+      return Promise.resolve(ok({ candidateColumns: saved }));
+    }) as never);
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByRole("columnheader", { name: "Nationality" });
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
@@ -93,5 +97,22 @@ describe("candidate list", () => {
       expect(put).toHaveBeenCalledWith("/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] } });
     });
     expect(await screen.findByRole("columnheader", { name: "Industry" })).toBeTruthy();
+  });
+
+  it("saves quick changes of columns one after another, so the last one is kept", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary], ["nationality"]));
+    const pending: ((v: unknown) => void)[] = [];
+    const put = vi.spyOn(api, "PUT").mockImplementation((() => new Promise((resolve) => { pending.push(resolve); })) as never);
+    renderWithClient(<CandidateList canCreate={false} />);
+    await screen.findByRole("columnheader", { name: "Nationality" });
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Residence" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Industry" }));
+    expect(await screen.findByRole("columnheader", { name: "Industry" })).toBeTruthy(); // shown at once
+    await new Promise((r) => { setTimeout(r, 50); });
+    expect(put).toHaveBeenCalledTimes(1); // the second waits for the first
+    pending[0]?.(ok({ candidateColumns: ["nationality", "residence"] }));
+    await waitFor(() => { expect(put).toHaveBeenCalledTimes(2); });
+    expect(put.mock.calls[1]).toEqual(["/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "industry"] } }]);
   });
 });

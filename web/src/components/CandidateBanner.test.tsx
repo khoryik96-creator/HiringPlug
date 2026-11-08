@@ -64,6 +64,8 @@ describe("candidate banner", () => {
     expect(sinceText("2026-11-03T02:00:00Z", new Date("2026-11-03T09:00:00Z"))).toBe("since 3 Nov 2026 · today");
     expect(sinceText("2026-11-02T02:00:00Z", new Date("2026-11-03T09:00:00Z"))).toBe("since 2 Nov 2026 · 1 day");
     expect(sinceText(null)).toBeNull();
+    // Calendar days, as the date says: set late yesterday is "1 day", not "today".
+    expect(sinceText(new Date(2026, 10, 7, 23, 0).toISOString(), new Date(2026, 10, 8, 9, 0))).toBe("since 7 Nov 2026 · 1 day");
   });
 
   it("says when the salary is restricted for the role", () => {

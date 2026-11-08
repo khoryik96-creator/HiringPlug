@@ -68,7 +68,9 @@ func (s *Service) StartBlindRewrite(ctx context.Context, p authz.Principal, adID
 			return err
 		}
 		blind := Blind(ad.Details, client)
-		if out, err = q.InsertBlindRewrite(ctx, store.InsertBlindRewriteParams{AdID: adID, Tone: o.Tone, Strength: o.Strength}); err != nil {
+		if out, err = q.InsertBlindRewrite(ctx, store.InsertBlindRewriteParams{
+			AdID: adID, Tone: o.Tone, Strength: o.Strength, SourceHash: strPtr(SourceHash(ad.Details)), // the ad it is made from
+		}); err != nil {
 			return err
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJdBlind, api.JdBlindJob{
@@ -99,7 +101,24 @@ func (s *Service) ListBlindRewrites(ctx context.Context, p authz.Principal, adID
 		out, err = q.ListBlindRewrites(ctx, adID)
 		return err
 	})
-	return out, err
+	return expireStale(out, time.Now()), err
+}
+
+// RewriteGivesUpAfter is how long a rewrite may stay queued before it is
+// shown as failed: its AI job died (the worker stopped, or every attempt
+// failed) and no answer will come. An answer that still arrives is used.
+const RewriteGivesUpAfter = 30 * time.Minute
+
+// expireStale shows rewrites queued for too long as failed, so the ad can be
+// rewritten again.
+func expireStale(runs []BlindRewrite, now time.Time) []BlindRewrite {
+	for i, r := range runs {
+		if r.Status == "queued" && now.Sub(r.CreatedAt) > RewriteGivesUpAfter {
+			reason := "It took too long: the AI did not answer. Try again."
+			runs[i].Status, runs[i].Error = "failed", &reason
+		}
+	}
+	return runs
 }
 
 // saveBlindRewrite handles jd.blinded: the AI's blind job description
@@ -152,6 +171,9 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 		return finish("failed", &reason)
 	}
 	hash := SourceHash(ad.Details)
+	if run.SourceHash != nil { // the ad as it was sent: later changes still mark the blind version out of date
+		hash = *run.SourceHash
+	}
 	if _, err := q.SetAdBlindText(ctx, store.SetAdBlindTextParams{
 		ID: ad.ID, BlindTitleEdit: &title, BlindDescriptionEdit: nonEmpty(text), BlindSourceHash: &hash,
 	}); err != nil {

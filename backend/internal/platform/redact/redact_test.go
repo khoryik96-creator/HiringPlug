@@ -54,3 +54,16 @@ func TestTheNameIsFoundWhereItReadsAsThePerson(t *testing.T) {
 		assert.Equal(t, c.scrubbed, Scrub(c.text, id), c.name)
 	}
 }
+
+func TestNamesInScriptsWithoutCapitalsAreFound(t *testing.T) {
+	chinese := IdentityOf("陈 伟明", "", "")
+	assert.Equal(t, "Contact the candidate for details", Scrub("Contact 伟明 for details", chinese))
+	assert.Equal(t, "推荐the candidate担任经理", Scrub("推荐伟明担任经理", chinese), "Chinese has no spaces between words")
+	assert.Equal(t, []string{"name"}, Found("由伟明负责", chinese))
+
+	tamil := IdentityOf("Kumar முருகன்", "", "")
+	assert.Equal(t, "Referee: the candidate", Scrub("Referee: முருகன்", tamil))
+	assert.Equal(t, "முருகன்கள்", Scrub("முருகன்கள்", tamil), "inside a longer Tamil word it is not the name")
+
+	assert.Equal(t, "a grace period", Scrub("a grace period", IdentityOf("Grace Tan", "", "")), "Latin keeps its rule: capitals only")
+}

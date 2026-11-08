@@ -5,8 +5,15 @@ package jobs
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+)
+
+// The longest blind title and text an ad keeps (as for a person's edit).
+const (
+	MaxBlindTitle = 200
+	MaxBlindText  = 20000
 )
 
 // MinRewriteText is the least job description CV Studio rewrites (it asks
@@ -53,7 +60,7 @@ func RemoveAlso(own *string, c Client) string {
 // do, What you need to succeed, Nice to have, Why join us), as plain text
 // with "• " bullets (the ad's own format).
 func RewriteText(jd api.BlindJd, fallbackTitle string) (title, text string) {
-	title = oneLine(jd.JobTitle)
+	title = clipText(oneLine(jd.JobTitle), MaxBlindTitle)
 	if title == "" {
 		title = fallbackTitle
 	}
@@ -100,7 +107,20 @@ func RewriteText(jd api.BlindJd, fallbackTitle string) (title, text string) {
 	section("What you need to succeed", bullets(jd.Requirements))
 	section("Nice to have", bullets(jd.NiceToHave))
 	section("Why join us", bullets(jd.WhyJoin))
-	return title, b.String()
+	return title, clipLines(b.String(), MaxBlindText)
+}
+
+// clipLines keeps text within n characters, ending at a whole line when it
+// has to be cut.
+func clipLines(text string, n int) string {
+	if utf8.RuneCountInString(text) <= n {
+		return text
+	}
+	cut := clipText(text, n)
+	if i := strings.LastIndex(cut, "\n"); i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " \n")
 }
 
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }

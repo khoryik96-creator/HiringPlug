@@ -163,8 +163,8 @@ WHERE id = @id;
 
 -- AI rewrites of an ad's blind version (CV Studio's way).
 -- name: InsertBlindRewrite :one
-INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, created_by)
-VALUES (app_current_tenant(), @ad_id, @tone, @strength, app_current_user())
+INSERT INTO job_ad_blind_rewrite (tenant_id, ad_id, tone, strength, source_hash, created_by)
+VALUES (app_current_tenant(), @ad_id, @tone, @strength, @source_hash, app_current_user())
 RETURNING *;
 
 -- name: GetBlindRewrite :one

@@ -59,4 +59,13 @@ func TestLeaksReadTheFileAsWordShowsIt(t *testing.T) {
 	leaks, err = Leaks(docx(t, `<w:p><w:r><w:t>Audit Senior, Jan 2020 - May 2023; based in Petaling Jaya</w:t></w:r></w:p>`), id)
 	require.NoError(t, err)
 	assert.Empty(t, leaks, "a month, not the candidate: the blind CV is saved")
+
+	box := `<w:p><w:r><w:t>Profile</w:t></w:r><w:r><w:pict><w:txbxContent><w:p><w:r><w:t>Candidate C-4F2K9Q</w:t></w:r></w:p></w:txbxContent></w:pict></w:r>` +
+		`<w:r><w:t xml:space="preserve"> prepared by </w:t></w:r><w:r><w:t>Siew</w:t></w:r></w:p>`
+	leaks, err = Leaks(docx(t, box), id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"name"}, leaks, "text after a text box, in the paragraph that holds it")
+	leaks, err = Leaks(docx(t, `<w:p><w:r><w:t>Auditor</w:t><w:tab/><w:t>Siew</w:t></w:r></w:p>`), id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"name"}, leaks, "a tab between words is a space")
 }

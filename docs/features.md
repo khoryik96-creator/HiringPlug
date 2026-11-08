@@ -406,6 +406,10 @@ lead's company (with the built-in email check).
   stack, What you will do, What you need to succeed, Nice to have, Why join
   us), as a person's edit would; Go refuses one that still names the client.
   What to check (tech terms missing, wording still close) is shown with it.
+  It is cut at a whole line to the blind text's 20,000 characters. If the ad
+  is changed while the AI works, the blind version is marked out of date (it
+  was made from the earlier text); one with no answer after 30 minutes (the
+  AI worker stopped) shows as failed so the ad can be rewritten again.
   Its tokens count in the monthly AI allowance.
 - **Job ads** ✅: the advertised text of a job, separate from the internal job
   order (a job can have several), with its own country (the job's unless chosen). Each has its own title, location, work type

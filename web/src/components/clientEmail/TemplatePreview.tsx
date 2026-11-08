@@ -5,12 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, unwrap } from "../../api/client";
+import { ErrorMessage } from "../ErrorMessage";
 import { showBanners, withoutCaretMarks } from "./richText";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** The value after it has stopped changing for a moment. */
-function useSettled<T>(value: T, ms = 300): T {
+/** The value after it has stopped changing for a moment (a string: compared by value). */
+function useSettled(value: string, ms = 300): string {
   const [settled, setSettled] = useState(value);
   useEffect(() => {
     const t = setTimeout(() => { setSettled(value); }, ms);
@@ -30,11 +31,12 @@ export function TemplatePreview({ subject, html, bannerUrls }: Props) {
     queryFn: async () => unwrap(await api.GET("/v1/candidates", { params: { query: { q: search, limit: 5 } } })).items,
     enabled: search.length > 1 && !who,
   });
-  const body = useSettled({ subject, html: withoutCaretMarks(html) });
+  const settledSubject = useSettled(subject);
+  const settledHtml = useSettled(withoutCaretMarks(html));
   const preview = useQuery({
-    queryKey: ["template-preview", who?.id, body],
+    queryKey: ["template-preview", who?.id, settledSubject, settledHtml],
     queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: body.subject, bodyHtml: body.html, candidateId: who?.id, timeZone: timeZone() },
+      body: { subject: settledSubject, bodyHtml: settledHtml, candidateId: who?.id, timeZone: timeZone() },
     })),
     enabled: !!who,
     placeholderData: (previous) => previous,
@@ -66,6 +68,7 @@ export function TemplatePreview({ subject, html, bannerUrls }: Props) {
         </ul>
       )}
       {!who && <p className="muted small">The fields you put in show this candidate&apos;s values here as you write; the template keeps the fields.</p>}
+      <ErrorMessage error={who ? preview.error : found.error} />
       {who && preview.data && (
         <div className="email-preview">
           <p><span className="muted">Subject:</span> {preview.data.subject}</p>

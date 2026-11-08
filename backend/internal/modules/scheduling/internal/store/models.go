@@ -553,6 +553,7 @@ type JobAdBlindRewrite struct {
 	CreatedBy  string
 	CreatedAt  time.Time
 	FinishedAt *time.Time
+	SourceHash *string
 }
 
 type JobDescriptionFile struct {

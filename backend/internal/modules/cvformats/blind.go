@@ -60,15 +60,18 @@ func Blind(d Data, c Candidate, ref string) Data {
 }
 
 var (
-	tagRe       = regexp.MustCompile(`<[^>]*>`)
-	paragraphRe = regexp.MustCompile(`(?s)<w:p[ >].*?</w:p>|<w:p/>`)
-	runTextRe   = regexp.MustCompile(`<w:(?:t|delText|instrText)(?: [^>]*)?>([^<]*)</w:(?:t|delText|instrText)>`)
+	tagRe = regexp.MustCompile(`<[^>]*>`)
+	// In document order: a run's text, or where a line or space falls
+	// (a paragraph's end, a text box's start, a tab, a break).
+	textTokenRe = regexp.MustCompile(`<w:(?:t|delText|instrText)(?: [^>]*)?>([^<]*)</w:(?:t|delText|instrText)>|</w:p>|<w:p/>|<w:txbxContent[ >]|<w:(?:tab|br|cr)(?: [^>]*)?/>`)
 	targetRe    = regexp.MustCompile(`Target="([^"]*)"`)
 )
 
 // fileText is a Word file's text as a reader sees it: each paragraph's runs
 // joined (Word splits words across runs: "Ali" + "ce" is Alice), paragraphs
-// on their own lines, then its properties and every link's address.
+// and text boxes on their own lines (a text box sits inside a paragraph,
+// whose text goes on after it), tabs and breaks as spaces; then its
+// properties and every link's address.
 func fileText(contents map[string][]byte) string {
 	var all strings.Builder
 	for name, b := range contents {
@@ -78,12 +81,17 @@ func fileText(contents map[string][]byte) string {
 				all.WriteString(html.UnescapeString(string(m[1])) + "\n")
 			}
 		case strings.HasPrefix(name, "word/") && strings.HasSuffix(name, ".xml"):
-			for _, p := range paragraphRe.FindAll(b, -1) {
-				for _, m := range runTextRe.FindAllSubmatch(p, -1) {
+			for _, m := range textTokenRe.FindAllSubmatch(b, -1) {
+				switch tok := string(m[0]); {
+				case strings.HasPrefix(tok, "</w:p") || strings.HasPrefix(tok, "<w:p/") || strings.HasPrefix(tok, "<w:txbxContent"):
+					all.WriteString("\n")
+				case strings.HasPrefix(tok, "<w:tab") || strings.HasPrefix(tok, "<w:br") || strings.HasPrefix(tok, "<w:cr"):
+					all.WriteString(" ")
+				default:
 					all.WriteString(html.UnescapeString(string(m[1])))
 				}
-				all.WriteString("\n")
 			}
+			all.WriteString("\n")
 		case strings.HasSuffix(name, ".xml"): // properties: author, title, company...
 			all.WriteString(html.UnescapeString(tagRe.ReplaceAllString(string(b), "\n")) + "\n")
 		}
