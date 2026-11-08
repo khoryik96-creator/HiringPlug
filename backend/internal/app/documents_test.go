@@ -200,9 +200,22 @@ func claimAIJobWhere(t *testing.T, conn *pgx.Conn, key, value string) claimedJob
 	require.NoError(t, err)
 	var j claimedJob
 	var reqID *string
-	err = conn.QueryRow(ctx, `SELECT id, tenant_id, kind, payload, request_id FROM job_claim('ai', 'python-test', 60)`).
-		Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID)
-	require.NoError(t, err, "no AI job found for %s", value)
+	for range 20 {
+		err = conn.QueryRow(ctx, `SELECT id, tenant_id, kind, payload, request_id FROM job_claim('ai', 'python-test', 60)`).
+			Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID)
+		require.NoError(t, err, "no AI job found for %s", value)
+		var mine bool
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT payload->>$1 = $2 FROM job WHERE id = $3`, key, value, j.ID).Scan(&mine))
+		if mine {
+			break
+		}
+		// Another test's job came first: one it claimed earlier and left
+		// unfinished, claimable again once its test lease ran out (it was
+		// moved to the front then too). Put it back and claim again.
+		_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'pending', attempts = greatest(attempts - 1, 0),
+			locked_by = NULL, locked_until = NULL, run_after = now(), priority = 9 WHERE id = $1`, j.ID)
+		require.NoError(t, err)
+	}
 	// Others that matched (a Word CV's PDF copy has the same documentId) go
 	// back, so they do not jump ahead in another test's claim.
 	_, err = testutil.Current.Admin.Exec(ctx,
@@ -319,4 +332,31 @@ func TestAWordCVGetsAPDFCopyToPreview(t *testing.T) {
 	// Leave the AI queue tidy for other tests.
 	_, err := testutil.Current.Admin.Exec(ctx, `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
 	require.NoError(t, err)
+}
+
+// A job another test claimed and left unfinished is claimable again once its
+// test lease runs out, and was moved to the front when it was claimed: the
+// claim must still return this test's job (seen in CI: an assistant test got
+// another test's CV job).
+func TestAClaimSkipsAnotherTestsLapsedJob(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	enqueue := func(doc string) string {
+		var id string
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT job_enqueue($1, 'ai', 'document.extract_text', $2::jsonb, 'req_test')`,
+			tenant.ID, `{"documentId": "`+doc+`"}`).Scan(&id))
+		return id
+	}
+	lapsed := enqueue("doc_lapsed_" + tenant.ID)
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET status = 'running', locked_by = 'python-test', priority = 1,
+		run_after = now() - interval '2 hours', locked_until = now() - interval '1 minute' WHERE id = $1`, lapsed)
+	require.NoError(t, err)
+	mine := "doc_mine_" + tenant.ID
+	enqueue(mine)
+	got := claimAIJobWhere(t, aiConnFor(t), "documentId", mine)
+	assert.Contains(t, string(got.Payload), mine)
+	var status string
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT status FROM job WHERE id = $1`, lapsed).Scan(&status))
+	assert.Contains(t, []string{"pending", "running"}, status, "put back for whoever owns it")
 }
