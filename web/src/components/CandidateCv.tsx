@@ -9,7 +9,8 @@ import { ErrorMessage } from "./ErrorMessage";
 
 const WORD = new Set(["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"]);
 
-export function CandidateCv({ candidateId }: { candidateId: string }) {
+/** highlight: a boolean search whose words to mark (opened from the search's results). */
+export function CandidateCv({ candidateId, highlight = "" }: { candidateId: string; highlight?: string }) {
   const queryClient = useQueryClient();
   const docs = useQuery({
     queryKey: ["documents", candidateId],
@@ -36,7 +37,7 @@ export function CandidateCv({ candidateId }: { candidateId: string }) {
   const shown = doc.data && fromList ? { ...doc.data, pdfStatus: fromList.pdfStatus } : doc.data;
   return (
     <div className="candidate-cv">
-      <CvPane title="CV" docs={list} doc={shown} selected={selected} onSelect={setPicked} />
+      <CvPane title="CV" docs={list} doc={shown} selected={selected} onSelect={setPicked} highlight={highlight} />
     </div>
   );
 }

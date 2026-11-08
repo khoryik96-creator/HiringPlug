@@ -91,3 +91,32 @@ INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current
 -- Tokens the AI used reading the company's CVs since a time.
 -- name: AITokensSince :one
 SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= @since;
+
+-- Advanced search: the candidates with a CV (read, not formatted) matching
+-- a boolean search (as a text search query), up to a limit.
+-- name: CandidatesWithMatchingCV :many
+SELECT DISTINCT candidate_id::text FROM cv_search
+WHERE terms @@ to_tsquery('english', @ts::text)
+LIMIT @row_limit;
+
+-- Where each candidate's best matching CV matches: the words found between
+-- [[ and ]].
+-- name: CVSnippets :many
+WITH q AS (SELECT to_tsquery('english', @ts::text) AS query),
+best AS (
+  SELECT DISTINCT ON (s.candidate_id) s.candidate_id, s.document_id
+  FROM cv_search s, q
+  WHERE s.candidate_id = ANY (@candidate_ids::text[]) AND s.terms @@ q.query
+  ORDER BY s.candidate_id, ts_rank_cd(s.terms, q.query, 32) DESC, s.document_id DESC
+)
+SELECT b.candidate_id::text AS candidate_id,
+       ts_headline('english', d.extracted_text, q.query,
+         'MaxFragments=2, MaxWords=18, MinWords=8, FragmentDelimiter=" ... ", StartSel=[[, StopSel=]]')::text AS snippet
+FROM best b JOIN document d ON d.id = b.document_id, q;
+
+-- A document's whole text with a search's words marked (between \x01 and
+-- \x02, characters no CV text holds).
+-- name: HighlightDocumentText :one
+SELECT ts_headline('english', coalesce(extracted_text, ''), to_tsquery('english', @ts::text),
+         'HighlightAll=true, StartSel=' || chr(1) || ', StopSel=' || chr(2))::text AS marked
+FROM document WHERE id = @id;

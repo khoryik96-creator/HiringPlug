@@ -117,6 +117,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Advanced search - filters and a boolean search of their CVs and profiles, newest first
+         * @description Every filter given must hold. The boolean (SAP AND (BW OR BPC) NOT internship, "project manager", manag*) is looked for in the candidate's CVs (each one read, not formatted ones) and in their profile (title, company, skills, tags, industry, specialization, location); a candidate is found when either matches. Each hit says where, with a snippet of the CV and the words to highlight.
+         */
+        post: operations["searchCandidates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/used-values": {
         parameters: {
             query?: never;
@@ -747,6 +767,25 @@ export interface paths {
         };
         /** Get a document, including its extracted text */
         get: operations["getDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/documents/{documentId}/highlights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A document's text with the words of a boolean search marked */
+        get: operations["highlightDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2964,6 +3003,61 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        CandidateSearch: {
+            /** @description Name, email, phone, title or company, as the quick search. */
+            q?: string;
+            /** @description AND, OR, NOT (or -word), ( ), "phrases", word*; words side by side must all appear. */
+            boolean?: string;
+            availability?: components["schemas"]["CandidateAvailability"][];
+            workAuthorization?: components["schemas"]["WorkAuthorizationKind"][];
+            nationality?: components["schemas"]["CountryCode"][];
+            residence?: components["schemas"]["CountryCode"][];
+            source?: string[];
+            industry?: string[];
+            skills?: string[];
+            /**
+             * @description Whether a candidate needs every skill listed, or any one of them.
+             * @default all
+             * @enum {string}
+             */
+            skillsMatch: "all" | "any";
+            tags?: string[];
+            /** @description Part of where they are (ignoring case). */
+            location?: string;
+            /** @description Notice period at most this long (a month counts as 30 days); those without one are left out. */
+            noticeMaxDays?: number;
+            /** @description Expected salary (its lowest figure) at most this, per month (a year counts as 12 months, a day as 22 days, an hour as 176 hours), in this currency. Only for roles that may see salaries. */
+            expectedSalaryMax?: components["schemas"]["SalaryCap"];
+            /** @description A user id, or "me". */
+            owner?: string;
+            updatedWithinDays?: number;
+            /** @default 25 */
+            limit: number;
+            cursor?: components["schemas"]["CandidateId"];
+        };
+        SalaryCap: {
+            /** @example 12000 */
+            amount: string;
+            currency: components["schemas"]["CurrencyCode"];
+        };
+        /**
+         * @description How the list colours a candidate: local; pr (permanent resident); expat (RP-T, spouse visa or other pass held); needs_pass; unknown.
+         * @enum {string}
+         */
+        WorkAuthorizationKind: "local" | "pr" | "expat" | "needs_pass" | "unknown";
+        CandidateSearchHit: {
+            candidate: components["schemas"]["CandidateSummary"];
+            /** @description Where the boolean was found (empty without one). */
+            matchedIn: ("cv" | "profile")[];
+            /** @description Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ..."). */
+            cvSnippet: string | null;
+        };
+        CandidateSearchPage: {
+            items: components["schemas"]["CandidateSearchHit"][];
+            nextCursor: components["schemas"]["CandidateId"] | null;
+            /** @description The boolean's words and phrases to highlight (not those left out with NOT). */
+            terms: string[];
+        };
         CandidatePage: {
             items: components["schemas"]["CandidateSummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
@@ -3397,6 +3491,16 @@ export interface components {
         FormattedCv: {
             documentId: components["schemas"]["DocumentId"];
             fileName: string;
+        };
+        DocumentHighlights: {
+            /** @description The text in order; parts with match true are the words found (as the search matches them, other forms included). */
+            parts: components["schemas"]["DocumentHighlightPart"][];
+            /** @description How many places match. */
+            matches: number;
+        };
+        DocumentHighlightPart: {
+            text: string;
+            match: boolean;
         };
         /** @example doc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         DocumentId: string;
@@ -6076,6 +6180,33 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    searchCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateSearch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateSearchPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listCandidateUsedValues: {
         parameters: {
             query?: never;
@@ -7207,6 +7338,34 @@ export interface operations {
                     "application/json": components["schemas"]["Document"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    highlightDocument: {
+        parameters: {
+            query: {
+                boolean: string;
+            };
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentHighlights"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

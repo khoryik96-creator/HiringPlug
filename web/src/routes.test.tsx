@@ -12,6 +12,8 @@ describe("the route table", () => {
     expect([r.route.section, r.id]).toEqual(["candidates", "cand_01jbz6w0m0k8q9x2r3s4t5v6w7"]);
     expect(resolve("#/candidates/cand_01jbz6w0m0k8q9x2r3s4t5v6w7/screening", RECRUITER).route.path.source).toContain("screening");
     expect(resolve("#/jobs/jo_01jbz6w0m0k8q9x2r3s4t5v6w7", RECRUITER).id).toBe("jo_01jbz6w0m0k8q9x2r3s4t5v6w7");
+    const searched = resolve("#/candidates/cand_01jbz6w0m0k8q9x2r3s4t5v6w7?hl=SAP%20AND%20BW", RECRUITER);
+    expect([searched.route.path.source, searched.id]).toEqual([r.route.path.source, "cand_01jbz6w0m0k8q9x2r3s4t5v6w7"]); // what it is given does not change the page
   });
 
   it("never opens a page the user may not open", () => {

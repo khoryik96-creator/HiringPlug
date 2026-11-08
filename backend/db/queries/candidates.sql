@@ -79,6 +79,56 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
 ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC, c.id DESC
 LIMIT @row_limit;
 
+-- Advanced search: every filter given must hold. With @ts (a boolean
+-- search as a text search query), a candidate is found when their profile
+-- matches or they are one of @cv_ids (whose CVs match, found by the
+-- documents module); a profile match does not count for @excluded_ids
+-- (whose CVs have a word left out with NOT). Newest first, keyset
+-- pagination on id.
+-- name: SearchCandidates :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry,
+       (sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text))::boolean AS profile_hit
+FROM candidate c
+WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
+  AND (sqlc.narg(query)::text IS NULL
+       OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+       OR c.phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
+  AND (sqlc.narg(ts)::text IS NULL
+       OR (c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) AND NOT c.id = ANY (@excluded_ids::text[]))
+       OR c.id = ANY (@cv_ids::text[]))
+  AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
+  AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
+         WHEN c.work_authorization = 'local' THEN 'local'
+         WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
+         WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
+         WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
+         ELSE 'unknown' END) = ANY (@wa_kinds::text[]))
+  AND (cardinality(@nationality::text[]) = 0 OR c.nationality = ANY (@nationality::text[]))
+  AND (cardinality(@residence::text[]) = 0 OR c.residence_country = ANY (@residence::text[]))
+  AND (cardinality(@sources::text[]) = 0 OR c.source = ANY (@sources::text[]))
+  AND (cardinality(@industries::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array(@industries::text[])))
+  AND (cardinality(@skills::text[]) = 0
+       OR (@all_skills::boolean AND app_lower_array(c.skills) @> app_lower_array(@skills::text[]))
+       OR (NOT @all_skills::boolean AND app_lower_array(c.skills) && app_lower_array(@skills::text[])))
+  AND (cardinality(@tags::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array(@tags::text[]))
+  AND (sqlc.narg(location)::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace(sqlc.narg(location)::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND (sqlc.narg(notice_max_days)::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= sqlc.narg(notice_max_days)::int))
+  -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
+  AND (sqlc.narg(salary_max)::text IS NULL OR EXISTS (
+       SELECT 1 FROM candidate_compensation cc
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = sqlc.narg(salary_currency)::text
+         AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
+             <= (sqlc.narg(salary_max)::text)::numeric))
+  AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
+ORDER BY c.id DESC
+LIMIT @row_limit;
+
 -- Amounts are numeric in the database; the Go code converts them to and
 -- from exact decimal strings, so no precision is ever lost.
 -- A page of candidates' salaries. Row-level security shows them only to

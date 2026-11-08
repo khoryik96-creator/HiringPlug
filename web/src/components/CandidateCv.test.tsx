@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
@@ -66,5 +66,20 @@ describe("the candidate's CV", () => {
     renderWithClient(<CandidateCv candidateId="cand_1" />);
     await waitFor(() => { expect(api.GET).toHaveBeenCalled(); });
     expect(document.querySelector(".candidate-cv")).toBeNull();
+  });
+
+  it("opened from a search, shows the text with the search's words marked", async () => {
+    serve([doc("doc_p", "application/pdf", null, "cv.pdf")]);
+    const get = api.GET as unknown as ReturnType<typeof vi.fn>;
+    const served = get.getMockImplementation() as (path: string, init: unknown) => Promise<unknown>;
+    get.mockImplementation(((path: string, init: unknown) => path === "/v1/documents/{documentId}/highlights"
+      ? Promise.resolve(ok({ parts: [{ text: "Led ", match: false }, { text: "SAP", match: true }, { text: " upgrades", match: false }], matches: 1 }))
+      : served(path, init)) as never);
+    renderWithClient(<CandidateCv candidateId="cand_1" highlight="SAP NOT intern" />);
+    expect((await screen.findByText("SAP")).tagName).toBe("MARK");
+    expect(screen.getByRole("status").textContent).toContain("1 place for");
+    expect(get).toHaveBeenCalledWith("/v1/documents/{documentId}/highlights", { params: { path: { documentId: "doc_p" }, query: { boolean: "SAP NOT intern" } } });
+    fireEvent.click(screen.getByRole("button", { name: "Stop marking" }));
+    expect(await screen.findByText("text of cv.pdf")).toBeTruthy();
   });
 });

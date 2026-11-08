@@ -22,6 +22,85 @@ func (q *Queries) AITokensSince(ctx context.Context, since time.Time) (int64, er
 	return column_1, err
 }
 
+const cVSnippets = `-- name: CVSnippets :many
+WITH q AS (SELECT to_tsquery('english', $1::text) AS query),
+best AS (
+  SELECT DISTINCT ON (s.candidate_id) s.candidate_id, s.document_id
+  FROM cv_search s, q
+  WHERE s.candidate_id = ANY ($2::text[]) AND s.terms @@ q.query
+  ORDER BY s.candidate_id, ts_rank_cd(s.terms, q.query, 32) DESC, s.document_id DESC
+)
+SELECT b.candidate_id::text AS candidate_id,
+       ts_headline('english', d.extracted_text, q.query,
+         'MaxFragments=2, MaxWords=18, MinWords=8, FragmentDelimiter=" ... ", StartSel=[[, StopSel=]]')::text AS snippet
+FROM best b JOIN document d ON d.id = b.document_id, q
+`
+
+type CVSnippetsParams struct {
+	Ts           string
+	CandidateIds []string
+}
+
+type CVSnippetsRow struct {
+	CandidateID string
+	Snippet     string
+}
+
+// Where each candidate's best matching CV matches: the words found between
+// [[ and ]].
+func (q *Queries) CVSnippets(ctx context.Context, arg CVSnippetsParams) ([]CVSnippetsRow, error) {
+	rows, err := q.db.Query(ctx, cVSnippets, arg.Ts, arg.CandidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CVSnippetsRow
+	for rows.Next() {
+		var i CVSnippetsRow
+		if err := rows.Scan(&i.CandidateID, &i.Snippet); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const candidatesWithMatchingCV = `-- name: CandidatesWithMatchingCV :many
+SELECT DISTINCT candidate_id::text FROM cv_search
+WHERE terms @@ to_tsquery('english', $1::text)
+LIMIT $2
+`
+
+type CandidatesWithMatchingCVParams struct {
+	Ts       string
+	RowLimit int32
+}
+
+// Advanced search: the candidates with a CV (read, not formatted) matching
+// a boolean search (as a text search query), up to a limit.
+func (q *Queries) CandidatesWithMatchingCV(ctx context.Context, arg CandidatesWithMatchingCVParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, candidatesWithMatchingCV, arg.Ts, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var candidate_id string
+		if err := rows.Scan(&candidate_id); err != nil {
+			return nil, err
+		}
+		items = append(items, candidate_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error FROM document WHERE id = $1
 `
@@ -56,6 +135,26 @@ func (q *Queries) GetDocument(ctx context.Context, id string) (Document, error) 
 		&i.PdfError,
 	)
 	return i, err
+}
+
+const highlightDocumentText = `-- name: HighlightDocumentText :one
+SELECT ts_headline('english', coalesce(extracted_text, ''), to_tsquery('english', $1::text),
+         'HighlightAll=true, StartSel=' || chr(1) || ', StopSel=' || chr(2))::text AS marked
+FROM document WHERE id = $2
+`
+
+type HighlightDocumentTextParams struct {
+	Ts string
+	ID string
+}
+
+// A document's whole text with a search's words marked (between \x01 and
+// \x02, characters no CV text holds).
+func (q *Queries) HighlightDocumentText(ctx context.Context, arg HighlightDocumentTextParams) (string, error) {
+	row := q.db.QueryRow(ctx, highlightDocumentText, arg.Ts, arg.ID)
+	var marked string
+	err := row.Scan(&marked)
+	return marked, err
 }
 
 const insertDocument = `-- name: InsertDocument :one

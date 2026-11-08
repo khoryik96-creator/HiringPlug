@@ -2,11 +2,12 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { ok, renderWithClient } from "../test-utils";
+import { ok, renderWithClient, sentBody, testFieldSettings } from "../test-utils";
 import { CandidateList } from "./CandidateList";
 
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -22,24 +23,50 @@ function answer(items: unknown[], columns: string[] | null | (() => string[] | n
   return ((path: string) => {
     if (path === "/v1/candidates") return Promise.resolve(ok({ items, nextCursor: null }));
     if (path === "/v1/me/preferences") return Promise.resolve(ok({ candidateColumns: typeof columns === "function" ? columns() : columns }));
-    if (path === "/v1/settings/fields") return Promise.resolve(ok({ lists: [] }));
+    if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
     return Promise.resolve(ok({ tags: ["relocate"], skills: ["SAP"], industries: [], specializations: [] }));
   }) as never;
 }
 
 describe("candidate list", () => {
-  it("filters by skill and tag from the values already in use, and shows tags by the name", async () => {
-    const get = vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+  it("shows tags by the name", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);
     expect(await screen.findByText("Siti Aisyah")).toBeTruthy();
     expect(screen.getAllByText("relocate").some((el) => el.classList.contains("chip"))).toBe(true);
+  });
 
-    fireEvent.change(await screen.findByLabelText("Skill"), { target: { value: "SAP" } });
-    await screen.findByRole("option", { name: "relocate" });
-    fireEvent.change(screen.getByLabelText("Tag"), { target: { value: "relocate" } });
-    await waitFor(() => {
-      expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { skill: "SAP", tag: "relocate" } } });
+  it("searches with a boolean and dropdowns, marks where the CV matches, and opens the CV with the words marked", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({
+      items: [{ candidate: { ...summary, fullName: "Aina" }, matchedIn: ["cv"], cvSnippet: "Led [[SAP]] [[BW]] upgrades" }],
+      nextCursor: null, terms: ["sap", "bw"],
+    }));
+    renderWithClient(<CandidateList canCreate canSeeSalary />);
+    await screen.findByText("Siti Aisyah");
+    fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
+    fireEvent.change(screen.getByPlaceholderText(/SAP AND/), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
+    expect(screen.getByText("internship").className).toBe("bool-not"); // read as left out
+    fireEvent.click(screen.getByRole("button", { name: /^Skills/ }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "SAP" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Looking out" }));
+    fireEvent.change(screen.getByLabelText(/Expects at most/), { target: { value: "12,000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({
+      limit: 25, skillsMatch: "all", boolean: "SAP AND (BW OR BPC) NOT internship", skills: ["SAP"], availability: ["looking"],
+      expectedSalaryMax: { amount: "12000", currency: "MYR" },
     });
+    const link = await screen.findByRole("link", { name: "Aina" });
+    expect(link.getAttribute("href")).toBe("#/candidates/cand_01jbz6w0m0k8q9x2r3s4t5v6w7?hl=" + encodeURIComponent("SAP AND (BW OR BPC) NOT internship"));
+    expect(screen.getAllByText(/^(SAP|BW)$/).filter((el) => el.tagName === "MARK")).toHaveLength(2);
+    expect(screen.queryByPlaceholderText("First name")).toBeNull(); // adding waits while searching
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Status: Looking out" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect((sentBody(post, 1) as { availability?: string[] }).availability).toBeUndefined();
   });
 
   it("shows each candidate's status and since when, notice period and salaries, or that salary is restricted", async () => {

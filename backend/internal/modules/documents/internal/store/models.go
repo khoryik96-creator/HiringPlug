@@ -184,6 +184,7 @@ type Candidate struct {
 	NameText               *string
 	PhoneDigits            *string
 	AvailabilitySince      *time.Time
+	ProfileTerms           interface{}
 }
 
 type CandidateCompensation struct {

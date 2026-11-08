@@ -196,6 +196,30 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/documents/{documentId}/highlights:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: highlightDocument
+      tags: [documents]
+      summary: A document's text with the words of a boolean search marked
+      x-permission: documents:read
+      parameters:
+        - name: boolean
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentHighlights' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   parameters:
     DocumentIdPath:
@@ -205,6 +229,21 @@ components:
       schema: { $ref: '#/components/schemas/DocumentId' }
 
   schemas:
+    DocumentHighlights:
+      type: object
+      required: [parts, matches]
+      properties:
+        parts:
+          type: array
+          description: The text in order; parts with match true are the words found (as the search matches them, other forms included).
+          items: { $ref: '#/components/schemas/DocumentHighlightPart' }
+        matches: { type: integer, description: How many places match. }
+    DocumentHighlightPart:
+      type: object
+      required: [text, match]
+      properties:
+        text: { type: string }
+        match: { type: boolean }
     DocumentId:
       type: string
       pattern: '^doc_[0-9a-hjkmnp-tv-z]{26}$'

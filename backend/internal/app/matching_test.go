@@ -36,13 +36,14 @@ func (a *testApp) scoreFit(token, applicationID string) api.Match {
 }
 
 // withCV uploads a CV for the candidate and plays the AI worker reading its text.
-func withCV(t *testing.T, a *testApp, aiConn *pgx.Conn, token, candidateID, text string) {
+func withCV(t *testing.T, a *testApp, aiConn *pgx.Conn, token, candidateID, text string) string {
 	t.Helper()
 	res := a.upload("/v1/candidates/"+candidateID+"/documents", token, "original", "cv.pdf", minimalPDF)
 	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 	var doc api.Document
 	res.JSON(&doc)
 	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, text))
+	return doc.Id
 }
 
 // aiScores plays the Python worker: it claims the match's question and answers it.

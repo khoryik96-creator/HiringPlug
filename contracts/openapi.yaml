@@ -426,6 +426,29 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/search:
+    post:
+      operationId: searchCandidates
+      tags: [candidates]
+      summary: Advanced search - filters and a boolean search of their CVs and profiles, newest first
+      description: >
+        Every filter given must hold. The boolean (SAP AND (BW OR BPC) NOT internship, "project manager", manag*) is looked for in the candidate's CVs (each one read, not formatted ones) and in their profile (title, company, skills, tags, industry, specialization, location); a candidate is found when either matches. Each hit says where, with a snippet of the CV and the words to highlight.
+
+      x-permission: candidates:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CandidateSearch'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CandidateSearchPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/candidates/used-values:
     get:
       operationId: listCandidateUsedValues
@@ -1310,6 +1333,29 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Document'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/documents/{documentId}/highlights:
+    parameters:
+      - $ref: '#/components/parameters/DocumentIdPath'
+    get:
+      operationId: highlightDocument
+      tags: [documents]
+      summary: A document's text with the words of a boolean search marked
+      x-permission: documents:read
+      parameters:
+        - name: boolean
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 1000}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentHighlights'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -4648,6 +4694,72 @@ components:
           nullable: true
         tags: {type: array, items: {type: string}}
         updatedAt: {type: string, format: date-time}
+    CandidateSearch:
+      type: object
+      additionalProperties: false
+      properties:
+        q: {type: string, maxLength: 200, description: "Name, email, phone, title or company, as the quick search."}
+        boolean: {type: string, maxLength: 1000, description: "AND, OR, NOT (or -word), ( ), \"phrases\", word*; words side by side must all appear."}
+        availability: {type: array, maxItems: 4, items: {$ref: '#/components/schemas/CandidateAvailability'}}
+        workAuthorization: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/WorkAuthorizationKind'}}
+        nationality: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/CountryCode'}}
+        residence: {type: array, maxItems: 50, items: {$ref: '#/components/schemas/CountryCode'}}
+        source: {type: array, maxItems: 30, items: {type: string, minLength: 1, maxLength: 60}}
+        industry: {type: array, maxItems: 30, items: {type: string, minLength: 1, maxLength: 100}}
+        skills: {type: array, maxItems: 20, items: {type: string, minLength: 1, maxLength: 60}}
+        skillsMatch:
+          type: string
+          enum: [all, any]
+          default: all
+          description: Whether a candidate needs every skill listed, or any one of them.
+        tags: {type: array, maxItems: 20, items: {type: string, minLength: 1, maxLength: 60}}
+        location: {type: string, maxLength: 100, description: Part of where they are (ignoring case).}
+        noticeMaxDays: {type: integer, minimum: 0, maximum: 365, description: "Notice period at most this long (a month counts as 30 days); those without one are left out."}
+        expectedSalaryMax:
+          description: "Expected salary (its lowest figure) at most this, per month (a year counts as 12 months, a day as 22 days, an hour as 176 hours), in this currency. Only for roles that may see salaries."
+          allOf: [{$ref: '#/components/schemas/SalaryCap'}]
+        owner: {type: string, minLength: 1, maxLength: 40, description: 'A user id, or "me".'}
+        updatedWithinDays: {type: integer, minimum: 1, maximum: 3650}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 25}
+        cursor: {$ref: '#/components/schemas/CandidateId'}
+    SalaryCap:
+      type: object
+      additionalProperties: false
+      required: [amount, currency]
+      properties:
+        amount: {type: string, pattern: '^[0-9]{1,12}(\.[0-9]{1,2})?$', example: "12000"}
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+    WorkAuthorizationKind:
+      type: string
+      description: "How the list colours a candidate: local; pr (permanent resident); expat (RP-T, spouse visa or other pass held); needs_pass; unknown."
+      enum: [local, pr, expat, needs_pass, unknown]
+    CandidateSearchHit:
+      type: object
+      required: [candidate, matchedIn, cvSnippet]
+      properties:
+        candidate: {$ref: '#/components/schemas/CandidateSummary'}
+        matchedIn:
+          type: array
+          description: Where the boolean was found (empty without one).
+          items: {type: string, enum: [cv, profile]}
+        cvSnippet:
+          type: string
+          nullable: true
+          description: "Where the CV matches, the words found between [[ and ]] (\"... led [[SAP]] [[BW]] upgrades ...\")."
+    CandidateSearchPage:
+      type: object
+      required: [items, nextCursor, terms]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/CandidateSearchHit'}
+        nextCursor:
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        terms:
+          type: array
+          description: The boolean's words and phrases to highlight (not those left out with NOT).
+          items: {type: string}
     CandidatePage:
       type: object
       required: [items, nextCursor]
@@ -5213,6 +5325,21 @@ components:
       properties:
         documentId: {$ref: '#/components/schemas/DocumentId'}
         fileName: {type: string}
+    DocumentHighlights:
+      type: object
+      required: [parts, matches]
+      properties:
+        parts:
+          type: array
+          description: The text in order; parts with match true are the words found (as the search matches them, other forms included).
+          items: {$ref: '#/components/schemas/DocumentHighlightPart'}
+        matches: {type: integer, description: How many places match.}
+    DocumentHighlightPart:
+      type: object
+      required: [text, match]
+      properties:
+        text: {type: string}
+        match: {type: boolean}
     DocumentId:
       type: string
       pattern: '^doc_[0-9a-hjkmnp-tv-z]{26}$'

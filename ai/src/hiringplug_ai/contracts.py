@@ -731,6 +731,62 @@ class CandidateSummary(BaseModel):
     updatedAt: AwareDatetime
 
 
+class SourceItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=60, min_length=1)]
+
+
+class IndustryItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, min_length=1)]
+
+
+class SkillsMatch(StrEnum):
+    all = "all"
+    any = "any"
+
+
+class SalaryCap(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    amount: Annotated[str, Field(examples=["12000"], pattern="^[0-9]{1,12}(\\.[0-9]{1,2})?$")]
+    currency: CurrencyCode
+
+
+class WorkAuthorizationKind(StrEnum):
+    local = "local"
+    pr = "pr"
+    expat = "expat"
+    needs_pass = "needs_pass"
+    unknown = "unknown"
+
+
+class MatchedInEnum(StrEnum):
+    cv = "cv"
+    profile = "profile"
+
+
+class CandidateSearchHit(BaseModel):
+    candidate: CandidateSummary
+    matchedIn: Annotated[
+        list[MatchedInEnum], Field(description="Where the boolean was found (empty without one).")
+    ]
+    cvSnippet: Annotated[
+        str | None,
+        Field(
+            description='Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ...").'
+        ),
+    ]
+
+
+class CandidateSearchPage(BaseModel):
+    items: list[CandidateSearchHit]
+    nextCursor: Annotated[CandidateId | None, Field(...)]
+    terms: Annotated[
+        list[str],
+        Field(description="The boolean's words and phrases to highlight (not those left out with NOT)."),
+    ]
+
+
 class CandidatePage(BaseModel):
     items: list[CandidateSummary]
     nextCursor: Annotated[
@@ -1156,6 +1212,11 @@ class CvStudioFormattedJob(BaseModel):
     model: Annotated[str | None, Field(...)]
     inputTokens: Annotated[int, Field(ge=0)]
     outputTokens: Annotated[int, Field(ge=0)]
+
+
+class DocumentHighlightPart(BaseModel):
+    text: str
+    match: bool
 
 
 class DocumentId(RootModel[str]):
@@ -3631,6 +3692,55 @@ class AiProviderEntry(BaseModel):
     check: Annotated[AiProviderCheck | None, Field(...)]
 
 
+class CandidateSearch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    q: Annotated[
+        str | None,
+        Field(description="Name, email, phone, title or company, as the quick search.", max_length=200),
+    ] = None
+    boolean: Annotated[
+        str | None,
+        Field(
+            description='AND, OR, NOT (or -word), ( ), "phrases", word*; words side by side must all appear.',
+            max_length=1000,
+        ),
+    ] = None
+    availability: Annotated[list[CandidateAvailability] | None, Field(max_length=4)] = None
+    workAuthorization: Annotated[list[WorkAuthorizationKind] | None, Field(max_length=5)] = None
+    nationality: Annotated[list[CountryCode] | None, Field(max_length=50)] = None
+    residence: Annotated[list[CountryCode] | None, Field(max_length=50)] = None
+    source: Annotated[list[SourceItem] | None, Field(max_length=30)] = None
+    industry: Annotated[list[IndustryItem] | None, Field(max_length=30)] = None
+    skills: Annotated[list[Skill] | None, Field(max_length=20)] = None
+    skillsMatch: Annotated[
+        SkillsMatch, Field(description="Whether a candidate needs every skill listed, or any one of them.")
+    ] = "all"
+    tags: Annotated[list[Tag] | None, Field(max_length=20)] = None
+    location: Annotated[
+        str | None, Field(description="Part of where they are (ignoring case).", max_length=100)
+    ] = None
+    noticeMaxDays: Annotated[
+        int | None,
+        Field(
+            description="Notice period at most this long (a month counts as 30 days); those without one are left out.",
+            ge=0,
+            le=365,
+        ),
+    ] = None
+    expectedSalaryMax: Annotated[
+        SalaryCap | None,
+        Field(
+            description="Expected salary (its lowest figure) at most this, per month (a year counts as 12 months, a day as 22 days, an hour as 176 hours), in this currency. Only for roles that may see salaries."
+        ),
+    ] = None
+    owner: Annotated[str | None, Field(description='A user id, or "me".', max_length=40, min_length=1)] = None
+    updatedWithinDays: Annotated[int | None, Field(ge=1, le=3650)] = None
+    limit: Annotated[int, Field(ge=1, le=100)] = 25
+    cursor: CandidateId | None = None
+
+
 class ScreeningCallResult(BaseModel):
     candidate: Candidate
     noteId: Annotated[NoteId | None, Field(...)]
@@ -3780,6 +3890,16 @@ class StudioCvList(BaseModel):
 class FormattedCv(BaseModel):
     documentId: DocumentId
     fileName: str
+
+
+class DocumentHighlights(BaseModel):
+    parts: Annotated[
+        list[DocumentHighlightPart],
+        Field(
+            description="The text in order; parts with match true are the words found (as the search matches them, other forms included)."
+        ),
+    ]
+    matches: Annotated[int, Field(description="How many places match.")]
 
 
 class Document(BaseModel):

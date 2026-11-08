@@ -79,7 +79,7 @@ export const ROUTES: Route[] = [
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
-    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} /> },
+    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} canSeeSalary={can(c, "candidates.compensation:read")} /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "companies", path: /^#\/companies/, menu: { in: "main", label: "Companies", href: "#/companies" },
@@ -145,11 +145,12 @@ export function menu(which: "main" | "settings", permissions: readonly Permissio
  * first part they may open; elsewhere the dashboard, or the candidates).
  */
 export function resolve(hash: string, permissions: readonly Permission[]): { route: Route; id: string } {
+  const path = hash.split("?")[0] ?? hash; // "#/candidates/cand_1?hl=SAP": the page, then what it is given
   for (const r of ROUTES) {
-    const m = r.path.exec(hash);
+    const m = r.path.exec(path);
     if (m && allowed(r, permissions)) return { route: r, id: m[1] ?? "" };
   }
-  if (/^#\/settings/.test(hash)) {
+  if (/^#\/settings/.test(path)) {
     const parts = menu("settings", permissions);
     const first = parts.find((r) => !r.unless) ?? parts[0]; // a part they can use, not one that says who can
     if (first) return { route: first, id: "" };

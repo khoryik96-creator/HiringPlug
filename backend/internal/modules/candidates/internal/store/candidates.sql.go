@@ -115,7 +115,7 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -154,6 +154,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -196,7 +197,7 @@ INSERT INTO candidate (
   $16, $17, $18, $19, $20, $21,
   $22, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
 `
 
 type InsertCandidateParams struct {
@@ -285,6 +286,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -759,6 +761,169 @@ func (q *Queries) MoveWorkIfNone(ctx context.Context, arg MoveWorkIfNoneParams) 
 	return err
 }
 
+const searchCandidates = `-- name: SearchCandidates :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry,
+       ($1::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', $1::text))::boolean AS profile_hit
+FROM candidate c
+WHERE ($2::text IS NULL OR c.id < $2::text)
+  AND ($3::text IS NULL
+       OR c.search_text LIKE ALL (app_search_patterns($3::text))
+       OR c.phone_digits LIKE '%' || app_phone_key($3::text) || '%')
+  AND ($1::text IS NULL
+       OR (c.profile_terms @@ to_tsquery('english', $1::text) AND NOT c.id = ANY ($4::text[]))
+       OR c.id = ANY ($5::text[]))
+  AND (cardinality($6::text[]) = 0 OR c.availability = ANY ($6::text[]))
+  AND (cardinality($7::text[]) = 0 OR (CASE
+         WHEN c.work_authorization = 'local' THEN 'local'
+         WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
+         WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
+         WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
+         ELSE 'unknown' END) = ANY ($7::text[]))
+  AND (cardinality($8::text[]) = 0 OR c.nationality = ANY ($8::text[]))
+  AND (cardinality($9::text[]) = 0 OR c.residence_country = ANY ($9::text[]))
+  AND (cardinality($10::text[]) = 0 OR c.source = ANY ($10::text[]))
+  AND (cardinality($11::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($11::text[])))
+  AND (cardinality($12::text[]) = 0
+       OR ($13::boolean AND app_lower_array(c.skills) @> app_lower_array($12::text[]))
+       OR (NOT $13::boolean AND app_lower_array(c.skills) && app_lower_array($12::text[])))
+  AND (cardinality($14::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($14::text[]))
+  AND ($15::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($15::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($16::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $16::int))
+  -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
+  AND ($17::text IS NULL OR EXISTS (
+       SELECT 1 FROM candidate_compensation cc
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $18::text
+         AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
+             <= ($17::text)::numeric))
+  AND ($19::text IS NULL OR c.owner_id = $19::text)
+  AND ($20::int IS NULL OR c.updated_at >= now() - make_interval(days => $20::int))
+ORDER BY c.id DESC
+LIMIT $21
+`
+
+type SearchCandidatesParams struct {
+	Ts                *string
+	Cursor            *string
+	Query             *string
+	ExcludedIds       []string
+	CvIds             []string
+	Availability      []string
+	WaKinds           []string
+	Nationality       []string
+	Residence         []string
+	Sources           []string
+	Industries        []string
+	Skills            []string
+	AllSkills         bool
+	Tags              []string
+	Location          *string
+	NoticeMaxDays     *int32
+	SalaryMax         *string
+	SalaryCurrency    *string
+	Owner             *string
+	UpdatedWithinDays *int32
+	RowLimit          int32
+}
+
+type SearchCandidatesRow struct {
+	ID                     string
+	FirstName              string
+	LastName               string
+	Email                  *string
+	Phone                  *string
+	CurrentTitle           *string
+	CurrentCompany         *string
+	Location               *string
+	WorkAuthorization      *string
+	Tags                   []string
+	UpdatedAt              time.Time
+	Availability           *string
+	AvailabilitySince      *time.Time
+	NoticePeriodValue      *int32
+	NoticePeriodUnit       *string
+	WorkAuthorizationBasis *string
+	Nationality            *string
+	ResidenceCountry       *string
+	Source                 *string
+	Industry               *string
+	ProfileHit             bool
+}
+
+// Advanced search: every filter given must hold. With @ts (a boolean
+// search as a text search query), a candidate is found when their profile
+// matches or they are one of @cv_ids (whose CVs match, found by the
+// documents module); a profile match does not count for @excluded_ids
+// (whose CVs have a word left out with NOT). Newest first, keyset
+// pagination on id.
+func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, searchCandidates,
+		arg.Ts,
+		arg.Cursor,
+		arg.Query,
+		arg.ExcludedIds,
+		arg.CvIds,
+		arg.Availability,
+		arg.WaKinds,
+		arg.Nationality,
+		arg.Residence,
+		arg.Sources,
+		arg.Industries,
+		arg.Skills,
+		arg.AllSkills,
+		arg.Tags,
+		arg.Location,
+		arg.NoticeMaxDays,
+		arg.SalaryMax,
+		arg.SalaryCurrency,
+		arg.Owner,
+		arg.UpdatedWithinDays,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchCandidatesRow
+	for rows.Next() {
+		var i SearchCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Phone,
+			&i.CurrentTitle,
+			&i.CurrentCompany,
+			&i.Location,
+			&i.WorkAuthorization,
+			&i.Tags,
+			&i.UpdatedAt,
+			&i.Availability,
+			&i.AvailabilitySince,
+			&i.NoticePeriodValue,
+			&i.NoticePeriodUnit,
+			&i.WorkAuthorizationBasis,
+			&i.Nationality,
+			&i.ResidenceCountry,
+			&i.Source,
+			&i.Industry,
+			&i.ProfileHit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setCandidateOwner = `-- name: SetCandidateOwner :one
 SELECT app_set_candidate_owner($1::text, $2::text)::boolean AS changed
 `
@@ -848,7 +1013,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
 `
 
 type TouchCandidateParams struct {
@@ -894,6 +1059,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -927,7 +1093,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $22 AND version = $23
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
 `
 
 type UpdateCandidateParams struct {
@@ -1018,6 +1184,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
+		&i.ProfileTerms,
 	)
 	return i, err
 }

@@ -64,6 +64,25 @@ source, industry, tags, phone and last updated; the choice is saved for them
 (`/v1/me/preferences`, readable only by them) and "Back to the default"
 undoes it.
 
+**Advanced search** (Candidates, "Advanced search"): a boolean search of
+their CVs and profiles, as on job boards: `SAP AND (BW OR BPC) NOT
+internship`, `"project manager"`, `manag*` (any ending); words side by side
+must all appear; NOT or -word leaves out (a word left out found in any of
+their CVs leaves them out, even when their profile matches). The box shows
+how it is read (operators, phrases and words left out in their colours).
+Dropdowns narrow it: status, work authorization (local, PR, spousal / RP-T
+/ other pass, needs pass, not known), nationality, where they live, source,
+industry, skills (all or any of them), tags, location, notice period (at
+most), expected salary (at most, RM a month; only for roles that may see
+salaries, and the database enforces it), and when the profile was last
+updated. What is set shows as chips to remove one by one; the search is
+kept while you open candidates and come back. Each result says whether it
+was found in the CV or the profile, with the lines of the CV where the
+words are, marked. Opening a candidate from the results shows their CV as
+text with the words marked ("4 places for ...", "Go to the first", "Stop
+marking"). Words are matched in their other forms (manager, managers), as
+CVs are indexed; symbols are not searchable (C++ is C, .NET is NET).
+
 The web app edits every field above. Salary has its own form, shown only to
 roles with `candidates.compensation:update`; viewers get no edit buttons. Edits
 are protected against lost updates (`version`): a form saves with the version

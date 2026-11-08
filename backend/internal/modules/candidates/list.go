@@ -76,43 +76,56 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 			page.NextCursor = &last
 		}
 		page.Items = make([]Summary, len(rows))
-		ids := make([]string, len(rows))
 		for i, r := range rows {
-			ids[i] = r.ID
-			page.Items[i] = Summary{
-				ID: r.ID, FullName: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}),
-				Email: r.Email, Phone: r.Phone, CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
-				Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, WorkAuthorizationBasis: r.WorkAuthorizationBasis,
-				Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, Source: r.Source, Industry: r.Industry,
-				Tags: r.Tags, UpdatedAt: r.UpdatedAt,
-				Availability: r.Availability, AvailabilitySince: r.AvailabilitySince, SalaryRestricted: !canSeeSalary(p),
-			}
-			if r.NoticePeriodValue != nil && r.NoticePeriodUnit != nil {
-				page.Items[i].NoticePeriod = &NoticePeriod{Value: int(*r.NoticePeriodValue), Unit: *r.NoticePeriodUnit}
-			}
+			page.Items[i] = summaryOf(r, !canSeeSalary(p))
 		}
-		if !canSeeSalary(p) || len(ids) == 0 {
-			return nil
-		}
-		// The database shows salaries only with candidates.compensation:read too.
-		comps, err := store.New(tx).ListCompensations(ctx, ids)
-		if err != nil {
-			return err
-		}
-		byID := make(map[string]store.CandidateCompensation, len(comps))
-		for _, c := range comps {
-			byID[c.CandidateID] = c
-		}
-		for i := range page.Items {
-			if row, ok := byID[page.Items[i].ID]; ok {
-				c, err := fromCompensationRow(row)
-				if err != nil {
-					return err
-				}
-				page.Items[i].Compensation = &c
-			}
-		}
-		return nil
+		return attachCompensation(ctx, tx, p, page.Items)
 	})
 	return page, err
+}
+
+// attachCompensation adds salaries to a page of summaries, for those who may
+// see them (the database shows them only with candidates.compensation:read too).
+func attachCompensation(ctx context.Context, tx pgx.Tx, p authz.Principal, items []Summary) error {
+	if !canSeeSalary(p) || len(items) == 0 {
+		return nil
+	}
+	ids := make([]string, len(items))
+	for i := range items {
+		ids[i] = items[i].ID
+	}
+	comps, err := store.New(tx).ListCompensations(ctx, ids)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]store.CandidateCompensation, len(comps))
+	for _, c := range comps {
+		byID[c.CandidateID] = c
+	}
+	for i := range items {
+		if row, ok := byID[items[i].ID]; ok {
+			c, err := fromCompensationRow(row)
+			if err != nil {
+				return err
+			}
+			items[i].Compensation = &c
+		}
+	}
+	return nil
+}
+
+// summaryOf is a listed row as a summary (salary added after).
+func summaryOf(r store.ListCandidatesRow, salaryRestricted bool) Summary {
+	out := Summary{
+		ID: r.ID, FullName: FullName(Profile{FirstName: r.FirstName, LastName: r.LastName}),
+		Email: r.Email, Phone: r.Phone, CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
+		Location: r.Location, WorkAuthorizationStatus: r.WorkAuthorization, WorkAuthorizationBasis: r.WorkAuthorizationBasis,
+		Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, Source: r.Source, Industry: r.Industry,
+		Tags: r.Tags, UpdatedAt: r.UpdatedAt,
+		Availability: r.Availability, AvailabilitySince: r.AvailabilitySince, SalaryRestricted: salaryRestricted,
+	}
+	if r.NoticePeriodValue != nil && r.NoticePeriodUnit != nil {
+		out.NoticePeriod = &NoticePeriod{Value: int(*r.NoticePeriodValue), Unit: *r.NoticePeriodUnit}
+	}
+	return out
 }

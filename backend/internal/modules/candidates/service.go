@@ -28,6 +28,7 @@ type Service struct {
 	rules       FieldRules // the company's mandatory fields and sources
 	movers      []RecordMover
 	notes       Notes // screening calls' notes
+	cvs         CVs   // CV text, for advanced search
 }
 
 // Create adds a candidate.
