@@ -201,12 +201,43 @@ only code that touches it). In CV Studio's own order:
 3. CV Studio's rules tidy and reconcile it with the text and run its fidelity
    check; anything that may be lost or changed comes back as a **warning** the
    recruiter sees ("compare it with the CV before sending").
-4. For a blind CV the AI anonymises it with CV Studio's blind prompt (optionally
-   "the candidate" instead of he or she), then CV Studio's deterministic sweeps
-   run; Go checks the finished file for the candidate's name, email and phone
-   before saving it, and never saves one that shows them.
+4. For a blind CV, exactly as CV Studio's `/blind` route: the reading in step 2
+   keeps the CV's own About / Summary section as written (CV Studio's
+   `preserve_source_summary`); the summary is prepared (taken from an About /
+   Summary group of skills when there is no other) and lines stating pay are
+   removed from it; the AI is sent "Anonymise this parsed CV JSON:" and the
+   prepared CV with CV Studio's blind prompt (optionally "the candidate"
+   instead of he or she); then CV Studio's five checks run in its order
+   (restore structure, summary, employers, the candidate's identity,
+   normalize) against the prepared CV. When CV Studio refuses an answer (a
+   summary bullet lost or still naming the candidate) its own reason is shown.
 5. CV Studio's renderer (`node generate.js`, a time limit) writes the Word file,
    with the Word file's own bullet depth when the source was Word.
+6. A blind file is checked as the client would open it, twice: the AI worker
+   runs CV Studio's identity sweep over all of the file's text (body,
+   headers, footers, properties, link addresses; runs joined as Word shows
+   them) and refuses it when the sweep would still change anything; Go then
+   checks it for the candidate's name, email and phone as HiringPlug holds
+   them, by the same name rules (below), and never saves one that shows them.
+   Its file name carries a reference (`Candidate C-1A2B3C - Blind CV`), never
+   the name.
+
+**Names follow CV Studio's rules everywhere** (`platform/redact`, used by the
+blind checks, blind CVs from the profile, blind job ads and what the AI
+assistant and matching see). The whole name is found in any case; a single
+name word only where it reads as the person: written with a capital, three
+letters or more, not one of CV Studio's everyday, month, place, lineage or
+technology words, and not after a lineage word ("binti Rahman" is the
+father). So "May 2023", "Petaling Jaya", "a grace period" and "bin Abdul" no
+longer count as the candidate (before, such a blind CV was refused, or the
+words were replaced). The word lists are `redact/name_words.json`, kept equal
+to the engine's by `ai/tests/test_name_words.py`.
+
+**Long CVs.** Reading a whole CV into JSON and writing it again anonymised
+takes minutes for a long CV, so CV Studio's two AI calls may each take
+`HP_AI_LONG_TIMEOUT_SECONDS` (300; CV Studio allows 180 for DeepSeek and
+ChatGPT), and before each long step the worker extends its claim on the job
+(`job_extend`), so no second worker takes it and pays for the same calls.
 
 Go saves it as the candidate's `formatted` CV (a PDF follows) and counts the
 tokens in the company's monthly allowance. Every failure comes back as a
@@ -262,7 +293,8 @@ Responses API). A job without `ai` uses the server's own provider,
 `OpenAICompatible` (DeepSeek's API, hosts of its open model, self-hosted
 servers): `HP_AI_PROVIDER` (off / openai_compatible), `HP_AI_PROVIDER_URL`,
 `HP_AI_PROVIDER_KEY` (never logged or printed), `HP_AI_MODEL`,
-`HP_AI_TIMEOUT_SECONDS`. `aiprovider.check` sends a provider a tiny request
+`HP_AI_TIMEOUT_SECONDS` (`HP_AI_LONG_TIMEOUT_SECONDS` for CV Studio's whole-CV
+answers). `aiprovider.check` sends a provider a tiny request
 when a company saves a key and reports back as `aiprovider.checked`. Paid
 requests are sent again only on 429/529; provider error texts (which can echo
 part of a key) are replaced by fixed messages. See

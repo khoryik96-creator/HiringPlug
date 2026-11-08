@@ -4,6 +4,7 @@ package cvformats
 // a CV's data, and checking a finished file for anything left.
 
 import (
+	"html"
 	"regexp"
 	"strings"
 
@@ -58,21 +59,45 @@ func Blind(d Data, c Candidate, ref string) Data {
 	return Data{Values: values, Lists: lists}
 }
 
-var tagRe = regexp.MustCompile(`<[^>]*>`)
+var (
+	tagRe       = regexp.MustCompile(`<[^>]*>`)
+	paragraphRe = regexp.MustCompile(`(?s)<w:p[ >].*?</w:p>|<w:p/>`)
+	runTextRe   = regexp.MustCompile(`<w:(?:t|delText|instrText)(?: [^>]*)?>([^<]*)</w:(?:t|delText|instrText)>`)
+	targetRe    = regexp.MustCompile(`Target="([^"]*)"`)
+)
+
+// fileText is a Word file's text as a reader sees it: each paragraph's runs
+// joined (Word splits words across runs: "Ali" + "ce" is Alice), paragraphs
+// on their own lines, then its properties and every link's address.
+func fileText(contents map[string][]byte) string {
+	var all strings.Builder
+	for name, b := range contents {
+		switch {
+		case strings.HasSuffix(name, ".rels"):
+			for _, m := range targetRe.FindAllSubmatch(b, -1) {
+				all.WriteString(html.UnescapeString(string(m[1])) + "\n")
+			}
+		case strings.HasPrefix(name, "word/") && strings.HasSuffix(name, ".xml"):
+			for _, p := range paragraphRe.FindAll(b, -1) {
+				for _, m := range runTextRe.FindAllSubmatch(p, -1) {
+					all.WriteString(html.UnescapeString(string(m[1])))
+				}
+				all.WriteString("\n")
+			}
+		case strings.HasSuffix(name, ".xml"): // properties: author, title, company...
+			all.WriteString(html.UnescapeString(tagRe.ReplaceAllString(string(b), "\n")) + "\n")
+		}
+	}
+	return all.String()
+}
 
 // Leaks returns what kinds of identifying detail a finished file still holds
-// anywhere (text, headers, footers, properties): "name", "email", "phone".
+// anywhere (text, headers, footers, properties, links): "name", "email",
+// "phone". The name by CV Studio's rules (redact): "May 2023" is a date.
 func Leaks(docx []byte, id Identity) ([]string, error) {
 	_, contents, err := readParts(docx)
 	if err != nil {
 		return nil, err
 	}
-	var all strings.Builder
-	for name, b := range contents {
-		if strings.HasSuffix(name, ".xml") || strings.HasSuffix(name, ".rels") {
-			all.WriteString(tagRe.ReplaceAllString(string(b), " "))
-			all.WriteString("\n")
-		}
-	}
-	return redact.Found(all.String(), id), nil
+	return redact.Found(fileText(contents), id), nil
 }

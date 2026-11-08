@@ -8,6 +8,7 @@ code and easy to test.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -54,16 +55,31 @@ class Deps:
     ai: Provider | None = None  # the server's own provider (HP_AI_*); None: off
     # Builds the provider a company chose in Settings (opens its sealed key).
     connect: Callable[[AiAccess], Provider] | None = None
+    # How long one long AI answer may take (HP_AI_LONG_TIMEOUT_SECONDS).
+    long_timeout_seconds: float | None = None
+    # Keeps this job's claim before a long step (the worker sets it per job);
+    # raises LeaseLostError when another worker took the job.
+    keep_alive: Callable[[], None] = lambda: None
 
-    def provider(self, access: AiAccess | None) -> Provider | None:
+    def provider(self, access: AiAccess | None, *, long: bool = False) -> Provider | None:
         """The provider a job was queued for: the company's choice, or the
-        server's own when it chose none. Raises ProviderError when the
-        company's key cannot be opened."""
+        server's own when it chose none; `long` for answers that take minutes
+        (a whole CV as JSON). Raises ProviderError when the company's key
+        cannot be opened."""
         if access is None:
-            return self.ai
-        if self.connect is None:
+            chosen = self.ai
+        elif self.connect is None:
             raise ProviderError("the AI worker cannot open saved AI keys (HP_AI_KEYS_SECRET is not set)")
-        return self.connect(access)
+        else:
+            chosen = self.connect(access)
+        if (
+            long
+            and self.long_timeout_seconds
+            and dataclasses.is_dataclass(chosen)
+            and hasattr(chosen, "timeout_seconds")
+        ):
+            return dataclasses.replace(chosen, timeout_seconds=self.long_timeout_seconds)
+        return chosen
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ queue retries the job later (or marks it dead after its last attempt).
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import signal
@@ -31,7 +32,7 @@ from .queue import ClaimedJob, LeaseLostError, Queue
 log = logging.getLogger("hiringplug_ai.worker")
 
 
-def process(queue: Queue, job: ClaimedJob, deps: Deps) -> None:
+def process(queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None = None) -> None:
     with logs.context(
         job_id=job.id,
         job_kind=job.kind,
@@ -43,6 +44,8 @@ def process(queue: Queue, job: ClaimedJob, deps: Deps) -> None:
         try:
             handler = HANDLERS[JobKind(job.kind)]
             payload = handler.payload_model.model_validate(job.payload)
+            if lease_seconds:
+                deps = dataclasses.replace(deps, keep_alive=lambda: queue.extend(job, lease_seconds))
             queue.complete(job, handler.run(payload, deps))
             log.info("job done", extra={"duration_ms": int((time.monotonic() - started) * 1000)})
         except LeaseLostError:
@@ -74,6 +77,7 @@ def main() -> None:
         limits=DEFAULT_LIMITS,
         max_download_bytes=config.max_download_bytes,
         ai=ai,
+        long_timeout_seconds=config.ai_long_timeout_seconds,
         connect=(
             (lambda access: connect(access, config.ai_keys_secret, config.ai_timeout_seconds))
             if config.ai_keys_secret
@@ -123,7 +127,7 @@ def run_slot(queue: Queue, deps: Deps, config: Config, stop: threading.Event) ->
             if job is None:
                 queue.wait_for_work(config.poll_seconds)
                 continue
-            process(queue, job, deps)
+            process(queue, job, deps, config.lease_seconds)
         except psycopg.OperationalError:
             log.exception("database unavailable; retrying shortly")
             queue.close()

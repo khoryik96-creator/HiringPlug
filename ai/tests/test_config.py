@@ -24,3 +24,10 @@ def test_every_problem_is_reported_at_once() -> None:
         load_config({"HP_AI_OCR": "maybe", "HP_AI_POLL_SECONDS": "soon", "HP_LOG_LEVEL": "loud"})
     for key in ("HP_AI_DATABASE_URL", "HP_AI_OCR", "HP_AI_POLL_SECONDS", "HP_LOG_LEVEL"):
         assert key in str(err.value)
+
+
+def test_one_long_ai_answer_must_fit_in_a_lease() -> None:
+    config = load_config({"HP_AI_DATABASE_URL": "postgresql://x@localhost/h"})
+    assert config.ai_long_timeout_seconds == 300, "a long CV, read or anonymised, takes minutes"
+    with pytest.raises(ConfigError, match="HP_AI_LONG_TIMEOUT_SECONDS"):
+        load_config({"HP_AI_DATABASE_URL": "postgresql://x@localhost/h", "HP_AI_LONG_TIMEOUT_SECONDS": "580"})

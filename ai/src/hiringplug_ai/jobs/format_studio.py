@@ -14,7 +14,6 @@ the reason, never raised, so the person waiting sees why.
 from __future__ import annotations
 
 import base64
-import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -78,7 +77,7 @@ def run(payload: CvFormatStudioJob, deps: Deps) -> list[FollowUp]:
 def _format(
     payload: CvFormatStudioJob, deps: Deps, tokens: dict[str, int], model: list[str]
 ) -> tuple[bytes, str | None, int]:
-    ai = deps.provider(payload.ai)
+    ai = deps.provider(payload.ai, long=True)  # a whole CV as JSON: minutes for a long one
     if ai is None:
         raise _FailedError("no AI provider is set up")
     data = deps.download(payload.downloadUrl, deps.max_download_bytes)
@@ -89,6 +88,7 @@ def _format(
     source = cvstudio.prepare_source(text)
 
     def ask(system: str, user: str, max_tokens: int) -> dict[str, object]:
+        deps.keep_alive()  # this job stays ours for the call: no second worker pays for it again
         done = ai.complete(system, user, max_tokens=max_tokens)
         tokens["in"] += done.input_tokens
         tokens["out"] += done.output_tokens
@@ -100,7 +100,9 @@ def _format(
 
     parsed = ask(cvstudio.parse_prompt(payload.correctLanguage), source, PARSE_TOKENS)
     try:
-        checked = cvstudio.after_parse(parsed, source, correct_language=payload.correctLanguage)
+        checked = cvstudio.after_parse(
+            parsed, source, correct_language=payload.correctLanguage, keep_source_summary=payload.blind
+        )
     except Exception as exc:
         log.exception("cv studio rules failed")
         raise _FailedError("CV Studio's rules could not use the AI's reading") from exc
@@ -108,22 +110,41 @@ def _format(
     removed += int(checked.get("summary_pay_removed") or 0)
     warning = checked.get("warning") if checked.get("degraded") else None
 
+    identity: dict[str, object] | None = None
     if payload.blind:
-        blinded = ask(
-            cvstudio.blind_prompt(payload.neutralGender), json.dumps(cv, ensure_ascii=False), BLIND_TOKENS
+        prepared, pay = cvstudio.prepare_blind(cv)
+        removed += pay
+        identity = dict(prepared.get("candidate") or {})
+        cv = _blind(
+            prepared,
+            ask(cvstudio.blind_prompt(payload.neutralGender), cvstudio.blind_request(prepared), BLIND_TOKENS),
         )
-        try:
-            cv = cvstudio.after_blind(blinded, cv)
-        except Exception as exc:
-            log.exception("cv studio blind checks failed")
-            raise _FailedError("CV Studio's blind checks could not use the AI's answer") from exc
 
     levels = checked.get("bullet_levels") or []
     if payload.contentType.endswith("wordprocessingml.document"):  # the Word file's own list depth first
         levels = cvstudio.merge_levels(cvstudio.docx_bullet_levels(data), levels)
+    deps.keep_alive()
     try:
         docx = cvstudio.render(cv, alignment=payload.alignment.value, bullet_levels=list(levels))
     except Exception as exc:
         log.exception("cv studio renderer failed")
         raise _FailedError("the Word file could not be made") from exc
+    if identity is not None:  # the file itself, as the client would open it, never only the data
+        left = cvstudio.identity_left(docx, identity)
+        if left:
+            raise _FailedError(
+                f"This blind CV would still show the candidate's {' and '.join(left)}, so it was not saved."
+            )
     return docx, str(warning) if warning else None, removed
+
+
+def _blind(prepared: dict[str, object], answer: dict[str, object]) -> dict[str, object]:
+    """CV Studio's checks of the AI's anonymised CV; its own reason when it refuses one."""
+    try:
+        return cvstudio.after_blind(answer, prepared)
+    except Exception as exc:
+        reason = cvstudio.blind_refusal(exc)
+        if reason is None:
+            log.exception("cv studio blind checks failed")
+            reason = "CV Studio's blind checks could not use the AI's answer"
+        raise _FailedError(reason) from exc

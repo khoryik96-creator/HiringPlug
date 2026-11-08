@@ -96,6 +96,18 @@ class Queue:
             if row is None or not row[0]:
                 raise LeaseLostError(job.id)  # rolls back the follow-ups
 
+    def extend(self, job: ClaimedJob, lease_seconds: int) -> None:
+        """Keep the claim on a job for another lease, before a long step.
+        Raises LeaseLostError when another worker took it: stop, do not pay
+        for work whose result would be discarded."""
+        row = (
+            self._connection()
+            .execute("SELECT job_extend(%s, %s, %s)", (job.id, self.worker_id, lease_seconds))
+            .fetchone()
+        )
+        if row is None or not row[0]:
+            raise LeaseLostError(job.id)
+
     def fail(self, job: ClaimedJob, error: str) -> str:
         """Record a failure. Returns the job's new status: 'pending' (retried later) or 'dead'."""
         row = (

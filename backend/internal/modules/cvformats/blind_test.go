@@ -31,7 +31,7 @@ func TestBlindCv(t *testing.T) {
 	assert.NotContains(t, text, "siti@example.com")
 	assert.NotContains(t, text, "Malaysian", "no nationality")
 	assert.Contains(t, text, "the candidate built the team; call [phone removed]")
-	assert.Contains(t, text, "Summary\nthe candidate the candidate is strong.")
+	assert.Contains(t, text, "Summary\nthe candidate is strong.")
 	leaks, err := Leaks(out, IdentityOf(c))
 	require.NoError(t, err)
 	assert.Empty(t, leaks)
@@ -49,4 +49,14 @@ func TestLeaksAreFoundAnywhere(t *testing.T) {
 	leaks, err = Leaks(docx(t, `<w:p><w:r><w:t>2017 2021 2022 2023</w:t></w:r></w:p>`), IdentityOf(Candidate{FirstName: "X", Phone: ptr("20212022")}))
 	require.NoError(t, err)
 	assert.Empty(t, leaks, "years next to each other are not a phone number")
+}
+
+func TestLeaksReadTheFileAsWordShowsIt(t *testing.T) {
+	id := IdentityOf(Candidate{FirstName: "May", LastName: "Tan Siew Ling", Email: ptr("may@example.com")})
+	leaks, err := Leaks(docx(t, `<w:p><w:r><w:t>Si</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">ew, auditor</w:t></w:r></w:p>`), id)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"name"}, leaks, "a name Word split across runs")
+	leaks, err = Leaks(docx(t, `<w:p><w:r><w:t>Audit Senior, Jan 2020 - May 2023; based in Petaling Jaya</w:t></w:r></w:p>`), id)
+	require.NoError(t, err)
+	assert.Empty(t, leaks, "a month, not the candidate: the blind CV is saved")
 }

@@ -7,7 +7,7 @@ import pytest
 
 from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobJdReadJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
-from hiringplug_ai.jobs import Deps
+from hiringplug_ai.jobs import HANDLERS, Deps, Handler
 from hiringplug_ai.jobs import parse_cv as parse_job
 from hiringplug_ai.queue import ClaimedJob, FollowUp, LeaseLostError
 from hiringplug_ai.worker import process, slot_id
@@ -51,6 +51,13 @@ class FakeQueue:
     def fail(self, job: ClaimedJob, error: str) -> str:
         self.failed.append(error)
         return "pending"
+
+    extended: list[int] = field(default_factory=list)
+
+    def extend(self, job: ClaimedJob, lease_seconds: int) -> None:
+        if self.lose_lease:
+            raise LeaseLostError(job.id)
+        self.extended.append(lease_seconds)
 
 
 def deps(data: bytes = b"", error: Exception | None = None) -> Deps:
@@ -163,3 +170,23 @@ def test_a_parser_crash_is_reported_as_a_failed_parse(monkeypatch: pytest.Monkey
 def test_each_slot_holds_its_own_leases() -> None:
     assert slot_id("py:host:1", 0, 1) == "py:host:1"
     assert [slot_id("py:host:1", i, 3) for i in range(3)] == ["py:host:1/1", "py:host:1/2", "py:host:1/3"]
+
+
+def test_a_handler_can_keep_its_claim_on_a_long_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    def long_step(_payload: object, d: Deps) -> list[FollowUp]:
+        d.keep_alive()
+        d.keep_alive()
+        return []
+
+    kind = JobKind.document_extract_text
+    monkeypatch.setitem(HANDLERS, kind, Handler(HANDLERS[kind].payload_model, long_step))
+    queue = FakeQueue()
+    process(queue, job(), deps(), 600)  # type: ignore[arg-type]
+    assert queue.extended == [600, 600]
+    assert queue.completed == [[]]
+
+    lost = FakeQueue(lose_lease=True)
+    process(lost, job(), deps(), 600)  # type: ignore[arg-type]
+    assert (lost.completed, lost.failed) == ([], []), (
+        "another worker owns it now: nothing more is done or recorded"
+    )

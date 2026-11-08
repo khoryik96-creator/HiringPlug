@@ -148,6 +148,9 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   lost or point at data that was rolled back.
 - **Claimed with a lease.** If a worker dies, the lease expires and another
   worker takes over; the first worker's late result is discarded.
+- **Kept while it runs.** `job_extend` renews a worker's lease before a long
+  step (a CV Studio CV makes two AI calls of minutes each), and tells it to
+  stop when another worker already took the job.
 - **One company only, when asked.** `job_claim_for_tenant` claims only one
   company's jobs (`Worker.Tenant`). Tests use it: they run in parallel on one
   queue, each with its own companies and settings, and a test's worker must

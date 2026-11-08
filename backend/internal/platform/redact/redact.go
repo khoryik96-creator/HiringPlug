@@ -8,26 +8,31 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Identity is what identifies a person in text.
 type Identity struct {
-	Names  []string // name parts, e.g. Siti, Aisyah
+	Full   []string // the whole name's words in order, e.g. Siti, Aisyah, binti, Rahman
+	Names  []string // its words that may name the person alone (no lineage words), e.g. Siti, Aisyah, Rahman
 	Emails []string // lower case
 	Phones []string // digits only
 }
-
-// Malay, Tamil, Arabic and Dutch name connectors are not identifying alone.
-var connectors = []string{"bin", "binti", "bte", "bt", "a/l", "a/p", "al", "el", "van", "de", "der", "von", "s/o", "d/o"}
 
 // IdentityOf gathers a person's name parts, email and phone (empty ones are
 // left out).
 func IdentityOf(name, email, phone string) Identity {
 	var id Identity
-	for _, part := range strings.Fields(name) {
-		part = strings.Trim(part, ".,'\"()")
-		if len([]rune(part)) >= 2 && !slices.Contains(connectors, strings.ToLower(part)) && !slices.Contains(id.Names, part) {
-			id.Names = append(id.Names, part)
+	id.Full = splitName(name)
+	for _, word := range id.Full {
+		if isParticle(word) {
+			continue
+		}
+		// A double-barrelled name stands alone in either form: Smith-Jones and Jones.
+		for _, part := range append([]string{word}, strings.Split(word, "-")...) {
+			if utf8.RuneCountInString(part) >= 2 && !slices.Contains(id.Names, part) {
+				id.Names = append(id.Names, part)
+			}
 		}
 	}
 	if e := strings.TrimSpace(email); e != "" {
@@ -69,13 +74,9 @@ func isPhone(m string) bool {
 	return false
 }
 
-// nameRe matches a name part as a whole word, in any case.
-func nameRe(name string) *regexp.Regexp {
-	return regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}])` + regexp.QuoteMeta(name) + `($|[^\p{L}\p{N}])`)
-}
-
 // Scrub takes identifying details out of free text: every email, link and
-// phone number (8 digits or more), and the person's names ("the candidate").
+// phone number (8 digits or more), and the person's name where it reads as
+// them (names.go: CV Studio's rules), as "the candidate".
 func Scrub(text string, id Identity) string { return ScrubWith(text, id, "the candidate") }
 
 // ScrubWith is Scrub with the words that replace a name.
@@ -88,10 +89,7 @@ func ScrubWith(text string, id Identity, name string) string {
 		}
 		return m
 	})
-	for _, n := range id.Names {
-		text = nameRe(n).ReplaceAllString(text, "${1}"+strings.ReplaceAll(name, "$", "$$")+"${2}")
-	}
-	return text
+	return id.replaceNames(text, name)
 }
 
 // Found returns what kinds of the person's details text still holds:
@@ -99,11 +97,8 @@ func ScrubWith(text string, id Identity, name string) string {
 func Found(text string, id Identity) []string {
 	lower := strings.ToLower(text)
 	var kinds []string
-	for _, n := range id.Names {
-		if nameRe(n).MatchString(text) {
-			kinds = append(kinds, "name")
-			break
-		}
+	if len(id.nameSpans(text)) > 0 {
+		kinds = append(kinds, "name")
 	}
 	for _, e := range id.Emails {
 		if strings.Contains(lower, e) {

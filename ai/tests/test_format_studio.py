@@ -10,15 +10,17 @@ import json
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import docx
 import pytest
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
 from hiringplug_ai import cvstudio
 from hiringplug_ai.contracts import CvFormatStudioJob, CvStudioFormattedJob, JobKind
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import Deps, format_studio
-from hiringplug_ai.providers import Completion, ProviderError
+from hiringplug_ai.providers import Completion, OpenAICompatible, ProviderError
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "cvstudio" / "examples"
 SOURCE = (EXAMPLES / "synthetic-source.txt").read_text(encoding="utf-8")
@@ -68,13 +70,19 @@ def job(**over: object) -> CvFormatStudioJob:
     return CvFormatStudioJob.model_validate(values)
 
 
-def run(ai: FakeAI | None, payload: CvFormatStudioJob, data: bytes | None = None) -> CvStudioFormattedJob:
+def run(
+    ai: FakeAI | None,
+    payload: CvFormatStudioJob,
+    data: bytes | None = None,
+    keep_alive: Callable[[], None] | None = None,
+) -> CvStudioFormattedJob:
     deps = Deps(
         download=lambda _u, _m: data or a_docx(SOURCE),
         ocr=None,
         limits=DEFAULT_LIMITS,
         max_download_bytes=10_000_000,
         ai=ai,
+        keep_alive=keep_alive or (lambda: None),
     )
     [follow_up] = format_studio.run(payload, deps)
     assert follow_up.queue == "core"
@@ -118,11 +126,21 @@ def test_language_correction_swaps_in_cv_studios_fuller_instruction() -> None:
     assert "Correct the casing of well-known technology" in prompt
 
 
+def sent_cv(sent: str) -> dict[str, Any]:
+    """The CV's JSON in a blind request, after CV Studio's opening line."""
+    assert sent.startswith(cvstudio.BLIND_REQUEST), "CV Studio's /blind request"
+    value = json.loads(sent[len(cvstudio.BLIND_REQUEST) :])
+    assert isinstance(value, dict)
+    return value
+
+
+def anonymise(sent: str) -> str:  # what a provider does with what it is given
+    cv = sent_cv(sent)
+    cv["candidate"].update(name="Candidate", email="[Email Redacted]", phone="[Phone Redacted]")
+    return json.dumps(cv)
+
+
 def test_a_blind_cv_is_anonymised_by_the_ai_and_checked_by_cv_studio() -> None:
-    def anonymise(sent: str) -> str:  # what a provider does with what it is given
-        cv = json.loads(sent)
-        cv["candidate"].update(name="Candidate", email="[Email Redacted]", phone="[Phone Redacted]")
-        return json.dumps(cv)
 
     ai = FakeAI(json.dumps(PARSED), anonymise)
     result = run(ai, job(blind=True, neutralGender=True))
@@ -174,3 +192,136 @@ def test_only_statements_of_the_candidates_own_pay_are_left_out(line: str, dropp
     assert removed == (1 if dropped else 0)
     assert text.startswith("Siti Aisyah\n")
     assert text.endswith("Senior Accountant")
+
+
+def test_a_blind_cv_keeps_the_cvs_own_summary_without_pay_as_cv_studio_does() -> None:
+    ai = FakeAI(json.dumps(PARSED), anonymise)
+    result = run(ai, job(blind=True))
+    assert result.error is None
+    summary = sent_cv(ai.calls[1][1])["summary_bullets"]
+    # The CV's own PROFILE section, as written (not the AI's re-wording, whose
+    # bold markers show it), with the pay line gone before any AI saw it.
+    assert summary == [
+        "Infrastructure engineer with cloud operations experience."
+        " Delivered automation and disaster recovery improvements."
+    ]
+    assert result.payStatementsRemoved == 1
+    assert result.docxBase64 is not None
+    assert "Delivered automation and disaster recovery improvements." in word_text(result.docxBase64)
+
+
+def test_a_summary_kept_among_the_skills_is_prepared_and_its_pay_removed() -> None:
+    cv: dict[str, Any] = {
+        "candidate": {"name": "Nur Example"},
+        "skills": [
+            {
+                "category": "About",
+                "items": ["Auditor with 5 years in statutory audit.", "Expected salary RM 8,000"],
+            },
+            {"category": "Technical Skills", "items": ["SAP"]},
+        ],
+    }
+    prepared, removed = cvstudio.prepare_blind(cv)
+    assert prepared["summary_bullets"] == ["Auditor with 5 years in statutory audit."]
+    assert prepared["skills"] == [{"category": "Technical Skills", "items": ["SAP"]}]
+    assert removed == 1
+    assert cv["skills"][0]["category"] == "About", "the CV given is not changed"
+
+
+def test_a_blind_answer_that_loses_a_summary_bullet_is_refused_with_cv_studios_reason() -> None:
+    def drops_the_summary(sent: str) -> str:
+        cv = json.loads(anonymise(sent))
+        cv["summary_bullets"] = []
+        return json.dumps(cv)
+
+    result = run(FakeAI(json.dumps(PARSED), drops_the_summary), job(blind=True))
+    assert result.docxBase64 is None
+    assert result.error == (
+        "CV Studio's blind checks stopped it:"
+        " Blind CV could not preserve every About Him / Her summary bullet"
+    )
+    assert result.inputTokens == 10000, "both paid calls are counted"
+
+
+def test_only_cv_studios_own_blind_reasons_are_shown() -> None:
+    assert cvstudio.blind_refusal(ValueError("invalid literal for int(): 'Avery Example'")) is None
+    assert cvstudio.blind_refusal(KeyError("Blind CV x")) is None
+
+
+def test_a_blind_word_file_still_naming_the_candidate_anywhere_is_not_sent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def renders_with_the_author(_cv: object, **_kw: object) -> bytes:
+        d = docx.Document()
+        d.add_paragraph("Candidate - Senior Infrastructure Engineer")
+        d.core_properties.author = "Avery Example"  # e.g. a template that keeps its author
+        buf = io.BytesIO()
+        d.save(buf)
+        return buf.getvalue()
+
+    monkeypatch.setattr(cvstudio, "render", renders_with_the_author)
+    result = run(FakeAI(json.dumps(PARSED), anonymise), job(blind=True))
+    assert result.docxBase64 is None
+    assert result.error == "This blind CV would still show the candidate's name, so it was not saved."
+
+
+def test_the_identity_check_follows_cv_studios_name_rules() -> None:
+    def a_file(*paragraphs: str, link: str | None = None) -> bytes:
+        d = docx.Document()
+        for p in paragraphs:
+            d.add_paragraph(p)
+        if link:
+            part = d.part
+            part.relate_to(link, RT.HYPERLINK, is_external=True)
+        buf = io.BytesIO()
+        d.save(buf)
+        return buf.getvalue()
+
+    may = {
+        "name": "May Tan Siew Ling",
+        "email": "may.tan@example.invalid",
+        "linkedin": "https://linkedin.com/in/maytan",
+    }
+    assert (
+        cvstudio.identity_left(a_file("Audit Senior, Jan 2020 - May 2023", "Based in Petaling Jaya"), may)
+        == []
+    )
+    assert cvstudio.identity_left(a_file("Siew Ling led the audit."), may) == ["name"]
+    assert cvstudio.identity_left(a_file("Candidate", link="mailto:may.tan@example.invalid"), may) == [
+        "email"
+    ]
+    assert cvstudio.identity_left(a_file("Reach me at someone.else@example.invalid"), may) == ["email"], (
+        "any address"
+    )
+    assert cvstudio.identity_left(a_file("See www.linkedin.com/in/maytan"), may) == ["link"]
+
+
+def test_the_job_keeps_its_claim_before_each_long_step() -> None:
+    steps: list[str] = []
+    ai = FakeAI(json.dumps(PARSED), anonymise)
+    original = ai.complete
+
+    def complete(system: str, user: str, *, max_tokens: int) -> Completion:
+        steps.append("ai")
+        return original(system, user, max_tokens=max_tokens)
+
+    ai.complete = complete  # type: ignore[method-assign]
+    result = run(ai, job(blind=True), keep_alive=lambda: steps.append("keep"))
+    assert result.error is None
+    assert steps == ["keep", "ai", "keep", "ai", "keep"], "before each AI call and the renderer"
+
+
+def test_a_long_answer_gets_the_long_time_limit() -> None:
+    server = OpenAICompatible("https://ai.test/v1", "k", "m", timeout_seconds=90)
+    deps = Deps(
+        download=lambda _u, _m: b"",
+        ocr=None,
+        limits=DEFAULT_LIMITS,
+        max_download_bytes=1,
+        ai=server,
+        long_timeout_seconds=300,
+    )
+    long = deps.provider(None, long=True)
+    assert isinstance(long, OpenAICompatible)
+    assert (long.timeout_seconds, server.timeout_seconds) == (300, 90)
+    assert deps.provider(None) is server

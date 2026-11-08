@@ -177,3 +177,26 @@ def test_after_losing_the_lease_nothing_is_committed(database: dict[str, str]) -
 def test_the_ai_role_cannot_read_candidate_data(database: dict[str, str]) -> None:
     with psycopg.connect(database["ai"]) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
         conn.execute("SELECT count(*) FROM candidate")
+
+
+def test_a_long_job_keeps_its_claim_until_another_worker_takes_it(database: dict[str, str]) -> None:
+    job_id = enqueue_ai_job(database["admin"], database["tenant"])
+    queue = Queue(database["ai"], "pytest-worker")
+    job = queue.claim(lease_seconds=60)
+    assert job is not None
+
+    def lease_left() -> float:
+        with psycopg.connect(database["admin"]) as admin:
+            row = admin.execute(
+                "SELECT extract(epoch FROM locked_until - now()) FROM job WHERE id = %s", (job_id,)
+            ).fetchone()
+        assert row is not None
+        return float(row[0])
+
+    queue.extend(job, 600)
+    assert lease_left() > 500, "the worker's own role may extend its lease"
+    with psycopg.connect(database["admin"], autocommit=True) as admin:
+        admin.execute("UPDATE job SET locked_by = 'someone-else' WHERE id = %s", (job_id,))
+    with pytest.raises(LeaseLostError):
+        queue.extend(job, 600)
+    queue.close()

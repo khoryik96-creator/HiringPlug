@@ -33,6 +33,9 @@ class Config:
     ai_key: str = field(default="", repr=False)  # never printed
     ai_model: str = ""
     ai_timeout_seconds: float = 90.0
+    # One long AI answer: CV Studio reads a whole CV into JSON and writes it
+    # again anonymised, several minutes for a long CV (CV Studio allows 180 s).
+    ai_long_timeout_seconds: float = 300.0
     # Opens the API keys companies save in Settings (the API seals them with
     # the same secret). Empty: those keys cannot be used.
     ai_keys_secret: str = field(default="", repr=False)  # never printed
@@ -93,16 +96,26 @@ def load_config(env: Mapping[str, str]) -> Config:
         ai_key=env.get("HP_AI_PROVIDER_KEY", "").strip(),
         ai_model=ai_model,
         ai_timeout_seconds=number("HP_AI_TIMEOUT_SECONDS", 90.0),
+        ai_long_timeout_seconds=number("HP_AI_LONG_TIMEOUT_SECONDS", 300.0),
         ai_keys_secret=env.get("HP_AI_KEYS_SECRET", "").strip(),
     )
+    _check_limits(config, problems)
+    if problems:
+        raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))
+    return config
+
+
+def _check_limits(config: Config, problems: list[str]) -> None:
     if 0 < len(config.ai_keys_secret) < 32:
         problems.append("HP_AI_KEYS_SECRET must be at least 32 characters (or empty)")
     if config.ai_timeout_seconds <= 0 or config.ai_timeout_seconds * 2 >= config.lease_seconds:
         problems.append("HP_AI_TIMEOUT_SECONDS must be positive and well under HP_AI_LEASE_SECONDS")
+    if config.ai_long_timeout_seconds <= 0 or config.ai_long_timeout_seconds + 60 >= config.lease_seconds:
+        # The lease is extended before each long call, so one call must fit in it.
+        problems.append(
+            "HP_AI_LONG_TIMEOUT_SECONDS must be positive and at least a minute under HP_AI_LEASE_SECONDS"
+        )
     if not 1 <= config.concurrency <= 16:
         problems.append("HP_AI_CONCURRENCY must be 1 to 16")
     if config.lease_seconds < 30:
         problems.append("HP_AI_LEASE_SECONDS must be at least 30")
-    if problems:
-        raise ConfigError("invalid configuration:\n  - " + "\n  - ".join(problems))
-    return config

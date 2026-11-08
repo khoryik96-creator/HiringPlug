@@ -37,7 +37,7 @@ func TestTheJobTextHasItsDetailsDescriptionAndAdButNoSalary(t *testing.T) {
 func TestTheCVTextHasNoNameContactsOrSalary(t *testing.T) {
 	got := CVText(Candidate{Name: "Siti Aisyah", Email: "siti@mail.com", Phone: "012-345 6789"},
 		"SITI AISYAH\nsiti@mail.com | 012-345 6789\nAccountant at Contoh, 2019-2023\nExpected salary: RM 8,000")
-	assert.Equal(t, "the candidate the candidate\n[email removed] | [phone removed]\nAccountant at Contoh, 2019-2023\nExpected [salary removed]", got)
+	assert.Equal(t, "the candidate\n[email removed] | [phone removed]\nAccountant at Contoh, 2019-2023\nExpected [salary removed]", got)
 	assert.Empty(t, CVText(Candidate{Name: "X"}, " \n "))
 	assert.True(t, strings.HasSuffix(CVText(Candidate{}, strings.Repeat("a", maxCVText+1)), "[... cut here]"))
 }
