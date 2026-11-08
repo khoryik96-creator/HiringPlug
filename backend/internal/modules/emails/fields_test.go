@@ -59,3 +59,11 @@ func TestHowFieldsAreWritten(t *testing.T) {
 	assert.Equal(t, "Permanent resident", FormatWorkAuthorization("expat_eligible", &pr))
 	assert.Equal(t, "Needs an employment pass", FormatWorkAuthorization("requires_visa", nil))
 }
+
+// The toolbar's indent (as browsers write it) survives saving a template.
+func TestIndentedTextIsKept(t *testing.T) {
+	out := SanitizeHTML(`<blockquote style="margin: 0 0 0 40px; border: none; padding: 0px;"><p>Indented</p></blockquote><div style="margin-left: 40px;">Also</div>`)
+	assert.Contains(t, out, "<blockquote")
+	assert.Contains(t, out, "Indented")
+	assert.Contains(t, out, `style="margin-left: 40px"`)
+}

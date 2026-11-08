@@ -481,7 +481,12 @@ lead's company (with the built-in email check).
   name go to the job's hiring contact; others to the candidate. Every company
   starts with four templates (interview invitation, submit candidate to
   client, application received, unsuccessful application), changed or added
-  to on the templates page (`#/email-templates`). Sending is queued with the email's record and delivered in the
+  to on the templates page (`#/email-templates`), which formats them as CV
+  Studio's email client does (bold, italic, underline, strike, lists,
+  indent and outdent, alignment, links, font, size, colour, banners) with an
+  "Insert field" list for the message and one for the subject (the
+  candidate's name, expected salary...; salary fields fill only for senders
+  who may see salaries). Sending is queued with the email's record and delivered in the
   background by the worker through your mail server (`HP_SMTP_*`): from your
   sending address, shown as "Sender (Company)", with replies going to the
   person who sent it. The candidate's page lists every email with its state

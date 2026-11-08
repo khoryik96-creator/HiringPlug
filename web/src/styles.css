@@ -187,7 +187,9 @@ main.roomy { max-width: 1200px; }
 .rich { margin-top: 0.75rem; }
 .rich .toolbar { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.4rem; }
 .rich .tool { font-size: 0.8rem; padding: 0.25rem 0.55rem; border: 1px solid #d1d5db; border-radius: 999px; background: #fff; cursor: pointer; }
-.rich .toolbar select, .rich .toolbar input[type="color"] { font-size: 0.8rem; }
+.rich .toolbar select, .rich .toolbar input[type="color"] { font-size: 0.8rem; width: auto; }
+.subject-fields select { font-size: 0.85rem; width: auto; }
+.rich .toolbar input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; }
 .rich-box { min-height: 12rem; border: 1.5px solid var(--accent); border-radius: 8px; padding: 0.75rem; background: #fff; font-family: Calibri, Arial, sans-serif; font-size: 12pt; overflow-wrap: anywhere; }
 .rich-box img { max-width: 100%; }
 .attachments ul.plain, ul.plain { list-style: none; padding-left: 0; margin: 0.25rem 0; }

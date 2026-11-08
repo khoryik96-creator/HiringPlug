@@ -1,6 +1,6 @@
 // The message box with its toolbar: bold, italic, underline, strike, lists,
-// alignment, link, clear format, font, size, colour, insert a field
-// ([Expected salary]) or a banner.
+// indent, alignment, link, clear format, font, size, colour, insert a field
+// ([Expected salary]) or a banner. CV Studio's email client, with indent.
 import { useEffect, useRef } from "react";
 
 import type { Schemas } from "../../api/client";
@@ -80,6 +80,8 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         {button("Strike", "strikeThrough", "Strike")}
         {button("Bullets", "insertUnorderedList")}
         {button("Numbered list", "insertOrderedList")}
+        {button("Indent", "indent", "Indent →")}
+        {button("Outdent", "outdent", "← Outdent")}
         {button("Left", "justifyLeft")}
         {button("Center", "justifyCenter")}
         {button("Right", "justifyRight")}

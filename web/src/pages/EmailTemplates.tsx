@@ -1,78 +1,120 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { emailTemplatesKey } from "../api/keys";
+import { RichEditor } from "../components/clientEmail/RichEditor";
+import { plainToHtml, showBanners, withoutCaretMarks } from "../components/clientEmail/richText";
+import { useBanners } from "../components/clientEmail/useBanners";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
 import { fieldErrors } from "../components/forms";
 
 type Template = Schemas["EmailTemplate"];
+type Field = Schemas["EmailField"];
 
-/** The company's email templates: change them, or add one. */
+/** The company's email templates, formatted as CV Studio's email client does: change them, or add one. */
 export function EmailTemplates({ canManage }: { canManage: boolean }) {
   const list = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
+  const { banners, urls, upload } = useBanners();
   const [editing, setEditing] = useState<string | null>(null); // a template id, or "new"
+  const fields = list.data?.fields ?? [];
+  const editor = (template?: Template) => (
+    <TemplateForm key={template?.id ?? "new"} template={template} fields={fields} banners={banners} bannerUrls={urls}
+      onUploadBanner={(f) => { upload.mutate(f); }} onDone={() => { setEditing(null); }} />
+  );
   return (
     <main>
       <h2>Email templates</h2>
-      <ErrorMessage error={list.error} />
-      {list.data && (
-        <p className="muted">
-          Placeholders are filled in when you write an email:{" "}
-          {list.data.placeholders.map((p) => <code key={p}>{`{{${p}}}`} </code>)}
-        </p>
-      )}
+      <ErrorMessage error={list.error ?? upload.error} />
+      <p className="muted">
+        Format the message with the toolbar, and put in fields such as the candidate&apos;s name or expected salary with
+        &ldquo;Insert field&rdquo;: they are filled in from the candidate when you write an email (salary only for those who may see it).
+      </p>
       {list.data?.items.map((t) =>
-        editing === t.id ? (
-          <TemplateForm key={t.id} template={t} onDone={() => { setEditing(null); }} />
-        ) : (
+        editing === t.id ? editor(t) : (
           <section key={t.id} className="panel" aria-label={t.name}>
             <div className="row spread">
               <strong>{t.name}</strong>
               {canManage && <button type="button" className="link" onClick={() => { setEditing(t.id); }}>Change</button>}
             </div>
             <p className="muted">{t.subject}</p>
-            <p className="email-body">{t.body}</p>
+            {t.bodyHtml ? <FormattedBody html={t.bodyHtml} bannerUrls={urls} /> : <p className="email-body">{t.body}</p>}
           </section>
         ),
       )}
-      {canManage && (editing === "new"
-        ? <TemplateForm onDone={() => { setEditing(null); }} />
-        : <button type="button" onClick={() => { setEditing("new"); }}>Add template</button>)}
+      {canManage && (editing === "new" ? editor() : <button type="button" onClick={() => { setEditing("new"); }}>Add template</button>)}
     </main>
   );
 }
 
-function TemplateForm({ template, onDone }: { template?: Template; onDone: () => void }) {
+/** A saved template's message as it was formatted (the server keeps only safe formatting). */
+function FormattedBody({ html, bannerUrls }: { html: string; bannerUrls: Record<string, string> }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => { showBanners(box.current, bannerUrls); }, [html, bannerUrls]);
+  return <div ref={box} className="email-body formatted" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+type FormProps = {
+  template?: Template;
+  fields: Field[];
+  banners: Schemas["EmailBanner"][];
+  bannerUrls: Record<string, string>;
+  onUploadBanner: (file: File) => void;
+  onDone: () => void;
+};
+
+function TemplateForm({ template, fields, banners, bannerUrls, onUploadBanner, onDone }: FormProps) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ name: template?.name ?? "", subject: template?.subject ?? "", body: template?.body ?? "" });
+  const [form, setForm] = useState({ name: template?.name ?? "", subject: template?.subject ?? "" });
+  const [html, setHtml] = useState(() => template?.bodyHtml ?? plainToHtml(template?.body ?? ""));
+  const subject = useRef<HTMLInputElement>(null);
   const save = useMutation({
-    mutationFn: async () => template
-      ? unwrap(await api.PUT("/v1/email-templates/{templateId}", { params: { path: { templateId: template.id } }, body: { version: template.version, ...form } }))
-      : unwrap(await api.POST("/v1/email-templates", { body: form })),
+    mutationFn: async () => {
+      const body = { ...form, bodyHtml: withoutCaretMarks(html) };
+      return template
+        ? unwrap(await api.PUT("/v1/email-templates/{templateId}", { params: { path: { templateId: template.id } }, body: { version: template.version, ...body } }))
+        : unwrap(await api.POST("/v1/email-templates", { body }));
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: emailTemplatesKey });
       onDone();
     },
   });
   const errors = fieldErrors(save.error);
-  const field = (name: keyof typeof form, label: string, multiline = false) => (
-    <label className="field full">{label}
-      {multiline
-        ? <textarea rows={10} value={form[name]} onChange={(e) => { setForm({ ...form, [name]: e.target.value }); }} />
-        : <input value={form[name]} onChange={(e) => { setForm({ ...form, [name]: e.target.value }); }} />}
-      {errors[name] && <span className="warning">{errors[name]}</span>}
-    </label>
-  );
+  const empty = !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  // A field goes in the subject where the cursor is.
+  const toSubject = (token: string) => {
+    const input = subject.current;
+    const at = input?.selectionStart ?? form.subject.length;
+    const end = input?.selectionEnd ?? at;
+    setForm({ ...form, subject: form.subject.slice(0, at) + token + form.subject.slice(end) });
+  };
   return (
     <form className="panel form-grid" aria-label={template ? `Change ${template.name}` : "New template"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-      {field("name", "Name")}
-      {field("subject", "Subject")}
-      {field("body", "Message", true)}
-      <SaveError error={save.error} shown={["name", "subject", "body"]} onReload={() => { void queryClient.invalidateQueries({ queryKey: emailTemplatesKey }); onDone(); }} />
+      <label className="field full">Name
+        <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} />
+        {errors.name && <span className="warning">{errors.name}</span>}
+      </label>
+      <label className="field full">Subject
+        <input ref={subject} value={form.subject} onChange={(e) => { setForm({ ...form, subject: e.target.value }); }} />
+        {errors.subject && <span className="warning">{errors.subject}</span>}
+      </label>
+      <div className="row full subject-fields">
+        <select aria-label="Insert field in subject" value="" onChange={(e) => { if (e.target.value) toSubject(e.target.value); }}>
+          <option value="">Insert field in subject…</option>
+          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}</option>)}
+        </select>
+      </div>
+      <div className="full">
+        <RichEditor html={html} resetKey={0} onChange={setHtml} fields={fields} banners={banners} bannerUrls={bannerUrls}
+          onUploadBanner={onUploadBanner} />
+        {(errors.body ?? errors.bodyHtml) && <span className="warning">{errors.body ?? errors.bodyHtml}</span>}
+      </div>
+      <SaveError error={save.error} shown={["name", "subject", "body", "bodyHtml"]}
+        onReload={() => { void queryClient.invalidateQueries({ queryKey: emailTemplatesKey }); onDone(); }} />
       <div className="row full">
-        <button type="submit" disabled={save.isPending || !form.name.trim() || !form.subject.trim() || !form.body.trim()}>Save</button>
+        <button type="submit" disabled={save.isPending || !form.name.trim() || !form.subject.trim() || empty}>Save</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>
