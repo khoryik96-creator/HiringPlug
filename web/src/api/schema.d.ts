@@ -5430,7 +5430,7 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects").
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call).
          * @enum {string}
          */
         FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check";

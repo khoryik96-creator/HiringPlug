@@ -70,9 +70,10 @@ var lists = []listDef{
 	{name: "work_arrangement", label: "Work arrangement", fixed: true, defaults: opts(
 		"onsite", "On site", "hybrid", "Hybrid", "remote", "Remote")},
 	// What to ask on a screening call, in order; each label is written before
-	// its answer in the call's note ("RFL: better prospects").
+	// its answer in the call's note ("RFL: better prospects"). Notice period
+	// and salaries have their own fields on the call, so they are not items.
 	{name: "screening_call", label: "Screening call", defaults: opts(
-		"rfl", "RFL", "lf", "LF", "cs", "CS", "es", "ES", "np", "NP")},
+		"rfl", "RFL", "lf", "LF")},
 	{name: "reference_check", label: "Reference check", defaults: opts(
 		"referee", "Referee (name, title, company, contact)", "relationship", "How they worked together, and for how long",
 		"role", "Role and responsibilities", "strengths", "Strengths", "improve", "Areas to improve",

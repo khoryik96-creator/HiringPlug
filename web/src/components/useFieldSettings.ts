@@ -20,7 +20,7 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
   ].map((i) => [i, i])),
   work_type: WORK_TYPE,
   work_arrangement: WORK_ARRANGEMENT,
-  screening_call: { rfl: "RFL", lf: "LF", cs: "CS", es: "ES", np: "NP" },
+  screening_call: { rfl: "RFL", lf: "LF" },
   reference_check: {
     referee: "Referee (name, title, company, contact)", relationship: "How they worked together, and for how long",
     role: "Role and responsibilities", strengths: "Strengths", improve: "Areas to improve", reason_left: "Reason for leaving",

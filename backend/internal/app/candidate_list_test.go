@@ -86,7 +86,7 @@ func TestAReferenceCheckIsANoteWithTheCompanysQuestions(t *testing.T) {
 			lists[l.Name] = append(lists[l.Name], o.Label)
 		}
 	}
-	assert.Equal(t, []string{"RFL", "LF", "CS", "ES", "NP"}, lists[api.FieldListNameScreeningCall])
+	assert.Equal(t, []string{"RFL", "LF"}, lists[api.FieldListNameScreeningCall])
 	assert.Contains(t, lists[api.FieldListNameReferenceCheck], "Would you rehire them?")
 
 	c := a.createCandidate(token, map[string]any{"firstName": "Siti"})

@@ -612,8 +612,9 @@ the profile meanwhile), nothing is saved, and the notes typed are kept. The
 audit log records that a call was saved, never the salary.
 
 The notes are asked item by item, as the company sets them in **Settings >
-Screening call** (starting with RFL, LF, CS, ES, NP; add, rename, reorder or
-hide them): a box per item, then "Other notes"; the note reads "RFL: better
+Screening call** (starting with RFL and LF, reason for leaving and what
+they look for; notice period and salaries have their own fields; add,
+rename, reorder or hide them): a box per item, then "Other notes"; the note reads "RFL: better
 prospects", one line per item answered.
 
 ✅ **Reference check** (candidate page: *Reference check*): the questions set

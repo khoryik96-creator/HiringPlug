@@ -46,7 +46,8 @@ describe("screening call", () => {
     expect(await screen.findByText("text of doc_new")).toBeTruthy(); // the CV, readable during the call
     const form = screen.getByRole("form", { name: "Screening call" });
     fireEvent.change(within(form).getByLabelText("RFL"), { target: { value: "Better prospects " } });
-    fireEvent.change(within(form).getByLabelText("ES"), { target: { value: "SGD 9,500" } });
+    fireEvent.change(within(form).getByLabelText("LF"), { target: { value: "Audit roles in SG" } });
+    expect(within(form).queryByLabelText("ES")).toBeNull(); // salary and notice have their own fields
     fireEvent.change(within(form).getByLabelText("Other notes"), { target: { value: "  Wants hybrid; open to SG.  " } });
     fireEvent.click(within(form).getByLabelText(/Sensitive note/));
     fireEvent.change(within(form).getByLabelText("Notice period"), { target: { value: "2_week" } });
@@ -60,7 +61,7 @@ describe("screening call", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/screening-calls");
     expect(sentBody(post)).toEqual({
-      version: 3, notes: "RFL: Better prospects\nES: SGD 9,500\n\nWants hybrid; open to SG.", sensitive: true,
+      version: 3, notes: "RFL: Better prospects\nLF: Audit roles in SG\n\nWants hybrid; open to SG.", sensitive: true,
       nationality: "SG", workAuthorization: { status: "requires_visa", basis: null, note: null }, noticePeriod: { value: 2, unit: "week" },
       source: "referral",
       compensation: {
