@@ -34,6 +34,7 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
           candidateId={candidateId}
           applications={apps.data?.items.map((a) => ({ id: a.id, label: `${a.jobTitle} at ${a.companyName}` }))}
           canManageTemplates={permissions.includes("emails.templates:manage")}
+          canCreateTemplates={permissions.includes("emails.templates:create")}
           canBook={permissions.includes("scheduling:use")}
           onDone={() => { setWriting(false); }}
         />

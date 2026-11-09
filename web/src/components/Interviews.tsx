@@ -83,7 +83,8 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
       <ErrorMessage error={setStatus.error} />
       {emailing && (
         <EmailComposer candidateId={iv.candidateId} applicationId={iv.applicationId} interviewId={iv.id} template="Interview invitation"
-          canManageTemplates={permissions.includes("emails.templates:manage")} onDone={() => { setEmailing(false); }} />
+          canManageTemplates={permissions.includes("emails.templates:manage")}
+          canCreateTemplates={permissions.includes("emails.templates:create")} onDone={() => { setEmailing(false); }} />
       )}
       {iv.instructions && <p className="muted">For the candidate: {iv.instructions}</p>}
       {iv.feedback.map((f) => (

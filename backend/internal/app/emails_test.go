@@ -40,8 +40,8 @@ func (a *testApp) emails(token, candidateID string) []api.Email {
 func TestEmailTemplatesAndDrafts(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
-	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleHiringManager, api.RoleSourcer)
-	recruiter, sourcer := tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleSourcer]
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleHiringManager, api.RoleSourcer, api.RoleAdmin)
+	recruiter, sourcer, admin := tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleSourcer], tenant.Users[api.RoleAdmin]
 
 	templates := a.emailTemplates(recruiter.Token)
 	require.Len(t, templates, 4, "every company starts with the starter templates")
@@ -53,7 +53,8 @@ func TestEmailTemplatesAndDrafts(t *testing.T) {
 		assert.Equal(t, []string{"subject"}, fieldNames(t, res.Error()), "only known placeholders")
 		res = a.request(http.MethodPost, "/v1/email-templates", recruiter.Token, map[string]any{"name": "interview INVITATION", "subject": "x", "body": "x"})
 		assert.Equal(t, []string{"name"}, fieldNames(t, res.Error()), "names are unique")
-		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/email-templates", sourcer.Token, map[string]any{"name": "Mine", "subject": "x", "body": "x"}).Status)
+		assert.Equal(t, http.StatusCreated, a.request(http.MethodPost, "/v1/email-templates", sourcer.Token, map[string]any{"name": "Mine", "subject": "x", "body": "x"}).Status,
+			"anyone who writes emails may add a template")
 
 		res = a.request(http.MethodPost, "/v1/email-templates", recruiter.Token, map[string]any{"name": " Follow  up ", "subject": "Following up on {{job.title}}", "body": "Hi {{candidate.firstName}}"})
 		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
@@ -62,8 +63,10 @@ func TestEmailTemplatesAndDrafts(t *testing.T) {
 		assert.Equal(t, "Follow up", created.Name)
 		path := "/v1/email-templates/" + created.Id
 		update := map[string]any{"version": created.Version, "name": "Follow up", "subject": "Still keen on {{job.title}}?", "body": "Hi {{candidate.firstName}}"}
-		assert.Equal(t, http.StatusOK, a.request(http.MethodPut, path, recruiter.Token, update).Status)
-		assert.Equal(t, http.StatusConflict, a.request(http.MethodPut, path, recruiter.Token, update).Status, "stale version")
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPut, path, recruiter.Token, update).Status, "changing the company's templates is for admins")
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodDelete, path, recruiter.Token, nil).Status)
+		assert.Equal(t, http.StatusOK, a.request(http.MethodPut, path, admin.Token, update).Status)
+		assert.Equal(t, http.StatusConflict, a.request(http.MethodPut, path, admin.Token, update).Status, "stale version")
 	})
 
 	company := a.createCompany(recruiter.Token, map[string]any{"name": "Contoh Berhad"})

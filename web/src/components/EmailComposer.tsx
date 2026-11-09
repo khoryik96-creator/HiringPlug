@@ -5,7 +5,8 @@ import { api, unwrap } from "../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../api/keys";
 import { BookingLinkForm } from "./CandidateBookings";
 import { RichEditor } from "./clientEmail/RichEditor";
-import { plainToHtml, withoutCaretMarks } from "./clientEmail/richText";
+import { SaveAsTemplate } from "./clientEmail/SaveAsTemplate";
+import { atCursor, fillTokens, plainToHtml, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
@@ -25,6 +26,8 @@ type Props = {
   /** The template to start with, by name (e.g. "Interview invitation"). */
   template?: string;
   canManageTemplates: boolean;
+  /** The sender may save the email as a new template (emails.templates:create). */
+  canCreateTemplates?: boolean;
   /** The sender may put a booking link in (scheduling:use). */
   canBook?: boolean;
   onDone: () => void;
@@ -40,7 +43,7 @@ const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g
  * send. Placeholders without a value stay in brackets, and sending waits
  * until they are filled in.
  */
-export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, canBook = false, onDone }: Props) {
+export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, canCreateTemplates = false, canBook = false, onDone }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [about, setAbout] = useState(applicationId ?? "");
@@ -59,6 +62,16 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   });
   // A booking link to put in where the cursor was in the message (at its end when it had none).
   const [inserting, setInserting] = useState<{ id: number; html: string }>();
+  // "Insert field" puts a field where the cursor last was: the subject or the message.
+  const subjectBox = useRef<HTMLInputElement>(null);
+  const inSubject = useRef(false);
+  const values = context.data?.fieldValues;
+  const fields = templates.data?.fields ?? [];
+  // A template's fields in the subject show the candidate's values (the message's are filled by the editor).
+  useEffect(() => {
+    if (values) setForm((f) => ({ ...f, subject: fillTokens(f.subject, fields, values) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, reset]);
   const insert = (text: string) => {
     setInserting((i) => ({ id: (i?.id ?? 0) + 1, html: plainToHtml(text) }));
     setBooking(false);
@@ -125,12 +138,18 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       )}
       <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
-      <label className="field full">Subject<input value={form.subject} onChange={set("subject")} /></label>
+      <label className="field full">Subject<input ref={subjectBox} value={form.subject} onChange={set("subject")}
+        onFocus={() => { inSubject.current = true; }} /></label>
       <div className="field full">
         <span>Message</span>
-        <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
+        <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
-          values={context.data?.fieldValues} inserting={inserting} />
+          values={values} inserting={inserting} onFocus={() => { inSubject.current = false; }}
+          insertElsewhere={(f, value) => {
+            if (!inSubject.current) return false;
+            setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, cur.subject, value ?? f.token) }));
+            return true;
+          }} />
       </div>
       {canBook && (booking
         ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>
@@ -146,6 +165,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
           Send
         </button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
+        {canCreateTemplates && <SaveAsTemplate subject={form.subject} html={html} values={values} />}
         {canManageTemplates && <a href="#/email-templates" className="muted">Edit templates</a>}
       </div>
     </form>

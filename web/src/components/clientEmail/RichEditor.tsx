@@ -27,9 +27,16 @@ type Props = {
   values?: Record<string, string>;
   /** Something to put in where the cursor was (a booking link); a new id puts it in. */
   inserting?: { id: number; html: string } | undefined;
+  /**
+   * A field picked while the cursor was last outside the message (in the
+   * subject): put it there and say true; false puts it in the message.
+   */
+  insertElsewhere?: (field: Schemas["EmailField"], value: string | undefined) => boolean;
+  /** The message got the focus (so fields go in it again). */
+  onFocus?: () => void;
 };
 
-export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting }: Props) {
+export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
   const vals = values ?? NONE;
   const box = useRef<HTMLDivElement>(null);
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
@@ -42,6 +49,13 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
   useEffect(() => { showBanners(box.current, bannerUrls); }, [bannerUrls]);
+  // Wherever the cursor goes in the message (a click, the keyboard, a field
+  // just put in), it is remembered, so the next field goes exactly there.
+  useEffect(() => {
+    const track = () => { if (box.current) cursor.current = saveRange(box.current) ?? cursor.current; };
+    document.addEventListener("selectionchange", track);
+    return () => { document.removeEventListener("selectionchange", track); };
+  }, []);
   // A template's fields (and any typed before the values came) show their values.
   useEffect(() => {
     if (box.current && fillTypedFields(box.current, fields, vals)) onChange(box.current.innerHTML);
@@ -108,6 +122,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
           const field = fields.find((f) => f.token === e.target.value);
           const value = field && vals[field.token];
           if (!field || !box.current) return;
+          if (insertElsewhere?.(field, value || undefined)) return;
           if (!value) { insert(field.token); return; } // no value: the field stays, and sending says so
           back();
           insertValue(box.current, field.key, value);
@@ -134,7 +149,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         )}
       </div>
       <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        aria-label="Message" tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} />
+        aria-label="Message" tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />
     </div>
   );
 }

@@ -38,6 +38,7 @@ class Permission(StrEnum):
     documents_create = "documents:create"
     documents_delete = "documents:delete"
     documents_read = "documents:read"
+    emails_templates_create = "emails.templates:create"
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
     emails_send = "emails:send"

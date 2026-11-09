@@ -18,9 +18,12 @@ x-module:
     emails:send:
       description: Send email from the app.
       roles: [owner, admin, recruiter, sourcer]
+    emails.templates:create:
+      description: "Add new email templates, e.g. save an email being written as one (changing or deleting templates needs emails.templates:manage)."
+      roles: [owner, admin, recruiter, sourcer]
     emails.templates:manage:
-      description: Add and change the company's email templates.
-      roles: [owner, admin, recruiter]
+      description: "Change and delete the company's email templates, and add banners (admins: give it to the people you trust)."
+      roles: [owner, admin]
   errorCodes:
     EMAIL_DO_NOT_CONTACT:
       status: 409
@@ -51,7 +54,7 @@ paths:
       operationId: createEmailTemplate
       tags: [emails]
       summary: Add a template
-      x-permission: emails.templates:manage
+      x-permission: emails.templates:create
       requestBody:
         required: true
         content:

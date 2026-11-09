@@ -164,3 +164,30 @@ export function fillTypedFields(editor: HTMLElement, fields: { token: string; ke
   }
   return changed;
 }
+
+/** Fields in plain text (a subject) as their values; fields without one stay as [Field]. */
+export function fillTokens(text: string, fields: { token: string }[], values: Record<string, string>): string {
+  const known = fields.filter((f) => values[f.token]);
+  if (known.length === 0) return text;
+  const pattern = new RegExp(known.map((f) => f.token.replace(/[[\]]/g, "\\$&")).join("|"), "gi");
+  return text.replace(pattern, (m) => values[known.find((f) => f.token.toLowerCase() === m.toLowerCase())?.token ?? ""] ?? m);
+}
+
+/** Puts text into an input's value where its cursor is (at the end when it never had one). */
+export function atCursor(input: HTMLInputElement | null, current: string, text: string): string {
+  const at = input?.selectionStart ?? current.length;
+  const end = input?.selectionEnd ?? at;
+  return current.slice(0, at) + text + current.slice(end);
+}
+
+/**
+ * A subject filled in for one candidate back as fields ("Siti - RM 12,000" ->
+ * "[First name] - [Expected salary]"), so a template saved from an email never
+ * keeps their details. Longer values first, so "Siti Aisyah" is [Full name].
+ */
+export function valuesToTokens(text: string, values: Record<string, string>): string {
+  const known = Object.entries(values).filter(([, v]) => v.trim().length > 1).sort(([, a], [, b]) => b.length - a.length);
+  let out = text;
+  for (const [token, value] of known) out = out.split(value).join(token);
+  return out;
+}

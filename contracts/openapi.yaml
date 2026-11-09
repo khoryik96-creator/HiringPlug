@@ -1606,7 +1606,7 @@ paths:
       operationId: createEmailTemplate
       tags: [emails]
       summary: Add a template
-      x-permission: emails.templates:manage
+      x-permission: emails.templates:create
       requestBody:
         required: true
         content:
@@ -4405,6 +4405,7 @@ components:
         - documents:create
         - documents:delete
         - documents:read
+        - emails.templates:create
         - emails.templates:manage
         - emails:read
         - emails:send
@@ -9139,11 +9140,16 @@ x-permissions:
     description: View and download candidate documents, including extracted text.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  emails.templates:create:
+    module: emails
+    description: Add new email templates, e.g. save an email being written as one (changing or deleting templates needs emails.templates:manage).
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
   emails.templates:manage:
     module: emails
-    description: Add and change the company's email templates.
+    description: 'Change and delete the company''s email templates, and add banners (admins: give it to the people you trust).'
     sensitive: false
-    roles: [owner, admin, recruiter]
+    roles: [owner, admin]
   emails:read:
     module: emails
     description: See emails sent from the app.

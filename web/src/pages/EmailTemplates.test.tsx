@@ -40,14 +40,21 @@ describe("email templates", () => {
     fireEvent.change(fieldsInBody, { target: { value: "[Candidate name]" } });
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toContain("[Candidate name]");
 
-    fireEvent.change(screen.getByLabelText("Insert field in subject"), { target: { value: "[Candidate name]" } });
+    // The same picker puts a field in the subject when the cursor was last there.
+    const subject = screen.getByRole("textbox", { name: "Subject" });
+    fireEvent.focus(subject);
+    fireEvent.change(fieldsInBody, { target: { value: "[Candidate name]" } });
+    expect((screen.getByRole("textbox", { name: "Message" }).textContent.match(/\[Candidate name\]/g) ?? []).length).toBe(1);
+    fireEvent.focus(screen.getByRole("textbox", { name: "Message" }));
+    fireEvent.change(fieldsInBody, { target: { value: "[Candidate name]" } });
+    expect((screen.getByRole("textbox", { name: "Message" }).textContent.match(/\[Candidate name\]/g) ?? []).length).toBe(2);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     const sent = sentBody(put) as { subject: string; bodyHtml: string; version: number };
     expect(sent.version).toBe(2);
     expect(sent.subject).toBe("Candidate for you[Candidate name]");
     expect(sent.bodyHtml).toContain("<b>there</b>");
-    expect(sent.bodyHtml).toContain("[Candidate name]");
+    expect(sent.bodyHtml).toContain("[Candidate name][Candidate name]");
   });
 
   it("are only read by those who may not change them", async () => {

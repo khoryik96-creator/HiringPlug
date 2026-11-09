@@ -97,6 +97,46 @@ describe("candidate emails", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).innerHTML).toContain("<li>Bring your IC</li>");
   });
 
+  it("fills a template's fields with the candidate's values, salary too, in the subject and the message", async () => {
+    reads([]);
+    const fieldValues = { "[First name]": "Siti", "[Expected salary]": "RM 12,000 per month" };
+    vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-drafts"
+      ? { to: ["siti@example.com"], subject: "[First name] - [Expected salary]", body: "x", bodyHtml: "<p>Hi [First name], you expect [Expected salary].</p>", missing: [] }
+      : { ...preview, fieldValues }))) as never);
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-templates"
+      ? { items: [template("Interview invitation", "etpl_1")], placeholders: [], fields: [
+        { token: "[First name]", key: "candidate.firstName", label: "First name", salary: false },
+        { token: "[Expected salary]", key: "candidate.expectedSalary", label: "Expected salary", salary: true }] }
+      : { items: [] }))) as never);
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    await screen.findByRole("option", { name: "Interview invitation" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "etpl_1" } });
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Subject").value).toBe("Siti - RM 12,000 per month"); });
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent?.replaceAll("\u200b", "")).toBe("Hi Siti, you expect RM 12,000 per month.");
+  });
+
+  it("saves the email as a new template, the candidate's details back as fields", async () => {
+    reads([]);
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-previews"
+      ? { ...preview, fieldValues: { "[First name]": "Siti", "[Full name]": "Siti Aisyah" } }
+      : template("Follow-up", "etpl_9")))) as never);
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send", "emails.templates:create"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    expect(screen.queryByRole("link", { name: "Edit templates" }), "changing them is for admins").toBeNull();
+    await waitFor(() => { expect(post).toHaveBeenCalledWith("/v1/email-previews", expect.anything()); });
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Siti Aisyah, Siti: next steps" } });
+    typeMessage('<p>Hi <span data-field="candidate.firstName">Siti</span></p>');
+    fireEvent.click(screen.getByRole("button", { name: "Save as a new template" }));
+    fireEvent.change(screen.getByLabelText("New template name"), { target: { value: "Follow-up" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save template" }));
+    await waitFor(() => { expect(bodyTo(post, "/v1/email-templates")).toBeTruthy(); });
+    expect(bodyTo(post, "/v1/email-templates")).toEqual({
+      name: "Follow-up", subject: "[Full name], [First name]: next steps", bodyHtml: '<p>Hi <span data-field="candidate.firstName">Siti</span></p>',
+    });
+    expect(await screen.findByText(/Saved as/)).toBeTruthy();
+  });
+
   it("reads addresses however they are separated", () => {
     expect(addresses(" a@x.test, b@y.test;c@z.test  d@w.test ")).toEqual(["a@x.test", "b@y.test", "c@z.test", "d@w.test"]);
   });

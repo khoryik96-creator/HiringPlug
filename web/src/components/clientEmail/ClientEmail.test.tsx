@@ -57,7 +57,7 @@ describe("emailing the client", () => {
     await within(panel).findByRole("option", { name: "Client submission" });
     fireEvent.change(within(panel).getByLabelText("Template"), { target: { value: "etpl_1" } });
     fireEvent.click(within(panel).getByRole("button", { name: "Use selected template" }));
-    expect(within(panel).getByLabelText<HTMLInputElement>("Subject").value).toBe("[Full name] for [Job title]");
+    expect(within(panel).getByLabelText<HTMLInputElement>("Subject").value).toBe("Siti Aisyah for [Job title]"); // the candidate's values; fields without one stay
     const message = within(panel).getByRole("textbox", { name: "Message" });
     expect(message.innerHTML).toContain("Expecting [Expected salary].");
     await waitFor(() => { expect(within(panel).getByRole("option", { name: "Expected salary (salary) — no value" })).toBeTruthy(); });
@@ -79,7 +79,7 @@ describe("emailing the client", () => {
     const call = post.mock.calls.findIndex((c) => c[0] === "/v1/emails");
     expect(sentBody(post, call)).toMatchObject({
       to: ["hr@client.test", "boss@client.test"], cc: ["lead@agency.test"], bcc: ["me@agency.test"],
-      subject: "[Full name] for [Job title]", candidateId: "cand_1", applicationId: "appl_1",
+      subject: "Siti Aisyah for [Job title]", candidateId: "cand_1", applicationId: "appl_1",
       attachmentIds: ["eat_1"], cvs: [{ documentId: "doc_1", asPdf: false }, { documentId: "doc_2", asPdf: true }],
     });
     const sentHtml = (sentBody(post, call) as { bodyHtml: string }).bodyHtml;

@@ -13,7 +13,8 @@ import { ErrorMessage } from "../ErrorMessage";
 import { fieldErrors } from "../forms";
 import { Attachments, type CvChoice } from "./Attachments";
 import { RichEditor } from "./RichEditor";
-import { plainToHtml, showBanners, withoutCaretMarks } from "./richText";
+import { atCursor, fillTokens, plainToHtml, showBanners, valuesToTokens, withoutCaretMarks } from "./richText";
+import { SaveAsTemplate } from "./SaveAsTemplate";
 import { useBanners } from "./useBanners";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -23,6 +24,7 @@ type Props = { candidateId: string; applicationId?: string; permissions: Permiss
 export function ClientEmail({ candidateId, applicationId, permissions, onClose }: Props) {
   const queryClient = useQueryClient();
   const canManage = permissions.includes("emails.templates:manage");
+  const canCreate = permissions.includes("emails.templates:create");
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const { banners, urls, upload: uploadBanner } = useBanners();
@@ -49,6 +51,16 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   useEffect(() => { showBanners(previewBox.current, urls); }, [preview, urls]);
 
   const selected = templates.data?.items.find((t) => t.id === picked);
+  const values = context.data?.fieldValues;
+  const fields = templates.data?.fields ?? [];
+  // "Insert field" puts a field where the cursor last was: the subject or the message.
+  const subjectBox = useRef<HTMLInputElement>(null);
+  const inSubject = useRef(false);
+  // A template's fields in the subject show the candidate's values (the message's are filled by the editor).
+  useEffect(() => {
+    if (values) setForm((f) => ({ ...f, subject: fillTokens(f.subject, fields, values) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, reset]);
   const useTemplate = () => {
     if (!selected) return;
     setForm((f) => ({ ...f, subject: selected.subject }));
@@ -58,7 +70,8 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   };
   const saveTemplate = useMutation({
     mutationFn: async (asNew: boolean) => {
-      const body = { name: name.trim(), subject: form.subject, bodyHtml: withoutCaretMarks(html) };
+      // The candidate's details go back in as fields (the message's are turned back by the server).
+      const body = { name: name.trim(), subject: valuesToTokens(form.subject, values ?? {}), bodyHtml: withoutCaretMarks(html) };
       if (asNew || !selected) return unwrap(await api.POST("/v1/email-templates", { body }));
       return unwrap(await api.PUT("/v1/email-templates/{templateId}", { params: { path: { templateId: selected.id } }, body: { ...body, version: selected.version } }));
     },
@@ -118,6 +131,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
             onClick={() => { if (selected && window.confirm(`Delete the template "${selected.name}"?`)) deleteTemplate.mutate(selected.id); }}>Delete template</button>
         </div>
       )}
+      {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={form.subject} html={html} values={values} /></div>}
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
 
       <label className="field">To<input value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
@@ -126,11 +140,17 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
         <label className="field">CC<input value={form.cc} onChange={set("cc")} /></label>
         <label className="field">BCC<input value={form.bcc} onChange={set("bcc")} /></label>
       </div>
-      <label className="field">Subject<input value={form.subject} onChange={set("subject")} /></label>
+      <label className="field">Subject<input ref={subjectBox} value={form.subject} onChange={set("subject")}
+        onFocus={() => { inSubject.current = true; }} /></label>
 
-      <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
+      <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
-        values={context.data?.fieldValues} />
+        values={values} onFocus={() => { inSubject.current = false; }}
+        insertElsewhere={(f, value) => {
+          if (!inSubject.current) return false;
+          setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, cur.subject, value ?? f.token) }));
+          return true;
+        }} />
       <ErrorMessage error={uploadBanner.error} />
       {!permissions.includes("candidates.compensation:read") && <p className="muted small">Salary fields need a role that may see salaries.</p>}
 

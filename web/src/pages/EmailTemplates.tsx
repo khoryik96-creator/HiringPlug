@@ -5,7 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { emailTemplatesKey } from "../api/keys";
 import { RichEditor } from "../components/clientEmail/RichEditor";
 import { TemplatePreview } from "../components/clientEmail/TemplatePreview";
-import { plainToHtml, showBanners, withoutCaretMarks } from "../components/clientEmail/richText";
+import { atCursor, plainToHtml, showBanners, withoutCaretMarks } from "../components/clientEmail/richText";
 import { useBanners } from "../components/clientEmail/useBanners";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
@@ -15,7 +15,7 @@ type Template = Schemas["EmailTemplate"];
 type Field = Schemas["EmailField"];
 
 /** The company's email templates, formatted as CV Studio's email client does: change them, or add one. */
-export function EmailTemplates({ canManage, canPreview = false }: { canManage: boolean; canPreview?: boolean }) {
+export function EmailTemplates({ canManage, canCreate = canManage, canPreview = false }: { canManage: boolean; canCreate?: boolean; canPreview?: boolean }) {
   const list = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const { banners, urls, upload } = useBanners();
   const [editing, setEditing] = useState<string | null>(null); // a template id, or "new"
@@ -44,7 +44,11 @@ export function EmailTemplates({ canManage, canPreview = false }: { canManage: b
           </section>
         ),
       )}
-      {canManage && (editing === "new" ? editor() : <button type="button" onClick={() => { setEditing("new"); }}>Add template</button>)}
+      {!canManage && (
+        <p className="muted small">Only admins change these templates (Settings, Roles and access: &ldquo;Change and delete the company&apos;s email
+          templates&rdquo;). {canCreate ? "You can add new ones, here or with \u201cSave as a new template\u201d when writing an email." : ""}</p>
+      )}
+      {canCreate && (editing === "new" ? editor() : <button type="button" onClick={() => { setEditing("new"); }}>Add template</button>)}
     </main>
   );
 }
@@ -85,13 +89,8 @@ function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUpl
   });
   const errors = fieldErrors(save.error);
   const empty = !html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-  // A field goes in the subject where the cursor is.
-  const toSubject = (token: string) => {
-    const input = subject.current;
-    const at = input?.selectionStart ?? form.subject.length;
-    const end = input?.selectionEnd ?? at;
-    setForm({ ...form, subject: form.subject.slice(0, at) + token + form.subject.slice(end) });
-  };
+  // "Insert field" puts a field where the cursor last was: the subject or the message.
+  const inSubject = useRef(false);
   return (
     <form className="panel form-grid" aria-label={template ? `Change ${template.name}` : "New template"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <label className="field full">Name
@@ -99,18 +98,19 @@ function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUpl
         {errors.name && <span className="warning">{errors.name}</span>}
       </label>
       <label className="field full">Subject
-        <input ref={subject} value={form.subject} onChange={(e) => { setForm({ ...form, subject: e.target.value }); }} />
+        <input ref={subject} value={form.subject} onFocus={() => { inSubject.current = true; }}
+          onChange={(e) => { setForm({ ...form, subject: e.target.value }); }} />
         {errors.subject && <span className="warning">{errors.subject}</span>}
       </label>
-      <div className="row full subject-fields">
-        <select aria-label="Insert field in subject" value="" onChange={(e) => { if (e.target.value) toSubject(e.target.value); }}>
-          <option value="">Insert field in subject…</option>
-          {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}</option>)}
-        </select>
-      </div>
+      <p className="muted small full">&ldquo;Insert field&rdquo; puts a field where your cursor is: in the subject or the message.</p>
       <div className="full">
         <RichEditor html={html} resetKey={0} onChange={setHtml} fields={fields} banners={banners} bannerUrls={bannerUrls}
-          onUploadBanner={onUploadBanner} />
+          onUploadBanner={onUploadBanner} onFocus={() => { inSubject.current = false; }}
+          insertElsewhere={(f) => {
+            if (!inSubject.current) return false;
+            setForm((cur) => ({ ...cur, subject: atCursor(subject.current, cur.subject, f.token) }));
+            return true;
+          }} />
         {(errors.body ?? errors.bodyHtml) && <span className="warning">{errors.body ?? errors.bodyHtml}</span>}
       </div>
       {canPreview && <TemplatePreview subject={form.subject} html={html} bannerUrls={bannerUrls} />}
