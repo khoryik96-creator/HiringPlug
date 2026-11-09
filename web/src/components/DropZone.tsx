@@ -1,6 +1,9 @@
 // A box to drop files on (or click to choose them), for CVs and job descriptions.
 import { useId, useState } from "react";
 
+/** Files a CV comes in: PDF, Word, text, RTF, ODT, or a picture of it (read with OCR). */
+export const CV_TYPES = ".pdf,.docx,.doc,.txt,.rtf,.odt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp";
+
 /** The files whose extension is one of `accept` (".pdf,.docx"), and the names of the others. */
 export function acceptable(files: File[], accept: string): { ok: File[]; skipped: string[] } {
   const exts = accept.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);

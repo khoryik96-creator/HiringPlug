@@ -6,7 +6,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
-import { DropZone } from "./DropZone";
+import { CV_TYPES, DropZone } from "./DropZone";
 import { SourcePicker } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -76,8 +76,8 @@ export function CvImports() {
     <section className="panel" aria-label="CV import">
       <h3>CVs and LinkedIn PDFs</h3>
       <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
-      <DropZone accept=".pdf,.docx,.doc" multiple disabled={start.isPending} label="Drop CVs here"
-        hint="PDF or Word"
+      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
+        hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);

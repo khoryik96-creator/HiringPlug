@@ -1,20 +1,20 @@
 package documents
 
 import (
-	"archive/zip"
-	"bytes"
 	"regexp"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 )
 
-// Supported file types.
+// Supported file types (filekind has them all).
 const (
-	ContentTypePDF  = "application/pdf"
-	ContentTypeDOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-	ContentTypeDOC  = "application/msword"
+	ContentTypePDF  = filekind.PDF
+	ContentTypeDOCX = filekind.DOCX
+	ContentTypeDOC  = filekind.DOC
 )
 
 // Document statuses (mirroring the contract's DocumentStatus enum).
@@ -47,36 +47,21 @@ type Document struct {
 	UpdatedAt     time.Time
 }
 
-var oleMagic = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
-
-// DetectContentType identifies a PDF or a Word (.docx or old .doc) file from its bytes,
-// never trusting the name or the browser's claimed type alone.
-func DetectContentType(data []byte) (string, bool) {
-	switch {
-	case bytes.HasPrefix(data, []byte("%PDF-")):
-		return ContentTypePDF, true
-	case bytes.HasPrefix(data, []byte("PK\x03\x04")) && isDOCX(data):
-		return ContentTypeDOCX, true
-	case bytes.HasPrefix(data, oleMagic):
-		// Old Word files are OLE compound documents (as are old Excel and
-		// PowerPoint files, which the AI worker refuses with advice).
-		return ContentTypeDOC, true
-	default:
-		return "", false
-	}
+// DetectContentType identifies an uploaded file from its bytes (and, for a
+// plain text file, its name): see filekind.
+func DetectContentType(name string, data []byte) (string, bool) {
+	return filekind.Detect(name, data)
 }
 
-func isDOCX(data []byte) bool {
-	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		return false
+// Readable reports a file of a type taken whose text can be read (a text,
+// RTF or ODT file is read at once; the others by the AI worker).
+func Readable(name string, data []byte) bool {
+	ct, ok := DetectContentType(name, data)
+	if ok && filekind.ReadHere(ct) {
+		_, err := filekind.Text(ct, data)
+		return err == nil
 	}
-	for _, f := range r.File {
-		if f.Name == "word/document.xml" {
-			return true
-		}
-	}
-	return false
+	return ok
 }
 
 // CleanFileName keeps just the base name, without control characters or

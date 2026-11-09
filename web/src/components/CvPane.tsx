@@ -38,8 +38,8 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "" }:
 }) {
   const [marking, setMarking] = useState(highlight.trim());
   const [view, setView] = useState<"original" | "text">(marking ? "text" : "original");
-  // A PDF shows itself; a Word file shows its PDF copy once made.
-  const isPdf = doc?.contentType === "application/pdf" || doc?.pdfStatus === "ready";
+  // A PDF or a picture shows itself; a Word, RTF or ODT file shows its PDF copy once made.
+  const isPdf = doc?.contentType === "application/pdf" || isImage(doc) || doc?.pdfStatus === "ready";
   return (
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
       <div className="row">
@@ -72,7 +72,7 @@ function Original({ doc }: { doc: Document }) {
   useEffect(() => {
     let current: string | null = null;
     let cancelled = false;
-    (contentType === "application/pdf" ? fetchDocumentFile({ id, contentType }) : fetchDocumentPdf(id)).then(
+    (contentType === "application/pdf" || contentType.startsWith("image/") ? fetchDocumentFile({ id, contentType }) : fetchDocumentPdf(id)).then(
       (blob) => {
         if (cancelled) return;
         current = URL.createObjectURL(blob);
@@ -86,8 +86,14 @@ function Original({ doc }: { doc: Document }) {
     };
   }, [id, contentType]); // not on every refresh of the document's details
   if (error) return <ErrorMessage error={error} />;
-  return url ? <iframe className="cv-frame" title={doc.fileName} src={url} /> : <p className="muted">Loading…</p>;
+  if (!url) return <p className="muted">Loading…</p>;
+  return isImage(doc)
+    ? <div className="cv-picture"><img src={url} alt={doc.fileName} /></div>
+    : <iframe className="cv-frame" title={doc.fileName} src={url} />;
 }
+
+/** A picture of a CV (read with OCR): shown as it is. */
+const isImage = (doc: Document | undefined) => Boolean(doc?.contentType.startsWith("image/"));
 
 /** The CV's text with the search's words marked, and how many places. */
 function Marked({ doc, boolean, onClear }: { doc: Document; boolean: string; onClear: () => void }) {

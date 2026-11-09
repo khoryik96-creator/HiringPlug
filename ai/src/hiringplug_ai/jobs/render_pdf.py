@@ -51,10 +51,21 @@ def run(payload: DocumentRenderPdfJob, deps: Deps) -> list[FollowUp]:
 
 def _convert(data: bytes) -> bytes | None:
     with tempfile.TemporaryDirectory(prefix="hp-pdf-") as tmp:
-        # An old Word .doc (an OLE file) is named as one, as LibreOffice expects.
-        path = Path(tmp) / ("cv.doc" if data.startswith(b"\xd0\xcf\x11\xe0") else "cv.docx")
+        # Named as what it is, as LibreOffice expects: an old Word .doc (an OLE
+        # file), RTF, OpenDocument text, or a .docx.
+        path = Path(tmp) / _office_name(data)
         path.write_bytes(data)
         return office.convert(path, Path(tmp), "pdf")
+
+
+def _office_name(data: bytes) -> str:
+    if data.startswith(b"\xd0\xcf\x11\xe0"):
+        return "cv.doc"
+    if data.startswith(b"{\\rtf"):
+        return "cv.rtf"
+    if data.startswith(b"PK") and b"application/vnd.oasis.opendocument.text" in data[:200]:
+        return "cv.odt"
+    return "cv.docx"
 
 
 _LAST_PARAGRAPH = re.compile(

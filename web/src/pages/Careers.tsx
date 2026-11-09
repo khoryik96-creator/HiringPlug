@@ -7,6 +7,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { SaveError } from "../components/SaveError";
 import type { CareersRoute } from "../careersRoute";
 import { countryName, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
+import { CV_TYPES } from "../components/DropZone";
 
 type Ad = Schemas["PublicJobAd"];
 
@@ -102,8 +103,8 @@ function ApplyForm({ slug, adId, company, via }: { slug: string; adId: string; c
       {text("lastName", "Last name")}
       {text("email", "Email", "email")}
       {text("phone", "Phone", "tel")}
-      <label className="field full">CV (PDF or Word)
-        <input type="file" accept=".pdf,.docx,.doc" onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} />
+      <label className="field full">CV (PDF, Word, text or a photo)
+        <input type="file" accept={CV_TYPES} onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} />
       </label>
       {/* A trap for robots: hidden from people (and screen readers), so it stays empty. */}
       <label className="trap" aria-hidden="true">Website

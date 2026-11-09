@@ -92,8 +92,8 @@ func TestJobDescriptionFillsTheAd(t *testing.T) {
 		assert.Contains(t, read.Error.MustGet(), "scan with no text")
 	})
 
-	t.Run("only PDF, Word and text files; only for those who edit jobs; only your company's", func(t *testing.T) {
-		assert.Equal(t, http.StatusBadRequest, a.upload("/v1/jobs/"+job.Id+"/jd-files", token, "", "photo.png", bannerPNG).Status)
+	t.Run("only the files a JD comes in; only for those who edit jobs; only your company's", func(t *testing.T) {
+		assert.Equal(t, http.StatusBadRequest, a.upload("/v1/jobs/"+job.Id+"/jd-files", token, "", "slides.pptx", []byte("PK\x03\x04 not a JD")).Status)
 		assert.Equal(t, http.StatusBadRequest, a.upload("/v1/jobs/"+job.Id+"/jd-files", token, "", "fake.pdf", []byte("hello")).Status)
 		assert.Equal(t, http.StatusForbidden, a.upload("/v1/jobs/"+job.Id+"/jd-files", tenant.Users[api.RoleViewer].Token, "", "jd.txt", []byte(financeJD)).Status)
 		assert.Equal(t, http.StatusNotFound, a.upload("/v1/jobs/"+job.Id+"/jd-files", other, "", "jd.txt", []byte(financeJD)).Status)

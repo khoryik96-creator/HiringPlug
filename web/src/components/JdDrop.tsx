@@ -8,7 +8,7 @@ import { getToken } from "../auth";
 import { DropZone } from "./DropZone";
 
 export type JdDetails = Schemas["JdDetails"];
-export const JD_TYPES = ".pdf,.docx,.doc,.txt";
+export const JD_TYPES = ".pdf,.docx,.doc,.txt,.rtf,.odt,.md,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp";
 
 /** Sends a job description (multipart, so not through the typed client); without a job, for one being added. */
 async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["JdFile"]> {
@@ -60,7 +60,7 @@ export function JdDrop({ jobId, start, onRead, readText = "Check it, then save."
   return (
     <div className="jd-drop">
       <DropZone accept={JD_TYPES} disabled={reading} label="Drop the client's JD"
-        hint="PDF, Word or text" onFiles={([f]) => { if (f) upload.mutate(f); }} />
+        hint="PDF, Word, text or a picture" onFiles={([f]) => { if (f) upload.mutate(f); }} />
       {reading && <p className="muted small" role="status">Reading {latest?.fileName ?? "the file"}…</p>}
       {latest?.status === "read" && <p className="small" role="status">Filled in from {latest.fileName}. {readText}</p>}
       {latest?.status === "failed" && <p className="error small">{latest.fileName}: {latest.error ?? "it could not be read."}</p>}

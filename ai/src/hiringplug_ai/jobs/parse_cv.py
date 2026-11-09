@@ -22,7 +22,7 @@ RESULT_QUEUE = "core"  # checked against the contract by tests/test_contract_wir
 def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
     tokens = 0
     try:
-        profile = parse_cv(payload.text)
+        profile = parse_cv(payload.text, file_name=payload.fileName)
         ai = None
         if payload.useAi and payload.aiText:
             try:

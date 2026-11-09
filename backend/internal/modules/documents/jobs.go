@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/oapi-codegen/nullable"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
@@ -23,6 +25,29 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	if err := job.Decode(&result); err != nil {
 		return err
 	}
+	return s.applyExtraction(ctx, tx, job.TenantID, result)
+}
+
+// readHere is the text of a file read here (text, RTF or ODT), as the AI
+// worker would report it.
+func readHere(id, contentType string, data []byte) api.DocumentTextExtractedJob {
+	out := api.DocumentTextExtractedJob{DocumentId: id, Extractor: "hiringplug-" + strings.ToLower(filekind.Short(contentType)),
+		Warnings: []string{}, PageCount: nullable.NewNullNullable[int](), Text: nullable.NewNullNullable[string](),
+		ErrorMessage: nullable.NewNullNullable[string]()}
+	text, err := filekind.Text(contentType, data)
+	if err != nil {
+		out.Status = api.ExtractionStatusFailed
+		out.ErrorMessage = nullable.NewNullableWithValue(strings.ToUpper(err.Error()[:1]) + err.Error()[1:] + ".")
+		return out
+	}
+	out.Status = api.ExtractionStatusExtracted
+	out.Text = nullable.NewNullableWithValue(text)
+	return out
+}
+
+// applyExtraction saves a document's text (read by the AI worker, or here),
+// then parses it and tells whoever waits for CVs to be read.
+func (s *Service) applyExtraction(ctx context.Context, tx pgx.Tx, tenantID string, result api.DocumentTextExtractedJob) error {
 	var text *string
 	if t, err := result.Text.Get(); err == nil {
 		cleaned := CleanExtractedText(t)
@@ -52,17 +77,17 @@ func (s *Service) saveExtraction(ctx context.Context, tx pgx.Tx, job jobqueue.Jo
 	// Every CV is parsed as soon as its text is saved: candidates' CVs for
 	// review, formatted ones (our own output) for comparing with the original.
 	if row.Status == string(api.DocumentStatusExtracted) && hasText(row.ExtractedText) {
-		if err := s.queueParse(ctx, tx, job.TenantID, row); err != nil {
+		if err := s.queueParse(ctx, tx, tenantID, row); err != nil {
 			return err
 		}
 		if row.Source != "formatted" {
 			for _, hook := range s.whenRead {
-				if err := hook(ctx, tx, job.TenantID, row.CandidateID); err != nil {
+				if err := hook(ctx, tx, tenantID, row.CandidateID); err != nil {
 					return err
 				}
 			}
 		}
-	} else if err := s.readDone(ctx, tx, job.TenantID, row.ID, nil); err != nil { // no text: nothing to parse
+	} else if err := s.readDone(ctx, tx, tenantID, row.ID, nil); err != nil { // no text: nothing to parse
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{
@@ -82,7 +107,8 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 			return err
 		}
 	}
-	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI}
+	name := row.FileName // often the candidate's name: a hint for finding it in the text
+	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI, FileName: &name}
 	if useAI {
 		job.Ai = ai
 		forAI := redact.WithoutSalary(*row.ExtractedText) // salary never goes to the AI

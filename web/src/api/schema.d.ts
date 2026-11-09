@@ -3671,6 +3671,8 @@ export interface components {
             documentId: components["schemas"]["DocumentId"];
             /** @description The document's saved text, so quotes match it exactly. */
             text: string;
+            /** @description The file's name, a hint to the candidate's name ("SITI AISYAH-SEEK-Profile.pdf"). */
+            fileName?: string;
             /** @description The AI may fill what the rules leave empty (Kano's way: when the rules find name, email, phone, current title and company, only the industry is asked for). Set when the AI is on and the company has allowance left. */
             useAi?: boolean;
             /** @description What the AI may read: the text with salary figures taken out (salary never goes to the AI). Sent with useAi; quotes still come from text. */

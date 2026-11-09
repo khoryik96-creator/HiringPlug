@@ -17,6 +17,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -53,9 +54,12 @@ type TextReadHook func(ctx context.Context, tx pgx.Tx, tenantID, candidateID str
 // document row and the job are committed together: there is never a document
 // that nobody will process, or a job for a document that does not exist.
 func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, source, fileName string, data []byte) (Document, error) {
-	contentType, ok := DetectContentType(data)
+	contentType, ok := DetectContentType(fileName, data)
 	if !ok {
-		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx or .doc) file.")
+		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload "+filekind.Accepted+".")
+	}
+	if !Readable(fileName, data) {
+		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "No readable text was found in this "+filekind.Short(contentType)+" file.")
 	}
 	var doc Document
 	var storedKey string
@@ -99,7 +103,15 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	if err != nil {
 		return Document{}, key, err
 	}
-	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
+	if filekind.ReadHere(contentType) {
+		// A text, RTF or ODT file is read here and now: no tool to run.
+		if err := s.applyExtraction(ctx, tx, tenantID, readHere(id, contentType, data)); err != nil {
+			return Document{}, key, err
+		}
+		if row, err = q.GetDocument(ctx, id); err != nil {
+			return Document{}, key, err
+		}
+	} else if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindDocumentExtractText, api.DocumentExtractTextJob{
 		DocumentId:  id,
 		DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
 		ContentType: contentType,
@@ -108,9 +120,9 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	}); err != nil {
 		return Document{}, key, err
 	}
-	// A Word CV also gets a PDF copy, so it can be previewed as it looks
-	// (formatted CVs queue theirs in AddFormatted).
-	if (contentType == ContentTypeDOCX || contentType == ContentTypeDOC) && source != "formatted" {
+	// A Word, RTF or ODT CV also gets a PDF copy, so it can be previewed as it
+	// looks (formatted CVs queue theirs in AddFormatted).
+	if filekind.Office(contentType) && source != "formatted" {
 		if err := s.queuePdf(ctx, tx, tenantID, Document{ID: id}, key); err != nil {
 			return Document{}, key, err
 		}

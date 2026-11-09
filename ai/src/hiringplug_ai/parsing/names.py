@@ -36,7 +36,11 @@ _PARTICLES = {
 _ADDRESS = re.compile(
     r"\b(?:jalan|jln|lorong|lrg|taman|kampung|kg|bandar|persiaran|lebuh|block|blok|street|road|avenue|floor|"
     r"tingkat|apartment|residenc[ey]|condominium|postcode|poskod|curriculum|vitae|resume|profile|summary|"
-    r"objective|address|mobile|phone|email|nationality|personal|details|experience|education|skills|contact)\b",
+    r"objective|address|mobile|phone|email|nationality|personal|details|experience|education|skills|contact|"
+    # labels a CV puts before a value ("LOCATION Penang", "Based in Kuala Lumpur")
+    r"location|based|residing|citizenship|gender|sex|age|birth|dob|religion|race|marital|status|languages?|"
+    r"salary|notice|availability|available|expected|current|references?|hobbies|interests|linkedin|github|"
+    r"website|portfolio|passport|nric|ic)\b",
     re.IGNORECASE,
 )
 _WORD = re.compile(r"^[^\W\d_](?:[^\W\d_]|['’.\-/])*$")
@@ -88,10 +92,13 @@ def _plausible(value: str, supported: bool) -> bool:
     return not (words[0][0].isupper() and any(w.islower() and w.lower() not in _PARTICLES for w in words[1:]))
 
 
-def _hints(email: str | None, linkedin: str | None) -> str:
+def _hints(email: str | None, linkedin: str | None, file_name: str | None = None) -> str:
+    """The letters of the email's name, the LinkedIn link's and the file's
+    ("TUCK WAIFOONG-SEEK-Profile.pdf"): names found in them win."""
     local = (email or "").split("@")[0]
     slug = (linkedin or "").rstrip("/").rsplit("/", 1)[-1]
-    return re.sub(r"[^a-z]", "", f"{local} {slug}".lower())
+    stem = re.sub(r"\.[A-Za-z0-9]{1,5}$", "", file_name or "")
+    return re.sub(r"[^a-z]", "", f"{local} {slug} {stem}".lower())
 
 
 def _overlap(value: str, hints: str) -> int:
@@ -107,8 +114,10 @@ def _shapes(text: str) -> list[str]:
     return [s.strip() for s in out if s.strip()]
 
 
-def name(lines: list[Line], email: str | None = None, linkedin: str | None = None) -> tuple[str, str] | None:
-    hints = _hints(email, linkedin)
+def name(
+    lines: list[Line], email: str | None = None, linkedin: str | None = None, file_name: str | None = None
+) -> tuple[str, str] | None:
+    hints = _hints(email, linkedin, file_name)
     best: tuple[int, int, str, str] | None = None  # (score, -position, value, quote)
     labelled = next(
         (i for i, x in enumerate(lines[:60]) if re.match(r"^(?:full\s+)?name\s*[:：]?\s*$", x.text, re.I)),

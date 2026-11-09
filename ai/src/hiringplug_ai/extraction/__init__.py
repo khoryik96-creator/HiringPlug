@@ -15,6 +15,7 @@ from collections.abc import Callable
 
 from .doc_reader import extract_doc
 from .docx_reader import extract_docx
+from .image import extract_image
 from .limits import DEFAULT_LIMITS, DocumentRejectedError, Limits
 from .links import docx_links, with_links
 from .ocr import OcrEngine, TesseractOcr
@@ -27,24 +28,31 @@ __all__ = ["DEFAULT_LIMITS", "Extraction", "Limits", "OcrEngine", "TesseractOcr"
 log = logging.getLogger(__name__)
 
 
+UNSUPPORTED = (
+    "Only PDF, Word (.docx or .doc), text (.txt, .rtf, .odt) and picture "
+    "(PNG, JPG, TIFF, BMP, WEBP) files can be read."
+)
+
+
 def extract(data: bytes, *, ocr: OcrEngine | None, limits: Limits = DEFAULT_LIMITS) -> Extraction:
     kind = sniff(data)
+    readers: dict[str, Callable[[], Extraction]] = {
+        "pdf": lambda: _add_links(extract_pdf(data, limits, ocr)),  # links read with the text
+        "docx": lambda: _add_links(extract_docx(data, limits), lambda: docx_links(data)),
+        "doc": lambda: extract_doc(data, limits),
+        "image": lambda: extract_image(data, limits, ocr),
+    }
+    read = readers.get(kind)
+    if read is None:
+        return Extraction("failed", None, None, "none", error=UNSUPPORTED)
     try:
-        if kind == "pdf":
-            return _add_links(extract_pdf(data, limits, ocr))  # links read with the text
-        if kind == "docx":
-            return _add_links(extract_docx(data, limits), lambda: docx_links(data))
-        if kind == "doc":
-            return extract_doc(data, limits)
+        return read()
     except DocumentRejectedError as exc:
         return Extraction("failed", None, None, kind, error=str(exc))
     except Exception:
         # A damaged file can make the parsing libraries raise almost anything.
         log.warning("document could not be parsed", exc_info=True, extra={"document_kind": kind})
         return Extraction("failed", None, None, kind, error="The file is damaged or not a valid document.")
-    return Extraction(
-        "failed", None, None, "none", error="Only PDF and Word (.docx or .doc) files can be read."
-    )
 
 
 def _add_links(result: Extraction, read: Callable[[], list[str]] | None = None) -> Extraction:

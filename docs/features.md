@@ -136,6 +136,17 @@ the differences read from them on top: fields that disagree, jobs whose title
 or dates changed (matched by employer), jobs and skills only one version has.
 That is the check before sending a formatted CV to a client.
 
+**CV files** ✅: CVs and job descriptions come in the files CV Studio takes:
+PDF, Word (.docx and .doc), text (.txt), RTF, OpenDocument text (.odt), and
+pictures of the CV (PNG, JPG, TIFF, BMP, WEBP), told by their bytes, never
+their name. Text, RTF and ODT files are read at once at upload (in Go, by
+their formats: accents, paragraphs and tables kept, font tables and field
+codes left out); PDFs, Word files and pictures by the AI worker, scans and
+pictures with OCR (Tesseract: a phone photo turned upright, a small
+screenshot enlarged). RTF and ODT CVs also get a PDF copy to preview;
+a picture shows as it is. A file with no readable text is refused at upload.
+The file's name is a hint to the candidate's name ("TAN WEI LING CV.pdf").
+
 **CV parsing** ✅: after a CV's text is read (with OCR for scans), the AI
 worker reads the profile details out of it: name, email, phone, LinkedIn,
 location, nationality, notice period, skills, work history and education.
@@ -461,7 +472,7 @@ lead's company (with the built-in email check).
 - **Careers page** ✅: every company has a public page (`/#/careers/<address>`,
   linked from each job's ads panel) listing its published ads that have not
   passed their closing date, each with its text and an apply form: name,
-  email, phone, CV (PDF or Word) and a consent tick box ("I agree that
+  email, phone, CV (PDF, Word, text or a photo) and a consent tick box ("I agree that
   <company> keeps my details to handle my application"). Applying adds the
   candidate (source: careers page), or uses the existing candidate with that
   email without changing their profile; the CV is attached, read and parsed;

@@ -6,7 +6,6 @@ package jobs
 // the text (ReadJD) and kept with the file for the ad form to use.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +14,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -27,6 +25,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
@@ -42,20 +41,10 @@ type JDFile struct {
 	CreatedAt            time.Time
 }
 
-// jdKind is what an uploaded file is, from its first bytes and name.
+// jdKind is what an uploaded file is, from its bytes (and, for a plain text
+// file, its name): the same files as a CV (filekind).
 func jdKind(name string, data []byte) (contentType string, ok bool) {
-	ext := strings.ToLower(filepath.Ext(name))
-	switch {
-	case bytes.HasPrefix(data, []byte("%PDF")):
-		return "application/pdf", true
-	case bytes.HasPrefix(data, []byte("PK\x03\x04")) && ext == ".docx":
-		return "application/vnd.openxmlformats-officedocument.wordprocessingml.document", true
-	case bytes.HasPrefix(data, []byte("\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")) && ext == ".doc":
-		return "application/msword", true
-	case (ext == ".txt" || ext == ".md") && utf8.Valid(data) && !bytes.ContainsRune(data, 0):
-		return "text/plain", true
-	}
-	return "", false
+	return filekind.Detect(name, data)
 }
 
 // UploadJD stores a job description for a job (or, with jobID "", for a job
@@ -63,7 +52,7 @@ func jdKind(name string, data []byte) (contentType string, ok bool) {
 func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileName string, data []byte) (JDFile, error) {
 	ctype, ok := jdKind(fileName, data)
 	if !ok {
-		return JDFile{}, apperr.Validation(apperr.FieldErrors{{Field: "file", Message: "must be a PDF, a Word file (.docx or .doc) or a text file (.txt)"}})
+		return JDFile{}, apperr.Validation(apperr.FieldErrors{{Field: "file", Message: "must be " + filekind.Accepted}})
 	}
 	name := strings.TrimSpace(filepath.Base(strings.ReplaceAll(fileName, "\\", "/")))
 	if name == "" || name == "." {
@@ -98,8 +87,11 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 			ID: id, JobID: job, FileName: name, ContentType: ctype, SizeBytes: int32(len(data)), //nolint:gosec // capped by the upload limit
 			StorageKey: key, Status: string(api.JdFileStatusReading),
 		}
-		if ctype == "text/plain" { // nothing for the worker to do
-			text := strings.ToValidUTF8(string(data), "")
+		if filekind.ReadHere(ctype) { // a text, RTF or ODT file: read here, nothing for the worker to do
+			text, err := filekind.Text(ctype, data)
+			if err != nil {
+				return apperr.Validation(apperr.FieldErrors{{Field: "file", Message: "has no readable text"}})
+			}
 			details, err := json.Marshal(ReadJD(text, time.Now()))
 			if err != nil {
 				return err
@@ -110,7 +102,7 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 		if err != nil {
 			return err
 		}
-		if ctype != "text/plain" {
+		if !filekind.ReadHere(ctype) {
 			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJobReadJd, api.JobReadJdJob{
 				JdFileId: id, DownloadUrl: s.files.SignedURL(key, jdLinkTTL), ContentType: ctype, FileName: name, SizeBytes: int64(len(data)),
 			}); err != nil {

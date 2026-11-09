@@ -113,7 +113,7 @@ def test_an_unreadable_document_is_a_result_not_a_retry() -> None:
     result = queue.completed[0][0].payload
     assert isinstance(result, DocumentTextExtractedJob)
     assert result.status.value == "failed"
-    assert result.errorMessage == "Only PDF and Word (.docx or .doc) files can be read."
+    assert (result.errorMessage or "").startswith("Only PDF, Word (.docx or .doc), text")
 
 
 def test_parse_cv_sends_the_profile_back_to_the_go_worker() -> None:

@@ -28,6 +28,9 @@ class FakeOcr:
     def available(self) -> bool:
         return self.installed
 
+    def read_image(self, data: bytes, limits: Limits) -> str | None:
+        return self.texts.get(1)
+
     def read_pdf_pages(self, data: bytes, pages: list[int], limits: Limits) -> OcrPages:
         self.calls.append(pages)
         return OcrPages(
@@ -101,7 +104,7 @@ def test_too_many_pages_are_refused() -> None:
 
 def test_damaged_files_fail_with_a_readable_message() -> None:
     assert extract(b"%PDF-1.4 garbage", ocr=None).error == "The file is damaged or not a valid document."
-    assert extract(b"hello", ocr=None).error == "Only PDF and Word (.docx or .doc) files can be read."
+    assert (extract(b"hello", ocr=None).error or "").startswith("Only PDF, Word (.docx or .doc), text")
 
 
 @pytest.mark.ocr

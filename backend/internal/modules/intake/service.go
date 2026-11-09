@@ -75,8 +75,8 @@ func (s *Service) AddFile(ctx context.Context, p authz.Principal, importID, file
 			return err
 		}
 		params := store.InsertItemParams{ImportID: importID, FileName: fileName, Status: Reading}
-		if !s.deps.Documents.IsCVFile(data) { // recorded, so the import shows it; no candidate
-			msg := "Not a PDF or Word (.docx or .doc) file."
+		if !s.deps.Documents.IsCVFile(fileName, data) { // recorded, so the import shows it; no candidate
+			msg := "Not a CV file that can be read: PDF, Word, text (.txt, .rtf, .odt) or a picture (PNG, JPG, TIFF, BMP, WEBP)."
 			params.Status, params.Error = Failed, &msg
 		} else {
 			owner := p.UserID

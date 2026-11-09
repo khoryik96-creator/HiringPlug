@@ -22,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
@@ -122,8 +123,7 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 		if err != nil {
 			return err
 		}
-		word := row.ContentType == ContentTypeDOCX || row.ContentType == ContentTypeDOC
-		if word && row.PdfStatus == nil { // a failed copy is not tried again on every view
+		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view
 			if err := s.queuePdf(ctx, tx, p.TenantID, fromRow(row), row.StorageKey); err != nil {
 				return err
 			}

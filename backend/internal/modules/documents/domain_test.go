@@ -23,25 +23,25 @@ func zipWith(t *testing.T, name string) []byte {
 }
 
 func TestDetectContentType(t *testing.T) {
-	got, ok := DetectContentType([]byte("%PDF-1.7 ..."))
+	got, ok := DetectContentType("cv.pdf", []byte("%PDF-1.7 ..."))
 	assert.True(t, ok)
 	assert.Equal(t, ContentTypePDF, got)
 
-	got, ok = DetectContentType(zipWith(t, "word/document.xml"))
+	got, ok = DetectContentType("cv.docx", zipWith(t, "word/document.xml"))
 	assert.True(t, ok)
 	assert.Equal(t, ContentTypeDOCX, got)
 
-	got, ok = DetectContentType([]byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0})
+	got, ok = DetectContentType("cv.doc", []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 0, 0})
 	assert.True(t, ok)
 	assert.Equal(t, ContentTypeDOC, got)
 
 	for name, data := range map[string][]byte{
-		"plain text":           []byte("hello"),
-		"a zip that is no CV":  zipWith(t, "photo.jpg"),
-		"empty":                nil,
-		"a cut-off OLE header": {0xD0, 0xCF, 0x11, 0xE0},
+		"plain text without a .txt name": []byte("hello"),
+		"a zip that is no CV":            zipWith(t, "photo.jpg"),
+		"empty":                          nil,
+		"a cut-off OLE header":           {0xD0, 0xCF, 0x11, 0xE0},
 	} {
-		_, ok := DetectContentType(data)
+		_, ok := DetectContentType(name, data)
 		assert.False(t, ok, name)
 	}
 }

@@ -10,7 +10,7 @@ ai/src/hiringplug_ai/
   worker.py          the loop: claim → validate payload → handler → complete (or fail)
   queue.py           calls the shared SQL job functions; this role can do nothing else
   jobs/              one module per job kind (extract_text.py, parse_cv.py)
-  extraction/        reading documents: sniff, pdf, ocr, docx_reader, zipsafety, text, limits
+  extraction/        reading documents: sniff, pdf, ocr, image, docx_reader, zipsafety, text, limits
   parsing/           reading profile details out of CV text: layout, dates, contacts, history, skills
   contracts.py       GENERATED models from contracts/openapi.yaml
 ```
@@ -21,7 +21,14 @@ The mechanisms come from **CV Studio**, where they were tuned on real CVs,
 rebuilt here as small, separately tested modules.
 
 1. **Identify the file from its bytes**, never from its name or claimed type
-   (`sniff.py`). PDF, Word (.docx) and old Word (.doc); images next.
+   (`sniff.py`). PDF, Word (.docx), old Word (.doc) and pictures of a CV
+   (PNG, JPEG, TIFF, BMP, WEBP; `image.py`: turned upright as the camera
+   recorded, read in greys, enlarged under 1,600 pixels wide, read turned when
+   sideways, with Tesseract). Text files, RTF and OpenDocument text never
+   reach the worker: Go reads them at upload (`platform/filekind`), as CV
+   Studio accepts them, but following each format (its RTF and ODT readers
+   strip markup with a pattern, which leaves font names and joins
+   paragraphs).
 2. **PDF, page by page** (`pdf.py`):
    - read each page's text layer (pdfplumber);
    - decide per page whether to OCR it. *Unextractable*: the text is glyph

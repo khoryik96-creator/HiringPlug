@@ -34,8 +34,9 @@ type Deps struct {
 		Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 	}
 	Documents interface {
-		// IsCVFile reports whether data is a file CVs come in (PDF, .docx, .doc).
-		IsCVFile(data []byte) bool
+		// IsCVFile reports whether data is a file CVs come in (PDF, Word, text,
+		// RTF, ODT or a picture) that can be read.
+		IsCVFile(fileName string, data []byte) bool
 		AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName string, data []byte) (string, func(), error)
 	}
 	// Sources checks a candidate source is in the company's list.

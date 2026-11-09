@@ -33,9 +33,8 @@ func (a intakeCandidates) Names(ctx context.Context, tx pgx.Tx, ids []string) (m
 
 type intakeDocuments struct{ *documents.Module }
 
-func (intakeDocuments) IsCVFile(data []byte) bool {
-	_, ok := documents.DetectContentType(data)
-	return ok
+func (intakeDocuments) IsCVFile(fileName string, data []byte) bool {
+	return documents.Readable(fileName, data)
 }
 
 // value is a read value's words, or nil.

@@ -5,7 +5,7 @@ import { api, type Candidate, type Document, type Permission, unwrap } from "../
 import { downloadDocument, downloadFrom } from "../api/files";
 import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
-import { DropZone } from "./DropZone";
+import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
 import { FormatCv } from "./FormatCv";
 import { StudioCvRuns } from "./StudioCvRuns";
@@ -20,7 +20,12 @@ const STATUS_NOTE: Partial<Record<Document["status"], string>> = {
 };
 
 const added = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const kindOf = (d: Document) => (d.contentType === "application/pdf" ? "PDF" : d.fileName.toLowerCase().endsWith(".doc") ? "DOC" : "DOCX");
+const KIND: Record<string, string> = {
+  "application/pdf": "PDF", "application/msword": "DOC", "application/rtf": "RTF", "text/plain": "TXT",
+  "application/vnd.oasis.opendocument.text": "ODT",
+};
+const kindOf = (d: Document) => KIND[d.contentType] ?? (d.contentType.startsWith("image/") ? "IMG" : "DOCX");
+
 
 /**
  * A candidate's CVs: upload, reading status (polled while the AI worker reads
@@ -110,7 +115,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
                 Review details
               </button>
             )}
-            <button type="button" className="doc-btn" onClick={() => { void downloadDocument(d); }}>{d.contentType === "application/pdf" ? "Download" : "Word"}</button>
+            <button type="button" className="doc-btn" onClick={() => { void downloadDocument(d); }}>{kindOf(d) === "DOC" || kindOf(d) === "DOCX" ? "Word" : "Download"}</button>
             {d.pdfStatus === "ready" && <button type="button" className="doc-btn" onClick={() => { pdf.mutate(d); }}>PDF</button>}
             <details className="doc-more">
               <summary aria-label={`More for ${d.fileName}`}>⋯</summary>
@@ -159,8 +164,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               </label>
             ))}
           </fieldset>
-          <DropZone accept=".pdf,.docx,.doc" disabled={upload.isPending} label={upload.isPending ? "Uploading…" : "Drop the file here"}
-            hint="PDF or Word" onFiles={(files) => { if (files[0]) upload.mutate(files[0]); }} />
+          <DropZone accept={CV_TYPES} disabled={upload.isPending} label={upload.isPending ? "Uploading…" : "Drop the file here"}
+            hint="PDF, Word, text, or a photo of the CV" onFiles={(files) => { if (files[0]) upload.mutate(files[0]); }} />
         </div>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}

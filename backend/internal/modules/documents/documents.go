@@ -27,6 +27,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
@@ -59,9 +60,9 @@ func (m *Module) AddFile(ctx context.Context, tx pgx.Tx, tenantID, candidateID, 
 
 // AddFileAs is AddFile with the document's source (original, linkedin, ...).
 func (m *Module) AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName string, data []byte) (documentID string, undo func(), err error) {
-	contentType, ok := DetectContentType(data)
+	contentType, ok := DetectContentType(fileName, data)
 	if !ok {
-		return "", func() {}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload a PDF or a Word (.docx or .doc) file.")
+		return "", func() {}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload "+filekind.Accepted+".")
 	}
 	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, source, fileName, contentType, data)
 	undo = func() {

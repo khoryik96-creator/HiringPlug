@@ -458,6 +458,10 @@ components:
           type: string
           pattern: '^[^\x00]*$'
           description: The document's saved text, so quotes match it exactly.
+        fileName:
+          type: string
+          maxLength: 255
+          description: "The file's name, a hint to the candidate's name (\"SITI AISYAH-SEEK-Profile.pdf\")."
         useAi:
           type: boolean
           description: >

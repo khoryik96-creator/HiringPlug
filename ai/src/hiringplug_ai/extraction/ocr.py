@@ -10,13 +10,14 @@ read again turned 90, 180 and 270 degrees, and the clearly best reading wins.
 
 from __future__ import annotations
 
+import io
 import re
 import shutil
 import time
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from .limits import Limits
+from .limits import DocumentRejectedError, Limits
 
 
 @dataclass
@@ -33,6 +34,15 @@ class OcrEngine(Protocol):
     def available(self) -> bool: ...
 
     def read_pdf_pages(self, data: bytes, pages: list[int], limits: Limits) -> OcrPages: ...
+
+    def read_image(self, data: bytes, limits: Limits) -> str | None: ...
+
+
+# Pictures taken are these (Pillow's names); others are refused.
+IMAGE_FORMATS = frozenset({"PNG", "JPEG", "MPO", "TIFF", "BMP", "WEBP"})
+# A picture narrower than this is enlarged first: Tesseract reads small text
+# badly (a phone screenshot of a CV is often under 1,000 pixels wide).
+MIN_OCR_WIDTH = 1600
 
 
 class TesseractOcr:
@@ -78,6 +88,37 @@ class TesseractOcr:
         finally:
             document.close()
         return result
+
+    def read_image(self, data: bytes, limits: Limits) -> str | None:
+        """A picture's text; None when it is blank. Turned upright as the
+        camera recorded (EXIF), in greys, enlarged when small; a sideways
+        picture is also read turned. Raises DocumentRejectedError for a
+        picture that is not one of IMAGE_FORMATS or is too large."""
+        import pytesseract  # noqa: PLC0415
+        from PIL import Image, ImageOps  # noqa: PLC0415
+
+        pytesseract.pytesseract.tesseract_cmd = self.binary
+        Image.MAX_IMAGE_PIXELS = limits.max_image_pixels
+        try:
+            opened = Image.open(io.BytesIO(data))
+            kind = str(opened.format or "").upper()
+            if kind not in IMAGE_FORMATS:
+                raise DocumentRejectedError("Pictures can be PNG, JPG, TIFF, BMP or WEBP.")
+            width, height = opened.size
+            if width * height > limits.max_image_pixels:
+                raise DocumentRejectedError("The picture is too large to read.")
+            opened.seek(0)  # a multi-page TIFF: its first page
+            image = ImageOps.exif_transpose(opened).convert("L")
+        except (Image.DecompressionBombError, OSError) as exc:
+            raise DocumentRejectedError("The picture is damaged or too large to read.") from exc
+        if image.width < MIN_OCR_WIDTH:
+            scale = MIN_OCR_WIDTH / image.width
+            if image.width * scale * image.height * scale <= limits.max_image_pixels:
+                image = image.resize((MIN_OCR_WIDTH, round(image.height * scale)), Image.Resampling.LANCZOS)
+        if _visually_blank(image):
+            return None
+        deadline = time.monotonic() + limits.ocr_total_deadline_seconds
+        return self._read_upright(pytesseract, image, limits, deadline)
 
     def _read_upright(self, pytesseract: Any, image: Any, limits: Limits, deadline: float) -> str:
         def read(img: Any) -> str:

@@ -31,7 +31,8 @@ def _text(value: str | None) -> SourcedText | None:
     return _sourced((value, value)) if value else None
 
 
-def parse_cv(text: str) -> ParsedProfile:
+def parse_cv(text: str, file_name: str | None = None) -> ParsedProfile:
+    """The details in a CV's text; file_name (often the candidate's name) helps find the name."""
     lines = read_lines(text)
     email, linkedin = contacts.email(lines), contacts.linkedin(lines)
     phone, place = contacts.phone(lines), contacts.location(lines)
@@ -59,7 +60,7 @@ def parse_cv(text: str) -> ParsedProfile:
     ]
     return ParsedProfile(
         parser=PARSER,
-        fullName=_sourced(name(lines, email and email[0], linkedin and linkedin[0])),
+        fullName=_sourced(name(lines, email and email[0], linkedin and linkedin[0], file_name)),
         email=_sourced(email),
         phone=_sourced(phone),
         linkedinUrl=_sourced(linkedin),

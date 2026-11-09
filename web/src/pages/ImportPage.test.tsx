@@ -82,8 +82,8 @@ describe("importing CVs and LinkedIn PDFs", () => {
     const zone = (await screen.findByText("Drop CVs here")).closest(".drop-zone");
     if (!zone) throw new Error("no drop zone");
     const siti = new File(["%PDF"], "Siti.pdf");
-    fireEvent.drop(zone, { dataTransfer: { files: [siti, new File(["x"], "photo.png")] } });
-    expect(screen.getByText(/Skipped .*: photo.png/)).toBeTruthy();
+    fireEvent.drop(zone, { dataTransfer: { files: [siti, new File(["x"], "slides.pptx")] } });
+    expect(screen.getByText(/Skipped .*: slides.pptx/)).toBeTruthy();
     fireEvent.drop(zone, { dataTransfer: { files: [siti, new File(["PK"], "Ahmad.docx")] } });
     const list = screen.getByRole("list", { name: "Files to import" });
     expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Siti.pdf×", "Ahmad.docx×"]);

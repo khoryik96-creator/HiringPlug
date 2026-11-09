@@ -161,3 +161,28 @@ Installed, configured and supported Oracle databases for enterprise customers.
     # A wrapped "... at Dell" + "Technologies" is not a skills heading.
     p = parse_cv("EXPERIENCE\nSenior Advisor at Dell\nTechnologies\nSep 2021 - Nov 2023\nSKILLS\nExcel\n")
     assert [s.value for s in p.skills] == ["Excel"]
+
+
+# A two-column CV whose sidebar ("LOCATION / Penang") reads before the name,
+# with the name in a large title the text puts on a line of its own later.
+SIDEBAR_LABELS = """LOCATION Penang
+CONTACT
+lim.weiming@example.com
++60 12 345 6789
+Profile summary
+Lead of the L1 DBA team on database automation.
+LIM WEI MING
+Experience
+Lead Database Administrator, Contoh Tech
+Jan 2018 - Present
+"""
+
+
+def test_a_label_and_its_value_are_not_the_name() -> None:
+    assert v(parse_cv(SIDEBAR_LABELS).fullName) == "Lim Wei Ming"
+    assert v(parse_cv("LOCATION Penang\nGENDER Male\nAGE 35\n").fullName) is None
+
+
+def test_the_file_name_helps_find_the_name() -> None:
+    text = "Kuala Lumpur Office\nAina Sofea Rahman\nSenior Auditor\n"
+    assert v(parse_cv(text, file_name="AINA SOFEA-SEEK-Profile.pdf").fullName) == "Aina Sofea Rahman"

@@ -1389,6 +1389,13 @@ class DocumentParseCvJob(BaseModel):
         str,
         Field(description="The document's saved text, so quotes match it exactly.", pattern="^[^\\x00]*$"),
     ]
+    fileName: Annotated[
+        str | None,
+        Field(
+            description="The file's name, a hint to the candidate's name (\"SITI AISYAH-SEEK-Profile.pdf\").",
+            max_length=255,
+        ),
+    ] = None
     useAi: Annotated[
         bool | None,
         Field(

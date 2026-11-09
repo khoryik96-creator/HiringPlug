@@ -83,7 +83,7 @@ func TestImportingCVsAndLinkedInPDFs(t *testing.T) {
 	assert.Equal(t, "Profile Siti Aisyah", fresh.CandidateName.MustGet(), "the answer names the new candidate too")
 	dup := add("Bala.pdf", minimalPDF)
 	unreadable := add("scan.pdf", minimalPDF)
-	notCV := add("notes.txt", []byte("just some notes"))
+	notCV := add("slides.pptx", []byte("PK\x03\x04 not a CV"))
 	assert.Equal(t, api.CvImportItemStatusFailed, notCV.Status)
 	assert.True(t, notCV.CandidateId.IsNull(), "a file that is not a CV makes no candidate")
 
