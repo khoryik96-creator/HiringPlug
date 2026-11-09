@@ -150,17 +150,20 @@ type Notice struct {
 	Calendar string
 	// Files go with it (an invoice as a PDF).
 	Files []NoticeFile
-	// Restricted: it shows money (an invoice), so only roles that may see
-	// salaries see it, and its subject stays out of the audit log.
-	Restricted bool
+	// ShowsFees: it shows a fee (an invoice), so only roles that may see
+	// fees (placements.fees:read) see it, and its subject stays out of the
+	// audit log.
+	ShowsFees bool
 	// SenderName is who it is from ("HiringPlug" when empty).
 	SenderName string
 }
 
-// NoticeFile is a file attached to a notice.
+// NoticeFile is a file attached to a notice. Key, when given, names it in
+// storage for good (an invoice's number): a retry after a rollback writes
+// the same file again instead of leaving one behind.
 type NoticeFile struct {
-	Name, ContentType string
-	Data              []byte
+	Name, ContentType, Key string
+	Data                   []byte
 }
 
 // Notify records a notice and queues it for sending, in the caller's

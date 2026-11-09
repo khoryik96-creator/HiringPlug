@@ -40,6 +40,7 @@ type placementMailer struct{ emails *emails.Module }
 func (a placementMailer) SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m placements.InvoiceMail) error {
 	return a.emails.Notify(ctx, tx, tenantID, emails.Notice{
 		To: []string{m.To}, Subject: m.Subject, Body: m.Body, ApplicationID: &m.ApplicationID, SenderName: m.From,
-		Files: []emails.NoticeFile{{Name: m.FileName, ContentType: "application/pdf", Data: m.PDF}}, Restricted: true,
+		Files:     []emails.NoticeFile{{Name: m.FileName, ContentType: "application/pdf", Key: m.FileKey, Data: m.PDF}},
+		ShowsFees: true,
 	})
 }

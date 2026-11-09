@@ -39,15 +39,20 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
       setForm((f) => withDefaults(f, defaults.data, withMoney));
     }
   }, [defaults.data, withMoney]);
+  // Recorded but not yet finished (its invoicing failed to save): saving
+  // again changes it rather than recording it twice.
+  const [recorded, setRecorded] = useState<Placement | null>(null);
   const save = useMutation({
     mutationFn: async () => {
-      const saved = placement
+      const current = placement ?? recorded;
+      const saved = current
         ? unwrap(await api.PATCH("/v1/placements/{placementId}", {
-          params: { path: { placementId: placement.id } }, body: updateBody(form, opened.version, withMoney),
+          params: { path: { placementId: current.id } }, body: updateBody(form, placement ? opened.version : current.version, withMoney),
         }))
         : unwrap(await api.POST("/v1/applications/{applicationId}/placement", {
           params: { path: { applicationId } }, body: createBody(form, withMoney),
         }));
+      if (!placement) setRecorded(saved);
       return unwrap(await api.PUT("/v1/placements/{placementId}/invoicing", {
         params: { path: { placementId: saved.id } }, body: invoicingBody(form),
       }));

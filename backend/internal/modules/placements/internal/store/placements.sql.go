@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearInvoiceSchedule = `-- name: ClearInvoiceSchedule :exec
+UPDATE placement_invoice SET scheduled_for = NULL WHERE placement_id = $1
+`
+
+// The job queued for the invoice email is running: nothing is queued now.
+func (q *Queries) ClearInvoiceSchedule(ctx context.Context, placementID string) error {
+	_, err := q.db.Exec(ctx, clearInvoiceSchedule, placementID)
+	return err
+}
+
 const deletePlacementMoney = `-- name: DeletePlacementMoney :exec
 DELETE FROM placement_money WHERE placement_id = $1
 `
@@ -180,8 +190,51 @@ func (q *Queries) InsertPlacement(ctx context.Context, arg InsertPlacementParams
 	return i, err
 }
 
+const invoiceNumberUsed = `-- name: InvoiceNumberUsed :one
+SELECT EXISTS (SELECT 1 FROM placement WHERE invoice_number = $1)
+`
+
+func (q *Queries) InvoiceNumberUsed(ctx context.Context, invoiceNumber *string) (bool, error) {
+	row := q.db.QueryRow(ctx, invoiceNumberUsed, invoiceNumber)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const listAwaitingInvoices = `-- name: ListAwaitingInvoices :many
+SELECT p.id, p.start_date
+FROM placement_invoice i JOIN placement p ON p.id = i.placement_id
+WHERE i.auto_send AND i.sent_at IS NULL AND p.status = 'active' AND p.invoice_status = 'not_invoiced'
+`
+
+type ListAwaitingInvoicesRow struct {
+	ID        string
+	StartDate time.Time
+}
+
+// Invoices still to be emailed on their start date.
+func (q *Queries) ListAwaitingInvoices(ctx context.Context) ([]ListAwaitingInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, listAwaitingInvoices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAwaitingInvoicesRow
+	for rows.Next() {
+		var i ListAwaitingInvoicesRow
+		if err := rows.Scan(&i.ID, &i.StartDate); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlacementInvoicing = `-- name: ListPlacementInvoicing :many
-SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at FROM placement_invoice WHERE placement_id = ANY ($1::text[])
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for FROM placement_invoice WHERE placement_id = ANY ($1::text[])
 `
 
 // Invoicing: who receives the invoice, the terms and due date, and the
@@ -206,6 +259,7 @@ func (q *Queries) ListPlacementInvoicing(ctx context.Context, placementIds []str
 			&i.SendError,
 			&i.UpdatedBy,
 			&i.UpdatedAt,
+			&i.ScheduledFor,
 		); err != nil {
 			return nil, err
 		}
@@ -282,7 +336,7 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 }
 
 const lockPlacementInvoicing = `-- name: LockPlacementInvoicing :one
-SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at FROM placement_invoice WHERE placement_id = $1 FOR UPDATE
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at, scheduled_for FROM placement_invoice WHERE placement_id = $1 FOR UPDATE
 `
 
 // One sender at a time (the start-date job and "send now").
@@ -300,8 +354,28 @@ func (q *Queries) LockPlacementInvoicing(ctx context.Context, placementID string
 		&i.SendError,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.ScheduledFor,
 	)
 	return i, err
+}
+
+const markInvoiceScheduled = `-- name: MarkInvoiceScheduled :execrows
+UPDATE placement_invoice SET scheduled_for = $1, send_error = NULL
+WHERE placement_id = $2 AND scheduled_for IS DISTINCT FROM $1
+`
+
+type MarkInvoiceScheduledParams struct {
+	ScheduledFor *time.Time
+	PlacementID  string
+}
+
+// Queue the invoice email for at, unless it already is (none: nothing to queue).
+func (q *Queries) MarkInvoiceScheduled(ctx context.Context, arg MarkInvoiceScheduledParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markInvoiceScheduled, arg.ScheduledFor, arg.PlacementID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const markInvoiceSent = `-- name: MarkInvoiceSent :exec
@@ -499,7 +573,8 @@ func (q *Queries) SetInvoiceError(ctx context.Context, arg SetInvoiceErrorParams
 }
 
 const takeInvoiceNumber = `-- name: TakeInvoiceNumber :one
-UPDATE invoice_settings SET next_number = next_number + 1 RETURNING next_number - 1 AS number, number_prefix
+UPDATE invoice_settings SET next_number = next_number + 1, version = version + 1
+RETURNING next_number - 1 AS number, number_prefix
 `
 
 type TakeInvoiceNumberRow struct {
@@ -507,7 +582,9 @@ type TakeInvoiceNumberRow struct {
 	NumberPrefix string
 }
 
-// The next invoice number, taken (the row is locked until the transaction ends).
+// The next invoice number, taken (the row is locked until the transaction
+// ends). The version moves on too, so a template opened before cannot put
+// the number back.
 func (q *Queries) TakeInvoiceNumber(ctx context.Context) (TakeInvoiceNumberRow, error) {
 	row := q.db.QueryRow(ctx, takeInvoiceNumber)
 	var i TakeInvoiceNumberRow

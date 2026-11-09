@@ -102,6 +102,27 @@ SET issuer = @issuer, bank_details = @bank_details, number_prefix = @number_pref
     email_body = @email_body, send_hour = @send_hour, version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE version = @expected_version;
 
--- The next invoice number, taken (the row is locked until the transaction ends).
+-- The next invoice number, taken (the row is locked until the transaction
+-- ends). The version moves on too, so a template opened before cannot put
+-- the number back.
 -- name: TakeInvoiceNumber :one
-UPDATE invoice_settings SET next_number = next_number + 1 RETURNING next_number - 1 AS number, number_prefix;
+UPDATE invoice_settings SET next_number = next_number + 1, version = version + 1
+RETURNING next_number - 1 AS number, number_prefix;
+
+-- name: InvoiceNumberUsed :one
+SELECT EXISTS (SELECT 1 FROM placement WHERE invoice_number = @invoice_number);
+
+-- Queue the invoice email for at, unless it already is (none: nothing to queue).
+-- name: MarkInvoiceScheduled :execrows
+UPDATE placement_invoice SET scheduled_for = @scheduled_for, send_error = NULL
+WHERE placement_id = @placement_id AND scheduled_for IS DISTINCT FROM @scheduled_for;
+
+-- Invoices still to be emailed on their start date.
+-- name: ListAwaitingInvoices :many
+SELECT p.id, p.start_date
+FROM placement_invoice i JOIN placement p ON p.id = i.placement_id
+WHERE i.auto_send AND i.sent_at IS NULL AND p.status = 'active' AND p.invoice_status = 'not_invoiced';
+
+-- The job queued for the invoice email is running: nothing is queued now.
+-- name: ClearInvoiceSchedule :exec
+UPDATE placement_invoice SET scheduled_for = NULL WHERE placement_id = @placement_id;

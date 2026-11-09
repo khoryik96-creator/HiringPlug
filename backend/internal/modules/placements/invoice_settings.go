@@ -104,6 +104,11 @@ func (s *Service) PutSettings(ctx context.Context, p authz.Principal, expectedVe
 		if out, err = s.settingsIn(ctx, tx, p.TenantID); err != nil {
 			return err
 		}
+		if out.SendHour != cur.SendHour {
+			if err := s.rescheduleAll(ctx, tx, p.TenantID); err != nil {
+				return err
+			}
+		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "invoice_settings.saved", EntityType: "invoice_settings", EntityID: p.TenantID,
 			Changes: map[string]any{"nextNumber": strconv.Itoa(out.NextNumber), "numberPrefix": out.NumberPrefix, "taxPercent": out.TaxPercent}})
 	})

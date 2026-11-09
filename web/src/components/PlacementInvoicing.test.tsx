@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import * as files from "../api/files";
-import { ok, RECRUITER, renderWithClient, sentBody } from "../test-utils";
+import { invalidField, ok, RECRUITER, renderWithClient, sentBody } from "../test-utils";
 import { PlacementForm } from "./PlacementForm";
 import { PlacementInvoice } from "./PlacementInvoicing";
 import { autoDueOn } from "./placementFormState";
@@ -80,6 +80,24 @@ describe("invoicing a placement", () => {
       permissions={RECRUITER} />);
     expect(screen.getByRole("alert").textContent).toContain("Record the placement's fee first.");
     expect(screen.queryByRole("button", { name: "Preview invoice" }), "the invoice shows the fee").toBeNull();
+  });
+
+  it("a failed invoicing save does not record the placement twice", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/applications/{applicationId}/placement-defaults" ? defaults : path === "/v1/contacts" ? { items: contacts, nextCursor: null } : { items: [] },
+    ))) as never);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(placement()));
+    const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(placement({ version: 2 })));
+    const put = vi.spyOn(api, "PUT").mockResolvedValueOnce(invalidField("paymentTermsDays", "between 0 and 365 days")).mockResolvedValue(ok(placement()));
+    renderWithClient(<PlacementForm applicationId="appl_1" permissions={RECRUITER} onDone={() => undefined} />);
+    await screen.findByText(/terms of business/);
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
+    expect(await screen.findByText("between 0 and 365 days")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
+    await waitFor(() => { expect(put).toHaveBeenCalledTimes(2); });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1); // the second save changes the one recorded
   });
 
   it("works out the due date", () => {

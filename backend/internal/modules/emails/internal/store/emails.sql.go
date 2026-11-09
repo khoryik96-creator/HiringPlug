@@ -145,7 +145,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -172,6 +172,7 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.Salary,
 		&i.SalaryRestricted,
 		&i.Calendar,
+		&i.FeesRestricted,
 	)
 	return i, err
 }
@@ -272,11 +273,11 @@ func (q *Queries) InsertBanner(ctx context.Context, arg InsertBannerParams) (Ema
 
 const insertEmail = `-- name: InsertEmail :one
 INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
-                   body_html, salary, salary_restricted, sent_by, sender_name, reply_to)
+                   body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to)
 VALUES (app_current_tenant(), $1, $2, $3::text[],
         $4::text[], $5::text[], $6, $7, $8, $9, $10,
-        app_current_user(), $11, $12)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar
+        $11, app_current_user(), $12, $13)
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted
 `
 
 type InsertEmailParams struct {
@@ -290,6 +291,7 @@ type InsertEmailParams struct {
 	BodyHtml         *string
 	Salary           bool
 	SalaryRestricted bool
+	FeesRestricted   bool
 	SenderName       string
 	ReplyTo          string
 }
@@ -306,6 +308,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		arg.BodyHtml,
 		arg.Salary,
 		arg.SalaryRestricted,
+		arg.FeesRestricted,
 		arg.SenderName,
 		arg.ReplyTo,
 	)
@@ -331,6 +334,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.Salary,
 		&i.SalaryRestricted,
 		&i.Calendar,
+		&i.FeesRestricted,
 	)
 	return i, err
 }
@@ -406,7 +410,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) ([]Email, error) {
@@ -439,6 +443,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.Salary,
 			&i.SalaryRestricted,
 			&i.Calendar,
+			&i.FeesRestricted,
 		); err != nil {
 			return nil, err
 		}

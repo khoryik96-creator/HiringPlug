@@ -134,11 +134,16 @@ func DueOn(invoiceDate time.Time, termsDays int, set *time.Time) time.Time {
 // SendsAt is when a placement's invoice goes out on its start date: at the
 // agency's hour in its time zone, or at once if that is past.
 func SendsAt(start time.Time, hour int, loc *time.Location, now time.Time) time.Time {
-	at := time.Date(start.Year(), start.Month(), start.Day(), hour, 0, 0, 0, loc)
+	at := SendTime(start, hour, loc)
 	if at.Before(now) {
-		return now
+		return now.Truncate(time.Second)
 	}
 	return at
+}
+
+// SendTime is the agency's hour on the start date, in its time zone.
+func SendTime(start time.Time, hour int, loc *time.Location) time.Time {
+	return time.Date(start.Year(), start.Month(), start.Day(), hour, 0, 0, 0, loc)
 }
 
 // InvoiceTotals are an invoice's amounts, worked out exactly, two decimals each.

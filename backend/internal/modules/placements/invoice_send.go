@@ -162,18 +162,17 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 func (s *Service) send(ctx context.Context, tx pgx.Tx, tenantID string, row store.Placement, inv store.PlacementInvoice, auto bool) error {
 	q := store.New(tx)
 	// Check it can be made before a number is taken.
-	today := s.localToday()
-	if _, err := s.makeInvoice(ctx, tx, tenantID, row, inv, "INV", today, "pdf"); err != nil {
+	if err := s.ready(ctx, tx, row, inv); err != nil {
 		return err
 	}
 	if err := s.ensureSettings(ctx, tx, tenantID); err != nil {
 		return err
 	}
-	taken, err := q.TakeInvoiceNumber(ctx)
+	number, err := s.takeNumber(ctx, q)
 	if err != nil {
 		return err
 	}
-	number := InvoiceNumber(taken.NumberPrefix, int(taken.Number))
+	today := s.localToday()
 	made, err := s.makeInvoice(ctx, tx, tenantID, row, inv, number, today, "pdf")
 	if err != nil {
 		return err
@@ -185,7 +184,7 @@ func (s *Service) send(ctx context.Context, tx pgx.Tx, tenantID string, row stor
 	if err := s.inv.Mailer.SendInvoice(ctx, tx, tenantID, InvoiceMail{
 		To: *made.contact.Email, From: made.from, ApplicationID: row.ApplicationID,
 		Subject: FillInvoice(settings.EmailSubject, made.values), Body: FillInvoice(settings.EmailBody, made.values),
-		FileName: "Invoice " + number + ".pdf", PDF: made.pdf,
+		FileName: "Invoice " + number + ".pdf", FileKey: "invoice_" + row.ID + "_" + number, PDF: made.pdf,
 	}); err != nil {
 		return err
 	}
@@ -199,6 +198,49 @@ func (s *Service) send(ctx context.Context, tx pgx.Tx, tenantID string, row stor
 	return audit.Record(ctx, tx, audit.Entry{Action: "placement.invoice_sent", EntityType: "placement", EntityID: row.ID, Changes: map[string]any{
 		"invoiceNumber": number, "to": *made.contact.Email, "automatic": auto, "dueOn": made.due.Format(time.DateOnly),
 	}})
+}
+
+// ready reports why a placement's invoice cannot be made yet (no
+// recipient with an email address, no fee), without making it.
+func (s *Service) ready(ctx context.Context, tx pgx.Tx, row store.Placement, inv store.PlacementInvoice) error {
+	if inv.ContactID == nil {
+		return &notReady{"Choose who receives the invoice (one of the client's contacts)."}
+	}
+	contacts, err := s.inv.Contacts.Contacts(ctx, tx, []string{*inv.ContactID})
+	if err != nil {
+		return err
+	}
+	if c, ok := contacts[*inv.ContactID]; !ok || c.Email == nil {
+		return &notReady{"The invoice recipient has no email address."}
+	}
+	money, err := store.New(tx).PlacementMoney(ctx, []string{row.ID})
+	if err != nil {
+		return err
+	}
+	if len(money) == 0 || !money[0].FeeAmount.Valid || money[0].FeeCurrency == nil {
+		return &notReady{"Record the placement's fee first."}
+	}
+	return nil
+}
+
+// takeNumber takes the next invoice number, passing over any already on an
+// invoice (typed in by hand, or a counter set back).
+func (s *Service) takeNumber(ctx context.Context, q *store.Queries) (string, error) {
+	for range 1000 {
+		taken, err := q.TakeInvoiceNumber(ctx)
+		if err != nil {
+			return "", err
+		}
+		number := InvoiceNumber(taken.NumberPrefix, int(taken.Number))
+		used, err := q.InvoiceNumberUsed(ctx, &number)
+		if err != nil {
+			return "", err
+		}
+		if !used {
+			return number, nil
+		}
+	}
+	return "", errors.New("no free invoice number in the next 1000")
 }
 
 // InvoiceFile is an invoice to download.
@@ -223,13 +265,14 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id, format string
 		if err != nil {
 			return err
 		}
-		inv, err := q.LockPlacementInvoicing(ctx, id)
-		if database.IsNoRows(err) {
-			return notAllowed("Choose who receives the invoice first.")
-		}
+		invs, err := q.ListPlacementInvoicing(ctx, []string{id}) // read only: no lock
 		if err != nil {
 			return err
 		}
+		if len(invs) == 0 {
+			return notAllowed("Choose who receives the invoice first.")
+		}
+		inv := invs[0]
 		number, date := "(numbered when sent)", row.StartDate
 		if row.InvoiceNumber != nil {
 			number = *row.InvoiceNumber

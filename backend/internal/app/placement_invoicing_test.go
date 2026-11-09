@@ -97,6 +97,7 @@ func TestPlacementInvoicing(t *testing.T) {
 		s.Issuer = "Hyppies Sdn Bhd\nLevel 5, Menara KL\nSST No. W10-1234"
 		s.BankDetails = "Maybank 5140 1234 5678 (Hyppies Sdn Bhd)"
 		s.EmailSubject = "Invoice {{invoice.number}} for {{candidate.name}}"
+		s.SendHour = 0 // at midnight on the start date: due whatever the time of the test
 		body := map[string]any{"version": s.Version, "issuer": s.Issuer, "bankDetails": s.BankDetails, "numberPrefix": s.NumberPrefix,
 			"nextNumber": s.NextNumber, "taxLabel": s.TaxLabel, "taxPercent": s.TaxPercent, "lineText": s.LineText, "footer": s.Footer,
 			"emailSubject": s.EmailSubject, "emailBody": s.EmailBody, "sendHour": s.SendHour}

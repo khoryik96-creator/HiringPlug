@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { assistantAnswersKey, assistantKey, candidateApplicationsKey } from "../api/keys";
 import { ASSISTANT_KIND, formatWhen } from "../labels";
+import { AdText } from "./AdText";
 import { ErrorMessage } from "./ErrorMessage";
 
 type SubjectType = Schemas["AssistantSubjectType"];
@@ -105,7 +106,7 @@ function AnswerItem({ a }: { a: Answer }) {
       <strong>{a.question ?? ASSISTANT_KIND[a.kind]}</strong>
       {a.status === "queued" && <p className="muted" role="status">Thinking…</p>}
       {a.status === "failed" && <p className="warning">No answer: {a.error}</p>}
-      {a.status === "done" && <p className="pre">{a.answer}</p>}
+      {a.status === "done" && <AdText text={a.answer ?? ""} />}
       <div className="muted small">{formatWhen(a.createdAt)}{a.model && <> · {a.model}</>}</div>
     </article>
   );

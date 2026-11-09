@@ -133,6 +133,13 @@ func (s *Service) PutInvoicing(ctx context.Context, p authz.Principal, id string
 		if err != nil {
 			return err
 		}
+		invoiceDate := row.StartDate
+		if row.InvoicedOn != nil {
+			invoiceDate = *row.InvoicedOn
+		}
+		if in.DueOn != nil && in.DueOn.Before(invoiceDate) {
+			return apperr.Validation(apperr.FieldErrors{{Field: "dueOn", Message: "must be on or after the invoice date (" + LongDate(invoiceDate) + ")"}})
+		}
 		if in.ContactID != nil {
 			contacts, err := s.inv.Contacts.Contacts(ctx, tx, []string{*in.ContactID})
 			if err != nil {
@@ -174,16 +181,38 @@ func (s *Service) PutInvoicing(ctx context.Context, p authz.Principal, id string
 	return out, err
 }
 
-// schedule queues the emailing of a placement's invoice on its start date.
-// A job for an earlier start date finds the start moved and does nothing.
+// schedule queues the emailing of a placement's invoice on its start date,
+// unless it is already queued for that time. A job for an earlier time finds
+// the time moved and does nothing (or queues it again for the new time).
 func (s *Service) schedule(ctx context.Context, tx pgx.Tx, tenantID, placementID string, start time.Time) error {
 	settings, err := s.settingsIn(ctx, tx, tenantID)
 	if err != nil {
 		return err
 	}
-	at := SendsAt(start, settings.SendHour, s.inv.TimeZone, s.clock())
+	// Queued once per send time (the start date at the hour): the job clears
+	// it when it runs, so anything later queues it afresh.
+	when := SendTime(start, settings.SendHour, s.inv.TimeZone)
+	n, err := store.New(tx).MarkInvoiceScheduled(ctx, store.MarkInvoiceScheduledParams{PlacementID: placementID, ScheduledFor: &when})
+	if err != nil || n == 0 {
+		return err
+	}
+	at := SendsAt(start, settings.SendHour, s.inv.TimeZone, s.clock()) // at once when that time is past
 	_, err = jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindPlacementInvoice, api.PlacementInvoiceJob{PlacementId: placementID}, at)
 	return err
+}
+
+// rescheduleAll queues again every invoice still to be emailed (the hour changed).
+func (s *Service) rescheduleAll(ctx context.Context, tx pgx.Tx, tenantID string) error {
+	rows, err := store.New(tx).ListAwaitingInvoices(ctx)
+	if err != nil {
+		return err
+	}
+	for _, r := range rows {
+		if err := s.schedule(ctx, tx, tenantID, r.ID, r.StartDate); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) clock() time.Time {
@@ -214,6 +243,9 @@ func (s *Service) invoiceJob(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	if err != nil {
 		return err
 	}
+	if err := q.ClearInvoiceSchedule(ctx, payload.PlacementId); err != nil {
+		return err
+	}
 	row, err := q.GetPlacement(ctx, payload.PlacementId)
 	if err != nil {
 		return err
@@ -221,8 +253,12 @@ func (s *Service) invoiceJob(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	if !inv.AutoSend || inv.SentAt != nil || row.Status != Active || row.InvoiceStatus != NotInvoiced {
 		return nil
 	}
-	if row.StartDate.After(s.localToday()) {
-		return s.schedule(ctx, tx, job.TenantID, row.ID, row.StartDate)
+	settings, err := s.settingsIn(ctx, tx, job.TenantID)
+	if err != nil {
+		return err
+	}
+	if s.clock().Before(SendTime(row.StartDate, settings.SendHour, s.inv.TimeZone)) {
+		return s.schedule(ctx, tx, job.TenantID, row.ID, row.StartDate) // the start date or hour moved later
 	}
 	err = s.send(ctx, tx, job.TenantID, row, inv, true)
 	var reason *notReady
@@ -290,7 +326,7 @@ func (s *Service) invoicingViews(ctx context.Context, tx pgx.Tx, tenantID string
 				v.ContactName, v.ContactEmail = &c.Name, c.Email
 			}
 		}
-		if inv.AutoSend && inv.SentAt == nil && r.Status == Active && r.InvoiceStatus == NotInvoiced && v.ContactEmail != nil {
+		if inv.AutoSend && inv.SentAt == nil && inv.SendError == nil && r.Status == Active && r.InvoiceStatus == NotInvoiced && v.ContactEmail != nil {
 			if hour < 0 {
 				settings, err := s.settingsIn(ctx, tx, tenantID)
 				if err != nil {

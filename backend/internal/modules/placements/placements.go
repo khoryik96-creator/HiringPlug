@@ -59,6 +59,7 @@ type Contact struct {
 type InvoiceMail struct {
 	To, Subject, Body, From string
 	FileName                string
+	FileKey                 string // the same for the same invoice: a retry rewrites it
 	PDF                     []byte
 	ApplicationID           string
 }

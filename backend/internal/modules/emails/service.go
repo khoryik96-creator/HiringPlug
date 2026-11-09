@@ -2,6 +2,7 @@ package emails
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -318,13 +319,16 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	q := store.New(tx)
 	row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 		ApplicationID: n.ApplicationID, CandidateID: n.CandidateID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
-		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", Salary: n.Restricted, SalaryRestricted: n.Restricted,
+		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees,
 	})
 	if err != nil {
 		return err
 	}
 	for _, f := range n.Files {
 		key := tenantID + "/eat_" + newKey()
+		if f.Key != "" {
+			key = tenantID + "/eat_" + storageName(f.Key)
+		}
 		if err := s.files.Put(key, f.Data); err != nil {
 			return err
 		}
@@ -345,8 +349,22 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		return err
 	}
 	changes := map[string]any{"to": o.To, "subject": o.Subject, "automatic": true}
-	if n.Restricted {
+	if n.ShowsFees {
 		changes["subject"] = audit.Redacted // it may show the amount
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "email.queued", EntityType: "email", EntityID: row.ID, Changes: changes})
+}
+
+// storageName is a name as storage keys take it: lower case letters, digits
+// and _ ("invoice_plc_01…_HYP-0042" -> "invoice_plc_01…_hyp_0042").
+func storageName(name string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
+		}
+		return '_'
+	}, name)
 }

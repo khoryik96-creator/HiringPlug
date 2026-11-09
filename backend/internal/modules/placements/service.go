@@ -175,10 +175,10 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 		if err != nil {
 			return err
 		}
-		if !after.StartDate.Equal(before.StartDate) {
-			if err := s.reschedule(ctx, tx, p.TenantID, updated); err != nil {
-				return err
-			}
+		// A moved start date, a fee now recorded or a placement active again:
+		// the invoice email is queued (again) for the start date.
+		if err := s.reschedule(ctx, tx, p.TenantID, updated); err != nil {
+			return err
 		}
 		changes := audit.Diff(auditFields(before), auditFields(after))
 		if money.Set {

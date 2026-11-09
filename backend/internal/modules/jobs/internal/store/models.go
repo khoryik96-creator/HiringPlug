@@ -425,6 +425,7 @@ type Email struct {
 	Salary           bool
 	SalaryRestricted bool
 	Calendar         *string
+	FeesRestricted   bool
 }
 
 type EmailAttachment struct {
@@ -789,6 +790,7 @@ type PlacementInvoice struct {
 	SendError        *string
 	UpdatedBy        string
 	UpdatedAt        time.Time
+	ScheduledFor     *time.Time
 }
 
 type PlacementMoney struct {
