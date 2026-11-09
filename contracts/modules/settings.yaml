@@ -225,29 +225,33 @@ components:
         prospects"; screening starts with RFL and LF, as notice period and
         salaries have their own fields on the call), company_benefits and
         pre_offer_process (the template for a client's benefits and its steps
-        before an offer, on the company page; each item may carry a hint).
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process]
+        before an offer, on the company page; each item may carry a hint),
+        company_category (a company's category, e.g. Signed client or VIP
+        client, each with its colour).
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.
       enum: [open, fixed]
     FieldOption:
       type: object
-      required: [key, label, hint, hidden, builtIn]
+      required: [key, label, hint, color, hidden, builtIn]
       properties:
         key: { type: string, description: "What is stored (for notice periods: number_unit, e.g. 2_week)." }
         label: { type: string }
         hint: { type: string, nullable: true, description: "What to write for it (lists with hints only)." }
+        color: { type: string, nullable: true, pattern: '^#[0-9a-f]{6}$', description: "Its colour, e.g. #16a34a (lists with colours only)." }
         hidden: { type: boolean, description: Not offered for new choices; records that have it keep it. }
         builtIn: { type: boolean, description: "Comes with the app: hide it instead of removing it." }
     FieldList:
       type: object
-      required: [name, label, kind, hints, options]
+      required: [name, label, kind, hints, colors, options]
       properties:
         name: { $ref: '#/components/schemas/FieldListName' }
         label: { type: string }
         kind: { $ref: '#/components/schemas/FieldListKind' }
         hints: { type: boolean, description: "Its options carry a hint (what to write)." }
+        colors: { type: boolean, description: "Its options carry a colour." }
         options:
           type: array
           items: { $ref: '#/components/schemas/FieldOption' }
@@ -259,6 +263,7 @@ components:
         key: { type: string, maxLength: 100, description: "Omit for a new option (made from the label); notice periods need number_unit." }
         label: { type: string, minLength: 1, maxLength: 100 }
         hint: { type: string, maxLength: 300, description: "For lists with hints; ignored elsewhere." }
+        color: { type: string, pattern: '^#[0-9a-fA-F]{6}$', description: "For lists with colours; ignored elsewhere." }
         hidden: { type: boolean }
     FieldListInput:
       type: object

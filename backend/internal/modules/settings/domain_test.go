@@ -34,7 +34,7 @@ func builtIns(name string) []OptionInput {
 
 func TestDefaultsUntilACompanySaves(t *testing.T) {
 	all := Lists(map[string][]Option{"candidate_source": {{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true}}})
-	require.Len(t, all, 9)
+	require.Len(t, all, 10)
 	assert.Equal(t, []string{"RFL", "LF"}, labelsOf(all[5].Options), "a screening call's items, ready to change")
 	assert.Equal(t, "candidate_source", all[0].Name)
 	assert.Equal(t, []Option{{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true, BuiltIn: true}}, all[0].Options)
@@ -144,4 +144,25 @@ func TestBenefitItemsCarryHints(t *testing.T) {
 	plain, err := CheckList("screening_call", []OptionInput{{Key: "rfl", Label: "RFL", Hint: "ignored"}, {Key: "lf", Label: "LF"}})
 	require.NoError(t, err)
 	assert.Empty(t, plain[0].Hint, "only lists with hints keep one")
+}
+
+func TestCompanyCategoriesCarryAColour(t *testing.T) {
+	all := Lists(nil)
+	cats := all[len(all)-1]
+	require.Equal(t, "company_category", cats.Name)
+	assert.True(t, cats.Colors)
+	assert.Equal(t, []string{"Signed client", "Prospective client", "Unknown", "VIP client"}, labelsOf(cats.Options))
+	assert.Equal(t, "#16a34a", cats.Options[0].Color)
+
+	in := append(builtIns("company_category"), OptionInput{Label: "Key account", Color: "#7C3AED"}, OptionInput{Label: "Dormant"})
+	got, err := CheckList("company_category", in)
+	require.NoError(t, err)
+	assert.Equal(t, Option{Key: "key_account", Label: "Key account", Color: "#7c3aed"}, got[4], "named and coloured by the agency")
+	assert.Equal(t, "#6b7280", got[5].Color, "grey until a colour is chosen")
+	assert.Equal(t, "#16a34a", got[0].Color, "a built-in one keeps its own")
+	_, err = CheckList("company_category", append(builtIns("company_category"), OptionInput{Label: "Hot", Color: "red"}))
+	require.Error(t, err)
+	got, err = CheckList("candidate_source", append(builtIns("candidate_source"), OptionInput{Label: "Job fair", Color: "#16a34a"}))
+	require.NoError(t, err)
+	assert.Empty(t, got[len(got)-1].Color, "only lists with colours keep one")
 }

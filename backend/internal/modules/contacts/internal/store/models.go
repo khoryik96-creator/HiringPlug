@@ -259,6 +259,7 @@ type Company struct {
 	AutofillError      *string
 	AutofillCheckedAt  *time.Time
 	PhoneDigits        *string
+	Category           *string
 }
 
 type CompanyBenefit struct {
@@ -492,6 +493,7 @@ type FieldOption struct {
 	Hidden   bool
 	Position int32
 	Hint     *string
+	Color    *string
 }
 
 type FieldRule struct {

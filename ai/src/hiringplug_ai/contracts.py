@@ -1028,6 +1028,12 @@ class Company(BaseModel):
     version: Annotated[int, Field(description="Send it back when you update.")]
     name: str
     type: CompanyType
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."
+        ),
+    ]
     website: Annotated[str | None, Field(description="Always with https://, e.g. https://example.com.")]
     industry: Annotated[str | None, Field(...)]
     size: Annotated[CompanySize | None, Field(...)]
@@ -1050,6 +1056,13 @@ class CompanyCreate(BaseModel):
     )
     name: Annotated[str, Field(max_length=200, min_length=1)]
     type: Annotated[CompanyType | None, Field(description="Defaults to client.")] = None
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
     website: Annotated[
         str | None,
         Field(description="example.com or a full address; https:// is added if missing.", max_length=300),
@@ -1071,6 +1084,13 @@ class CompanyUpdate(BaseModel):
     version: Annotated[int, Field(description="The version you loaded.", ge=1)]
     name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
     type: CompanyType | None = None
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
     website: Annotated[str | None, Field(max_length=300)] = None
     industry: Annotated[str | None, Field(max_length=100)] = None
     size: CompanySize | None = None
@@ -1086,6 +1106,7 @@ class CompanySummary(BaseModel):
     id: CompanyId
     name: str
     type: CompanyType
+    category: Annotated[str | None, Field(...)]
     industry: Annotated[str | None, Field(...)]
     city: Annotated[str | None, Field(...)]
     website: Annotated[str | None, Field(...)]
@@ -3950,6 +3971,7 @@ class FieldListName(StrEnum):
     reference_check = "reference_check"
     company_benefits = "company_benefits"
     pre_offer_process = "pre_offer_process"
+    company_category = "company_category"
 
 
 class FieldListKind(StrEnum):
@@ -3961,6 +3983,10 @@ class FieldOption(BaseModel):
     key: Annotated[str, Field(description="What is stored (for notice periods: number_unit, e.g. 2_week).")]
     label: str
     hint: Annotated[str | None, Field(description="What to write for it (lists with hints only).")]
+    color: Annotated[
+        str | None,
+        Field(description="Its colour, e.g. #16a34a (lists with colours only).", pattern="^#[0-9a-f]{6}$"),
+    ]
     hidden: Annotated[bool, Field(description="Not offered for new choices; records that have it keep it.")]
     builtIn: Annotated[bool, Field(description="Comes with the app: hide it instead of removing it.")]
 
@@ -3970,6 +3996,7 @@ class FieldList(BaseModel):
     label: str
     kind: FieldListKind
     hints: Annotated[bool, Field(description="Its options carry a hint (what to write).")]
+    colors: Annotated[bool, Field(description="Its options carry a colour.")]
     options: list[FieldOption]
 
 
@@ -3987,6 +4014,10 @@ class FieldOptionInput(BaseModel):
     label: Annotated[str, Field(max_length=100, min_length=1)]
     hint: Annotated[
         str | None, Field(description="For lists with hints; ignored elsewhere.", max_length=300)
+    ] = None
+    color: Annotated[
+        str | None,
+        Field(description="For lists with colours; ignored elsewhere.", pattern="^#[0-9a-fA-F]{6}$"),
     ] = None
     hidden: bool | None = None
 

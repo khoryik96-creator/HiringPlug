@@ -628,3 +628,10 @@ fieldset.invoicing .check { display: block; }
 .placement-fact-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 650; }
 .placement-box .placement-invoice { border-top: 1px dashed var(--line); padding-top: 0.45rem; margin-top: 0; }
 .small-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* A company's card: like a candidate's, coloured by its category. */
+.company-banner .banner-facts a { color: inherit; }
+.company-banner .banner-job { font-size: 1.25rem; }
+.category-chip { display: inline-block; font-size: 0.78rem; font-weight: 650; padding: 0.15rem 0.6rem; border-radius: 999px; border: 1.5px solid; white-space: nowrap; }
+.color-input { width: 2.2rem; height: 2.2rem; padding: 0.1rem; border-radius: 8px; vertical-align: middle; margin-right: 0.4rem; cursor: pointer; }
+td .category-chip { margin-left: 0.5rem; vertical-align: middle; }

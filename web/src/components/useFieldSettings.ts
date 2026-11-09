@@ -35,6 +35,12 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
     reference_check: "Reference check", background_check: "Background check", health_screening: "Health screening",
     payslips: "Payslips + bonus slips", identity: "NRIC/passport (expat)", education: "Highest education certificate", additional: "Additional process",
   },
+  company_category: { signed_client: "Signed client", prospective_client: "Prospective client", unknown: "Unknown", vip_client: "VIP client" },
+};
+
+/** The built-in categories' colours, used until the company's load. */
+const BUILT_IN_COLOR: Record<string, string> = {
+  signed_client: "#16a34a", prospective_client: "#2563eb", unknown: "#6b7280", vip_client: "#b8860b",
 };
 
 /** A notice period key (2_week) in words, for one no longer in the list. */
@@ -71,7 +77,10 @@ export function fieldHelpers(data: Settings | undefined) {
   /** Whether a field must be filled in on a form (the app's own required ones included). */
   const mandatory = (form: Schemas["FieldForm"], field: string): boolean =>
     data?.mandatory.some((m) => m.form === form && m.field === field && m.mandatory) ?? false;
-  return { options, label, mandatory };
+  /** An option's colour (lists with colours), grey when it has none. */
+  const color = (name: ListName, key: string): string =>
+    list(name)?.options.find((o) => o.key === key)?.color ?? BUILT_IN_COLOR[key] ?? "#6b7280";
+  return { options, label, mandatory, color };
 }
 
 /** A label with " *" when the field is mandatory. */

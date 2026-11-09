@@ -16,6 +16,7 @@ import (
 type Option struct {
 	Key, Label string
 	Hint       string // what to write for it (lists with hints only)
+	Color      string // e.g. #16a34a (lists with colours only)
 	Hidden     bool
 	BuiltIn    bool
 }
@@ -25,19 +26,21 @@ type List struct {
 	Name, Label string
 	Fixed       bool // rename, reorder and hide only
 	Hints       bool // its options carry a hint
+	Colors      bool // its options carry a colour
 	Options     []Option
 }
 
 // OptionInput is an option as a person saves it (Key empty for a new one).
 type OptionInput struct {
-	Key, Label, Hint string
-	Hidden           bool
+	Key, Label, Hint, Color string
+	Hidden                  bool
 }
 
 type listDef struct {
 	name, label string
 	fixed       bool
 	hints       bool
+	colors      bool
 	defaults    []Option
 }
 
@@ -116,7 +119,19 @@ var lists = []listDef{
 		"identity", "NRIC/passport (expat)", "",
 		"education", "Highest education certificate", "Any specific certificate needed, like SPM",
 		"additional", "Additional process", "Confirmation with HR, more documents to submit, registration for health screening...")},
+	// A company's category, shown on its card in its colour.
+	{name: "company_category", label: "Company categories", colors: true, defaults: []Option{
+		{Key: "signed_client", Label: "Signed client", Color: "#16a34a", BuiltIn: true},
+		{Key: "prospective_client", Label: "Prospective client", Color: "#2563eb", BuiltIn: true},
+		{Key: "unknown", Label: "Unknown", Color: "#6b7280", BuiltIn: true},
+		{Key: "vip_client", Label: "VIP client", Color: "#b8860b", BuiltIn: true},
+	}},
 }
+
+// UnknownCategory is the category of a company without one.
+const UnknownCategory = "unknown"
+
+var colorRe = regexp.MustCompile(`^#[0-9a-f]{6}$`)
 
 func def(name string) (listDef, bool) {
 	for _, d := range lists {
@@ -139,7 +154,7 @@ func Lists(saved map[string][]Option) []List {
 		for i := range options {
 			options[i].BuiltIn = slices.ContainsFunc(d.defaults, func(o Option) bool { return o.Key == options[i].Key })
 		}
-		out = append(out, List{Name: d.name, Label: d.label, Fixed: d.fixed, Hints: d.hints, Options: options})
+		out = append(out, List{Name: d.name, Label: d.label, Fixed: d.fixed, Hints: d.hints, Colors: d.colors, Options: options})
 	}
 	return out
 }
@@ -222,8 +237,21 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 			errs.Add(field+".hint", fmt.Sprintf("must be at most %d characters", MaxHint))
 			continue
 		}
+		color := strings.ToLower(strings.TrimSpace(o.Color))
+		switch {
+		case !d.colors:
+			color = ""
+		case color == "":
+			color = "#6b7280" // grey until one is chosen (a built-in one keeps its own)
+			if i := slices.IndexFunc(d.defaults, func(b Option) bool { return b.Key == key }); i >= 0 {
+				color = d.defaults[i].Color
+			}
+		case !colorRe.MatchString(color):
+			errs.Add(field+".color", "a colour such as #16a34a")
+			continue
+		}
 		seenLabel[strings.ToLower(label)], seenKey[key] = true, true
-		out = append(out, Option{Key: key, Label: label, Hint: hint, Hidden: o.Hidden})
+		out = append(out, Option{Key: key, Label: label, Hint: hint, Color: color, Hidden: o.Hidden})
 	}
 	if name != "industry" { // industries are words: renaming one makes a new one
 		for _, b := range d.defaults {

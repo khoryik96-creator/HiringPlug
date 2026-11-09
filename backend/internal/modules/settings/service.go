@@ -35,7 +35,7 @@ func listsIn(ctx context.Context, q *store.Queries) ([]List, error) {
 		options[name] = []Option{}
 	}
 	for _, r := range rows {
-		options[r.List] = append(options[r.List], Option{Key: r.Key, Label: r.Label, Hint: deref(r.Hint), Hidden: r.Hidden})
+		options[r.List] = append(options[r.List], Option{Key: r.Key, Label: r.Label, Hint: deref(r.Hint), Color: deref(r.Color), Hidden: r.Hidden})
 	}
 	return Lists(options), nil
 }
@@ -82,7 +82,7 @@ func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, i
 			return err
 		}
 		for i, o := range options {
-			if err := q.InsertOption(ctx, store.InsertOptionParams{List: name, Key: o.Key, Label: o.Label, Hint: nonEmpty(o.Hint), Hidden: o.Hidden, Position: int32(i)}); err != nil { //nolint:gosec // at most 200
+			if err := q.InsertOption(ctx, store.InsertOptionParams{List: name, Key: o.Key, Label: o.Label, Hint: nonEmpty(o.Hint), Color: nonEmpty(o.Color), Hidden: o.Hidden, Position: int32(i)}); err != nil { //nolint:gosec // at most 200
 				return err
 			}
 		}

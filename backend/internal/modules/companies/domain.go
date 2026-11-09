@@ -14,7 +14,8 @@ import (
 // Details are the editable fields of a company.
 type Details struct {
 	Name               string
-	Type               string // client, prospect or internal
+	Type               string  // client, prospect or internal
+	Category           *string // a key of the company_category list; nil: not set (Unknown)
 	Website            *string
 	Industry           *string
 	Size               *string
@@ -40,6 +41,7 @@ type Summary struct {
 	ID        string
 	Name      string
 	Type      string
+	Category  *string
 	Industry  *string
 	City      *string
 	Website   *string
@@ -50,6 +52,7 @@ type Summary struct {
 type Patch struct {
 	Name               apiconv.Change[string]
 	Type               apiconv.Change[string]
+	Category           apiconv.Change[*string]
 	Website            apiconv.Change[*string]
 	Industry           apiconv.Change[*string]
 	Size               apiconv.Change[*string]
@@ -65,6 +68,7 @@ type Patch struct {
 func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.Name, p.Name)
 	apiconv.Apply(&d.Type, p.Type)
+	apiconv.Apply(&d.Category, p.Category)
 	apiconv.Apply(&d.Website, p.Website)
 	apiconv.Apply(&d.Industry, p.Industry)
 	apiconv.Apply(&d.Size, p.Size)
@@ -91,7 +95,7 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 	if d.Type == "" {
 		d.Type = DefaultType
 	}
-	for _, f := range []**string{&d.Industry, &d.Phone, &d.City, &d.RegistrationNumber} {
+	for _, f := range []**string{&d.Category, &d.Industry, &d.Phone, &d.City, &d.RegistrationNumber} {
 		*f = squeezedOrNil(*f)
 	}
 	for _, f := range []**string{&d.Address, &d.About} {

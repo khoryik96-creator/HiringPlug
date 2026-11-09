@@ -4,7 +4,9 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
 import { CompanyForm } from "../components/CompanyForm";
+import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { useFieldSettings } from "../components/useFieldSettings";
 import { COMPANY_TYPE, keysOf } from "../labels";
 import { hashParam } from "../hashQuery";
 
@@ -14,13 +16,16 @@ type TypeFilter = "" | Schemas["CompanyType"];
 export function CompanyList({ canCreate }: { canCreate: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [type, setType] = useState<TypeFilter>("");
+  const [category, setCategory] = useState("");
+  const fs = useFieldSettings();
   const [adding, setAdding] = useState(false);
   const list = useQuery({
-    queryKey: [...companiesKey, q, type],
+    queryKey: [...companiesKey, q, type, category],
     queryFn: async () => {
-      const query: { q?: string; type?: Schemas["CompanyType"] } = {};
+      const query: { q?: string; type?: Schemas["CompanyType"]; category?: string } = {};
       if (q.trim()) query.q = q.trim();
       if (type) query.type = type;
+      if (category) query.category = category;
       return unwrap(await api.GET("/v1/companies", { params: { query } }));
     },
   });
@@ -34,6 +39,10 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
           <select aria-label="Type" value={type} onChange={(e) => { setType(e.target.value as TypeFilter); }}>
             <option value="">All types</option>
             {keysOf(COMPANY_TYPE).map((t) => <option key={t} value={t}>{COMPANY_TYPE[t]}</option>)}
+          </select>
+          <select aria-label="Category" value={category} onChange={(e) => { setCategory(e.target.value); }}>
+            <option value="">All categories</option>
+            {fs.options("company_category").filter((o) => o.key !== UNKNOWN_CATEGORY).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
           {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add company</button>}
         </div>
@@ -50,6 +59,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
         <thead>
           <tr>
             <th>Name</th>
+            <th>Category</th>
             <th>Type</th>
             <th>Industry</th>
             <th>City</th>
@@ -60,6 +70,11 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
           {list.data?.items.map((c) => (
             <tr key={c.id}>
               <td><a href={`#/companies/${c.id}`}>{c.name}</a></td>
+              <td>
+                <span className="category-chip" style={chipStyle(fs.color("company_category", c.category ?? UNKNOWN_CATEGORY))}>
+                  {fs.label("company_category", c.category ?? UNKNOWN_CATEGORY)}
+                </span>
+              </td>
               <td>{COMPANY_TYPE[c.type]}</td>
               <td>{c.industry}</td>
               <td>{c.city}</td>
@@ -67,7 +82,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
             </tr>
           ))}
           {list.data?.items.length === 0 && (
-            <tr><td colSpan={5} className="muted">No companies yet{q || type ? " match" : ""}.</td></tr>
+            <tr><td colSpan={6} className="muted">No companies yet{q || type || category ? " match" : ""}.</td></tr>
           )}
         </tbody>
       </table>

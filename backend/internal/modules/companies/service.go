@@ -38,7 +38,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 			return err
 		}
 		row, err := q.InsertCompany(ctx, store.InsertCompanyParams{
-			Name: d.Name, Type: d.Type, Website: d.Website, Industry: d.Industry, Size: d.Size,
+			Name: d.Name, Type: d.Type, Category: d.Category, Website: d.Website, Industry: d.Industry, Size: d.Size,
 			Phone: d.Phone, Address: d.Address, City: d.City, Country: d.Country,
 			RegistrationNumber: d.RegistrationNumber, About: d.About,
 		})
@@ -116,7 +116,7 @@ func update(ctx context.Context, tx pgx.Tx, q *store.Queries, row store.Company,
 	}
 	updated, err := q.UpdateCompany(ctx, store.UpdateCompanyParams{
 		ID: id, ExpectedVersion: row.Version,
-		Name: after.Name, Type: after.Type, Website: after.Website, Industry: after.Industry, Size: after.Size,
+		Name: after.Name, Type: after.Type, Category: after.Category, Website: after.Website, Industry: after.Industry, Size: after.Size,
 		Phone: after.Phone, Address: after.Address, City: after.City, Country: after.Country,
 		RegistrationNumber: after.RegistrationNumber, About: after.About,
 	})
@@ -142,11 +142,11 @@ type Page struct {
 
 // List returns up to limit companies, optionally matching query and type,
 // starting after cursor (the last ID of the previous page).
-func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, cursor *string, limit int) (Page, error) {
+func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, category, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
-			Cursor: cursor, Type: companyType, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Type: companyType, Category: category, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -158,7 +158,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, companyTyp
 		}
 		page.Items = make([]Summary, len(rows))
 		for i, r := range rows {
-			page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Industry: r.Industry, City: r.City, Website: r.Website, UpdatedAt: r.UpdatedAt}
+			page.Items[i] = Summary{ID: r.ID, Name: r.Name, Type: r.Type, Category: r.Category, Industry: r.Industry, City: r.City, Website: r.Website, UpdatedAt: r.UpdatedAt}
 		}
 		return nil
 	})
@@ -206,7 +206,7 @@ func fromRow(r store.Company) Company {
 	return Company{
 		ID: r.ID, Version: int(r.Version), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Details: Details{
-			Name: r.Name, Type: r.Type, Website: r.Website, Industry: r.Industry, Size: r.Size,
+			Name: r.Name, Type: r.Type, Category: r.Category, Website: r.Website, Industry: r.Industry, Size: r.Size,
 			Phone: r.Phone, Address: r.Address, City: r.City, Country: r.Country,
 			RegistrationNumber: r.RegistrationNumber, About: r.About,
 		},
@@ -216,7 +216,7 @@ func fromRow(r store.Company) Company {
 // fields lists the values the audit log compares.
 func fields(d Details) map[string]any {
 	return map[string]any{
-		"name": d.Name, "type": d.Type, "website": d.Website, "industry": d.Industry, "size": d.Size,
+		"name": d.Name, "type": d.Type, "category": d.Category, "website": d.Website, "industry": d.Industry, "size": d.Size,
 		"phone": d.Phone, "address": d.Address, "city": d.City, "country": d.Country,
 		"registrationNumber": d.RegistrationNumber, "about": d.About,
 	}

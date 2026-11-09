@@ -3594,6 +3594,8 @@ export interface components {
             version: number;
             name: string;
             type: components["schemas"]["CompanyType"];
+            /** @description The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown). */
+            category: string | null;
             /** @description Always with https://, e.g. https://example.com. */
             website: string | null;
             industry: string | null;
@@ -3614,6 +3616,8 @@ export interface components {
             name: string;
             /** @description Defaults to client. */
             type?: components["schemas"]["CompanyType"];
+            /** @description The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown). */
+            category?: string | null;
             /** @description example.com or a full address; https:// is added if missing. */
             website?: string | null;
             industry?: string | null;
@@ -3630,6 +3634,8 @@ export interface components {
             version: number;
             name?: string;
             type?: components["schemas"]["CompanyType"];
+            /** @description The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown). */
+            category?: string | null;
             website?: string | null;
             industry?: string | null;
             size?: components["schemas"]["CompanySize"] | null;
@@ -3644,6 +3650,7 @@ export interface components {
             id: components["schemas"]["CompanyId"];
             name: string;
             type: components["schemas"]["CompanyType"];
+            category: string | null;
             industry: string | null;
             city: string | null;
             website: string | null;
@@ -6221,10 +6228,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour).
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}
@@ -6236,6 +6243,8 @@ export interface components {
             label: string;
             /** @description What to write for it (lists with hints only). */
             hint: string | null;
+            /** @description Its colour, e.g. #16a34a (lists with colours only). */
+            color: string | null;
             /** @description Not offered for new choices; records that have it keep it. */
             hidden: boolean;
             /** @description Comes with the app: hide it instead of removing it. */
@@ -6247,6 +6256,8 @@ export interface components {
             kind: components["schemas"]["FieldListKind"];
             /** @description Its options carry a hint (what to write). */
             hints: boolean;
+            /** @description Its options carry a colour. */
+            colors: boolean;
             options: components["schemas"]["FieldOption"][];
         };
         FieldOptionInput: {
@@ -6255,6 +6266,8 @@ export interface components {
             label: string;
             /** @description For lists with hints; ignored elsewhere. */
             hint?: string;
+            /** @description For lists with colours; ignored elsewhere. */
+            color?: string;
             hidden?: boolean;
         };
         FieldListInput: {
@@ -7278,6 +7291,8 @@ export interface operations {
                 /** @description Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written. */
                 q?: string;
                 type?: components["schemas"]["CompanyType"];
+                /** @description Only companies in this category (a key of the company_category list). */
+                category?: string;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CompanyId"];

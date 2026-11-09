@@ -6,7 +6,7 @@ import { fieldHelpers, labelFor, noticeKey } from "./useFieldSettings";
 describe("field settings helpers", () => {
   it("offers visible options, keeps a hidden or unlisted current value, and falls back to built-ins", () => {
     const data = testFieldSettings([{ form: "candidate", field: "email" }]) as unknown as Parameters<typeof fieldHelpers>[0];
-    data?.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hint: null, hidden: true, builtIn: false });
+    data?.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hint: null, color: null, hidden: true, builtIn: false });
     const fs = fieldHelpers(data);
     expect(fs.options("candidate_source").map((o) => o.key)).not.toContain("job_fair");
     expect(fs.options("candidate_source", "job_fair").at(-1)).toMatchObject({ key: "job_fair", label: "Job fair" });

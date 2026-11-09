@@ -167,7 +167,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -197,6 +197,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
+		&i.Category,
 	)
 	return i, err
 }
@@ -309,19 +310,20 @@ func (q *Queries) GetSuggestion(ctx context.Context, arg GetSuggestionParams) (C
 const insertCompany = `-- name: InsertCompany :one
 
 INSERT INTO company (
-  tenant_id, name, type, website, industry, size, phone, address, city, country,
+  tenant_id, name, type, category, website, industry, size, phone, address, city, country,
   registration_number, about, created_by
 ) VALUES (
-  app_current_tenant(), $1, $2, $3, $4, $5,
-  $6, $7, $8, $9,
-  $10, $11, app_current_user()
+  app_current_tenant(), $1, $2, $3, $4, $5, $6,
+  $7, $8, $9, $10,
+  $11, $12, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category
 `
 
 type InsertCompanyParams struct {
 	Name               string
 	Type               string
+	Category           *string
 	Website            *string
 	Industry           *string
 	Size               *string
@@ -339,6 +341,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 	row := q.db.QueryRow(ctx, insertCompany,
 		arg.Name,
 		arg.Type,
+		arg.Category,
 		arg.Website,
 		arg.Industry,
 		arg.Size,
@@ -374,6 +377,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
+		&i.Category,
 	)
 	return i, err
 }
@@ -501,20 +505,22 @@ func (q *Queries) InsertSuggestion(ctx context.Context, arg InsertSuggestionPara
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, type, industry, city, website, updated_at
+SELECT id, name, type, category, industry, city, website, updated_at
 FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
-  AND ($3::text IS NULL
-       OR search_text LIKE ALL (app_search_patterns($3::text))
-       OR phone_digits LIKE '%' || app_phone_key($3::text) || '%')
+  AND ($3::text IS NULL OR category = $3::text)
+  AND ($4::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns($4::text))
+       OR phone_digits LIKE '%' || app_phone_key($4::text) || '%')
 ORDER BY id DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListCompaniesParams struct {
 	Cursor   *string
 	Type     *string
+	Category *string
 	Query    *string
 	RowLimit int32
 }
@@ -523,6 +529,7 @@ type ListCompaniesRow struct {
 	ID        string
 	Name      string
 	Type      string
+	Category  *string
 	Industry  *string
 	City      *string
 	Website   *string
@@ -534,6 +541,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 	rows, err := q.db.Query(ctx, listCompanies,
 		arg.Cursor,
 		arg.Type,
+		arg.Category,
 		arg.Query,
 		arg.RowLimit,
 	)
@@ -548,6 +556,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.ID,
 			&i.Name,
 			&i.Type,
+			&i.Category,
 			&i.Industry,
 			&i.City,
 			&i.Website,
@@ -653,24 +662,26 @@ const updateCompany = `-- name: UpdateCompany :one
 UPDATE company SET
   name = $1,
   type = $2,
-  website = $3,
-  industry = $4,
-  size = $5,
-  phone = $6,
-  address = $7,
-  city = $8,
-  country = $9,
-  registration_number = $10,
-  about = $11,
+  category = $3,
+  website = $4,
+  industry = $5,
+  size = $6,
+  phone = $7,
+  address = $8,
+  city = $9,
+  country = $10,
+  registration_number = $11,
+  about = $12,
   version = version + 1,
   updated_at = now()
-WHERE id = $12 AND version = $13
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits
+WHERE id = $13 AND version = $14
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category
 `
 
 type UpdateCompanyParams struct {
 	Name               string
 	Type               string
+	Category           *string
 	Website            *string
 	Industry           *string
 	Size               *string
@@ -689,6 +700,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 	row := q.db.QueryRow(ctx, updateCompany,
 		arg.Name,
 		arg.Type,
+		arg.Category,
 		arg.Website,
 		arg.Industry,
 		arg.Size,
@@ -726,6 +738,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.AutofillError,
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
+		&i.Category,
 	)
 	return i, err
 }

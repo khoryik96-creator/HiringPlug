@@ -29,6 +29,9 @@ func (h *HTTP) PutFieldList(ctx context.Context, req api.PutFieldListRequestObje
 		if o.Hint != nil {
 			in[i].Hint = *o.Hint
 		}
+		if o.Color != nil {
+			in[i].Color = *o.Color
+		}
 		if o.Key != nil {
 			in[i].Key = *o.Key
 		}
@@ -57,14 +60,18 @@ func (h *HTTP) PutMandatoryFields(ctx context.Context, req api.PutMandatoryField
 }
 
 func listToAPI(l List) api.FieldList {
-	out := api.FieldList{Name: api.FieldListName(l.Name), Label: l.Label, Kind: api.FieldListKindOpen, Hints: l.Hints, Options: make([]api.FieldOption, len(l.Options))}
+	out := api.FieldList{Name: api.FieldListName(l.Name), Label: l.Label, Kind: api.FieldListKindOpen, Hints: l.Hints, Colors: l.Colors, Options: make([]api.FieldOption, len(l.Options))}
 	if l.Fixed {
 		out.Kind = api.FieldListKindFixed
 	}
 	for i, o := range l.Options {
-		out.Options[i] = api.FieldOption{Key: o.Key, Label: o.Label, Hint: nullable.NewNullNullable[string](), Hidden: o.Hidden, BuiltIn: o.BuiltIn}
+		out.Options[i] = api.FieldOption{Key: o.Key, Label: o.Label, Hint: nullable.NewNullNullable[string](), Color: nullable.NewNullNullable[string](),
+			Hidden: o.Hidden, BuiltIn: o.BuiltIn}
 		if o.Hint != "" {
 			out.Options[i].Hint = nullable.NewNullableWithValue(o.Hint)
+		}
+		if o.Color != "" {
+			out.Options[i].Color = nullable.NewNullableWithValue(o.Color)
 		}
 	}
 	return out

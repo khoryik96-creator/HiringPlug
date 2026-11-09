@@ -801,6 +801,10 @@ paths:
         - name: type
           in: query
           schema: {$ref: '#/components/schemas/CompanyType'}
+        - name: category
+          in: query
+          description: Only companies in this category (a key of the company_category list).
+          schema: {type: string, pattern: '^[a-z0-9_]{1,40}$'}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -5478,12 +5482,13 @@ components:
       enum: [micro, small, medium, large, enterprise]
     Company:
       type: object
-      required: [id, version, name, type, website, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
+      required: [id, version, name, type, category, website, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/CompanyId'}
         version: {type: integer, description: Send it back when you update.}
         name: {type: string}
         type: {$ref: '#/components/schemas/CompanyType'}
+        category: {type: string, nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."}
         website: {type: string, nullable: true, description: 'Always with https://, e.g. https://example.com.'}
         industry: {type: string, nullable: true}
         size:
@@ -5508,6 +5513,7 @@ components:
         type:
           allOf: [{$ref: '#/components/schemas/CompanyType'}]
           description: Defaults to client.
+        category: {type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."}
         website: {type: string, maxLength: 300, nullable: true, description: 'example.com or a full address; https:// is added if missing.'}
         industry: {type: string, maxLength: 100, nullable: true}
         size:
@@ -5529,6 +5535,7 @@ components:
         version: {type: integer, minimum: 1, description: The version you loaded.}
         name: {type: string, minLength: 1, maxLength: 200}
         type: {$ref: '#/components/schemas/CompanyType'}
+        category: {type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."}
         website: {type: string, maxLength: 300, nullable: true}
         industry: {type: string, maxLength: 100, nullable: true}
         size:
@@ -5544,11 +5551,12 @@ components:
         about: {type: string, maxLength: 4000, nullable: true}
     CompanySummary:
       type: object
-      required: [id, name, type, industry, city, website, updatedAt]
+      required: [id, name, type, category, industry, city, website, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/CompanyId'}
         name: {type: string}
         type: {$ref: '#/components/schemas/CompanyType'}
+        category: {type: string, nullable: true}
         industry: {type: string, nullable: true}
         city: {type: string, nullable: true}
         website: {type: string, nullable: true}
@@ -8854,30 +8862,32 @@ components:
     FieldListName:
       type: string
       description: >
-        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint).
+        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour).
 
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process]
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.
       enum: [open, fixed]
     FieldOption:
       type: object
-      required: [key, label, hint, hidden, builtIn]
+      required: [key, label, hint, color, hidden, builtIn]
       properties:
         key: {type: string, description: "What is stored (for notice periods: number_unit, e.g. 2_week)."}
         label: {type: string}
         hint: {type: string, nullable: true, description: "What to write for it (lists with hints only)."}
+        color: {type: string, nullable: true, pattern: '^#[0-9a-f]{6}$', description: "Its colour, e.g. #16a34a (lists with colours only)."}
         hidden: {type: boolean, description: Not offered for new choices; records that have it keep it.}
         builtIn: {type: boolean, description: "Comes with the app: hide it instead of removing it."}
     FieldList:
       type: object
-      required: [name, label, kind, hints, options]
+      required: [name, label, kind, hints, colors, options]
       properties:
         name: {$ref: '#/components/schemas/FieldListName'}
         label: {type: string}
         kind: {$ref: '#/components/schemas/FieldListKind'}
         hints: {type: boolean, description: "Its options carry a hint (what to write)."}
+        colors: {type: boolean, description: "Its options carry a colour."}
         options:
           type: array
           items: {$ref: '#/components/schemas/FieldOption'}
@@ -8889,6 +8899,7 @@ components:
         key: {type: string, maxLength: 100, description: "Omit for a new option (made from the label); notice periods need number_unit."}
         label: {type: string, minLength: 1, maxLength: 100}
         hint: {type: string, maxLength: 300, description: "For lists with hints; ignored elsewhere."}
+        color: {type: string, pattern: '^#[0-9a-fA-F]{6}$', description: "For lists with colours; ignored elsewhere."}
         hidden: {type: boolean}
     FieldListInput:
       type: object

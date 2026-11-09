@@ -363,6 +363,16 @@ for each of their jobs, with **Score fit** / **Score again**.
   them; deleting is a permission of its own (`companies.documents:delete`,
   owners and admins to start with), which an owner can give to any role in
   Settings, Roles and access.
+- **Company categories and card** ✅: each company is in a category
+  (Signed client, Prospective client, Unknown, VIP client to start with),
+  set from Settings, General, Company categories: rename them, add your
+  own and choose each one's colour. A company's page opens with a card in
+  its category's colour (like a candidate's): its name, category (also
+  down its right edge), type and industry, where it is based, size and
+  website; one click on a category changes it; and its fee (a range when
+  it depends on the salary), guarantee and payment terms and open jobs.
+  The company list shows each one's category as a coloured chip and can be
+  filtered by it.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
   page queues a job that reads its home page and its contact page (a link
   with "contact" or "hubungi"), only where robots.txt allows, through the

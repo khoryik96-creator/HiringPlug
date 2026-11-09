@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
 import { CompanyAutofill } from "../components/CompanyAutofill";
+import { CompanyBanner } from "../components/CompanyBanner";
 import { CompanyBenefits } from "../components/CompanyBenefits";
 import { CompanyTerms } from "../components/CompanyTerms";
 import { CompanyContacts } from "../components/CompanyContacts";
@@ -11,7 +12,7 @@ import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
-import { COMPANY_SIZE, COMPANY_TYPE, countryName } from "../labels";
+import { COMPANY_SIZE } from "../labels";
 
 /** One company. Render it with key={id} so edit state never carries over. */
 export function CompanyDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
@@ -23,7 +24,6 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
   const c = company.data;
   if (!c) return company.error ? <ErrorMessage error={company.error} /> : <p className="muted">Loading…</p>;
 
-  const place = [c.city, c.country ? countryName(c.country) : null].filter(Boolean).join(", ");
   return (
     <main>
       <a href="#/companies">← Companies</a>
@@ -32,13 +32,10 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           <p className="muted">Showing the version loaded earlier.</p>
         </ErrorMessage>
       )}
-      <div className="row spread">
-        <h2>{c.name}</h2>
-        {permissions.includes("companies:update") && !editing && (
-          <button type="button" onClick={() => { setEditing(true); }}>Edit company</button>
-        )}
-      </div>
-      <p className="muted">{[COMPANY_TYPE[c.type], c.industry, place].filter(Boolean).join(" · ")}</p>
+      {permissions.includes("companies:update") && !editing && (
+        <div className="row spread"><span /><button type="button" onClick={() => { setEditing(true); }}>Edit company</button></div>
+      )}
+      <CompanyBanner company={c} canEdit={permissions.includes("companies:update")} />
       {editing ? (
         <CompanyForm company={c} onDone={() => { setEditing(false); }} />
       ) : (

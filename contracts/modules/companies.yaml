@@ -42,6 +42,10 @@ paths:
         - name: type
           in: query
           schema: { $ref: '#/components/schemas/CompanyType' }
+        - name: category
+          in: query
+          description: Only companies in this category (a key of the company_category list).
+          schema: { type: string, pattern: '^[a-z0-9_]{1,40}$' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
@@ -508,12 +512,13 @@ components:
 
     Company:
       type: object
-      required: [id, version, name, type, website, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
+      required: [id, version, name, type, category, website, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/CompanyId' }
         version: { type: integer, description: Send it back when you update. }
         name: { type: string }
         type: { $ref: '#/components/schemas/CompanyType' }
+        category: { type: string, nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, nullable: true, description: 'Always with https://, e.g. https://example.com.' }
         industry: { type: string, nullable: true }
         size:
@@ -539,6 +544,7 @@ components:
         type:
           allOf: [{ $ref: '#/components/schemas/CompanyType' }]
           description: Defaults to client.
+        category: { type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, maxLength: 300, nullable: true, description: 'example.com or a full address; https:// is added if missing.' }
         industry: { type: string, maxLength: 100, nullable: true }
         size:
@@ -561,6 +567,7 @@ components:
         version: { type: integer, minimum: 1, description: The version you loaded. }
         name: { type: string, minLength: 1, maxLength: 200 }
         type: { $ref: '#/components/schemas/CompanyType' }
+        category: { type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, maxLength: 300, nullable: true }
         industry: { type: string, maxLength: 100, nullable: true }
         size:
@@ -577,11 +584,12 @@ components:
 
     CompanySummary:
       type: object
-      required: [id, name, type, industry, city, website, updatedAt]
+      required: [id, name, type, category, industry, city, website, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/CompanyId' }
         name: { type: string }
         type: { $ref: '#/components/schemas/CompanyType' }
+        category: { type: string, nullable: true }
         industry: { type: string, nullable: true }
         city: { type: string, nullable: true }
         website: { type: string, nullable: true }
