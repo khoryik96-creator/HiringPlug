@@ -139,6 +139,22 @@ func (q *Queries) DecideSuggestion(ctx context.Context, arg DecideSuggestionPara
 	return err
 }
 
+const deleteCompanyDocument = `-- name: DeleteCompanyDocument :one
+DELETE FROM company_document WHERE id = $1 AND company_id = $2 RETURNING storage_key
+`
+
+type DeleteCompanyDocumentParams struct {
+	ID        string
+	CompanyID string
+}
+
+func (q *Queries) DeleteCompanyDocument(ctx context.Context, arg DeleteCompanyDocumentParams) (string, error) {
+	row := q.db.QueryRow(ctx, deleteCompanyDocument, arg.ID, arg.CompanyID)
+	var storage_key string
+	err := row.Scan(&storage_key)
+	return storage_key, err
+}
+
 const findCompanyIDByName = `-- name: FindCompanyIDByName :one
 SELECT id FROM company WHERE name_key = app_normalize_text($1::text)
 `
@@ -205,6 +221,33 @@ func (q *Queries) GetCompanyBenefits(ctx context.Context, companyID string) (Get
 		&i.PreOffer,
 		&i.Version,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCompanyDocument = `-- name: GetCompanyDocument :one
+SELECT id, tenant_id, company_id, section, file_name, content_type, size_bytes, storage_key, created_by, created_at FROM company_document WHERE id = $1 AND company_id = $2
+`
+
+type GetCompanyDocumentParams struct {
+	ID        string
+	CompanyID string
+}
+
+func (q *Queries) GetCompanyDocument(ctx context.Context, arg GetCompanyDocumentParams) (CompanyDocument, error) {
+	row := q.db.QueryRow(ctx, getCompanyDocument, arg.ID, arg.CompanyID)
+	var i CompanyDocument
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CompanyID,
+		&i.Section,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.StorageKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -363,6 +406,46 @@ func (q *Queries) InsertCompanyBenefits(ctx context.Context, arg InsertCompanyBe
 	return i, err
 }
 
+const insertCompanyDocument = `-- name: InsertCompanyDocument :one
+INSERT INTO company_document (tenant_id, company_id, section, file_name, content_type, size_bytes, storage_key, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, app_current_user())
+RETURNING id, tenant_id, company_id, section, file_name, content_type, size_bytes, storage_key, created_by, created_at
+`
+
+type InsertCompanyDocumentParams struct {
+	CompanyID   string
+	Section     string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+}
+
+func (q *Queries) InsertCompanyDocument(ctx context.Context, arg InsertCompanyDocumentParams) (CompanyDocument, error) {
+	row := q.db.QueryRow(ctx, insertCompanyDocument,
+		arg.CompanyID,
+		arg.Section,
+		arg.FileName,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.StorageKey,
+	)
+	var i CompanyDocument
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CompanyID,
+		&i.Section,
+		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.StorageKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertCompanyTerms = `-- name: InsertCompanyTerms :one
 INSERT INTO company_terms (tenant_id, company_id, fee_percent, payment_terms_days, guarantee_days, signed_on, notes, updated_by)
 VALUES (app_current_tenant(), $1, $2::text::numeric, $3, $4,
@@ -474,6 +557,42 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.City,
 			&i.Website,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCompanyDocuments = `-- name: ListCompanyDocuments :many
+SELECT id, tenant_id, company_id, section, file_name, content_type, size_bytes, storage_key, created_by, created_at FROM company_document WHERE company_id = $1 ORDER BY created_at, id
+`
+
+// Documents kept with a client's terms or benefits, oldest first.
+func (q *Queries) ListCompanyDocuments(ctx context.Context, companyID string) ([]CompanyDocument, error) {
+	rows, err := q.db.Query(ctx, listCompanyDocuments, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanyDocument
+	for rows.Next() {
+		var i CompanyDocument
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CompanyID,
+			&i.Section,
+			&i.FileName,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.StorageKey,
+			&i.CreatedBy,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

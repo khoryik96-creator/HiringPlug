@@ -11,6 +11,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
@@ -19,7 +20,9 @@ const nameUniqueIndex = "company_tenant_name_uq"
 // Service holds the companies use cases.
 type Service struct {
 	pool         *pgxpool.Pool
-	allowPrivate bool // company websites on private networks (local testing only)
+	allowPrivate bool        // company websites on private networks (local testing only)
+	files        *blob.Store // documents kept with terms and benefits
+	users        Users
 }
 
 // Create adds a company.

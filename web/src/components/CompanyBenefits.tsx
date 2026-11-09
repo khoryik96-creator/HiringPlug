@@ -10,6 +10,7 @@ import { downloadFrom } from "../api/files";
 import { companyBenefitsKey, fieldSettingsKey } from "../api/keys";
 import { formatWhen } from "../labels";
 import { type Benefit, blankBenefit, blankStep, filled, type Row, rowsFor, type Step } from "./benefitRows";
+import { CompanyDocuments } from "./CompanyDocuments";
 import { ErrorMessage } from "./ErrorMessage";
 
 const TYPES = { docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdf: "application/pdf" } as const;
@@ -66,6 +67,7 @@ export function CompanyBenefits({ companyId, companyName, permissions }: { compa
       ) : (
         <BenefitsView benefits={benefits} steps={steps} empty={data.version === 0} />
       )}
+      <CompanyDocuments companyId={companyId} section="benefits" permissions={permissions} />
     </section>
   );
 }

@@ -21,12 +21,16 @@ describe("possible candidates", () => {
   });
 
   it("show where the CV has the job's words, and add someone to the job", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ candidateId: "cand_1", candidateName: "Aina", currentTitle: "Auditor", rank: 0.6, snippet: "statutory [[audit]] of listed [[groups]]" }] }));
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ candidateId: "cand_1", candidateName: "Aina", currentTitle: "Auditor", rank: 0.6,
+      snippet: "Aina aina@x.com +60 12 345 6789 statutory [[audit]] of listed [[groups]] … [[Audit]] lead" }] }));
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={[...SEE, "pipeline:update"]} />);
     expect(await screen.findByText("Aina")).toBeTruthy();
-    expect(screen.getByText("audit").tagName).toBe("MARK");
-    fireEvent.click(screen.getByRole("button", { name: "Add to job" }));
+    expect(screen.getByLabelText("Matched words").textContent).toBe("2 matched:auditgroups"); // once each
+    const excerpt = document.querySelector(".suggestion-snippet");
+    expect(excerpt?.textContent).toBe("Aina statutory audit of listed groups … Audit lead"); // contact details are on the profile
+    expect(excerpt?.querySelector("mark")?.textContent).toBe("audit");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add to job" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ candidateId: "cand_1" });
   });

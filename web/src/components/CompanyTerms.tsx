@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { formatDay, formatWhen } from "../labels";
+import { CompanyDocuments } from "./CompanyDocuments";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
 import { fieldErrors } from "./forms";
@@ -33,6 +34,7 @@ export function CompanyTerms({ companyId, permissions }: { companyId: string; pe
       </div>
       <ErrorMessage error={terms.error} />
       {t && (editing ? <TermsForm companyId={companyId} terms={t} onDone={() => { setEditing(false); }} /> : <TermsView t={t} />)}
+      <CompanyDocuments companyId={companyId} section="terms" permissions={permissions} />
     </section>
   );
 }

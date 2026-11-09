@@ -356,6 +356,13 @@ for each of their jobs, with **Score fit** / **Score again**.
   General (Company benefits template): rename, reorder, hide or add items and
   change their hints; an item taken out keeps what was recorded for it. The
   audit log says which items changed, not what they say.
+- **Terms and benefits documents** ✅: under a client's terms of business
+  and under its benefits, drop or choose files to keep there (the signed
+  terms, a benefits brochure: PDF, Word, text or a picture), each with who
+  added it and when, to download. Anyone who may edit companies can add
+  them; deleting is a permission of its own (`companies.documents:delete`,
+  owners and admins to start with), which an owner can give to any role in
+  Settings, Roles and access.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
   page queues a job that reads its home page and its contact page (a link
   with "contact" or "hubungi"), only where robots.txt allows, through the

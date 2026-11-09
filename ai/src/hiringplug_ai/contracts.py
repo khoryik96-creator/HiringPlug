@@ -26,6 +26,7 @@ class Permission(StrEnum):
     candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
+    companies_documents_delete = "companies.documents:delete"
     companies_create = "companies:create"
     companies_read = "companies:read"
     companies_update = "companies:update"
@@ -868,6 +869,31 @@ class UsedValues(BaseModel):
 
 class ApplicationReceived(BaseModel):
     received: bool
+
+
+class CompanyDocumentId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cdoc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cdoc_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class CompanyDocumentSection(StrEnum):
+    terms = "terms"
+    benefits = "benefits"
+
+
+class CompanyDocument(BaseModel):
+    id: CompanyDocumentId
+    section: CompanyDocumentSection
+    fileName: str
+    contentType: str
+    sizeBytes: int
+    createdAt: AwareDatetime
+    createdByName: Annotated[str | None, Field(...)]
+
+
+class CompanyDocumentList(BaseModel):
+    items: list[CompanyDocument]
 
 
 class CompanyTerms(BaseModel):

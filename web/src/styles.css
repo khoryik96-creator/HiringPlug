@@ -552,3 +552,31 @@ fieldset.invoicing .check { display: block; }
 .email-preview { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 0.9rem; }
 .ad-text .ad-heading { margin: 0.9rem 0 0.3rem; }
 .ad-text .ad-heading:first-child { margin-top: 0; }
+/* Long content scrolls inside its box instead of stretching the page. */
+.scroll-box, .ad-columns > section, pre.extracted, .market-insights .ad-text, .assistant .answer .ad-text,
+.timeline, .email-body, .job-description {
+  max-height: min(34rem, 70vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+.ad-columns > section { max-height: min(40rem, 75vh); }
+/* Possible candidates: a card per person, the words they match, a short excerpt. */
+.suggestions.scroll-box { max-height: min(40rem, 75vh); margin: 0; }
+.suggestion { padding: 0.7rem 0.2rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.35rem; }
+.suggestion:first-child { border-top: 0; }
+.suggestion-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+.suggestion-name { font-weight: 650; }
+.small-button { font-size: 0.82rem; padding: 0.3rem 0.7rem; white-space: nowrap; }
+.suggestion-words { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.word-chip { background: var(--accent-soft); color: var(--accent-dark); border-radius: 999px; padding: 0.05rem 0.55rem; font-size: 0.78rem; font-weight: 600; }
+.suggestion-snippet { margin: 0; font-size: 0.82rem; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.suggestion-snippet mark { background: transparent; color: var(--ink); font-weight: 650; padding: 0; }
+
+/* Documents kept with a client's terms or benefits. */
+.company-docs { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border, #d0d7de); display: grid; gap: 0.6rem; }
+.company-docs h4 { margin: 0; }
+.company-doc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; max-height: 18rem; overflow-y: auto; }
+.company-doc-list .doc-line { padding: 0.5rem 0.6rem; border: 1px solid var(--border, #d0d7de); border-radius: 10px; background: #fff; }
+.company-doc-list .doc-icon { width: 2.2rem; height: 2.2rem; }
+.company-docs .drop-zone { margin: 0; }
+.company-docs .drop-zone label { padding: 0.8rem 1rem; }
+.doc-btn.danger { color: #b91c1c; }
+.doc-btn.danger:hover { border-color: #b91c1c; color: #b91c1c; }

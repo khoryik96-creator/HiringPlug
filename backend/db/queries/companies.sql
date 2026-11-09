@@ -128,3 +128,18 @@ SET fee_percent = sqlc.narg(fee_percent)::text::numeric, payment_terms_days = sq
     version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE company_id = @company_id AND version = @expected_version
 RETURNING version, updated_at;
+
+-- Documents kept with a client's terms or benefits, oldest first.
+-- name: ListCompanyDocuments :many
+SELECT * FROM company_document WHERE company_id = @company_id ORDER BY created_at, id;
+
+-- name: InsertCompanyDocument :one
+INSERT INTO company_document (tenant_id, company_id, section, file_name, content_type, size_bytes, storage_key, created_by)
+VALUES (app_current_tenant(), @company_id, @section, @file_name, @content_type, @size_bytes, @storage_key, app_current_user())
+RETURNING *;
+
+-- name: GetCompanyDocument :one
+SELECT * FROM company_document WHERE id = @id AND company_id = @company_id;
+
+-- name: DeleteCompanyDocument :one
+DELETE FROM company_document WHERE id = @id AND company_id = @company_id RETURNING storage_key;

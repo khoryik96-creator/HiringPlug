@@ -271,6 +271,19 @@ type CompanyBenefit struct {
 	UpdatedAt time.Time
 }
 
+type CompanyDocument struct {
+	ID          string
+	TenantID    string
+	CompanyID   string
+	Section     string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	StorageKey  string
+	CreatedBy   string
+	CreatedAt   time.Time
+}
+
 type CompanySuggestion struct {
 	ID        string
 	TenantID  string

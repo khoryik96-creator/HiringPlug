@@ -65,7 +65,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       ) : (
         <section className="panel" aria-label="Job details">
           <p>{facts}</p>
-          <p className="pre">{j.description ?? <span className="muted">No description yet.</span>}</p>
+          <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
         </section>
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />

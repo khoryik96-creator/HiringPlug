@@ -18,6 +18,26 @@ export function Highlighted({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
+/** The job's words a snippet shares, once each, in the order they come. */
+export function matchedWords(snippet: string): string[] {
+  const seen = new Map<string, string>();
+  for (const m of snippet.matchAll(/\[\[(.*?)\]\]/g)) {
+    const word = m[1]?.trim() ?? "";
+    if (word.length > 1 && !seen.has(word.toLowerCase())) seen.set(word.toLowerCase(), word);
+  }
+  return [...seen.values()];
+}
+
+/** A snippet without contact details (they are on the profile) and with tidy gaps. */
+export function tidySnippet(snippet: string): string {
+  return snippet
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, " ")
+    .replace(/\(?\+?\d[\d\s()-]{7,}\d/g, " ")
+    .replace(/[•▪◦●○]/g, "·")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 /**
  * Possible candidates for a job: people not on it whose CVs share the most
  * words with the job's text (a keyword search, not the AI). Added to the job,
@@ -46,17 +66,31 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
       <h3>Possible candidates</h3>
       {noText ? <p className="muted">Add a description or an ad to see possible candidates.</p> : <ErrorMessage error={list.error ?? add.error} />}
       {list.data?.length === 0 && <p className="muted">No CV shares this job&apos;s words yet.</p>}
-      <ul className="suggestions">
-        {list.data?.map((s) => (
-          <li key={s.candidateId}>
-            <a href={`#/candidates/${s.candidateId}`}>{s.candidateName}</a>
-            {s.currentTitle && <span className="muted"> · {s.currentTitle}</span>}{" "}
-            {permissions.includes("pipeline:update") && (
-              <button type="button" className="link" disabled={add.isPending} onClick={() => { add.mutate(s.candidateId); }}>Add to job</button>
-            )}
-            <div className="small muted"><Highlighted text={s.snippet} /></div>
-          </li>
-        ))}
+      <ul className="suggestions scroll-box">
+        {list.data?.map((s) => {
+          const words = matchedWords(s.snippet);
+          return (
+            <li key={s.candidateId} className="suggestion">
+              <div className="suggestion-head">
+                <div>
+                  <a href={`#/candidates/${s.candidateId}`} className="suggestion-name">{s.candidateName}</a>
+                  {s.currentTitle && <div className="muted small">{s.currentTitle}</div>}
+                </div>
+                {permissions.includes("pipeline:update") && (
+                  <button type="button" className="small-button" disabled={add.isPending} onClick={() => { add.mutate(s.candidateId); }}>+ Add to job</button>
+                )}
+              </div>
+              {words.length > 0 && (
+                <div className="suggestion-words" aria-label="Matched words">
+                  <span className="muted small">{words.length} matched:</span>
+                  {words.slice(0, 8).map((w) => <span key={w} className="word-chip">{w}</span>)}
+                  {words.length > 8 && <span className="muted small">+{words.length - 8} more</span>}
+                </div>
+              )}
+              <p className="suggestion-snippet"><Highlighted text={tidySnippet(s.snippet)} /></p>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

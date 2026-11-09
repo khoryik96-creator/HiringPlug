@@ -21,6 +21,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -31,10 +32,15 @@ type Module struct {
 	HTTP    *HTTP
 }
 
+// Users names the people who added documents (the identity module).
+type Users interface {
+	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+}
+
 // New wires the module.
-func New(pool *pgxpool.Pool, allowPrivate bool) *Module {
-	svc := &Service{pool: pool, allowPrivate: allowPrivate}
-	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+func New(pool *pgxpool.Pool, allowPrivate bool, files *blob.Store, maxUploadBytes int64, users Users) *Module {
+	svc := &Service{pool: pool, allowPrivate: allowPrivate, files: files, users: users}
+	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 
 // Exists reports whether a company exists in tx's tenant. Other modules (e.g.

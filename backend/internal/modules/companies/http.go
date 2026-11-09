@@ -11,7 +11,10 @@ import (
 const defaultPageSize = 25
 
 // HTTP implements the companies operations of the contract.
-type HTTP struct{ svc *Service }
+type HTTP struct {
+	svc            *Service
+	maxUploadBytes int64
+}
 
 // ListCompanies handles GET /v1/companies.
 func (h *HTTP) ListCompanies(ctx context.Context, req api.ListCompaniesRequestObject) (api.ListCompaniesResponseObject, error) {

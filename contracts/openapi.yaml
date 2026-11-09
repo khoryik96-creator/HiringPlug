@@ -1042,6 +1042,85 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/companies/{companyId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: listCompanyDocuments
+      tags: [companies]
+      summary: Documents kept with a client's terms of business and benefits, oldest first
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocumentList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: addCompanyDocument
+      tags: [companies]
+      summary: Keep a document with the client's terms of business or benefits (PDF, Word, text or a picture)
+      x-permission: companies:update
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, section]
+              properties:
+                file: {type: string, format: binary}
+                section: {$ref: '#/components/schemas/CompanyDocumentSection'}
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyDocument'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+  /v1/companies/{companyId}/documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+      - {name: documentId, in: path, required: true, schema: {$ref: '#/components/schemas/CompanyDocumentId'}}
+    delete:
+      operationId: deleteCompanyDocument
+      tags: [companies]
+      summary: Delete a document kept with the client's terms or benefits
+      x-permission: companies.documents:delete
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/companies/{companyId}/documents/{documentId}/file:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+      - {name: documentId, in: path, required: true, schema: {$ref: '#/components/schemas/CompanyDocumentId'}}
+    get:
+      operationId: getCompanyDocumentFile
+      tags: [companies]
+      summary: Download a document kept with the client's terms or benefits
+      x-permission: companies:read
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/contacts:
     get:
       operationId: listContacts
@@ -4314,6 +4393,7 @@ components:
         - candidates:merge
         - candidates:read
         - candidates:update
+        - companies.documents:delete
         - companies:create
         - companies:read
         - companies:update
@@ -5273,6 +5353,30 @@ components:
       required: [received]
       properties:
         received: {type: boolean}
+    CompanyDocumentId:
+      type: string
+      pattern: '^cdoc_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cdoc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    CompanyDocumentSection:
+      type: string
+      description: "terms: with the terms of business (e.g. the signed terms); benefits: with the benefits (e.g. a brochure)."
+      enum: [terms, benefits]
+    CompanyDocument:
+      type: object
+      required: [id, section, fileName, contentType, sizeBytes, createdAt, createdByName]
+      properties:
+        id: {$ref: '#/components/schemas/CompanyDocumentId'}
+        section: {$ref: '#/components/schemas/CompanyDocumentSection'}
+        fileName: {type: string}
+        contentType: {type: string}
+        sizeBytes: {type: integer}
+        createdAt: {type: string, format: date-time}
+        createdByName: {type: string, nullable: true}
+    CompanyDocumentList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/CompanyDocument'}}
     CompanyTerms:
       type: object
       required: [feePercent, paymentTermsDays, guaranteeDays, signedOn, notes, version, updatedAt]
@@ -8946,6 +9050,11 @@ x-permissions:
     description: Edit candidate profiles.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  companies.documents:delete:
+    module: companies
+    description: Delete documents kept with a client's terms of business or benefits (give it to the people you trust).
+    sensitive: false
+    roles: [owner, admin]
   companies:create:
     module: companies
     description: Add companies.
