@@ -1652,6 +1652,12 @@ class EmailTemplateUpdate(BaseModel):
 
 
 class EmailDraft(BaseModel):
+    bodyHtml: Annotated[
+        str | None,
+        Field(
+            description="The template's formatted message, filled the same way (values made safe for HTML); null for a plain-text template."
+        ),
+    ]
     to: Annotated[
         list[EmailStr],
         Field(

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { api, unwrap } from "../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../api/keys";
 import { BookingLinkForm } from "./CandidateBookings";
+import { RichEditor } from "./clientEmail/RichEditor";
+import { plainToHtml, withoutCaretMarks } from "./clientEmail/richText";
+import { useBanners } from "./clientEmail/useBanners";
 import { ErrorMessage } from "./ErrorMessage";
 import { SaveError } from "./SaveError";
 
@@ -27,28 +30,37 @@ type Props = {
   onDone: () => void;
 };
 
+/** The words of a formatted message, to tell whether it says anything. */
+const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+
 /**
  * Write an email: pick a template (filled from the candidate, job and
- * interview), check and change it, send. Placeholders without a value stay in
- * brackets, and sending waits until they are filled in.
+ * interview, formatted as written), check and change it with the toolbar
+ * (bold, italic, underline, lists, indent, fields such as [Expected salary]),
+ * send. Placeholders without a value stay in brackets, and sending waits
+ * until they are filled in.
  */
 export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, canBook = false, onDone }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [about, setAbout] = useState(applicationId ?? "");
-  const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "", body: "" });
+  const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "" });
+  const [html, setHtml] = useState("");
+  const [reset, setReset] = useState(0); // puts html back into the editor (a template, a booking link)
   const [missing, setMissing] = useState<string[]>([]);
   const [booking, setBooking] = useState(false);
-  // Where the cursor last was in the message: the button that inserts takes the focus away.
-  const caret = useRef<number | null>(null);
-  /** Puts text where the cursor was in the message (at its end when it had none). */
+  const { banners, urls, upload: uploadBanner } = useBanners();
+  // The candidate's value for each field, so a field picked from the toolbar goes in as its value.
+  const context = useQuery({
+    queryKey: ["email-context", candidateId, about, interviewId ?? ""],
+    queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
+      body: { subject: "", bodyHtml: "", candidateId, applicationId: about || undefined, interviewId, timeZone: timeZone() },
+    })),
+  });
+  /** Puts a booking link's text at the end of the message. */
   const insert = (text: string) => {
-    setForm((f) => {
-      const at = Math.min(caret.current ?? f.body.length, f.body.length);
-      const before = f.body.slice(0, at);
-      const sep = before && !before.endsWith("\n") ? "\n\n" : "";
-      return { ...f, body: `${before}${sep}${text}\n${f.body.slice(at)}` };
-    });
+    setHtml((h) => `${withoutCaretMarks(h)}${plainToHtml(text)}`);
+    setReset((n) => n + 1);
     setBooking(false);
   };
 
@@ -58,7 +70,9 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
         body: { templateId, candidateId, applicationId: app || undefined, interviewId, timeZone: timeZone() },
       })),
     onSuccess: (d, { templateId }) => {
-      setForm((f) => ({ ...f, templateId, to: d.to.join(", "), subject: d.subject, body: d.body }));
+      setForm((f) => ({ ...f, templateId, to: d.to.join(", "), subject: d.subject }));
+      setHtml(d.bodyHtml ?? plainToHtml(d.body));
+      setReset((n) => n + 1);
       setMissing(d.missing);
     },
   });
@@ -80,8 +94,8 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
     mutationFn: async () =>
       unwrap(await api.POST("/v1/emails", {
         body: {
-          to: addresses(form.to), cc: addresses(form.cc), subject: form.subject, body: form.body,
-          candidateId, applicationId: about || undefined,
+          to: addresses(form.to), cc: addresses(form.cc), subject: form.subject, bodyHtml: withoutCaretMarks(html),
+          candidateId, applicationId: about || undefined, timeZone: timeZone(),
         },
       })),
     onSuccess: async () => {
@@ -89,12 +103,12 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       onDone();
     },
   });
-  const unfilled = missing.filter((key) => `${form.subject}\n${form.body}`.includes(`[${key}]`));
+  const unfilled = missing.filter((key) => `${form.subject}\n${textOf(html)}`.includes(`[${key}]`));
   const set = (field: keyof typeof form) => (e: { target: { value: string } }) => { setForm({ ...form, [field]: e.target.value }); };
 
   return (
     <form className="panel form-grid" aria-label="Write email" onSubmit={(e) => { e.preventDefault(); send.mutate(); }}>
-      <ErrorMessage error={templates.error ?? draft.error} />
+      <ErrorMessage error={templates.error ?? draft.error ?? uploadBanner.error} />
       <label className="field">Template
         <select value={form.templateId} onChange={(e) => { pick(e.target.value); }}>
           <option value="">No template</option>
@@ -112,8 +126,12 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
       <label className="field full">Subject<input value={form.subject} onChange={set("subject")} /></label>
-      <label className="field full">Message<textarea rows={12} value={form.body} onChange={set("body")}
-        onSelect={(e) => { caret.current = e.currentTarget.selectionStart; }} /></label>
+      <div className="field full">
+        <span>Message</span>
+        <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
+          bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
+          values={context.data?.fieldValues} />
+      </div>
       {canBook && (booking
         ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>
         : <div className="full"><button type="button" className="link" onClick={() => { setBooking(true); }}>+ Booking link</button></div>)}
@@ -124,7 +142,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       )}
       <SaveError error={send.error} shown={[]} onReload={onDone} />
       <div className="row full">
-        <button type="submit" disabled={send.isPending || draft.isPending || unfilled.length > 0 || !form.to.trim() || !form.subject.trim() || !form.body.trim()}>
+        <button type="submit" disabled={send.isPending || draft.isPending || unfilled.length > 0 || !form.to.trim() || !form.subject.trim() || !textOf(html)}>
           Send
         </button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>

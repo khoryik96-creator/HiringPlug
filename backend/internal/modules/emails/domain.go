@@ -3,6 +3,7 @@ package emails
 // The email rules, as plain functions on plain values: no database, no HTTP.
 
 import (
+	"html"
 	"net/mail"
 	"regexp"
 	"slices"
@@ -85,6 +86,27 @@ func Fill(text string, values map[string]string) (string, []string) {
 		return "[" + key + "]"
 	})
 	return extraBlankLines.ReplaceAllString(out, "\n\n"), missing
+}
+
+// FillHTML is Fill for a formatted message: the values are put in as text
+// (escaped), never as markup.
+func FillHTML(text string, values map[string]string) (string, []string) {
+	escaped := make(map[string]string, len(values))
+	for k, v := range values {
+		escaped[k] = strings.ReplaceAll(html.EscapeString(v), "\n", "<br>")
+	}
+	var missing []string
+	out := placeholderRe.ReplaceAllStringFunc(text, func(m string) string {
+		key := placeholderRe.FindStringSubmatch(m)[1]
+		if v, ok := escaped[key]; ok {
+			return v
+		}
+		if !slices.Contains(missing, key) {
+			missing = append(missing, key)
+		}
+		return "[" + key + "]"
+	})
+	return out, missing
 }
 
 // ForClient reports whether a template is written to the client (its hiring

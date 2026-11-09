@@ -4113,6 +4113,8 @@ export interface components {
             timeZone: string;
         };
         EmailDraft: {
+            /** @description The template's formatted message, filled the same way (values made safe for HTML); null for a plain-text template. */
+            bodyHtml: string | null;
             /** @description Suggested recipients (the candidate, or the job's hiring contact for templates addressed to the client). */
             to: string[];
             subject: string;

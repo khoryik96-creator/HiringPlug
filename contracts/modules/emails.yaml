@@ -457,8 +457,12 @@ components:
         timeZone: { type: string, maxLength: 64, example: Asia/Kuala_Lumpur }
     EmailDraft:
       type: object
-      required: [to, subject, body, missing]
+      required: [to, subject, body, bodyHtml, missing]
       properties:
+        bodyHtml:
+          type: string
+          nullable: true
+          description: "The template's formatted message, filled the same way (values made safe for HTML); null for a plain-text template."
         to:
           type: array
           description: Suggested recipients (the candidate, or the job's hiring contact for templates addressed to the client).

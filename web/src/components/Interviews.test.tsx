@@ -74,13 +74,15 @@ describe("interviews", () => {
   it("emails the candidate an invitation filled from the interview", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => {
       if (path === "/v1/me") return Promise.resolve(ok(me));
+      if (path === "/v1/email-banners") return Promise.resolve(ok({ items: [] }));
       return Promise.resolve(ok({ items: [{ id: "etpl_1", version: 1, name: "Interview invitation", subject: "s", body: "b", createdAt: "x", updatedAt: "x" }], placeholders: [] }));
     }) as never);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ to: ["siti@example.com"], subject: "Interview for Accountant", body: "Dear Siti", missing: [] }));
     renderWithClient(<InterviewItem interview={interview()} permissions={[...RECRUITER, "interviews:schedule", "emails:send"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Email candidate" }));
-    await waitFor(() => { expect(post).toHaveBeenCalled(); });
-    expect(sentBody(post)).toMatchObject({ templateId: "etpl_1", candidateId: "cand_1", applicationId: "appl_1", interviewId: interview().id });
+    await waitFor(() => { expect(post.mock.calls.some((c) => c[0] === "/v1/email-drafts")).toBe(true); });
+    const calls = post.mock.calls as unknown as [string, { body: unknown }][];
+    expect(calls.find((c) => c[0] === "/v1/email-drafts")?.[1].body).toMatchObject({ templateId: "etpl_1", candidateId: "cand_1", applicationId: "appl_1", interviewId: interview().id });
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Subject").value).toBe("Interview for Accountant"); });
   });
 });

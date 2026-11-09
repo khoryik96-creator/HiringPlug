@@ -156,6 +156,7 @@ type DraftRequest struct {
 type Draft struct {
 	To            []string
 	Subject, Body string
+	BodyHTML      *string // the formatted message, when the template has one
 	Missing       []string
 }
 
@@ -185,6 +186,10 @@ func (s *Service) Draft(ctx context.Context, p authz.Principal, r DraftRequest) 
 		subject, missingSubject := Fill(tpl.Subject, values)
 		body, missingBody := Fill(tpl.Body, values)
 		out = Draft{To: []string{}, Subject: subject, Body: body, Missing: union(missingSubject, missingBody)}
+		if tpl.BodyHtml != nil && *tpl.BodyHtml != "" {
+			filled, missingHTML := FillHTML(*tpl.BodyHtml, values)
+			out.BodyHTML, out.Missing = &filled, union(out.Missing, missingHTML)
+		}
 		to := dc.Candidate.Email
 		if ForClient(tpl.Name) {
 			to = nil

@@ -63,7 +63,7 @@ func (h *HTTP) DraftEmail(ctx context.Context, req api.DraftEmailRequestObject) 
 	if err != nil {
 		return nil, err
 	}
-	return api.DraftEmail200JSONResponse{To: convert[openapi_types.Email](d.To), Subject: d.Subject, Body: d.Body, Missing: d.Missing}, nil
+	return api.DraftEmail200JSONResponse{To: convert[openapi_types.Email](d.To), Subject: d.Subject, Body: d.Body, BodyHtml: c.OrNull(d.BodyHTML), Missing: d.Missing}, nil
 }
 
 // ListEmails handles GET /v1/emails.

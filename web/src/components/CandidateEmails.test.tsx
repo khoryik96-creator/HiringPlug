@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { ok, renderWithClient } from "../test-utils";
 import { CandidateEmails } from "./CandidateEmails";
 import { addresses } from "./EmailComposer";
 
@@ -30,6 +30,18 @@ const reads = (emails: Schemas["Email"][]) =>
     return Promise.resolve(ok({ items: emails }));
   }) as never);
 
+const preview = { subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} };
+/** The body sent to path (the composer also asks for a preview of the fields' values). */
+const bodyTo = (post: { mock: { calls: unknown[][] } }, path: string) =>
+  (post.mock.calls.find((c) => c[0] === path)?.[1] as { body: unknown } | undefined)?.body;
+/** Types a message into the formatted message box. */
+const typeMessage = (html: string) => {
+  const box = screen.getByRole("textbox", { name: "Message" });
+  box.innerHTML = html;
+  fireEvent.input(box);
+  return box;
+};
+
 describe("candidate emails", () => {
   it("lists what was sent, with why one was not", async () => {
     reads([sent]);
@@ -44,50 +56,63 @@ describe("candidate emails", () => {
     reads([]);
     const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => {
       if (path === "/v1/email-drafts") {
-        return Promise.resolve(ok({ to: ["hr@contoh.test"], subject: "Candidate for Accountant", body: "Dear [company.name] team", missing: ["company.name"] }));
+        return Promise.resolve(ok({ to: ["hr@contoh.test"], subject: "Candidate for Accountant", body: "Dear [company.name] team", bodyHtml: null, missing: ["company.name"] }));
       }
+      if (path === "/v1/email-previews") return Promise.resolve(ok(preview));
       return Promise.resolve(ok(sent));
     }) as never);
     renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send", "pipeline:read"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    expect(screen.getByRole("toolbar", { name: "Formatting" }), "bold, italic, underline, indent…").toBeTruthy();
+    expect(screen.getByLabelText("Insert field")).toBeTruthy();
     fireEvent.change(await screen.findByLabelText("About"), { target: { value: "appl_1" } });
     fireEvent.change(await screen.findByLabelText("Template"), { target: { value: "etpl_2" } });
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("To").value).toBe("hr@contoh.test"); });
-    expect(sentBody(post)).toMatchObject({ templateId: "etpl_2", candidateId: "cand_1", applicationId: "appl_1" });
+    expect(bodyTo(post, "/v1/email-drafts")).toMatchObject({ templateId: "etpl_2", candidateId: "cand_1", applicationId: "appl_1" });
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Dear [company.name] team");
     expect(screen.getByRole("status").textContent).toContain("[company.name]");
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
     expect(send.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Dear Contoh team" } });
+    typeMessage("<p>Dear <b>Contoh</b> team</p>");
     expect(send.disabled).toBe(false);
     fireEvent.change(screen.getByLabelText("Cc"), { target: { value: "me@agency.test; boss@agency.test" } });
     fireEvent.click(send);
-    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
-    expect(sentBody(post, 1)).toEqual({
+    await waitFor(() => { expect(bodyTo(post, "/v1/emails")).toBeTruthy(); });
+    expect(bodyTo(post, "/v1/emails")).toEqual({
       to: ["hr@contoh.test"], cc: ["me@agency.test", "boss@agency.test"], subject: "Candidate for Accountant",
-      body: "Dear Contoh team", candidateId: "cand_1", applicationId: "appl_1",
+      bodyHtml: "<p>Dear <b>Contoh</b> team</p>", candidateId: "cand_1", applicationId: "appl_1", timeZone: expect.any(String) as string,
     });
+  });
+
+  it("shows a formatted template formatted", async () => {
+    reads([]);
+    vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-drafts"
+      ? { to: ["siti@example.com"], subject: "Interview", body: "Dear Siti", bodyHtml: "<p>Dear <b>Siti</b>,</p><ul><li>Bring your IC</li></ul>", missing: [] }
+      : preview))) as never);
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
+    await screen.findByRole("option", { name: "Interview invitation" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "etpl_1" } });
+    await waitFor(() => { expect(screen.getByRole("textbox", { name: "Message" }).innerHTML).toContain("<b>Siti</b>"); });
+    expect(screen.getByRole("textbox", { name: "Message" }).innerHTML).toContain("<li>Bring your IC</li>");
   });
 
   it("reads addresses however they are separated", () => {
     expect(addresses(" a@x.test, b@y.test;c@z.test  d@w.test ")).toEqual(["a@x.test", "b@y.test", "c@z.test", "d@w.test"]);
   });
 
-  it("puts a booking link where the cursor was in the message", async () => {
+  it("puts a booking link in the message", async () => {
     reads([]);
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "bkl_1", url: "https://ats.example/book/abc", durationMinutes: 30 }));
+    vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/email-previews"
+      ? preview : { id: "bkl_1", url: "https://ats.example/book/abc", durationMinutes: 30 }))) as never);
     renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read", "emails:send", "scheduling:use"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Write email" }));
-    const message = screen.getByLabelText<HTMLTextAreaElement>("Message");
-    fireEvent.change(message, { target: { value: "Hi Siti,\nThanks, Aina" } });
-    message.setSelectionRange(9, 9); // after "Hi Siti,\n"
-    fireEvent.select(message);
+    typeMessage("<p>Hi Siti,</p>");
     fireEvent.click(screen.getByRole("button", { name: "+ Booking link" }));
-    const insertButton = screen.getByRole("button", { name: "Insert link" });
-    insertButton.focus(); // a click moves the focus to the button, as in a browser
-    fireEvent.click(insertButton);
-    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    fireEvent.click(screen.getByRole("button", { name: "Insert link" }));
     await waitFor(() => {
-      expect(message.value).toBe("Hi Siti,\nPlease pick a time that suits you (30 minutes): https://ats.example/book/abc\nThanks, Aina");
+      expect(screen.getByRole("textbox", { name: "Message" }).textContent)
+        .toBe("Hi Siti,Please pick a time that suits you (30 minutes): https://ats.example/book/abc");
     });
   });
 });
