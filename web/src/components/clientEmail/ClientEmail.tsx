@@ -57,10 +57,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   const subjectBox = useRef<HTMLInputElement>(null);
   const inSubject = useRef(false);
   // A template's fields in the subject show the candidate's values (the message's are filled by the editor).
-  useEffect(() => {
-    if (values) setForm((f) => ({ ...f, subject: fillTokens(f.subject, fields, values) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values, reset]);
+  const subject = values ? fillTokens(form.subject, fields, values) : form.subject;
   const useTemplate = () => {
     if (!selected) return;
     setForm((f) => ({ ...f, subject: selected.subject }));
@@ -71,7 +68,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   const saveTemplate = useMutation({
     mutationFn: async (asNew: boolean) => {
       // The candidate's details go back in as fields (the message's are turned back by the server).
-      const body = { name: name.trim(), subject: valuesToTokens(form.subject, values ?? {}), bodyHtml: withoutCaretMarks(html) };
+      const body = { name: name.trim(), subject: valuesToTokens(subject, values ?? {}), bodyHtml: withoutCaretMarks(html) };
       if (asNew || !selected) return unwrap(await api.POST("/v1/email-templates", { body }));
       return unwrap(await api.PUT("/v1/email-templates/{templateId}", { params: { path: { templateId: selected.id } }, body: { ...body, version: selected.version } }));
     },
@@ -83,14 +80,14 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   });
   const show = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: form.subject, bodyHtml: withoutCaretMarks(html), candidateId, applicationId, timeZone: timeZone() },
+      body: { subject, bodyHtml: withoutCaretMarks(html), candidateId, applicationId, timeZone: timeZone() },
     })),
     onSuccess: setPreview,
   });
   const send = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/emails", {
       body: {
-        to: addresses(to), cc: addresses(form.cc), bcc: addresses(form.bcc), subject: form.subject, bodyHtml: withoutCaretMarks(html),
+        to: addresses(to), cc: addresses(form.cc), bcc: addresses(form.bcc), subject, bodyHtml: withoutCaretMarks(html),
         candidateId, applicationId, timeZone: timeZone(), attachmentIds: uploads.map((u) => u.id), cvs,
       },
     })),
@@ -131,7 +128,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
             onClick={() => { if (selected && window.confirm(`Delete the template "${selected.name}"?`)) deleteTemplate.mutate(selected.id); }}>Delete template</button>
         </div>
       )}
-      {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={form.subject} html={html} values={values} /></div>}
+      {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={subject} html={html} values={values} /></div>}
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
 
       <label className="field">To<input value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
@@ -140,7 +137,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
         <label className="field">CC<input value={form.cc} onChange={set("cc")} /></label>
         <label className="field">BCC<input value={form.bcc} onChange={set("bcc")} /></label>
       </div>
-      <label className="field">Subject<input ref={subjectBox} value={form.subject} onChange={set("subject")}
+      <label className="field">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
 
       <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
@@ -148,7 +145,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
         values={values} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {
           if (!inSubject.current) return false;
-          setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, cur.subject, value ?? f.token) }));
+          setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));
           return true;
         }} />
       <ErrorMessage error={uploadBanner.error} />

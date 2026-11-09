@@ -68,10 +68,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   const values = context.data?.fieldValues;
   const fields = templates.data?.fields ?? [];
   // A template's fields in the subject show the candidate's values (the message's are filled by the editor).
-  useEffect(() => {
-    if (values) setForm((f) => ({ ...f, subject: fillTokens(f.subject, fields, values) }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values, reset]);
+  const subject = values ? fillTokens(form.subject, fields, values) : form.subject;
   const insert = (text: string) => {
     setInserting((i) => ({ id: (i?.id ?? 0) + 1, html: plainToHtml(text) }));
     setBooking(false);
@@ -107,7 +104,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
     mutationFn: async () =>
       unwrap(await api.POST("/v1/emails", {
         body: {
-          to: addresses(form.to), cc: addresses(form.cc), subject: form.subject, bodyHtml: withoutCaretMarks(html),
+          to: addresses(form.to), cc: addresses(form.cc), subject, bodyHtml: withoutCaretMarks(html),
           candidateId, applicationId: about || undefined, timeZone: timeZone(),
         },
       })),
@@ -116,7 +113,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       onDone();
     },
   });
-  const unfilled = missing.filter((key) => `${form.subject}\n${textOf(html)}`.includes(`[${key}]`));
+  const unfilled = missing.filter((key) => `${subject}\n${textOf(html)}`.includes(`[${key}]`));
   const set = (field: keyof typeof form) => (e: { target: { value: string } }) => { setForm({ ...form, [field]: e.target.value }); };
 
   return (
@@ -138,7 +135,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       )}
       <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
       <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
-      <label className="field full">Subject<input ref={subjectBox} value={form.subject} onChange={set("subject")}
+      <label className="field full">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
       <div className="field full">
         <span>Message</span>
@@ -147,7 +144,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
           values={values} inserting={inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {
             if (!inSubject.current) return false;
-            setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, cur.subject, value ?? f.token) }));
+            setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));
             return true;
           }} />
       </div>
@@ -161,11 +158,11 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       )}
       <SaveError error={send.error} shown={[]} onReload={onDone} />
       <div className="row full">
-        <button type="submit" disabled={send.isPending || draft.isPending || unfilled.length > 0 || !form.to.trim() || !form.subject.trim() || !textOf(html)}>
+        <button type="submit" disabled={send.isPending || draft.isPending || unfilled.length > 0 || !form.to.trim() || !subject.trim() || !textOf(html)}>
           Send
         </button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
-        {canCreateTemplates && <SaveAsTemplate subject={form.subject} html={html} values={values} />}
+        {canCreateTemplates && <SaveAsTemplate subject={subject} html={html} values={values} />}
         {canManageTemplates && <a href="#/email-templates" className="muted">Edit templates</a>}
       </div>
     </form>

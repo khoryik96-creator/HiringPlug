@@ -113,7 +113,7 @@ describe("candidate emails", () => {
     await screen.findByRole("option", { name: "Interview invitation" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "etpl_1" } });
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Subject").value).toBe("Siti - RM 12,000 per month"); });
-    expect(screen.getByRole("textbox", { name: "Message" }).textContent?.replaceAll("\u200b", "")).toBe("Hi Siti, you expect RM 12,000 per month.");
+    expect(screen.getByRole("textbox", { name: "Message" }).textContent.replaceAll("\u200b", "")).toBe("Hi Siti, you expect RM 12,000 per month.");
   });
 
   it("saves the email as a new template, the candidate's details back as fields", async () => {
