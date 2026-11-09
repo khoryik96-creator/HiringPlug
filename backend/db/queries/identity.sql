@@ -148,3 +148,7 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET candidate_columns = EXCLUDED.cand
 
 -- name: ResetCandidateColumns :exec
 UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE user_id = app_current_user();
+
+-- name: RenameTenant :one
+UPDATE tenant SET name = @name WHERE id = app_current_tenant()
+RETURNING id, name, careers_slug::text AS careers_slug;

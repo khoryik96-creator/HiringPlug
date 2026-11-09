@@ -1773,6 +1773,13 @@ class User(BaseModel):
     name: str
 
 
+class AgencyRename(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(examples=["Hyppies"], max_length=200, min_length=1)]
+
+
 class Tenant(BaseModel):
     careersSlug: Annotated[
         str,

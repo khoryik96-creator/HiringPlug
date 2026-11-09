@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { invalidField, ok, renderWithClient, sentBody, testFieldSettings } from "../test-utils";
+import { invalidField, ok, renderWithClient, sentBody, testFieldSettings, testMe } from "../test-utils";
 import { Settings } from "./Settings";
 
 afterEach(() => {
@@ -10,9 +10,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Answers the settings page's reads: who is signed in, the policies and the field settings. */
+const answerGets = () => vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+  path === "/v1/me" ? testMe(["settings:manage"]) : path === "/v1/settings/policies" ? { emailSalaryVisibility: "salary_roles" } : testFieldSettings(),
+))) as never);
+
 describe("settings", () => {
   it("adds, reorders and hides options, then saves the list in order", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    answerGets();
     const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { options: { key?: string; label: string; hidden: boolean }[] } }) =>
       Promise.resolve(ok({ name: "candidate_source", label: "Candidate source", kind: "open",
         options: init.body.options.map((o) => ({ key: o.key ?? "job_fair", label: o.label, hidden: o.hidden, builtIn: !!o.key })) }))) as never);
@@ -34,7 +39,7 @@ describe("settings", () => {
   });
 
   it("edits the company benefits template: items with what to write for each", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ name: "company_benefits", label: "Company benefits", kind: "open", hints: true, options: [] }));
     renderWithClient(<Settings />);
     const benefits = await screen.findByRole("region", { name: "Company benefits" });
@@ -53,8 +58,24 @@ describe("settings", () => {
     expect(body.options.at(-1)).toEqual({ label: "Car allowance", hidden: false, hint: "Amount, from which grade" });
   });
 
+  it("renames the agency, showing how formatted CVs will be named", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/me"
+      ? { user: { id: "usr_1", email: "o@x.my", name: "Owner" }, tenant: { id: "tnt_1", name: "Demo Recruitment", careersSlug: "demo" }, role: "owner", permissions: [] }
+      : testFieldSettings()))) as never);
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ id: "tnt_1", name: "Hyppies", careersSlug: "demo" }));
+    renderWithClient(<Settings />);
+    const agency = await screen.findByRole("region", { name: "Agency" });
+    const input = await within(agency).findByDisplayValue("Demo Recruitment");
+    expect(agency.textContent).toContain("Demo Recruitment CV - Siti Aisyah.docx");
+    fireEvent.change(input, { target: { value: "Hyppies" } });
+    expect(agency.textContent).toContain("“Hyppies CV - Siti Aisyah.docx”");
+    fireEvent.click(within(agency).getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ name: "Hyppies" });
+  });
+
   it("adds a notice period as a number and unit", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(invalidField("options[4].key", "a number of days, weeks or months"));
     renderWithClient(<Settings />);
     const notice = await screen.findByRole("region", { name: "Notice period" });
@@ -68,11 +89,12 @@ describe("settings", () => {
   });
 
   it("chooses mandatory fields; the app's own stay on", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ ...(testFieldSettings() as object), mandatory: [
+    const fields = { ...(testFieldSettings() as object), mandatory: [
       { form: "candidate", field: "firstName", label: "First name", mandatory: true, alwaysRequired: true },
       { form: "candidate", field: "email", label: "Email", mandatory: false, alwaysRequired: false },
       { form: "job", field: "location", label: "Location", mandatory: false, alwaysRequired: false },
-    ] }));
+    ] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/me" ? testMe([]) : fields))) as never);
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(testFieldSettings()));
     renderWithClient(<Settings />);
     const panel = await screen.findByRole("region", { name: "Mandatory fields" });
@@ -88,8 +110,7 @@ describe("settings", () => {
   });
 
   it("chooses who sees emails that show salary", async () => {
-    vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-      Promise.resolve(ok(path === "/v1/settings/policies" ? { emailSalaryVisibility: "salary_roles" } : testFieldSettings()))) as never);
+    answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ emailSalaryVisibility: "everyone" }));
     renderWithClient(<Settings />);
     const choice = await screen.findByLabelText<HTMLSelectElement>("Who sees emails that show salary");

@@ -600,6 +600,24 @@ func (q *Queries) RenameTeamGroup(ctx context.Context, arg RenameTeamGroupParams
 	return i, err
 }
 
+const renameTenant = `-- name: RenameTenant :one
+UPDATE tenant SET name = $1 WHERE id = app_current_tenant()
+RETURNING id, name, careers_slug::text AS careers_slug
+`
+
+type RenameTenantRow struct {
+	ID          string
+	Name        string
+	CareersSlug string
+}
+
+func (q *Queries) RenameTenant(ctx context.Context, name string) (RenameTenantRow, error) {
+	row := q.db.QueryRow(ctx, renameTenant, name)
+	var i RenameTenantRow
+	err := row.Scan(&i.ID, &i.Name, &i.CareersSlug)
+	return i, err
+}
+
 const resetCandidateColumns = `-- name: ResetCandidateColumns :exec
 UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE user_id = app_current_user()
 `

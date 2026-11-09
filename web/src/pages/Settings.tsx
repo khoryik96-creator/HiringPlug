@@ -21,6 +21,7 @@ export function Settings() {
       <ErrorMessage error={settings.error} />
       {settings.data && (
         <>
+          <AgencyName />
           <MandatoryFields fields={settings.data.mandatory} />
           <Policies />
           <h3>Dropdowns</h3>
@@ -41,6 +42,35 @@ const SALARY_CHOICES: Record<Schemas["EmailSalaryVisibility"], string> = {
   salary_roles: "Only roles that may see salaries (recommended)",
   everyone: "Everyone who may read emails",
 };
+
+/** The agency's name: on formatted CVs and their file names ("Hyppies CV - Siti Aisyah.docx"). */
+function AgencyName() {
+  const queryClient = useQueryClient();
+  const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
+  const [name, setName] = useState<string | null>(null);
+  const current = name ?? me.data?.tenant.name ?? "";
+  const save = useMutation({
+    mutationFn: async () => unwrap(await api.PUT("/v1/agency", { body: { name: current } })),
+    onSuccess: async () => { setName(null); await queryClient.invalidateQueries({ queryKey: ["me"] }); },
+  });
+  const errors = fieldErrors(save.error);
+  const example = current.trim() ? `${current.trim()} CV - Siti Aisyah.docx` : "CV - Siti Aisyah.docx";
+  return (
+    <section className="panel" aria-label="Agency">
+      <h3>Agency</h3>
+      <form className="row" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <label className="field">Agency name
+          <input value={current} maxLength={200} onChange={(e) => { setName(e.target.value); }} />
+        </label>
+        <button type="submit" disabled={save.isPending || name === null || !current.trim()}>Save</button>
+        {save.isSuccess && <span role="status" className="muted">Saved.</span>}
+      </form>
+      {errors.name && <small className="error">{errors.name}</small>}
+      <p className="muted small">On formatted CVs and their file names, e.g. “{example}”, and on the careers page.</p>
+      <ErrorMessage error={me.error ?? (errors.name ? null : save.error)} />
+    </section>
+  );
+}
 
 /** Who sees a sent email that shows salary. */
 function Policies() {
@@ -154,12 +184,14 @@ function ListEditor({ list }: { list: List }) {
               <td>
                 <label className="check"><input type="checkbox" checked={r.hidden} onChange={(e) => { update(i, { hidden: e.target.checked }); }} /> Hidden</label>
               </td>
-              <td className="row">
+              <td>
+                <span className="row">
                 <button type="button" className="link" aria-label={`Move ${r.label} up`} disabled={i === 0} onClick={() => { move(i, -1); }}>↑</button>
                 <button type="button" className="link" aria-label={`Move ${r.label} down`} disabled={i === rows.length - 1} onClick={() => { move(i, 1); }}>↓</button>
                 {list.kind === "open" && !r.builtIn && (
                   <button type="button" className="link" onClick={() => { setRows(rows.filter((_, j) => j !== i)); }}>Remove</button>
                 )}
+                </span>
               </td>
             </tr>
           ))}

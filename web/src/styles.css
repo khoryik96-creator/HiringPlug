@@ -536,4 +536,7 @@ main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto;
 .segmented button { border: 0; border-radius: 0; background: var(--surface); color: var(--text); padding: 0.4rem 0.7rem; font-size: 0.85rem; box-shadow: none; }
 .segmented button + button { border-left: 1px solid var(--line-strong); }
 .segmented button.on { background: var(--accent-soft); color: var(--accent-dark); font-weight: 650; }
-.hint-input { margin-top: 0.3rem; font-size: 0.85rem; }
+/* Settings: a template item's name, with its hint (what to write) under it. */
+td:has(> .hint-input) { width: 70%; }
+td:has(> .hint-input) > input { display: block; width: 100%; }
+.hint-input { margin-top: 0.3rem; font-size: 0.85rem; color: var(--muted); }

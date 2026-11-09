@@ -45,6 +45,31 @@ paths:
               schema: { $ref: '#/components/schemas/Me' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
 
+  /v1/agency:
+    put:
+      operationId: renameAgency
+      tags: [identity]
+      summary: Rename your agency (company)
+      description: >
+        The name shows on formatted CVs and their file names ("Hyppies CV -
+        Siti Aisyah.docx"), on the careers page and in the app. The careers
+        page address stays the same.
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AgencyRename' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenant' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/users:
     get:
       operationId: listUsers
@@ -567,6 +592,12 @@ components:
         id: { $ref: '#/components/schemas/UserId' }
         email: { type: string, format: email }
         name: { type: string }
+    AgencyRename:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200, example: Hyppies }
     Tenant:
       type: object
       required: [id, name, careersSlug]

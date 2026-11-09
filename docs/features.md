@@ -181,8 +181,11 @@ candidate" instead of he or she); paragraphs aligned left or justified. Lines
 stating the candidate's own salary are left out before the AI sees the CV. When
 CV Studio's check finds something the result may have lost or changed, the
 page says what, to compare before sending. It needs the AI (Settings > AI
-provider) and counts in the monthly AI allowance. **From their profile** is
-the template way below.
+provider) and counts in the monthly AI allowance. Its summary box carries
+CV Studio's "ABOUT HIM / HER" heading. **From their profile** is
+the template way below. Either way the file is named after the agency as CV
+Studio names it, "Hyppies CV - Siti Aisyah.docx": the agency's name is in
+Settings > General (Agency).
 
 **Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
 (after a confirmation; `documents:delete`, recruiters and up). Its Word file

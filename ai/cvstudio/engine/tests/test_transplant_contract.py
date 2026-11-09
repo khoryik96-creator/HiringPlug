@@ -63,7 +63,10 @@ def test_sanitized_template_has_only_summary_placeholder_text():
             if name.endswith('.xml'):
                 tree = etree.fromstring(archive.read(name))
                 texts += tree.xpath('//w:t/text()', namespaces=NS)
-        assert set(value for value in texts if value.strip()) == {'*Summary*', 'Private & Confidential | © Hyppies.com'}
+        # No sample candidate's text; only the summary's placeholder, its
+        # heading (as on CV Studio's CVs) and the footer.
+        assert set(value for value in texts if value.strip()) == {
+            '*Summary*', 'ABOUT HIM / HER', 'Private & Confidential | © Hyppies.com'}
 
 
 def test_renderer_keeps_summary_roles_project_and_education(tmp_path):
@@ -88,3 +91,6 @@ def test_renderer_keeps_summary_roles_project_and_education(tmp_path):
         assert 'cloud operations' in textbox_text
         assert '*Summary*' not in text
         assert '_CVStudioSummaryBox' in archive.read('word/document.xml').decode()
+        # The summary box keeps its heading, in the drawing and in its fallback.
+        assert 'ABOUT HIM / HER' in textbox_text
+        assert archive.read('word/document.xml').decode().count('>ABOUT HIM / HER<') == 2

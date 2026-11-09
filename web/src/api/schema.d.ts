@@ -1052,6 +1052,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/agency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename your agency (company)
+         * @description The name shows on formatted CVs and their file names ("Hyppies CV - Siti Aisyah.docx"), on the careers page and in the app. The careers page address stays the same.
+         */
+        put: operations["renameAgency"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/users": {
         parameters: {
             query?: never;
@@ -4079,6 +4099,10 @@ export interface components {
             id: components["schemas"]["UserId"];
             /** Format: email */
             email: string;
+            name: string;
+        };
+        AgencyRename: {
+            /** @example Hyppies */
             name: string;
         };
         Tenant: {
@@ -8165,6 +8189,33 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthenticated"];
+        };
+    };
+    renameAgency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgencyRename"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tenant"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listUsers: {
