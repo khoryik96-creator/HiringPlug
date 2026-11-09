@@ -25,9 +25,11 @@ type Props = {
    * a field without one stays as [Field] and is reported when sending.
    */
   values?: Record<string, string>;
+  /** Something to put in where the cursor was (a booking link); a new id puts it in. */
+  inserting?: { id: number; html: string } | undefined;
 };
 
-export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values }: Props) {
+export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting }: Props) {
   const vals = values ?? NONE;
   const box = useRef<HTMLDivElement>(null);
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
@@ -65,6 +67,11 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
     showBanners(box.current, bannerUrls);
     changed();
   };
+  useEffect(() => {
+    if (inserting) insert(inserting.html);
+    // Once per request, not when insert is made again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inserting?.id]);
   // Toolbar buttons keep the cursor where it is in the message.
   const keep = (e: React.MouseEvent) => { e.preventDefault(); };
   const button = (label: string, command: string, text = label) => (

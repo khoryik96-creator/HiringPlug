@@ -71,6 +71,12 @@ function TermsView({ t }: { t: Terms }) {
   );
 }
 
+/** A rate's fields, as its errors name them. */
+const ROW_FIELDS = {
+  salaryFrom: "salary from", salaryBelow: "below", feePercent: "fee", guaranteeDays: "guarantee (in days)",
+  paymentTermsDays: "payment terms", remarks: "payment method / remarks",
+};
+
 function TermsForm({ companyId, terms, onDone }: { companyId: string; terms: Terms; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<TierRow[]>(() => (terms.tiers.length > 0 ? terms.tiers.map(rowFromTier) : [emptyRow()]));
@@ -86,8 +92,11 @@ function TermsForm({ companyId, terms, onDone }: { companyId: string; terms: Ter
   const setRow = (i: number, k: keyof TierRow) => (e: { target: { value: string } }) => {
     setRows(rows.map((r, j) => (j === i ? { ...r, [k]: e.target.value } : r)));
   };
-  const err = (i: number, k: string) => errors[`tiers[${String(i)}].${k}`];
-  const rowErrors = (i: number) => ["salaryFrom", "salaryBelow", "feePercent", "guaranteeDays", "paymentTermsDays", "remarks"].map((k) => err(i, k)).filter(Boolean);
+  const err = (i: number, k: string) => errors[`tiers.${String(i)}.${k}`];
+  const rowErrors = (i: number) => Object.entries(ROW_FIELDS).flatMap(([k, label]) => {
+    const e = err(i, k);
+    return e ? [`${label}: ${e}`] : [];
+  });
   return (
     <form aria-label="Terms of business form" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <p className="muted small">

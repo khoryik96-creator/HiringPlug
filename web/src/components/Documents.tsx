@@ -7,6 +7,7 @@ import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
+import { fileKind } from "./fileKind";
 import { FormatCv } from "./FormatCv";
 import { StudioCvRuns } from "./StudioCvRuns";
 
@@ -20,11 +21,7 @@ const STATUS_NOTE: Partial<Record<Document["status"], string>> = {
 };
 
 const added = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const KIND: Record<string, string> = {
-  "application/pdf": "PDF", "application/msword": "DOC", "application/rtf": "RTF", "text/plain": "TXT",
-  "application/vnd.oasis.opendocument.text": "ODT",
-};
-const kindOf = (d: Document) => KIND[d.contentType] ?? (d.contentType.startsWith("image/") ? "IMG" : "DOCX");
+const kindOf = (d: Document) => fileKind(d.contentType);
 
 
 /**

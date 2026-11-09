@@ -5656,6 +5656,11 @@ export interface components {
         };
         PlacementInvoiceJob: {
             placementId: components["schemas"]["PlacementId"];
+            /**
+             * Format: date-time
+             * @description The send time this job was queued for (the start date at the hour). A job whose time is no longer the placement's does nothing: another is queued for the new one.
+             */
+            sendAt?: string;
         };
         /** @enum {string} */
         InvoiceFormat: "pdf" | "docx";

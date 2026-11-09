@@ -33,6 +33,8 @@ func TestInvoiceNumbersDatesAndSending(t *testing.T) {
 	assert.Equal(t, "2026-12-31", DueOn(start, 30, nil).Format(time.DateOnly))
 	set := time.Date(2027, 1, 15, 0, 0, 0, 0, time.UTC)
 	assert.Equal(t, set, DueOn(start, 30, &set), "a due date someone set stays")
+	sentLate := time.Date(2027, 1, 20, 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, "2027-02-19", DueOn(sentLate, 30, &set).Format(time.DateOnly), "unless the invoice went out after it: then the terms")
 
 	kl, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	require.NoError(t, err)

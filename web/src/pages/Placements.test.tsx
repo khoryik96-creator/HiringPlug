@@ -22,9 +22,14 @@ const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement
   restrictedFields: [], createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
   ...over,
 });
+const noTerms: Schemas["PlacementDefaults"] = {
+  companyId: "comp_1", companyName: "Maju Foods", termsSet: false, tiers: [], salaryCurrency: "MYR", feePercent: null,
+  paymentTermsDays: 30, guaranteeDays: 90, contactId: null,
+};
 const reads = (list: Schemas["PlacementList"]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => {
     if (path === "/v1/users") return Promise.resolve(ok({ items: [{ id: "usr_1", name: "Aina", role: "recruiter", canInterview: true }] }));
+    if (path === "/v1/applications/{applicationId}/placement-defaults") return Promise.resolve(ok(noTerms));
     return Promise.resolve(ok(list));
   }) as never);
 

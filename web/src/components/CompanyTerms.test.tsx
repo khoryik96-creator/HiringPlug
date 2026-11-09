@@ -23,7 +23,7 @@ const reads = (terms: object) => vi.spyOn(api, "GET").mockImplementation(((path:
 describe("a client's terms of business", () => {
   it("are tiers by annual salary, each with a fee, guarantee, payment terms and payment remarks", async () => {
     reads(none);
-    const put = vi.spyOn(api, "PUT").mockResolvedValueOnce(invalidField("tiers[1].salaryFrom", "overlaps rate 1")).mockResolvedValue(ok(tiered));
+    const put = vi.spyOn(api, "PUT").mockResolvedValueOnce(invalidField("tiers.1.salaryFrom", "overlaps rate 1")).mockResolvedValue(ok(tiered));
     renderWithClient(<CompanyTerms companyId="comp_1" permissions={["companies:read", "companies:update"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Add terms" }));
     fireEvent.change(screen.getByLabelText("Rate 1: annual salary from"), { target: { value: "120,000" } });
@@ -38,7 +38,7 @@ describe("a client's terms of business", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add a salary band" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove rate 3" }));
     fireEvent.click(screen.getByRole("button", { name: "Save terms" }));
-    expect(await screen.findByText("Rate 2: overlaps rate 1")).toBeTruthy();
+    expect(await screen.findByText("Rate 2: salary from: overlaps rate 1")).toBeTruthy();
     expect(sentBody(put)).toEqual({
       version: 0, salaryCurrency: "MYR", signedOn: null, notes: null,
       tiers: [rate("120000", null, "25", 90, 30, "50% on signing, 50% on start"), rate(null, "120000", "18", 60, 14)],

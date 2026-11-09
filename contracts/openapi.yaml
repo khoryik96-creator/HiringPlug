@@ -8188,6 +8188,10 @@ components:
       required: [placementId]
       properties:
         placementId: {$ref: '#/components/schemas/PlacementId'}
+        sendAt:
+          type: string
+          format: date-time
+          description: "The send time this job was queued for (the start date at the hour). A job whose time is no longer the placement's does nothing: another is queued for the new one."
     InvoiceFormat:
       type: string
       enum: [pdf, docx]

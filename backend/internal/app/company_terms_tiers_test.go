@@ -30,9 +30,9 @@ func TestTieredTermsOfBusinessFillPlacementsBySalary(t *testing.T) {
 
 	t.Run("a salary falls in one rate only", func(t *testing.T) {
 		res := put(0, rate(nil, "120000", "18", 14, 60, nil), rate("100000", nil, "25", 30, 90, nil))
-		assert.Equal(t, []string{"tiers[1].salaryFrom"}, fieldNames(t, res.Error()))
+		assert.Equal(t, []string{"tiers.1.salaryFrom"}, fieldNames(t, res.Error()))
 		res = put(0, rate("120000", "100000", "18", 14, 60, nil))
-		assert.Equal(t, []string{"tiers[0].salaryBelow"}, fieldNames(t, res.Error()))
+		assert.Equal(t, []string{"tiers.0.salaryBelow"}, fieldNames(t, res.Error()))
 	})
 
 	res := put(0,

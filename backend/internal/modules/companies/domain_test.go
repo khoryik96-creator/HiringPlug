@@ -139,10 +139,14 @@ func TestTermsRates(t *testing.T) {
 	assert.Equal(t, "18.5", *got.Tiers[0].FeePercent)
 	assert.Equal(t, "Retainer: 1/3 upfront", *got.Tiers[1].Remarks)
 
-	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{SalaryBelow: s("120000")}, {SalaryBelow: s("80000")}}})
-	assert.Equal(t, "tiers[1].salaryFrom", errs[0].Field, "both cover salaries below 80,000")
+	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{SalaryBelow: s("120000")}, {}, {SalaryBelow: s("80000")}}})
+	require.Len(t, errs, 1)
+	assert.Equal(t, "tiers.2.salaryFrom", errs[0].Field, "both cover salaries below 80,000; named by the row as sent, the empty one counted")
+	assert.Contains(t, errs[0].Message, "overlaps rate 1")
 	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{SalaryBelow: s("120000")}, {SalaryFrom: s("120000")}}})
 	assert.Empty(t, errs, "120,000 itself is in the second rate only")
-	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{FeePercent: s("101"), PaymentTermsDays: n(400)}}})
-	assert.Len(t, errs, 2)
+	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{FeePercent: s("101"), PaymentTermsDays: n(400), GuaranteeDays: n(-1)}}})
+	require.Len(t, errs, 3)
+	assert.Equal(t, []string{"tiers.0.feePercent", "tiers.0.guaranteeDays", "tiers.0.paymentTermsDays"},
+		[]string{errs[0].Field, errs[1].Field, errs[2].Field}, "always in the same order")
 }

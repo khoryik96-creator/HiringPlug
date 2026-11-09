@@ -57,8 +57,14 @@ func NormalizeTerms(t Terms) (Terms, apperr.FieldErrors) {
 	if t.SalaryCurrency == "" {
 		t.SalaryCurrency = "MYR"
 	}
-	tiers := make([]Tier, 0, len(t.Tiers))
-	for _, tier := range t.Tiers {
+	// Each rate keeps the number it was sent with, so an error names the row
+	// the person sees (empty rows included), named as the contract names them.
+	type numbered struct {
+		Tier
+		row int
+	}
+	var tiers []numbered
+	for row, tier := range t.Tiers {
 		if tier.Remarks != nil {
 			r := strings.TrimSpace(*tier.Remarks)
 			tier.Remarks = &r
@@ -69,23 +75,26 @@ func NormalizeTerms(t Terms) (Terms, apperr.FieldErrors) {
 		tier.FeePercent = trimZeros(tier.FeePercent)
 		tier.SalaryFrom, tier.SalaryBelow = trimZeros(tier.SalaryFrom), trimZeros(tier.SalaryBelow)
 		if !tier.empty() {
-			tiers = append(tiers, tier)
+			tiers = append(tiers, numbered{tier, row})
 		}
 	}
 	if len(tiers) > 20 {
 		errs.Add("tiers", "at most 20 rates")
 	}
 	for i, tier := range tiers {
-		at := func(f string) string { return "tiers[" + strconv.Itoa(i) + "]." + f }
+		at := func(f string) string { return "tiers." + strconv.Itoa(tier.row) + "." + f }
 		if tier.FeePercent != nil {
 			pct, ok := new(big.Rat).SetString(*tier.FeePercent)
 			if !ok || pct.Sign() <= 0 || pct.Cmp(big.NewRat(100, 1)) > 0 {
 				errs.Add(at("feePercent"), "a percentage above 0, at most 100")
 			}
 		}
-		for f, v := range map[string]*int{"paymentTermsDays": tier.PaymentTermsDays, "guaranteeDays": tier.GuaranteeDays} {
-			if v != nil && (*v < 0 || *v > 365) {
-				errs.Add(at(f), "between 0 and 365 days")
+		for _, d := range []struct {
+			field string
+			v     *int
+		}{{"guaranteeDays", tier.GuaranteeDays}, {"paymentTermsDays", tier.PaymentTermsDays}} {
+			if d.v != nil && (*d.v < 0 || *d.v > 365) {
+				errs.Add(at(d.field), "between 0 and 365 days")
 			}
 		}
 		if tier.Remarks != nil && len([]rune(*tier.Remarks)) > 500 {
@@ -96,14 +105,17 @@ func NormalizeTerms(t Terms) (Terms, apperr.FieldErrors) {
 			errs.Add(at("salaryBelow"), "must be more than the salary it starts from")
 			continue
 		}
-		for j := range i {
-			if overlap(tiers[j], tier) {
-				errs.Add(at("salaryFrom"), "overlaps rate "+strconv.Itoa(j+1)+": each salary must fall in one rate only")
+		for _, other := range tiers[:i] {
+			if overlap(other.Tier, tier.Tier) {
+				errs.Add(at("salaryFrom"), "overlaps rate "+strconv.Itoa(other.row+1)+": each salary must fall in one rate only")
 				break
 			}
 		}
 	}
-	t.Tiers = tiers
+	t.Tiers = make([]Tier, len(tiers))
+	for i, tier := range tiers {
+		t.Tiers[i] = tier.Tier
+	}
 	if t.Notes != nil {
 		n := strings.TrimSpace(*t.Notes)
 		t.Notes = &n

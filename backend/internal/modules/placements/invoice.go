@@ -194,26 +194,35 @@ func (s *Service) schedule(ctx context.Context, tx pgx.Tx, tenantID, placementID
 	if err != nil {
 		return err
 	}
-	// Queued once per send time (the start date at the hour): the job clears
-	// it when it runs, so anything later queues it afresh.
-	when := SendTime(start, settings.SendHour, s.inv.TimeZone)
+	return s.scheduleAt(ctx, tx, tenantID, placementID, start, settings.SendHour)
+}
+
+// scheduleAt is schedule with the agency's send hour already read.
+func (s *Service) scheduleAt(ctx context.Context, tx pgx.Tx, tenantID, placementID string, start time.Time, hour int) error {
+	// Queued once per send time (the start date at the hour): the job for
+	// that time clears it when it runs, so anything later queues it afresh.
+	when := SendTime(start, hour, s.inv.TimeZone)
 	n, err := store.New(tx).MarkInvoiceScheduled(ctx, store.MarkInvoiceScheduledParams{PlacementID: placementID, ScheduledFor: &when})
 	if err != nil || n == 0 {
 		return err
 	}
-	at := SendsAt(start, settings.SendHour, s.inv.TimeZone, s.clock()) // at once when that time is past
-	_, err = jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindPlacementInvoice, api.PlacementInvoiceJob{PlacementId: placementID}, at)
+	at := SendsAt(start, hour, s.inv.TimeZone, s.clock()) // at once when that time is past
+	_, err = jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindPlacementInvoice, api.PlacementInvoiceJob{PlacementId: placementID, SendAt: &when}, at)
 	return err
 }
 
 // rescheduleAll queues again every invoice still to be emailed (the hour changed).
 func (s *Service) rescheduleAll(ctx context.Context, tx pgx.Tx, tenantID string) error {
+	settings, err := s.settingsIn(ctx, tx, tenantID)
+	if err != nil {
+		return err
+	}
 	rows, err := store.New(tx).ListAwaitingInvoices(ctx)
 	if err != nil {
 		return err
 	}
 	for _, r := range rows {
-		if err := s.schedule(ctx, tx, tenantID, r.ID, r.StartDate); err != nil {
+		if err := s.scheduleAt(ctx, tx, tenantID, r.ID, r.StartDate, settings.SendHour); err != nil {
 			return err
 		}
 	}
@@ -247,6 +256,9 @@ func (s *Service) invoiceJob(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	}
 	if err != nil {
 		return err
+	}
+	if payload.SendAt != nil && inv.ScheduledFor != nil && !payload.SendAt.Equal(*inv.ScheduledFor) {
+		return nil // queued for a time since moved (the start date or hour): the job for the new time is queued
 	}
 	if err := q.ClearInvoiceSchedule(ctx, payload.PlacementId); err != nil {
 		return err

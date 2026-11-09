@@ -125,7 +125,7 @@ func InvoiceNumber(prefix string, n int) string { return fmt.Sprintf("%s%04d", p
 // DueOn is when payment is due: set by someone, or the invoice date plus
 // the payment terms.
 func DueOn(invoiceDate time.Time, termsDays int, set *time.Time) time.Time {
-	if set != nil {
+	if set != nil && !set.Before(invoiceDate) { // a date set by hand, unless the invoice went out after it
 		return *set
 	}
 	return invoiceDate.AddDate(0, 0, termsDays)

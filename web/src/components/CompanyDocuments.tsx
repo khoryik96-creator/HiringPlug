@@ -9,17 +9,14 @@ import { getToken } from "../auth";
 import { formatWhen } from "../labels";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
+import { fileKind } from "./fileKind";
 
 type Doc = Schemas["CompanyDocument"];
 type Section = Doc["section"];
 
 export const companyDocumentsKey = (id: string) => ["company", id, "documents"] as const;
 
-const KIND: Record<string, string> = {
-  "application/pdf": "PDF", "application/msword": "DOC", "application/rtf": "RTF", "text/plain": "TXT",
-  "application/vnd.oasis.opendocument.text": "ODT",
-};
-const kindOf = (d: Doc) => KIND[d.contentType] ?? (d.contentType.startsWith("image/") ? "IMG" : "DOCX");
+const kindOf = (d: Doc) => fileKind(d.contentType);
 const sizeOf = (bytes: number) => (bytes < 1024 * 1024 ? `${String(Math.max(1, Math.round(bytes / 1024)))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
 
 export function CompanyDocuments({ companyId, section, permissions }: { companyId: string; section: Section; permissions: Permission[] }) {

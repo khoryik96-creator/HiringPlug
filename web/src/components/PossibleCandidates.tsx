@@ -28,11 +28,15 @@ export function matchedWords(snippet: string): string[] {
   return [...seen.values()];
 }
 
+/** Digits that read as a phone number: 9 or more, not just years ("2015 - 2018 2018 - 2020"). */
+const isPhone = (m: string) =>
+  m.replace(/\D/g, "").length >= 9 && !(m.match(/\d+/g) ?? []).every((g) => /^(19|20)\d\d$/.test(g));
+
 /** A snippet without contact details (they are on the profile) and with tidy gaps. */
 export function tidySnippet(snippet: string): string {
   return snippet
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, " ")
-    .replace(/\(?\+?\d[\d\s()-]{7,}\d/g, " ")
+    .replace(/\(?\+?\d[\d\s()-]{7,}\d/g, (m) => (isPhone(m) ? " " : m))
     .replace(/[•▪◦●○]/g, "·")
     .replace(/\s{2,}/g, " ")
     .trim();

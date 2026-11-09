@@ -4728,6 +4728,12 @@ class PlacementInvoiceJob(BaseModel):
         extra="forbid",
     )
     placementId: PlacementId
+    sendAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="The send time this job was queued for (the start date at the hour). A job whose time is no longer the placement's does nothing: another is queued for the new one."
+        ),
+    ] = None
 
 
 class InvoiceSettings(InvoiceSettingsBase):

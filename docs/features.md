@@ -691,7 +691,7 @@ recipient), and any of it can be changed for that placement. The
 placement sheet says **who receives the invoice** (a dropdown of the client's
 contacts, "Name — email"), the **payment terms** and the **due date** (the
 invoice date plus the terms, worked out as the start date changes, unless
-set by hand), and whether to **email the invoice on the start date**. On that
+set by hand; a date set by hand that the invoice goes out after gives way to the terms), and whether to **email the invoice on the start date**. On that
 day (at the hour set in the template, in the agency's time zone; moved with
 the start date) the invoice is numbered, made as a PDF from the agency's
 **invoice template** (Settings > Invoicing: who it is from, bank details,

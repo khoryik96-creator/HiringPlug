@@ -46,7 +46,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   const [about, setAbout] = useState(applicationId ?? "");
   const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "" });
   const [html, setHtml] = useState("");
-  const [reset, setReset] = useState(0); // puts html back into the editor (a template, a booking link)
+  const [reset, setReset] = useState(0); // puts html back into the editor (a template)
   const [missing, setMissing] = useState<string[]>([]);
   const [booking, setBooking] = useState(false);
   const { banners, urls, upload: uploadBanner } = useBanners();
@@ -57,10 +57,10 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       body: { subject: "", bodyHtml: "", candidateId, applicationId: about || undefined, interviewId, timeZone: timeZone() },
     })),
   });
-  /** Puts a booking link's text at the end of the message. */
+  // A booking link to put in where the cursor was in the message (at its end when it had none).
+  const [inserting, setInserting] = useState<{ id: number; html: string }>();
   const insert = (text: string) => {
-    setHtml((h) => `${withoutCaretMarks(h)}${plainToHtml(text)}`);
-    setReset((n) => n + 1);
+    setInserting((i) => ({ id: (i?.id ?? 0) + 1, html: plainToHtml(text) }));
     setBooking(false);
   };
 
@@ -130,7 +130,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
         <span>Message</span>
         <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
-          values={context.data?.fieldValues} />
+          values={context.data?.fieldValues} inserting={inserting} />
       </div>
       {canBook && (booking
         ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>

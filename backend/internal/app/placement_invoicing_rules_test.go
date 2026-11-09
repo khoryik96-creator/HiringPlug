@@ -137,6 +137,13 @@ func TestInvoicingRules(t *testing.T) {
 		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT max(run_after) FROM job WHERE tenant_id = $1 AND kind = 'placement.invoice'
 			AND payload->>'placementId' = $2`, tenant.ID, p.Id).Scan(&at))
 		assert.Equal(t, 14, at.In(a.deps.Config.TimeZone).Hour())
+
+		// The job for the old hour runs first: it leaves the one for 14:00 alone.
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'placement.invoice'
+			AND status = 'pending' AND payload->>'placementId' = $2 AND run_after < $3`, tenant.ID, p.Id, at)
+		require.NoError(t, err)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+		assert.Equal(t, 1, pending(p), "one job, for 14:00")
 	})
 
 	t.Run("a due date before the invoice is refused", func(t *testing.T) {

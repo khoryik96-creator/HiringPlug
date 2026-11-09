@@ -66,4 +66,19 @@ describe("the message box", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("RM 9,000 per month\u200b and [Unknown]"); // the cursor mark goes when sent
     expect(onChange).toHaveBeenCalled();
   });
+
+  it("puts something asked for (a booking link) where the cursor was", () => {
+    const props = { resetKey: 0, onChange: vi.fn(), fields, banners: [], bannerUrls: {} };
+    const { rerender } = render(<RichEditor html="<p>Hi Siti,</p><p>Regards, Aina</p>" {...props} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    const range = document.createRange();
+    range.setStartAfter(box.querySelector("p") as Node);
+    range.collapse(true);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    fireEvent.mouseUp(box);
+    window.getSelection()?.removeAllRanges(); // the booking form took the focus
+    rerender(<RichEditor html="" {...props} inserting={{ id: 1, html: "<p>Pick a time: https://ats.example/book/abc</p>" }} />);
+    expect(box.textContent).toBe("Hi Siti,Pick a time: https://ats.example/book/abcRegards, Aina");
+  });
 });

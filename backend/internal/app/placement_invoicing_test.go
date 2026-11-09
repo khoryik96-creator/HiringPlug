@@ -39,7 +39,7 @@ func TestPlacementInvoicing(t *testing.T) {
 		bad := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "tiers": []any{flatRate("0", 30, 60)},
 			"salaryCurrency": "MYR", "signedOn": "2026-01-15", "notes": nil})
 		require.Equal(t, http.StatusBadRequest, bad.Status)
-		assert.Equal(t, []string{"tiers[0].feePercent"}, fieldNames(t, bad.Error()))
+		assert.Equal(t, []string{"tiers.0.feePercent"}, fieldNames(t, bad.Error()))
 		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPut, terms, viewer, map[string]any{"version": 0, "tiers": []any{flatRate("18", 30, 60)},
 			"salaryCurrency": "MYR", "signedOn": nil, "notes": nil}).Status)
 		res := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "tiers": []any{flatRate("18.00", 30, 60)},

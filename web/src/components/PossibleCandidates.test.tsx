@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Permission } from "../api/client";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
-import { Highlighted, PossibleCandidates } from "./PossibleCandidates";
+import { Highlighted, PossibleCandidates, tidySnippet } from "./PossibleCandidates";
 
 afterEach(() => {
   cleanup();
@@ -44,5 +44,10 @@ describe("possible candidates", () => {
   it("highlight only what is marked", () => {
     renderWithClient(<p data-testid="t"><Highlighted text="no marks [[here]] and [[there]]." /></p>);
     expect(screen.getByTestId("t").innerHTML).toBe("no marks <mark>here</mark> and <mark>there</mark>.");
+  });
+
+  it("hide contact details from snippets, but keep dates", () => {
+    expect(tidySnippet("Call +60 12-345 6789 or siti@maju.test • Accountant [[2018]] - 2020, 2015 - 2018 2018 - 2020"))
+      .toBe("Call or · Accountant [[2018]] - 2020, 2015 - 2018 2018 - 2020");
   });
 });
