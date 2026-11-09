@@ -184,7 +184,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         </div>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
-      {canFormat && <StudioCvRuns candidateId={candidateId} />}
+      {canFormat && <StudioCvRuns candidateId={candidateId} documentIds={docs.data ? new Set(all.map((d) => d.id)) : undefined} />}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error ?? remove.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {groups.map((g) => (

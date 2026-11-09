@@ -3,6 +3,7 @@ package filekind
 import (
 	"archive/zip"
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,4 +119,52 @@ func TestAHostileODTIsRefused(t *testing.T) {
 	require.NoError(t, w.Close())
 	_, err = Text(ODT, buf.Bytes())
 	assert.ErrorContains(t, err, "too large")
+}
+
+func TestRTFInOtherCodePagesWithPicturesAndLooseDestinations(t *testing.T) {
+	text, err := Text(RTF, []byte(`{\rtf1\ansi\ansicpg936{\fonttbl{\f0 SimSun;}} \'b3\'c2\'ce\'b0\'c3\'f7\par Auditor\par}`))
+	require.NoError(t, err)
+	assert.Equal(t, "陈伟明\nAuditor", text, "GBK, as the file says")
+
+	pic := append([]byte(`{\rtf1 Siti\par{\pict\pngblip\bin5 `), []byte("}{\x00}\xff")...)
+	pic = append(pic, []byte(`}Auditor\par}`)...)
+	text, err = Text(RTF, pic)
+	require.NoError(t, err)
+	assert.Equal(t, "Siti\nAuditor", text, "binary picture bytes are skipped, braces and all")
+
+	text, err = Text(RTF, []byte(`{\rtf1{ \*\generator Msftedit;}Siti\par}`))
+	require.NoError(t, err)
+	assert.Equal(t, "Siti", text, "no stray * from a destination marker after a space")
+}
+
+func TestAnODTPageHeaderIsRead(t *testing.T) {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	for name, body := range map[string]string{
+		"mimetype":    ODT,
+		"content.xml": odtContentXML,
+		"styles.xml": `<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ` +
+			`xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0">` +
+			`<office:styles><style:style style:name="P1"/></office:styles><office:master-styles><style:master-page>` +
+			`<style:header><text:p>siti@example.com · +60 12 345 6789</text:p></style:header></style:master-page></office:master-styles></office:document-styles>`,
+	} {
+		f, err := w.Create(name)
+		require.NoError(t, err)
+		_, _ = f.Write([]byte(body))
+	}
+	require.NoError(t, w.Close())
+	text, err := Text(ODT, buf.Bytes())
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(text, "siti@example.com · +60 12 345 6789\nSiti Aisyah"), text)
+}
+
+func TestATextFileStartingWithBMIsNotAPicture(t *testing.T) {
+	got, ok := Detect("cv.txt", []byte("BMW Group Malaysia, Data Engineer since 2019, Kuala Lumpur"))
+	assert.True(t, ok)
+	assert.Equal(t, TXT, got)
+	bmp := make([]byte, 60)
+	copy(bmp, "BM")
+	bmp[14] = 40 // a BITMAPINFOHEADER
+	got, _ = Detect("scan.bmp", bmp)
+	assert.Equal(t, BMP, got)
 }

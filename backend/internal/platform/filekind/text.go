@@ -16,6 +16,13 @@ import (
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/korean"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/traditionalchinese"
 )
 
 // Limits on what is read.
@@ -140,21 +147,42 @@ type rtfState struct {
 }
 
 // rtfText reads an RTF file's text, following its groups and control words.
+// Bytes written as \'hh (or raw) are decoded in the file's code page
+// (\ansicpg: Windows-1252 unless it says otherwise, e.g. 936 for Chinese).
 func rtfText(data []byte) (string, error) {
 	var out strings.Builder
 	stack := []rtfState{{uc: 1}}
 	state := &stack[0]
 	pendingSkip := 0 // fallback characters still to drop after a \u
 	depth := 0
+	var raw []byte // 8-bit text waiting to be decoded (a DBCS character is two bytes)
+	decode := cp1252
+	flush := func() {
+		if len(raw) > 0 {
+			if !state.skip && out.Len() < maxText*4 {
+				out.WriteString(decode(raw))
+			}
+			raw = raw[:0]
+		}
+	}
 	emit := func(s string) {
+		flush()
 		if !state.skip && out.Len() < maxText*4 {
 			out.WriteString(s)
+		}
+	}
+	byteText := func(b byte) {
+		if pendingSkip > 0 {
+			pendingSkip--
+		} else if !state.skip {
+			raw = append(raw, b)
 		}
 	}
 	for i := 0; i < len(data); {
 		c := data[i]
 		switch c {
 		case '{':
+			flush()
 			depth++
 			if depth > 10000 {
 				return "", errors.New("the RTF file is damaged (groups nested too deep)")
@@ -163,12 +191,8 @@ func rtfText(data []byte) (string, error) {
 			state = &stack[len(stack)-1]
 			pendingSkip = 0
 			i++
-			// A group starting with \* is a destination to skip when not understood.
-			if bytes.HasPrefix(data[i:], []byte(`\*`)) {
-				state.skip = true
-				i += 2
-			}
 		case '}':
+			flush()
 			if len(stack) > 1 {
 				stack = stack[:len(stack)-1]
 				state = &stack[len(stack)-1]
@@ -185,11 +209,7 @@ func rtfText(data []byte) (string, error) {
 			switch {
 			case n == '\'' && i+2 < len(data):
 				if v, err := strconv.ParseUint(string(data[i+1:i+3]), 16, 8); err == nil {
-					if pendingSkip > 0 {
-						pendingSkip--
-					} else {
-						emit(string(cp1252Rune(byte(v))))
-					}
+					byteText(byte(v))
 				}
 				i += 3
 			case isLetter(n):
@@ -214,6 +234,11 @@ func rtfText(data []byte) (string, error) {
 				}
 				i = k
 				switch {
+				case word == "bin" && hasParam: // raw binary (a picture): skipped whole, never read as RTF
+					i = min(i+max(param, 0), len(data))
+				case word == "ansicpg" && hasParam:
+					flush()
+					decode = codePage(param)
 				case word == "u" && hasParam:
 					if param < 0 {
 						param += 65536
@@ -223,12 +248,17 @@ func rtfText(data []byte) (string, error) {
 				case word == "uc" && hasParam:
 					state.uc = max(param, 0)
 				case rtfSkip[word]:
+					flush()
 					state.skip = true
 				default:
 					if s, ok := rtfChar[word]; ok {
 						emit(s)
 					}
 				}
+			case n == '*': // this group is a destination to skip when not understood
+				flush()
+				state.skip = true
+				i++
 			case n == '~':
 				emit("\u00a0")
 				i++
@@ -247,22 +277,50 @@ func rtfText(data []byte) (string, error) {
 		case '\r', '\n':
 			i++
 		default:
-			r, size := rune(c), 1
-			if c >= 0x80 { // raw 8-bit text: Windows-1252
-				r = cp1252Rune(c)
-			}
-			if pendingSkip > 0 {
+			if c >= 0x80 { // raw 8-bit text, in the code page
+				byteText(c)
+			} else if pendingSkip > 0 {
 				pendingSkip--
 			} else {
-				emit(string(r))
+				emit(string(rune(c)))
 			}
-			i += size
+			i++
 		}
 	}
+	flush()
 	if out.Len() == 0 {
 		return "", ErrNoText
 	}
 	return strings.ReplaceAll(out.String(), "\u00a0", " "), nil
+}
+
+// codePage decodes text in a Windows code page RTF names (\ansicpg).
+func codePage(n int) func([]byte) string {
+	var enc encoding.Encoding
+	switch n {
+	case 936:
+		enc = simplifiedchinese.GBK
+	case 950:
+		enc = traditionalchinese.Big5
+	case 932:
+		enc = japanese.ShiftJIS
+	case 949:
+		enc = korean.EUCKR
+	case 874:
+		enc = charmap.Windows874
+	case 1250, 1251, 1253, 1254, 1255, 1256, 1257, 1258:
+		enc = []encoding.Encoding{charmap.Windows1250, charmap.Windows1251, nil, charmap.Windows1253, charmap.Windows1254,
+			charmap.Windows1255, charmap.Windows1256, charmap.Windows1257, charmap.Windows1258}[n-1250]
+	default:
+		return cp1252
+	}
+	return func(b []byte) string {
+		s, err := enc.NewDecoder().Bytes(b)
+		if err != nil {
+			return cp1252(b)
+		}
+		return string(s)
+	}
 }
 
 func isLetter(b byte) bool { return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') }
@@ -280,17 +338,26 @@ func odtText(data []byte) (string, error) {
 	if len(r.File) > maxZipEntries {
 		return "", errors.New("the ODT file has too many parts")
 	}
+	parts := map[string]string{}
 	for _, f := range r.File {
-		if f.Name != "content.xml" {
+		if f.Name != "content.xml" && f.Name != "styles.xml" {
 			continue
 		}
 		content, err := readEntry(f, maxODTContent)
 		if err != nil {
 			return "", err
 		}
-		return odtContent(content)
+		if parts[f.Name], err = odtContent(content); err != nil {
+			return "", err
+		}
 	}
-	return "", errors.New("the ODT file has no content")
+	body, ok := parts["content.xml"]
+	if !ok {
+		return "", errors.New("the ODT file has no content")
+	}
+	// The page header and footer (where many CVs put the name and contacts)
+	// are in styles.xml; its only paragraphs are theirs.
+	return strings.TrimSpace(strings.TrimSpace(parts["styles.xml"]) + "\n" + body), nil
 }
 
 func odtContent(content []byte) (string, error) {

@@ -58,9 +58,6 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 	if !ok {
 		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload "+filekind.Accepted+".")
 	}
-	if !Readable(fileName, data) {
-		return Document{}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "No readable text was found in this "+filekind.Short(contentType)+" file.")
-	}
 	var doc Document
 	var storedKey string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -79,6 +76,14 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 // extraction, in the caller's transaction. storedKey is set once the file is
 // written, so the caller can remove it if the transaction rolls back.
 func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName, contentType string, data []byte) (doc Document, storedKey string, err error) {
+	var read *api.DocumentTextExtractedJob
+	if filekind.ReadHere(contentType) { // read before anything is stored: no text, no file
+		r := readHere("", contentType, data)
+		if r.Status != api.ExtractionStatusExtracted {
+			return Document{}, "", apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "No readable text was found in this "+filekind.Short(contentType)+" file.")
+		}
+		read = &r
+	}
 	exists, err := s.candidates.Exists(ctx, tx, candidateID)
 	if err != nil {
 		return Document{}, "", err
@@ -103,9 +108,10 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	if err != nil {
 		return Document{}, key, err
 	}
-	if filekind.ReadHere(contentType) {
+	if read != nil {
 		// A text, RTF or ODT file is read here and now: no tool to run.
-		if err := s.applyExtraction(ctx, tx, tenantID, readHere(id, contentType, data)); err != nil {
+		read.DocumentId = id
+		if err := s.applyExtraction(ctx, tx, tenantID, *read); err != nil {
 			return Document{}, key, err
 		}
 		if row, err = q.GetDocument(ctx, id); err != nil {

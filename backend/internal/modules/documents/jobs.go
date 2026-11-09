@@ -107,8 +107,11 @@ func (s *Service) queueParse(ctx context.Context, tx pgx.Tx, tenantID string, ro
 			return err
 		}
 	}
-	name := row.FileName // often the candidate's name: a hint for finding it in the text
-	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI, FileName: &name}
+	job := api.DocumentParseCvJob{DocumentId: row.ID, Text: *row.ExtractedText, UseAi: &useAI}
+	if row.Source != "formatted" { // often the candidate's name; a formatted CV's starts with the agency's
+		name := row.FileName
+		job.FileName = &name
+	}
 	if useAI {
 		job.Ai = ai
 		forAI := redact.WithoutSalary(*row.ExtractedText) // salary never goes to the AI

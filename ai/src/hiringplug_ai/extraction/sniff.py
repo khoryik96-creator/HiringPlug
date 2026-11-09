@@ -14,13 +14,15 @@ OLE_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
 # Pictures of a CV (read with OCR): PNG, JPEG, TIFF, BMP, WEBP.
-_IMAGE_MAGIC = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"II*\x00", b"MM\x00*", b"BM")
+_IMAGE_MAGIC = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"II*\x00", b"MM\x00*")
+# A BMP's header size is one of these (a text file can start with "BM" too).
+_BMP_HEADERS = {12, 40, 52, 56, 64, 108, 124}
 
 
 def sniff(data: bytes) -> Kind:
     if data.startswith(b"%PDF-"):
         return "pdf"
-    if data.startswith(_IMAGE_MAGIC) or (data[:4] == b"RIFF" and data[8:12] == b"WEBP"):
+    if _is_image(data):
         return "image"
     if data.startswith(OLE_MAGIC):
         return "doc"
@@ -32,3 +34,11 @@ def sniff(data: bytes) -> Kind:
         except zipfile.BadZipFile:
             return "unknown"
     return "unknown"
+
+
+def _is_image(data: bytes) -> bool:
+    if data.startswith(_IMAGE_MAGIC) or (data[:4] == b"RIFF" and data[8:12] == b"WEBP"):
+        return True
+    return (
+        data.startswith(b"BM") and len(data) >= 26 and int.from_bytes(data[14:18], "little") in _BMP_HEADERS
+    )

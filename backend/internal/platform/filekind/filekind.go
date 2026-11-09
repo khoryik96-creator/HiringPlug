@@ -14,6 +14,7 @@ package filekind
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -60,7 +61,7 @@ func Detect(name string, data []byte) (string, bool) {
 		return JPEG, true
 	case bytes.HasPrefix(data, []byte("II*\x00")) || bytes.HasPrefix(data, []byte("MM\x00*")):
 		return TIFF, true
-	case bytes.HasPrefix(data, []byte("BM")) && len(data) > 26:
+	case isBMP(data):
 		return BMP, true
 	case len(data) > 12 && bytes.Equal(data[:4], []byte("RIFF")) && bytes.Equal(data[8:12], []byte("WEBP")):
 		return WEBP, true
@@ -72,6 +73,19 @@ func Detect(name string, data []byte) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// isBMP checks more than "BM" (which many text files start with): the size
+// of the bitmap's header must be one BMP files use.
+func isBMP(data []byte) bool {
+	if len(data) < 26 || !bytes.HasPrefix(data, []byte("BM")) {
+		return false
+	}
+	switch binary.LittleEndian.Uint32(data[14:18]) {
+	case 12, 40, 52, 56, 64, 108, 124:
+		return true
+	}
+	return false
 }
 
 func zipKind(data []byte) (string, bool) {

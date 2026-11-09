@@ -8,7 +8,8 @@ import { studioCvsKey } from "./FormatCv";
 
 const DAY = 24 * 3600 * 1000;
 
-export function StudioCvRuns({ candidateId }: { candidateId: string }) {
+/** documentIds: the candidate's documents now (a run whose CV was deleted is left out). */
+export function StudioCvRuns({ candidateId, documentIds }: { candidateId: string; documentIds?: Set<string> }) {
   const queryClient = useQueryClient();
   const runs = useQuery({
     queryKey: studioCvsKey(candidateId),
@@ -23,7 +24,10 @@ export function StudioCvRuns({ candidateId }: { candidateId: string }) {
     queued.current = now;
   }, [runs.data, candidateId, queryClient]);
   const fetchedAt = runs.dataUpdatedAt;
-  const recent = (runs.data ?? []).filter((r) => r.status === "queued" || fetchedAt - new Date(r.createdAt).getTime() < DAY).slice(0, 3);
+  const recent = (runs.data ?? [])
+    .filter((r) => r.status === "queued" || fetchedAt - new Date(r.createdAt).getTime() < DAY)
+    .filter((r) => !(r.status === "done" && r.documentId && documentIds && !documentIds.has(r.documentId)))
+    .slice(0, 3);
   if (recent.length === 0) return null;
   return (
     <ul className="studio-runs" aria-label="CV Studio formatting">

@@ -68,6 +68,14 @@ func TestCVsComeInMoreFormatsAsInCVStudio(t *testing.T) {
 		assert.Equal(t, name, *asked.FileName, "the file's name helps find the candidate's name")
 	}
 
+	res := a.upload(docs, token, "formatted", "Contoh CV - Siti Aisyah.txt", []byte("Contoh Recruitment\nSiti Aisyah"))
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var formatted api.Document
+	res.JSON(&formatted)
+	var parseFormatted api.DocumentParseCvJob
+	require.NoError(t, json.Unmarshal(claimAIJobFor(t, aiConn, formatted.Id).Payload, &parseFormatted))
+	assert.Nil(t, parseFormatted.FileName, "a formatted CV's name starts with the agency's: no hint from it")
+
 	photo := upload("cv-photo.jpg", []byte{0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, 'J', 'F', 'I', 'F'})
 	assert.Equal(t, api.DocumentStatusQueued, photo.Status, "a picture is read with OCR by the AI worker")
 	read := claimAIJobFor(t, aiConn, photo.Id)
@@ -76,7 +84,7 @@ func TestCVsComeInMoreFormatsAsInCVStudio(t *testing.T) {
 	require.NoError(t, json.Unmarshal(read.Payload, &asked))
 	assert.Equal(t, "image/jpeg", asked.ContentType)
 
-	res := a.upload(docs, token, "original", "empty.rtf", []byte(`{\rtf1{\fonttbl{\f0 Arial;}}}`))
+	res = a.upload(docs, token, "original", "empty.rtf", []byte(`{\rtf1{\fonttbl{\f0 Arial;}}}`))
 	assert.Equal(t, http.StatusUnsupportedMediaType, res.Status, "nothing to read")
 	res = a.upload(docs, token, "original", "slides.pptx", []byte("PK\x03\x04garbage"))
 	assert.Equal(t, http.StatusUnsupportedMediaType, res.Status)

@@ -40,4 +40,11 @@ describe("CV Studio formatting runs", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("no AI provider is set up");
     expect(screen.queryByText("old")).toBeNull();
   });
+
+  it("leaves out a run whose formatted CV was deleted", async () => {
+    serve([run({ status: "done", documentId: "doc_gone", fileName: "Gone - CV.docx" }), run({ id: "scv_2", status: "done", documentId: "doc_2", fileName: "Kept - CV.docx" })]);
+    renderWithClient(<StudioCvRuns candidateId="cand_1" documentIds={new Set(["doc_2"])} />);
+    expect(await screen.findByText("Kept - CV.docx")).toBeTruthy();
+    expect(screen.queryByText("Gone - CV.docx")).toBeNull();
+  });
 });

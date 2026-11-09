@@ -64,3 +64,7 @@ def test_a_picture_without_ocr_waits_for_it_and_a_damaged_one_says_so() -> None:
     blank = io.BytesIO()
     Image.new("RGB", (800, 1000), "white").save(blank, format="PNG")
     assert extract(blank.getvalue(), ocr=TesseractOcr()).status == "failed"
+
+
+def test_a_text_starting_with_bm_is_not_a_picture() -> None:
+    assert sniff(b"BMW Group Malaysia, Data Engineer since 2019, Kuala Lumpur") != "image"
