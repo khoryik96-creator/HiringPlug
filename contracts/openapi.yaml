@@ -1002,6 +1002,46 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/companies/{companyId}/terms:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: getCompanyTerms
+      tags: [companies]
+      summary: A client's terms of business (fee, payment terms, guarantee)
+      description: Version 0 and nothing set before the first save. They fill in a new placement's fee, payment terms and guarantee.
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyTerms'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: putCompanyTerms
+      tags: [companies]
+      summary: Save a client's terms of business
+      description: "`version` must be the version you loaded (0 for the first save)."
+      x-permission: companies:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CompanyTermsInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyTerms'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/contacts:
     get:
       operationId: listContacts
@@ -3579,6 +3619,125 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/PlacementNotAllowed'}
+  /v1/applications/{applicationId}/placement-defaults:
+    parameters:
+      - {name: applicationId, in: path, required: true, schema: {$ref: '#/components/schemas/ApplicationId'}}
+    get:
+      operationId: getPlacementDefaults
+      tags: [placements]
+      summary: What a new placement starts with, from the client's terms of business
+      description: The fee, payment terms and guarantee the client signed, and the job's hiring contact to invoice.
+      x-permission: placements:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PlacementDefaults'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/placements/{placementId}/invoicing:
+    parameters:
+      - $ref: '#/components/parameters/PlacementIdPath'
+    put:
+      operationId: putPlacementInvoicing
+      tags: [placements]
+      summary: Who is invoiced, the payment terms and due date, and whether the invoice is emailed on the start date
+      x-permission: placements:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PlacementInvoicingInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Placement'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/placements/{placementId}/invoice:
+    parameters:
+      - $ref: '#/components/parameters/PlacementIdPath'
+    post:
+      operationId: sendPlacementInvoice
+      tags: [placements]
+      summary: Email the invoice now (numbered from the template; the placement is then invoiced)
+      description: Needs placements.fees:read too (the invoice shows the fee).
+      x-permission: placements:manage
+      responses:
+        '200':
+          description: Queued for sending
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Placement'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/PlacementNotAllowed'}
+  /v1/placements/{placementId}/invoice/file:
+    parameters:
+      - $ref: '#/components/parameters/PlacementIdPath'
+    get:
+      operationId: getPlacementInvoiceFile
+      tags: [placements]
+      summary: The invoice as a PDF or Word file (before it is sent, a preview without its number)
+      description: Needs placements.fees:read too.
+      x-permission: placements:read
+      parameters:
+        - {name: format, in: query, required: true, schema: {$ref: '#/components/schemas/InvoiceFormat'}}
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: {type: string}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/PlacementNotAllowed'}
+  /v1/invoice-settings:
+    get:
+      operationId: getInvoiceSettings
+      tags: [placements]
+      summary: The agency's invoice template and the email that sends it
+      x-permission: placements:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvoiceSettings'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putInvoiceSettings
+      tags: [placements]
+      summary: Change the invoice template and its email
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InvoiceSettingsInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InvoiceSettings'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/privacy:
     get:
       operationId: getPrivacyOverview
@@ -4287,6 +4446,7 @@ components:
         - lead_source.check
         - match.score
         - match.scored
+        - placement.invoice
         - scheduling.refresh_calendar
         - talent.rank
         - talent.ranked
@@ -5113,6 +5273,33 @@ components:
       required: [received]
       properties:
         received: {type: boolean}
+    CompanyTerms:
+      type: object
+      required: [feePercent, paymentTermsDays, guaranteeDays, signedOn, notes, version, updatedAt]
+      properties:
+        feePercent:
+          description: "The fee, as a percentage of the yearly salary: e.g. \"18\"."
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        paymentTermsDays: {type: integer, nullable: true, description: "Days after the invoice the fee is due, e.g. 30."}
+        guaranteeDays: {type: integer, nullable: true, description: "Days after the start a placement is guaranteed."}
+        signedOn: {type: string, format: date, nullable: true, description: When the terms were signed.}
+        notes: {type: string, nullable: true}
+        version: {type: integer, description: 0 before the first save.}
+        updatedAt: {type: string, format: date-time, nullable: true}
+    CompanyTermsInput:
+      type: object
+      additionalProperties: false
+      required: [version, feePercent, paymentTermsDays, guaranteeDays, signedOn, notes]
+      properties:
+        version: {type: integer, minimum: 0}
+        feePercent:
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        paymentTermsDays: {type: integer, minimum: 0, maximum: 365, nullable: true}
+        guaranteeDays: {type: integer, minimum: 0, maximum: 365, nullable: true}
+        signedOn: {type: string, format: date, nullable: true}
+        notes: {type: string, maxLength: 2000, nullable: true}
     CompanyBenefitsFormat:
       type: string
       enum: [docx, pdf]
@@ -7867,6 +8054,100 @@ components:
           items: {$ref: '#/components/schemas/Application'}
         placedLast30Days: {type: integer}
         movedLast7Days: {type: integer, description: Applications that changed stage in the last 7 days.}
+    PlacementInvoiceJob:
+      type: object
+      additionalProperties: false
+      required: [placementId]
+      properties:
+        placementId: {$ref: '#/components/schemas/PlacementId'}
+    InvoiceFormat:
+      type: string
+      enum: [pdf, docx]
+    PlacementDefaults:
+      type: object
+      required: [companyId, companyName, feePercent, paymentTermsDays, guaranteeDays, contactId, termsSet]
+      properties:
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+        companyName: {type: string}
+        termsSet: {type: boolean, description: The client has terms of business recorded.}
+        feePercent:
+          description: From the client's terms.
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        paymentTermsDays: {type: integer, description: "From the client's terms (30 when not set)."}
+        guaranteeDays: {type: integer, description: "From the client's terms (90 when not set)."}
+        contactId:
+          description: The job's hiring contact, when they have an email address.
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
+          nullable: true
+    PlacementInvoicing:
+      type: object
+      required: [contactId, contactName, contactEmail, paymentTermsDays, dueOn, dueOnSet, autoSend, sendsAt, sentAt, sendError]
+      properties:
+        contactId:
+          description: Who receives the invoice (one of the client's contacts).
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
+          nullable: true
+        contactName: {type: string, nullable: true}
+        contactEmail: {type: string, nullable: true}
+        paymentTermsDays: {type: integer}
+        dueOn: {type: string, format: date, description: "When payment is due: the invoice date (the start date until invoiced) plus the terms, unless set."}
+        dueOnSet: {type: boolean, description: "true: someone set the due date; false: it follows the start date and the terms."}
+        autoSend: {type: boolean, description: Email the invoice to the contact on the start date.}
+        sendsAt: {type: string, format: date-time, nullable: true, description: When it will be emailed (null when it will not be).}
+        sentAt: {type: string, format: date-time, nullable: true}
+        sendError: {type: string, nullable: true, description: Why it could not be emailed on its own.}
+    PlacementInvoicingInput:
+      type: object
+      additionalProperties: false
+      required: [contactId, paymentTermsDays, dueOn, autoSend]
+      properties:
+        contactId:
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
+          nullable: true
+        paymentTermsDays: {type: integer, minimum: 0, maximum: 365}
+        dueOn: {type: string, format: date, nullable: true, description: "null: the start date plus the terms."}
+        autoSend: {type: boolean}
+    InvoiceSettingsBase:
+      type: object
+      required: [issuer, bankDetails, numberPrefix, nextNumber, taxLabel, taxPercent, lineText, footer, emailSubject, emailBody, sendHour]
+      properties:
+        issuer: {type: string, maxLength: 1000, description: "Your company's name and details, a line each (address, registration and tax numbers)."}
+        bankDetails: {type: string, maxLength: 1000}
+        numberPrefix: {type: string, maxLength: 20, example: INV-}
+        nextNumber: {type: integer, minimum: 1, maximum: 99999999, description: "The next invoice's number (INV-0001)."}
+        taxLabel: {type: string, maxLength: 40, example: SST}
+        taxPercent: {$ref: '#/components/schemas/DecimalAmount'}
+        lineText: {type: string, minLength: 1, maxLength: 1000, description: "The invoice line, with {{fields}}."}
+        footer: {type: string, maxLength: 2000}
+        emailSubject: {type: string, minLength: 1, maxLength: 200}
+        emailBody: {type: string, minLength: 1, maxLength: 10000}
+        sendHour: {type: integer, minimum: 0, maximum: 23, description: "The hour invoices go out on the start date (the agency's time zone)."}
+    InvoiceSettings:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSettingsBase'
+        - type: object
+          required: [version, fields]
+          properties:
+            version: {type: integer, description: 0 while the defaults are in use.}
+            fields:
+              type: array
+              description: The {{fields}} the texts may use.
+              items: {$ref: '#/components/schemas/InvoiceField'}
+    InvoiceField:
+      type: object
+      required: [key, label, example]
+      properties:
+        key: {type: string, example: invoice.total}
+        label: {type: string}
+        example: {type: string}
+    InvoiceSettingsInput:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSettingsBase'
+        - type: object
+          required: [version]
+          properties:
+            version: {type: integer, minimum: 0}
     PlacementId:
       type: string
       pattern: '^plc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -7910,7 +8191,7 @@ components:
           nullable: true
     Placement:
       type: object
-      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyName, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn, restrictedFields, createdAt, updatedAt]
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyId, companyName, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn, invoicing, restrictedFields, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/PlacementId'}
         version: {type: integer}
@@ -7919,7 +8200,9 @@ components:
         candidateName: {type: string}
         jobId: {$ref: '#/components/schemas/JobOrderId'}
         jobTitle: {type: string}
+        companyId: {$ref: '#/components/schemas/CompanyId'}
         companyName: {type: string}
+        invoicing: {$ref: '#/components/schemas/PlacementInvoicing'}
         recruiterId:
           description: The recruiter credited with the placement.
           allOf: [{$ref: '#/components/schemas/UserId'}]
@@ -9074,6 +9357,12 @@ x-jobs:
     payload: MatchScoredJob
     priority: normal
     description: Check the AI's quotes against the texts it was sent, work out the score and save it (Go worker).
+  placement.invoice:
+    module: placements
+    queue: core
+    payload: PlacementInvoiceJob
+    priority: normal
+    description: 'On a placement''s start date: email its invoice to the client, if it is still to be emailed (Go worker).'
   scheduling.refresh_calendar:
     module: scheduling
     queue: core

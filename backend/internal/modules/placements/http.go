@@ -116,13 +116,14 @@ func toAPI(v View) api.Placement {
 	d := v.Details
 	out := api.Placement{
 		Id: v.ID, Version: v.Version, ApplicationId: v.ApplicationID,
-		CandidateId: v.App.CandidateID, CandidateName: v.App.CandidateName, JobId: v.App.JobID, JobTitle: v.App.JobTitle, CompanyName: v.App.CompanyName,
+		CandidateId: v.App.CandidateID, CandidateName: v.App.CandidateName, JobId: v.App.JobID, JobTitle: v.App.JobTitle, CompanyId: v.App.CompanyID, CompanyName: v.App.CompanyName,
 		RecruiterId: c.OrNull(d.RecruiterID), RecruiterName: c.OrNull(v.RecruiterName),
 		StartDate: openapi_types.Date{Time: d.StartDate}, GuaranteeDays: d.GuaranteeDays, GuaranteeEndsOn: openapi_types.Date{Time: d.GuaranteeEnds()},
 		Status: api.PlacementStatus(d.Status), LeftOn: dateOf(d.LeftOn), StatusNote: c.OrNull(d.StatusNote),
 		Replacement:   api.ReplacementStatus(d.Replacement),
 		InvoiceStatus: api.InvoiceStatus(d.InvoiceStatus), InvoiceNumber: c.OrNull(d.InvoiceNumber),
 		InvoicedOn: dateOf(d.InvoicedOn), PaidOn: dateOf(d.PaidOn),
+		Invoicing:        invoicingToAPI(v.Invoicing),
 		RestrictedFields: []api.PlacementRestrictedField{}, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}
 	switch {

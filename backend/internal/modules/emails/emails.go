@@ -148,6 +148,19 @@ type Notice struct {
 	// Calendar is an iCalendar invitation (METHOD:REQUEST or CANCEL), sent
 	// so that Gmail, Outlook and Apple Mail offer it for the calendar.
 	Calendar string
+	// Files go with it (an invoice as a PDF).
+	Files []NoticeFile
+	// Restricted: it shows money (an invoice), so only roles that may see
+	// salaries see it, and its subject stays out of the audit log.
+	Restricted bool
+	// SenderName is who it is from ("HiringPlug" when empty).
+	SenderName string
+}
+
+// NoticeFile is a file attached to a notice.
+type NoticeFile struct {
+	Name, ContentType string
+	Data              []byte
 }
 
 // Notify records a notice and queues it for sending, in the caller's

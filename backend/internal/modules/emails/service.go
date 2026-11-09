@@ -311,12 +311,30 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	if err := errs.Err(); err != nil {
 		return err
 	}
-	row, err := store.New(tx).InsertEmail(ctx, store.InsertEmailParams{
+	sender := n.SenderName
+	if sender == "" {
+		sender = "HiringPlug"
+	}
+	q := store.New(tx)
+	row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 		ApplicationID: n.ApplicationID, CandidateID: n.CandidateID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
-		Subject: o.Subject, Body: o.Body, SenderName: "HiringPlug", ReplyTo: "",
+		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", Salary: n.Restricted, SalaryRestricted: n.Restricted,
 	})
 	if err != nil {
 		return err
+	}
+	for _, f := range n.Files {
+		key := tenantID + "/eat_" + newKey()
+		if err := s.files.Put(key, f.Data); err != nil {
+			return err
+		}
+		if _, err := q.InsertAttachment(ctx, store.InsertAttachmentParams{
+			EmailID: &row.ID, FileName: clip(f.Name, 255), ContentType: clip(f.ContentType, 255),
+			SizeBytes: int32(len(f.Data)), StorageKey: key, //nolint:gosec // a generated invoice is small
+		}); err != nil {
+			_ = s.files.Delete(key)
+			return err
+		}
 	}
 	if n.Calendar != "" {
 		if err := store.New(tx).SetEmailCalendar(ctx, store.SetEmailCalendarParams{ID: row.ID, Calendar: &n.Calendar}); err != nil {
@@ -326,8 +344,9 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
 		return err
 	}
-	return audit.Record(ctx, tx, audit.Entry{
-		Action: "email.queued", EntityType: "email", EntityID: row.ID,
-		Changes: map[string]any{"to": o.To, "subject": o.Subject, "automatic": true},
-	})
+	changes := map[string]any{"to": o.To, "subject": o.Subject, "automatic": true}
+	if n.Restricted {
+		changes["subject"] = audit.Redacted // it may show the amount
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "email.queued", EntityType: "email", EntityID: row.ID, Changes: changes})
 }

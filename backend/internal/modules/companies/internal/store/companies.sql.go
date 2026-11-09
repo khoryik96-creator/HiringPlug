@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const autofillState = `-- name: AutofillState :one
@@ -207,6 +209,37 @@ func (q *Queries) GetCompanyBenefits(ctx context.Context, companyID string) (Get
 	return i, err
 }
 
+const getCompanyTerms = `-- name: GetCompanyTerms :one
+SELECT fee_percent, payment_terms_days, guarantee_days, signed_on, notes, version, updated_at
+FROM company_terms WHERE company_id = $1
+`
+
+type GetCompanyTermsRow struct {
+	FeePercent       pgtype.Numeric
+	PaymentTermsDays *int32
+	GuaranteeDays    *int32
+	SignedOn         pgtype.Date
+	Notes            *string
+	Version          int32
+	UpdatedAt        time.Time
+}
+
+// A client's terms of business.
+func (q *Queries) GetCompanyTerms(ctx context.Context, companyID string) (GetCompanyTermsRow, error) {
+	row := q.db.QueryRow(ctx, getCompanyTerms, companyID)
+	var i GetCompanyTermsRow
+	err := row.Scan(
+		&i.FeePercent,
+		&i.PaymentTermsDays,
+		&i.GuaranteeDays,
+		&i.SignedOn,
+		&i.Notes,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSuggestion = `-- name: GetSuggestion :one
 SELECT id, tenant_id, company_id, field, value, source, status, created_at FROM company_suggestion WHERE id = $1 AND company_id = $2
 `
@@ -326,6 +359,43 @@ type InsertCompanyBenefitsRow struct {
 func (q *Queries) InsertCompanyBenefits(ctx context.Context, arg InsertCompanyBenefitsParams) (InsertCompanyBenefitsRow, error) {
 	row := q.db.QueryRow(ctx, insertCompanyBenefits, arg.CompanyID, arg.Benefits, arg.PreOffer)
 	var i InsertCompanyBenefitsRow
+	err := row.Scan(&i.Version, &i.UpdatedAt)
+	return i, err
+}
+
+const insertCompanyTerms = `-- name: InsertCompanyTerms :one
+INSERT INTO company_terms (tenant_id, company_id, fee_percent, payment_terms_days, guarantee_days, signed_on, notes, updated_by)
+VALUES (app_current_tenant(), $1, $2::text::numeric, $3, $4,
+        $5, $6, app_current_user())
+ON CONFLICT (tenant_id, company_id) DO NOTHING
+RETURNING version, updated_at
+`
+
+type InsertCompanyTermsParams struct {
+	CompanyID        string
+	FeePercent       *string
+	PaymentTermsDays *int32
+	GuaranteeDays    *int32
+	SignedOn         pgtype.Date
+	Notes            *string
+}
+
+type InsertCompanyTermsRow struct {
+	Version   int32
+	UpdatedAt time.Time
+}
+
+// The first save (no row yet; none returned when someone saved first).
+func (q *Queries) InsertCompanyTerms(ctx context.Context, arg InsertCompanyTermsParams) (InsertCompanyTermsRow, error) {
+	row := q.db.QueryRow(ctx, insertCompanyTerms,
+		arg.CompanyID,
+		arg.FeePercent,
+		arg.PaymentTermsDays,
+		arg.GuaranteeDays,
+		arg.SignedOn,
+		arg.Notes,
+	)
+	var i InsertCompanyTermsRow
 	err := row.Scan(&i.Version, &i.UpdatedAt)
 	return i, err
 }
@@ -573,6 +643,45 @@ func (q *Queries) UpdateCompanyBenefits(ctx context.Context, arg UpdateCompanyBe
 		arg.ExpectedVersion,
 	)
 	var i UpdateCompanyBenefitsRow
+	err := row.Scan(&i.Version, &i.UpdatedAt)
+	return i, err
+}
+
+const updateCompanyTerms = `-- name: UpdateCompanyTerms :one
+UPDATE company_terms
+SET fee_percent = $1::text::numeric, payment_terms_days = $2,
+    guarantee_days = $3, signed_on = $4, notes = $5,
+    version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE company_id = $6 AND version = $7
+RETURNING version, updated_at
+`
+
+type UpdateCompanyTermsParams struct {
+	FeePercent       *string
+	PaymentTermsDays *int32
+	GuaranteeDays    *int32
+	SignedOn         pgtype.Date
+	Notes            *string
+	CompanyID        string
+	ExpectedVersion  int32
+}
+
+type UpdateCompanyTermsRow struct {
+	Version   int32
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateCompanyTerms(ctx context.Context, arg UpdateCompanyTermsParams) (UpdateCompanyTermsRow, error) {
+	row := q.db.QueryRow(ctx, updateCompanyTerms,
+		arg.FeePercent,
+		arg.PaymentTermsDays,
+		arg.GuaranteeDays,
+		arg.SignedOn,
+		arg.Notes,
+		arg.CompanyID,
+		arg.ExpectedVersion,
+	)
+	var i UpdateCompanyTermsRow
 	err := row.Scan(&i.Version, &i.UpdatedAt)
 	return i, err
 }

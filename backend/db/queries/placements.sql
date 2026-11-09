@@ -54,3 +54,54 @@ FROM placement p LEFT JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.
 WHERE p.start_date >= @from_day AND p.start_date <= @to_day
 ORDER BY p.start_date
 LIMIT 20000;
+
+-- Invoicing: who receives the invoice, the terms and due date, and the
+-- emailing on the start date.
+-- name: ListPlacementInvoicing :many
+SELECT * FROM placement_invoice WHERE placement_id = ANY (@placement_ids::text[]);
+
+-- name: PutPlacementInvoicing :exec
+INSERT INTO placement_invoice (tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, updated_by)
+VALUES (app_current_tenant(), @placement_id, sqlc.narg(contact_id), @payment_terms_days, sqlc.narg(due_on), @auto_send, app_current_user())
+ON CONFLICT (tenant_id, placement_id) DO UPDATE SET
+  contact_id = EXCLUDED.contact_id, payment_terms_days = EXCLUDED.payment_terms_days, due_on = EXCLUDED.due_on,
+  auto_send = EXCLUDED.auto_send, send_error = NULL, updated_by = EXCLUDED.updated_by, updated_at = now();
+
+-- One sender at a time (the start-date job and "send now").
+-- name: LockPlacementInvoicing :one
+SELECT * FROM placement_invoice WHERE placement_id = @placement_id FOR UPDATE;
+
+-- name: MarkInvoiceSent :exec
+UPDATE placement_invoice SET sent_at = now(), send_error = NULL, due_on = @due_on WHERE placement_id = @placement_id;
+
+-- name: SetInvoiceError :exec
+UPDATE placement_invoice SET send_error = @send_error WHERE placement_id = @placement_id;
+
+-- name: MarkPlacementInvoiced :exec
+UPDATE placement SET invoice_status = 'invoiced', invoice_number = @invoice_number, invoiced_on = @invoiced_on,
+  version = version + 1, updated_at = now()
+WHERE id = @id;
+
+-- The agency's invoice template (none: the defaults).
+-- name: GetInvoiceSettings :one
+SELECT tenant_id, issuer, bank_details, number_prefix, next_number, tax_label, tax_percent::text AS tax_percent, line_text, footer,
+       email_subject, email_body, send_hour, version
+FROM invoice_settings;
+
+-- name: InsertInvoiceSettings :exec
+INSERT INTO invoice_settings (tenant_id, issuer, bank_details, number_prefix, next_number, tax_label, tax_percent, line_text, footer,
+                              email_subject, email_body, send_hour, updated_by)
+VALUES (app_current_tenant(), @issuer, @bank_details, @number_prefix, @next_number, @tax_label, sqlc.arg(tax_percent)::text::numeric, @line_text,
+        @footer, @email_subject, @email_body, @send_hour, app_current_user())
+ON CONFLICT (tenant_id) DO NOTHING;
+
+-- name: UpdateInvoiceSettings :execrows
+UPDATE invoice_settings
+SET issuer = @issuer, bank_details = @bank_details, number_prefix = @number_prefix, next_number = @next_number, tax_label = @tax_label,
+    tax_percent = sqlc.arg(tax_percent)::text::numeric, line_text = @line_text, footer = @footer, email_subject = @email_subject,
+    email_body = @email_body, send_hour = @send_hour, version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE version = @expected_version;
+
+-- The next invoice number, taken (the row is locked until the transaction ends).
+-- name: TakeInvoiceNumber :one
+UPDATE invoice_settings SET next_number = next_number + 1 RETURNING next_number - 1 AS number, number_prefix;

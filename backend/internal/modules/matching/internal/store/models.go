@@ -282,6 +282,19 @@ type CompanySuggestion struct {
 	CreatedAt time.Time
 }
 
+type CompanyTerm struct {
+	TenantID         string
+	CompanyID        string
+	FeePercent       pgtype.Numeric
+	PaymentTermsDays *int32
+	GuaranteeDays    *int32
+	SignedOn         pgtype.Date
+	Notes            *string
+	Version          int32
+	UpdatedBy        string
+	UpdatedAt        time.Time
+}
+
 type Contact struct {
 	ID                string
 	TenantID          string
@@ -502,6 +515,24 @@ type InterviewFeedback struct {
 	Recommendation string
 	Comments       *string
 	SubmittedAt    time.Time
+}
+
+type InvoiceSetting struct {
+	TenantID     string
+	Issuer       string
+	BankDetails  string
+	NumberPrefix string
+	NextNumber   int32
+	TaxLabel     string
+	TaxPercent   pgtype.Numeric
+	LineText     string
+	Footer       string
+	EmailSubject string
+	EmailBody    string
+	SendHour     int32
+	Version      int32
+	UpdatedBy    string
+	UpdatedAt    time.Time
 }
 
 type Job struct {
@@ -745,6 +776,19 @@ type Placement struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	Replacement   string
+}
+
+type PlacementInvoice struct {
+	TenantID         string
+	PlacementID      string
+	ContactID        *string
+	PaymentTermsDays int32
+	DueOn            pgtype.Date
+	AutoSend         bool
+	SentAt           *time.Time
+	SendError        *string
+	UpdatedBy        string
+	UpdatedAt        time.Time
 }
 
 type PlacementMoney struct {

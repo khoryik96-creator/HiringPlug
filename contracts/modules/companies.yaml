@@ -248,6 +248,47 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/companies/{companyId}/terms:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: getCompanyTerms
+      tags: [companies]
+      summary: A client's terms of business (fee, payment terms, guarantee)
+      description: Version 0 and nothing set before the first save. They fill in a new placement's fee, payment terms and guarantee.
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyTerms' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: putCompanyTerms
+      tags: [companies]
+      summary: Save a client's terms of business
+      description: "`version` must be the version you loaded (0 for the first save)."
+      x-permission: companies:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyTermsInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyTerms' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
 components:
   parameters:
     CompanyIdPath:
@@ -257,6 +298,33 @@ components:
       schema: { $ref: '#/components/schemas/CompanyId' }
 
   schemas:
+    CompanyTerms:
+      type: object
+      required: [feePercent, paymentTermsDays, guaranteeDays, signedOn, notes, version, updatedAt]
+      properties:
+        feePercent:
+          description: "The fee, as a percentage of the yearly salary: e.g. \"18\"."
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        paymentTermsDays: { type: integer, nullable: true, description: "Days after the invoice the fee is due, e.g. 30." }
+        guaranteeDays: { type: integer, nullable: true, description: "Days after the start a placement is guaranteed." }
+        signedOn: { type: string, format: date, nullable: true, description: When the terms were signed. }
+        notes: { type: string, nullable: true }
+        version: { type: integer, description: 0 before the first save. }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    CompanyTermsInput:
+      type: object
+      additionalProperties: false
+      required: [version, feePercent, paymentTermsDays, guaranteeDays, signedOn, notes]
+      properties:
+        version: { type: integer, minimum: 0 }
+        feePercent:
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        paymentTermsDays: { type: integer, minimum: 0, maximum: 365, nullable: true }
+        guaranteeDays: { type: integer, minimum: 0, maximum: 365, nullable: true }
+        signedOn: { type: string, format: date, nullable: true }
+        notes: { type: string, maxLength: 2000, nullable: true }
     CompanyBenefitsFormat:
       type: string
       enum: [docx, pdf]

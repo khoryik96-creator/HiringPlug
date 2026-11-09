@@ -21,6 +21,50 @@ func (q *Queries) DeletePlacementMoney(ctx context.Context, placementID string) 
 	return err
 }
 
+const getInvoiceSettings = `-- name: GetInvoiceSettings :one
+SELECT tenant_id, issuer, bank_details, number_prefix, next_number, tax_label, tax_percent::text AS tax_percent, line_text, footer,
+       email_subject, email_body, send_hour, version
+FROM invoice_settings
+`
+
+type GetInvoiceSettingsRow struct {
+	TenantID     string
+	Issuer       string
+	BankDetails  string
+	NumberPrefix string
+	NextNumber   int32
+	TaxLabel     string
+	TaxPercent   string
+	LineText     string
+	Footer       string
+	EmailSubject string
+	EmailBody    string
+	SendHour     int32
+	Version      int32
+}
+
+// The agency's invoice template (none: the defaults).
+func (q *Queries) GetInvoiceSettings(ctx context.Context) (GetInvoiceSettingsRow, error) {
+	row := q.db.QueryRow(ctx, getInvoiceSettings)
+	var i GetInvoiceSettingsRow
+	err := row.Scan(
+		&i.TenantID,
+		&i.Issuer,
+		&i.BankDetails,
+		&i.NumberPrefix,
+		&i.NextNumber,
+		&i.TaxLabel,
+		&i.TaxPercent,
+		&i.LineText,
+		&i.Footer,
+		&i.EmailSubject,
+		&i.EmailBody,
+		&i.SendHour,
+		&i.Version,
+	)
+	return i, err
+}
+
 const getPlacement = `-- name: GetPlacement :one
 SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement FROM placement WHERE id = $1
 `
@@ -49,6 +93,45 @@ func (q *Queries) GetPlacement(ctx context.Context, id string) (Placement, error
 		&i.Replacement,
 	)
 	return i, err
+}
+
+const insertInvoiceSettings = `-- name: InsertInvoiceSettings :exec
+INSERT INTO invoice_settings (tenant_id, issuer, bank_details, number_prefix, next_number, tax_label, tax_percent, line_text, footer,
+                              email_subject, email_body, send_hour, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6::text::numeric, $7,
+        $8, $9, $10, $11, app_current_user())
+ON CONFLICT (tenant_id) DO NOTHING
+`
+
+type InsertInvoiceSettingsParams struct {
+	Issuer       string
+	BankDetails  string
+	NumberPrefix string
+	NextNumber   int32
+	TaxLabel     string
+	TaxPercent   string
+	LineText     string
+	Footer       string
+	EmailSubject string
+	EmailBody    string
+	SendHour     int32
+}
+
+func (q *Queries) InsertInvoiceSettings(ctx context.Context, arg InsertInvoiceSettingsParams) error {
+	_, err := q.db.Exec(ctx, insertInvoiceSettings,
+		arg.Issuer,
+		arg.BankDetails,
+		arg.NumberPrefix,
+		arg.NextNumber,
+		arg.TaxLabel,
+		arg.TaxPercent,
+		arg.LineText,
+		arg.Footer,
+		arg.EmailSubject,
+		arg.EmailBody,
+		arg.SendHour,
+	)
+	return err
 }
 
 const insertPlacement = `-- name: InsertPlacement :one
@@ -95,6 +178,43 @@ func (q *Queries) InsertPlacement(ctx context.Context, arg InsertPlacementParams
 		&i.Replacement,
 	)
 	return i, err
+}
+
+const listPlacementInvoicing = `-- name: ListPlacementInvoicing :many
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at FROM placement_invoice WHERE placement_id = ANY ($1::text[])
+`
+
+// Invoicing: who receives the invoice, the terms and due date, and the
+// emailing on the start date.
+func (q *Queries) ListPlacementInvoicing(ctx context.Context, placementIds []string) ([]PlacementInvoice, error) {
+	rows, err := q.db.Query(ctx, listPlacementInvoicing, placementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlacementInvoice
+	for rows.Next() {
+		var i PlacementInvoice
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.PlacementID,
+			&i.ContactID,
+			&i.PaymentTermsDays,
+			&i.DueOn,
+			&i.AutoSend,
+			&i.SentAt,
+			&i.SendError,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPlacements = `-- name: ListPlacements :many
@@ -159,6 +279,60 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPlacementInvoicing = `-- name: LockPlacementInvoicing :one
+SELECT tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, sent_at, send_error, updated_by, updated_at FROM placement_invoice WHERE placement_id = $1 FOR UPDATE
+`
+
+// One sender at a time (the start-date job and "send now").
+func (q *Queries) LockPlacementInvoicing(ctx context.Context, placementID string) (PlacementInvoice, error) {
+	row := q.db.QueryRow(ctx, lockPlacementInvoicing, placementID)
+	var i PlacementInvoice
+	err := row.Scan(
+		&i.TenantID,
+		&i.PlacementID,
+		&i.ContactID,
+		&i.PaymentTermsDays,
+		&i.DueOn,
+		&i.AutoSend,
+		&i.SentAt,
+		&i.SendError,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markInvoiceSent = `-- name: MarkInvoiceSent :exec
+UPDATE placement_invoice SET sent_at = now(), send_error = NULL, due_on = $1 WHERE placement_id = $2
+`
+
+type MarkInvoiceSentParams struct {
+	DueOn       *time.Time
+	PlacementID string
+}
+
+func (q *Queries) MarkInvoiceSent(ctx context.Context, arg MarkInvoiceSentParams) error {
+	_, err := q.db.Exec(ctx, markInvoiceSent, arg.DueOn, arg.PlacementID)
+	return err
+}
+
+const markPlacementInvoiced = `-- name: MarkPlacementInvoiced :exec
+UPDATE placement SET invoice_status = 'invoiced', invoice_number = $1, invoiced_on = $2,
+  version = version + 1, updated_at = now()
+WHERE id = $3
+`
+
+type MarkPlacementInvoicedParams struct {
+	InvoiceNumber *string
+	InvoicedOn    *time.Time
+	ID            string
+}
+
+func (q *Queries) MarkPlacementInvoiced(ctx context.Context, arg MarkPlacementInvoicedParams) error {
+	_, err := q.db.Exec(ctx, markPlacementInvoiced, arg.InvoiceNumber, arg.InvoicedOn, arg.ID)
+	return err
 }
 
 const placementFacts = `-- name: PlacementFacts :many
@@ -248,6 +422,33 @@ func (q *Queries) PlacementMoney(ctx context.Context, ids []string) ([]Placement
 	return items, nil
 }
 
+const putPlacementInvoicing = `-- name: PutPlacementInvoicing :exec
+INSERT INTO placement_invoice (tenant_id, placement_id, contact_id, payment_terms_days, due_on, auto_send, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
+ON CONFLICT (tenant_id, placement_id) DO UPDATE SET
+  contact_id = EXCLUDED.contact_id, payment_terms_days = EXCLUDED.payment_terms_days, due_on = EXCLUDED.due_on,
+  auto_send = EXCLUDED.auto_send, send_error = NULL, updated_by = EXCLUDED.updated_by, updated_at = now()
+`
+
+type PutPlacementInvoicingParams struct {
+	PlacementID      string
+	ContactID        *string
+	PaymentTermsDays int32
+	DueOn            *time.Time
+	AutoSend         bool
+}
+
+func (q *Queries) PutPlacementInvoicing(ctx context.Context, arg PutPlacementInvoicingParams) error {
+	_, err := q.db.Exec(ctx, putPlacementInvoicing,
+		arg.PlacementID,
+		arg.ContactID,
+		arg.PaymentTermsDays,
+		arg.DueOn,
+		arg.AutoSend,
+	)
+	return err
+}
+
 const putPlacementMoney = `-- name: PutPlacementMoney :exec
 INSERT INTO placement_money (placement_id, tenant_id, salary_amount, salary_currency, salary_period,
                              fee_percent, fee_amount, fee_currency, updated_by)
@@ -281,6 +482,81 @@ func (q *Queries) PutPlacementMoney(ctx context.Context, arg PutPlacementMoneyPa
 		arg.FeeCurrency,
 	)
 	return err
+}
+
+const setInvoiceError = `-- name: SetInvoiceError :exec
+UPDATE placement_invoice SET send_error = $1 WHERE placement_id = $2
+`
+
+type SetInvoiceErrorParams struct {
+	SendError   *string
+	PlacementID string
+}
+
+func (q *Queries) SetInvoiceError(ctx context.Context, arg SetInvoiceErrorParams) error {
+	_, err := q.db.Exec(ctx, setInvoiceError, arg.SendError, arg.PlacementID)
+	return err
+}
+
+const takeInvoiceNumber = `-- name: TakeInvoiceNumber :one
+UPDATE invoice_settings SET next_number = next_number + 1 RETURNING next_number - 1 AS number, number_prefix
+`
+
+type TakeInvoiceNumberRow struct {
+	Number       int32
+	NumberPrefix string
+}
+
+// The next invoice number, taken (the row is locked until the transaction ends).
+func (q *Queries) TakeInvoiceNumber(ctx context.Context) (TakeInvoiceNumberRow, error) {
+	row := q.db.QueryRow(ctx, takeInvoiceNumber)
+	var i TakeInvoiceNumberRow
+	err := row.Scan(&i.Number, &i.NumberPrefix)
+	return i, err
+}
+
+const updateInvoiceSettings = `-- name: UpdateInvoiceSettings :execrows
+UPDATE invoice_settings
+SET issuer = $1, bank_details = $2, number_prefix = $3, next_number = $4, tax_label = $5,
+    tax_percent = $6::text::numeric, line_text = $7, footer = $8, email_subject = $9,
+    email_body = $10, send_hour = $11, version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE version = $12
+`
+
+type UpdateInvoiceSettingsParams struct {
+	Issuer          string
+	BankDetails     string
+	NumberPrefix    string
+	NextNumber      int32
+	TaxLabel        string
+	TaxPercent      string
+	LineText        string
+	Footer          string
+	EmailSubject    string
+	EmailBody       string
+	SendHour        int32
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpdateInvoiceSettings(ctx context.Context, arg UpdateInvoiceSettingsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateInvoiceSettings,
+		arg.Issuer,
+		arg.BankDetails,
+		arg.NumberPrefix,
+		arg.NextNumber,
+		arg.TaxLabel,
+		arg.TaxPercent,
+		arg.LineText,
+		arg.Footer,
+		arg.EmailSubject,
+		arg.EmailBody,
+		arg.SendHour,
+		arg.ExpectedVersion,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updatePlacement = `-- name: UpdatePlacement :one

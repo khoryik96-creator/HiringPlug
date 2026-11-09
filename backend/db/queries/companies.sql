@@ -107,3 +107,24 @@ UPDATE company_benefits
 SET benefits = @benefits, pre_offer = @pre_offer, version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE company_id = @company_id AND version = @expected_version
 RETURNING version, updated_at;
+
+-- A client's terms of business.
+-- name: GetCompanyTerms :one
+SELECT fee_percent, payment_terms_days, guarantee_days, signed_on, notes, version, updated_at
+FROM company_terms WHERE company_id = @company_id;
+
+-- The first save (no row yet; none returned when someone saved first).
+-- name: InsertCompanyTerms :one
+INSERT INTO company_terms (tenant_id, company_id, fee_percent, payment_terms_days, guarantee_days, signed_on, notes, updated_by)
+VALUES (app_current_tenant(), @company_id, sqlc.narg(fee_percent)::text::numeric, sqlc.narg(payment_terms_days), sqlc.narg(guarantee_days),
+        sqlc.narg(signed_on), sqlc.narg(notes), app_current_user())
+ON CONFLICT (tenant_id, company_id) DO NOTHING
+RETURNING version, updated_at;
+
+-- name: UpdateCompanyTerms :one
+UPDATE company_terms
+SET fee_percent = sqlc.narg(fee_percent)::text::numeric, payment_terms_days = sqlc.narg(payment_terms_days),
+    guarantee_days = sqlc.narg(guarantee_days), signed_on = sqlc.narg(signed_on), notes = sqlc.narg(notes),
+    version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE company_id = @company_id AND version = @expected_version
+RETURNING version, updated_at;

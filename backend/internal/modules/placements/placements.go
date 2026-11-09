@@ -13,6 +13,8 @@
 //	placements.go  the module's public API and what it needs from other modules
 //	domain.go      the rules, as pure functions on plain values (unit tested)
 //	service.go     use cases: one transaction each
+//	invoice*.go    invoicing: the client's terms, the recipient and due date,
+//	               the invoice template, and the invoice emailed on the start date
 //	http.go        HTTP handlers: contract types <-> service calls
 //	internal/store generated SQL (db/queries/placements.sql); private to this module
 package placements
@@ -27,6 +29,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/placements/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 // Application is what this module needs to know about an application.
@@ -34,7 +37,49 @@ type Application struct {
 	Stage                      string
 	CandidateID, CandidateName string
 	JobID, JobTitle            string
-	CompanyName                string
+	CompanyID, CompanyName     string
+	ContactID                  *string // the job's hiring contact
+}
+
+// ClientTerms are a client's terms of business (companies module); nil: not set.
+type ClientTerms struct {
+	FeePercent                      *string
+	PaymentTermsDays, GuaranteeDays *int
+	Set                             bool
+}
+
+// Contact is someone at a client who may receive invoices (contacts module).
+type Contact struct {
+	Name, CompanyID string
+	Email           *string
+}
+
+// InvoiceMail is an invoice emailed to a client (emails module): from the
+// agency, the invoice attached as a PDF, shown only to those who may see money.
+type InvoiceMail struct {
+	To, Subject, Body, From string
+	FileName                string
+	PDF                     []byte
+	ApplicationID           string
+}
+
+// Invoicing is what invoicing needs from other modules, each read in the
+// caller's transaction, and the agency's time zone (invoices go out on the
+// start date there).
+type Invoicing struct {
+	Terms interface {
+		Terms(ctx context.Context, tx pgx.Tx, companyID string) (ClientTerms, error)
+	}
+	Contacts interface {
+		Contacts(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Contact, error)
+	}
+	Mailer interface {
+		SendInvoice(ctx context.Context, tx pgx.Tx, tenantID string, m InvoiceMail) error
+	}
+	Tenants interface {
+		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
+	}
+	TimeZone *time.Location
 }
 
 // Applications reads applications and moves them to placed (pipeline module).
@@ -56,9 +101,17 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, applications Applications, users Users) *Module {
-	svc := &Service{pool: pool, applications: applications, users: users}
+func New(pool *pgxpool.Pool, applications Applications, users Users, invoicing Invoicing) *Module {
+	if invoicing.TimeZone == nil {
+		invoicing.TimeZone = time.UTC
+	}
+	svc := &Service{pool: pool, applications: applications, users: users, inv: invoicing}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
+}
+
+// JobHandlers returns the module's handlers for the core queue.
+func (m *Module) JobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindPlacementInvoice: m.service.invoiceJob}
 }
 
 // Fact is a placement as reports count it. FeeAmount is nil when none is

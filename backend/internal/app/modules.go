@@ -109,7 +109,10 @@ func NewModules(d Deps) *Modules {
 	}, d.Mail, d.Files)
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
 		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
-	m.Placements = placements.New(d.Pool, placementApplications{m.Pipeline}, m.Identity)
+	m.Placements = placements.New(d.Pool, placementApplications{m.Pipeline, m.Jobs}, m.Identity, placements.Invoicing{
+		Terms: placementTerms{m.Companies}, Contacts: placementContacts{m.Contacts}, Mailer: placementMailer{m.Emails},
+		Tenants: m.Identity, TimeZone: d.Config.TimeZone,
+	})
 	m.Reports = reports.New(d.Pool, reports.Deps{
 		Applications: reportApplications{m.Pipeline}, Sources: reportSources{m.Candidates}, Jobs: reportJobs{m.Jobs},
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
@@ -276,6 +279,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Integrations.JobHandlers(),
 		m.Leads.JobHandlers(),
 		m.Companies.JobHandlers(),
+		m.Placements.JobHandlers(),
 		m.Contacts.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),

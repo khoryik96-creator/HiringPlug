@@ -158,6 +158,7 @@ class JobKind(StrEnum):
     lead_source_check = "lead_source.check"
     match_score = "match.score"
     match_scored = "match.scored"
+    placement_invoice = "placement.invoice"
     scheduling_refresh_calendar = "scheduling.refresh_calendar"
     talent_rank = "talent.rank"
     talent_ranked = "talent.ranked"
@@ -867,6 +868,32 @@ class UsedValues(BaseModel):
 
 class ApplicationReceived(BaseModel):
     received: bool
+
+
+class CompanyTerms(BaseModel):
+    feePercent: Annotated[
+        DecimalAmount | None, Field(description='The fee, as a percentage of the yearly salary: e.g. "18".')
+    ]
+    paymentTermsDays: Annotated[
+        int | None, Field(description="Days after the invoice the fee is due, e.g. 30.")
+    ]
+    guaranteeDays: Annotated[int | None, Field(description="Days after the start a placement is guaranteed.")]
+    signedOn: Annotated[date | None, Field(description="When the terms were signed.")]
+    notes: Annotated[str | None, Field(...)]
+    version: Annotated[int, Field(description="0 before the first save.")]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class CompanyTermsInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0)]
+    feePercent: Annotated[DecimalAmount | None, Field(...)]
+    paymentTermsDays: Annotated[int | None, Field(ge=0, le=365)]
+    guaranteeDays: Annotated[int | None, Field(ge=0, le=365)]
+    signedOn: Annotated[date | None, Field(...)]
+    notes: Annotated[str | None, Field(max_length=2000)]
 
 
 class CompanyBenefitsFormat(StrEnum):
@@ -3261,6 +3288,95 @@ class PipelineSummary(BaseModel):
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
 
 
+class InvoiceFormat(StrEnum):
+    pdf = "pdf"
+    docx = "docx"
+
+
+class PlacementDefaults(BaseModel):
+    companyId: CompanyId
+    companyName: str
+    termsSet: Annotated[bool, Field(description="The client has terms of business recorded.")]
+    feePercent: Annotated[DecimalAmount | None, Field(description="From the client's terms.")]
+    paymentTermsDays: Annotated[int, Field(description="From the client's terms (30 when not set).")]
+    guaranteeDays: Annotated[int, Field(description="From the client's terms (90 when not set).")]
+    contactId: Annotated[
+        ContactId | None, Field(description="The job's hiring contact, when they have an email address.")
+    ]
+
+
+class PlacementInvoicing(BaseModel):
+    contactId: Annotated[
+        ContactId | None, Field(description="Who receives the invoice (one of the client's contacts).")
+    ]
+    contactName: Annotated[str | None, Field(...)]
+    contactEmail: Annotated[str | None, Field(...)]
+    paymentTermsDays: int
+    dueOn: Annotated[
+        date,
+        Field(
+            description="When payment is due: the invoice date (the start date until invoiced) plus the terms, unless set."
+        ),
+    ]
+    dueOnSet: Annotated[
+        bool,
+        Field(description="true: someone set the due date; false: it follows the start date and the terms."),
+    ]
+    autoSend: Annotated[bool, Field(description="Email the invoice to the contact on the start date.")]
+    sendsAt: Annotated[
+        AwareDatetime | None, Field(description="When it will be emailed (null when it will not be).")
+    ]
+    sentAt: Annotated[AwareDatetime | None, Field(...)]
+    sendError: Annotated[str | None, Field(description="Why it could not be emailed on its own.")]
+
+
+class PlacementInvoicingInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    contactId: Annotated[ContactId | None, Field(...)]
+    paymentTermsDays: Annotated[int, Field(ge=0, le=365)]
+    dueOn: Annotated[date | None, Field(description="null: the start date plus the terms.")]
+    autoSend: bool
+
+
+class InvoiceSettingsBase(BaseModel):
+    issuer: Annotated[
+        str,
+        Field(
+            description="Your company's name and details, a line each (address, registration and tax numbers).",
+            max_length=1000,
+        ),
+    ]
+    bankDetails: Annotated[str, Field(max_length=1000)]
+    numberPrefix: Annotated[str, Field(examples=["INV-"], max_length=20)]
+    nextNumber: Annotated[int, Field(description="The next invoice's number (INV-0001).", ge=1, le=99999999)]
+    taxLabel: Annotated[str, Field(examples=["SST"], max_length=40)]
+    taxPercent: DecimalAmount
+    lineText: Annotated[
+        str, Field(description="The invoice line, with {{fields}}.", max_length=1000, min_length=1)
+    ]
+    footer: Annotated[str, Field(max_length=2000)]
+    emailSubject: Annotated[str, Field(max_length=200, min_length=1)]
+    emailBody: Annotated[str, Field(max_length=10000, min_length=1)]
+    sendHour: Annotated[
+        int,
+        Field(
+            description="The hour invoices go out on the start date (the agency's time zone).", ge=0, le=23
+        ),
+    ]
+
+
+class InvoiceField(BaseModel):
+    key: Annotated[str, Field(examples=["invoice.total"])]
+    label: str
+    example: str
+
+
+class InvoiceSettingsInput(InvoiceSettingsBase):
+    version: Annotated[int, Field(ge=0)]
+
+
 class PlacementId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["plc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^plc_[0-9a-hjkmnp-tv-z]{26}$")
@@ -3308,7 +3424,9 @@ class Placement(BaseModel):
     candidateName: str
     jobId: JobOrderId
     jobTitle: str
+    companyId: CompanyId
     companyName: str
+    invoicing: PlacementInvoicing
     recruiterId: Annotated[UserId | None, Field(description="The recruiter credited with the placement.")]
     recruiterName: Annotated[str | None, Field(...)]
     startDate: date
@@ -4524,6 +4642,18 @@ class Offer(BaseModel):
 
 class OfferList(BaseModel):
     items: list[Offer]
+
+
+class PlacementInvoiceJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    placementId: PlacementId
+
+
+class InvoiceSettings(InvoiceSettingsBase):
+    version: Annotated[int, Field(description="0 while the defaults are in use.")]
+    fields: Annotated[list[InvoiceField], Field(description="The {{fields}} the texts may use.")]
 
 
 class RecruiterRow(BaseModel):

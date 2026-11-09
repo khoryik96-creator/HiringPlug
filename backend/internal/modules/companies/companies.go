@@ -70,3 +70,10 @@ func (m *Module) Website(ctx context.Context, tx pgx.Tx, companyID string) (stri
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindCompanyAutofill: m.service.autofill}
 }
+
+// Terms returns a client's terms of business (nothing set when none were
+// saved), for other modules: a new placement's fee, payment terms and
+// guarantee come from them.
+func (m *Module) Terms(ctx context.Context, tx pgx.Tx, companyID string) (Terms, error) {
+	return termsIn(ctx, tx, companyID, false)
+}

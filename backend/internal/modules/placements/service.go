@@ -21,6 +21,7 @@ type Service struct {
 	pool         *pgxpool.Pool
 	applications Applications
 	users        Users
+	inv          Invoicing
 	now          func() time.Time // tests may fix "today"
 }
 
@@ -34,6 +35,7 @@ type View struct {
 	RecruiterName *string
 	Money         *Money // nil: none recorded, or hidden (MoneyHidden)
 	MoneyHidden   bool
+	Invoicing     InvoicingView
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -106,6 +108,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 		if err := putMoney(ctx, q, row.ID, m); err != nil {
 			return err
 		}
+		if err := s.startInvoicing(ctx, tx, row.ID, app); err != nil {
+			return err
+		}
 		changes := map[string]any{"applicationId": appID, "startDate": d.StartDate.Format(time.DateOnly), "guaranteeDays": d.GuaranteeDays, "recruiterId": d.RecruiterID}
 		if m != nil {
 			changes["money"] = audit.Redacted
@@ -169,6 +174,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 		}
 		if err != nil {
 			return err
+		}
+		if !after.StartDate.Equal(before.StartDate) {
+			if err := s.reschedule(ctx, tx, p.TenantID, updated); err != nil {
+				return err
+			}
 		}
 		changes := audit.Diff(auditFields(before), auditFields(after))
 		if money.Set {
@@ -315,11 +325,15 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 			money[r.PlacementID] = m
 		}
 	}
+	invoicing, err := s.invoicingViews(ctx, tx, p.TenantID, rows)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]View, len(rows))
 	for i, r := range rows {
 		v := View{
 			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: apps[r.ApplicationID], Details: detailsOf(r),
-			Money: money[r.ID], MoneyHidden: !seeMoney, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+			Money: money[r.ID], MoneyHidden: !seeMoney, Invoicing: invoicing[r.ID], CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		}
 		if r.RecruiterID != nil {
 			if n, ok := names[*r.RecruiterID]; ok {

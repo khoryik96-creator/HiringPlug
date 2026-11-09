@@ -85,18 +85,34 @@ func (a interviewApplications) ReachInterview(ctx context.Context, tx pgx.Tx, id
 }
 
 // placementApplications gives the placements module the pipeline's
-// applications, in its own type.
-type placementApplications struct{ pipeline *pipeline.Module }
+// applications, with the job's client and hiring contact, in its own type.
+type placementApplications struct {
+	pipeline *pipeline.Module
+	jobs     *jobs.Module
+}
 
 func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]placements.Application, error) {
 	briefs, err := a.pipeline.Briefs(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	jobIDs := make([]string, 0, len(briefs))
+	for _, b := range briefs {
+		jobIDs = append(jobIDs, b.JobID)
+	}
+	jobBriefs, err := a.jobs.Briefs(ctx, tx, jobIDs)
+	if err != nil {
+		return nil, err
+	}
 	out := make(map[string]placements.Application, len(briefs))
 	for id, b := range briefs {
+		j := jobBriefs[b.JobID]
 		out[id] = placements.Application{
-			Stage: b.Stage, CandidateID: b.CandidateID, CandidateName: b.CandidateName, JobID: b.JobID, JobTitle: b.JobTitle, CompanyName: b.CompanyName,
+			Stage: b.Stage, CandidateID: b.CandidateID, CandidateName: b.CandidateName, JobID: b.JobID, JobTitle: b.JobTitle,
+			CompanyID: j.CompanyID, CompanyName: b.CompanyName, ContactID: j.ContactID,
 		}
 	}
-	return out, err
+	return out, nil
 }
 
 func (a placementApplications) Place(ctx context.Context, tx pgx.Tx, id string) error {
