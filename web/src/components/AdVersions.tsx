@@ -62,8 +62,8 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
           <h5>Blind {live && ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="blind" title={ad.blindTitle} />
         </div>
-        <BlindText ad={ad} canEdit={canEdit} facts={factsOf(ad.blindLocation, ad.blindSalaryText)} />
         <BlindRewrite adId={ad.id} jobId={ad.jobId} canEdit={canEdit} />
+        <BlindText ad={ad} canEdit={canEdit} facts={factsOf(ad.blindLocation, ad.blindSalaryText)} />
       </section>
     </div>
   );

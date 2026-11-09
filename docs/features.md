@@ -442,8 +442,11 @@ lead's company (with the built-in email check).
   downloads as **Word or PDF** (title, a line of facts, the text with its bullet
   points; the PDF uses a standard font, so characters beyond Western European
   ones, such as Chinese, print as "?").
-- **Blind ads rewritten by the AI, CV Studio's way** ✅ ("Rewrite with AI" under
-  the blind version, once the AI is on): a pattern can take out names, but
+- **Blind ads rewritten by the AI, CV Studio's way** ✅ (on its own when an ad
+  is added and the company has the AI, as CV Studio blinds a JD on upload;
+  again with "Rewrite with AI" at the top of the blind version, choosing tone
+  and rewording; until the AI answers, and without the AI, the blind version
+  is the one made by the rules): a pattern can take out names, but
   not "40 hubs across 12 countries", which finds the client just as well. CV
   Studio's Blind JD prompt rewrites the ad into a candidate-facing job
   description without the client's identity (names, brands, addresses,
@@ -723,6 +726,23 @@ accents), or add it. Excel files (.xlsx) directly: later.
 ✅ The home page: open jobs with candidates per stage, totals, candidates
 moved this week, placements in the last 30 days, and who has waited more than
 14 days in one stage.
+
+✅ **Search boxes** for candidates, jobs, companies and contacts, with results
+as you type. Candidates follow Kano's /find rules: several searches at once,
+split on commas (at most six, each in its own block); each is an **email**
+(matched exactly), a **phone number** (the whole number in any format, with
+or without +, 00 or the leading 0: without a country code it is read as a
+local number of the agency's country, then Malaysia, Singapore, Indonesia,
+India, Pakistan, Bangladesh, the UK, the US and the larger European
+countries, then any country where it is valid; never only its last digits,
+and a note says when numbers in more than one country match) or a **name**
+(every word in the name, email, title or company, in any order; then names
+alike, scored as Kano does and shown as "83% name match"). "**name -
+company**" (a dash with a space before it) keeps those who work or worked
+there, word for word ("Nintex" finds Nintex Malaysia Sdn Bhd, not
+Nintexify), and says which. An incomplete email or phone number says so
+instead of matching something. The candidates list and advanced search
+match phone numbers whole too.
 
 ✅ **Recent moves**: a timeline of stage moves, newest first and grouped by
 day (Today, Yesterday, then the date): the time, the candidate, from which

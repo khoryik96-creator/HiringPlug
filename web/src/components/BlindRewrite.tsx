@@ -1,6 +1,8 @@
 // Rewriting a blind ad with the AI, CV Studio's way: the client's identity
 // taken out, company size described broadly, the wording paraphrased, the
 // tech stack and requirements kept. When it is done it becomes the blind ad.
+// A new ad is rewritten on its own (when the company has the AI); this sits
+// at the top of the blind column, so its progress and the button are seen.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -55,7 +57,7 @@ export function BlindRewrite({ adId, jobId, canEdit }: { adId: string; jobId: st
   const busy = latest?.status === "queued";
   return (
     <div className="blind-rewrite">
-      {latest?.status === "queued" && <p role="status">Rewriting the blind ad with the AI… this takes a minute.</p>}
+      {latest?.status === "queued" && <p role="status" className="small">Blinding it with the AI… this takes a minute. Until then this is the blind version made by the rules.</p>}
       {latest?.status === "done" && latest.warnings.length > 0 && (
         <div className="warning" role="status">
           Rewritten by the AI. Check before sharing:
@@ -65,7 +67,7 @@ export function BlindRewrite({ adId, jobId, canEdit }: { adId: string; jobId: st
       {latest?.status === "done" && latest.warnings.length === 0 && <p className="muted small">Rewritten by the AI. Read it before sharing.</p>}
       {latest?.status === "failed" && <p className="warning" role="alert">{latest.error}</p>}
       {canEdit && !open && (
-        <button type="button" className="link" disabled={busy} onClick={() => { setOpen(true); }}>Rewrite with AI</button>
+        <button type="button" disabled={busy} onClick={() => { setOpen(true); }}>{latest ? "Rewrite with AI again" : "Rewrite with AI"}</button>
       )}
       {canEdit && open && (
         <form aria-label="Rewrite blind ad" onSubmit={(e) => { e.preventDefault(); start.mutate(); }}>

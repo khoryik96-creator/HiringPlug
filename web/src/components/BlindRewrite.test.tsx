@@ -34,7 +34,7 @@ describe("rewriting a blind ad with the AI", () => {
     lists([run({ warnings: ["Check the tech stack: Kafka from the ad may be missing."] })]);
     renderWithClient(<BlindRewrite adId="ad_1" jobId="jo_1" canEdit={false} />);
     expect((await screen.findByRole("status")).textContent).toContain("Kafka from the ad may be missing");
-    expect(screen.queryByRole("button", { name: "Rewrite with AI" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Rewrite with AI/ })).toBeNull();
     cleanup();
     lists([run({ status: "failed", error: "The AI's version still names the client, so it was not used." })]);
     renderWithClient(<BlindRewrite adId="ad_1" jobId="jo_1" canEdit />);
@@ -42,8 +42,9 @@ describe("rewriting a blind ad with the AI", () => {
     cleanup();
     lists([run({ status: "queued" })]);
     renderWithClient(<BlindRewrite adId="ad_1" jobId="jo_1" canEdit />);
-    expect((await screen.findByRole("status")).textContent).toContain("Rewriting the blind ad");
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Rewrite with AI" }).disabled).toBe(true);
+    // A new ad is blinded by the AI on its own: this is what shows meanwhile.
+    expect((await screen.findByRole("status")).textContent).toContain("Blinding it with the AI");
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Rewrite with AI again" }).disabled).toBe(true);
   });
 
   it("says when the AI is off", async () => {

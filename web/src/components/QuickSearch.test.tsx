@@ -71,7 +71,7 @@ describe("dashboard search", () => {
     expect(screen.getByText("1 more search was left out: six at a time.")).toBeTruthy();
 
     fireEvent.submit(screen.getByRole("search", { name: "Search candidates" }));
-    expect(window.location.hash).toBe("", "several searches: Enter stays on the results");
+    expect(window.location.hash).toBe(""); // several searches: Enter stays on the results
   });
 
   it("Enter opens the one match, or the full list", async () => {

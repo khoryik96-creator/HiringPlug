@@ -50,7 +50,7 @@ func (s *Service) ListAds(ctx context.Context, p authz.Principal, jobID string) 
 	return ads, err
 }
 
-// CreateAd adds a draft ad for a job.
+// CreateAd adds a draft ad for a job, and starts its AI blind rewrite.
 func (s *Service) CreateAd(ctx context.Context, p authz.Principal, jobID string, d AdDetails) (Ad, error) {
 	d.Status = "draft"
 	d, errs := NormalizeAd(d)
@@ -86,6 +86,11 @@ func (s *Service) CreateAd(ctx context.Context, p authz.Principal, jobID string,
 		if err := audit.Record(ctx, tx, audit.Entry{
 			Action: "job_ad.created", EntityType: "job_ad", EntityID: ad.ID, Changes: map[string]any{"jobId": jobID, "title": d.Title},
 		}); err != nil {
+			return err
+		}
+		// Blinded by the AI on its own, as CV Studio does on upload (when the
+		// company has the AI); until then, and without it, by the rules.
+		if _, err := s.startRewrite(ctx, tx, p, ad, AutoRewrite, true); err != nil {
 			return err
 		}
 		return withClient(client, &ad)

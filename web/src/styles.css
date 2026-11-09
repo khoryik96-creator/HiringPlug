@@ -447,10 +447,10 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
 .page-head h2 { margin: 0; }
 .list-toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 14px; padding: 0.55rem 0.65rem; margin-bottom: 0.75rem; }
-.search-box { flex: 1; min-width: 16rem; display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border, #d0d7de); border-radius: 10px; padding: 0 0.7rem; background: #fff; }
-.search-box span { color: var(--muted); font-size: 1.1rem; }
-.search-box input { border: 0; outline: none; flex: 1; padding: 0.5rem 0; background: transparent; box-shadow: none; }
-.search-box:focus-within { border-color: var(--accent); }
+.list-toolbar .search-box { flex: 1; min-width: 16rem; display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border, #d0d7de); border-radius: 10px; padding: 0 0.7rem; background: #fff; }
+.list-toolbar .search-box span { color: var(--muted); font-size: 1.1rem; }
+.list-toolbar .search-box input { border: 0; outline: none; flex: 1; padding: 0.5rem 0; background: transparent; box-shadow: none; }
+.list-toolbar .search-box:focus-within { border-color: var(--accent); }
 .toggle-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; font-size: 0.85rem; font-weight: 550; cursor: pointer; }
 .toggle-chip.on { border-color: var(--accent); background: var(--accent-soft); }
 .toggle-chip input { margin: 0; }

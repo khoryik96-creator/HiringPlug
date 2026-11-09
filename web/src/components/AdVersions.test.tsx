@@ -35,6 +35,9 @@ describe("ad versions", () => {
     expect(blind.textContent).toContain("A logistics firm is growing.");
     expect(await within(blind).findByText(/Shah Alam, Malaysia \(MY\) · Full time · edited/)).toBeTruthy();
     expect(within(blind).getByRole("status").textContent).toContain("The ad changed after this blind text was written");
+    // The AI rewrite is at the top of the blind column, not below a long ad.
+    const rewrite = within(blind).getByRole("button", { name: "Rewrite with AI" });
+    expect(rewrite.compareDocumentPosition(within(blind).getByText("A logistics firm is growing.")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("saves a person's blind text, or makes it again from the ad", async () => {

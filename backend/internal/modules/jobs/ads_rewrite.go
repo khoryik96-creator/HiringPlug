@@ -42,51 +42,70 @@ type BlindRewrite = store.JobAdBlindRewrite
 func (s *Service) StartBlindRewrite(ctx context.Context, p authz.Principal, adID string, o RewriteOptions) (BlindRewrite, error) {
 	var out BlindRewrite
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		q := store.New(tx)
-		row, err := getAdRow(ctx, q, adID)
+		row, err := getAdRow(ctx, store.New(tx), adID)
 		if err != nil {
 			return err
 		}
-		ad := adFromRow(row)
-		raw := RewriteSource(ad.Details)
-		if utf8.RuneCountInString(raw) < MinRewriteText {
-			return apperr.New(api.ErrorCodeJOBADBLINDTOOSHORT, "Write the ad first: there is too little text to rewrite.")
-		}
-		var access *api.AiAccess
-		on := false
-		if s.ai != nil {
-			if access, on, err = s.ai.Allowed(ctx, tx); err != nil {
-				return err
-			}
-		}
-		if !on {
-			return apperr.New(api.ErrorCodeJOBADBLINDAIOFF,
-				"Rewriting needs the AI: set up an AI provider in Settings, or wait for next month's allowance.")
-		}
-		client, err := s.clientOf(ctx, tx, ad.JobID)
-		if err != nil {
-			return err
-		}
-		blind := Blind(ad.Details, client)
-		if out, err = q.InsertBlindRewrite(ctx, store.InsertBlindRewriteParams{
-			AdID: adID, Tone: o.Tone, Strength: o.Strength, SourceHash: strPtr(SourceHash(ad.Details)), // the ad it is made from
-		}); err != nil {
-			return err
-		}
-		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJdBlind, api.JdBlindJob{
-			RewriteId: out.ID, Raw: raw, CompanyName: client.Name, Industry: nullable.NewNullNullable[string](),
-			Location: orNull(blind.Location), WorkMode: orNull(strPtr(WorkMode(ad.Details))),
-			ClientDescription: orNull(ad.Details.ClientDescription), Context: orNull(o.Context),
-			RemoveAlso: orNull(strPtr(RemoveAlso(o.RemoveAlso, client))), WhyJoinUs: orNull(o.WhyJoinUs),
-			Tone: api.BlindRewriteTone(o.Tone), Strength: api.BlindRewriteStrength(o.Strength), Ai: access,
-		}); err != nil {
-			return err
-		}
-		return audit.Record(ctx, tx, audit.Entry{Action: "job_ad.blind_rewrite_started", EntityType: "job_ad", EntityID: adID, Changes: map[string]any{
-			"rewriteId": out.ID, "tone": o.Tone, "strength": o.Strength,
-		}})
+		out, err = s.startRewrite(ctx, tx, p, adFromRow(row), o, false)
+		return err
 	})
 	return out, err
+}
+
+// AutoRewrite is how a new ad's blind version is rewritten on its own.
+var AutoRewrite = RewriteOptions{Tone: "professional", Strength: "medium"}
+
+// startRewrite queues the AI rewrite of ad's blind version in tx. With
+// auto (a new ad, blinded on its own as CV Studio does on upload), an ad
+// too short to rewrite, or a company without the AI, is left to the
+// blind version made by the rules: no rewrite, no error.
+func (s *Service) startRewrite(ctx context.Context, tx pgx.Tx, p authz.Principal, ad Ad, o RewriteOptions, auto bool) (BlindRewrite, error) {
+	q := store.New(tx)
+	raw := RewriteSource(ad.Details)
+	if utf8.RuneCountInString(raw) < MinRewriteText {
+		if auto {
+			return BlindRewrite{}, nil
+		}
+		return BlindRewrite{}, apperr.New(api.ErrorCodeJOBADBLINDTOOSHORT, "Write the ad first: there is too little text to rewrite.")
+	}
+	var access *api.AiAccess
+	on := false
+	if s.ai != nil {
+		var err error
+		if access, on, err = s.ai.Allowed(ctx, tx); err != nil {
+			return BlindRewrite{}, err
+		}
+	}
+	if !on {
+		if auto {
+			return BlindRewrite{}, nil
+		}
+		return BlindRewrite{}, apperr.New(api.ErrorCodeJOBADBLINDAIOFF,
+			"Rewriting needs the AI: set up an AI provider in Settings, or wait for next month's allowance.")
+	}
+	client, err := s.clientOf(ctx, tx, ad.JobID)
+	if err != nil {
+		return BlindRewrite{}, err
+	}
+	blind := Blind(ad.Details, client)
+	out, err := q.InsertBlindRewrite(ctx, store.InsertBlindRewriteParams{
+		AdID: ad.ID, Tone: o.Tone, Strength: o.Strength, SourceHash: strPtr(SourceHash(ad.Details)), // the ad it is made from
+	})
+	if err != nil {
+		return BlindRewrite{}, err
+	}
+	if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJdBlind, api.JdBlindJob{
+		RewriteId: out.ID, Raw: raw, CompanyName: client.Name, Industry: nullable.NewNullNullable[string](),
+		Location: orNull(blind.Location), WorkMode: orNull(strPtr(WorkMode(ad.Details))),
+		ClientDescription: orNull(ad.Details.ClientDescription), Context: orNull(o.Context),
+		RemoveAlso: orNull(strPtr(RemoveAlso(o.RemoveAlso, client))), WhyJoinUs: orNull(o.WhyJoinUs),
+		Tone: api.BlindRewriteTone(o.Tone), Strength: api.BlindRewriteStrength(o.Strength), Ai: access,
+	}); err != nil {
+		return BlindRewrite{}, err
+	}
+	return out, audit.Record(ctx, tx, audit.Entry{Action: "job_ad.blind_rewrite_started", EntityType: "job_ad", EntityID: ad.ID, Changes: map[string]any{
+		"rewriteId": out.ID, "tone": o.Tone, "strength": o.Strength, "auto": auto,
+	}})
 }
 
 // ListBlindRewrites returns an ad's latest rewrites, newest first.

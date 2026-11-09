@@ -102,6 +102,7 @@ func (s *Service) findOne(ctx context.Context, q *store.Queries, search findquer
 				return r, err
 			}
 		}
+	case findquery.Email: // matched exactly: no names alike
 	}
 	r.More = len(items) > findShown
 	r.Items = items[:min(len(items), findShown)]

@@ -46,7 +46,19 @@ func TestABlindAdIsRewrittenByTheAICVStudiosWay(t *testing.T) {
 	}, http.StatusCreated)
 	rewrites := "/v1/job-ads/" + ad.Id + "/blind-rewrites"
 
+	// A new ad is blinded by the AI on its own, as CV Studio does on upload.
+	var auto api.BlindRewriteList
+	a.request(http.MethodGet, rewrites, token, nil).JSON(&auto)
+	require.Len(t, auto.Items, 1, "a new ad's AI rewrite starts on its own")
+	assert.Equal(t, api.BlindRewriteStatusQueued, auto.Items[0].Status)
+	assert.Equal(t, api.BlindRewriteToneProfessional, auto.Items[0].Tone)
+	assert.Equal(t, api.BlindRewriteStrengthMedium, auto.Items[0].Strength)
+	claimed := claimAIJobWhere(t, aiConn, "rewriteId", auto.Items[0].Id)
+	require.Equal(t, string(api.JobKindJdBlind), claimed.Kind)
+
 	short := a.adRequest(http.MethodPost, "/v1/jobs/"+job.Id+"/ads", token, map[string]any{"title": "Clerk", "description": "Filing."}, http.StatusCreated)
+	a.request(http.MethodGet, "/v1/job-ads/"+short.Id+"/blind-rewrites", token, nil).JSON(&auto)
+	assert.Empty(t, auto.Items, "too little text: the rules' blind version is enough")
 	res := a.request(http.MethodPost, "/v1/job-ads/"+short.Id+"/blind-rewrites", token, map[string]any{"tone": "professional", "strength": "medium"})
 	assert.Equal(t, api.ErrorCodeJOBADBLINDTOOSHORT, res.Error().Error.Code)
 	viewer := tenant.Users[api.RoleViewer].Token
@@ -58,7 +70,7 @@ func TestABlindAdIsRewrittenByTheAICVStudiosWay(t *testing.T) {
 	res.JSON(&run)
 	assert.Equal(t, api.BlindRewriteStatusQueued, run.Status)
 
-	claimed := claimAIJobWhere(t, aiConn, "rewriteId", run.Id)
+	claimed = claimAIJobWhere(t, aiConn, "rewriteId", run.Id)
 	require.Equal(t, string(api.JobKindJdBlind), claimed.Kind)
 	var asked api.JdBlindJob
 	require.NoError(t, json.Unmarshal(claimed.Payload, &asked))
@@ -86,7 +98,7 @@ func TestABlindAdIsRewrittenByTheAICVStudiosWay(t *testing.T) {
 
 	var list api.BlindRewriteList
 	a.request(http.MethodGet, rewrites, viewer, nil).JSON(&list)
-	require.Len(t, list.Items, 1)
+	require.Len(t, list.Items, 2, "the one asked for, and the one started with the ad")
 	done := list.Items[0]
 	assert.Equal(t, api.BlindRewriteStatusDone, done.Status)
 	assert.Equal(t, 1600, done.Tokens)
@@ -139,6 +151,10 @@ func TestABlindAdIsNotRewrittenWhileTheAIIsOff(t *testing.T) {
 	company := a.createCompany(token, map[string]any{"name": "Maju Logistik Sdn Bhd"})
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Hub Manager"})
 	ad := a.adRequest(http.MethodPost, "/v1/jobs/"+job.Id+"/ads", token, map[string]any{"title": "Hub Manager", "description": longAd}, http.StatusCreated)
+	assert.NotContains(t, ad.BlindDescription.MustGet(), "Maju", "the rules still blind it")
+	var list api.BlindRewriteList
+	a.request(http.MethodGet, "/v1/job-ads/"+ad.Id+"/blind-rewrites", token, nil).JSON(&list)
+	assert.Empty(t, list.Items, "without the AI a new ad is not sent to it")
 	res := a.request(http.MethodPost, "/v1/job-ads/"+ad.Id+"/blind-rewrites", token, map[string]any{"tone": "professional", "strength": "medium"})
 	assert.Equal(t, api.ErrorCodeJOBADBLINDAIOFF, res.Error().Error.Code)
 }
