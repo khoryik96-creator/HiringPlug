@@ -41,11 +41,20 @@ type Application struct {
 	ContactID                  *string // the job's hiring contact
 }
 
-// ClientTerms are a client's terms of business (companies module); nil: not set.
+// ClientTerms are a client's terms of business (companies module): their
+// rates by annual salary, the limits in SalaryCurrency.
 type ClientTerms struct {
-	FeePercent                      *string
-	PaymentTermsDays, GuaranteeDays *int
-	Set                             bool
+	Tiers          []ClientTier
+	SalaryCurrency string
+	Set            bool
+}
+
+// ClientTier is one rate, for annual salaries from SalaryFrom (inclusive)
+// up to SalaryBelow (exclusive); nil limits are open, other nils not set.
+type ClientTier struct {
+	SalaryFrom, SalaryBelow, FeePercent *string
+	PaymentTermsDays, GuaranteeDays     *int
+	Remarks                             *string
 }
 
 // Contact is someone at a client who may receive invoices (contacts module).

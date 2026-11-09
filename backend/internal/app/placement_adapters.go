@@ -19,7 +19,14 @@ type placementTerms struct{ companies *companies.Module }
 
 func (a placementTerms) Terms(ctx context.Context, tx pgx.Tx, companyID string) (placements.ClientTerms, error) {
 	t, err := a.companies.Terms(ctx, tx, companyID)
-	return placements.ClientTerms{FeePercent: t.FeePercent, PaymentTermsDays: t.PaymentTermsDays, GuaranteeDays: t.GuaranteeDays, Set: t.Version > 0}, err
+	out := placements.ClientTerms{SalaryCurrency: t.SalaryCurrency, Set: t.Version > 0, Tiers: make([]placements.ClientTier, len(t.Tiers))}
+	for i, r := range t.Tiers {
+		out.Tiers[i] = placements.ClientTier{
+			SalaryFrom: r.SalaryFrom, SalaryBelow: r.SalaryBelow, FeePercent: r.FeePercent,
+			PaymentTermsDays: r.PaymentTermsDays, GuaranteeDays: r.GuaranteeDays, Remarks: r.Remarks,
+		}
+	}
+	return out, err
 }
 
 // placementContacts gives the placements module the contacts who may receive invoices.

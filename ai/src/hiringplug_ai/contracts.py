@@ -896,14 +896,46 @@ class CompanyDocumentList(BaseModel):
     items: list[CompanyDocument]
 
 
-class CompanyTerms(BaseModel):
+class CompanyTermsTier(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    salaryFrom: Annotated[
+        DecimalAmount | None,
+        Field(
+            description="Annual salaries at or above this (in the terms' salaryCurrency); null for no lower limit."
+        ),
+    ]
+    salaryBelow: Annotated[
+        DecimalAmount | None, Field(description="Annual salaries below this; null for no upper limit.")
+    ]
     feePercent: Annotated[
         DecimalAmount | None, Field(description='The fee, as a percentage of the yearly salary: e.g. "18".')
     ]
     paymentTermsDays: Annotated[
-        int | None, Field(description="Days after the invoice the fee is due, e.g. 30.")
+        int | None, Field(description="Days after the invoice the fee is due, e.g. 30.", ge=0, le=365)
     ]
-    guaranteeDays: Annotated[int | None, Field(description="Days after the start a placement is guaranteed.")]
+    guaranteeDays: Annotated[
+        int | None,
+        Field(description="Days after the start a placement is guaranteed (a month is 30).", ge=0, le=365),
+    ]
+    remarks: Annotated[
+        str | None,
+        Field(
+            description="Another payment method or anything else about this rate (e.g. 50% on signing, 50% on start).",
+            max_length=500,
+        ),
+    ]
+
+
+class CompanyTerms(BaseModel):
+    tiers: Annotated[
+        list[CompanyTermsTier],
+        Field(description="The rates, by annual salary. One with no salary limits is a flat rate."),
+    ]
+    salaryCurrency: Annotated[
+        str, Field(description="The currency of the tiers' salary limits.", pattern="^[A-Z]{3}$")
+    ]
     signedOn: Annotated[date | None, Field(description="When the terms were signed.")]
     notes: Annotated[str | None, Field(...)]
     version: Annotated[int, Field(description="0 before the first save.")]
@@ -915,9 +947,8 @@ class CompanyTermsInput(BaseModel):
         extra="forbid",
     )
     version: Annotated[int, Field(ge=0)]
-    feePercent: Annotated[DecimalAmount | None, Field(...)]
-    paymentTermsDays: Annotated[int | None, Field(ge=0, le=365)]
-    guaranteeDays: Annotated[int | None, Field(ge=0, le=365)]
+    tiers: Annotated[list[CompanyTermsTier], Field(max_length=20)]
+    salaryCurrency: Annotated[str, Field(pattern="^[A-Z]{3}$")]
     signedOn: Annotated[date | None, Field(...)]
     notes: Annotated[str | None, Field(max_length=2000)]
 
@@ -3329,9 +3360,25 @@ class PlacementDefaults(BaseModel):
     companyId: CompanyId
     companyName: str
     termsSet: Annotated[bool, Field(description="The client has terms of business recorded.")]
-    feePercent: Annotated[DecimalAmount | None, Field(description="From the client's terms.")]
-    paymentTermsDays: Annotated[int, Field(description="From the client's terms (30 when not set).")]
-    guaranteeDays: Annotated[int, Field(description="From the client's terms (90 when not set).")]
+    tiers: Annotated[
+        list[CompanyTermsTier],
+        Field(
+            description="The client's rates by annual salary: the form picks the one for the salary typed in."
+        ),
+    ]
+    salaryCurrency: Annotated[str, Field(description="The currency of the tiers' salary limits.")]
+    feePercent: Annotated[
+        DecimalAmount | None,
+        Field(
+            description="From the client's terms (the rate for any salary; null when it depends on the salary)."
+        ),
+    ]
+    paymentTermsDays: Annotated[
+        int, Field(description="From the client's terms (30 when not set or when it depends on the salary).")
+    ]
+    guaranteeDays: Annotated[
+        int, Field(description="From the client's terms (90 when not set or when it depends on the salary).")
+    ]
     contactId: Annotated[
         ContactId | None, Field(description="The job's hiring contact, when they have an email address.")
     ]

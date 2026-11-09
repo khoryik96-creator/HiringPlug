@@ -36,17 +36,18 @@ func TestPlacementInvoicing(t *testing.T) {
 		var got api.CompanyTerms
 		a.request(http.MethodGet, terms, viewer, nil).JSON(&got)
 		assert.Equal(t, 0, got.Version)
-		bad := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "feePercent": "0", "paymentTermsDays": 30,
-			"guaranteeDays": 60, "signedOn": "2026-01-15", "notes": nil})
+		bad := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "tiers": []any{flatRate("0", 30, 60)},
+			"salaryCurrency": "MYR", "signedOn": "2026-01-15", "notes": nil})
 		require.Equal(t, http.StatusBadRequest, bad.Status)
-		assert.Equal(t, []string{"feePercent"}, fieldNames(t, bad.Error()))
-		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPut, terms, viewer, map[string]any{"version": 0, "feePercent": "18",
-			"paymentTermsDays": 30, "guaranteeDays": 60, "signedOn": nil, "notes": nil}).Status)
-		res := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "feePercent": "18.00", "paymentTermsDays": 30,
-			"guaranteeDays": 60, "signedOn": "2026-01-15", "notes": " Replacement once within the guarantee. "})
+		assert.Equal(t, []string{"tiers[0].feePercent"}, fieldNames(t, bad.Error()))
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodPut, terms, viewer, map[string]any{"version": 0, "tiers": []any{flatRate("18", 30, 60)},
+			"salaryCurrency": "MYR", "signedOn": nil, "notes": nil}).Status)
+		res := a.request(http.MethodPut, terms, recruiter, map[string]any{"version": 0, "tiers": []any{flatRate("18.00", 30, 60)},
+			"salaryCurrency": "MYR", "signedOn": "2026-01-15", "notes": " Replacement once within the guarantee. "})
 		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 		res.JSON(&got)
-		assert.Equal(t, "18", got.FeePercent.MustGet())
+		require.Len(t, got.Tiers, 1)
+		assert.Equal(t, "18", got.Tiers[0].FeePercent.MustGet())
 		assert.Equal(t, "Replacement once within the guarantee.", got.Notes.MustGet())
 		assert.Equal(t, 1, got.Version)
 	})
@@ -176,4 +177,10 @@ func TestPlacementInvoicing(t *testing.T) {
 			tenant.ID).Scan(&waiting))
 		assert.Equal(t, 1, waiting, "queued again for the start date")
 	})
+}
+
+// flatRate is one rate for any salary.
+func flatRate(feePercent string, paymentTermsDays, guaranteeDays int) map[string]any {
+	return map[string]any{"salaryFrom": nil, "salaryBelow": nil, "feePercent": feePercent, "paymentTermsDays": paymentTermsDays,
+		"guaranteeDays": guaranteeDays, "remarks": nil}
 }

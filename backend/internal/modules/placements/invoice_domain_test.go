@@ -64,3 +64,29 @@ func TestInvoiceTemplates(t *testing.T) {
 		assert.NotContains(t, b.Cells, "SST 0%", "no tax line without tax")
 	}
 }
+
+func TestTheRateForASalary(t *testing.T) {
+	s := func(v string) *string { return &v }
+	n := func(v int) *int { return &v }
+	tiered := ClientTerms{SalaryCurrency: "MYR", Tiers: []ClientTier{
+		{SalaryBelow: s("120000"), FeePercent: s("18"), PaymentTermsDays: n(14)},
+		{SalaryFrom: s("120000"), FeePercent: s("25"), PaymentTermsDays: n(30)},
+	}}
+	fee := func(terms ClientTerms, salary *Salary) string {
+		r, ok := terms.For(salary)
+		if !ok {
+			return "none"
+		}
+		return *r.FeePercent
+	}
+	assert.Equal(t, "18", fee(tiered, &Salary{Amount: "9999.99", Currency: "MYR", Period: "month"}))
+	assert.Equal(t, "25", fee(tiered, &Salary{Amount: "10000", Currency: "myr", Period: "month"}), "from 120,000 a year, inclusive")
+	assert.Equal(t, "25", fee(tiered, &Salary{Amount: "150000", Currency: "MYR", Period: "year"}))
+	assert.Equal(t, "none", fee(tiered, nil), "it depends on the salary")
+	assert.Equal(t, "none", fee(tiered, &Salary{Amount: "10000", Currency: "SGD", Period: "month"}), "limits are in ringgit")
+
+	flat := ClientTerms{SalaryCurrency: "MYR", Tiers: []ClientTier{{FeePercent: s("20")}}}
+	assert.Equal(t, "20", fee(flat, nil))
+	assert.Equal(t, "20", fee(flat, &Salary{Amount: "5000", Currency: "SGD", Period: "month"}))
+	assert.Equal(t, "none", fee(ClientTerms{}, nil))
+}

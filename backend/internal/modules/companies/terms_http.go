@@ -22,8 +22,10 @@ func (h *HTTP) GetCompanyTerms(ctx context.Context, req api.GetCompanyTermsReque
 // PutCompanyTerms handles PUT /v1/companies/{companyId}/terms.
 func (h *HTTP) PutCompanyTerms(ctx context.Context, req api.PutCompanyTermsRequestObject) (api.PutCompanyTermsResponseObject, error) {
 	b := req.Body
-	in := Terms{PaymentTermsDays: valueOf(b.PaymentTermsDays), GuaranteeDays: valueOf(b.GuaranteeDays), Notes: valueOf(b.Notes)}
-	in.FeePercent = valueOf(b.FeePercent)
+	in := Terms{SalaryCurrency: b.SalaryCurrency, Notes: valueOf(b.Notes), Tiers: make([]Tier, len(b.Tiers))}
+	for i, t := range b.Tiers {
+		in.Tiers[i] = TierFromAPI(t)
+	}
 	if v := valueOf(b.SignedOn); v != nil {
 		d := v.Time
 		in.SignedOn = &d
@@ -37,15 +39,34 @@ func (h *HTTP) PutCompanyTerms(ctx context.Context, req api.PutCompanyTermsReque
 
 func termsToAPI(t Terms) api.CompanyTerms {
 	out := api.CompanyTerms{
-		FeePercent: nullable.NewNullNullable[api.DecimalAmount](), PaymentTermsDays: nullOf(t.PaymentTermsDays),
-		GuaranteeDays: nullOf(t.GuaranteeDays), SignedOn: nullable.NewNullNullable[openapi_types.Date](), Notes: nullOf(t.Notes),
-		Version: t.Version, UpdatedAt: nullOf(t.UpdatedAt),
+		Tiers: TiersToAPI(t.Tiers), SalaryCurrency: t.SalaryCurrency, SignedOn: nullable.NewNullNullable[openapi_types.Date](),
+		Notes: nullOf(t.Notes), Version: t.Version, UpdatedAt: nullOf(t.UpdatedAt),
 	}
-	if t.FeePercent != nil {
-		out.FeePercent = nullable.NewNullableWithValue(*t.FeePercent)
+	if out.SalaryCurrency == "" {
+		out.SalaryCurrency = "MYR"
 	}
 	if t.SignedOn != nil {
 		out.SignedOn = nullable.NewNullableWithValue(openapi_types.Date{Time: *t.SignedOn})
+	}
+	return out
+}
+
+// TierFromAPI reads a rate sent to the API.
+func TierFromAPI(t api.CompanyTermsTier) Tier {
+	return Tier{
+		SalaryFrom: valueOf(t.SalaryFrom), SalaryBelow: valueOf(t.SalaryBelow), FeePercent: valueOf(t.FeePercent),
+		PaymentTermsDays: valueOf(t.PaymentTermsDays), GuaranteeDays: valueOf(t.GuaranteeDays), Remarks: valueOf(t.Remarks),
+	}
+}
+
+// TiersToAPI writes rates for the API (also the placements module's defaults).
+func TiersToAPI(tiers []Tier) []api.CompanyTermsTier {
+	out := make([]api.CompanyTermsTier, len(tiers))
+	for i, t := range tiers {
+		out[i] = api.CompanyTermsTier{
+			SalaryFrom: nullOf(t.SalaryFrom), SalaryBelow: nullOf(t.SalaryBelow), FeePercent: nullOf(t.FeePercent),
+			PaymentTermsDays: nullOf(t.PaymentTermsDays), GuaranteeDays: nullOf(t.GuaranteeDays), Remarks: nullOf(t.Remarks),
+		}
 	}
 	return out
 }

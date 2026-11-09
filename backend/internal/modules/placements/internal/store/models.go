@@ -296,16 +296,15 @@ type CompanySuggestion struct {
 }
 
 type CompanyTerm struct {
-	TenantID         string
-	CompanyID        string
-	FeePercent       pgtype.Numeric
-	PaymentTermsDays *int32
-	GuaranteeDays    *int32
-	SignedOn         *time.Time
-	Notes            *string
-	Version          int32
-	UpdatedBy        string
-	UpdatedAt        time.Time
+	TenantID       string
+	CompanyID      string
+	SignedOn       *time.Time
+	Notes          *string
+	Version        int32
+	UpdatedBy      string
+	UpdatedAt      time.Time
+	Tiers          []byte
+	SalaryCurrency string
 }
 
 type Contact struct {

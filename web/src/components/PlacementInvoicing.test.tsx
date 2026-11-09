@@ -18,8 +18,11 @@ const contacts = [
   { id: "cont_ken", fullName: "Ken Lim", email: "ken@maju.test" },
   { id: "cont_wei", fullName: "Wei Tan", email: null },
 ];
+const rate = (salaryFrom: string | null, salaryBelow: string | null, feePercent: string, guaranteeDays: number, paymentTermsDays: number, remarks: string | null = null) =>
+  ({ salaryFrom, salaryBelow, feePercent, guaranteeDays, paymentTermsDays, remarks });
 const defaults: Schemas["PlacementDefaults"] = {
   companyId: "comp_1", companyName: "Maju Foods", termsSet: true, feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, contactId: "cont_aisyah",
+  tiers: [rate(null, null, "18", 60, 30)], salaryCurrency: "MYR",
 };
 const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement"] => ({
   id: "plc_1", version: 1, applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "jo_1", jobTitle: "Finance Manager",
@@ -40,7 +43,7 @@ describe("invoicing a placement", () => {
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(placement()));
     renderWithClient(<PlacementForm applicationId="appl_1" permissions={RECRUITER.concat("placements.fees:update")} onDone={() => undefined} />);
 
-    expect(await screen.findByText(/From Maju Foods's terms of business: 18% fee · 30 days to pay · 60-day guarantee/)).toBeTruthy();
+    expect(await screen.findByText(/From Maju Foods's terms of business: 18% fee · 30 days to pay · 2 months guarantee/)).toBeTruthy();
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Guarantee (days)").value).toBe("60"); });
     expect(screen.getByLabelText<HTMLInputElement>("Fee %").value).toBe("18");
     const to = screen.getByLabelText<HTMLSelectElement>("Send the invoice to");
@@ -56,6 +59,28 @@ describe("invoicing a placement", () => {
     fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({ contactId: "cont_ken", paymentTermsDays: 45, dueOn: null, autoSend: true });
+  });
+
+  it("takes the rate for the salary from tiered terms", async () => {
+    const tiered = { ...defaults, feePercent: null, tiers: [rate(null, "120000", "18", 60, 14), rate("120000", null, "25", 90, 30, "50% on signing")] };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/applications/{applicationId}/placement-defaults" ? tiered : path === "/v1/contacts" ? { items: contacts, nextCursor: null } : { items: [] },
+    ))) as never);
+    renderWithClient(<PlacementForm applicationId="appl_1" permissions={RECRUITER.concat("placements.fees:update")} onDone={() => undefined} />);
+    expect(await screen.findByText(/rates depend on the annual salary \(Below RM 120,000: 18%; RM 120,000 and above: 25%\)/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Agreed salary"), { target: { value: "12,000" } }); // a month: RM 144,000 a year
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Fee %").value).toBe("25"); });
+    expect(screen.getByLabelText<HTMLInputElement>("Guarantee (days)").value).toBe("90");
+    expect(screen.getByLabelText<HTMLInputElement>("Payment terms (days)").value).toBe("30");
+    expect(screen.getByRole("note").textContent).toContain("(RM 120,000 and above): 25% fee · 30 days to pay · 3 months guarantee. Payment: 50% on signing.");
+
+    fireEvent.change(screen.getByLabelText("Fee %"), { target: { value: "22" } }); // changed for this placement: kept
+    fireEvent.change(screen.getByLabelText("Agreed salary"), { target: { value: "12,500" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Fee %").value).toBe("22");
+    fireEvent.change(screen.getByLabelText("Agreed salary"), { target: { value: "9000" } }); // into the lower band
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Fee %").value).toBe("18"); });
+    expect(screen.getByLabelText<HTMLInputElement>("Payment terms (days)").value).toBe("14");
   });
 
   it("shows where the invoice stands, previews it and sends it now", async () => {

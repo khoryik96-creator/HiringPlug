@@ -678,10 +678,16 @@ guarantee ends within two weeks. A fall-through means the client is owed a
 the Placements page) until it is marked provided or refunded.
 
 **Terms of business and invoicing ✅.** Each client has **terms of business**
-on its page (fee as a % of the annual salary, payment terms in days,
-guarantee in days, when signed, notes). A new placement starts from them (the
-fee %, guarantee and payment terms, and the job's hiring contact as the
-invoice recipient), and any of it can be changed for that placement. The
+on its page: one rate, or **tiers by annual salary** (e.g. RM 120,000 and
+above: 25%, 3 months' guarantee, 30 days to pay; below: 18%, 2 months, 14
+days), edited as a table where rows are added and removed. Each rate has the
+fee as a % of the annual salary, the guarantee (in months or days), the
+payment terms in days, and a **payment method / remarks** column for other
+arrangements (e.g. 50% on signing). Also when signed, notes, and the currency
+of the salary bands. A new placement starts from the rate for its salary,
+picked as the salary is typed in (monthly salaries count 12 times; the fee
+%, guarantee and payment terms, and the job's hiring contact as the invoice
+recipient), and any of it can be changed for that placement. The
 placement sheet says **who receives the invoice** (a dropdown of the client's
 contacts, "Name — email"), the **payment terms** and the **due date** (the
 invoice date plus the terms, worked out as the start date changes, unless

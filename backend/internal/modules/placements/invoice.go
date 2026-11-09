@@ -26,6 +26,7 @@ import (
 type Defaults struct {
 	CompanyID, CompanyName          string
 	Terms                           ClientTerms
+	FeePercent                      *string // the rate for any salary; nil when it depends on the salary
 	PaymentTermsDays, GuaranteeDays int
 	ContactID                       *string // the job's hiring contact, when they have an email address
 }
@@ -66,11 +67,14 @@ func (s *Service) Defaults(ctx context.Context, p authz.Principal, appID string)
 		}
 		out = Defaults{CompanyID: app.CompanyID, CompanyName: app.CompanyName, Terms: terms,
 			PaymentTermsDays: DefaultPaymentTermsDays, GuaranteeDays: DefaultGuaranteeDays}
-		if terms.PaymentTermsDays != nil {
-			out.PaymentTermsDays = *terms.PaymentTermsDays
-		}
-		if terms.GuaranteeDays != nil {
-			out.GuaranteeDays = *terms.GuaranteeDays
+		if rate, ok := terms.For(nil); ok {
+			out.FeePercent = rate.FeePercent
+			if rate.PaymentTermsDays != nil {
+				out.PaymentTermsDays = *rate.PaymentTermsDays
+			}
+			if rate.GuaranteeDays != nil {
+				out.GuaranteeDays = *rate.GuaranteeDays
+			}
 		}
 		out.ContactID, err = s.hiringContact(ctx, tx, app)
 		return err
@@ -93,16 +97,17 @@ func (s *Service) hiringContact(ctx context.Context, tx pgx.Tx, app Application)
 	return nil, nil //nolint:nilnil // a contact without an email address is no recipient
 }
 
-// startInvoicing gives a new placement its client's payment terms and the
-// job's hiring contact as the recipient (not emailed until someone says so).
-func (s *Service) startInvoicing(ctx context.Context, tx pgx.Tx, placementID string, app Application) error {
+// startInvoicing gives a new placement its client's payment terms (the rate
+// for its salary) and the job's hiring contact as the recipient (not emailed
+// until someone says so).
+func (s *Service) startInvoicing(ctx context.Context, tx pgx.Tx, placementID string, app Application, salary *Salary) error {
 	terms, err := s.inv.Terms.Terms(ctx, tx, app.CompanyID)
 	if err != nil {
 		return err
 	}
 	days := DefaultPaymentTermsDays
-	if terms.PaymentTermsDays != nil {
-		days = *terms.PaymentTermsDays
+	if rate, ok := terms.For(salary); ok && rate.PaymentTermsDays != nil {
+		days = *rate.PaymentTermsDays
 	}
 	contact, err := s.hiringContact(ctx, tx, app)
 	if err != nil {

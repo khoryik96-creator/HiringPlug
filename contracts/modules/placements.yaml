@@ -263,17 +263,22 @@ components:
       enum: [pdf, docx]
     PlacementDefaults:
       type: object
-      required: [companyId, companyName, feePercent, paymentTermsDays, guaranteeDays, contactId, termsSet]
+      required: [companyId, companyName, feePercent, paymentTermsDays, guaranteeDays, contactId, termsSet, tiers, salaryCurrency]
       properties:
         companyId: { $ref: '#/components/schemas/CompanyId' }
         companyName: { type: string }
         termsSet: { type: boolean, description: The client has terms of business recorded. }
+        tiers:
+          type: array
+          description: "The client's rates by annual salary: the form picks the one for the salary typed in."
+          items: { $ref: '#/components/schemas/CompanyTermsTier' }
+        salaryCurrency: { type: string, description: The currency of the tiers' salary limits. }
         feePercent:
-          description: From the client's terms.
+          description: From the client's terms (the rate for any salary; null when it depends on the salary).
           allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
           nullable: true
-        paymentTermsDays: { type: integer, description: "From the client's terms (30 when not set)." }
-        guaranteeDays: { type: integer, description: "From the client's terms (90 when not set)." }
+        paymentTermsDays: { type: integer, description: "From the client's terms (30 when not set or when it depends on the salary)." }
+        guaranteeDays: { type: integer, description: "From the client's terms (90 when not set or when it depends on the salary)." }
         contactId:
           description: The job's hiring contact, when they have an email address.
           allOf: [{ $ref: '#/components/schemas/ContactId' }]

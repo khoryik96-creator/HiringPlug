@@ -240,3 +240,37 @@ func annualSalary(s Salary) string {
 	}
 	return amount.FloatString(2)
 }
+
+// For is the rate for a salary: the one whose range has its annual amount
+// (when it is in the terms' currency). Without a salary, or one in another
+// currency, it is the only rate, when that has no salary limits.
+func (t ClientTerms) For(salary *Salary) (ClientTier, bool) {
+	if salary != nil && strings.EqualFold(salary.Currency, t.SalaryCurrency) {
+		if annual, ok := new(big.Rat).SetString(annualSalary(*salary)); ok {
+			for _, tier := range t.Tiers {
+				if inRange(annual, tier.SalaryFrom, tier.SalaryBelow) {
+					return tier, true
+				}
+			}
+			return ClientTier{}, false
+		}
+	}
+	if len(t.Tiers) == 1 && t.Tiers[0].SalaryFrom == nil && t.Tiers[0].SalaryBelow == nil {
+		return t.Tiers[0], true
+	}
+	return ClientTier{}, false
+}
+
+func inRange(v *big.Rat, from, below *string) bool {
+	if from != nil {
+		if f, ok := new(big.Rat).SetString(*from); ok && v.Cmp(f) < 0 {
+			return false
+		}
+	}
+	if below != nil {
+		if b, ok := new(big.Rat).SetString(*below); ok && v.Cmp(b) >= 0 {
+			return false
+		}
+	}
+	return true
+}

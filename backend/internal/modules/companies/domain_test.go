@@ -123,3 +123,26 @@ func TestSizesAndCountries(t *testing.T) {
 	found := Merge([]Suggestion{{Field: "name", Value: "A"}}, []Suggestion{{Field: "name", Value: "B"}, {Field: "phone", Value: "1"}})
 	assert.Len(t, found, 2, "a later page only adds what is missing")
 }
+
+func TestTermsRates(t *testing.T) {
+	s := func(v string) *string { return &v }
+	n := func(v int) *int { return &v }
+	got, errs := NormalizeTerms(Terms{SalaryCurrency: " myr ", Tiers: []Tier{
+		{SalaryBelow: s("120000.00"), FeePercent: s("18.50"), GuaranteeDays: n(60)},
+		{Remarks: s("   ")}, // empty: dropped
+		{SalaryFrom: s("120000"), FeePercent: s("25"), Remarks: s(" Retainer: 1/3 upfront ")},
+	}})
+	require.Empty(t, errs)
+	assert.Equal(t, "MYR", got.SalaryCurrency)
+	require.Len(t, got.Tiers, 2)
+	assert.Equal(t, "120000", *got.Tiers[0].SalaryBelow)
+	assert.Equal(t, "18.5", *got.Tiers[0].FeePercent)
+	assert.Equal(t, "Retainer: 1/3 upfront", *got.Tiers[1].Remarks)
+
+	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{SalaryBelow: s("120000")}, {SalaryBelow: s("80000")}}})
+	assert.Equal(t, "tiers[1].salaryFrom", errs[0].Field, "both cover salaries below 80,000")
+	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{SalaryBelow: s("120000")}, {SalaryFrom: s("120000")}}})
+	assert.Empty(t, errs, "120,000 itself is in the second rate only")
+	_, errs = NormalizeTerms(Terms{Tiers: []Tier{{FeePercent: s("101"), PaymentTermsDays: n(400)}}})
+	assert.Len(t, errs, 2)
+}

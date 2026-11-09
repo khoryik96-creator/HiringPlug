@@ -10,31 +10,51 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const none = { feePercent: null, paymentTermsDays: null, guaranteeDays: null, signedOn: null, notes: null, version: 0, updatedAt: null };
-const signed = { feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, signedOn: "2026-01-15", notes: "One free replacement.", version: 1, updatedAt: "2026-11-09T03:00:00Z" };
+const none = { tiers: [], salaryCurrency: "MYR", signedOn: null, notes: null, version: 0, updatedAt: null };
+const rate = (salaryFrom: string | null, salaryBelow: string | null, feePercent: string, guaranteeDays: number, paymentTermsDays: number, remarks: string | null = null) =>
+  ({ salaryFrom, salaryBelow, feePercent, guaranteeDays, paymentTermsDays, remarks });
+const tiered = {
+  tiers: [rate("120000", null, "25", 90, 30, "50% on signing, 50% on start"), rate(null, "120000", "18", 60, 14)],
+  salaryCurrency: "MYR", signedOn: "2026-01-15", notes: "One free replacement.", version: 1, updatedAt: "2026-11-09T03:00:00Z",
+};
+const reads = (terms: object) => vi.spyOn(api, "GET").mockImplementation(((path: string) =>
+  Promise.resolve(ok(path === "/v1/companies/{companyId}/terms" ? terms : { items: [] }))) as never);
 
 describe("a client's terms of business", () => {
-  it("are added: fee, payment terms, guarantee, when signed", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(none));
-    const put = vi.spyOn(api, "PUT").mockResolvedValueOnce(invalidField("feePercent", "a percentage above 0, at most 100")).mockResolvedValue(ok(signed));
+  it("are tiers by annual salary, each with a fee, guarantee, payment terms and payment remarks", async () => {
+    reads(none);
+    const put = vi.spyOn(api, "PUT").mockResolvedValueOnce(invalidField("tiers[1].salaryFrom", "overlaps rate 1")).mockResolvedValue(ok(tiered));
     renderWithClient(<CompanyTerms companyId="comp_1" permissions={["companies:read", "companies:update"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Add terms" }));
-    fireEvent.change(screen.getByLabelText("Fee (% of annual salary)"), { target: { value: "18%" } });
-    fireEvent.change(screen.getByLabelText("Guarantee (days)"), { target: { value: "60" } });
-    fireEvent.change(screen.getByLabelText("Signed on"), { target: { value: "2026-01-15" } });
+    fireEvent.change(screen.getByLabelText("Rate 1: annual salary from"), { target: { value: "120,000" } });
+    fireEvent.change(screen.getByLabelText("Rate 1: fee %"), { target: { value: "25%" } });
+    fireEvent.change(screen.getByLabelText("Rate 1: payment method / remarks"), { target: { value: "50% on signing, 50% on start" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add a salary band" }));
+    fireEvent.change(screen.getByLabelText("Rate 2: below"), { target: { value: "RM120000" } });
+    fireEvent.change(screen.getByLabelText("Rate 2: fee %"), { target: { value: "18" } });
+    fireEvent.change(screen.getByLabelText("Rate 2: guarantee"), { target: { value: "60" } });
+    fireEvent.change(screen.getByLabelText("Rate 2: guarantee in"), { target: { value: "days" } });
+    fireEvent.change(screen.getByLabelText("Rate 2: payment terms (days)"), { target: { value: "14" } });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add a salary band" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove rate 3" }));
     fireEvent.click(screen.getByRole("button", { name: "Save terms" }));
-    expect(await screen.findByText("a percentage above 0, at most 100")).toBeTruthy();
-    expect(sentBody(put)).toEqual({ version: 0, feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, signedOn: "2026-01-15", notes: null });
+    expect(await screen.findByText("Rate 2: overlaps rate 1")).toBeTruthy();
+    expect(sentBody(put)).toEqual({
+      version: 0, salaryCurrency: "MYR", signedOn: null, notes: null,
+      tiers: [rate("120000", null, "25", 90, 30, "50% on signing, 50% on start"), rate(null, "120000", "18", 60, 14)],
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save terms" }));
-    await waitFor(() => { expect(screen.getByText("18% of annual salary")).toBeTruthy(); });
-    expect(screen.getByText("30 days")).toBeTruthy();
-    expect(screen.getByText("One free replacement.")).toBeTruthy();
+    await waitFor(() => { expect(screen.getByText("RM 120,000 and above")).toBeTruthy(); });
+    expect(screen.getByText("Below RM 120,000")).toBeTruthy();
+    expect(screen.getByText("3 months")).toBeTruthy();
+    expect(screen.getByText("14 days")).toBeTruthy();
+    expect(screen.getByText("50% on signing, 50% on start")).toBeTruthy();
   });
 
   it("are read only without companies:update", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(signed));
+    reads(tiered);
     renderWithClient(<CompanyTerms companyId="comp_1" permissions={["companies:read"]} />);
-    expect(await screen.findByText("60 days")).toBeTruthy();
+    expect(await screen.findByText("2 months")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
   });
 });

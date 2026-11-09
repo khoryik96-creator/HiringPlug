@@ -407,16 +407,36 @@ components:
       required: [items]
       properties:
         items: { type: array, items: { $ref: '#/components/schemas/CompanyDocument' } }
-    CompanyTerms:
+    CompanyTermsTier:
       type: object
-      required: [feePercent, paymentTermsDays, guaranteeDays, signedOn, notes, version, updatedAt]
+      additionalProperties: false
+      description: "One rate of a client's terms: for annual salaries from salaryFrom (inclusive) up to salaryBelow (exclusive); both null: any salary."
+      required: [salaryFrom, salaryBelow, feePercent, paymentTermsDays, guaranteeDays, remarks]
       properties:
+        salaryFrom:
+          description: Annual salaries at or above this (in the terms' salaryCurrency); null for no lower limit.
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
+        salaryBelow:
+          description: Annual salaries below this; null for no upper limit.
+          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
+          nullable: true
         feePercent:
           description: "The fee, as a percentage of the yearly salary: e.g. \"18\"."
           allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
           nullable: true
-        paymentTermsDays: { type: integer, nullable: true, description: "Days after the invoice the fee is due, e.g. 30." }
-        guaranteeDays: { type: integer, nullable: true, description: "Days after the start a placement is guaranteed." }
+        paymentTermsDays: { type: integer, minimum: 0, maximum: 365, nullable: true, description: "Days after the invoice the fee is due, e.g. 30." }
+        guaranteeDays: { type: integer, minimum: 0, maximum: 365, nullable: true, description: "Days after the start a placement is guaranteed (a month is 30)." }
+        remarks: { type: string, maxLength: 500, nullable: true, description: "Another payment method or anything else about this rate (e.g. 50% on signing, 50% on start)." }
+    CompanyTerms:
+      type: object
+      required: [tiers, salaryCurrency, signedOn, notes, version, updatedAt]
+      properties:
+        tiers:
+          type: array
+          description: The rates, by annual salary. One with no salary limits is a flat rate.
+          items: { $ref: '#/components/schemas/CompanyTermsTier' }
+        salaryCurrency: { type: string, pattern: '^[A-Z]{3}$', description: The currency of the tiers' salary limits. }
         signedOn: { type: string, format: date, nullable: true, description: When the terms were signed. }
         notes: { type: string, nullable: true }
         version: { type: integer, description: 0 before the first save. }
@@ -424,14 +444,14 @@ components:
     CompanyTermsInput:
       type: object
       additionalProperties: false
-      required: [version, feePercent, paymentTermsDays, guaranteeDays, signedOn, notes]
+      required: [version, tiers, salaryCurrency, signedOn, notes]
       properties:
         version: { type: integer, minimum: 0 }
-        feePercent:
-          allOf: [{ $ref: '#/components/schemas/DecimalAmount' }]
-          nullable: true
-        paymentTermsDays: { type: integer, minimum: 0, maximum: 365, nullable: true }
-        guaranteeDays: { type: integer, minimum: 0, maximum: 365, nullable: true }
+        tiers:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/CompanyTermsTier' }
+        salaryCurrency: { type: string, pattern: '^[A-Z]{3}$' }
         signedOn: { type: string, format: date, nullable: true }
         notes: { type: string, maxLength: 2000, nullable: true }
     CompanyBenefitsFormat:

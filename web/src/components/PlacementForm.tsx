@@ -8,6 +8,7 @@ import { Field } from "./Field";
 import { CURRENCIES, fieldErrors } from "./forms";
 import { createBody, feePreview, formFromPlacement, invoicingBody, type PlacementFormState, updateBody, withDefaults } from "./placementFormState";
 import { InvoicingFields } from "./PlacementInvoicing";
+import { pickTier } from "./termsTiers";
 import { SaveError } from "./SaveError";
 
 type Placement = Schemas["Placement"];
@@ -39,6 +40,22 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
       setForm((f) => withDefaults(f, defaults.data, withMoney));
     }
   }, [defaults.data, withMoney]);
+  // Tiered terms: the rate for the salary typed in fills the fee, guarantee
+  // and payment terms when the salary moves into it (and can still be changed).
+  const tier = defaults.data ? pickTier(defaults.data.tiers, defaults.data.salaryCurrency,
+    { amount: form.salaryAmount, currency: form.salaryCurrency, period: form.salaryPeriod }) : -1;
+  const appliedTier = useRef(-1);
+  useEffect(() => {
+    const rate = defaults.data?.tiers[tier];
+    if (placement || !rate || appliedTier.current === tier) return;
+    appliedTier.current = tier;
+    setForm((f) => ({
+      ...f,
+      guaranteeDays: rate.guaranteeDays !== null ? String(rate.guaranteeDays) : f.guaranteeDays,
+      paymentTermsDays: rate.paymentTermsDays !== null ? String(rate.paymentTermsDays) : f.paymentTermsDays,
+      feePercent: withMoney && f.feeKind === "percent" && rate.feePercent ? rate.feePercent : f.feePercent,
+    }));
+  }, [tier, defaults.data, placement, withMoney]);
   // Recorded but not yet finished (its invoicing failed to save): saving
   // again changes it rather than recording it twice.
   const [recorded, setRecorded] = useState<Placement | null>(null);
@@ -154,7 +171,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
         </fieldset>
       )}
       <InvoicingFields form={form} setForm={setForm} companyId={placement?.companyId ?? defaults.data?.companyId}
-        terms={placement ? undefined : defaults.data} errors={errors} />
+        terms={placement ? undefined : defaults.data} tier={tier} errors={errors} />
       <SaveError error={save.error} shown={shown} onReload={onDone} />
       <div className="row full">
         <button type="submit" disabled={save.isPending || !form.startDate}>{placement ? "Save" : "Record placement"}</button>

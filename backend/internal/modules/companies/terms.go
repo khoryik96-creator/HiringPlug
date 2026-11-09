@@ -1,11 +1,15 @@
 package companies
 
-// A client's terms of business: the fee (a percentage of the yearly salary),
-// payment terms and guarantee they signed, which fill in a new placement.
+// A client's terms of business: rates by annual salary, each with the fee (a
+// percentage of the yearly salary), payment terms, guarantee and remarks
+// (another payment method), which fill in a new placement.
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,32 +23,87 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// Terms are a client's terms of business; nil fields are not set.
+// Terms are a client's terms of business: their rates by annual salary.
 type Terms struct {
-	FeePercent                      *string // e.g. "18"
-	PaymentTermsDays, GuaranteeDays *int
-	SignedOn                        *time.Time
-	Notes                           *string
-	Version                         int // 0 before the first save
-	UpdatedAt                       *time.Time
+	Tiers          []Tier
+	SalaryCurrency string // of the tiers' salary limits
+	SignedOn       *time.Time
+	Notes          *string
+	Version        int // 0 before the first save
+	UpdatedAt      *time.Time
 }
 
-// NormalizeTerms checks terms a person saves.
+// Tier is one rate: for annual salaries from SalaryFrom (inclusive) up to
+// SalaryBelow (exclusive); nil limits are open. Nil fields are not set.
+type Tier struct {
+	SalaryFrom       *string `json:"salaryFrom,omitempty"`
+	SalaryBelow      *string `json:"salaryBelow,omitempty"`
+	FeePercent       *string `json:"feePercent,omitempty"` // e.g. "18"
+	PaymentTermsDays *int    `json:"paymentTermsDays,omitempty"`
+	GuaranteeDays    *int    `json:"guaranteeDays,omitempty"`
+	Remarks          *string `json:"remarks,omitempty"` // another payment method, anything else
+}
+
+func (t Tier) empty() bool {
+	return t.SalaryFrom == nil && t.SalaryBelow == nil && t.FeePercent == nil && t.PaymentTermsDays == nil &&
+		t.GuaranteeDays == nil && t.Remarks == nil
+}
+
+// NormalizeTerms checks terms a person saves: rows left empty are dropped;
+// each rate's salary range must not overlap another's.
 func NormalizeTerms(t Terms) (Terms, apperr.FieldErrors) {
 	var errs apperr.FieldErrors
-	if t.FeePercent != nil {
-		pct, ok := new(big.Rat).SetString(*t.FeePercent)
-		if !ok || pct.Sign() <= 0 || pct.Cmp(big.NewRat(100, 1)) > 0 {
-			errs.Add("feePercent", "a percentage above 0, at most 100")
+	t.SalaryCurrency = strings.ToUpper(strings.TrimSpace(t.SalaryCurrency))
+	if t.SalaryCurrency == "" {
+		t.SalaryCurrency = "MYR"
+	}
+	tiers := make([]Tier, 0, len(t.Tiers))
+	for _, tier := range t.Tiers {
+		if tier.Remarks != nil {
+			r := strings.TrimSpace(*tier.Remarks)
+			tier.Remarks = &r
+			if r == "" {
+				tier.Remarks = nil
+			}
+		}
+		tier.FeePercent = trimZeros(tier.FeePercent)
+		tier.SalaryFrom, tier.SalaryBelow = trimZeros(tier.SalaryFrom), trimZeros(tier.SalaryBelow)
+		if !tier.empty() {
+			tiers = append(tiers, tier)
 		}
 	}
-	days := func(field string, v *int) {
-		if v != nil && (*v < 0 || *v > 365) {
-			errs.Add(field, "between 0 and 365 days")
+	if len(tiers) > 20 {
+		errs.Add("tiers", "at most 20 rates")
+	}
+	for i, tier := range tiers {
+		at := func(f string) string { return "tiers[" + strconv.Itoa(i) + "]." + f }
+		if tier.FeePercent != nil {
+			pct, ok := new(big.Rat).SetString(*tier.FeePercent)
+			if !ok || pct.Sign() <= 0 || pct.Cmp(big.NewRat(100, 1)) > 0 {
+				errs.Add(at("feePercent"), "a percentage above 0, at most 100")
+			}
+		}
+		for f, v := range map[string]*int{"paymentTermsDays": tier.PaymentTermsDays, "guaranteeDays": tier.GuaranteeDays} {
+			if v != nil && (*v < 0 || *v > 365) {
+				errs.Add(at(f), "between 0 and 365 days")
+			}
+		}
+		if tier.Remarks != nil && len([]rune(*tier.Remarks)) > 500 {
+			errs.Add(at("remarks"), "must be at most 500 characters")
+		}
+		from, below := ratOf(tier.SalaryFrom), ratOf(tier.SalaryBelow)
+		if from != nil && below != nil && from.Cmp(below) >= 0 {
+			errs.Add(at("salaryBelow"), "must be more than the salary it starts from")
+			continue
+		}
+		for j := range i {
+			if overlap(tiers[j], tier) {
+				errs.Add(at("salaryFrom"), "overlaps rate "+strconv.Itoa(j+1)+": each salary must fall in one rate only")
+				break
+			}
 		}
 	}
-	days("paymentTermsDays", t.PaymentTermsDays)
-	days("guaranteeDays", t.GuaranteeDays)
+	t.Tiers = tiers
 	if t.Notes != nil {
 		n := strings.TrimSpace(*t.Notes)
 		t.Notes = &n
@@ -55,6 +114,24 @@ func NormalizeTerms(t Terms) (Terms, apperr.FieldErrors) {
 		}
 	}
 	return t, errs
+}
+
+// overlap reports whether two rates' salary ranges share a salary.
+func overlap(a, b Tier) bool {
+	below := func(x, y *big.Rat) bool { return x != nil && y != nil && x.Cmp(y) <= 0 } // [.., x) ends before [y, ..)
+	aFrom, aBelow, bFrom, bBelow := ratOf(a.SalaryFrom), ratOf(a.SalaryBelow), ratOf(b.SalaryFrom), ratOf(b.SalaryBelow)
+	return !below(aBelow, bFrom) && !below(bBelow, aFrom)
+}
+
+func ratOf(s *string) *big.Rat {
+	if s == nil {
+		return nil
+	}
+	r, ok := new(big.Rat).SetString(*s)
+	if !ok {
+		return nil
+	}
+	return r
 }
 
 // GetTerms returns a client's terms (nothing set before the first save).
@@ -87,13 +164,16 @@ func termsIn(ctx context.Context, tx pgx.Tx, companyID string, check bool) (Term
 	if err != nil {
 		return Terms{}, err
 	}
-	fee, err := database.DecimalString(row.FeePercent)
-	if err != nil {
+	var tiers []Tier
+	if err := json.Unmarshal(row.Tiers, &tiers); err != nil {
 		return Terms{}, err
 	}
+	for i, t := range tiers { // "18.00" (terms saved before tiers) reads "18"
+		tiers[i].FeePercent, tiers[i].SalaryFrom, tiers[i].SalaryBelow = trimZeros(t.FeePercent), trimZeros(t.SalaryFrom), trimZeros(t.SalaryBelow)
+	}
 	return Terms{
-		FeePercent: trimZeros(fee), PaymentTermsDays: intOf(row.PaymentTermsDays), GuaranteeDays: intOf(row.GuaranteeDays),
-		SignedOn: dateOf(row.SignedOn), Notes: row.Notes, Version: int(row.Version), UpdatedAt: &row.UpdatedAt,
+		Tiers: tiers, SalaryCurrency: row.SalaryCurrency, SignedOn: dateOf(row.SignedOn), Notes: row.Notes,
+		Version: int(row.Version), UpdatedAt: &row.UpdatedAt,
 	}, nil
 }
 
@@ -114,13 +194,15 @@ func (s *Service) PutTerms(ctx context.Context, p authz.Principal, companyID str
 			return apperr.StaleVersion("terms").WithDetail("currentVersion", before.Version)
 		}
 		q := store.New(tx)
-		pay, guarantee := int32Of(in.PaymentTermsDays), int32Of(in.GuaranteeDays)
+		tiers, err := json.Marshal(in.Tiers)
+		if err != nil {
+			return err
+		}
 		var version int32
 		var at time.Time
 		if expectedVersion == 0 {
 			row, err := q.InsertCompanyTerms(ctx, store.InsertCompanyTermsParams{
-				CompanyID: companyID, FeePercent: in.FeePercent, PaymentTermsDays: pay, GuaranteeDays: guarantee,
-				SignedOn: pgDate(in.SignedOn), Notes: in.Notes,
+				CompanyID: companyID, Tiers: tiers, SalaryCurrency: in.SalaryCurrency, SignedOn: pgDate(in.SignedOn), Notes: in.Notes,
 			})
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("terms")
@@ -132,7 +214,7 @@ func (s *Service) PutTerms(ctx context.Context, p authz.Principal, companyID str
 		} else {
 			row, err := q.UpdateCompanyTerms(ctx, store.UpdateCompanyTermsParams{
 				CompanyID: companyID, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small
-				FeePercent: in.FeePercent, PaymentTermsDays: pay, GuaranteeDays: guarantee, SignedOn: pgDate(in.SignedOn), Notes: in.Notes,
+				Tiers: tiers, SalaryCurrency: in.SalaryCurrency, SignedOn: pgDate(in.SignedOn), Notes: in.Notes,
 			})
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("terms")
@@ -143,10 +225,9 @@ func (s *Service) PutTerms(ctx context.Context, p authz.Principal, companyID str
 			version, at = row.Version, row.UpdatedAt
 		}
 		out = in
-		out.FeePercent = trimZeros(in.FeePercent)
 		out.Version, out.UpdatedAt = int(version), &at
-		// The fee, payment terms and guarantee are commercial terms, not a
-		// person's pay: they go in the audit log as they are.
+		// The rates are commercial terms, not a person's pay (the salary
+		// limits are the client's bands): they go in the audit log as they are.
 		return audit.Record(ctx, tx, audit.Entry{Action: "company.terms_saved", EntityType: "company", EntityID: companyID,
 			Changes: audit.Diff(termsFields(before), termsFields(out))})
 	})
@@ -160,8 +241,20 @@ func termsFields(t Terms) map[string]any {
 		}
 		return d.Format(time.DateOnly)
 	}
-	return map[string]any{"feePercent": deref(trimZeros(t.FeePercent)), "paymentTermsDays": t.PaymentTermsDays,
-		"guaranteeDays": t.GuaranteeDays, "signedOn": day(t.SignedOn), "notes": t.Notes}
+	rates := make([]string, len(t.Tiers))
+	for i, r := range t.Tiers {
+		rates[i] = fmt.Sprintf("salary %s to below %s: %s%% · %s days to pay · %s-day guarantee", deref(r.SalaryFrom), deref(r.SalaryBelow),
+			deref(r.FeePercent), intText(r.PaymentTermsDays), intText(r.GuaranteeDays))
+	}
+	return map[string]any{"rates": rates, "salaryCurrency": t.SalaryCurrency,
+		"signedOn": day(t.SignedOn), "notes": t.Notes}
+}
+
+func intText(v *int) string {
+	if v == nil {
+		return "?"
+	}
+	return strconv.Itoa(*v)
 }
 
 // trimZeros writes a percentage as people do: "18.00" is "18", "12.50" "12.5".
@@ -174,22 +267,6 @@ func trimZeros(s *string) *string {
 		v = strings.TrimRight(strings.TrimRight(v, "0"), ".")
 	}
 	return &v
-}
-
-func intOf(v *int32) *int {
-	if v == nil {
-		return nil
-	}
-	n := int(*v)
-	return &n
-}
-
-func int32Of(v *int) *int32 {
-	if v == nil {
-		return nil
-	}
-	n := int32(*v) //nolint:gosec // 0..365, checked
-	return &n
 }
 
 func dateOf(d pgtype.Date) *time.Time {

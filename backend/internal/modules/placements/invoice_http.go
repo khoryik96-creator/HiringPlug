@@ -22,10 +22,19 @@ func (h *HTTP) GetPlacementDefaults(ctx context.Context, req api.GetPlacementDef
 	out := api.GetPlacementDefaults200JSONResponse{
 		CompanyId: d.CompanyID, CompanyName: d.CompanyName, TermsSet: d.Terms.Set,
 		FeePercent: nullable.NewNullNullable[api.DecimalAmount](), PaymentTermsDays: d.PaymentTermsDays, GuaranteeDays: d.GuaranteeDays,
-		ContactId: c.OrNull(d.ContactID),
+		ContactId: c.OrNull(d.ContactID), SalaryCurrency: d.Terms.SalaryCurrency, Tiers: make([]api.CompanyTermsTier, len(d.Terms.Tiers)),
 	}
-	if d.Terms.FeePercent != nil {
-		out.FeePercent = nullable.NewNullableWithValue(*d.Terms.FeePercent)
+	if out.SalaryCurrency == "" {
+		out.SalaryCurrency = "MYR"
+	}
+	for i, t := range d.Terms.Tiers {
+		out.Tiers[i] = api.CompanyTermsTier{
+			SalaryFrom: c.OrNull(t.SalaryFrom), SalaryBelow: c.OrNull(t.SalaryBelow), FeePercent: c.OrNull(t.FeePercent),
+			PaymentTermsDays: c.OrNull(t.PaymentTermsDays), GuaranteeDays: c.OrNull(t.GuaranteeDays), Remarks: c.OrNull(t.Remarks),
+		}
+	}
+	if d.FeePercent != nil {
+		out.FeePercent = nullable.NewNullableWithValue(*d.FeePercent)
 	}
 	return out, nil
 }

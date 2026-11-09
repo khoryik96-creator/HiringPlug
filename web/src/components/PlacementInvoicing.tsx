@@ -12,6 +12,7 @@ import { formatDay, formatWhen } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
 import { autoDueOn, type PlacementFormState } from "./placementFormState";
+import { bySalary, guaranteeLabel, rangeLabel } from "./termsTiers";
 
 type Placement = Schemas["Placement"];
 
@@ -26,9 +27,9 @@ export function useClientContacts(companyId: string | undefined) {
 }
 
 /** The form's invoicing fields. */
-export function InvoicingFields({ form, setForm, companyId, terms, errors }: {
+export function InvoicingFields({ form, setForm, companyId, terms, tier = -1, errors }: {
   form: PlacementFormState; setForm: (f: PlacementFormState) => void; companyId: string | undefined;
-  terms?: Schemas["PlacementDefaults"]; errors: Record<string, string>;
+  terms?: Schemas["PlacementDefaults"]; tier?: number; errors: Record<string, string>;
 }) {
   const contacts = useClientContacts(companyId);
   const auto = autoDueOn(form.startDate, form.paymentTermsDays);
@@ -36,14 +37,7 @@ export function InvoicingFields({ form, setForm, companyId, terms, errors }: {
   return (
     <fieldset className="form-grid full invoicing">
       <legend>Invoicing</legend>
-      {terms && (
-        <p className="muted small full">
-          {terms.termsSet
-            ? <>From {terms.companyName}&apos;s terms of business: {[terms.feePercent && `${terms.feePercent}% fee`, `${String(terms.paymentTermsDays)} days to pay`,
-              `${String(terms.guaranteeDays)}-day guarantee`].filter(Boolean).join(" · ")}. Change anything below for this placement.</>
-            : <>No terms of business for {terms.companyName} yet: add them on <a href={`#/companies/${terms.companyId}`}>its page</a> to fill these in.</>}
-        </p>
-      )}
+      {terms && <TermsNote terms={terms} tier={tier} />}
       <Field label="Send the invoice to" error={errors.contactId}>
         <select value={form.contactId} onChange={(e) => { setForm({ ...form, contactId: e.target.value, autoSend: e.target.value ? form.autoSend : false }); }}>
           <option value="">Choose a contact…</option>
@@ -72,6 +66,25 @@ export function InvoicingFields({ form, setForm, companyId, terms, errors }: {
         {" "}<a href="#/invoicing">invoice template</a>
       </label>
     </fieldset>
+  );
+}
+
+/** Which of the client's rates filled in the form. */
+function TermsNote({ terms, tier }: { terms: Schemas["PlacementDefaults"]; tier: number }) {
+  if (!terms.termsSet || terms.tiers.length === 0) {
+    return <p className="muted small full">No terms of business for {terms.companyName} yet: add them on <a href={`#/companies/${terms.companyId}`}>its page</a> to fill these in.</p>;
+  }
+  const rate = terms.tiers[tier];
+  const says = rate && [rate.feePercent && `${rate.feePercent}% fee`, rate.paymentTermsDays !== null && `${String(rate.paymentTermsDays)} days to pay`,
+    rate.guaranteeDays !== null && `${guaranteeLabel(rate.guaranteeDays)} guarantee`].filter(Boolean).join(" · ");
+  return (
+    <p className="muted small full" role="note">
+      {rate
+        ? <>From {terms.companyName}&apos;s terms of business{bySalary(terms.tiers) ? ` (${rangeLabel(rate, terms.salaryCurrency)})` : ""}: {says}.
+          {rate.remarks && <> Payment: {rate.remarks}.</>} Change anything below for this placement.</>
+        : <>{terms.companyName}&apos;s rates depend on the annual salary ({terms.tiers.map((t) => `${rangeLabel(t, terms.salaryCurrency)}: ${t.feePercent ?? "?"}%`).join("; ")}):
+          enter the salary{terms.salaryCurrency !== "MYR" ? ` in ${terms.salaryCurrency}` : ""} to fill them in.</>}
+    </p>
   );
 }
 

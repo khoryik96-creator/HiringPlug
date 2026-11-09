@@ -253,18 +253,17 @@ func (q *Queries) GetCompanyDocument(ctx context.Context, arg GetCompanyDocument
 }
 
 const getCompanyTerms = `-- name: GetCompanyTerms :one
-SELECT fee_percent, payment_terms_days, guarantee_days, signed_on, notes, version, updated_at
+SELECT tiers, salary_currency, signed_on, notes, version, updated_at
 FROM company_terms WHERE company_id = $1
 `
 
 type GetCompanyTermsRow struct {
-	FeePercent       pgtype.Numeric
-	PaymentTermsDays *int32
-	GuaranteeDays    *int32
-	SignedOn         pgtype.Date
-	Notes            *string
-	Version          int32
-	UpdatedAt        time.Time
+	Tiers          []byte
+	SalaryCurrency string
+	SignedOn       pgtype.Date
+	Notes          *string
+	Version        int32
+	UpdatedAt      time.Time
 }
 
 // A client's terms of business.
@@ -272,9 +271,8 @@ func (q *Queries) GetCompanyTerms(ctx context.Context, companyID string) (GetCom
 	row := q.db.QueryRow(ctx, getCompanyTerms, companyID)
 	var i GetCompanyTermsRow
 	err := row.Scan(
-		&i.FeePercent,
-		&i.PaymentTermsDays,
-		&i.GuaranteeDays,
+		&i.Tiers,
+		&i.SalaryCurrency,
 		&i.SignedOn,
 		&i.Notes,
 		&i.Version,
@@ -447,20 +445,18 @@ func (q *Queries) InsertCompanyDocument(ctx context.Context, arg InsertCompanyDo
 }
 
 const insertCompanyTerms = `-- name: InsertCompanyTerms :one
-INSERT INTO company_terms (tenant_id, company_id, fee_percent, payment_terms_days, guarantee_days, signed_on, notes, updated_by)
-VALUES (app_current_tenant(), $1, $2::text::numeric, $3, $4,
-        $5, $6, app_current_user())
+INSERT INTO company_terms (tenant_id, company_id, tiers, salary_currency, signed_on, notes, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
 ON CONFLICT (tenant_id, company_id) DO NOTHING
 RETURNING version, updated_at
 `
 
 type InsertCompanyTermsParams struct {
-	CompanyID        string
-	FeePercent       *string
-	PaymentTermsDays *int32
-	GuaranteeDays    *int32
-	SignedOn         pgtype.Date
-	Notes            *string
+	CompanyID      string
+	Tiers          []byte
+	SalaryCurrency string
+	SignedOn       pgtype.Date
+	Notes          *string
 }
 
 type InsertCompanyTermsRow struct {
@@ -472,9 +468,8 @@ type InsertCompanyTermsRow struct {
 func (q *Queries) InsertCompanyTerms(ctx context.Context, arg InsertCompanyTermsParams) (InsertCompanyTermsRow, error) {
 	row := q.db.QueryRow(ctx, insertCompanyTerms,
 		arg.CompanyID,
-		arg.FeePercent,
-		arg.PaymentTermsDays,
-		arg.GuaranteeDays,
+		arg.Tiers,
+		arg.SalaryCurrency,
 		arg.SignedOn,
 		arg.Notes,
 	)
@@ -768,21 +763,19 @@ func (q *Queries) UpdateCompanyBenefits(ctx context.Context, arg UpdateCompanyBe
 
 const updateCompanyTerms = `-- name: UpdateCompanyTerms :one
 UPDATE company_terms
-SET fee_percent = $1::text::numeric, payment_terms_days = $2,
-    guarantee_days = $3, signed_on = $4, notes = $5,
+SET tiers = $1, salary_currency = $2, signed_on = $3, notes = $4,
     version = version + 1, updated_by = app_current_user(), updated_at = now()
-WHERE company_id = $6 AND version = $7
+WHERE company_id = $5 AND version = $6
 RETURNING version, updated_at
 `
 
 type UpdateCompanyTermsParams struct {
-	FeePercent       *string
-	PaymentTermsDays *int32
-	GuaranteeDays    *int32
-	SignedOn         pgtype.Date
-	Notes            *string
-	CompanyID        string
-	ExpectedVersion  int32
+	Tiers           []byte
+	SalaryCurrency  string
+	SignedOn        pgtype.Date
+	Notes           *string
+	CompanyID       string
+	ExpectedVersion int32
 }
 
 type UpdateCompanyTermsRow struct {
@@ -792,9 +785,8 @@ type UpdateCompanyTermsRow struct {
 
 func (q *Queries) UpdateCompanyTerms(ctx context.Context, arg UpdateCompanyTermsParams) (UpdateCompanyTermsRow, error) {
 	row := q.db.QueryRow(ctx, updateCompanyTerms,
-		arg.FeePercent,
-		arg.PaymentTermsDays,
-		arg.GuaranteeDays,
+		arg.Tiers,
+		arg.SalaryCurrency,
 		arg.SignedOn,
 		arg.Notes,
 		arg.CompanyID,

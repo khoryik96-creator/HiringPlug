@@ -108,7 +108,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 		if err := putMoney(ctx, q, row.ID, m); err != nil {
 			return err
 		}
-		if err := s.startInvoicing(ctx, tx, row.ID, app); err != nil {
+		var salary *Salary
+		if m != nil {
+			salary = m.Salary
+		}
+		if err := s.startInvoicing(ctx, tx, row.ID, app, salary); err != nil {
 			return err
 		}
 		changes := map[string]any{"applicationId": appID, "startDate": d.StartDate.Format(time.DateOnly), "guaranteeDays": d.GuaranteeDays, "recruiterId": d.RecruiterID}

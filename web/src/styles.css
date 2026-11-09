@@ -580,3 +580,16 @@ fieldset.invoicing .check { display: block; }
 .company-docs .drop-zone label { padding: 0.8rem 1rem; }
 .doc-btn.danger { color: #b91c1c; }
 .doc-btn.danger:hover { border-color: #b91c1c; color: #b91c1c; }
+
+/* A client's rates by annual salary. */
+.terms-table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.6rem; font-size: 0.92rem; }
+.terms-table th { text-align: left; font-size: 0.75rem; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--line); }
+.terms-table td { padding: 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.terms-table td.strong { font-weight: 700; }
+.terms-table tbody tr:nth-child(odd) td { background: var(--soft); }
+.terms-table.editing td { padding: 0.35rem 0.3rem; background: none; }
+.terms-table.editing input, .terms-table.editing select, .terms-table.editing textarea { width: 100%; min-width: 4.5rem; box-sizing: border-box; }
+.terms-table.editing textarea { min-width: 12rem; resize: vertical; }
+.terms-table .guarantee { display: flex; gap: 0.3rem; }
+.terms-table.editing .guarantee input { width: 4rem; min-width: 3.5rem; }
+.terms-table.editing .guarantee select { width: auto; min-width: 0; }

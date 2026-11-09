@@ -3505,13 +3505,26 @@ export interface components {
         CompanyDocumentList: {
             items: components["schemas"]["CompanyDocument"][];
         };
-        CompanyTerms: {
+        /** @description One rate of a client's terms: for annual salaries from salaryFrom (inclusive) up to salaryBelow (exclusive); both null: any salary. */
+        CompanyTermsTier: {
+            /** @description Annual salaries at or above this (in the terms' salaryCurrency); null for no lower limit. */
+            salaryFrom: components["schemas"]["DecimalAmount"] | null;
+            /** @description Annual salaries below this; null for no upper limit. */
+            salaryBelow: components["schemas"]["DecimalAmount"] | null;
             /** @description The fee, as a percentage of the yearly salary: e.g. "18". */
             feePercent: components["schemas"]["DecimalAmount"] | null;
             /** @description Days after the invoice the fee is due, e.g. 30. */
             paymentTermsDays: number | null;
-            /** @description Days after the start a placement is guaranteed. */
+            /** @description Days after the start a placement is guaranteed (a month is 30). */
             guaranteeDays: number | null;
+            /** @description Another payment method or anything else about this rate (e.g. 50% on signing, 50% on start). */
+            remarks: string | null;
+        };
+        CompanyTerms: {
+            /** @description The rates, by annual salary. One with no salary limits is a flat rate. */
+            tiers: components["schemas"]["CompanyTermsTier"][];
+            /** @description The currency of the tiers' salary limits. */
+            salaryCurrency: string;
             /**
              * Format: date
              * @description When the terms were signed.
@@ -3525,9 +3538,8 @@ export interface components {
         };
         CompanyTermsInput: {
             version: number;
-            feePercent: components["schemas"]["DecimalAmount"] | null;
-            paymentTermsDays: number | null;
-            guaranteeDays: number | null;
+            tiers: components["schemas"]["CompanyTermsTier"][];
+            salaryCurrency: string;
             /** Format: date */
             signedOn: string | null;
             notes: string | null;
@@ -5652,11 +5664,15 @@ export interface components {
             companyName: string;
             /** @description The client has terms of business recorded. */
             termsSet: boolean;
-            /** @description From the client's terms. */
+            /** @description The client's rates by annual salary: the form picks the one for the salary typed in. */
+            tiers: components["schemas"]["CompanyTermsTier"][];
+            /** @description The currency of the tiers' salary limits. */
+            salaryCurrency: string;
+            /** @description From the client's terms (the rate for any salary; null when it depends on the salary). */
             feePercent: components["schemas"]["DecimalAmount"] | null;
-            /** @description From the client's terms (30 when not set). */
+            /** @description From the client's terms (30 when not set or when it depends on the salary). */
             paymentTermsDays: number;
-            /** @description From the client's terms (90 when not set). */
+            /** @description From the client's terms (90 when not set or when it depends on the salary). */
             guaranteeDays: number;
             /** @description The job's hiring contact, when they have an email address. */
             contactId: components["schemas"]["ContactId"] | null;
