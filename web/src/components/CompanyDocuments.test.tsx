@@ -23,7 +23,9 @@ describe("documents kept with a client's terms or benefits", () => {
     expect(await screen.findByRole("button", { name: "Signed TOB 2026.pdf" })).toBeTruthy();
     expect(screen.queryByText("Benefits brochure.pdf")).toBeNull();
     expect(screen.getByText(/239 KB · added .* by Aina/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /^Delete/ }), "deleting is a permission of its own").toBeNull();
+    const del = screen.getByRole<HTMLButtonElement>("button", { name: "Delete Signed TOB 2026.pdf" });
+    expect(del.disabled, "deleting is a permission of its own (admins)").toBe(true);
+    expect(del.title).toContain("Only admins delete documents");
 
     const file = new File(["%PDF-1.4"], "Addendum.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText("Drop the signed terms here"), { target: { files: [file] } });

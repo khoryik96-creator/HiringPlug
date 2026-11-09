@@ -2,6 +2,7 @@
 // terms, a benefits brochure): drop or choose files, download them, and
 // delete them for those given companies.documents:delete (Settings › Roles).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
@@ -9,6 +10,7 @@ import { getToken } from "../auth";
 import { formatWhen } from "../labels";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
+import { FileViewer } from "./FileViewer";
 import { fileKind } from "./fileKind";
 
 type Doc = Schemas["CompanyDocument"];
@@ -50,6 +52,8 @@ export function CompanyDocuments({ companyId, section, permissions }: { companyI
     mutationFn: (d: Doc) => downloadFrom(`/v1/companies/${companyId}/documents/${d.id}/file`, d.fileName, d.contentType),
   });
 
+  const [viewing, setViewing] = useState<Doc | null>(null);
+  const viewable = (d: Doc) => d.contentType === "application/pdf" || d.contentType.startsWith("image/");
   const mine = (docs.data ?? []).filter((d) => d.section === section);
   const canAdd = permissions.includes("companies:update");
   const canDelete = permissions.includes("companies.documents:delete");
@@ -65,23 +69,29 @@ export function CompanyDocuments({ companyId, section, permissions }: { companyI
             <li key={d.id} className="doc-line">
               <span className={`doc-icon ${kindOf(d).toLowerCase()}`} aria-hidden="true">{kindOf(d)}</span>
               <div className="doc-main">
-                <button type="button" className="doc-name" title="Download" onClick={() => { download.mutate(d); }}>{d.fileName}</button>
+                <button type="button" className="doc-name" title={viewable(d) ? "View" : "Download"}
+                  onClick={() => { if (viewable(d)) setViewing(d); else download.mutate(d); }}>{d.fileName}</button>
                 <div className="doc-meta">{sizeOf(d.sizeBytes)} · added {formatWhen(d.createdAt)}{d.createdByName ? ` by ${d.createdByName}` : ""}</div>
               </div>
               <div className="doc-buttons">
+                {viewable(d) && <button type="button" className="doc-btn" onClick={() => { setViewing(d); }}>View</button>}
                 <button type="button" className="doc-btn" onClick={() => { download.mutate(d); }}>Download</button>
-                {canDelete && (
-                  <button type="button" className="doc-btn danger" aria-label={`Delete ${d.fileName}`} disabled={remove.isPending}
-                    onClick={() => { if (window.confirm(`Delete ${d.fileName}? This cannot be undone.`)) remove.mutate(d); }}>
-                    Delete
-                  </button>
-                )}
+                {/* Always there; only those given companies.documents:delete (admins, to start with) may use it. */}
+                <button type="button" className="doc-btn danger" aria-label={`Delete ${d.fileName}`} disabled={!canDelete || remove.isPending}
+                  title={canDelete ? undefined : "Only admins delete documents: ask one, or for the “Delete documents” permission"}
+                  onClick={() => { if (window.confirm(`Delete ${d.fileName}? This cannot be undone.`)) remove.mutate(d); }}>
+                  Delete
+                </button>
               </div>
             </li>
           ))}
         </ul>
       ) : (
         !canAdd && <p className="muted small">No documents.</p>
+      )}
+      {viewing && (
+        <FileViewer title={viewing.fileName} path={`/v1/companies/${companyId}/documents/${viewing.id}/file`} type={viewing.contentType}
+          onClose={() => { setViewing(null); }} actions={<button type="button" onClick={() => { download.mutate(viewing); }}>Download</button>} />
       )}
       {canAdd && (
         <DropZone accept={CV_TYPES} multiple disabled={upload.isPending}

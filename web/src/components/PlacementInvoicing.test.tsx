@@ -89,8 +89,18 @@ describe("invoicing a placement", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithClient(<PlacementInvoice p={placement()} permissions={RECRUITER.concat("placements.fees:read", "placements:manage")} />);
     expect(screen.getByText(/Emails to Ken Lim \(ken@maju.test\) on/).textContent).toContain("due 31 Dec 2026");
+    const fetched = vi.spyOn(files, "fetchFile").mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
+    URL.createObjectURL = vi.fn(() => "blob:invoice");
+    URL.revokeObjectURL = vi.fn();
     fireEvent.click(screen.getByRole("button", { name: "Preview invoice" }));
+    const viewer = await screen.findByTitle("Invoice preview: Siti Aisyah (numbered when sent)");
+    expect(viewer.getAttribute("src")).toBe("blob:invoice"); // shown in the app, not downloaded
+    expect(fetched).toHaveBeenCalledWith("/v1/placements/plc_1/invoice/file?format=pdf", "application/pdf");
+    expect(download).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
     expect(download).toHaveBeenCalledWith("/v1/placements/plc_1/invoice/file?format=pdf", "Invoice Siti Aisyah.pdf", "application/pdf");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByTitle("Invoice preview: Siti Aisyah (numbered when sent)")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Send invoice now" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     cleanup();

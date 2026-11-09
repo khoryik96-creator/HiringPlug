@@ -10,6 +10,7 @@ import { downloadFrom } from "../api/files";
 import { placementsKey } from "../api/keys";
 import { formatDay, formatWhen } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { FileViewer } from "./FileViewer";
 import { Field } from "./Field";
 import { autoDueOn, type PlacementFormState } from "./placementFormState";
 import { bySalary, guaranteeLabel, rangeLabel } from "./termsTiers";
@@ -105,12 +106,17 @@ export function PlacementInvoice({ p, permissions }: { p: Placement; permissions
     downloadFrom(`/v1/placements/${p.id}/invoice/file?format=${format}`, `Invoice ${p.invoiceNumber ?? p.candidateName}.${format}`, TYPES[format])
       .catch((e: unknown) => { setError(e); });
   };
+  const [viewing, setViewing] = useState(false);
   const to = inv.contactName ? `${inv.contactName}${inv.contactEmail ? ` (${inv.contactEmail})` : ""}` : null;
   let status: string;
   if (inv.sentAt) status = `Invoice ${p.invoiceNumber ?? ""} emailed to ${to ?? "the client"} on ${formatWhen(inv.sentAt)}`;
   else if (p.invoiceStatus !== "not_invoiced") status = `Invoiced${p.invoiceNumber ? ` (${p.invoiceNumber})` : ""}`;
   else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${formatWhen(inv.sendsAt)}`;
   else status = to ? `To ${to}; not emailed automatically` : "No invoice recipient yet";
+  const sendButton = (
+    <button type="button" className="link" disabled={send.isPending || !inv.contactEmail}
+      onClick={() => { if (window.confirm(`Email the invoice to ${to ?? "the client"} now?`)) { send.mutate(); setViewing(false); } }}>Send invoice now</button>
+  );
   const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled";
   return (
     <div className="placement-invoice">
@@ -118,13 +124,20 @@ export function PlacementInvoice({ p, permissions }: { p: Placement; permissions
       {inv.sendError && !inv.sentAt && <span className="warning small" role="alert"> Not emailed: {inv.sendError}</span>}
       {seeFees && (
         <span className="row">
-          <button type="button" className="link" onClick={() => { get("pdf"); }}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "Invoice PDF"}</button>
+          <button type="button" className="link" onClick={() => { setViewing(true); }}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "View invoice"}</button>
+          <button type="button" className="link" onClick={() => { get("pdf"); }}>PDF</button>
           <button type="button" className="link" onClick={() => { get("docx"); }}>Word</button>
-          {canSend && (
-            <button type="button" className="link" disabled={send.isPending || !inv.contactEmail}
-              onClick={() => { if (window.confirm(`Email the invoice to ${to ?? "the client"} now?`)) send.mutate(); }}>Send invoice now</button>
-          )}
+          {canSend && sendButton}
         </span>
+      )}
+      {viewing && (
+        <FileViewer title={p.invoiceNumber ? `Invoice ${p.invoiceNumber}` : `Invoice preview: ${p.candidateName} (numbered when sent)`}
+          path={`/v1/placements/${p.id}/invoice/file?format=pdf`} type={TYPES.pdf} onClose={() => { setViewing(false); }}
+          actions={<>
+            <button type="button" onClick={() => { get("pdf"); }}>Download PDF</button>
+            <button type="button" onClick={() => { get("docx"); }}>Word</button>
+            {canSend && sendButton}
+          </>} />
       )}
       <ErrorMessage error={error ?? send.error} />
     </div>

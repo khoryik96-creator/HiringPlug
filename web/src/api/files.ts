@@ -17,6 +17,13 @@ export async function fetchDocumentPdf(id: string): Promise<Blob> {
   return new Blob([await res.arrayBuffer()], { type: "application/pdf" });
 }
 
+/** A file the API serves, as a blob of the given type (to show it in the app). */
+export async function fetchFile(path: string, type: string): Promise<Blob> {
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+  if (!res.ok) unwrap({ error: await res.json(), response: res });
+  return new Blob([await res.arrayBuffer()], { type });
+}
+
 /** Saves a file the API serves (e.g. an interview's calendar entry) under the given name. */
 export async function downloadFrom(path: string, fileName: string, type: string): Promise<void> {
   const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
