@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { api, unwrap } from "../api/client";
-import { candidateEmailsKey, emailTemplatesKey } from "../api/keys";
+import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
 import { BookingLinkForm } from "./CandidateBookings";
 import { RichEditor } from "./clientEmail/RichEditor";
 import { SaveAsTemplate } from "./clientEmail/SaveAsTemplate";
@@ -18,7 +18,11 @@ export const addresses = (text: string) => text.split(/[\s,;]+/).filter(Boolean)
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 type Props = {
-  candidateId: string;
+  /** About a candidate, or (contactId) to one of a client's contacts. */
+  candidateId?: string;
+  contactId?: string;
+  /** Who it goes to before a template says (a contact's address). */
+  defaultTo?: string;
   /** The candidate's jobs, to fill a template for one of them. */
   applications?: { id: string; label: string }[];
   applicationId?: string;
@@ -43,11 +47,13 @@ const textOf = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g
  * send. Placeholders without a value stay in brackets, and sending waits
  * until they are filled in.
  */
-export function EmailComposer({ candidateId, applications = [], applicationId, interviewId, template, canManageTemplates, canCreateTemplates = false, canBook = false, onDone }: Props) {
+export function EmailComposer({ candidateId, contactId, defaultTo = "", applications = [], applicationId, interviewId, template, canManageTemplates, canCreateTemplates = false, canBook = false, onDone }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: emailTemplatesKey, queryFn: async () => unwrap(await api.GET("/v1/email-templates")) });
   const [about, setAbout] = useState(applicationId ?? "");
-  const [form, setForm] = useState({ templateId: "", to: "", cc: "", subject: "" });
+  const [form, setForm] = useState({ templateId: "", to: defaultTo, cc: "", subject: "" });
+  // Whom the fields are filled from: the candidate (and a job), or the contact (and their company).
+  const who = contactId ? { contactId } : { candidateId };
   const [html, setHtml] = useState("");
   const [reset, setReset] = useState(0); // puts html back into the editor (a template)
   const [missing, setMissing] = useState<string[]>([]);
@@ -55,9 +61,9 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   const { banners, urls, upload: uploadBanner } = useBanners();
   // The candidate's value for each field, so a field picked from the toolbar goes in as its value.
   const context = useQuery({
-    queryKey: ["email-context", candidateId, about, interviewId ?? ""],
+    queryKey: ["email-context", candidateId ?? "", contactId ?? "", about, interviewId ?? ""],
     queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: "", bodyHtml: "", candidateId, applicationId: about || undefined, interviewId, timeZone: timeZone() },
+      body: { subject: "", bodyHtml: "", ...who, applicationId: about || undefined, interviewId, timeZone: timeZone() },
     })),
   });
   // A booking link to put in where the cursor was in the message (at its end when it had none).
@@ -77,7 +83,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
   const draft = useMutation({
     mutationFn: async ({ templateId, applicationId: app }: { templateId: string; applicationId: string }) =>
       unwrap(await api.POST("/v1/email-drafts", {
-        body: { templateId, candidateId, applicationId: app || undefined, interviewId, timeZone: timeZone() },
+        body: { templateId, ...who, applicationId: app || undefined, interviewId, timeZone: timeZone() },
       })),
     onSuccess: (d, { templateId }) => {
       setForm((f) => ({ ...f, templateId, to: d.to.join(", "), subject: d.subject }));
@@ -105,11 +111,11 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
       unwrap(await api.POST("/v1/emails", {
         body: {
           to: addresses(form.to), cc: addresses(form.cc), subject, bodyHtml: withoutCaretMarks(html),
-          candidateId, applicationId: about || undefined, timeZone: timeZone(),
+          ...who, applicationId: about || undefined, timeZone: timeZone(),
         },
       })),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: candidateEmailsKey(candidateId) });
+      await queryClient.invalidateQueries({ queryKey: contactId ? contactEmailsKey(contactId) : candidateEmailsKey(candidateId ?? "") });
       onDone();
     },
   });
@@ -148,7 +154,7 @@ export function EmailComposer({ candidateId, applications = [], applicationId, i
             return true;
           }} />
       </div>
-      {canBook && (booking
+      {canBook && candidateId && (booking
         ? <div className="full"><BookingLinkForm candidateId={candidateId} applicationId={about || undefined} onInsert={insert} onCancel={() => { setBooking(false); }} /></div>
         : <div className="full"><button type="button" className="link" onClick={() => { setBooking(true); }}>+ Booking link</button></div>)}
       {unfilled.length > 0 && (

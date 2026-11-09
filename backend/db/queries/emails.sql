@@ -29,9 +29,9 @@ WHERE id = @id AND version = @expected_version
 RETURNING *;
 
 -- name: InsertEmail :one
-INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
+INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
                    body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to)
-VALUES (app_current_tenant(), sqlc.narg(candidate_id), sqlc.narg(application_id), @to_addresses::text[],
+VALUES (app_current_tenant(), sqlc.narg(candidate_id), sqlc.narg(application_id), sqlc.narg(contact_id), @to_addresses::text[],
         @cc_addresses::text[], @bcc_addresses::text[], @subject, @body, sqlc.narg(body_html), @salary, @salary_restricted,
         @fees_restricted, app_current_user(), @sender_name, @reply_to)
 RETURNING *;
@@ -44,6 +44,9 @@ SELECT * FROM email WHERE id = @id;
 
 -- name: ListCandidateEmails :many
 SELECT * FROM email WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
+
+-- name: ListContactEmails :many
+SELECT * FROM email WHERE contact_id = @contact_id ORDER BY id DESC LIMIT 200;
 
 -- name: MarkEmail :exec
 UPDATE email SET status = @status, error = sqlc.narg(error),

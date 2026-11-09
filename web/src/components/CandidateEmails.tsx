@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Permission, unwrap } from "../api/client";
+import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
 import { CandidateBookings } from "./CandidateBookings";
@@ -41,8 +41,17 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
       )}
       {permissions.includes("scheduling:use") && <CandidateBookings candidateId={candidateId} />}
       <ErrorMessage error={list.error} />
-      {list.data?.length === 0 && <p className="muted">No emails sent from HiringPlug yet.</p>}
-      {list.data?.map((e) => (
+      <SentEmails emails={list.data} />
+    </section>
+  );
+}
+
+/** Emails sent, newest first: subject, status, to whom, by whom, when; opened to read. */
+export function SentEmails({ emails }: { emails: Schemas["Email"][] | undefined }) {
+  return (
+    <>
+      {emails?.length === 0 && <p className="muted">No emails sent from HiringPlug yet.</p>}
+      {emails?.map((e) => (
         <details key={e.id} className="email">
           <summary>
             <strong>{e.subject}</strong> <span className={`badge ${e.status}`}>{EMAIL_STATUS[e.status]}</span>{" "}
@@ -56,6 +65,6 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
           <p className="email-body">{e.body}</p>
         </details>
       ))}
-    </section>
+    </>
   );
 }

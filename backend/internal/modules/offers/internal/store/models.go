@@ -439,6 +439,7 @@ type Email struct {
 	SalaryRestricted bool
 	Calendar         *string
 	FeesRestricted   bool
+	ContactID        *string
 }
 
 type EmailAttachment struct {

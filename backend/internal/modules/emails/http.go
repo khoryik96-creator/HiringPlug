@@ -58,7 +58,7 @@ func (h *HTTP) UpdateEmailTemplate(ctx context.Context, req api.UpdateEmailTempl
 func (h *HTTP) DraftEmail(ctx context.Context, req api.DraftEmailRequestObject) (api.DraftEmailResponseObject, error) {
 	b := req.Body
 	d, err := h.svc.Draft(ctx, authz.MustFromContext(ctx), DraftRequest{
-		TemplateID: b.TemplateId, CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, InterviewID: b.InterviewId, TimeZone: b.TimeZone,
+		TemplateID: b.TemplateId, CandidateID: b.CandidateId, ContactID: b.ContactId, ApplicationID: b.ApplicationId, InterviewID: b.InterviewId, TimeZone: b.TimeZone,
 	})
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (h *HTTP) DraftEmail(ctx context.Context, req api.DraftEmailRequestObject) 
 
 // ListEmails handles GET /v1/emails.
 func (h *HTTP) ListEmails(ctx context.Context, req api.ListEmailsRequestObject) (api.ListEmailsResponseObject, error) {
-	rows, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.CandidateId)
+	rows, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.CandidateId, req.Params.ContactId)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 	b := req.Body
 	r := SendRequest{
 		Outgoing:    Outgoing{To: convert[string](b.To), Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)},
-		CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, TimeZone: deref(b.TimeZone),
+		CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, ContactID: b.ContactId, TimeZone: deref(b.TimeZone),
 	}
 	if b.Cc != nil {
 		r.Cc = convert[string](*b.Cc)
@@ -110,7 +110,7 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 // PreviewEmail handles POST /v1/email-previews.
 func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObject) (api.PreviewEmailResponseObject, error) {
 	b := req.Body
-	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.TimeZone)
+	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, b.TimeZone)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func emailToAPI(v EmailView) api.Email {
 		files[i] = attachmentToAPI(f)
 	}
 	return api.Email{
-		Id: r.ID, CandidateId: c.OrNull(r.CandidateID), ApplicationId: c.OrNull(r.ApplicationID),
+		Id: r.ID, CandidateId: c.OrNull(r.CandidateID), ApplicationId: c.OrNull(r.ApplicationID), ContactId: c.OrNull(r.ContactID),
 		To: r.ToAddresses, Cc: r.CcAddresses, Bcc: r.BccAddresses, Subject: r.Subject, Body: r.Body, BodyHtml: c.OrNull(r.BodyHtml),
 		Attachments: files, Salary: r.Salary, Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
 		SentBy: r.SentBy, SentByName: r.SenderName, CreatedAt: r.CreatedAt, SentAt: c.OrNull(r.SentAt),

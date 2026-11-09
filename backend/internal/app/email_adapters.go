@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
@@ -17,6 +18,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
 )
@@ -186,4 +188,27 @@ type identityMailer struct{ modules *Modules }
 
 func (a identityMailer) Notify(ctx context.Context, tx pgx.Tx, tenantID string, to []string, subject, body string) error {
 	return a.modules.Emails.Notify(ctx, tx, tenantID, emails.Notice{To: to, Subject: subject, Body: body})
+}
+
+// emailContacts gives the emails module a client's contact to write to.
+type emailContacts struct {
+	contacts  *contacts.Module
+	companies *companies.Module
+}
+
+func (a emailContacts) Contact(ctx context.Context, tx pgx.Tx, id string) (emails.Contact, error) {
+	briefs, err := a.contacts.Briefs(ctx, tx, []string{id})
+	if err != nil {
+		return emails.Contact{}, err
+	}
+	b, ok := briefs[id]
+	if !ok {
+		return emails.Contact{}, apperr.NotFound("contact")
+	}
+	names, err := a.companies.Names(ctx, tx, []string{b.CompanyID})
+	if err != nil {
+		return emails.Contact{}, err
+	}
+	first, last, _ := strings.Cut(strings.TrimSpace(b.Name), " ")
+	return emails.Contact{FirstName: first, LastName: strings.TrimSpace(last), FullName: b.Name, CompanyName: names[b.CompanyID], Email: b.Email}, nil
 }

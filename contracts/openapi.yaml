@@ -1806,10 +1806,12 @@ paths:
     get:
       operationId: listEmails
       tags: [emails]
-      summary: Emails sent about a candidate, newest first
+      summary: Emails sent about a candidate, or to a client's contact, newest first
+      description: Give candidateId or contactId.
       x-permission: emails:read
       parameters:
-        - {name: candidateId, in: query, required: true, schema: {$ref: '#/components/schemas/CandidateId'}}
+        - {name: candidateId, in: query, required: false, schema: {$ref: '#/components/schemas/CandidateId'}}
+        - {name: contactId, in: query, required: false, schema: {$ref: '#/components/schemas/ContactId'}}
       responses:
         '200':
           description: OK
@@ -6233,6 +6235,7 @@ components:
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
         interviewId: {$ref: '#/components/schemas/InterviewId'}
+        contactId: {$ref: '#/components/schemas/ContactId'}
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
     EmailPreview:
       type: object
@@ -6309,10 +6312,12 @@ components:
     EmailDraftRequest:
       type: object
       additionalProperties: false
-      required: [templateId, candidateId, timeZone]
+      required: [templateId, timeZone]
+      description: For a candidate (candidateId) or one of a client's contacts (contactId).
       properties:
         templateId: {$ref: '#/components/schemas/EmailTemplateId'}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
+        contactId: {$ref: '#/components/schemas/ContactId'}
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
         interviewId: {$ref: '#/components/schemas/InterviewId'}
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
@@ -6340,11 +6345,15 @@ components:
       enum: [queued, sent, failed]
     Email:
       type: object
-      required: [id, candidateId, applicationId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
+      required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
       properties:
         id: {$ref: '#/components/schemas/EmailId'}
         candidateId:
           allOf: [{$ref: '#/components/schemas/CandidateId'}]
+          nullable: true
+        contactId:
+          description: The client's contact it was written to (from the contact's page).
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
           nullable: true
         applicationId:
           allOf: [{$ref: '#/components/schemas/ApplicationId'}]
@@ -6399,6 +6408,9 @@ components:
         timeZone: {type: string, maxLength: 64, description: For interview times in fields (default Asia/Kuala_Lumpur).}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
+        contactId:
+          description: "To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company."
+          allOf: [{$ref: '#/components/schemas/ContactId'}]
         attachmentIds:
           type: array
           maxItems: 10

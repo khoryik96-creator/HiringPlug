@@ -147,7 +147,8 @@ func nameTaken() error {
 
 // DraftRequest is what to fill a template for.
 type DraftRequest struct {
-	TemplateID, CandidateID    string
+	TemplateID                 string
+	CandidateID, ContactID     *string // one of them: a candidate, or a client's contact
 	ApplicationID, InterviewID *string
 	TimeZone                   string
 }
@@ -177,12 +178,31 @@ func (s *Service) Draft(ctx context.Context, p authz.Principal, r DraftRequest) 
 		if err != nil {
 			return err
 		}
-		dc, err := s.context(ctx, tx, p, r.CandidateID, r.ApplicationID, r.InterviewID)
-		if err != nil {
-			return err
+		var values map[string]string
+		var dc Context
+		var contactEmail *string
+		switch {
+		case r.CandidateID != nil:
+			if dc, err = s.context(ctx, tx, p, *r.CandidateID, r.ApplicationID, r.InterviewID); err != nil {
+				return err
+			}
+			dc.Location = loc
+			values = Values(dc)
+		case r.ContactID != nil:
+			ct, err := s.deps.Contacts.Contact(ctx, tx, *r.ContactID)
+			if err != nil {
+				return err
+			}
+			tenant, err := s.deps.Tenants.TenantName(ctx, tx, p.TenantID)
+			if err != nil {
+				return err
+			}
+			values, contactEmail = ContactValues(ct, p.Name, tenant), ct.Email
+		default:
+			var errs apperr.FieldErrors
+			errs.Add("candidateId", "give candidateId or contactId")
+			return errs.Err()
 		}
-		dc.Location = loc
-		values := Values(dc)
 		subject, missingSubject := Fill(tpl.Subject, values)
 		body, missingBody := Fill(tpl.Body, values)
 		out = Draft{To: []string{}, Subject: subject, Body: body, Missing: union(missingSubject, missingBody)}
@@ -191,7 +211,9 @@ func (s *Service) Draft(ctx context.Context, p authz.Principal, r DraftRequest) 
 			out.BodyHTML, out.Missing = &filled, union(out.Missing, missingHTML)
 		}
 		to := dc.Candidate.Email
-		if ForClient(tpl.Name) {
+		if r.ContactID != nil {
+			to = contactEmail
+		} else if ForClient(tpl.Name) {
 			to = nil
 			if dc.Application != nil {
 				to = dc.Application.ClientEmail
@@ -281,11 +303,22 @@ type EmailView struct {
 }
 
 // List returns the emails about a candidate the user may see, newest first.
-func (s *Service) List(ctx context.Context, p authz.Principal, candidateID string) ([]EmailView, error) {
+func (s *Service) List(ctx context.Context, p authz.Principal, candidateID, contactID *string) ([]EmailView, error) {
+	if (candidateID == nil) == (contactID == nil) {
+		var errs apperr.FieldErrors
+		errs.Add("candidateId", "give candidateId or contactId")
+		return nil, errs.Err()
+	}
 	var out []EmailView
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		rows, err := q.ListCandidateEmails(ctx, &candidateID)
+		var rows []store.Email
+		var err error
+		if candidateID != nil {
+			rows, err = q.ListCandidateEmails(ctx, candidateID)
+		} else {
+			rows, err = q.ListContactEmails(ctx, contactID)
+		}
 		if err != nil {
 			return err
 		}

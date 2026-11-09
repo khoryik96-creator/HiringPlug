@@ -42,6 +42,7 @@ type CVRef struct {
 type SendRequest struct {
 	Outgoing
 	CandidateID, ApplicationID *string
+	ContactID                  *string // to one of a client's contacts (their page)
 	TimeZone                   string
 	AttachmentIDs              []string
 	CVs                        []CVRef
@@ -71,14 +72,14 @@ func fieldValues(values map[string]string) map[string]string {
 
 // Preview fills a message's fields for a candidate (and an application or
 // interview) without sending anything.
-func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID *string, zone string) (Preview, error) {
+func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, zone string) (Preview, error) {
 	loc, err := location(zone)
 	if err != nil {
 		return Preview{}, err
 	}
 	var out Preview
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		values, err := s.values(ctx, tx, p, candidateID, appID, interviewID, loc)
+		values, err := s.values(ctx, tx, p, candidateID, appID, interviewID, contactID, loc)
 		if err != nil {
 			return err
 		}
@@ -102,8 +103,17 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 }
 
 // values are the field values for an email: the candidate's (as p may see
-// them), the application's and the interview's, the sender's and the agency's.
-func (s *Service) values(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, appID, interviewID *string, loc *time.Location) (map[string]string, error) {
+// them), the application's and the interview's, the sender's and the agency's;
+// or, for an email to a client's contact, the contact's and their company's.
+func (s *Service) values(ctx context.Context, tx pgx.Tx, p authz.Principal, candidateID, appID, interviewID, contactID *string, loc *time.Location) (map[string]string, error) {
+	if candidateID == nil && appID == nil && contactID != nil {
+		ct, err := s.deps.Contacts.Contact(ctx, tx, *contactID)
+		if err != nil {
+			return nil, err
+		}
+		tenant, err := s.deps.Tenants.TenantName(ctx, tx, p.TenantID)
+		return ContactValues(ct, p.Name, tenant), err
+	}
 	if candidateID == nil && appID != nil {
 		app, err := s.application(ctx, tx, *appID, nil)
 		if err != nil {
@@ -168,7 +178,12 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 				return err
 			}
 		}
-		values, err := s.values(ctx, tx, p, candidateID, r.ApplicationID, nil, loc)
+		if r.ContactID != nil && (candidateID != nil || r.ApplicationID != nil) {
+			var errs apperr.FieldErrors
+			errs.Add("contactId", "an email is to a contact or about a candidate, not both")
+			return errs.Err()
+		}
+		values, err := s.values(ctx, tx, p, candidateID, r.ApplicationID, nil, r.ContactID, loc)
 		if err != nil {
 			return err
 		}
@@ -219,7 +234,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			restricted = visibility != "everyone"
 		}
 		row, err := q.InsertEmail(ctx, store.InsertEmailParams{
-			CandidateID: candidateID, ApplicationID: r.ApplicationID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
+			CandidateID: candidateID, ApplicationID: r.ApplicationID, ContactID: r.ContactID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
 			Subject: filled.Subject, Body: filled.Body, BodyHtml: orNil(filled.BodyHTML), Salary: filled.salary, SalaryRestricted: restricted,
 			SenderName: p.Name, ReplyTo: p.Email,
 		})

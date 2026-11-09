@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { contactKey } from "../api/keys";
+import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
@@ -74,6 +75,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
         </section>
       )}
       {!editing && <EmploymentCheck contact={c} canCheck={canEdit} />}
+      {permissions.includes("emails:read") && <ContactEmails contactId={c.id} email={c.email} permissions={permissions} />}
       <Timeline subjectType="contact" subjectId={c.id} permissions={permissions} />
     </main>
   );

@@ -145,7 +145,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -173,6 +173,7 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.SalaryRestricted,
 		&i.Calendar,
 		&i.FeesRestricted,
+		&i.ContactID,
 	)
 	return i, err
 }
@@ -272,17 +273,18 @@ func (q *Queries) InsertBanner(ctx context.Context, arg InsertBannerParams) (Ema
 }
 
 const insertEmail = `-- name: InsertEmail :one
-INSERT INTO email (tenant_id, candidate_id, application_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
+INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addresses, cc_addresses, bcc_addresses, subject, body,
                    body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to)
-VALUES (app_current_tenant(), $1, $2, $3::text[],
-        $4::text[], $5::text[], $6, $7, $8, $9, $10,
-        $11, app_current_user(), $12, $13)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted
+VALUES (app_current_tenant(), $1, $2, $3, $4::text[],
+        $5::text[], $6::text[], $7, $8, $9, $10, $11,
+        $12, app_current_user(), $13, $14)
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id
 `
 
 type InsertEmailParams struct {
 	CandidateID      *string
 	ApplicationID    *string
+	ContactID        *string
 	ToAddresses      []string
 	CcAddresses      []string
 	BccAddresses     []string
@@ -300,6 +302,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 	row := q.db.QueryRow(ctx, insertEmail,
 		arg.CandidateID,
 		arg.ApplicationID,
+		arg.ContactID,
 		arg.ToAddresses,
 		arg.CcAddresses,
 		arg.BccAddresses,
@@ -335,6 +338,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.SalaryRestricted,
 		&i.Calendar,
 		&i.FeesRestricted,
+		&i.ContactID,
 	)
 	return i, err
 }
@@ -410,7 +414,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) ([]Email, error) {
@@ -444,6 +448,54 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.SalaryRestricted,
 			&i.Calendar,
 			&i.FeesRestricted,
+			&i.ContactID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listContactEmails = `-- name: ListContactEmails :many
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
+`
+
+func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]Email, error) {
+	rows, err := q.db.Query(ctx, listContactEmails, contactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Email
+	for rows.Next() {
+		var i Email
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CandidateID,
+			&i.ApplicationID,
+			&i.ToAddresses,
+			&i.CcAddresses,
+			&i.Subject,
+			&i.Body,
+			&i.SentBy,
+			&i.SenderName,
+			&i.ReplyTo,
+			&i.Status,
+			&i.Error,
+			&i.CreatedAt,
+			&i.SentAt,
+			&i.BodyHtml,
+			&i.BccAddresses,
+			&i.Salary,
+			&i.SalaryRestricted,
+			&i.Calendar,
+			&i.FeesRestricted,
+			&i.ContactID,
 		); err != nil {
 			return nil, err
 		}

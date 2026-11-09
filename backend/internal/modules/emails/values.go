@@ -151,3 +151,22 @@ func FormatWorkAuthorization(status string, basis *string) string {
 		return "Expat (other pass)"
 	}
 }
+
+// ContactValues are the field values for an email to one of a client's
+// contacts: [First name], [Last name] and [Full name] are the contact's,
+// [Client company] their company, [Client contact] them too.
+func ContactValues(ct Contact, senderName, agencyName string) map[string]string {
+	v := map[string]string{"sender.name": senderName, "agency.name": agencyName}
+	for key, val := range map[string]string{
+		"candidate.firstName": ct.FirstName, "candidate.lastName": ct.LastName, "candidate.fullName": ct.FullName,
+		"client.name": ct.FullName, "company.name": ct.CompanyName,
+	} {
+		if strings.TrimSpace(val) != "" {
+			v[key] = val
+		}
+	}
+	if v["candidate.firstName"] == "" && ct.FullName != "" {
+		v["candidate.firstName"] = ct.FullName
+	}
+	return v
+}

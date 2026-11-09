@@ -552,6 +552,20 @@ lead's company (with the built-in email check).
   how, where, who else, and a link to the candidate), with the time in the
   company's time zone (`HP_TIME_ZONE`); a moved interview is reminded of at
   its new time only, and a cancelled one not at all.
+- **Email a client's contact** ✅: a contact's page has **Emails**: **Write
+  email** opens the same composer, to the contact's address, with the
+  templates; fields are filled from the contact ([First name], [Last name],
+  [Full name] and [Client contact] are theirs, [Client company] their
+  company) and the emails sent to them are listed there.
+- **Fields go where the cursor is** ✅: one **Insert field** puts a field in
+  the subject or the message, wherever the cursor last was (templates and
+  both composers); a template's fields show the candidate's values in the
+  subject as in the message.
+- **Who changes templates** ✅: changing and deleting the company's email
+  templates is for owners and admins (`emails.templates:manage`); anyone who
+  writes emails may add new ones (`emails.templates:create`), e.g. **Save as
+  a new template** under an email being written (its values go back in as
+  fields, so a template never keeps a candidate's details).
 - **Email the client** ✅ (CV Studio's composer): **Email client** on any
   candidate on a job (the job's board, or the candidate's job list) opens a
   composer addressed to the job's hiring contact, from you (replies come to

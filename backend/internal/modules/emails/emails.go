@@ -105,11 +105,23 @@ type Deps struct {
 	Tenants interface {
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
 	}
+	// Contacts gives a client's contact, to write to from their page
+	// (contacts and companies modules); NOT_FOUND when missing.
+	Contacts interface {
+		Contact(ctx context.Context, tx pgx.Tx, id string) (Contact, error)
+	}
 	// Consent says whether a candidate asked not to be contacted (privacy
 	// module); emails to them are refused. Nil: nobody is.
 	Consent interface {
 		DoNotContact(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
 	}
+}
+
+// Contact is one of a client's contacts, written to from their page.
+type Contact struct {
+	FirstName, LastName, FullName string
+	CompanyName                   string
+	Email                         *string
 }
 
 // Module is the emails module.

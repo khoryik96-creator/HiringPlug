@@ -73,12 +73,14 @@ func TestSendingACandidateToTheClient(t *testing.T) {
 	cv.JSON(&doc)
 
 	var banner api.EmailBanner
-	res = a.upload("/v1/email-banners", recruiter, "", "contoh-banner.png", bannerPNG)
+	admin := tenant.Users[api.RoleOwner].Token // banners are part of the templates: admins'
+	assert.Equal(t, http.StatusForbidden, a.upload("/v1/email-banners", recruiter, "", "b.png", bannerPNG).Status)
+	res = a.upload("/v1/email-banners", admin, "", "contoh-banner.png", bannerPNG)
 	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
 	res.JSON(&banner)
 	assert.Equal(t, "contoh-banner", banner.Name)
 	assert.Equal(t, http.StatusForbidden, a.upload("/v1/email-banners", sourcer, "", "b.png", bannerPNG).Status)
-	assert.Equal(t, http.StatusBadRequest, a.upload("/v1/email-banners", recruiter, "", "b.png", []byte("not an image")).Status)
+	assert.Equal(t, http.StatusBadRequest, a.upload("/v1/email-banners", admin, "", "b.png", []byte("not an image")).Status)
 
 	var upload api.EmailAttachment
 	res = a.upload("/v1/email-attachments", recruiter, "", "Job description.pdf", minimalPDF)
@@ -191,8 +193,10 @@ func TestSendingACandidateToTheClient(t *testing.T) {
 		a.request(http.MethodGet, "/v1/email-templates", recruiter, nil).JSON(&list)
 		assert.Equal(t, "[Expected salary]", list.Fields[4].Token)
 		assert.True(t, list.Fields[4].Salary)
-		assert.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, recruiter, nil).Status)
-		assert.Equal(t, http.StatusNotFound, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, recruiter, nil).Status)
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, recruiter, nil).Status,
+			"recruiters add templates; deleting them is for admins")
+		assert.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, admin, nil).Status)
+		assert.Equal(t, http.StatusNotFound, a.request(http.MethodDelete, "/v1/email-templates/"+tpl.Id, admin, nil).Status)
 	})
 
 	t.Run("an upload goes with one email, even when two are sent at the same moment", func(t *testing.T) {

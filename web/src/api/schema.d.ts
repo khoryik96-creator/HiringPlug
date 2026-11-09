@@ -1110,7 +1110,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Emails sent about a candidate, newest first */
+        /**
+         * Emails sent about a candidate, or to a client's contact, newest first
+         * @description Give candidateId or contactId.
+         */
         get: operations["listEmails"];
         put?: never;
         /** Send an email (it is queued and sent in the background) */
@@ -4149,6 +4152,7 @@ export interface components {
             candidateId?: components["schemas"]["CandidateId"];
             applicationId?: components["schemas"]["ApplicationId"];
             interviewId?: components["schemas"]["InterviewId"];
+            contactId?: components["schemas"]["ContactId"];
             /** @example Asia/Kuala_Lumpur */
             timeZone: string;
         };
@@ -4203,9 +4207,11 @@ export interface components {
             body?: string;
             bodyHtml?: string;
         };
+        /** @description For a candidate (candidateId) or one of a client's contacts (contactId). */
         EmailDraftRequest: {
             templateId: components["schemas"]["EmailTemplateId"];
-            candidateId: components["schemas"]["CandidateId"];
+            candidateId?: components["schemas"]["CandidateId"];
+            contactId?: components["schemas"]["ContactId"];
             applicationId?: components["schemas"]["ApplicationId"];
             interviewId?: components["schemas"]["InterviewId"];
             /** @example Asia/Kuala_Lumpur */
@@ -4229,6 +4235,8 @@ export interface components {
         Email: {
             id: components["schemas"]["EmailId"];
             candidateId: components["schemas"]["CandidateId"] | null;
+            /** @description The client's contact it was written to (from the contact's page). */
+            contactId: components["schemas"]["ContactId"] | null;
             applicationId: components["schemas"]["ApplicationId"] | null;
             to: string[];
             cc: string[];
@@ -4265,6 +4273,8 @@ export interface components {
             timeZone?: string;
             candidateId?: components["schemas"]["CandidateId"];
             applicationId?: components["schemas"]["ApplicationId"];
+            /** @description To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company. */
+            contactId?: components["schemas"]["ContactId"];
             /** @description Files you uploaded to /v1/email-attachments. */
             attachmentIds?: components["schemas"]["EmailAttachmentId"][];
             /** @description The candidate's CVs from the ATS (needs documents:read). */
@@ -8650,8 +8660,9 @@ export interface operations {
     };
     listEmails: {
         parameters: {
-            query: {
-                candidateId: components["schemas"]["CandidateId"];
+            query?: {
+                candidateId?: components["schemas"]["CandidateId"];
+                contactId?: components["schemas"]["ContactId"];
             };
             header?: never;
             path?: never;

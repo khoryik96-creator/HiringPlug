@@ -15,7 +15,7 @@ const template = (name: string, id: string): Schemas["EmailTemplate"] => ({
   id, version: 1, name, subject: "s", body: "b", bodyHtml: null, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 });
 const sent: Schemas["Email"] = {
-  id: "eml_1", candidateId: "cand_1", applicationId: null, to: ["siti@example.com"], cc: [], bcc: [], bodyHtml: null, attachments: [], salary: false, subject: "Your application",
+  id: "eml_1", candidateId: "cand_1", contactId: null, applicationId: null, to: ["siti@example.com"], cc: [], bcc: [], bodyHtml: null, attachments: [], salary: false, subject: "Your application",
   body: "Dear Siti,\n\nThanks.", status: "failed", error: "550 no such user", sentBy: "usr_1", sentByName: "Aina",
   createdAt: "2026-11-01T00:00:00Z", sentAt: null,
 };

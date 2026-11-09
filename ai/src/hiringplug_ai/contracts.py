@@ -4358,6 +4358,7 @@ class EmailPreviewRequest(BaseModel):
     candidateId: CandidateId | None = None
     applicationId: ApplicationId | None = None
     interviewId: InterviewId | None = None
+    contactId: ContactId | None = None
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
 
 
@@ -4366,7 +4367,8 @@ class EmailDraftRequest(BaseModel):
         extra="forbid",
     )
     templateId: EmailTemplateId
-    candidateId: CandidateId
+    candidateId: CandidateId | None = None
+    contactId: ContactId | None = None
     applicationId: ApplicationId | None = None
     interviewId: InterviewId | None = None
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
@@ -4375,6 +4377,10 @@ class EmailDraftRequest(BaseModel):
 class Email(BaseModel):
     id: EmailId
     candidateId: Annotated[CandidateId | None, Field(...)]
+    contactId: Annotated[
+        ContactId | None,
+        Field(description="The client's contact it was written to (from the contact's page)."),
+    ]
     applicationId: Annotated[ApplicationId | None, Field(...)]
     to: list[str]
     cc: list[str]
@@ -4417,6 +4423,12 @@ class EmailSend(BaseModel):
     ] = None
     candidateId: CandidateId | None = None
     applicationId: ApplicationId | None = None
+    contactId: Annotated[
+        ContactId | None,
+        Field(
+            description="To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company."
+        ),
+    ] = None
     attachmentIds: Annotated[
         list[EmailAttachmentId] | None,
         Field(description="Files you uploaded to /v1/email-attachments.", max_length=10),
