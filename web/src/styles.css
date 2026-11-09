@@ -557,7 +557,8 @@ fieldset.invoicing .check { display: block; }
 .timeline, .email-body, .job-description {
   max-height: min(34rem, 70vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 }
-.ad-columns > section { max-height: min(40rem, 75vh); }
+/* As tall as the screen allows (header and a margin off), never longer: the rest scrolls inside. */
+.ad-columns > section { max-height: calc(100vh - 8rem); min-height: min(30rem, calc(100vh - 8rem)); }
 /* Possible candidates: a card per person, the words they match, a short excerpt. */
 .suggestions.scroll-box { max-height: min(40rem, 75vh); margin: 0; }
 .suggestion { padding: 0.7rem 0.2rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.35rem; }
@@ -603,3 +604,27 @@ fieldset.invoicing .check { display: block; }
 .file-viewer-wait { padding: 2rem; text-align: center; }
 .doc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .doc-btn:disabled:hover { border-color: var(--border, #d0d7de); color: inherit; }
+
+/* A candidate's jobs: one card each. */
+.app-cards { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; gap: 0.75rem; }
+.app-card { border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 0.9rem; background: #fff; display: grid; gap: 0.6rem; }
+.app-card-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.4rem 1rem; align-items: center; }
+.app-card-title { display: flex; flex-direction: column; min-width: 0; }
+.app-card-title a { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-card-stage { display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
+.app-card-actions { display: flex; gap: 0.4rem; align-items: center; }
+.app-card-actions select { font-size: 0.85rem; padding: 0.3rem 1.8rem 0.3rem 0.6rem; min-width: 8rem; }
+.app-card-body { display: grid; gap: 0.5rem; }
+.app-card-body:empty { display: none; }
+.app-card-body .application-fit { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; }
+@media (max-width: 640px) { .app-card-head { grid-template-columns: 1fr; } .app-card-stage { align-items: flex-start; flex-direction: row; } }
+
+/* A placement on a candidate's job. */
+.placement-box { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); padding: 0.6rem 0.75rem; display: grid; gap: 0.5rem; }
+.placement-box-head { display: flex; align-items: center; gap: 0.5rem; }
+.placement-box-head .link { margin-left: auto; }
+.placement-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.4rem 0.9rem; }
+.placement-fact { display: flex; flex-direction: column; font-size: 0.9rem; }
+.placement-fact-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 650; }
+.placement-box .placement-invoice { border-top: 1px dashed var(--line); padding-top: 0.45rem; margin-top: 0; }
+.small-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }

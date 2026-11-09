@@ -41,16 +41,37 @@ export function ApplicationPlacement({ applicationId, stage, permissions }: { ap
   if (editing) {
     return <PlacementForm applicationId={applicationId} placement={placement} permissions={permissions} onDone={() => { setEditing(false); }} />;
   }
+  if (!placement) {
+    return (
+      <div className="placement">
+        <ErrorMessage error={list.error} />
+        {canManage && list.isSuccess && (
+          <button type="button" className="small-button" onClick={() => { setEditing(true); }}>Record placement</button>
+        )}
+      </div>
+    );
+  }
+  const fee = placement.money?.feeAmount && placement.money.feeCurrency ? formatMoney(placement.money.feeAmount, placement.money.feeCurrency) : null;
+  const fact = (label: string, value: React.ReactNode) => (
+    <div className="placement-fact"><span className="placement-fact-label">{label}</span><span>{value}</span></div>
+  );
   return (
-    <div className="placement">
-      <ErrorMessage error={list.error} />
-      {placement && <PlacementSummary p={placement} />}{" "}
-      {placement && <PlacementInvoice p={placement} permissions={permissions} />}
-      {canManage && list.isSuccess && (
-        <button type="button" className="link" onClick={() => { setEditing(true); }}>
-          {placement ? "Change placement" : "Record placement"}
-        </button>
-      )}
+    <div className="placement-box" aria-label="Placement">
+      <div className="placement-box-head">
+        <span className={`badge ${placement.status}`}>{PLACEMENT_STATUS[placement.status]}</span>
+        <strong>Placement</strong>
+        {canManage && <button type="button" className="link small" onClick={() => { setEditing(true); }}>Change placement</button>}
+      </div>
+      <div className="placement-facts">
+        {fact("Starts", formatDay(placement.startDate))}
+        {fact("Guarantee to", formatDay(placement.guaranteeEndsOn))}
+        {fee && fact("Fee", <strong>{fee}</strong>)}
+        {fact("Invoice", INVOICE_STATUS[placement.invoiceStatus])}
+        {placement.recruiterName && fact("Recruiter", placement.recruiterName)}
+        {placement.leftOn && fact("Left", formatDay(placement.leftOn))}
+        {placement.replacement !== "none" && fact("Replacement", REPLACEMENT[placement.replacement])}
+      </div>
+      <PlacementInvoice p={placement} permissions={permissions} />
     </div>
   );
 }

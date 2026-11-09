@@ -114,7 +114,7 @@ export function PlacementInvoice({ p, permissions }: { p: Placement; permissions
   else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${formatWhen(inv.sendsAt)}`;
   else status = to ? `To ${to}; not emailed automatically` : "No invoice recipient yet";
   const sendButton = (
-    <button type="button" className="link" disabled={send.isPending || !inv.contactEmail}
+    <button type="button" className="small-button primary" disabled={send.isPending || !inv.contactEmail}
       onClick={() => { if (window.confirm(`Email the invoice to ${to ?? "the client"} now?`)) { send.mutate(); setViewing(false); } }}>Send invoice now</button>
   );
   const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled";
@@ -124,9 +124,9 @@ export function PlacementInvoice({ p, permissions }: { p: Placement; permissions
       {inv.sendError && !inv.sentAt && <span className="warning small" role="alert"> Not emailed: {inv.sendError}</span>}
       {seeFees && (
         <span className="row">
-          <button type="button" className="link" onClick={() => { setViewing(true); }}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "View invoice"}</button>
-          <button type="button" className="link" onClick={() => { get("pdf"); }}>PDF</button>
-          <button type="button" className="link" onClick={() => { get("docx"); }}>Word</button>
+          <button type="button" className="small-button" onClick={() => { setViewing(true); }}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "View invoice"}</button>
+          <button type="button" className="link small" onClick={() => { get("pdf"); }}>PDF</button>
+          <button type="button" className="link small" onClick={() => { get("docx"); }}>Word</button>
           {canSend && sendButton}
         </span>
       )}

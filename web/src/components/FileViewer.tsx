@@ -39,7 +39,7 @@ export function FileViewer({ title, path, type, actions, onClose }: {
       {!url && !error && <p className="muted file-viewer-wait">Making the preview…</p>}
       {url && (type.startsWith("image/")
         ? <img className="file-viewer-body" src={url} alt={title} />
-        : <iframe className="file-viewer-body" title={title} src={url} />)}
+        : <iframe className="file-viewer-body" title={title} src={`${url}#navpanes=0&view=FitH`} />)}
     </dialog>
   );
 }

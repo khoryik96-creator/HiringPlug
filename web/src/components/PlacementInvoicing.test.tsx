@@ -94,7 +94,7 @@ describe("invoicing a placement", () => {
     URL.revokeObjectURL = vi.fn();
     fireEvent.click(screen.getByRole("button", { name: "Preview invoice" }));
     const viewer = await screen.findByTitle("Invoice preview: Siti Aisyah (numbered when sent)");
-    expect(viewer.getAttribute("src")).toBe("blob:invoice"); // shown in the app, not downloaded
+    expect(viewer.getAttribute("src")).toMatch(/^blob:invoice#/); // shown in the app, not downloaded
     expect(fetched).toHaveBeenCalledWith("/v1/placements/plc_1/invoice/file?format=pdf", "application/pdf");
     expect(download).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));

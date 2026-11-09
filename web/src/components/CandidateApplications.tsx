@@ -38,24 +38,33 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
       <h3>Jobs</h3>
       <ErrorMessage error={list.error ?? move.error} />
       {list.data && list.data.items.length === 0 && <p className="muted">Not on any job yet.</p>}
-      <ul>
+      <ul className="app-cards">
         {list.data?.items.map((a) => (
-          <li key={a.id}>
-            <a href={`#/jobs/${a.jobId}`}>{a.jobTitle}</a> <span className="muted">at {a.companyName}</span>{" "}
-            <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>{" "}
-            <span className="muted">
-              {a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}
-            </span>{" "}
-            {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
-            {permissions.includes("emails:send") && (
-              <button type="button" className="link" onClick={() => { setEmailing(a.id); }}>Email client</button>
-            )}
-            {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
-            {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
-            {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
-            {permissions.includes("interviews:read") && (
-              <ApplicationInterviews applicationId={a.id} closed={["rejected", "withdrawn", "placed"].includes(a.stage)} permissions={permissions} />
-            )}
+          <li key={a.id} className="app-card">
+            <div className="app-card-head">
+              <div className="app-card-title">
+                <a href={`#/jobs/${a.jobId}`}>{a.jobTitle}</a>
+                <span className="muted small">{a.companyName}</span>
+              </div>
+              <div className="app-card-stage">
+                <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>
+                <span className="muted small">{a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}</span>
+              </div>
+              <div className="app-card-actions">
+                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+                {permissions.includes("emails:send") && (
+                  <button type="button" className="small-button" onClick={() => { setEmailing(a.id); }}>Email client</button>
+                )}
+              </div>
+            </div>
+            <div className="app-card-body">
+              {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
+              {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
+              {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
+              {permissions.includes("interviews:read") && (
+                <ApplicationInterviews applicationId={a.id} closed={["rejected", "withdrawn", "placed"].includes(a.stage)} permissions={permissions} />
+              )}
+            </div>
           </li>
         ))}
       </ul>
