@@ -22,6 +22,7 @@ const answers: Record<string, unknown> = {
   "/v1/companies/{companyId}/autofill": { status: "idle", checkedAt: null, error: null, suggestions: [] },
   "/v1/companies/{companyId}/benefits": { benefits: [], preOffer: [], version: 0, updatedAt: null },
   "/v1/settings/fields": testFieldSettings(),
+  "/v1/companies/{companyId}/terms": { feePercent: null, paymentTermsDays: null, guaranteeDays: null, signedOn: null, notes: null, version: 0, updatedAt: null },
 };
 
 describe("company pages", () => {

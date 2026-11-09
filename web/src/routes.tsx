@@ -32,6 +32,7 @@ const ContactList = page(() => import("./pages/ContactList"), "ContactList");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
+const Invoicing = page(() => import("./pages/Invoicing"), "Invoicing");
 const ImportPage = page(() => import("./pages/ImportPage"), "ImportPage");
 const Integrations = page(() => import("./pages/Integrations"), "Integrations");
 const JobDetail = page(() => import("./pages/JobDetail"), "JobDetail");
@@ -128,6 +129,8 @@ export const ROUTES: Route[] = [
     render: (c) => <CvTemplates canManage={can(c, "cvformats.templates:manage")} /> },
   { section: "email-templates", path: /^#\/email-templates/, permission: "emails:send", menu: { in: "settings", label: "Email templates", href: "#/email-templates" },
     render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} canPreview={can(c, "emails:send") && can(c, "candidates:read")} /> },
+  { section: "invoicing", path: /^#\/invoicing/, permission: "placements:read", menu: { in: "settings", label: "Invoicing", href: "#/invoicing" },
+    render: (c) => <Invoicing canManage={can(c, "settings:manage")} /> },
   { section: "system", path: /^#\/system/, permission: "settings:manage", menu: { in: "settings", label: "System", href: "#/system" },
     render: () => <System /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },

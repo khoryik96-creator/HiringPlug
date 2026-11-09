@@ -28,6 +28,7 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "document.pdf_rendered": "Saving PDF copies",
   "email.send": "Sending emails",
   "interview.remind": "Interview reminders",
+  "placement.invoice": "Invoices emailed on start dates",
   "jd.blind": "Rewriting blind ads with the AI",
   "jd.blinded": "Saving rewritten blind ads",
   "job.read_jd": "Reading job descriptions",

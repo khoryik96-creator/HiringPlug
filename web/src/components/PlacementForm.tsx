@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey, usersKey } from "../api/keys";
 import { INVOICE_STATUS, keysOf, PAY_PERIOD, PLACEMENT_STATUS, REPLACEMENT, formatMoney } from "../labels";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors } from "./forms";
-import { createBody, feePreview, formFromPlacement, type PlacementFormState, updateBody } from "./placementFormState";
+import { createBody, feePreview, formFromPlacement, invoicingBody, type PlacementFormState, updateBody, withDefaults } from "./placementFormState";
+import { InvoicingFields } from "./PlacementInvoicing";
 import { SaveError } from "./SaveError";
 
 type Placement = Schemas["Placement"];
@@ -25,14 +26,32 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
   const [opened] = useState(() => ({ version: placement?.version ?? 0 }));
   // When recording, "" means you (the server's default).
   const [form, setForm] = useState(() => formFromPlacement(placement, ""));
+  // A new placement starts from the client's terms of business.
+  const defaults = useQuery({
+    queryKey: ["placement-defaults", applicationId],
+    queryFn: async () => unwrap(await api.GET("/v1/applications/{applicationId}/placement-defaults", { params: { path: { applicationId } } })),
+    enabled: !placement,
+  });
+  const applied = useRef(false);
+  useEffect(() => {
+    if (defaults.data && !applied.current) {
+      applied.current = true;
+      setForm((f) => withDefaults(f, defaults.data, withMoney));
+    }
+  }, [defaults.data, withMoney]);
   const save = useMutation({
-    mutationFn: async () => placement
-      ? unwrap(await api.PATCH("/v1/placements/{placementId}", {
-        params: { path: { placementId: placement.id } }, body: updateBody(form, opened.version, withMoney),
-      }))
-      : unwrap(await api.POST("/v1/applications/{applicationId}/placement", {
-        params: { path: { applicationId } }, body: createBody(form, withMoney),
-      })),
+    mutationFn: async () => {
+      const saved = placement
+        ? unwrap(await api.PATCH("/v1/placements/{placementId}", {
+          params: { path: { placementId: placement.id } }, body: updateBody(form, opened.version, withMoney),
+        }))
+        : unwrap(await api.POST("/v1/applications/{applicationId}/placement", {
+          params: { path: { applicationId } }, body: createBody(form, withMoney),
+        }));
+      return unwrap(await api.PUT("/v1/placements/{placementId}/invoicing", {
+        params: { path: { placementId: saved.id } }, body: invoicingBody(form),
+      }));
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: placementsKey });
       await queryClient.invalidateQueries({ queryKey: ["applications"] }); // the stage moves to placed
@@ -44,7 +63,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
     setForm((f) => ({ ...f, [key]: e.target.value }));
   };
   const preview = feePreview(form);
-  const shown = ["startDate", "guaranteeDays", "recruiterId", "leftOn", "paidOn", "money.feePercent", "money.feeAmount"];
+  const shown = ["startDate", "guaranteeDays", "recruiterId", "leftOn", "paidOn", "money.feePercent", "money.feeAmount", "contactId", "paymentTermsDays", "dueOn"];
 
   return (
     <form className="panel form-grid" aria-label={placement ? "Change placement" : "Record placement"}
@@ -129,6 +148,8 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
           {preview && <p className="muted full" role="status">Fee: {formatMoney(preview, form.salaryCurrency.toUpperCase())}</p>}
         </fieldset>
       )}
+      <InvoicingFields form={form} setForm={setForm} companyId={placement?.companyId ?? defaults.data?.companyId}
+        terms={placement ? undefined : defaults.data} errors={errors} />
       <SaveError error={save.error} shown={shown} onReload={onDone} />
       <div className="row full">
         <button type="submit" disabled={save.isPending || !form.startDate}>{placement ? "Save" : "Record placement"}</button>

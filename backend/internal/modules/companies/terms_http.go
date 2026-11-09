@@ -23,10 +23,7 @@ func (h *HTTP) GetCompanyTerms(ctx context.Context, req api.GetCompanyTermsReque
 func (h *HTTP) PutCompanyTerms(ctx context.Context, req api.PutCompanyTermsRequestObject) (api.PutCompanyTermsResponseObject, error) {
 	b := req.Body
 	in := Terms{PaymentTermsDays: valueOf(b.PaymentTermsDays), GuaranteeDays: valueOf(b.GuaranteeDays), Notes: valueOf(b.Notes)}
-	if v := valueOf(b.FeePercent); v != nil {
-		s := string(*v)
-		in.FeePercent = &s
-	}
+	in.FeePercent = valueOf(b.FeePercent)
 	if v := valueOf(b.SignedOn); v != nil {
 		d := v.Time
 		in.SignedOn = &d
@@ -45,7 +42,7 @@ func termsToAPI(t Terms) api.CompanyTerms {
 		Version: t.Version, UpdatedAt: nullOf(t.UpdatedAt),
 	}
 	if t.FeePercent != nil {
-		out.FeePercent = nullable.NewNullableWithValue(api.DecimalAmount(*t.FeePercent))
+		out.FeePercent = nullable.NewNullableWithValue(*t.FeePercent)
 	}
 	if t.SignedOn != nil {
 		out.SignedOn = nullable.NewNullableWithValue(openapi_types.Date{Time: *t.SignedOn})

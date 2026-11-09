@@ -46,7 +46,7 @@ func TestPlacementInvoicing(t *testing.T) {
 			"guaranteeDays": 60, "signedOn": "2026-01-15", "notes": " Replacement once within the guarantee. "})
 		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 		res.JSON(&got)
-		assert.Equal(t, "18", string(got.FeePercent.MustGet()))
+		assert.Equal(t, "18", got.FeePercent.MustGet())
 		assert.Equal(t, "Replacement once within the guarantee.", got.Notes.MustGet())
 		assert.Equal(t, 1, got.Version)
 	})
@@ -54,7 +54,7 @@ func TestPlacementInvoicing(t *testing.T) {
 	var defaults api.PlacementDefaults
 	a.request(http.MethodGet, "/v1/applications/"+appl.Id+"/placement-defaults", recruiter, nil).JSON(&defaults)
 	assert.True(t, defaults.TermsSet)
-	assert.Equal(t, "18", string(defaults.FeePercent.MustGet()))
+	assert.Equal(t, "18", defaults.FeePercent.MustGet())
 	assert.Equal(t, 30, defaults.PaymentTermsDays)
 	assert.Equal(t, 60, defaults.GuaranteeDays)
 	assert.Equal(t, hiring.Id, defaults.ContactId.MustGet(), "the job's hiring contact")
@@ -176,4 +176,3 @@ func TestPlacementInvoicing(t *testing.T) {
 		assert.Equal(t, 1, waiting, "queued again for the start date")
 	})
 }
-

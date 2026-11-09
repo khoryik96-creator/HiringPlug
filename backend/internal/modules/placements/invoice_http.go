@@ -25,7 +25,7 @@ func (h *HTTP) GetPlacementDefaults(ctx context.Context, req api.GetPlacementDef
 		ContactId: c.OrNull(d.ContactID),
 	}
 	if d.Terms.FeePercent != nil {
-		out.FeePercent = nullable.NewNullableWithValue(api.DecimalAmount(*d.Terms.FeePercent))
+		out.FeePercent = nullable.NewNullableWithValue(*d.Terms.FeePercent)
 	}
 	return out, nil
 }

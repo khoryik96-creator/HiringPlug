@@ -13,7 +13,9 @@ afterEach(() => {
 
 const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement"] => ({
   id: "plc_1", version: 1, applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "jo_1",
-  jobTitle: "Accountant", companyName: "Contoh Berhad", recruiterId: "usr_1", recruiterName: "Aina",
+  jobTitle: "Accountant", companyId: "comp_1", companyName: "Contoh Berhad",
+  invoicing: { contactId: "cont_1", contactName: "Mei Tan", contactEmail: "mei@contoh.test", paymentTermsDays: 30, dueOn: "2027-01-04",
+    dueOnSet: false, autoSend: true, sendsAt: null, sentAt: "2026-12-05T01:00:00Z", sendError: null }, recruiterId: "usr_1", recruiterName: "Aina",
   startDate: "2026-12-01", guaranteeDays: 90, guaranteeEndsOn: "2027-03-01", status: "active", leftOn: null, statusNote: null, replacement: "none",
   invoiceStatus: "invoiced", invoiceNumber: "INV-1", invoicedOn: "2026-12-05", paidOn: null,
   money: { salary: { amount: "8500.00", currency: "MYR", period: "month" }, feePercent: "20.00", feeAmount: "20400.00", feeCurrency: "MYR" },

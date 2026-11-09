@@ -1,0 +1,90 @@
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { api, type Schemas } from "../api/client";
+import * as files from "../api/files";
+import { ok, RECRUITER, renderWithClient, sentBody } from "../test-utils";
+import { PlacementForm } from "./PlacementForm";
+import { PlacementInvoice } from "./PlacementInvoicing";
+import { autoDueOn } from "./placementFormState";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const contacts = [
+  { id: "cont_aisyah", fullName: "Aisyah Rahman", email: "aisyah@maju.test" },
+  { id: "cont_ken", fullName: "Ken Lim", email: "ken@maju.test" },
+  { id: "cont_wei", fullName: "Wei Tan", email: null },
+];
+const defaults: Schemas["PlacementDefaults"] = {
+  companyId: "comp_1", companyName: "Maju Foods", termsSet: true, feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, contactId: "cont_aisyah",
+};
+const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement"] => ({
+  id: "plc_1", version: 1, applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "jo_1", jobTitle: "Finance Manager",
+  companyId: "comp_1", companyName: "Maju Foods", recruiterId: null, recruiterName: null, startDate: "2026-12-01", guaranteeDays: 60,
+  guaranteeEndsOn: "2027-01-30", status: "active", leftOn: null, statusNote: null, replacement: "none", invoiceStatus: "not_invoiced",
+  invoiceNumber: null, invoicedOn: null, paidOn: null, money: null, restrictedFields: [], createdAt: "2026-11-09T00:00:00Z", updatedAt: "2026-11-09T00:00:00Z",
+  invoicing: { contactId: "cont_ken", contactName: "Ken Lim", contactEmail: "ken@maju.test", paymentTermsDays: 30, dueOn: "2026-12-31",
+    dueOnSet: false, autoSend: true, sendsAt: "2026-12-01T01:00:00Z", sentAt: null, sendError: null },
+  ...over,
+});
+
+describe("invoicing a placement", () => {
+  it("starts from the client's terms, invoices whom you choose, and emails it on the start date", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/applications/{applicationId}/placement-defaults" ? defaults : path === "/v1/contacts" ? { items: contacts, nextCursor: null } : { items: [] },
+    ))) as never);
+    vi.spyOn(api, "POST").mockResolvedValue(ok(placement()));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(placement()));
+    renderWithClient(<PlacementForm applicationId="appl_1" permissions={RECRUITER.concat("placements.fees:update")} onDone={() => undefined} />);
+
+    expect(await screen.findByText(/From Maju Foods's terms of business: 18% fee · 30 days to pay · 60-day guarantee/)).toBeTruthy();
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>("Guarantee (days)").value).toBe("60"); });
+    expect(screen.getByLabelText<HTMLInputElement>("Fee %").value).toBe("18");
+    const to = screen.getByLabelText<HTMLSelectElement>("Send the invoice to");
+    expect(to.value).toBe("cont_aisyah"); // the hiring contact
+    expect(within(to).getByRole("option", { name: "Wei Tan — no email address" })).toHaveProperty("disabled", true);
+    fireEvent.change(to, { target: { value: "cont_ken" } });
+    fireEvent.change(screen.getByLabelText("Start date"), { target: { value: "2026-12-01" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Payment due").value).toBe("2026-12-31"); // start + 30 days
+    fireEvent.change(screen.getByLabelText("Payment terms (days)"), { target: { value: "45" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Payment due").value).toBe("2027-01-15");
+    expect(screen.getByLabelText<HTMLInputElement>(/Email the invoice to Ken Lim on the start date/).checked).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ contactId: "cont_ken", paymentTermsDays: 45, dueOn: null, autoSend: true });
+  });
+
+  it("shows where the invoice stands, previews it and sends it now", async () => {
+    const download = vi.spyOn(files, "downloadFrom").mockResolvedValue();
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(placement()));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<PlacementInvoice p={placement()} permissions={RECRUITER.concat("placements.fees:read", "placements:manage")} />);
+    expect(screen.getByText(/Emails to Ken Lim \(ken@maju.test\) on/).textContent).toContain("due 31 Dec 2026");
+    fireEvent.click(screen.getByRole("button", { name: "Preview invoice" }));
+    expect(download).toHaveBeenCalledWith("/v1/placements/plc_1/invoice/file?format=pdf", "Invoice Siti Aisyah.pdf", "application/pdf");
+    fireEvent.click(screen.getByRole("button", { name: "Send invoice now" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    cleanup();
+
+    renderWithClient(<PlacementInvoice p={placement({ invoiceStatus: "invoiced", invoiceNumber: "HYP-0042",
+      invoicing: { ...placement().invoicing, sentAt: "2026-12-01T01:00:00Z", sendsAt: null } })} permissions={RECRUITER.concat("placements.fees:read")} />);
+    expect(screen.getByText(/Invoice HYP-0042 emailed to Ken Lim/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send invoice now" })).toBeNull();
+    cleanup();
+
+    renderWithClient(<PlacementInvoice p={placement({ invoicing: { ...placement().invoicing, sendsAt: null, sendError: "Record the placement's fee first." } })}
+      permissions={RECRUITER} />);
+    expect(screen.getByRole("alert").textContent).toContain("Record the placement's fee first.");
+    expect(screen.queryByRole("button", { name: "Preview invoice" }), "the invoice shows the fee").toBeNull();
+  });
+
+  it("works out the due date", () => {
+    expect(autoDueOn("2026-12-01", "30")).toBe("2026-12-31");
+    expect(autoDueOn("2027-01-31", "30")).toBe("2027-03-02");
+    expect(autoDueOn("", "30")).toBe("");
+  });
+});

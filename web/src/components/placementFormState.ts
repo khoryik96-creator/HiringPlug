@@ -22,6 +22,12 @@ export type PlacementFormState = {
   feePercent: string;
   feeAmount: string;
   feeCurrency: string;
+  // Invoicing: who receives it, the terms, a due date someone set ("": the
+  // invoice date plus the terms), and emailing it on the start date.
+  contactId: string;
+  paymentTermsDays: string;
+  dueOn: string;
+  autoSend: boolean;
 };
 
 export function formFromPlacement(p: Placement | undefined, recruiterId: string): PlacementFormState {
@@ -45,7 +51,36 @@ export function formFromPlacement(p: Placement | undefined, recruiterId: string)
     feePercent: money?.feePercent ?? "",
     feeAmount: money?.feeAmount ?? "",
     feeCurrency: money?.feeCurrency ?? "MYR",
+    contactId: p?.invoicing.contactId ?? "",
+    paymentTermsDays: String(p?.invoicing.paymentTermsDays ?? 30),
+    dueOn: p?.invoicing.dueOnSet ? p.invoicing.dueOn : "",
+    autoSend: p?.invoicing.autoSend ?? false,
   };
+}
+
+/** A new placement's form with the client's terms of business and hiring contact (what the user has not typed yet). */
+export function withDefaults(f: PlacementFormState, d: Schemas["PlacementDefaults"], withMoney: boolean): PlacementFormState {
+  return {
+    ...f,
+    guaranteeDays: String(d.guaranteeDays),
+    paymentTermsDays: String(d.paymentTermsDays),
+    contactId: f.contactId || (d.contactId ?? ""),
+    autoSend: f.contactId ? f.autoSend : d.contactId !== null,
+    feePercent: withMoney && f.feeKind === "percent" && !f.feePercent && d.feePercent ? d.feePercent : f.feePercent,
+  };
+}
+
+/** The due date when nobody sets one: the start date (the invoice date) plus the terms. */
+export function autoDueOn(startDate: string, termsDays: string): string {
+  const days = Number(termsDays);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !Number.isInteger(days)) return "";
+  const d = new Date(`${startDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function invoicingBody(f: PlacementFormState): Schemas["PlacementInvoicingInput"] {
+  return { contactId: orNull(f.contactId), paymentTermsDays: Number(f.paymentTermsDays), dueOn: orNull(f.dueOn), autoSend: f.autoSend };
 }
 
 /** "8,500" -> "8500": people type thousands separators. */

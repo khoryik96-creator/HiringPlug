@@ -5,6 +5,7 @@ import { api, type Permission, unwrap } from "../api/client";
 import { companyKey } from "../api/keys";
 import { CompanyAutofill } from "../components/CompanyAutofill";
 import { CompanyBenefits } from "../components/CompanyBenefits";
+import { CompanyTerms } from "../components/CompanyTerms";
 import { CompanyContacts } from "../components/CompanyContacts";
 import { CompanyForm } from "../components/CompanyForm";
 import { CompanyJobs } from "../components/CompanyJobs";
@@ -58,6 +59,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           </dl>
         </section>
       )}
+      <CompanyTerms companyId={c.id} permissions={permissions} />
       <CompanyBenefits companyId={c.id} companyName={c.name} permissions={permissions} />
       {/* Notes (and the timeline) right under the details, as on a candidate's page. */}
       <Timeline subjectType="company" subjectId={c.id} permissions={permissions} />

@@ -540,3 +540,13 @@ main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto;
 td:has(> .hint-input) { width: 70%; }
 td:has(> .hint-input) > input { display: block; width: 100%; }
 .hint-input { margin-top: 0.3rem; font-size: 0.85rem; color: var(--muted); }
+/* A client's terms of business. */
+.terms { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; margin: 0.4rem 0 0.6rem; }
+.term { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.7rem; display: flex; flex-direction: column; gap: 0.1rem; }
+.term-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.term-value { font-weight: 650; color: var(--ink); }
+/* A placement's invoice: where it stands, and its actions. */
+.placement-invoice { display: flex; flex-wrap: wrap; gap: 0.2rem 0.75rem; align-items: center; margin-top: 0.25rem; }
+fieldset.invoicing .check { display: block; }
+.invoicing-settings .field textarea, .invoicing-settings .field input, .invoicing-settings .field select { width: 100%; }
+.email-preview { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 0.9rem; }

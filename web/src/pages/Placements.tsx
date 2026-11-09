@@ -6,6 +6,7 @@ import { placementsKey } from "../api/keys";
 import { PlacementSummary } from "../components/ApplicationPlacement";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { PlacementForm } from "../components/PlacementForm";
+import { PlacementInvoice } from "../components/PlacementInvoicing";
 import { INVOICE_STATUS, keysOf, PLACEMENT_STATUS, formatMoney } from "../labels";
 
 type Filters = { status: Schemas["PlacementStatus"] | ""; invoiceStatus: Schemas["InvoiceStatus"] | "" };
@@ -80,6 +81,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
               <a href={`#/candidates/${p.candidateId}`}><strong>{p.candidateName}</strong></a> as{" "}
               <a href={`#/jobs/${p.jobId}`}>{p.jobTitle}</a> <span className="muted">at {p.companyName}</span>
               <div><PlacementSummary p={p} /></div>
+              <PlacementInvoice p={p} permissions={permissions} />
               {p.statusNote && <div className="muted">{p.statusNote}</div>}
             </div>
             {permissions.includes("placements:manage") && (

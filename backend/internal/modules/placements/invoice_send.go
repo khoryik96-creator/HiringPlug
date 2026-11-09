@@ -257,4 +257,3 @@ func (s *Service) File(ctx context.Context, p authz.Principal, id, format string
 	})
 	return out, err
 }
-

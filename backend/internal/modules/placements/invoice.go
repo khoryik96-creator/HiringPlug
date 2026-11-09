@@ -81,7 +81,7 @@ func (s *Service) Defaults(ctx context.Context, p authz.Principal, appID string)
 // hiringContact is the job's hiring contact, when they have an email address.
 func (s *Service) hiringContact(ctx context.Context, tx pgx.Tx, app Application) (*string, error) {
 	if app.ContactID == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // no hiring contact is not an error
 	}
 	contacts, err := s.inv.Contacts.Contacts(ctx, tx, []string{*app.ContactID})
 	if err != nil {
@@ -90,7 +90,7 @@ func (s *Service) hiringContact(ctx context.Context, tx pgx.Tx, app Application)
 	if c, ok := contacts[*app.ContactID]; ok && c.Email != nil {
 		return app.ContactID, nil
 	}
-	return nil, nil
+	return nil, nil //nolint:nilnil // a contact without an email address is no recipient
 }
 
 // startInvoicing gives a new placement its client's payment terms and the

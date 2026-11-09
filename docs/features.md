@@ -670,6 +670,28 @@ guarantee ends within two weeks. A fall-through means the client is owed a
 **replacement**: the placement shows "Replacement owed" (listed at the top of
 the Placements page) until it is marked provided or refunded.
 
+**Terms of business and invoicing ✅.** Each client has **terms of business**
+on its page (fee as a % of the annual salary, payment terms in days,
+guarantee in days, when signed, notes). A new placement starts from them (the
+fee %, guarantee and payment terms, and the job's hiring contact as the
+invoice recipient), and any of it can be changed for that placement. The
+placement sheet says **who receives the invoice** (a dropdown of the client's
+contacts, "Name — email"), the **payment terms** and the **due date** (the
+invoice date plus the terms, worked out as the start date changes, unless
+set by hand), and whether to **email the invoice on the start date**. On that
+day (at the hour set in the template, in the agency's time zone; moved with
+the start date) the invoice is numbered, made as a PDF from the agency's
+**invoice template** (Settings > Invoicing: who it is from, bank details,
+numbering, tax such as SST, the fee line, footer, and the email's subject and
+message, all with {{fields}} such as {{invoice.total}} and {{invoice.dueDate}},
+clicked in where the cursor is, with a preview) and emailed to the recipient;
+the placement becomes invoiced with that number. "Send invoice now" does the
+same at once; the invoice downloads as a PDF or Word file (a preview before it
+is sent). An invoice is never sent twice; one that cannot be sent on its own
+(no fee recorded, no recipient) says why on the placement. The invoice email
+is shown only to roles that may see salaries, and the audit log records the
+number and recipient, never the amounts.
+
 ## 5. Notes and activity
 
 ✅ Notes (general, screening, interview, call) on candidates, jobs, companies

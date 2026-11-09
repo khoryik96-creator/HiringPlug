@@ -6,6 +6,7 @@ import { applicationPlacementKey } from "../api/keys";
 import { INVOICE_STATUS, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMoney } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { PlacementForm } from "./PlacementForm";
+import { PlacementInvoice } from "./PlacementInvoicing";
 
 type Placement = Schemas["Placement"];
 
@@ -44,6 +45,7 @@ export function ApplicationPlacement({ applicationId, stage, permissions }: { ap
     <div className="placement">
       <ErrorMessage error={list.error} />
       {placement && <PlacementSummary p={placement} />}{" "}
+      {placement && <PlacementInvoice p={placement} permissions={permissions} />}
       {canManage && list.isSuccess && (
         <button type="button" className="link" onClick={() => { setEditing(true); }}>
           {placement ? "Change placement" : "Record placement"}
