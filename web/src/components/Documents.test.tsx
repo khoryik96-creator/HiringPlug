@@ -51,4 +51,18 @@ describe("CVs and documents", () => {
     expect((init.body as FormData).get("source")).toBe("linkedin");
     await waitFor(() => { expect(screen.getByRole("button", { name: "Upload" })).toBeTruthy(); }); // closed once uploaded
   });
+
+  it("deletes a formatted CV after asking, never the candidate's own", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx" }), doc({})] }));
+    const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:delete"]} />);
+    const own = (await screen.findByText("Siti CV.pdf")).closest("li") as HTMLElement;
+    fireEvent.click(within(own).getByLabelText(/More for/));
+    expect(within(own).queryByRole("menuitem", { name: /Delete/ })).toBeNull();
+    const formatted = screen.getByText("Contoh CV - Siti.docx").closest("li") as HTMLElement;
+    fireEvent.click(within(formatted).getByLabelText(/More for/));
+    fireEvent.click(within(formatted).getByRole("menuitem", { name: "Delete this formatted CV" }));
+    await waitFor(() => { expect(del).toHaveBeenCalledWith("/v1/documents/{documentId}", { params: { path: { documentId: "doc_f" } } }); });
+  });
 });

@@ -501,3 +501,5 @@ main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto;
 .ai-filters[open] summary { margin-bottom: 0.7rem; }
 .cv-picture { max-height: 80vh; overflow: auto; background: #f1f5f9; border-radius: 8px; padding: 0.5rem; text-align: center; }
 .cv-picture img { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+.doc-menu button.danger { color: #b91c1c; }
+.doc-menu button.danger:hover { background: #fee2e2; }

@@ -62,6 +62,7 @@ details get their own permissions.
 | `candidates.compensation:update` (salary) | ✓ | ✓ | ✓ | | | |
 | `documents:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `documents:create` | ✓ | ✓ | ✓ | ✓ | | |
+| `documents:delete` (formatted CVs only) | ✓ | ✓ | ✓ | ✓ | | |
 | `companies:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `companies:create`, `companies:update` | ✓ | ✓ | ✓ | ✓ | | |
 | `contacts:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |

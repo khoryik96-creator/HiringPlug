@@ -60,6 +60,12 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: async (d: Document) => { unwrap(await api.DELETE("/v1/documents/{documentId}", { params: { path: { documentId: d.id } } })); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", candidateId] }),
+  });
+  const canDelete = permissions.includes("documents:delete");
+
   const pdf = useMutation({
     mutationFn: async (d: Document) => { await downloadFrom(`/v1/documents/${d.id}/pdf`, d.fileName.replace(/\.docx$/, "") + ".pdf", "application/pdf"); },
   });
@@ -130,6 +136,15 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
                   </button>
                 )}
                 {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
+                {canDelete && d.source === "formatted" && (
+                  <button type="button" role="menuitem" className="danger" disabled={remove.isPending}
+                    onClick={(e) => {
+                      e.currentTarget.closest("details")?.removeAttribute("open");
+                      if (window.confirm(`Delete the formatted CV "${d.fileName}"? Its Word and PDF files go too; this cannot be undone.`)) remove.mutate(d);
+                    }}>
+                    Delete this formatted CV
+                  </button>
+                )}
               </div>
             </details>
           </div>
@@ -170,7 +185,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
       {canFormat && <StudioCvRuns candidateId={candidateId} />}
-      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error} />
+      <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error ?? remove.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {groups.map((g) => (
         <div key={g.title} className="doc-group">

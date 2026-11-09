@@ -92,6 +92,10 @@ x-error-codes:
     module: documents
     status: 409
     description: The document has no extracted text yet (still being read, scanned without OCR, or unreadable), so there is nothing to parse.
+  DOCUMENT_NOT_DELETABLE:
+    module: documents
+    status: 409
+    description: Only formatted CVs can be deleted; the candidate's own CVs (and other files) are kept.
   EMAIL_DO_NOT_CONTACT:
     module: emails
     status: 409
@@ -1322,6 +1326,22 @@ paths:
   /v1/documents/{documentId}:
     parameters:
       - $ref: '#/components/parameters/DocumentIdPath'
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a formatted CV (its file and PDF copy too)
+      description: Only CVs HiringPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
+      x-permission: documents:delete
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: Not a formatted CV (DOCUMENT_NOT_DELETABLE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
     get:
       operationId: getDocument
       tags: [documents]
@@ -4031,6 +4051,7 @@ components:
         - cvformats.templates:manage
         - cvformats:create
         - documents:create
+        - documents:delete
         - documents:read
         - emails.templates:manage
         - emails:read
@@ -4093,6 +4114,7 @@ components:
         - CONTACT_DUPLICATE_EMAIL
         - CV_NOT_BLIND
         - DOCUMENT_HAS_NO_TEXT
+        - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
         - FORBIDDEN
         - INTERNAL
@@ -8475,6 +8497,11 @@ x-permissions:
   documents:create:
     module: documents
     description: Upload candidate documents.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  documents:delete:
+    module: documents
+    description: Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
   documents:read:

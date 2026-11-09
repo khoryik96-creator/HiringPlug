@@ -101,6 +101,25 @@ func (q *Queries) CandidatesWithMatchingCV(ctx context.Context, arg CandidatesWi
 	return items, nil
 }
 
+const deleteFormattedDocument = `-- name: DeleteFormattedDocument :one
+DELETE FROM document WHERE id = $1 AND source = 'formatted'
+RETURNING storage_key, pdf_key
+`
+
+type DeleteFormattedDocumentRow struct {
+	StorageKey string
+	PdfKey     *string
+}
+
+// A formatted CV deleted (the service checks it is one); its files are
+// removed after the transaction.
+func (q *Queries) DeleteFormattedDocument(ctx context.Context, id string) (DeleteFormattedDocumentRow, error) {
+	row := q.db.QueryRow(ctx, deleteFormattedDocument, id)
+	var i DeleteFormattedDocumentRow
+	err := row.Scan(&i.StorageKey, &i.PdfKey)
+	return i, err
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error FROM document WHERE id = $1
 `

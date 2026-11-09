@@ -184,6 +184,11 @@ page says what, to compare before sending. It needs the AI (Settings > AI
 provider) and counts in the monthly AI allowance. **From their profile** is
 the template way below.
 
+**Deleting a formatted CV ✅**: its "..." menu has "Delete this formatted CV"
+(after a confirmation; `documents:delete`, recruiters and up). Its Word file
+and PDF copy are removed and the deletion is in the audit log. Only CVs
+HiringPlug made can be deleted: the candidate's own files are always kept.
+
 **Formatted CVs ✅.** "Make formatted CV" (candidate page, CVs and documents)
 fills the candidate's profile, work history and education into a Word
 template and saves it as their `formatted` CV (read and compared with the

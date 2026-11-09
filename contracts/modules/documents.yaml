@@ -12,7 +12,13 @@ x-module:
     documents:create:
       description: Upload candidate documents.
       roles: [owner, admin, recruiter, sourcer]
+    documents:delete:
+      description: "Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept."
+      roles: [owner, admin, recruiter, sourcer]
   errorCodes:
+    DOCUMENT_NOT_DELETABLE:
+      status: 409
+      description: "Only formatted CVs can be deleted; the candidate's own CVs (and other files) are kept."
     DOCUMENT_HAS_NO_TEXT:
       status: 409
       description: The document has no extracted text yet (still being read, scanned without OCR, or unreadable), so there is nothing to parse.
@@ -181,6 +187,22 @@ paths:
   /v1/documents/{documentId}:
     parameters:
       - $ref: '#/components/parameters/DocumentIdPath'
+    delete:
+      operationId: deleteDocument
+      tags: [documents]
+      summary: Delete a formatted CV (its file and PDF copy too)
+      description: Only CVs HiringPlug made (source formatted); the candidate's own files are kept. Recorded in the audit log.
+      x-permission: documents:delete
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Not a formatted CV (DOCUMENT_NOT_DELETABLE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
     get:
       operationId: getDocument
       tags: [documents]

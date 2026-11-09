@@ -135,3 +135,9 @@ WHERE q.query IS NOT NULL AND s.candidate_id = ANY (@candidate_ids::text[]) AND 
 GROUP BY s.candidate_id
 ORDER BY rank DESC, s.candidate_id
 LIMIT @row_limit;
+
+-- A formatted CV deleted (the service checks it is one); its files are
+-- removed after the transaction.
+-- name: DeleteFormattedDocument :one
+DELETE FROM document WHERE id = @id AND source = 'formatted'
+RETURNING storage_key, pdf_key;
