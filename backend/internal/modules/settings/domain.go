@@ -15,6 +15,7 @@ import (
 // Option is one choice in a dropdown.
 type Option struct {
 	Key, Label string
+	Hint       string // what to write for it (lists with hints only)
 	Hidden     bool
 	BuiltIn    bool
 }
@@ -23,19 +24,33 @@ type Option struct {
 type List struct {
 	Name, Label string
 	Fixed       bool // rename, reorder and hide only
+	Hints       bool // its options carry a hint
 	Options     []Option
 }
 
 // OptionInput is an option as a person saves it (Key empty for a new one).
 type OptionInput struct {
-	Key, Label string
-	Hidden     bool
+	Key, Label, Hint string
+	Hidden           bool
 }
 
 type listDef struct {
 	name, label string
 	fixed       bool
+	hints       bool
 	defaults    []Option
+}
+
+// MaxHint is the longest hint an option may carry.
+const MaxHint = 300
+
+// withHints is opts with a hint for each option: key, label, hint, ...
+func withHints(triples ...string) []Option {
+	out := make([]Option, 0, len(triples)/3)
+	for i := 0; i < len(triples); i += 3 {
+		out = append(out, Option{Key: triples[i], Label: triples[i+1], Hint: triples[i+2], BuiltIn: true})
+	}
+	return out
 }
 
 func opts(pairs ...string) []Option {
@@ -78,6 +93,29 @@ var lists = []listDef{
 		"referee", "Referee (name, title, company, contact)", "relationship", "How they worked together, and for how long",
 		"role", "Role and responsibilities", "strengths", "Strengths", "improve", "Areas to improve",
 		"reason_left", "Reason for leaving", "rehire", "Would you rehire them?")},
+	// A client's benefits and its steps before an offer (the company page),
+	// as in the Hyppies Benefits & Pre-Offer Process template.
+	{name: "company_benefits", label: "Company benefits", hints: true, defaults: withHints(
+		"job_grade", "Job grade/level", "",
+		"annual_leave", "Annual leave", "If it grows with service or grade, give the detail",
+		"other_leave", "Miscellaneous leave", "Compassionate, birthday, paternity/maternity: specify",
+		"medical", "Medical and insurance", "Put * if extended to immediate family members, or say so in the remarks",
+		"work_mode", "Work mode", "If hybrid, how many days in the office",
+		"working_hours", "Working hours and flexibility", "If shifts are required, say whether there is a shift allowance",
+		"dental_optical", "Dental & optical", "",
+		"fixed_bonus", "Fixed bonus", "13th, 13.5 or 14th month; any specific clause",
+		"performance_bonus", "Performance bonus", "Average, bonus cycles, payout",
+		"other_bonus", "Miscellaneous bonus", "Gratuity, ESOS, retention",
+		"commission", "Commission structure", "Payout cycle",
+		"special", "Special benefits", "Free products, higher EPF, subsidies: anything really")},
+	{name: "pre_offer_process", label: "Pre-offer process", hints: true, defaults: withHints(
+		"reference_check", "Reference check", "How many, and which referees (superior/peers)",
+		"background_check", "Background check", "",
+		"health_screening", "Health screening", "",
+		"payslips", "Payslips + bonus slips", "",
+		"identity", "NRIC/passport (expat)", "",
+		"education", "Highest education certificate", "Any specific certificate needed, like SPM",
+		"additional", "Additional process", "Confirmation with HR, more documents to submit, registration for health screening...")},
 }
 
 func def(name string) (listDef, bool) {
@@ -101,7 +139,7 @@ func Lists(saved map[string][]Option) []List {
 		for i := range options {
 			options[i].BuiltIn = slices.ContainsFunc(d.defaults, func(o Option) bool { return o.Key == options[i].Key })
 		}
-		out = append(out, List{Name: d.name, Label: d.label, Fixed: d.fixed, Options: options})
+		out = append(out, List{Name: d.name, Label: d.label, Fixed: d.fixed, Hints: d.hints, Options: options})
 	}
 	return out
 }
@@ -176,8 +214,16 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 			errs.Add(field+".key", "this list's options are fixed: rename or hide them")
 			continue
 		}
+		hint := strings.Join(strings.Fields(o.Hint), " ")
+		if !d.hints {
+			hint = ""
+		}
+		if len([]rune(hint)) > MaxHint {
+			errs.Add(field+".hint", fmt.Sprintf("must be at most %d characters", MaxHint))
+			continue
+		}
 		seenLabel[strings.ToLower(label)], seenKey[key] = true, true
-		out = append(out, Option{Key: key, Label: label, Hidden: o.Hidden})
+		out = append(out, Option{Key: key, Label: label, Hint: hint, Hidden: o.Hidden})
 	}
 	if name != "industry" { // industries are words: renaming one makes a new one
 		for _, b := range d.defaults {

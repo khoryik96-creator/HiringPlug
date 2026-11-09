@@ -1,7 +1,7 @@
 -- Queries owned by the settings module. Run inside a tenant-scoped transaction.
 
 -- name: ListOptions :many
-SELECT list, key, label, hidden FROM field_option ORDER BY list, position;
+SELECT list, key, label, hint, hidden FROM field_option ORDER BY list, position;
 
 -- Lists the company has saved (their rows are the whole list).
 -- name: SavedLists :many
@@ -11,8 +11,8 @@ SELECT list FROM field_list_saved;
 DELETE FROM field_option WHERE list = @list;
 
 -- name: InsertOption :exec
-INSERT INTO field_option (tenant_id, list, key, label, hidden, position)
-VALUES (app_current_tenant(), @list, @key, @label, @hidden, @position);
+INSERT INTO field_option (tenant_id, list, key, label, hint, hidden, position)
+VALUES (app_current_tenant(), @list, @key, @label, sqlc.narg(hint), @hidden, @position);
 
 -- name: MarkSaved :exec
 INSERT INTO field_list_saved (tenant_id, list, updated_by)

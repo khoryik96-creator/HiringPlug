@@ -178,6 +178,76 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /v1/companies/{companyId}/benefits:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: getCompanyBenefits
+      tags: [companies]
+      summary: A client's benefits and its steps before an offer
+      description: >
+        As last saved (version 0 and empty lists before the first save). The
+        items to fill come from the company_benefits and pre_offer_process
+        lists in Settings; a saved item keeps its label even if the list
+        changes later.
+      x-permission: companies:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyBenefits' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: putCompanyBenefits
+      tags: [companies]
+      summary: Save a client's benefits and pre-offer process (the whole lists, in order)
+      description: "`version` must be the version you loaded (0 for the first save)."
+      x-permission: companies:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyBenefitsInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompanyBenefits' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/companies/{companyId}/benefits/file:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: exportCompanyBenefits
+      tags: [companies]
+      summary: Download a client's benefits and pre-offer process as a Word file or a PDF
+      x-permission: companies:read
+      parameters:
+        - { name: format, in: query, required: true, schema: { $ref: '#/components/schemas/CompanyBenefitsFormat' } }
+      responses:
+        '200':
+          description: The file
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   parameters:
     CompanyIdPath:
@@ -187,6 +257,43 @@ components:
       schema: { $ref: '#/components/schemas/CompanyId' }
 
   schemas:
+    CompanyBenefitsFormat:
+      type: string
+      enum: [docx, pdf]
+    CompanyBenefit:
+      type: object
+      additionalProperties: false
+      required: [key, label, value, remarks]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 100, description: The item's key in the company_benefits list. }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        value: { type: string, nullable: true, maxLength: 1000, description: "e.g. 18 days, rising to 21 after 3 years." }
+        remarks: { type: string, nullable: true, maxLength: 2000, description: Remarks or clauses. }
+    CompanyPreOfferStep:
+      type: object
+      additionalProperties: false
+      required: [key, label, applies, remarks]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 100, description: The item's key in the pre_offer_process list. }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        applies: { type: boolean, nullable: true, description: "true: the client does it; false: it does not; null: not known yet." }
+        remarks: { type: string, nullable: true, maxLength: 2000 }
+    CompanyBenefits:
+      type: object
+      required: [benefits, preOffer, version, updatedAt]
+      properties:
+        benefits: { type: array, items: { $ref: '#/components/schemas/CompanyBenefit' } }
+        preOffer: { type: array, items: { $ref: '#/components/schemas/CompanyPreOfferStep' } }
+        version: { type: integer, description: 0 before the first save. }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    CompanyBenefitsInput:
+      type: object
+      additionalProperties: false
+      required: [version, benefits, preOffer]
+      properties:
+        version: { type: integer, minimum: 0 }
+        benefits: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/CompanyBenefit' } }
+        preOffer: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/CompanyPreOfferStep' } }
     CompanyId:
       type: string
       pattern: '^comp_[0-9a-hjkmnp-tv-z]{26}$'

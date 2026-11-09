@@ -1,6 +1,8 @@
 package settings
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +34,7 @@ func builtIns(name string) []OptionInput {
 
 func TestDefaultsUntilACompanySaves(t *testing.T) {
 	all := Lists(map[string][]Option{"candidate_source": {{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true}}})
-	require.Len(t, all, 7)
+	require.Len(t, all, 9)
 	assert.Equal(t, []string{"RFL", "LF"}, labelsOf(all[5].Options), "a screening call's items, ready to change")
 	assert.Equal(t, "candidate_source", all[0].Name)
 	assert.Equal(t, []Option{{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true, BuiltIn: true}}, all[0].Options)
@@ -115,4 +117,31 @@ func TestCallItemsCanBeAddedRenamedAndHidden(t *testing.T) {
 	assert.True(t, got[1].Hidden)
 	_, err = CheckList("screening_call", []OptionInput{{Key: "rfl", Label: "RFL"}})
 	require.Error(t, err, "the app's items are hidden, not removed")
+}
+
+func TestBenefitItemsCarryHints(t *testing.T) {
+	all := Lists(nil)
+	i := slices.IndexFunc(all, func(l List) bool { return l.Name == "company_benefits" })
+	require.GreaterOrEqual(t, i, 0)
+	assert.True(t, all[i].Hints)
+	assert.Equal(t, "Annual leave", all[i].Options[1].Label, "Hyppies' template")
+	assert.NotEmpty(t, all[i].Options[1].Hint)
+
+	var in []OptionInput
+	for _, o := range all[i].Options {
+		in = append(in, OptionInput{Key: o.Key, Label: o.Label, Hint: o.Hint})
+	}
+	in = append(in, OptionInput{Label: "Car allowance", Hint: "  Amount   and   grade  "})
+	got, err := CheckList("company_benefits", in)
+	require.NoError(t, err)
+	assert.Equal(t, "car_allowance", got[len(got)-1].Key)
+	assert.Equal(t, "Amount and grade", got[len(got)-1].Hint)
+
+	in[len(in)-1].Hint = strings.Repeat("x", MaxHint+1)
+	_, err = CheckList("company_benefits", in)
+	require.Error(t, err)
+
+	plain, err := CheckList("screening_call", []OptionInput{{Key: "rfl", Label: "RFL", Hint: "ignored"}, {Key: "lf", Label: "LF"}})
+	require.NoError(t, err)
+	assert.Empty(t, plain[0].Hint, "only lists with hints keep one")
 }

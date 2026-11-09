@@ -503,6 +503,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/companies/{companyId}/benefits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A client's benefits and its steps before an offer
+         * @description As last saved (version 0 and empty lists before the first save). The items to fill come from the company_benefits and pre_offer_process lists in Settings; a saved item keeps its label even if the list changes later.
+         */
+        get: operations["getCompanyBenefits"];
+        /**
+         * Save a client's benefits and pre-offer process (the whole lists, in order)
+         * @description `version` must be the version you loaded (0 for the first save).
+         */
+        put: operations["putCompanyBenefits"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/benefits/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Download a client's benefits and pre-offer process as a Word file or a PDF */
+        get: operations["exportCompanyBenefits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts": {
         parameters: {
             query?: never;
@@ -3231,6 +3276,38 @@ export interface components {
         ApplicationReceived: {
             received: boolean;
         };
+        /** @enum {string} */
+        CompanyBenefitsFormat: "docx" | "pdf";
+        CompanyBenefit: {
+            /** @description The item's key in the company_benefits list. */
+            key: string;
+            label: string;
+            /** @description e.g. 18 days, rising to 21 after 3 years. */
+            value: string | null;
+            /** @description Remarks or clauses. */
+            remarks: string | null;
+        };
+        CompanyPreOfferStep: {
+            /** @description The item's key in the pre_offer_process list. */
+            key: string;
+            label: string;
+            /** @description true: the client does it; false: it does not; null: not known yet. */
+            applies: boolean | null;
+            remarks: string | null;
+        };
+        CompanyBenefits: {
+            benefits: components["schemas"]["CompanyBenefit"][];
+            preOffer: components["schemas"]["CompanyPreOfferStep"][];
+            /** @description 0 before the first save. */
+            version: number;
+            /** Format: date-time */
+            updatedAt: string | null;
+        };
+        CompanyBenefitsInput: {
+            version: number;
+            benefits: components["schemas"]["CompanyBenefit"][];
+            preOffer: components["schemas"]["CompanyPreOfferStep"][];
+        };
         /** @example comp_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyId: string;
         /**
@@ -5771,10 +5848,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint).
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}
@@ -5784,6 +5861,8 @@ export interface components {
             /** @description What is stored (for notice periods: number_unit, e.g. 2_week). */
             key: string;
             label: string;
+            /** @description What to write for it (lists with hints only). */
+            hint: string | null;
             /** @description Not offered for new choices; records that have it keep it. */
             hidden: boolean;
             /** @description Comes with the app: hide it instead of removing it. */
@@ -5793,12 +5872,16 @@ export interface components {
             name: components["schemas"]["FieldListName"];
             label: string;
             kind: components["schemas"]["FieldListKind"];
+            /** @description Its options carry a hint (what to write). */
+            hints: boolean;
             options: components["schemas"]["FieldOption"][];
         };
         FieldOptionInput: {
             /** @description Omit for a new option (made from the label); notice periods need number_unit. */
             key?: string;
             label: string;
+            /** @description For lists with hints; ignored elsewhere. */
+            hint?: string;
             hidden?: boolean;
         };
         FieldListInput: {
@@ -7011,6 +7094,92 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getCompanyBenefits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyBenefits"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putCompanyBenefits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyBenefitsInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyBenefits"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    exportCompanyBenefits: {
+        parameters: {
+            query: {
+                format: components["schemas"]["CompanyBenefitsFormat"];
+            };
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    /** @description attachment, with the file name. */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listContacts: {

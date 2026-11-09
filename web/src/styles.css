@@ -508,3 +508,32 @@ main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto;
 .cv-picture img { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
 .doc-menu button.danger { color: #b91c1c; }
 .doc-menu button.danger:hover { background: #fee2e2; }
+/* A client's benefits and pre-offer process (company page). */
+.benefits h3 { margin-bottom: 0.1rem; }
+.benefits h4 { margin: 0.9rem 0 0.5rem; font-size: 0.78rem; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.benefits-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; }
+@media (max-width: 760px) { .benefits-columns { grid-template-columns: 1fr; } }
+.benefit-list { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.6rem; }
+.benefit-list > div { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.7rem; }
+.benefit-list dt { font-size: 0.78rem; color: var(--muted); font-weight: 600; margin: 0 0 0.15rem; }
+.benefit-list dd { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.benefit-value { font-weight: 650; color: var(--ink); }
+.benefit-remarks { font-size: 0.85rem; color: var(--text); }
+.pre-offer-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.pre-offer-list li { display: grid; grid-template-columns: 5.5rem 1fr; gap: 0.6rem; align-items: start; }
+.pre-offer-list li > span:last-child { display: flex; flex-direction: column; gap: 0.1rem; }
+.applies { display: inline-block; text-align: center; font-size: 0.75rem; font-weight: 650; border-radius: 999px; padding: 0.15rem 0.5rem; border: 1px solid var(--line-strong); color: var(--muted); }
+.applies.yes { background: #dcfce7; border-color: #86efac; color: #166534; }
+.applies.no { background: var(--soft); color: var(--muted); }
+.benefit-grid { display: grid; grid-template-columns: minmax(11rem, 1.1fr) minmax(9rem, 1fr) minmax(12rem, 1.4fr); gap: 0.45rem 0.75rem; align-items: start; }
+.benefit-grid input, .benefit-grid textarea { width: 100%; }
+.benefit-grid textarea { resize: vertical; min-height: 2.35rem; field-sizing: content; }
+.benefit-head { font-size: 0.72rem; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.benefit-item { display: flex; flex-direction: column; gap: 0.1rem; font-weight: 600; color: var(--ink); padding-top: 0.45rem; }
+.benefit-item small { font-weight: 400; line-height: 1.3; }
+@media (max-width: 760px) { .benefit-grid { grid-template-columns: 1fr; } .benefit-head { display: none; } .benefit-item { padding-top: 0.6rem; } }
+.segmented { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; margin-top: 0.15rem; }
+.segmented button { border: 0; border-radius: 0; background: var(--surface); color: var(--text); padding: 0.4rem 0.7rem; font-size: 0.85rem; box-shadow: none; }
+.segmented button + button { border-left: 1px solid var(--line-strong); }
+.segmented button.on { background: var(--accent-soft); color: var(--accent-dark); font-weight: 650; }
+.hint-input { margin-top: 0.3rem; font-size: 0.85rem; }

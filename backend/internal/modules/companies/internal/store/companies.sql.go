@@ -183,6 +183,30 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 	return i, err
 }
 
+const getCompanyBenefits = `-- name: GetCompanyBenefits :one
+SELECT benefits, pre_offer, version, updated_at FROM company_benefits WHERE company_id = $1
+`
+
+type GetCompanyBenefitsRow struct {
+	Benefits  []byte
+	PreOffer  []byte
+	Version   int32
+	UpdatedAt time.Time
+}
+
+// A client's benefits and pre-offer process (JSON arrays; see the migration).
+func (q *Queries) GetCompanyBenefits(ctx context.Context, companyID string) (GetCompanyBenefitsRow, error) {
+	row := q.db.QueryRow(ctx, getCompanyBenefits, companyID)
+	var i GetCompanyBenefitsRow
+	err := row.Scan(
+		&i.Benefits,
+		&i.PreOffer,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSuggestion = `-- name: GetSuggestion :one
 SELECT id, tenant_id, company_id, field, value, source, status, created_at FROM company_suggestion WHERE id = $1 AND company_id = $2
 `
@@ -277,6 +301,32 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
 	)
+	return i, err
+}
+
+const insertCompanyBenefits = `-- name: InsertCompanyBenefits :one
+INSERT INTO company_benefits (tenant_id, company_id, benefits, pre_offer, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
+ON CONFLICT (tenant_id, company_id) DO NOTHING
+RETURNING version, updated_at
+`
+
+type InsertCompanyBenefitsParams struct {
+	CompanyID string
+	Benefits  []byte
+	PreOffer  []byte
+}
+
+type InsertCompanyBenefitsRow struct {
+	Version   int32
+	UpdatedAt time.Time
+}
+
+// The first save (nothing is saved yet, or someone saved first: no row).
+func (q *Queries) InsertCompanyBenefits(ctx context.Context, arg InsertCompanyBenefitsParams) (InsertCompanyBenefitsRow, error) {
+	row := q.db.QueryRow(ctx, insertCompanyBenefits, arg.CompanyID, arg.Benefits, arg.PreOffer)
+	var i InsertCompanyBenefitsRow
+	err := row.Scan(&i.Version, &i.UpdatedAt)
 	return i, err
 }
 
@@ -493,5 +543,36 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
 	)
+	return i, err
+}
+
+const updateCompanyBenefits = `-- name: UpdateCompanyBenefits :one
+UPDATE company_benefits
+SET benefits = $1, pre_offer = $2, version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE company_id = $3 AND version = $4
+RETURNING version, updated_at
+`
+
+type UpdateCompanyBenefitsParams struct {
+	Benefits        []byte
+	PreOffer        []byte
+	CompanyID       string
+	ExpectedVersion int32
+}
+
+type UpdateCompanyBenefitsRow struct {
+	Version   int32
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateCompanyBenefits(ctx context.Context, arg UpdateCompanyBenefitsParams) (UpdateCompanyBenefitsRow, error) {
+	row := q.db.QueryRow(ctx, updateCompanyBenefits,
+		arg.Benefits,
+		arg.PreOffer,
+		arg.CompanyID,
+		arg.ExpectedVersion,
+	)
+	var i UpdateCompanyBenefitsRow
+	err := row.Scan(&i.Version, &i.UpdatedAt)
 	return i, err
 }

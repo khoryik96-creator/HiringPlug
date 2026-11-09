@@ -869,6 +869,55 @@ class ApplicationReceived(BaseModel):
     received: bool
 
 
+class CompanyBenefitsFormat(StrEnum):
+    docx = "docx"
+    pdf = "pdf"
+
+
+class CompanyBenefit(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        str, Field(description="The item's key in the company_benefits list.", max_length=100, min_length=1)
+    ]
+    label: Annotated[str, Field(max_length=100, min_length=1)]
+    value: Annotated[
+        str | None, Field(description="e.g. 18 days, rising to 21 after 3 years.", max_length=1000)
+    ]
+    remarks: Annotated[str | None, Field(description="Remarks or clauses.", max_length=2000)]
+
+
+class CompanyPreOfferStep(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        str, Field(description="The item's key in the pre_offer_process list.", max_length=100, min_length=1)
+    ]
+    label: Annotated[str, Field(max_length=100, min_length=1)]
+    applies: Annotated[
+        bool | None, Field(description="true: the client does it; false: it does not; null: not known yet.")
+    ]
+    remarks: Annotated[str | None, Field(max_length=2000)]
+
+
+class CompanyBenefits(BaseModel):
+    benefits: list[CompanyBenefit]
+    preOffer: list[CompanyPreOfferStep]
+    version: Annotated[int, Field(description="0 before the first save.")]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class CompanyBenefitsInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0)]
+    benefits: Annotated[list[CompanyBenefit], Field(max_length=100)]
+    preOffer: Annotated[list[CompanyPreOfferStep], Field(max_length=100)]
+
+
 class CompanyId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["comp_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^comp_[0-9a-hjkmnp-tv-z]{26}$")
@@ -3694,6 +3743,8 @@ class FieldListName(StrEnum):
     work_arrangement = "work_arrangement"
     screening_call = "screening_call"
     reference_check = "reference_check"
+    company_benefits = "company_benefits"
+    pre_offer_process = "pre_offer_process"
 
 
 class FieldListKind(StrEnum):
@@ -3704,6 +3755,7 @@ class FieldListKind(StrEnum):
 class FieldOption(BaseModel):
     key: Annotated[str, Field(description="What is stored (for notice periods: number_unit, e.g. 2_week).")]
     label: str
+    hint: Annotated[str | None, Field(description="What to write for it (lists with hints only).")]
     hidden: Annotated[bool, Field(description="Not offered for new choices; records that have it keep it.")]
     builtIn: Annotated[bool, Field(description="Comes with the app: hide it instead of removing it.")]
 
@@ -3712,6 +3764,7 @@ class FieldList(BaseModel):
     name: FieldListName
     label: str
     kind: FieldListKind
+    hints: Annotated[bool, Field(description="Its options carry a hint (what to write).")]
     options: list[FieldOption]
 
 
@@ -3727,6 +3780,9 @@ class FieldOptionInput(BaseModel):
         ),
     ] = None
     label: Annotated[str, Field(max_length=100, min_length=1)]
+    hint: Annotated[
+        str | None, Field(description="For lists with hints; ignored elsewhere.", max_length=300)
+    ] = None
     hidden: bool | None = None
 
 

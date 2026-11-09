@@ -3,6 +3,8 @@ package settings
 import (
 	"context"
 
+	"github.com/oapi-codegen/nullable"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
@@ -24,6 +26,9 @@ func (h *HTTP) PutFieldList(ctx context.Context, req api.PutFieldListRequestObje
 	in := make([]OptionInput, len(req.Body.Options))
 	for i, o := range req.Body.Options {
 		in[i] = OptionInput{Label: o.Label}
+		if o.Hint != nil {
+			in[i].Hint = *o.Hint
+		}
 		if o.Key != nil {
 			in[i].Key = *o.Key
 		}
@@ -52,12 +57,15 @@ func (h *HTTP) PutMandatoryFields(ctx context.Context, req api.PutMandatoryField
 }
 
 func listToAPI(l List) api.FieldList {
-	out := api.FieldList{Name: api.FieldListName(l.Name), Label: l.Label, Kind: api.FieldListKindOpen, Options: make([]api.FieldOption, len(l.Options))}
+	out := api.FieldList{Name: api.FieldListName(l.Name), Label: l.Label, Kind: api.FieldListKindOpen, Hints: l.Hints, Options: make([]api.FieldOption, len(l.Options))}
 	if l.Fixed {
 		out.Kind = api.FieldListKindFixed
 	}
 	for i, o := range l.Options {
-		out.Options[i] = api.FieldOption{Key: o.Key, Label: o.Label, Hidden: o.Hidden, BuiltIn: o.BuiltIn}
+		out.Options[i] = api.FieldOption{Key: o.Key, Label: o.Label, Hint: nullable.NewNullNullable[string](), Hidden: o.Hidden, BuiltIn: o.BuiltIn}
+		if o.Hint != "" {
+			out.Options[i].Hint = nullable.NewNullableWithValue(o.Hint)
+		}
 	}
 	return out
 }

@@ -33,6 +33,26 @@ describe("settings", () => {
     expect(body.options[5]).toEqual({ label: "Job fair", hidden: false });
   });
 
+  it("edits the company benefits template: items with what to write for each", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ name: "company_benefits", label: "Company benefits", kind: "open", hints: true, options: [] }));
+    renderWithClient(<Settings />);
+    const benefits = await screen.findByRole("region", { name: "Company benefits" });
+    expect(screen.getByRole("heading", { name: "Company benefits template" })).toBeTruthy();
+    expect(within(benefits).getByLabelText<HTMLInputElement>("Hint for Annual leave").value).toBe("If it grows with service or grade, give the detail");
+    expect(within(screen.getByRole("region", { name: "Candidate source" })).queryByLabelText(/Hint/)).toBeNull();
+
+    fireEvent.change(within(benefits).getByLabelText("Hint for Dental & optical"), { target: { value: "Yearly limit" } });
+    fireEvent.change(within(benefits).getByLabelText("New company benefits option"), { target: { value: "Car allowance" } });
+    fireEvent.change(within(benefits).getByLabelText("Hint for the new company benefits item"), { target: { value: "Amount, from which grade" } });
+    fireEvent.click(within(benefits).getByRole("button", { name: "Add" }));
+    fireEvent.click(within(benefits).getByRole("button", { name: "Save company benefits" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    const body = sentBody(put) as { options: { key?: string; label: string; hint: string }[] };
+    expect(body.options[1]).toEqual({ key: "dental_optical", label: "Dental & optical", hidden: false, hint: "Yearly limit" });
+    expect(body.options.at(-1)).toEqual({ label: "Car allowance", hidden: false, hint: "Amount, from which grade" });
+  });
+
   it("adds a notice period as a number and unit", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
     const put = vi.spyOn(api, "PUT").mockResolvedValue(invalidField("options[4].key", "a number of days, weeks or months"));

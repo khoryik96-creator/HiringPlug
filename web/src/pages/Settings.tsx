@@ -8,7 +8,9 @@ import { fieldErrors } from "../components/forms";
 import { NOTICE_UNIT, keysOf } from "../labels";
 
 type List = Schemas["FieldList"];
-type Row = { key?: string; label: string; hidden: boolean; builtIn: boolean };
+type Row = { key?: string; label: string; hint: string; hidden: boolean; builtIn: boolean };
+
+const rowOf = (o: Schemas["FieldOption"]): Row => ({ ...o, hint: o.hint ?? "" });
 
 /** General settings: the company's mandatory fields, salary in emails and dropdown options. */
 export function Settings() {
@@ -22,7 +24,13 @@ export function Settings() {
           <MandatoryFields fields={settings.data.mandatory} />
           <Policies />
           <h3>Dropdowns</h3>
-          {settings.data.lists.map((l) => <ListEditor key={l.name} list={l} />)}
+          {settings.data.lists.filter((l) => !l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
+          <h3 id="benefits-template">Company benefits template</h3>
+          <p className="muted">
+            What to record for each client on its page: its benefits, and the steps it takes before an offer. Rename, reorder,
+            hide or add items; the hint under each says what to write.
+          </p>
+          {settings.data.lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
         </>
       )}
     </main>
@@ -95,15 +103,15 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
 
 function ListEditor({ list }: { list: List }) {
   const queryClient = useQueryClient();
-  const [rows, setRows] = useState<Row[]>(() => list.options.map((o) => ({ ...o })));
-  const [adding, setAdding] = useState({ label: "", value: "1", unit: "month" });
+  const [rows, setRows] = useState<Row[]>(() => list.options.map(rowOf));
+  const [adding, setAdding] = useState({ label: "", hint: "", value: "1", unit: "month" });
   const save = useMutation({
     mutationFn: async () => unwrap(await api.PUT("/v1/settings/fields/lists/{fieldList}", {
       params: { path: { fieldList: list.name } },
-      body: { options: rows.map((r) => ({ ...(r.key ? { key: r.key } : {}), label: r.label, hidden: r.hidden })) },
+      body: { options: rows.map((r) => ({ ...(r.key ? { key: r.key } : {}), label: r.label, hidden: r.hidden, ...(list.hints ? { hint: r.hint } : {}) })) },
     })),
     onSuccess: (saved) => {
-      setRows(saved.options.map((o) => ({ ...o })));
+      setRows(saved.options.map(rowOf));
       void queryClient.invalidateQueries({ queryKey: fieldSettingsKey });
     },
   });
@@ -120,11 +128,11 @@ function ListEditor({ list }: { list: List }) {
     if (notice) {
       const n = Number(adding.value);
       const unit = NOTICE_UNIT[adding.unit as Schemas["NoticePeriodUnit"]];
-      setRows([...rows, { key: `${String(n)}_${adding.unit}`, label: n === 0 ? "Immediately" : `${String(n)} ${n === 1 ? unit.one : unit.many}`, hidden: false, builtIn: false }]);
+      setRows([...rows, { key: `${String(n)}_${adding.unit}`, label: n === 0 ? "Immediately" : `${String(n)} ${n === 1 ? unit.one : unit.many}`, hint: "", hidden: false, builtIn: false }]);
     } else if (adding.label.trim()) {
-      setRows([...rows, { label: adding.label.trim(), hidden: false, builtIn: false }]);
+      setRows([...rows, { label: adding.label.trim(), hint: adding.hint.trim(), hidden: false, builtIn: false }]);
     }
-    setAdding({ ...adding, label: "" });
+    setAdding({ ...adding, label: "", hint: "" });
   };
   return (
     <section className="panel" aria-label={list.label}>
@@ -135,7 +143,12 @@ function ListEditor({ list }: { list: List }) {
             <tr key={r.key ?? `new-${String(i)}`}>
               <td>
                 <input aria-label={`${list.label} option ${String(i + 1)}`} value={r.label} onChange={(e) => { update(i, { label: e.target.value }); }} />
+                {list.hints && (
+                  <input className="hint-input" aria-label={`Hint for ${r.label || `option ${String(i + 1)}`}`} placeholder="Hint: what to write (optional)"
+                    maxLength={300} value={r.hint} onChange={(e) => { update(i, { hint: e.target.value }); }} />
+                )}
                 {errors[`options[${String(i)}].label`] && <small className="error">{errors[`options[${String(i)}].label`]}</small>}
+                {errors[`options[${String(i)}].hint`] && <small className="error">{errors[`options[${String(i)}].hint`]}</small>}
                 {errors[`options[${String(i)}].key`] && <small className="error">{errors[`options[${String(i)}].key`]}</small>}
               </td>
               <td>
@@ -162,8 +175,14 @@ function ListEditor({ list }: { list: List }) {
               </select>
             </>
           ) : (
-            <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder="New option" value={adding.label}
-              onChange={(e) => { setAdding({ ...adding, label: e.target.value }); }} />
+            <>
+              <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder={list.hints ? "New item" : "New option"} value={adding.label}
+                onChange={(e) => { setAdding({ ...adding, label: e.target.value }); }} />
+              {list.hints && (
+                <input aria-label={`Hint for the new ${list.label.toLowerCase()} item`} placeholder="Hint (optional)" maxLength={300} value={adding.hint}
+                  onChange={(e) => { setAdding({ ...adding, hint: e.target.value }); }} />
+              )}
+            </>
           )}
           <button type="button" className="link" onClick={add}>Add</button>
         </div>

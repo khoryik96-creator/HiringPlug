@@ -53,7 +53,11 @@ func TestCompaniesChooseTheirSourcesAndMandatoryFields(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	var list api.FieldList
 	res.JSON(&list)
-	assert.Equal(t, api.FieldOption{Key: "job_fair", Label: "Job fair", Hidden: false, BuiltIn: false}, list.Options[0])
+	assert.Equal(t, "job_fair", list.Options[0].Key)
+	assert.Equal(t, "Job fair", list.Options[0].Label)
+	assert.False(t, list.Options[0].Hidden)
+	assert.False(t, list.Options[0].BuiltIn)
+	assert.True(t, list.Options[0].Hint.IsNull(), "sources carry no hint")
 
 	t.Run("a candidate's source comes from the company's list", func(t *testing.T) {
 		c := a.createCandidate(recruiter, map[string]any{"firstName": "Aina", "source": "job_fair"})

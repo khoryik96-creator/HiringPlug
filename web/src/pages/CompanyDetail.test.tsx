@@ -2,7 +2,7 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Company } from "../api/client";
-import { ok, RECRUITER, renderWithClient } from "../test-utils";
+import { ok, RECRUITER, renderWithClient, testFieldSettings } from "../test-utils";
 import { CompanyDetail } from "./CompanyDetail";
 import { CompanyList } from "./CompanyList";
 
@@ -17,12 +17,16 @@ const company: Company = {
   city: "Singapore", country: "SG", registrationNumber: "201221800W", about: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
+const answers: Record<string, unknown> = {
+  "/v1/companies/{companyId}": company,
+  "/v1/companies/{companyId}/autofill": { status: "idle", checkedAt: null, error: null, suggestions: [] },
+  "/v1/companies/{companyId}/benefits": { benefits: [], preOffer: [], version: 0, updatedAt: null },
+  "/v1/settings/fields": testFieldSettings(),
+};
 
 describe("company pages", () => {
   it("shows a company in words, with an edit button for those who may edit", async () => {
-    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies/{companyId}/autofill"
-      ? { status: "idle", checkedAt: null, error: null, suggestions: [] }
-      : path === "/v1/companies/{companyId}" ? company : { items: [], nextCursor: null }))) as never);
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("companies:update")} />);
     await screen.findByRole("heading", { name: "Grab" });
     expect(screen.getByText("Prospect · Technology · Singapore, Singapore (SG)")).toBeTruthy();
@@ -32,7 +36,7 @@ describe("company pages", () => {
   });
 
   it("gives viewers no edit or add buttons", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(company));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={["companies:read"]} />);
     await screen.findByRole("heading", { name: "Grab" });
     expect(screen.queryByRole("button", { name: "Edit company" })).toBeNull();

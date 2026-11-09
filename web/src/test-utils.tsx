@@ -66,8 +66,8 @@ export function sentBody(mock: { mock: { calls: unknown[][] } }, call = 0): unkn
 
 /** The settings a company starts with (GET /v1/settings/fields), optionally with mandatory fields. */
 export function testFieldSettings(mandatory: { form: "candidate" | "job"; field: string }[] = []): never {
-  const list = (name: string, label: string, kind: "open" | "fixed", pairs: [string, string][]) =>
-    ({ name, label, kind, options: pairs.map(([key, l]) => ({ key, label: l, hidden: false, builtIn: true })) });
+  const list = (name: string, label: string, kind: "open" | "fixed", pairs: [string, string, string?][], hints = false) =>
+    ({ name, label, kind, hints, options: pairs.map(([key, l, hint]) => ({ key, label: l, hint: hint ?? null, hidden: false, builtIn: true })) });
   return {
     lists: [
       list("candidate_source", "Candidate source", "open", [["jobstreet", "JobStreet"], ["linkedin", "LinkedIn"], ["referral", "Referral"], ["careers_page", "Careers page"], ["direct", "Direct"], ["other", "Other"]]),
@@ -75,6 +75,13 @@ export function testFieldSettings(mandatory: { form: "candidate" | "job"; field:
       list("industry", "Industry", "open", [["Financial Services", "Financial Services"], ["FMCG", "FMCG"]]),
       list("work_type", "Work type", "fixed", [["full_time", "Full time"], ["contract", "Contract"]]),
       list("work_arrangement", "Work arrangement", "fixed", [["onsite", "On site"], ["hybrid", "Hybrid"], ["remote", "Remote"]]),
+      list("company_benefits", "Company benefits", "open", [
+        ["annual_leave", "Annual leave", "If it grows with service or grade, give the detail"], ["dental_optical", "Dental & optical"],
+        ["fixed_bonus", "Fixed bonus", "13th, 13.5 or 14th month; any specific clause"],
+      ], true),
+      list("pre_offer_process", "Pre-offer process", "open", [
+        ["reference_check", "Reference check", "How many, and which referees (superior/peers)"], ["health_screening", "Health screening"],
+      ], true),
     ],
     mandatory: mandatory.map((m) => ({ ...m, label: m.field, mandatory: true, alwaysRequired: false })),
   } as never;

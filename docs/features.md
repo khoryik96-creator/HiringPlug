@@ -339,6 +339,20 @@ for each of their jobs, with **Score fit** / **Score again**.
   website (ignoring case and accents), filter by type. Names are unique per
   company (`Nestlé Malaysia` and `nestle malaysia` are the same), and edits use
   the same lost-update protection as candidates.
+- **Benefits & pre-offer process** ✅: on a client's page, under its details,
+  what it offers and what it checks before an offer, recorded from the
+  agency's template (Hyppies' Benefits & Pre-Offer Process to start with:
+  job grade, annual and other leave, medical and insurance, work mode,
+  working hours, dental and optical, fixed, performance and other bonuses,
+  commission, special benefits; then reference and background checks,
+  health screening, payslips, NRIC/passport, education certificate and
+  anything else). Filled in as one form, each item with a value and remarks
+  and a hint saying what to write; each pre-offer step Yes, No or Not known
+  with remarks. It reads as cards, says which items are not recorded yet,
+  and downloads as Word or PDF in two tables. The template is in Settings,
+  General (Company benefits template): rename, reorder, hide or add items and
+  change their hints; an item taken out keeps what was recorded for it. The
+  audit log says which items changed, not what they say.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
   page queues a job that reads its home page and its contact page (a link
   with "contact" or "hubungi"), only where robots.txt allows, through the

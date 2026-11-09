@@ -26,6 +26,15 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
     role: "Role and responsibilities", strengths: "Strengths", improve: "Areas to improve", reason_left: "Reason for leaving",
     rehire: "Would you rehire them?",
   },
+  company_benefits: {
+    job_grade: "Job grade/level", annual_leave: "Annual leave", other_leave: "Miscellaneous leave", medical: "Medical and insurance",
+    work_mode: "Work mode", working_hours: "Working hours and flexibility", dental_optical: "Dental & optical", fixed_bonus: "Fixed bonus",
+    performance_bonus: "Performance bonus", other_bonus: "Miscellaneous bonus", commission: "Commission structure", special: "Special benefits",
+  },
+  pre_offer_process: {
+    reference_check: "Reference check", background_check: "Background check", health_screening: "Health screening",
+    payslips: "Payslips + bonus slips", identity: "NRIC/passport (expat)", education: "Highest education certificate", additional: "Additional process",
+  },
 };
 
 /** A notice period key (2_week) in words, for one no longer in the list. */

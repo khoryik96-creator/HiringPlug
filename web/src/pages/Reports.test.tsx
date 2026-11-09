@@ -54,7 +54,7 @@ describe("reports", () => {
 
   it("names a company's own sources", async () => {
     const settings = testFieldSettings() as unknown as Schemas["FieldSettings"];
-    settings.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hidden: false, builtIn: false });
+    settings.lists[0]?.options.push({ key: "job_fair", label: "Job fair", hint: null, hidden: false, builtIn: false });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(settings)
       : ok(report({ sources: [{ source: "job_fair", applications: 2, interviewed: 1, placed: 0 }] })))) as never);
     renderWithClient(<Reports />);

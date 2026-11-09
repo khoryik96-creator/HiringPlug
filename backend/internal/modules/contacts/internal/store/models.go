@@ -261,6 +261,16 @@ type Company struct {
 	PhoneDigits        *string
 }
 
+type CompanyBenefit struct {
+	TenantID  string
+	CompanyID string
+	Benefits  []byte
+	PreOffer  []byte
+	Version   int32
+	UpdatedBy string
+	UpdatedAt time.Time
+}
+
 type CompanySuggestion struct {
 	ID        string
 	TenantID  string
@@ -455,6 +465,7 @@ type FieldOption struct {
 	Label    string
 	Hidden   bool
 	Position int32
+	Hint     *string
 }
 
 type FieldRule struct {

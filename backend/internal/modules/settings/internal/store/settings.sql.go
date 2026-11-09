@@ -30,14 +30,15 @@ func (q *Queries) GetPolicy(ctx context.Context, key string) (string, error) {
 }
 
 const insertOption = `-- name: InsertOption :exec
-INSERT INTO field_option (tenant_id, list, key, label, hidden, position)
-VALUES (app_current_tenant(), $1, $2, $3, $4, $5)
+INSERT INTO field_option (tenant_id, list, key, label, hint, hidden, position)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6)
 `
 
 type InsertOptionParams struct {
 	List     string
 	Key      string
 	Label    string
+	Hint     *string
 	Hidden   bool
 	Position int32
 }
@@ -47,6 +48,7 @@ func (q *Queries) InsertOption(ctx context.Context, arg InsertOptionParams) erro
 		arg.List,
 		arg.Key,
 		arg.Label,
+		arg.Hint,
 		arg.Hidden,
 		arg.Position,
 	)
@@ -55,13 +57,14 @@ func (q *Queries) InsertOption(ctx context.Context, arg InsertOptionParams) erro
 
 const listOptions = `-- name: ListOptions :many
 
-SELECT list, key, label, hidden FROM field_option ORDER BY list, position
+SELECT list, key, label, hint, hidden FROM field_option ORDER BY list, position
 `
 
 type ListOptionsRow struct {
 	List   string
 	Key    string
 	Label  string
+	Hint   *string
 	Hidden bool
 }
 
@@ -79,6 +82,7 @@ func (q *Queries) ListOptions(ctx context.Context) ([]ListOptionsRow, error) {
 			&i.List,
 			&i.Key,
 			&i.Label,
+			&i.Hint,
 			&i.Hidden,
 		); err != nil {
 			return nil, err
