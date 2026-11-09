@@ -62,7 +62,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 			cursor = nil // ordered by likeness, not by id: one page
 		}
 		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: f.Query, Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err

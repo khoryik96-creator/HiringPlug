@@ -13,7 +13,7 @@ import (
 )
 
 // The dashboard's quick search (like Kano's /find): every word must appear,
-// phone numbers match however they are written, names can be looked up
+// phone numbers match however they are written (whole numbers only), names can be looked up
 // loosely, and jobs are found by their client's name.
 func TestQuickSearch(t *testing.T) {
 	t.Parallel()
@@ -42,9 +42,10 @@ func TestQuickSearch(t *testing.T) {
 
 	t.Run("candidates by email, phone in any format, and several words", func(t *testing.T) {
 		assert.Equal(t, []string{"Edran Zainal"}, candidates(q("edran.z@example.com")))
-		for _, phone := range []string{"0167663880", "016-766 3880", "+60167663880", "60 16 766 3880", "7663880"} {
+		for _, phone := range []string{"0167663880", "016-766 3880", "+60167663880", "60 16 766 3880", "0060 16 766 3880"} {
 			assert.Equal(t, []string{"Edran Zainal"}, candidates(q(phone)), phone)
 		}
+		assert.Empty(t, candidates(q("7663880")), "the last digits of a number are not the number (Kano's rule)")
 		assert.Equal(t, []string{"Edran Zainal"}, candidates(q("edran lenovo")), "name and current company")
 		assert.Equal(t, []string{"Edran Zainal"}, candidates(q("lenovo - edran")), "in any order, punctuation ignored")
 		assert.Equal(t, []string{"Edran Zainal"}, candidates(q("database administrator")), "current title")

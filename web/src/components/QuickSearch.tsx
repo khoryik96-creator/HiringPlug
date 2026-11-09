@@ -1,5 +1,6 @@
-// The dashboard's four search boxes (like Kano's /find): candidates by name,
-// email, phone, title or company; companies; contacts; jobs by title,
+// The dashboard's four search boxes: candidates by Kano's /find rules
+// (several searches split on commas; each a name, an email or a whole phone
+// number, optionally "name - company"); companies; contacts; jobs by title,
 // location or client. Results show as you type; Enter opens the only match,
 // or the full list. For people, names alike are offered too (for typos).
 import { useQuery } from "@tanstack/react-query";
@@ -11,45 +12,58 @@ import { JOB_STATUS } from "../labels";
 
 /** One result: where it opens, its name and a line about it. */
 export type Hit = { id: string; href: string; name: string; detail: string; status?: Schemas["JobStatus"] };
-type Found = { hits: Hit[]; similar: Hit[] };
+/** What one search found; a box with several searches shows a block for each, titled. */
+type Block = { title?: string; error?: string; note?: string; hits: Hit[]; similar: Hit[]; more: boolean };
+type Found = { blocks: Block[]; skipped: number };
 
 const SHOWN = 5;
 const line = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
+const one = (hits: Hit[], similar: Hit[] = []): Found => ({ blocks: [{ hits, similar, more: hits.length === SHOWN }], skipped: 0 });
 
 /** Names alike are worth asking for when the words found few people and the query has letters. */
 const wantsSimilar = (q: string, found: number) => found < 3 && /\p{L}{3}/u.test(q);
 
+function candidateHit(c: Schemas["CandidateFound"]): Hit {
+  const e = c.employer;
+  const where = e ? `${line(e.title, e.company)} (${e.current ? "works there now" : "worked there"})` : line(c.currentTitle, c.currentCompany);
+  const score = c.score != null ? `${String(Math.round(c.score * 100))}% name match` : null;
+  return { id: c.id, href: `#/candidates/${c.id}`, name: c.fullName, detail: line(score, where, c.email ?? c.phone) };
+}
+
 async function findCandidates(q: string): Promise<Found> {
-  const get = async (similar: boolean) => unwrap(await api.GET("/v1/candidates", { params: { query: { q, limit: SHOWN, ...(similar ? { similar } : {}) } } })).items
-    .map((c): Hit => ({ id: c.id, href: `#/candidates/${c.id}`, name: c.fullName, detail: line(line(c.currentTitle, c.currentCompany), c.email ?? c.phone) }));
-  const hits = await get(false);
-  return { hits, similar: wantsSimilar(q, hits.length) ? await get(true) : [] };
+  const found = unwrap(await api.GET("/v1/candidates/find", { params: { query: { q } } }));
+  const several = found.searches.length > 1;
+  return {
+    skipped: found.skipped,
+    blocks: found.searches.map((s) => ({
+      title: several ? s.text : undefined,
+      error: s.error ?? undefined, note: s.note ?? undefined, more: s.more,
+      hits: s.items.map(candidateHit), similar: s.similar.map(candidateHit),
+    })),
+  };
 }
 
 async function findContacts(q: string): Promise<Found> {
   const get = async (similar: boolean) => unwrap(await api.GET("/v1/contacts", { params: { query: { q, limit: SHOWN, ...(similar ? { similar } : {}) } } })).items
     .map((c): Hit => ({ id: c.id, href: `#/contacts/${c.id}`, name: c.fullName, detail: line(line(c.title, c.companyName), c.email ?? c.mobile ?? c.phone) }));
   const hits = await get(false);
-  return { hits, similar: wantsSimilar(q, hits.length) ? await get(true) : [] };
+  return one(hits, wantsSimilar(q, hits.length) ? await get(true) : []);
 }
 
 async function findCompanies(q: string): Promise<Found> {
   const page = unwrap(await api.GET("/v1/companies", { params: { query: { q, limit: SHOWN } } }));
-  return { hits: page.items.map((c) => ({ id: c.id, href: `#/companies/${c.id}`, name: c.name, detail: line(c.industry, c.city, c.website) })), similar: [] };
+  return one(page.items.map((c) => ({ id: c.id, href: `#/companies/${c.id}`, name: c.name, detail: line(c.industry, c.city, c.website) })));
 }
 
 async function findJobs(q: string): Promise<Found> {
   const page = unwrap(await api.GET("/v1/jobs", { params: { query: { q, limit: SHOWN } } }));
-  return {
-    hits: page.items.map((j) => ({ id: j.id, href: `#/jobs/${j.id}`, name: j.title, detail: line(j.companyName, j.location), status: j.status })),
-    similar: [],
-  };
+  return one(page.items.map((j) => ({ id: j.id, href: `#/jobs/${j.id}`, name: j.title, detail: line(j.companyName, j.location), status: j.status })));
 }
 
 type Box = { label: string; list: string; key: readonly unknown[]; find: (q: string) => Promise<Found>; hint: string };
 
 const BOXES: { permission: Permission; box: Box }[] = [
-  { permission: "candidates:read", box: { label: "Candidates", list: "#/candidates", key: candidatesKey, find: findCandidates, hint: "Name, email or phone" } },
+  { permission: "candidates:read", box: { label: "Candidates", list: "#/candidates", key: candidatesKey, find: findCandidates, hint: "Name, email or phone; commas for several" } },
   { permission: "jobs:read", box: { label: "Jobs", list: "#/jobs", key: jobsKey, find: findJobs, hint: "Title, location or client" } },
   { permission: "companies:read", box: { label: "Companies", list: "#/companies", key: companiesKey, find: findCompanies, hint: "Name or phone" } },
   { permission: "contacts:read", box: { label: "Contacts", list: "#/contacts", key: contactsKey, find: findContacts, hint: "Name, email or phone" } },
@@ -80,17 +94,16 @@ function SearchBox({ box }: { box: Box }) {
   const q = useSettled(text.trim());
   const found = useQuery({ queryKey: [...box.key, "quick", q], queryFn: () => box.find(q), enabled: q !== "" });
   const all = `${box.list}?q=${encodeURIComponent(text.trim())}`;
-  const hits = q && found.data ? found.data.hits : [];
-  const shown = new Set(hits.map((h) => h.id));
-  const similar = q && found.data ? found.data.similar.filter((h) => !shown.has(h.id)) : [];
+  const blocks = q && found.data ? found.data.blocks : [];
+  const single = blocks.length === 1 ? blocks[0] : undefined;
 
   return (
     <div className="search-box">
       <form role="search" aria-label={`Search ${box.label.toLowerCase()}`} onSubmit={(e) => {
         e.preventDefault();
-        if (!text.trim()) return;
+        if (!text.trim() || blocks.length > 1) return; // several searches: their results are the answer
         // The only match opens straight away; otherwise the full list, filtered.
-        const only = hits.length === 1 && similar.length === 0 && q === text.trim() ? hits[0] : undefined;
+        const only = single?.hits.length === 1 && single.similar.length === 0 && q === text.trim() ? single.hits[0] : undefined;
         window.location.hash = only ? only.href : all;
       }}>
         <label>
@@ -103,16 +116,38 @@ function SearchBox({ box }: { box: Box }) {
         <div className="search-results" aria-live="polite">
           {found.isPending && <p className="muted small">Searching…</p>}
           {found.isError && <p className="error small">Could not search. Try again.</p>}
-          {found.data && hits.length === 0 && similar.length === 0 && <p className="muted small">No {box.label.toLowerCase()} match “{q}”.</p>}
-          <HitList hits={hits} label={box.label} />
+          {blocks.map((b, i) => <Results key={i} block={b} label={box.label} q={q} all={single ? all : undefined} />)}
+          {found.data && found.data.skipped > 0 && (
+            <p className="muted small">{found.data.skipped} more {found.data.skipped === 1 ? "search was" : "searches were"} left out: six at a time.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One search's results: its matches, then names alike. */
+function Results({ block, label, q, all }: { block: Block; label: string; q: string; all?: string }) {
+  const shown = new Set(block.hits.map((h) => h.id));
+  const similar = block.similar.filter((h) => !shown.has(h.id));
+  const asked = block.title ?? q;
+  const name = block.title ? `${label}: ${block.title}` : label;
+  return (
+    <div className={block.title ? "search-block" : undefined}>
+      {block.title && <p className="search-block-title">{block.title}</p>}
+      {block.error ? <p className="search-error small">{block.error}</p> : (
+        <>
+          {block.hits.length === 0 && similar.length === 0 && <p className="muted small">No {label.toLowerCase()} match “{asked}”.</p>}
+          <HitList hits={block.hits} label={name} />
           {similar.length > 0 && (
             <>
               <p className="search-similar">Similar names</p>
-              <HitList hits={similar} label={`Similar ${box.label.toLowerCase()}`} />
+              <HitList hits={similar} label={`Similar ${block.title ? name : label.toLowerCase()}`} />
             </>
           )}
-          {hits.length === SHOWN && <a className="search-all" href={all}>See all {box.label.toLowerCase()} matching “{q}” →</a>}
-        </div>
+          {block.note && <p className="search-note small">{block.note}</p>}
+          {block.more && all && <a className="search-all" href={all}>See all {label.toLowerCase()} matching “{q}” →</a>}
+        </>
       )}
     </div>
   );

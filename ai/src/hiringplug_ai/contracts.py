@@ -846,6 +846,18 @@ class CandidateMerge(BaseModel):
     version: Annotated[int, Field(description="The version of the candidate you keep.", ge=1)]
 
 
+class Kind(StrEnum):
+    name = "name"
+    email = "email"
+    phone = "phone"
+
+
+class CandidateFoundEmployer(BaseModel):
+    company: str
+    title: Annotated[str | None, Field(...)]
+    current: Annotated[bool, Field(description="true: works there now; false: worked there.")]
+
+
 class UsedValues(BaseModel):
     tags: list[str]
     skills: list[str]
@@ -1750,13 +1762,13 @@ class PasswordResetRequest(BaseModel):
     email: Annotated[EmailStr, Field(max_length=254)]
 
 
-class Kind(StrEnum):
+class Kind1(StrEnum):
     invite = "invite"
     reset = "reset"
 
 
 class AuthLink(BaseModel):
-    kind: Kind
+    kind: Kind1
     email: str
     name: str
     companyName: str
@@ -3831,6 +3843,20 @@ class ScreeningCallResult(BaseModel):
     ]
 
 
+class CandidateFound(BaseModel):
+    id: CandidateId
+    fullName: str
+    currentTitle: Annotated[str | None, Field(...)]
+    currentCompany: Annotated[str | None, Field(...)]
+    email: Annotated[str | None, Field(...)]
+    phone: Annotated[str | None, Field(...)]
+    employer: Annotated[
+        CandidateFoundEmployer | None,
+        Field(description="With a company searched for: where they work or worked there."),
+    ]
+    score: Annotated[float | None, Field(description="For names alike, how alike (0 to 1).")]
+
+
 class PublicJobAd(BaseModel):
     id: JobAdId
     title: Annotated[str, Field(description="The blind title when the ad is published blind.")]
@@ -4517,6 +4543,22 @@ class AiProviders(BaseModel):
     ]
 
 
+class CandidateFindSearch(BaseModel):
+    text: Annotated[str, Field(description="The search as typed.")]
+    kind: Kind
+    company: Annotated[str | None, Field(description='From "name - company".')]
+    error: Annotated[str | None, Field(description="Why it could not be run as typed (nothing is searched).")]
+    items: Annotated[list[CandidateFound], Field(description="The matches (at most 10).")]
+    similar: Annotated[
+        list[CandidateFound],
+        Field(
+            description="Names alike (each with its score) filling the rest of the 10, best first; for names only."
+        ),
+    ]
+    more: Annotated[bool, Field(description="More matched than are shown.")]
+    note: Annotated[str | None, Field(description="Something to check before trusting the matches.")]
+
+
 class CareersPage(BaseModel):
     companyName: str
     ads: list[PublicJobAd]
@@ -4607,6 +4649,11 @@ class Report(BaseModel):
     ]
     timeToFill: TimeToFill
     feesHidden: Annotated[bool, Field(description="Fees are left out (placements.fees:read is needed).")]
+
+
+class CandidateFind(BaseModel):
+    searches: list[CandidateFindSearch]
+    skipped: Annotated[int, Field(description="Searches past the sixth that were left out.")]
 
 
 class MarketMap(BaseModel):

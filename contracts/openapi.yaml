@@ -453,6 +453,30 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/candidates/find:
+    get:
+      operationId: findCandidates
+      tags: [candidates]
+      summary: The home page search - candidates by name, email or phone, several at once
+      description: >
+        Kano's /find rules. Searches are split on commas (at most six). Each is an email (matched exactly), a phone number (the whole number, in any format: without a country code it is read as a local number of the agency's country, the usual candidate countries, then any country where it is valid; never only its last digits) or a name (every word in the name, email, title or company; then names alike, scored). "name - company" keeps those who work or worked there, word for word. Each search gets its own block, with a message instead when it is incomplete.
+
+      x-permission: candidates:read
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: "For example: ali abu - nintex, +60 12-345 6789, aisyah@example.com"
+          schema: {type: string, minLength: 1, maxLength: 500}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CandidateFind'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/candidates/used-values:
     get:
       operationId: listCandidateUsedValues
@@ -4912,6 +4936,52 @@ components:
           description: The candidate to merge in (and delete).
           allOf: [{$ref: '#/components/schemas/CandidateId'}]
         version: {type: integer, minimum: 1, description: The version of the candidate you keep.}
+    CandidateFind:
+      type: object
+      required: [searches, skipped]
+      properties:
+        searches: {type: array, items: {$ref: '#/components/schemas/CandidateFindSearch'}}
+        skipped: {type: integer, description: Searches past the sixth that were left out.}
+    CandidateFindSearch:
+      type: object
+      required: [text, kind, company, error, items, similar, more, note]
+      properties:
+        text: {type: string, description: The search as typed.}
+        kind: {type: string, enum: [name, email, phone]}
+        company: {type: string, nullable: true, description: "From \"name - company\"."}
+        error: {type: string, nullable: true, description: Why it could not be run as typed (nothing is searched).}
+        items:
+          type: array
+          description: The matches (at most 10).
+          items: {$ref: '#/components/schemas/CandidateFound'}
+        similar:
+          type: array
+          description: "Names alike (each with its score) filling the rest of the 10, best first; for names only."
+          items: {$ref: '#/components/schemas/CandidateFound'}
+        more: {type: boolean, description: More matched than are shown.}
+        note: {type: string, nullable: true, description: Something to check before trusting the matches.}
+    CandidateFound:
+      type: object
+      required: [id, fullName, currentTitle, currentCompany, email, phone, employer, score]
+      properties:
+        id: {$ref: '#/components/schemas/CandidateId'}
+        fullName: {type: string}
+        currentTitle: {type: string, nullable: true}
+        currentCompany: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+        phone: {type: string, nullable: true}
+        employer:
+          description: "With a company searched for: where they work or worked there."
+          allOf: [{$ref: '#/components/schemas/CandidateFoundEmployer'}]
+          nullable: true
+        score: {type: number, nullable: true, description: "For names alike, how alike (0 to 1)."}
+    CandidateFoundEmployer:
+      type: object
+      required: [company, title, current]
+      properties:
+        company: {type: string}
+        title: {type: string, nullable: true}
+        current: {type: boolean, description: "true: works there now; false: worked there."}
     UsedValues:
       type: object
       required: [tags, skills, industries, specializations]

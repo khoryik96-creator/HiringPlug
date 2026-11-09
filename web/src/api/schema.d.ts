@@ -137,6 +137,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/candidates/find": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The home page search - candidates by name, email or phone, several at once
+         * @description Kano's /find rules. Searches are split on commas (at most six). Each is an email (matched exactly), a phone number (the whole number, in any format: without a country code it is read as a local number of the agency's country, the usual candidate countries, then any country where it is valid; never only its last digits) or a name (every word in the name, email, title or company; then names alike, scored). "name - company" keeps those who work or worked there, word for word. Each search gets its own block, with a message instead when it is incomplete.
+         */
+        get: operations["findCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates/used-values": {
         parameters: {
             query?: never;
@@ -3139,6 +3159,47 @@ export interface components {
             duplicateId: components["schemas"]["CandidateId"];
             /** @description The version of the candidate you keep. */
             version: number;
+        };
+        CandidateFind: {
+            searches: components["schemas"]["CandidateFindSearch"][];
+            /** @description Searches past the sixth that were left out. */
+            skipped: number;
+        };
+        CandidateFindSearch: {
+            /** @description The search as typed. */
+            text: string;
+            /** @enum {string} */
+            kind: "name" | "email" | "phone";
+            /** @description From "name - company". */
+            company: string | null;
+            /** @description Why it could not be run as typed (nothing is searched). */
+            error: string | null;
+            /** @description The matches (at most 10). */
+            items: components["schemas"]["CandidateFound"][];
+            /** @description Names alike (each with its score) filling the rest of the 10, best first; for names only. */
+            similar: components["schemas"]["CandidateFound"][];
+            /** @description More matched than are shown. */
+            more: boolean;
+            /** @description Something to check before trusting the matches. */
+            note: string | null;
+        };
+        CandidateFound: {
+            id: components["schemas"]["CandidateId"];
+            fullName: string;
+            currentTitle: string | null;
+            currentCompany: string | null;
+            email: string | null;
+            phone: string | null;
+            /** @description With a company searched for: where they work or worked there. */
+            employer: components["schemas"]["CandidateFoundEmployer"] | null;
+            /** @description For names alike, how alike (0 to 1). */
+            score: number | null;
+        };
+        CandidateFoundEmployer: {
+            company: string;
+            title: string | null;
+            /** @description true: works there now; false: worked there. */
+            current: boolean;
         };
         UsedValues: {
             tags: string[];
@@ -6341,6 +6402,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateSearchPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    findCandidates: {
+        parameters: {
+            query: {
+                /** @description For example: ali abu - nintex, +60 12-345 6789, aisyah@example.com */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateFind"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

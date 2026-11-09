@@ -59,7 +59,8 @@ WHERE id = @id AND version = @expected_version
 RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
--- With @similar, names like the query (typos) instead, the closest first.
+-- @phones are the whole numbers a phone number typed as the query can be
+-- (findquery.Numbers): never its last digits. With @similar, names like the query (typos) instead, the closest first.
 -- name: ListCandidates :many
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
@@ -71,7 +72,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
        OR CASE WHEN sqlc.arg(similar_names)::boolean
             THEN app_normalize_text(sqlc.narg(query)::text) <% c.name_text
             ELSE c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
-              OR c.phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
+              OR c.phone = ANY (@phones::text[])
           END)
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
@@ -95,7 +96,7 @@ FROM candidate c
 WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(query)::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
-       OR c.phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
+       OR c.phone = ANY (@phones::text[]))
   AND (sqlc.narg(ts)::text IS NULL
        OR (c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) AND NOT c.id = ANY (@excluded_ids::text[]))
        OR c.id = ANY (@cv_ids::text[]))
@@ -272,3 +273,34 @@ SELECT coalesce(current_amount::text, '')::text AS current_amount, current_curre
        coalesce(expected_min::text, '')::text AS expected_min, expected_currency, expected_period
 FROM candidate_compensation
 WHERE candidate_id = ANY(@ids::text[]);
+
+-- The home page search (Kano's /find), one search: by @phones (the whole
+-- numbers a phone number typed can be), by @email exactly, or by @name
+-- (every word in the name, email, title or company; with @similar_names,
+-- names alike by trigrams or containing one of @probes, the closest
+-- first). With @company_words (LIKE patterns), only those whose current or
+-- a past company has every word; the service then checks it word for word.
+-- name: FindCandidates :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company
+FROM candidate c
+WHERE CASE
+    WHEN cardinality(@phones::text[]) > 0 THEN c.phone = ANY (@phones::text[])
+    WHEN sqlc.narg(email)::text IS NOT NULL THEN c.email = lower(sqlc.narg(email)::text)
+    WHEN sqlc.arg(similar_names)::boolean
+      THEN app_normalize_text(@name::text) <% c.name_text OR c.name_text LIKE ANY (@probes::text[])
+    ELSE c.search_text LIKE ALL (app_search_patterns(@name::text))
+  END
+  AND (cardinality(@company_words::text[]) = 0
+       OR app_normalize_text(coalesce(c.current_company, '')) LIKE ALL (@company_words::text[])
+       OR EXISTS (SELECT 1 FROM candidate_work w
+                  WHERE w.candidate_id = c.id AND app_normalize_text(coalesce(w.company, '')) LIKE ALL (@company_words::text[])))
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(@name::text), c.name_text) END DESC,
+  c.id DESC
+LIMIT @row_limit;
+
+-- The companies candidates work or worked at, newest first.
+-- name: ListWorkCompanies :many
+SELECT candidate_id, company::text AS company, title, is_current
+FROM candidate_work
+WHERE candidate_id = ANY (@candidate_ids::text[]) AND company IS NOT NULL
+ORDER BY candidate_id, position;

@@ -114,6 +114,87 @@ func (q *Queries) FindCandidateIDByEmail(ctx context.Context, email *string) (st
 	return id, err
 }
 
+const findCandidates = `-- name: FindCandidates :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company
+FROM candidate c
+WHERE CASE
+    WHEN cardinality($1::text[]) > 0 THEN c.phone = ANY ($1::text[])
+    WHEN $2::text IS NOT NULL THEN c.email = lower($2::text)
+    WHEN $3::boolean
+      THEN app_normalize_text($4::text) <% c.name_text OR c.name_text LIKE ANY ($5::text[])
+    ELSE c.search_text LIKE ALL (app_search_patterns($4::text))
+  END
+  AND (cardinality($6::text[]) = 0
+       OR app_normalize_text(coalesce(c.current_company, '')) LIKE ALL ($6::text[])
+       OR EXISTS (SELECT 1 FROM candidate_work w
+                  WHERE w.candidate_id = c.id AND app_normalize_text(coalesce(w.company, '')) LIKE ALL ($6::text[])))
+ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text($4::text), c.name_text) END DESC,
+  c.id DESC
+LIMIT $7
+`
+
+type FindCandidatesParams struct {
+	Phones       []string
+	Email        *string
+	SimilarNames bool
+	Name         string
+	Probes       []string
+	CompanyWords []string
+	RowLimit     int32
+}
+
+type FindCandidatesRow struct {
+	ID             string
+	FirstName      string
+	LastName       string
+	Email          *string
+	Phone          *string
+	CurrentTitle   *string
+	CurrentCompany *string
+}
+
+// The home page search (Kano's /find), one search: by @phones (the whole
+// numbers a phone number typed can be), by @email exactly, or by @name
+// (every word in the name, email, title or company; with @similar_names,
+// names alike by trigrams or containing one of @probes, the closest
+// first). With @company_words (LIKE patterns), only those whose current or
+// a past company has every word; the service then checks it word for word.
+func (q *Queries) FindCandidates(ctx context.Context, arg FindCandidatesParams) ([]FindCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, findCandidates,
+		arg.Phones,
+		arg.Email,
+		arg.SimilarNames,
+		arg.Name,
+		arg.Probes,
+		arg.CompanyWords,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindCandidatesRow
+	for rows.Next() {
+		var i FindCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Phone,
+			&i.CurrentTitle,
+			&i.CurrentCompany,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCandidate = `-- name: GetCandidate :one
 SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms FROM candidate WHERE id = $1
 `
@@ -411,19 +492,20 @@ WHERE ($1::text IS NULL OR c.id < $1::text)
        OR CASE WHEN $3::boolean
             THEN app_normalize_text($2::text) <% c.name_text
             ELSE c.search_text LIKE ALL (app_search_patterns($2::text))
-              OR c.phone_digits LIKE '%' || app_phone_key($2::text) || '%'
+              OR c.phone = ANY ($4::text[])
           END)
-  AND ($4::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($4::text)])
-  AND ($5::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($5::text)])
-  AND ($6::text IS NULL OR c.owner_id = $6::text)
+  AND ($5::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($5::text)])
+  AND ($6::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($6::text)])
+  AND ($7::text IS NULL OR c.owner_id = $7::text)
 ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC, c.id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type ListCandidatesParams struct {
 	Cursor       *string
 	Query        *string
 	SimilarNames bool
+	Phones       []string
 	Tag          *string
 	Skill        *string
 	Owner        *string
@@ -454,12 +536,14 @@ type ListCandidatesRow struct {
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
-// With @similar, names like the query (typos) instead, the closest first.
+// @phones are the whole numbers a phone number typed as the query can be
+// (findquery.Numbers): never its last digits. With @similar, names like the query (typos) instead, the closest first.
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listCandidates,
 		arg.Cursor,
 		arg.Query,
 		arg.SimilarNames,
+		arg.Phones,
 		arg.Tag,
 		arg.Skill,
 		arg.Owner,
@@ -600,6 +684,46 @@ func (q *Queries) ListWork(ctx context.Context, candidateID string) ([]Candidate
 			&i.EndDate,
 			&i.IsCurrent,
 			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkCompanies = `-- name: ListWorkCompanies :many
+SELECT candidate_id, company::text AS company, title, is_current
+FROM candidate_work
+WHERE candidate_id = ANY ($1::text[]) AND company IS NOT NULL
+ORDER BY candidate_id, position
+`
+
+type ListWorkCompaniesRow struct {
+	CandidateID string
+	Company     string
+	Title       *string
+	IsCurrent   bool
+}
+
+// The companies candidates work or worked at, newest first.
+func (q *Queries) ListWorkCompanies(ctx context.Context, candidateIds []string) ([]ListWorkCompaniesRow, error) {
+	rows, err := q.db.Query(ctx, listWorkCompanies, candidateIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkCompaniesRow
+	for rows.Next() {
+		var i ListWorkCompaniesRow
+		if err := rows.Scan(
+			&i.CandidateID,
+			&i.Company,
+			&i.Title,
+			&i.IsCurrent,
 		); err != nil {
 			return nil, err
 		}
@@ -771,45 +895,46 @@ FROM candidate c
 WHERE ($2::text IS NULL OR c.id < $2::text)
   AND ($3::text IS NULL
        OR c.search_text LIKE ALL (app_search_patterns($3::text))
-       OR c.phone_digits LIKE '%' || app_phone_key($3::text) || '%')
+       OR c.phone = ANY ($4::text[]))
   AND ($1::text IS NULL
-       OR (c.profile_terms @@ to_tsquery('english', $1::text) AND NOT c.id = ANY ($4::text[]))
-       OR c.id = ANY ($5::text[]))
-  AND (cardinality($6::text[]) = 0 OR c.availability = ANY ($6::text[]))
-  AND (cardinality($7::text[]) = 0 OR (CASE
+       OR (c.profile_terms @@ to_tsquery('english', $1::text) AND NOT c.id = ANY ($5::text[]))
+       OR c.id = ANY ($6::text[]))
+  AND (cardinality($7::text[]) = 0 OR c.availability = ANY ($7::text[]))
+  AND (cardinality($8::text[]) = 0 OR (CASE
          WHEN c.work_authorization = 'local' THEN 'local'
          WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
          WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
          WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
-         ELSE 'unknown' END) = ANY ($7::text[]))
-  AND (cardinality($8::text[]) = 0 OR c.nationality = ANY ($8::text[]))
-  AND (cardinality($9::text[]) = 0 OR c.residence_country = ANY ($9::text[]))
-  AND (cardinality($10::text[]) = 0 OR c.source = ANY ($10::text[]))
-  AND (cardinality($11::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($11::text[])))
-  AND (cardinality($12::text[]) = 0
-       OR ($13::boolean AND app_lower_array(c.skills) @> app_lower_array($12::text[]))
-       OR (NOT $13::boolean AND app_lower_array(c.skills) && app_lower_array($12::text[])))
-  AND (cardinality($14::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($14::text[]))
-  AND ($15::text IS NULL
-       OR c.location ILIKE '%' || replace(replace(replace($15::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-  AND ($16::int IS NULL OR (c.notice_period_value IS NOT NULL AND
-       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $16::int))
+         ELSE 'unknown' END) = ANY ($8::text[]))
+  AND (cardinality($9::text[]) = 0 OR c.nationality = ANY ($9::text[]))
+  AND (cardinality($10::text[]) = 0 OR c.residence_country = ANY ($10::text[]))
+  AND (cardinality($11::text[]) = 0 OR c.source = ANY ($11::text[]))
+  AND (cardinality($12::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($12::text[])))
+  AND (cardinality($13::text[]) = 0
+       OR ($14::boolean AND app_lower_array(c.skills) @> app_lower_array($13::text[]))
+       OR (NOT $14::boolean AND app_lower_array(c.skills) && app_lower_array($13::text[])))
+  AND (cardinality($15::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($15::text[]))
+  AND ($16::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($16::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($17::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $17::int))
   -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
-  AND ($17::text IS NULL OR EXISTS (
+  AND ($18::text IS NULL OR EXISTS (
        SELECT 1 FROM candidate_compensation cc
-       WHERE cc.candidate_id = c.id AND cc.expected_currency = $18::text
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $19::text
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
-             <= ($17::text)::numeric))
-  AND ($19::text IS NULL OR c.owner_id = $19::text)
-  AND ($20::int IS NULL OR c.updated_at >= now() - make_interval(days => $20::int))
+             <= ($18::text)::numeric))
+  AND ($20::text IS NULL OR c.owner_id = $20::text)
+  AND ($21::int IS NULL OR c.updated_at >= now() - make_interval(days => $21::int))
 ORDER BY c.id DESC
-LIMIT $21
+LIMIT $22
 `
 
 type SearchCandidatesParams struct {
 	Ts                *string
 	Cursor            *string
 	Query             *string
+	Phones            []string
 	ExcludedIds       []string
 	CvIds             []string
 	Availability      []string
@@ -865,6 +990,7 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.Ts,
 		arg.Cursor,
 		arg.Query,
+		arg.Phones,
 		arg.ExcludedIds,
 		arg.CvIds,
 		arg.Availability,
