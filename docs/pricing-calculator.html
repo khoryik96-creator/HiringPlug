@@ -1,0 +1,508 @@
+<title>HiringPlug Profit Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a ledger-style planner. Inputs on the left in folding groups, a
+   sticky P&L summary on the right, the month-by-month forecast full width. */
+:root {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --ink: #17221f;
+  --muted: #5d6b67;
+  --line: #dde4e1;
+  --accent: #0f6b5c;
+  --accent-soft: #e2f1ed;
+  --profit: #13794a;
+  --loss: #b23a2e;
+  --warn: #9a6400;
+  --chart-rev: #0f6b5c;
+  --chart-cost: #b23a2e;
+  --chart-profit: #6a58c9;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1514; --surface: #17201e; --ink: #e6eeeb; --muted: #9aaba6; --line: #2a3734;
+    --accent: #4fc2a8; --accent-soft: #183630; --profit: #4fd08a; --loss: #f07a6c; --warn: #e2b04a;
+    --chart-rev: #4fc2a8; --chart-cost: #f07a6c; --chart-profit: #a594f5; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1514; --surface: #17201e; --ink: #e6eeeb; --muted: #9aaba6; --line: #2a3734;
+  --accent: #4fc2a8; --accent-soft: #183630; --profit: #4fd08a; --loss: #f07a6c; --warn: #e2b04a;
+  --chart-rev: #4fc2a8; --chart-cost: #f07a6c; --chart-profit: #a594f5; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font: 700 1.6rem/1.2 var(--font-display); margin: 0; text-wrap: balance; }
+h2 { font: 600 1.05rem/1.3 var(--font-display); margin: 0; }
+.lead { color: var(--muted); margin: 6px 0 0; max-width: 70ch; }
+.head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 20px; }
+.example-note { font-size: 0.82rem; color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-radius: 999px; padding: 4px 12px; }
+button { font: 600 0.85rem var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .results { position: static; } }
+.inputs { display: grid; gap: 12px; min-width: 0; }
+details.group { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+details.group > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::after { content: "▾"; color: var(--muted); }
+details.group:not([open]) > summary::after { content: "▸"; }
+.sum-hint { color: var(--muted); font-size: 0.82rem; margin-left: auto; font-family: var(--font-num); }
+.body { padding: 0 16px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.plans .inp input, .costs .inp input { width: 6em; }
+.inp input { width: 100%; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 10px 14px; }
+.fc-fields { flex: 1 1 300px; min-width: 0; max-width: 640px; }
+label.f { display: grid; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--muted); letter-spacing: 0.01em; }
+.inp { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.inp span { padding: 0 8px; color: var(--muted); font: 0.8rem var(--font-num); white-space: nowrap; }
+.inp input, .inp select { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 0.95rem var(--font-num); padding: 8px; }
+select.plain { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: 0.9rem var(--font-body); padding: 8px; }
+.note { font-size: 0.8rem; color: var(--muted); margin: 0; max-width: 75ch; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.plans th, .plans td, .costs td { padding: 6px 4px; text-align: left; font-size: 0.85rem; }
+.plans th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--line); }
+.plans td .inp, .costs td .inp { min-width: 90px; }
+.costs td:first-child input { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: 0.9rem var(--font-body); padding: 8px; }
+.x { padding: 4px 9px; color: var(--muted); }
+.scroll { overflow-x: auto; }
+/* Results */
+.results { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.pl td:first-child { overflow-wrap: anywhere; }
+.verdict { border-left: 4px solid var(--profit); }
+.verdict.loss { border-left-color: var(--loss); }
+.big { font: 700 1.9rem/1.1 var(--font-num); }
+.pos { color: var(--profit); } .neg { color: var(--loss); }
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kpi { background: var(--bg); border-radius: 8px; padding: 10px; }
+.kpi b { display: block; font: 600 1.05rem var(--font-num); }
+.kpi small { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.pl { table-layout: fixed; }
+.pl td { padding: 5px 0; font-size: 0.88rem; border-bottom: 1px dashed var(--line); }
+.pl td:last-child { text-align: right; font-family: var(--font-num); white-space: nowrap; width: 9em; }
+.pl tr.total td { font-weight: 700; border-bottom: 0; border-top: 1px solid var(--ink); }
+.pl tr.sub td { color: var(--muted); padding-left: 12px; font-size: 0.8rem; white-space: normal; text-align: left; font-family: var(--font-body); }
+.insights { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.87rem; }
+/* Forecast */
+.forecast { margin-top: 20px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+svg text { fill: var(--muted); font: 11px var(--font-num); }
+.ft th, .ft td { padding: 6px 8px; font-size: 0.8rem; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.ft th:first-child, .ft td:first-child { text-align: left; }
+.ft th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--surface); }
+.ft tr.mark td { background: var(--accent-soft); }
+.ft-box { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+@media (prefers-reduced-motion: no-preference) { .big, .kpi b { transition: color 0.2s; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <h1>HiringPlug Profit Planner</h1>
+      <p class="lead">Try prices, numbers of users, costs and tax rates, and see revenue, margin, profit and break-even for the HiringPlug SaaS, monthly and as a forecast. All amounts in ringgit (RM) per month unless marked.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="example-note" id="exampleNote">Example figures: replace with yours</span>
+      <button type="button" id="reset">Reset to the example</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="inputs">
+      <details class="group" open>
+        <summary><h2>Plans and paying users</h2><span class="sum-hint" id="hUsers"></span></summary>
+        <div class="body">
+          <div class="scroll">
+            <table class="plans">
+              <thead><tr><th>Plan</th><th>Price per user / month</th><th>Paying users</th></tr></thead>
+              <tbody>
+                <tr><td>Solo (freelancer)</td><td><div class="inp"><span>RM</span><input id="pSolo" type="number" min="0" step="1"></div></td><td><div class="inp"><input id="uSolo" type="number" min="0" step="1"></div></td></tr>
+                <tr><td>Agency</td><td><div class="inp"><span>RM</span><input id="pAgency" type="number" min="0" step="1"></div></td><td><div class="inp"><input id="uAgency" type="number" min="0" step="1"></div></td></tr>
+                <tr><td>Agency Pro</td><td><div class="inp"><span>RM</span><input id="pPro" type="number" min="0" step="1"></div></td><td><div class="inp"><input id="uPro" type="number" min="0" step="1"></div></td></tr>
+                <tr><td>Enterprise</td><td><div class="inp"><span>RM</span><input id="pEnt" type="number" min="0" step="1"></div></td><td><div class="inp"><input id="uEnt" type="number" min="0" step="1"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="fields">
+            <label class="f" for="agencySize">Average users per agency (not Solo)<div class="inp"><input id="agencySize" type="number" min="1" step="0.5"></div></label>
+            <label class="f" for="annualShare">Users paying yearly<div class="inp"><input id="annualShare" type="number" min="0" max="100" step="1"><span>%</span></div></label>
+            <label class="f" for="annualDisc">Discount for paying yearly<div class="inp"><input id="annualDisc" type="number" min="0" max="100" step="0.1"><span>%</span></div></label>
+          </div>
+          <p class="note">"2 months free" on yearly billing is a 16.7% discount.</p>
+        </div>
+      </details>
+
+      <details class="group" open>
+        <summary><h2>Costs for each user</h2><span class="sum-hint" id="hVar"></span></summary>
+        <div class="body">
+          <div class="fields">
+            <label class="f" for="cServer">Servers and storage<div class="inp"><span>RM</span><input id="cServer" type="number" min="0" step="0.1"><span>/user</span></div></label>
+            <label class="f" for="aiActions">AI actions included<div class="inp"><input id="aiActions" type="number" min="0" step="10"><span>/user</span></div></label>
+            <label class="f" for="aiCost">Cost of one AI action<div class="inp"><span>RM</span><input id="aiCost" type="number" min="0" step="0.001"></div></label>
+            <label class="f" for="cEmail">Sending email<div class="inp"><span>RM</span><input id="cEmail" type="number" min="0" step="0.1"><span>/user</span></div></label>
+            <label class="f" for="cOther">Other per user (support, tools)<div class="inp"><span>RM</span><input id="cOther" type="number" min="0" step="0.5"><span>/user</span></div></label>
+          </div>
+          <p class="note">One AI action is about RM 0.005 on a low-cost model (DeepSeek class) and about RM 0.08 on a premium one (Claude Sonnet). Servers are about RM 0.60–5.50 per user (see the scaling plan).</p>
+        </div>
+      </details>
+
+      <details class="group" open>
+        <summary><h2>Payments and tax</h2><span class="sum-hint" id="hTax"></span></summary>
+        <div class="body">
+          <div class="fields">
+            <label class="f" for="payPct">Card / FPX fee<div class="inp"><input id="payPct" type="number" min="0" step="0.1"><span>%</span></div></label>
+            <label class="f" for="payFix">Plus per charge<div class="inp"><span>RM</span><input id="payFix" type="number" min="0" step="0.1"></div></label>
+            <label class="f" for="sst">Service tax (SST)<div class="inp"><input id="sst" type="number" min="0" step="0.5"><span>%</span></div></label>
+            <label class="f" for="sstMode">My prices…<select id="sstMode" class="plain"><option value="add">exclude SST (added on top)</option><option value="incl">include SST</option><option value="none">no SST (not registered)</option></select></label>
+            <label class="f" for="taxMode">Income tax on profit<select id="taxMode" class="plain"><option value="sme">Malaysian SME rates</option><option value="flat">One flat rate</option></select></label>
+            <label class="f" for="taxFlat">Flat rate<div class="inp"><input id="taxFlat" type="number" min="0" max="100" step="0.5"><span>%</span></div></label>
+          </div>
+          <p class="note">SST is collected from customers and paid to the government, so it is not your income. SME rates: 15% on the first RM 150,000 of yearly profit, 17% up to RM 600,000, 24% above (for qualifying small companies). Confirm both with your accountant.</p>
+        </div>
+      </details>
+
+      <details class="group" open>
+        <summary><h2>Fixed costs each month</h2><span class="sum-hint" id="hFixed"></span></summary>
+        <div class="body">
+          <div class="scroll">
+            <table class="costs"><tbody id="fixedRows"></tbody></table>
+          </div>
+          <div><button type="button" id="addFixed">+ Add a cost</button></div>
+          <p class="note">Salaries should include the employer's EPF, SOCSO and EIS.</p>
+        </div>
+      </details>
+
+      <details class="group" open>
+        <summary><h2>Goals, churn and winning customers</h2><span class="sum-hint" id="hGoal"></span></summary>
+        <div class="body">
+          <div class="fields">
+            <label class="f" for="target">Profit I want after tax<div class="inp"><span>RM</span><input id="target" type="number" min="0" step="1000"><span>/month</span></div></label>
+            <label class="f" for="churn">Agencies leaving each month<div class="inp"><input id="churn" type="number" min="0.1" max="100" step="0.1"><span>%</span></div></label>
+            <label class="f" for="cac">Cost to win one agency<div class="inp"><span>RM</span><input id="cac" type="number" min="0" step="100"></div></label>
+          </div>
+          <p class="note">The forecast adds the cost to win each new agency (sales, demos, ads, referral rewards) on top of the fixed costs. Leave marketing out of the fixed costs if you count it here, so it is not counted twice.</p>
+        </div>
+      </details>
+    </div>
+
+    <aside class="results" aria-live="polite">
+      <section class="card verdict" id="verdict">
+        <small style="color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:.72rem">Profit after tax, per month</small>
+        <div class="big" id="rProfit"></div>
+        <div id="rProfitYear" class="note"></div>
+        <div class="kpis">
+          <div class="kpi"><small>Net margin</small><b id="rMargin"></b></div>
+          <div class="kpi"><small>Gross margin</small><b id="rGross"></b></div>
+          <div class="kpi"><small>Break-even</small><b id="rBE"></b></div>
+          <div class="kpi"><small>For your goal</small><b id="rGoal"></b></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Monthly profit and loss</h2>
+        <table class="pl"><tbody id="pl"></tbody></table>
+      </section>
+      <section class="card">
+        <h2>What it means</h2>
+        <ul class="insights" id="insights"></ul>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card forecast">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:end">
+      <div>
+        <h2>Forecast</h2>
+        <p class="note">Start from the users above, win new agencies each month, lose some to churn. Prices, mix and costs as set above.</p>
+      </div>
+      <div class="fields fc-fields">
+        <label class="f" for="fNew">New agencies per month<div class="inp"><input id="fNew" type="number" min="0" step="1"></div></label>
+        <label class="f" for="fMonths">Months<div class="inp"><input id="fMonths" type="number" min="3" max="120" step="1"></div></label>
+        <label class="f" for="fCash">Money in the bank at start<div class="inp"><span>RM</span><input id="fCash" type="number" step="1000"></div></label>
+        <label class="f" for="fFixedGrow">Fixed costs grow per year<div class="inp"><input id="fFixedGrow" type="number" min="0" step="1"><span>%</span></div></label>
+      </div>
+    </div>
+    <div class="legend"><span><i style="background:var(--chart-rev)"></i>Revenue</span><span><i style="background:var(--chart-cost)"></i>All costs incl. tax</span><span><i style="background:var(--chart-profit)"></i>Money in the bank</span></div>
+    <div class="scroll"><svg id="chart" viewBox="0 0 900 280" width="100%" role="img" aria-label="Forecast chart"></svg></div>
+    <p class="note" id="fSummary"></p>
+    <div class="ft-box"><table class="ft"><thead><tr><th>Month</th><th>Users</th><th>Agencies</th><th>Revenue</th><th>Costs incl. tax</th><th>Profit after tax</th><th>In the bank</th></tr></thead><tbody id="ftBody"></tbody></table></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const EXAMPLE = {
+    pSolo: 99, pAgency: 149, pPro: 249, pEnt: 199,
+    uSolo: 20, uAgency: 150, uPro: 50, uEnt: 0,
+    agencySize: 5, annualShare: 30, annualDisc: 16.7,
+    cServer: 3, aiActions: 500, aiCost: 0.005, cEmail: 0.3, cOther: 0,
+    payPct: 3, payFix: 1, sst: 8, sstMode: "add", taxMode: "sme", taxFlat: 24,
+    target: 20000, churn: 2, cac: 3000,
+    fNew: 6, fMonths: 36, fCash: 50000, fFixedGrow: 10,
+    fixed: [
+      ["Developer (incl. EPF, SOCSO)", 12000],
+      ["Customer support, part-time", 2500],
+      ["Marketing and ads", 3000],
+      ["Servers (base, any size)", 1500],
+      ["Accounting, legal, software", 1200],
+    ],
+  };
+  const KEY = "hiringplug-profit-planner";
+  const $ = (id) => document.getElementById(id);
+  const fields = Object.keys(EXAMPLE).filter((k) => k !== "fixed");
+  let fixed = [];
+
+  const load = () => {
+    try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s) return s; } catch { /* storage unavailable */ }
+    return null;
+  };
+  const save = (state) => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable */ } };
+  const isExample = (s) => JSON.stringify(s) === JSON.stringify(EXAMPLE);
+
+  const RM = (n, d = 0) => (n < 0 ? "−" : "") + "RM " + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const pct = (n) => (isFinite(n) ? n.toFixed(1) + "%" : "—");
+  const num = (n) => Math.round(n).toLocaleString("en-MY");
+
+  function apply(state) {
+    for (const k of fields) $(k).value = state[k];
+    fixed = state.fixed.map((r) => [...r]);
+    drawFixed();
+  }
+  function read() {
+    const s = {};
+    for (const k of fields) {
+      const el = $(k);
+      s[k] = el.tagName === "SELECT" ? el.value : (parseFloat(el.value) || 0);
+    }
+    s.fixed = fixed.map((r) => [...r]);
+    return s;
+  }
+  function drawFixed() {
+    const body = $("fixedRows");
+    body.textContent = "";
+    fixed.forEach((row, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><input aria-label="Cost name" id="fxn${i}"></td><td><div class="inp"><span>RM</span><input type="number" min="0" step="100" aria-label="Amount per month" id="fxa${i}"></div></td><td><button type="button" class="x" aria-label="Remove">×</button></td>`;
+      const [n, a] = tr.querySelectorAll("input");
+      n.value = row[0]; a.value = row[1];
+      n.addEventListener("input", () => { fixed[i][0] = n.value; update(); });
+      a.addEventListener("input", () => { fixed[i][1] = parseFloat(a.value) || 0; update(); });
+      tr.querySelector("button").addEventListener("click", () => { fixed.splice(i, 1); drawFixed(); update(); });
+      body.appendChild(tr);
+    });
+  }
+
+  // Yearly income tax on a yearly profit.
+  function incomeTax(yearProfit, s) {
+    if (yearProfit <= 0) return 0;
+    if (s.taxMode === "flat") return yearProfit * s.taxFlat / 100;
+    const a = Math.min(yearProfit, 150000), b = Math.min(Math.max(yearProfit - 150000, 0), 450000), c = Math.max(yearProfit - 600000, 0);
+    return a * 0.15 + b * 0.17 + c * 0.24;
+  }
+
+  // One month of the business for a number of users on each plan.
+  function month(s, users, fixedTotal) {
+    const plans = [["Solo", s.pSolo, users.solo], ["Agency", s.pAgency, users.agency], ["Agency Pro", s.pPro, users.pro], ["Enterprise", s.pEnt, users.ent]];
+    const disc = 1 - (s.annualShare / 100) * (s.annualDisc / 100);
+    const sstRate = s.sstMode === "none" ? 0 : s.sst / 100;
+    let listed = 0, totalUsers = 0;
+    for (const [, price, n] of plans) { listed += price * n * disc; totalUsers += n; }
+    // Revenue for you, and what customers pay (with SST).
+    const revenue = s.sstMode === "incl" ? listed / (1 + sstRate) : listed;
+    const charged = s.sstMode === "incl" ? listed : listed * (1 + sstRate);
+    const sstCollected = charged - revenue;
+    const accounts = users.solo + (users.agency + users.pro + users.ent) / Math.max(s.agencySize, 1);
+    const chargesPerMonth = accounts * (1 - s.annualShare / 100) + accounts * (s.annualShare / 100) / 12;
+    const payment = charged * s.payPct / 100 + chargesPerMonth * s.payFix;
+    const perUser = s.cServer + s.aiActions * s.aiCost + s.cEmail + s.cOther;
+    const variable = perUser * totalUsers + payment;
+    const pbt = revenue - variable - fixedTotal;
+    const tax = incomeTax(pbt * 12, s) / 12;
+    return { revenue, charged, sstCollected, accounts, payment, perUser, variable, pbt, tax, pat: pbt - tax, totalUsers, aiCost: s.aiActions * s.aiCost * totalUsers };
+  }
+
+  function usersFrom(s) { return { solo: s.uSolo, agency: s.uAgency, pro: s.uPro, ent: s.uEnt }; }
+  function scaled(s, total) {
+    const u = usersFrom(s); const t = u.solo + u.agency + u.pro + u.ent;
+    const mix = t > 0 ? u : { solo: 0, agency: 1, pro: 0, ent: 0 };
+    const mt = t > 0 ? t : 1;
+    return { solo: total * mix.solo / mt, agency: total * mix.agency / mt, pro: total * mix.pro / mt, ent: total * mix.ent / mt };
+  }
+  // Smallest number of users (same plan mix) whose profit after tax reaches a goal.
+  function usersFor(s, fixedTotal, goal) {
+    const at = (n) => month(s, scaled(s, n), fixedTotal).pat;
+    if (at(1e6) < goal) return Infinity;
+    let lo = 0, hi = 1e6;
+    for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2; if (at(mid) >= goal) hi = mid; else lo = mid; }
+    return Math.ceil(hi);
+  }
+
+  function update() {
+    const s = read();
+    save(s);
+    $("exampleNote").hidden = !isExample(s);
+    const fixedTotal = s.fixed.reduce((a, r) => a + (Number(r[1]) || 0), 0);
+    const m = month(s, usersFrom(s), fixedTotal);
+    const margin = m.revenue > 0 ? (m.pat / m.revenue) * 100 : NaN;
+    const gross = m.revenue > 0 ? ((m.revenue - m.variable) / m.revenue) * 100 : NaN;
+    const arpu = m.totalUsers > 0 ? m.revenue / m.totalUsers : 0;
+    const contribUser = m.totalUsers > 0 ? (m.revenue - m.variable) / m.totalUsers : 0;
+    const be = usersFor(s, fixedTotal, 0);
+    const goalUsers = usersFor(s, fixedTotal, s.target);
+    const agencies = (n) => isFinite(n) ? Math.ceil(n / Math.max(s.agencySize, 1)) : Infinity;
+
+    $("hUsers").textContent = `${num(m.totalUsers)} users · ${RM(m.revenue)}`;
+    $("hVar").textContent = `${RM(m.perUser, 2)} per user`;
+    $("hTax").textContent = `SST ${s.sstMode === "none" ? "off" : s.sst + "%"} · ${s.taxMode === "sme" ? "SME rates" : s.taxFlat + "%"}`;
+    $("hFixed").textContent = RM(fixedTotal);
+    $("hGoal").textContent = `${RM(s.target)} goal`;
+
+    const profitEl = $("rProfit");
+    profitEl.textContent = RM(m.pat);
+    profitEl.className = "big " + (m.pat >= 0 ? "pos" : "neg");
+    $("verdict").classList.toggle("loss", m.pat < 0);
+    $("rProfitYear").textContent = `${RM(m.pat * 12)} a year · revenue ${RM(m.revenue * 12)} a year`;
+    $("rMargin").textContent = pct(margin); $("rMargin").className = margin >= 0 ? "pos" : "neg";
+    $("rGross").textContent = pct(gross);
+    $("rBE").textContent = isFinite(be) ? `${num(be)} users` : "never";
+    $("rGoal").textContent = isFinite(goalUsers) ? `${num(goalUsers)} users` : "not reachable";
+
+    const rows = [
+      ["Revenue (after yearly discounts, without SST)", m.revenue],
+      ["sub", `Customers pay ${RM(m.charged)}; SST collected for the government ${RM(m.sstCollected)}`],
+      ["Servers, AI, email, other per user", -(m.variable - m.payment)],
+      ["sub", `of which AI ${RM(m.aiCost)}`],
+      ["Card and FPX fees", -m.payment],
+      ["Fixed costs", -fixedTotal],
+      ["Profit before tax", m.pbt],
+      ["Income tax", -m.tax],
+      ["total", "Profit after tax", m.pat],
+    ];
+    const pl = $("pl"); pl.textContent = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      if (r[0] === "sub") { tr.className = "sub"; tr.innerHTML = `<td colspan="2"></td>`; tr.firstChild.textContent = r[1]; }
+      else {
+        const total = r[0] === "total";
+        if (total) tr.className = "total";
+        const label = total ? r[1] : r[0], val = total ? r[2] : r[1];
+        tr.innerHTML = "<td></td><td></td>";
+        tr.children[0].textContent = label;
+        tr.children[1].textContent = RM(val);
+        if (total || label.startsWith("Profit")) tr.children[1].className = val >= 0 ? "pos" : "neg";
+      }
+      pl.appendChild(tr);
+    }
+
+    const churn = Math.max(s.churn, 0.1) / 100;
+    const contribAgency = contribUser * s.agencySize;
+    const ltv = contribAgency / churn;
+    const tips = [
+      `Each user brings in ${RM(arpu, 2)} and costs ${RM(m.totalUsers ? m.variable / m.totalUsers : 0, 2)} to serve, so ${RM(contribUser, 2)} per user goes to fixed costs and profit.`,
+      isFinite(be) ? `Break-even at about ${num(be)} paying users (about ${num(agencies(be))} agencies of ${s.agencySize}); you have ${num(m.totalUsers)}.` : `At these prices you never break even: each user costs more than they pay.`,
+      isFinite(goalUsers) ? `To keep ${RM(s.target)} a month after tax you need about ${num(goalUsers)} users (about ${num(agencies(goalUsers))} agencies).` : `The profit goal cannot be reached at these prices and costs.`,
+      `An agency stays about ${num(1 / churn)} months at ${s.churn}% churn and is worth ${RM(ltv)} over that time; winning one for ${RM(s.cac)} is ${s.cac > 0 ? (ltv / s.cac).toFixed(1) + " times" : "infinitely"} returned (aim for 3 times or more), paid back in ${contribAgency > 0 ? Math.ceil(s.cac / contribAgency) : "—"} months.`,
+      m.revenue > 0 ? `AI is ${pct(m.aiCost / m.revenue * 100)} of revenue. A premium model at about RM 0.08 an action would cost ${RM(s.aiActions * 0.08 * m.totalUsers)} a month for the same use.` : `Add paying users to see the AI share.`,
+    ];
+    const ul = $("insights"); ul.textContent = "";
+    for (const t of tips) { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); }
+
+    forecast(s, fixedTotal);
+  }
+
+  function forecast(s, fixedTotal) {
+    const months = Math.min(Math.max(Math.round(s.fMonths), 3), 120);
+    const churn = s.churn / 100;
+    let total = s.uSolo + s.uAgency + s.uPro + s.uEnt;
+    const solos = total > 0 ? s.uSolo / total : 0;
+    const usersPerNewAccount = solos * 1 + (1 - solos) * Math.max(s.agencySize, 1);
+    let cash = s.fCash, firstProfit = null, cashBack = null;
+    const out = [];
+    for (let i = 1; i <= months; i++) {
+      total = total * (1 - churn) + s.fNew * usersPerNewAccount;
+      const f = fixedTotal * Math.pow(1 + s.fFixedGrow / 100, (i - 1) / 12);
+      const m = month(s, scaled(s, total), f);
+      const marketing = s.fNew * s.cac;
+      const pat = m.pat - marketing;
+      cash += pat;
+      if (firstProfit === null && pat >= 0) firstProfit = i;
+      if (cashBack === null && cash >= s.fCash && i > 1 && firstProfit !== null) cashBack = i;
+      out.push({ i, users: total, agencies: m.accounts, revenue: m.revenue, costs: m.revenue - pat, pat, cash });
+    }
+    const body = $("ftBody"); body.textContent = "";
+    for (const r of out) {
+      const tr = document.createElement("tr");
+      if (r.i === firstProfit) tr.className = "mark";
+      const cells = [r.i, num(r.users), num(r.agencies), RM(r.revenue), RM(r.costs), RM(r.pat), RM(r.cash)];
+      tr.innerHTML = cells.map(() => "<td></td>").join("");
+      cells.forEach((c, j) => { tr.children[j].textContent = c; });
+      tr.children[5].className = r.pat >= 0 ? "pos" : "neg";
+      tr.children[6].className = r.cash >= 0 ? "" : "neg";
+      body.appendChild(tr);
+    }
+    const low = out.reduce((a, r) => Math.min(a, r.cash), s.fCash);
+    const last = out[out.length - 1];
+    $("fSummary").textContent =
+      `${firstProfit ? `Profitable from month ${firstProfit} (highlighted)` : `Not profitable within ${months} months`}` +
+      `${low < 0 ? `; the bank goes down to ${RM(low)}, so you need ${RM(-low + s.fCash)} to start` : `; the bank never drops below ${RM(low)}`}` +
+      `. After ${months} months: ${num(last.users)} users, ${RM(last.revenue)} revenue a month, ${RM(last.cash)} in the bank. ` +
+      `Winning agencies costs ${RM(s.fNew * s.cac)} a month (cost to win one × new agencies), included in costs.`;
+    chart(out);
+  }
+
+  function chart(rows) {
+    const svg = $("chart");
+    const W = 900, H = 280, L = 74, R = 12, T = 12, B = 30;
+    const vals = rows.flatMap((r) => [r.revenue, r.costs, r.cash]);
+    let max = Math.max(...vals, 0), min = Math.min(...vals, 0);
+    const span = niceStep((max - min) / 5);
+    max = Math.ceil(max / span) * span; min = Math.floor(min / span) * span;
+    if (max === min) max = min + span;
+    const x = (i) => L + ((i - 1) / Math.max(rows.length - 1, 1)) * (W - L - R);
+    const y = (v) => T + (1 - (v - min) / (max - min)) * (H - T - B);
+    const parts = [];
+    for (let v = min; v <= max + span / 2; v += span) {
+      parts.push(`<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="${v === 0 ? 1.5 : 1}"/>`);
+      parts.push(`<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${short(v)}</text>`);
+    }
+    const stepX = Math.max(1, Math.round(rows.length / 12));
+    rows.forEach((r) => { if ((r.i - 1) % stepX === 0 || r.i === rows.length) parts.push(`<text x="${x(r.i)}" y="${H - 10}" text-anchor="middle">${r.i}</text>`); });
+    const line = (key, color, w) => `<polyline fill="none" stroke="${color}" stroke-width="${w}" stroke-linejoin="round" points="${rows.map((r) => `${x(r.i).toFixed(1)},${y(r[key]).toFixed(1)}`).join(" ")}"/>`;
+    parts.push(line("revenue", "var(--chart-rev)", 2.5), line("costs", "var(--chart-cost)", 2), line("cash", "var(--chart-profit)", 2));
+    const lastR = rows[rows.length - 1];
+    parts.push(`<circle cx="${x(lastR.i)}" cy="${y(lastR.cash)}" r="4" fill="var(--chart-profit)"/>`);
+    svg.innerHTML = parts.join("");
+  }
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1000;
+    const p = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+  }
+  function short(v) {
+    const a = Math.abs(v), sign = v < 0 ? "−" : "";
+    if (a >= 1e6) return `${sign}RM ${(a / 1e6).toFixed(a % 1e6 ? 1 : 0)}m`;
+    if (a >= 1e3) return `${sign}RM ${(a / 1e3).toFixed(0)}k`;
+    return `${sign}RM ${a.toFixed(0)}`;
+  }
+
+  for (const k of fields) {
+    const el = $(k);
+    el.addEventListener(el.tagName === "SELECT" ? "change" : "input", update);
+  }
+  $("addFixed").addEventListener("click", () => { fixed.push(["New cost", 0]); drawFixed(); update(); });
+  $("reset").addEventListener("click", () => { apply(EXAMPLE); update(); });
+
+  const saved = load();
+  apply(saved && saved.fixed ? { ...EXAMPLE, ...saved } : EXAMPLE);
+  update();
+})();
+</script>

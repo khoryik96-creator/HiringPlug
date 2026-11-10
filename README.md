@@ -37,6 +37,17 @@ machine first and is built to move to the cloud later.
 
 Your full feature list and how each item is designed: [docs/features.md](docs/features.md).
 
+## Selling HiringPlug as a SaaS
+
+- **[Profit Planner](https://claude.ai/artifact/SXZUgNHU16BkqiUHX6uU2G)**: an
+  interactive calculator for pricing, users, costs, SST and income tax, with
+  margins, break-even and a month-by-month forecast (in RM). Its source is
+  [docs/pricing-calculator.html](docs/pricing-calculator.html). The link is
+  private to its owner until shared from the page's Share menu.
+- **[Scaling plan](docs/saas-plan-scaling-to-20k-users.md)**: what to change
+  before selling, the set-up and monthly cost at each size up to 20,000 users
+  online, AI costs, and why the Python worker stays.
+
 ## How it is built (one minute version)
 
 | Part | Language | Does |
