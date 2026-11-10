@@ -13,9 +13,10 @@ download() {
 
 if ! download; then
   echo '::warning::Document-tool download failed or exceeded its time limit; retrying with the Ubuntu archive mirror.'
-  for sources in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+  for sources in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
+    /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
     if [[ -f "$sources" ]]; then
-      sed -i 's|://azure.archive.ubuntu.com/ubuntu|://archive.ubuntu.com/ubuntu|g' "$sources"
+      sed -i 's|://azure[.]archive[.]ubuntu[.]com/ubuntu|://archive.ubuntu.com/ubuntu|g' "$sources"
     fi
   done
   download

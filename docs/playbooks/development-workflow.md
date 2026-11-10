@@ -52,7 +52,8 @@ do not repeatedly retry the same blocked download.
 The OCR/document installer in `.github/scripts/install-document-tools.sh`
 limits index updates to 30 seconds and package downloads to 90 seconds per
 attempt, then retries once using Ubuntu's archive mirror instead of the Azure
-mirror. It downloads before configuring packages, fails if downloads still
+mirror. It updates both direct source URLs and the runner's `apt-mirrors.txt`
+used by `mirror+file:` sources. It downloads before configuring packages, fails if downloads still
 fail, and never skips the document tests. Both callers have a six-minute step
 limit. Inspect the error before rerunning only the failed infrastructure job;
 preserve successful jobs. Do not restart a run that is progressing normally.
