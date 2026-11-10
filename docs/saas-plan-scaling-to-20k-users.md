@@ -14,6 +14,11 @@ estimates from those measurements and typical cloud prices (November 2026).
 Prices change: check them before buying, and **run a load test on the real
 servers before launch**.
 
+**Currency.** All costs are in Malaysian ringgit, converted from the US
+dollar prices cloud and AI providers charge at **RM 4.10 to US$1** (the rate
+was about RM 4.06 at the end of October 2026; rounded up a little to leave
+room). Providers bill in US dollars, so the ringgit cost moves with the rate.
+
 Contents:
 
 1. [Where HiringPlug stands today](#1-where-hiringplug-stands-today)
@@ -133,9 +138,9 @@ API, Go worker, Python worker, web. Backups copied off the machine every night.
 
 | | Budget | AWS-style |
 |---|---|---|
-| One server, 8 cores, 16–32 GB | $40–80 | $150–250 |
-| Off-site backups, email sending service | $10–30 | $20–50 |
-| **Total** | **$50–110** | **$170–300** |
+| One server, 8 cores, 16–32 GB | RM 160–330 | RM 620–1,000 |
+| Off-site backups, email sending service | RM 40–120 | RM 80–200 |
+| **Total** | **RM 200–450** | **RM 700–1,200** |
 
 ### Stage 1: launch (up to ~200 agencies, ~1,000 users online)
 
@@ -153,40 +158,40 @@ Needs the "more than one server" changes above.
 
 | | Budget | AWS-style |
 |---|---|---|
-| 2 API servers | $30–60 | $200–300 |
-| Database (8 cores, 32 GB, backups) | $150–300 | $700–1,000 |
-| 2 Python worker servers | $60–120 | $300–450 |
-| Files (1–3 TB), load balancer, email, monitoring | $60–150 | $200–400 |
-| **Total** | **$300–630** | **$1,400–2,150** |
+| 2 API servers | RM 120–250 | RM 820–1,200 |
+| Database (8 cores, 32 GB, backups) | RM 620–1,200 | RM 2,900–4,100 |
+| 2 Python worker servers | RM 250–490 | RM 1,200–1,800 |
+| Files (1–3 TB), load balancer, email, monitoring | RM 250–620 | RM 820–1,600 |
+| **Total** | **RM 1,240–2,560** | **RM 5,740–8,700** |
 
 ### Stage 2: 1,000 agencies, 5,000 users online
 
 | | Budget | AWS-style |
 |---|---|---|
-| 3 API servers (4 cores) | $45–90 | $300–450 |
-| 2 Go worker servers | $30–60 | $200–300 |
-| Python workers, 4–6 servers (8 cores), more in busy hours | $150–300 | $700–1,200 |
-| Database primary (16 cores, 64 GB) + 1 read copy + PgBouncer | $500–900 | $2,500–3,500 |
-| Files (grows ~1 TB a month at heavy use; older CVs to cheaper storage) | $50–300 | $100–600 |
-| Load balancer, email, monitoring, logs | $100–250 | $300–700 |
-| **Total** | **$875–1,900** | **$4,100–6,750** |
+| 3 API servers (4 cores) | RM 180–370 | RM 1,200–1,800 |
+| 2 Go worker servers | RM 120–250 | RM 820–1,200 |
+| Python workers, 4–6 servers (8 cores), more in busy hours | RM 620–1,200 | RM 2,900–4,900 |
+| Database primary (16 cores, 64 GB) + 1 read copy + PgBouncer | RM 2,000–3,700 | RM 10,200–14,300 |
+| Files (grows ~1 TB a month at heavy use; older CVs to cheaper storage) | RM 200–1,200 | RM 410–2,500 |
+| Load balancer, email, monitoring, logs | RM 410–1,000 | RM 1,200–2,900 |
+| **Total** | **RM 3,530–7,720** | **RM 16,730–27,600** |
 
-About **$0.20–1.40 per user per month** without AI.
+About **RM 0.70–5.50 per user per month** without AI.
 
 ### Stage 3: 20,000 users online
 
 | | Budget | AWS-style |
 |---|---|---|
-| 8–10 API servers | $150–300 | $900–1,500 |
-| Go workers, 4 servers | $60–120 | $400–600 |
-| Python workers, 15–20 servers at busy hours (scaled down at night) | $500–1,000 | $2,500–4,000 |
-| Database primary (32 cores, 128 GB) + 2 read copies + PgBouncer | $1,500–2,500 | $8,000–12,000 |
-| CV search engine, 3 servers | $200–400 | $1,200–2,000 |
-| Files (10+ TB, older ones on cheaper storage) | $200–800 | $500–1,500 |
-| Load balancer, CDN, email, monitoring, logs | $300–600 | $1,000–2,000 |
-| **Total** | **$2,900–5,700** | **$14,500–23,600** |
+| 8–10 API servers | RM 620–1,200 | RM 3,700–6,100 |
+| Go workers, 4 servers | RM 250–490 | RM 1,600–2,500 |
+| Python workers, 15–20 servers at busy hours (scaled down at night) | RM 2,000–4,100 | RM 10,200–16,400 |
+| Database primary (32 cores, 128 GB) + 2 read copies + PgBouncer | RM 6,100–10,200 | RM 32,800–49,200 |
+| CV search engine, 3 servers | RM 820–1,600 | RM 4,900–8,200 |
+| Files (10+ TB, older ones on cheaper storage) | RM 820–3,300 | RM 2,000–6,100 |
+| Load balancer, CDN, email, monitoring, logs | RM 1,200–2,500 | RM 4,100–8,200 |
+| **Total** | **RM 11,810–23,390** | **RM 59,300–96,700** |
 
-About **$0.15–1.20 per user per month** without AI. At this size, hire (or
+About **RM 0.60–4.80 per user per month** without AI. At this size, hire (or
 contract) someone to look after the servers and the database.
 
 ### How the sizes were worked out
@@ -228,9 +233,9 @@ million calls a month**, each ~3,000 tokens in and ~700 out:
 
 | Model (price per million tokens in / out, check current prices) | Per month | Per user |
 |---|---|---|
-| DeepSeek (~$0.30 / ~$0.45) | ~$2,700 | ~$0.55 |
-| Claude Haiku (~$1 / ~$5) | ~$14,300 | ~$2.90 |
-| Claude Sonnet (~$3 / ~$15) | ~$43,000 | ~$8.60 |
+| DeepSeek (~RM 1.23 / ~RM 1.84) | ~RM 11,000 | ~RM 2.19 |
+| Claude Haiku (~RM 4.10 / ~RM 20.50) | ~RM 58,600 | ~RM 11.73 |
+| Claude Sonnet (~RM 12.30 / ~RM 61.50) | ~RM 175,900 | ~RM 35.18 |
 
 What to do about it:
 
@@ -260,7 +265,7 @@ and Python for reading CVs, CV Studio's formatting and talking to the AI.
   API and the database. Python only does background work.
 - The heavy parts (LibreOffice, Tesseract, the PDF library) are separate C
   programs; **Go would need the same ones**. Python itself costs about 40–90
-  MB more per worker than Go: a few GB at 20,000 users, about **$50–150 a
+  MB more per worker than Go: a few GB at 20,000 users, about **RM 200–620 a
   month**.
 - **Reading CVs stays in Python**: its PDF and Word libraries were tuned on
   real CVs in CV Studio; Go's PDF libraries are weaker, so names, phones and
@@ -313,7 +318,7 @@ uploads and AI calls.
   default) limits how many CVs are read or formatted at once, and so the
   memory peaks; jobs then queue a few seconds longer.
 - **Price per user** with the cost per user in mind: servers cost roughly
-  $0.20–1.40 per user a month; AI, if included, much more.
+  RM 0.60–5.50 per user a month; AI, if included, much more.
 
 ## 9. Order of work
 
