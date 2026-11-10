@@ -598,10 +598,24 @@ lead's company (with the built-in email check).
   (the database enforces it), unless Settings → Salary in emails says
   everyone who may read emails sees it. **Attachments**: the candidate's CVs
   from the ATS (a formatted CV as PDF once made) and files from your computer,
-  up to 10 files and 10 MB in all. **Banners** are images uploaded once (PNG,
+  up to 10 files and 20 MB in all. **Banners** are images uploaded once (PNG,
   JPEG or GIF, up to 1 MB) and shown inside the email, not linked. Only the
   toolbar's formatting is kept (no scripts, no images loading from elsewhere),
   and every email also carries a plain-text version.
+- **Email the client about several candidates** ✅: tick candidates on the
+  job's board (up to 10) and **Email client about N candidates**. Each
+  candidate has a row: the profile to attach (their newest formatted CV, as
+  PDF once made, by default; any of their CVs, or no attachment), up and down
+  for their order, and Remove; more can be added from the job. **Insert
+  candidates into the message** writes them as **a block each** ("1. Name,
+  title" and a line of details) or **one table** (a row each), with the
+  details ticked (current and expected salary, notice period and location to
+  start with; also current company, nationality, expat status; the choice is
+  remembered). Each candidate's own values go in, editable; what is not on
+  record shows as "—" and is listed. Fields left in the message are the
+  job's, its client's and the sender's, never one candidate's. The email is
+  kept on each candidate's emails, and the job's activity says "emailed the
+  client about N candidates".
 - **Email** ✅: write email from a candidate's page (or "Email candidate" on
   an interview). Pick a template, optionally for one of their jobs: it is
   filled from the candidate, the job and its company, the interview (time in

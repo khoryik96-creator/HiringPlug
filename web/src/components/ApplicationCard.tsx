@@ -62,8 +62,11 @@ export function timeInStage(app: Application, now = Date.now()): string {
 }
 
 /** A candidate's card on a job's board: drag it to another column, or use the menu. Its fit badge opens the reasons. */
-export function ApplicationCard({ app, match, onShowFit, onEmailClient, canMove, onMove, busy, onDragStart }: {
+export function ApplicationCard({ app, match, onShowFit, onEmailClient, picked, onPick, canMove, onMove, busy, onDragStart }: {
   app: Application;
+  /** Chosen for an email to the client about several candidates. */
+  picked?: boolean;
+  onPick?: (app: Application, on: boolean) => void;
   match?: Match;
   onShowFit?: (app: Application) => void;
   /** Opens an email to the client about this candidate. */
@@ -75,11 +78,17 @@ export function ApplicationCard({ app, match, onShowFit, onEmailClient, canMove,
 }) {
   return (
     <div
-      className="card"
+      className={picked ? "card picked" : "card"}
       draggable={canMove}
       onDragStart={(e) => { e.dataTransfer.setData("text/plain", app.id); onDragStart(app); }}
     >
-      <a href={`#/candidates/${app.candidateId}`}>{app.candidateName}</a>
+      <span className="card-name">
+        {onPick && (
+          <input type="checkbox" aria-label={`Choose ${app.candidateName} for an email to the client`} checked={picked ?? false}
+            onChange={(e) => { onPick(app, e.target.checked); }} />
+        )}
+        <a href={`#/candidates/${app.candidateId}`}>{app.candidateName}</a>
+      </span>
       {app.candidateTitle && <div className="muted">{app.candidateTitle}</div>}
       <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}</div>
       {app.channel && <div className="muted">Applied via {CHANNEL[app.channel]}</div>}

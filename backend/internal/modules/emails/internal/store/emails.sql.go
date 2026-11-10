@@ -75,6 +75,22 @@ func (q *Queries) DeleteTemplate(ctx context.Context, id string) (int64, error) 
 	return result.RowsAffected(), nil
 }
 
+const dropShortlistDuplicates = `-- name: DropShortlistDuplicates :exec
+DELETE FROM email_candidate d WHERE d.candidate_id = $1
+  AND EXISTS (SELECT 1 FROM email_candidate k WHERE k.email_id = d.email_id AND k.candidate_id = $2)
+`
+
+type DropShortlistDuplicatesParams struct {
+	FromID string
+	ToID   string
+}
+
+// A shortlist that named both keeps the one kept, once.
+func (q *Queries) DropShortlistDuplicates(ctx context.Context, arg DropShortlistDuplicatesParams) error {
+	_, err := q.db.Exec(ctx, dropShortlistDuplicates, arg.FromID, arg.ToID)
+	return err
+}
+
 const emailAttachments = `-- name: EmailAttachments :many
 SELECT id, tenant_id, email_id, file_name, content_type, size_bytes, storage_key, created_by, created_at FROM email_attachment WHERE email_id = ANY($1::text[]) ORDER BY created_at, id
 `
@@ -343,6 +359,28 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 	return i, err
 }
 
+const insertEmailCandidate = `-- name: InsertEmailCandidate :exec
+INSERT INTO email_candidate (tenant_id, email_id, candidate_id, application_id, position)
+VALUES (app_current_tenant(), $1, $2, $3, $4)
+`
+
+type InsertEmailCandidateParams struct {
+	EmailID       string
+	CandidateID   string
+	ApplicationID *string
+	Position      int16
+}
+
+func (q *Queries) InsertEmailCandidate(ctx context.Context, arg InsertEmailCandidateParams) error {
+	_, err := q.db.Exec(ctx, insertEmailCandidate,
+		arg.EmailID,
+		arg.CandidateID,
+		arg.ApplicationID,
+		arg.Position,
+	)
+	return err
+}
+
 const insertTemplate = `-- name: InsertTemplate :one
 INSERT INTO email_template (tenant_id, name, subject, body, body_html, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
@@ -414,9 +452,13 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id FROM email e
+WHERE e.candidate_id = $1
+   OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = $1::text)
+ORDER BY e.id DESC LIMIT 200
 `
 
+// Their own emails and the shortlists they were in.
 func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) ([]Email, error) {
 	rows, err := q.db.Query(ctx, listCandidateEmails, candidateID)
 	if err != nil {
@@ -577,6 +619,20 @@ func (q *Queries) MoveEmailsToCandidate(ctx context.Context, arg MoveEmailsToCan
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const moveShortlistsToCandidate = `-- name: MoveShortlistsToCandidate :exec
+UPDATE email_candidate SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveShortlistsToCandidateParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveShortlistsToCandidate(ctx context.Context, arg MoveShortlistsToCandidateParams) error {
+	_, err := q.db.Exec(ctx, moveShortlistsToCandidate, arg.ToID, arg.FromID)
+	return err
 }
 
 const seedTemplate = `-- name: SeedTemplate :exec

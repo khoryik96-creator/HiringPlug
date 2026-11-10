@@ -1039,7 +1039,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a file from the computer, to attach to the next email you send
-         * @description Up to 10 MB a file; an email takes up to 10 files and 10 MB in all.
+         * @description Up to 10 MB a file; an email takes up to 10 files and 20 MB in all.
          */
         post: operations["addEmailAttachment"];
         delete?: never;
@@ -4254,8 +4254,15 @@ export interface components {
             applicationId?: components["schemas"]["ApplicationId"];
             interviewId?: components["schemas"]["InterviewId"];
             contactId?: components["schemas"]["ContactId"];
+            /** @description As for sending to the client about several candidates; fieldValues are then the job's, its client's and the sender's. */
+            candidates?: components["schemas"]["EmailCandidate"][];
             /** @example Asia/Kuala_Lumpur */
             timeZone: string;
+        };
+        EmailCandidate: {
+            candidateId: components["schemas"]["CandidateId"];
+            /** @description Their application to the job the email is about. */
+            applicationId?: components["schemas"]["ApplicationId"];
         };
         EmailPreview: {
             /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
@@ -4376,9 +4383,11 @@ export interface components {
             applicationId?: components["schemas"]["ApplicationId"];
             /** @description To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company. */
             contactId?: components["schemas"]["ContactId"];
+            /** @description An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails. */
+            candidates?: components["schemas"]["EmailCandidate"][];
             /** @description Files you uploaded to /v1/email-attachments. */
             attachmentIds?: components["schemas"]["EmailAttachmentId"][];
-            /** @description The candidate's CVs from the ATS (needs documents:read). */
+            /** @description The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs. */
             cvs?: components["schemas"]["EmailCvAttachment"][];
         };
         EmailSendJob: {

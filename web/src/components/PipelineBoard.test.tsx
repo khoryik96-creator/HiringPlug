@@ -80,4 +80,23 @@ describe("pipeline board", () => {
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(screen.getByText("Siti Aisyah").closest(".card")?.getAttribute("draggable")).toBe("false");
   });
+
+  it("emails the client about the candidates ticked, in the board's order", async () => {
+    const aina: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w3", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w3", candidateName: "Aina Yusof", stage: "interview" };
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [aina, siti, wei] }));
+    vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} }));
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Choose Aina Yusof for an email to the client" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Choose Siti Aisyah for an email to the client" }));
+    expect(screen.getByText("2 chosen")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Email client about 2 candidates" }));
+    const email = await screen.findByRole("region", { name: "Email client" });
+    expect(within(email).getByRole("heading", { name: "Email client about 2 candidates" })).toBeTruthy();
+    expect(within(email).getAllByRole("listitem").map((li) => li.querySelector("strong")?.textContent)).toEqual(["Siti Aisyah", "Aina Yusof"]); // screening before interview
+  });
+
+  it("offers no ticks to those who may not send email", async () => {
+    await showBoard();
+    expect(screen.queryByRole("checkbox", { name: /for an email to the client/ })).toBeNull();
+  });
 });

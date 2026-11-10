@@ -54,6 +54,7 @@ type Details struct {
 // Application is what this module needs to know about an application.
 type Application struct {
 	CandidateID   string
+	JobID         string
 	JobTitle      string
 	CompanyName   string
 	ClientEmail   *string // the job's hiring contact
@@ -146,8 +147,14 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 // MoveCandidate moves a merged duplicate's emails to the candidate kept, in
 // the merge's transaction.
 func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
-	_, err := store.New(tx).MoveEmailsToCandidate(ctx, store.MoveEmailsToCandidateParams{FromID: &fromID, ToID: &toID})
-	return err
+	q := store.New(tx)
+	if _, err := q.MoveEmailsToCandidate(ctx, store.MoveEmailsToCandidateParams{FromID: &fromID, ToID: &toID}); err != nil {
+		return err
+	}
+	if err := q.DropShortlistDuplicates(ctx, store.DropShortlistDuplicatesParams{FromID: fromID, ToID: toID}); err != nil {
+		return err
+	}
+	return q.MoveShortlistsToCandidate(ctx, store.MoveShortlistsToCandidateParams{FromID: fromID, ToID: toID})
 }
 
 // Notice is an email the app sends by itself (an interview reminder): from

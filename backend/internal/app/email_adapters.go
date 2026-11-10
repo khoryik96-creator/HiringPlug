@@ -136,7 +136,7 @@ func (a emailApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) 
 	}
 	out := make(map[string]emails.Application, len(apps))
 	for id, b := range apps {
-		app := emails.Application{CandidateID: b.CandidateID, JobTitle: b.JobTitle, CompanyName: b.CompanyName}
+		app := emails.Application{CandidateID: b.CandidateID, JobID: b.JobID, JobTitle: b.JobTitle, CompanyName: b.CompanyName}
 		if j := jobBriefs[b.JobID]; j.ContactID != nil {
 			if c, ok := contactBriefs[*j.ContactID]; ok {
 				app.ClientEmail, app.ClientContact = c.Email, c.Name

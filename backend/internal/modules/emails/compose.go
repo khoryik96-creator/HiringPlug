@@ -27,7 +27,7 @@ import (
 const (
 	maxFiles     = 10
 	maxFileBytes = 10 << 20
-	maxAllBytes  = 10 << 20
+	maxAllBytes  = 20 << 20
 )
 
 const defaultZone = "Asia/Kuala_Lumpur"
@@ -46,6 +46,7 @@ type SendRequest struct {
 	TimeZone                   string
 	AttachmentIDs              []string
 	CVs                        []CVRef
+	Candidates                 []Shortlisted // to the client about several candidates, instead of CandidateID
 }
 
 // Preview is a message with its fields filled, as it will be sent.
@@ -72,16 +73,32 @@ func fieldValues(values map[string]string) map[string]string {
 
 // Preview fills a message's fields for a candidate (and an application or
 // interview) without sending anything.
-func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, zone string) (Preview, error) {
+func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, list []Shortlisted, zone string) (Preview, error) {
 	loc, err := location(zone)
 	if err != nil {
 		return Preview{}, err
 	}
 	var out Preview
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		values, err := s.values(ctx, tx, p, candidateID, appID, interviewID, contactID, loc)
-		if err != nil {
-			return err
+		var values map[string]string
+		if len(list) > 0 {
+			if candidateID != nil || appID != nil || interviewID != nil || contactID != nil {
+				return notBoth()
+			}
+			first, err := s.checkShortlist(ctx, tx, list)
+			if err != nil {
+				return err
+			}
+			candidateID, appID = &first.CandidateID, first.ApplicationID
+			values, err = s.shortlistValues(ctx, tx, p, first, loc)
+			if err != nil {
+				return err
+			}
+		} else {
+			var err error
+			if values, err = s.values(ctx, tx, p, candidateID, appID, interviewID, contactID, loc); err != nil {
+				return err
+			}
 		}
 		sub := FillFields(strings.Join(strings.Fields(subject), " "), values, false)
 		clean := SanitizeHTML(bodyHTML)
@@ -165,25 +182,42 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 	var out EmailView
 	var stored []string // files written for this email, removed if it is not saved
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		candidateID := r.CandidateID
-		if r.ApplicationID != nil {
-			app, err := s.application(ctx, tx, *r.ApplicationID, candidateID)
+		candidateID, appID := r.CandidateID, r.ApplicationID
+		var first Shortlisted // the first of several candidates
+		if len(r.Candidates) > 0 {
+			if candidateID != nil || appID != nil || r.ContactID != nil {
+				return notBoth()
+			}
+			var err error
+			if first, err = s.checkShortlist(ctx, tx, r.Candidates); err != nil {
+				return err
+			}
+			candidateID, appID = &first.CandidateID, first.ApplicationID
+		}
+		if appID != nil && len(r.Candidates) == 0 {
+			app, err := s.application(ctx, tx, *appID, candidateID)
 			if err != nil {
 				return err
 			}
 			candidateID = &app.CandidateID
 		}
-		if candidateID != nil {
+		if candidateID != nil && len(r.Candidates) == 0 {
 			if err := s.contactable(ctx, tx, *candidateID); err != nil {
 				return err
 			}
 		}
-		if r.ContactID != nil && (candidateID != nil || r.ApplicationID != nil) {
+		if r.ContactID != nil && (candidateID != nil || appID != nil) {
 			var errs apperr.FieldErrors
 			errs.Add("contactId", "an email is to a contact or about a candidate, not both")
 			return errs.Err()
 		}
-		values, err := s.values(ctx, tx, p, candidateID, r.ApplicationID, nil, r.ContactID, loc)
+		var values map[string]string
+		var err error
+		if len(r.Candidates) > 0 {
+			values, err = s.shortlistValues(ctx, tx, p, first, loc)
+		} else {
+			values, err = s.values(ctx, tx, p, candidateID, appID, nil, r.ContactID, loc)
+		}
 		if err != nil {
 			return err
 		}
@@ -214,7 +248,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			if err != nil {
 				return err
 			}
-			if candidateID == nil || cv.CandidateID != *candidateID {
+			if !cvAllowed(cv.CandidateID, candidateID, r.Candidates) {
 				var errs apperr.FieldErrors
 				errs.Add("cvs", "is not this candidate's CV")
 				return errs.Err()
@@ -222,8 +256,8 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			total += len(cv.Data)
 			cvs = append(cvs, cv)
 		}
-		if total > maxAllBytes {
-			return apperr.New(api.ErrorCodePAYLOADTOOLARGE, "The attachments come to more than 10 MB; leave some out.")
+		if err := attachmentsFit(total); err != nil {
+			return err
 		}
 		restricted := false
 		if filled.salary {
@@ -234,7 +268,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			restricted = visibility != "everyone"
 		}
 		row, err := q.InsertEmail(ctx, store.InsertEmailParams{
-			CandidateID: candidateID, ApplicationID: r.ApplicationID, ContactID: r.ContactID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
+			CandidateID: candidateID, ApplicationID: appID, ContactID: r.ContactID, ToAddresses: filled.To, CcAddresses: filled.Cc, BccAddresses: filled.Bcc,
 			Subject: filled.Subject, Body: filled.Body, BodyHtml: orNil(filled.BodyHTML), Salary: filled.salary, SalaryRestricted: restricted,
 			SenderName: p.Name, ReplyTo: p.Email,
 		})
@@ -259,10 +293,13 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 			}
 			stored = append(stored, key)
 			if _, err := q.InsertAttachment(ctx, store.InsertAttachmentParams{
-				EmailID: &row.ID, FileName: clip(cv.FileName, 255), ContentType: cv.ContentType, SizeBytes: int32(len(cv.Data)), StorageKey: key, //nolint:gosec // at most 10 MB
+				EmailID: &row.ID, FileName: clip(cv.FileName, 255), ContentType: cv.ContentType, SizeBytes: int32(len(cv.Data)), StorageKey: key, //nolint:gosec // at most 20 MB
 			}); err != nil {
 				return err
 			}
+		}
+		if err := s.keepShortlist(ctx, tx, row.ID, r.Candidates, filled.To); err != nil {
+			return err
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
 			return err
@@ -275,7 +312,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		// The text stays in the email record; never the salary in the audit log.
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "email.queued", EntityType: "email", EntityID: row.ID,
-			Changes: map[string]any{"candidateId": candidateID, "to": filled.To, "cc": filled.Cc, "bcc": len(filled.Bcc),
+			Changes: map[string]any{"candidateId": candidateID, "candidates": len(r.Candidates), "to": filled.To, "cc": filled.Cc, "bcc": len(filled.Bcc),
 				"subject": "(see the email)", "attachments": len(files), "salary": filled.salary},
 		})
 	})
@@ -362,6 +399,14 @@ func (s *Service) checkBanners(ctx context.Context, q *store.Queries, html strin
 		var errs apperr.FieldErrors
 		errs.Add("bodyHtml", "a banner in it was deleted: insert another one")
 		return errs.Err()
+	}
+	return nil
+}
+
+// attachmentsFit refuses attachments of more than 20 MB in all.
+func attachmentsFit(total int) error {
+	if total > maxAllBytes {
+		return apperr.New(api.ErrorCodePAYLOADTOOLARGE, "The attachments come to more than 20 MB; leave some out.")
 	}
 	return nil
 }

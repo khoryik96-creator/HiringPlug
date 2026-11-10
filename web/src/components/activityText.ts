@@ -48,6 +48,10 @@ export function describe(entry: ActivityEntry): string | null {
       const fields = Object.keys(entry.changes).map(fieldName);
       return fields.length > 0 ? `filled in from their CV: ${fields.join(", ")}` : "read their CV";
     }
+    case "email.shortlist_sent": {
+      const n = typeof entry.changes.candidates === "number" ? entry.changes.candidates : 0;
+      return `emailed the client about ${String(n)} candidate${n === 1 ? "" : "s"}`;
+    }
     case "job.jd_uploaded":
       return `uploaded the job description ${show(entry.changes.fileName)}`;
     case "job.jd_deleted":

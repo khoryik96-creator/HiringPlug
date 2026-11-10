@@ -467,6 +467,14 @@ type EmailBanner struct {
 	DeletedAt   *time.Time
 }
 
+type EmailCandidate struct {
+	TenantID      string
+	EmailID       string
+	CandidateID   string
+	ApplicationID *string
+	Position      int16
+}
+
 type EmailTemplate struct {
 	ID        string
 	TenantID  string

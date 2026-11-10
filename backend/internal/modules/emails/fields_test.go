@@ -67,3 +67,16 @@ func TestIndentedTextIsKept(t *testing.T) {
 	assert.Contains(t, out, "Indented")
 	assert.Contains(t, out, `style="margin-left: 40px"`)
 }
+
+func TestATableOfCandidatesKeepsItsLines(t *testing.T) {
+	in := `<table style="border-collapse:collapse"><tr><th style="border:1px solid #c8c8d0;padding:6px 8px;text-align:left;vertical-align:top;background:#f0edf9">Candidate</th>` +
+		`<td style="border:1px solid #c8c8d0;padding:6px 8px;position:fixed"><span data-field="candidate.expectedSalary">RM 9,000</span></td></tr></table>`
+	out := SanitizeHTML(in)
+	assert.Contains(t, out, `border-collapse: collapse`)
+	assert.Contains(t, out, `border: 1px solid #c8c8d0`)
+	assert.Contains(t, out, `padding: 6px 8px`)
+	assert.Contains(t, out, `vertical-align: top`)
+	assert.NotContains(t, out, "position", "only the table's own styles")
+	assert.True(t, ShowsSalaryField(out))
+	assert.Equal(t, "Candidate  RM 9,000", TextFromHTML(out))
+}

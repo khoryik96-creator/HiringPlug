@@ -1734,7 +1734,7 @@ paths:
       operationId: addEmailAttachment
       tags: [emails]
       summary: Upload a file from the computer, to attach to the next email you send
-      description: Up to 10 MB a file; an email takes up to 10 files and 10 MB in all.
+      description: Up to 10 MB a file; an email takes up to 10 files and 20 MB in all.
       x-permission: emails:send
       requestBody:
         required: true
@@ -6407,7 +6407,22 @@ components:
         applicationId: {$ref: '#/components/schemas/ApplicationId'}
         interviewId: {$ref: '#/components/schemas/InterviewId'}
         contactId: {$ref: '#/components/schemas/ContactId'}
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 10
+          description: As for sending to the client about several candidates; fieldValues are then the job's, its client's and the sender's.
+          items: {$ref: '#/components/schemas/EmailCandidate'}
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
+    EmailCandidate:
+      type: object
+      additionalProperties: false
+      required: [candidateId]
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        applicationId:
+          description: Their application to the job the email is about.
+          allOf: [{$ref: '#/components/schemas/ApplicationId'}]
     EmailPreview:
       type: object
       required: [subject, bodyHtml, missing, salary, clientEmail, fieldValues]
@@ -6582,6 +6597,14 @@ components:
         contactId:
           description: "To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company."
           allOf: [{$ref: '#/components/schemas/ContactId'}]
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 10
+          description: >
+            An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.
+
+          items: {$ref: '#/components/schemas/EmailCandidate'}
         attachmentIds:
           type: array
           maxItems: 10
@@ -6590,7 +6613,7 @@ components:
         cvs:
           type: array
           maxItems: 10
-          description: The candidate's CVs from the ATS (needs documents:read).
+          description: The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs.
           items: {$ref: '#/components/schemas/EmailCvAttachment'}
     EmailSendJob:
       type: object

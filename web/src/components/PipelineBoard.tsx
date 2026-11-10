@@ -6,6 +6,7 @@ import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys"
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
 import { ApplicationCard, MoveMenu } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
+import type { Shortlisted } from "./clientEmail/Shortlist";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
@@ -37,6 +38,16 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const [bestFirst, setBestFirst] = useState(false);
   const [fitShown, setFitShown] = useState<Application | null>(null);
   const [emailing, setEmailing] = useState<Application | null>(null);
+  // Candidates chosen for one email to the client, in the board's order.
+  const [picked, setPicked] = useState<string[]>([]);
+  const [shortlist, setShortlist] = useState<Shortlisted[] | null>(null);
+  const canEmail = permissions.includes("emails:send");
+  const pick = (a: Application, on: boolean) => { setPicked((cur) => (on ? [...cur, a.id] : cur.filter((id) => id !== a.id))); };
+  const startShortlist = () => {
+    const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)));
+    setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
+    setEmailing(null);
+  };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
   const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
 
@@ -53,6 +64,20 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         <label className="small">
           <input type="checkbox" checked={bestFirst} onChange={(e) => { setBestFirst(e.target.checked); }} /> Best fit first
         </label>
+      )}
+      {canEmail && picked.length > 0 && !shortlist && (
+        <div className="pick-bar" role="status">
+          <span>{picked.length} chosen</span>
+          <button type="button" className="primary" disabled={picked.length > 10} onClick={startShortlist}>
+            Email client about {picked.length} candidate{picked.length === 1 ? "" : "s"}
+          </button>
+          <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
+          {picked.length > 10 && <span className="warning small">At most 10 in one email.</span>}
+        </div>
+      )}
+      {shortlist && (
+        <ClientEmail key={shortlist.map((p) => p.candidateId).join()} shortlist={shortlist} jobId={jobId} permissions={permissions}
+          onClose={() => { setShortlist(null); setPicked([]); }} />
       )}
       {emailing && (
         <ClientEmail key={emailing.id} candidateId={emailing.candidateId} applicationId={emailing.id} permissions={permissions}
@@ -97,7 +122,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
                   <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}
-                    onEmailClient={permissions.includes("emails:send") ? setEmailing : undefined} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
+                    onEmailClient={canEmail ? (x) => { setShortlist(null); setEmailing(x); } : undefined}
+                    picked={picked.includes(a.id)} onPick={canEmail ? pick : undefined} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
                 </div>
               ))}
             </div>

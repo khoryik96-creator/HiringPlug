@@ -15,13 +15,20 @@ import { Attachments, type CvChoice } from "./Attachments";
 import { RichEditor } from "./RichEditor";
 import { atCursor, fillTokens, plainToHtml, showBanners, valuesToTokens, withoutCaretMarks } from "./richText";
 import { SaveAsTemplate } from "./SaveAsTemplate";
+import { type Shortlisted, ShortlistPanel, useShortlist } from "./Shortlist";
 import { useBanners } from "./useBanners";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-type Props = { candidateId: string; applicationId?: string; permissions: Permission[]; onClose: () => void };
+type Props = {
+  /** About one candidate (and their application)… */
+  candidateId?: string; applicationId?: string;
+  /** …or about several: their details go in the message, each one's profile is attached. */
+  shortlist?: Shortlisted[]; jobId?: string;
+  permissions: Permission[]; onClose: () => void;
+};
 
-export function ClientEmail({ candidateId, applicationId, permissions, onClose }: Props) {
+export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId, permissions, onClose }: Props) {
   const queryClient = useQueryClient();
   const canManage = permissions.includes("emails.templates:manage");
   const canCreate = permissions.includes("emails.templates:create");
@@ -39,12 +46,21 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   const [preview, setPreview] = useState<Schemas["EmailPreview"] | null>(null);
   const [sent, setSent] = useState(false);
   const previewBox = useRef<HTMLDivElement>(null);
+  const multi = shortlist !== undefined;
+  const [people, setPeople] = useState<Shortlisted[]>(shortlist ?? []);
+  const canSeeCvs = permissions.includes("documents:read");
+  const list = useShortlist(people, canSeeCvs);
+  const [inserting, setInserting] = useState<{ id: number; html: string }>();
+  // Who the email is about: several candidates, or one.
+  const about = multi
+    ? { candidates: people.map((p) => ({ candidateId: p.candidateId, applicationId: p.applicationId })) }
+    : { candidateId, applicationId };
 
   // The job's hiring contact, to send to, and the candidate's value for each field.
   const context = useQuery({
-    queryKey: ["email-context", applicationId ?? candidateId],
+    queryKey: multi ? ["email-context", "shortlist", ...people.map((p) => p.applicationId ?? p.candidateId)] : ["email-context", applicationId ?? candidateId],
     queryFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject: "", bodyHtml: "", candidateId, applicationId, timeZone: timeZone() },
+      body: { subject: "", bodyHtml: "", ...about, timeZone: timeZone() },
     })),
   });
   const to = typedTo ?? context.data?.clientEmail ?? "";
@@ -80,7 +96,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   });
   const show = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/email-previews", {
-      body: { subject, bodyHtml: withoutCaretMarks(html), candidateId, applicationId, timeZone: timeZone() },
+      body: { subject, bodyHtml: withoutCaretMarks(html), ...about, timeZone: timeZone() },
     })),
     onSuccess: setPreview,
   });
@@ -88,10 +104,13 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
     mutationFn: async () => unwrap(await api.POST("/v1/emails", {
       body: {
         to: addresses(to), cc: addresses(form.cc), bcc: addresses(form.bcc), subject, bodyHtml: withoutCaretMarks(html),
-        candidateId, applicationId, timeZone: timeZone(), attachmentIds: uploads.map((u) => u.id), cvs,
+        ...about, timeZone: timeZone(), attachmentIds: uploads.map((u) => u.id), cvs: multi ? list.cvs : cvs,
       },
     })),
-    onSuccess: async () => { setSent(true); await queryClient.invalidateQueries({ queryKey: candidateEmailsKey(candidateId) }); },
+    onSuccess: async () => {
+      setSent(true);
+      for (const id of multi ? people.map((p) => p.candidateId) : [candidateId]) await queryClient.invalidateQueries({ queryKey: candidateEmailsKey(id) });
+    },
   });
   const errors = fieldErrors(send.error);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => { setForm((f) => ({ ...f, [k]: e.target.value })); };
@@ -99,14 +118,17 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
   if (sent) {
     return (
       <section className="panel" aria-label="Email client">
-        <p role="status">Sent. It is on the candidate&apos;s emails, and goes out in a moment.</p>
+        <p role="status">Sent. It is on {multi ? "each candidate's" : "the candidate's"} emails, and goes out in a moment.</p>
         <button type="button" onClick={onClose}>Close</button>
       </section>
     );
   }
   return (
     <section className="panel client-email" aria-label="Email client">
-      <div className="row spread"><h3>Email client</h3><button type="button" onClick={onClose}>Close</button></div>
+      <div className="row spread">
+        <h3>{multi ? `Email client about ${String(people.length)} candidate${people.length === 1 ? "" : "s"}` : "Email client"}</h3>
+        <button type="button" onClick={onClose}>Close</button>
+      </div>
       <p>From: {me.data ? `${me.data.user.name} (${me.data.tenant.name}) · replies go to ${me.data.user.email}` : "you"}</p>
 
       <div className="row">
@@ -140,9 +162,16 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
       <label className="field">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
 
+      {multi && (
+        <>
+          <ShortlistPanel jobId={jobId} people={people} onPeople={setPeople} list={list} canSeeCvs={canSeeCvs}
+            onInsert={(h) => { setInserting((cur) => ({ id: (cur?.id ?? 0) + 1, html: h })); }} />
+          <ErrorMessage error={list.error} />
+        </>
+      )}
       <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
-        values={values} onFocus={() => { inSubject.current = false; }}
+        values={values} inserting={inserting} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {
           if (!inSubject.current) return false;
           setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));
@@ -151,7 +180,7 @@ export function ClientEmail({ candidateId, applicationId, permissions, onClose }
       <ErrorMessage error={uploadBanner.error} />
       {!permissions.includes("candidates.compensation:read") && <p className="muted small">Salary fields need a role that may see salaries.</p>}
 
-      <Attachments candidateId={candidateId} canSeeCvs={permissions.includes("documents:read")} cvs={cvs} onCvs={setCvs} uploads={uploads} onUploads={setUploads} />
+      <Attachments candidateId={candidateId} canSeeCvs={!multi && canSeeCvs} others={multi ? list.cvs.length : 0} cvs={cvs} onCvs={setCvs} uploads={uploads} onUploads={setUploads} />
 
       <div className="row">
         <button type="button" disabled={show.isPending} onClick={() => { show.mutate(); }}>Preview</button>

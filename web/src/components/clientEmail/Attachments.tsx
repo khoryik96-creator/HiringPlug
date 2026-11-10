@@ -12,8 +12,10 @@ type Upload = Schemas["EmailAttachment"];
 const SOURCE: Record<string, string> = { original: "Original", jobstreet: "JobStreet", linkedin: "LinkedIn", formatted: "Formatted", other: "Other" };
 const mb = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 104858 ? 2 : 1)} MB`;
 
-export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUploads }: {
+export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUploads, others = 0 }: {
   candidateId: string;
+  /** Files chosen elsewhere (each candidate's profile, on an email about several). */
+  others?: number;
   canSeeCvs: boolean;
   cvs: CvChoice[];
   onCvs: (v: CvChoice[]) => void;
@@ -48,7 +50,7 @@ export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUpl
 
   return (
     <fieldset className="attachments">
-      <legend>Attachments · up to 10 files, 10 MB in all ({count} chosen)</legend>
+      <legend>Attachments · up to 10 files, 20 MB in all ({count + others} chosen)</legend>
       {canSeeCvs && (
         <div>
           <span className="muted small">From the ATS</span>

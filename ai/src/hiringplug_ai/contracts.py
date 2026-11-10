@@ -4420,17 +4420,14 @@ class DocumentList(BaseModel):
     items: list[Document]
 
 
-class EmailPreviewRequest(BaseModel):
+class EmailCandidate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    subject: Annotated[str, Field(max_length=200)]
-    bodyHtml: Annotated[str, Field(max_length=100000)]
-    candidateId: CandidateId | None = None
-    applicationId: ApplicationId | None = None
-    interviewId: InterviewId | None = None
-    contactId: ContactId | None = None
-    timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+    candidateId: CandidateId
+    applicationId: Annotated[
+        ApplicationId | None, Field(description="Their application to the job the email is about.")
+    ] = None
 
 
 class EmailDraftRequest(BaseModel):
@@ -4500,13 +4497,24 @@ class EmailSend(BaseModel):
             description="To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company."
         ),
     ] = None
+    candidates: Annotated[
+        list[EmailCandidate] | None,
+        Field(
+            description="An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.\n",
+            max_length=10,
+            min_length=1,
+        ),
+    ] = None
     attachmentIds: Annotated[
         list[EmailAttachmentId] | None,
         Field(description="Files you uploaded to /v1/email-attachments.", max_length=10),
     ] = None
     cvs: Annotated[
         list[EmailCvAttachment] | None,
-        Field(description="The candidate's CVs from the ATS (needs documents:read).", max_length=10),
+        Field(
+            description="The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs.",
+            max_length=10,
+        ),
     ] = None
 
 
@@ -5002,6 +5010,27 @@ class Contact(BaseModel):
 
 class DocumentMatchList(BaseModel):
     items: list[DocumentMatchResult]
+
+
+class EmailPreviewRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    subject: Annotated[str, Field(max_length=200)]
+    bodyHtml: Annotated[str, Field(max_length=100000)]
+    candidateId: CandidateId | None = None
+    applicationId: ApplicationId | None = None
+    interviewId: InterviewId | None = None
+    contactId: ContactId | None = None
+    candidates: Annotated[
+        list[EmailCandidate] | None,
+        Field(
+            description="As for sending to the client about several candidates; fieldValues are then the job's, its client's and the sender's.",
+            max_length=10,
+            min_length=1,
+        ),
+    ] = None
+    timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
 
 
 class JdFile(BaseModel):

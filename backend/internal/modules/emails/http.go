@@ -100,6 +100,7 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 			r.CVs = append(r.CVs, CVRef{DocumentID: cv.DocumentId, AsPDF: deref(cv.AsPdf)})
 		}
 	}
+	r.Candidates = shortlistFrom(b.Candidates)
 	row, err := h.svc.Send(ctx, authz.MustFromContext(ctx), r)
 	if err != nil {
 		return nil, err
@@ -110,7 +111,7 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 // PreviewEmail handles POST /v1/email-previews.
 func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObject) (api.PreviewEmailResponseObject, error) {
 	b := req.Body
-	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, b.TimeZone)
+	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, shortlistFrom(b.Candidates), b.TimeZone)
 	if err != nil {
 		return nil, err
 	}
@@ -269,6 +270,17 @@ func convert[To ~string, From ~string](in []From) []To {
 	out := make([]To, len(in))
 	for i, v := range in {
 		out[i] = To(v)
+	}
+	return out
+}
+
+func shortlistFrom(list *[]api.EmailCandidate) []Shortlisted {
+	if list == nil {
+		return nil
+	}
+	out := make([]Shortlisted, len(*list))
+	for i, c := range *list {
+		out[i] = Shortlisted{CandidateID: c.CandidateId, ApplicationID: c.ApplicationId}
 	}
 	return out
 }

@@ -701,3 +701,27 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 .ad-card .share { margin-top: 0.6rem; }
 .jd-files { border-top: 1px solid var(--line, #e5e7eb); margin-top: 0.85rem; padding-top: 0.4rem; }
 .jd-files h4 { margin: 0.4rem 0 0.5rem; }
+
+/* Choosing candidates on the board for one email to the client. */
+.card-name { display: flex; align-items: center; gap: 0.4rem; }
+.card-name input { margin: 0; flex: none; }
+.card.picked { border-color: var(--accent); background: var(--accent-soft); }
+.pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
+
+/* The candidates on an email to the client. */
+.shortlist { border: 1px solid var(--line-strong); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.75rem 0; }
+.shortlist legend { font-size: 0.85rem; font-weight: 600; padding: 0 0.3rem; }
+.shortlist-rows { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.4rem; }
+.shortlist-row { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.6fr) auto; gap: 0.6rem; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem; }
+.shortlist-row > * { min-width: 0; }
+.shortlist-who { display: flex; flex-direction: column; }
+.shortlist-row select { width: 100%; }
+.shortlist-insert { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+.shortlist-details { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+.shortlist-details label { display: inline-flex; align-items: center; gap: 0.25rem; }
+@media (max-width: 700px) { .shortlist-row { grid-template-columns: 1fr; } }
+/* A table in a message (the candidates'): shown as the client will see it, not in the app's table style. */
+.rich-box table, .email-preview table { width: auto; border-collapse: collapse; box-shadow: none; border-radius: 0; margin: 0.4rem 0; }
+.rich-box th, .email-preview th { font-size: inherit; font-weight: 700; letter-spacing: normal; text-transform: none; color: inherit; white-space: normal; }
+.rich-box td, .email-preview td { border-bottom: 0; }
+.rich-box tr:hover td, .email-preview tr:hover td { background: transparent; }

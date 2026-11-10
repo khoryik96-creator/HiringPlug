@@ -42,8 +42,16 @@ UPDATE email SET calendar = @calendar WHERE id = @id;
 -- name: GetEmail :one
 SELECT * FROM email WHERE id = @id;
 
+-- Their own emails and the shortlists they were in.
 -- name: ListCandidateEmails :many
-SELECT * FROM email WHERE candidate_id = @candidate_id ORDER BY id DESC LIMIT 200;
+SELECT e.* FROM email e
+WHERE e.candidate_id = @candidate_id
+   OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = @candidate_id::text)
+ORDER BY e.id DESC LIMIT 200;
+
+-- name: InsertEmailCandidate :exec
+INSERT INTO email_candidate (tenant_id, email_id, candidate_id, application_id, position)
+VALUES (app_current_tenant(), @email_id, @candidate_id, sqlc.narg(application_id), @position);
 
 -- name: ListContactEmails :many
 SELECT * FROM email WHERE contact_id = @contact_id ORDER BY id DESC LIMIT 200;
@@ -56,6 +64,14 @@ WHERE id = @id;
 -- Merging candidates: the duplicate's emails follow them.
 -- name: MoveEmailsToCandidate :execrows
 UPDATE email SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- A shortlist that named both keeps the one kept, once.
+-- name: DropShortlistDuplicates :exec
+DELETE FROM email_candidate d WHERE d.candidate_id = @from_id
+  AND EXISTS (SELECT 1 FROM email_candidate k WHERE k.email_id = d.email_id AND k.candidate_id = @to_id);
+
+-- name: MoveShortlistsToCandidate :exec
+UPDATE email_candidate SET candidate_id = @to_id WHERE candidate_id = @from_id;
 
 -- name: InsertBanner :one
 INSERT INTO email_banner (tenant_id, name, content_type, size_bytes, storage_key, created_by)

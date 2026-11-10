@@ -40,6 +40,8 @@ var policy = func() *bluemonday.Policy {
 	p.AllowStyles("color", "background-color", "font-family", "font-size", "font-weight", "font-style",
 		"text-decoration", "text-align", "margin-left", "padding-left", "line-height").Globally()
 	p.AllowStyles("width", "max-width", "height").OnElements("img")
+	// A table of candidates (the composer's): its lines and spacing.
+	p.AllowStyles("border", "border-collapse", "padding", "vertical-align").OnElements("table", "td", "th")
 	return p
 }()
 
