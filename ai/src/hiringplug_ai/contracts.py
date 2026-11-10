@@ -839,6 +839,10 @@ class ScreeningCallInput(BaseModel):
             description="Current and expected salary, replacing both (needs candidates.compensation:update)."
         ),
     ] = None
+    calledOn: Annotated[
+        date | None, Field(description="When the call was (today when left out; not in the future).")
+    ] = None
+    calledBy: Annotated[UserId | None, Field(description="Who made the call (you when left out).")] = None
 
 
 class CandidateMerge(BaseModel):
@@ -4127,12 +4131,18 @@ class CandidateSearch(BaseModel):
     cursor: CandidateId | None = None
 
 
-class ScreeningCallResult(BaseModel):
-    candidate: Candidate
+class ScreeningCallSummary(BaseModel):
+    id: Annotated[str, Field(examples=["scl_01jbz6w0m0k8q9x2r3s4t5v6w7"])]
+    calledOn: date
+    calledBy: UserId
+    calledByName: Annotated[str | None, Field(...)]
     noteId: Annotated[NoteId | None, Field(...)]
-    sourceKept: Annotated[
-        bool, Field(description="True when a source was sent but the candidate already had one.")
-    ]
+    salaryRecorded: Annotated[bool, Field(description="The call set the candidate's salary.")]
+    createdAt: AwareDatetime
+
+
+class ScreeningCallList(BaseModel):
+    items: list[ScreeningCallSummary]
 
 
 class CandidateFound(BaseModel):
@@ -4863,6 +4873,21 @@ class AiProviders(BaseModel):
     providers: Annotated[
         list[AiProviderEntry], Field(description="Every provider, in the order deepseek, claude, openai.")
     ]
+
+
+class ScreeningCallResult(BaseModel):
+    candidate: Candidate
+    noteId: Annotated[NoteId | None, Field(...)]
+    sourceKept: Annotated[
+        bool, Field(description="True when a source was sent but the candidate already had one.")
+    ]
+    salaryApplied: Annotated[
+        bool,
+        Field(
+            description="False when salary was sent but a later call (by its date) already set the salary: the salary follows the latest call."
+        ),
+    ]
+    call: ScreeningCallSummary
 
 
 class CandidateFindSearch(BaseModel):

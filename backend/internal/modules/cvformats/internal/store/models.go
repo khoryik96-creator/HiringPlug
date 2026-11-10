@@ -873,6 +873,18 @@ type Schedule struct {
 	UpdatedAt       time.Time
 }
 
+type ScreeningCall struct {
+	ID             string
+	TenantID       string
+	CandidateID    string
+	CalledOn       pgtype.Date
+	CalledBy       string
+	NoteID         *string
+	SalaryRecorded bool
+	CreatedBy      string
+	CreatedAt      time.Time
+}
+
 type StudioCv struct {
 	ID               string
 	TenantID         string

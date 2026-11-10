@@ -29,6 +29,9 @@ function reads(c: Candidate) {
   }) as never);
 }
 
+const now = new Date();
+const today = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
 describe("screening call", () => {
   it("picks the newest CV the candidate sent, not one the app formatted", () => {
     expect(latestCv(docs)?.id).toBe("doc_new");
@@ -40,7 +43,7 @@ describe("screening call", () => {
     const c = testCandidate({ source: null, nationality: "MY", noticePeriod: null, compensation: null });
     reads(c);
     const saved = testCandidate({ ...c, version: 4, source: "referral" });
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: saved, noteId: "note_1", sourceKept: false }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: saved, noteId: "note_1", sourceKept: false, call: { id: "scl_1", calledOn: "2026-11-09", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: false, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: true }));
     renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
 
     expect(await screen.findByText("text of doc_new")).toBeTruthy(); // the CV, readable during the call
@@ -61,7 +64,7 @@ describe("screening call", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/screening-calls");
     expect(sentBody(post)).toEqual({
-      version: 3, notes: "RFL: Better prospects\nLF: Audit roles in SG\n\nWants hybrid; open to SG.", sensitive: true,
+      version: 3, notes: "RFL: Better prospects\nLF: Audit roles in SG\n\nWants hybrid; open to SG.", sensitive: true, calledOn: today,
       nationality: "SG", workAuthorization: { status: "requires_visa", basis: null, note: null }, noticePeriod: { value: 2, unit: "week" },
       source: "referral",
       compensation: {
@@ -78,14 +81,14 @@ describe("screening call", () => {
   it("keeps an existing source and leaves salary alone when it was not touched or may not be changed", async () => {
     const c = testCandidate({ source: "jobstreet" });
     reads(c);
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: c, noteId: null, sourceKept: false }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: c, noteId: null, sourceKept: false, call: { id: "scl_1", calledOn: "2026-11-09", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: false, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: true }));
     renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
     const form = await screen.findByRole("form", { name: "Screening call" });
     expect(within(form).getByText(/JobStreet \(kept/)).toBeTruthy();
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     // Only what changed is sent: nothing here, so nothing a colleague changed meanwhile is sent back.
-    expect(sentBody(post)).toEqual({ version: 3, notes: "", sensitive: false });
+    expect(sentBody(post)).toEqual({ version: 3, notes: "", sensitive: false, calledOn: today });
     cleanup();
 
     reads(c);
@@ -112,7 +115,7 @@ describe("screening call", () => {
     await waitFor(() => { expect(within(form).getByLabelText<HTMLSelectElement>("Nationality").value).toBe("ID"); });
     expect(within(form).getByLabelText<HTMLTextAreaElement>("Other notes").value).toBe("Twenty minutes of notes");
 
-    post.mockResolvedValueOnce(ok({ candidate: testCandidate({ ...c, version: 5 }), noteId: "note_2", sourceKept: false }));
+    post.mockResolvedValueOnce(ok({ candidate: testCandidate({ ...c, version: 5 }), noteId: "note_2", sourceKept: false, call: { id: "scl_1", calledOn: "2026-11-09", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: false, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: true }));
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
     expect(sentBody(post, 1)).toMatchObject({ version: 5, notes: "Twenty minutes of notes" });

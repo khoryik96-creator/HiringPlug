@@ -304,3 +304,20 @@ SELECT candidate_id, company::text AS company, title, is_current
 FROM candidate_work
 WHERE candidate_id = ANY (@candidate_ids::text[]) AND company IS NOT NULL
 ORDER BY candidate_id, position;
+
+-- Screening calls, latest first (by when they were, then when logged).
+-- name: ListScreeningCalls :many
+SELECT * FROM screening_call WHERE candidate_id = @candidate_id ORDER BY called_on DESC, created_at DESC;
+
+-- The date of the latest call that set the salary (none: no such call).
+-- name: LatestSalaryCall :one
+SELECT max(called_on)::date AS called_on FROM screening_call WHERE candidate_id = @candidate_id AND salary_recorded;
+
+-- name: InsertScreeningCall :one
+INSERT INTO screening_call (tenant_id, candidate_id, called_on, called_by, note_id, salary_recorded, created_by)
+VALUES (app_current_tenant(), @candidate_id, @called_on, @called_by, sqlc.narg(note_id), @salary_recorded, app_current_user())
+RETURNING *;
+
+-- Merging: the duplicate's screening calls go to the kept candidate.
+-- name: MoveScreeningCalls :exec
+UPDATE screening_call SET candidate_id = @to_id WHERE candidate_id = @from_id;

@@ -46,3 +46,4 @@ export const cvImportsKey = ["cv-imports"] as const;
 export const stageMovesKey = (candidateId?: string) => ["applications", "moves", candidateId ?? "all"] as const;
 export const emailBannersKey = ["email-banners"] as const;
 export const policiesKey = ["settings", "policies"] as const;
+export const screeningCallsKey = (candidateId: string) => ["screening-calls", candidateId] as const;

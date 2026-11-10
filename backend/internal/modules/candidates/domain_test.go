@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -132,4 +133,13 @@ func TestHistoryKeepsDutiesOnTheirOwnLines(t *testing.T) {
 	blank := " \n \n"
 	h, _ = NormalizeHistory(History{Work: []Job{{Title: &title, Description: &blank}}})
 	assert.Nil(t, h.Work[0].Description)
+}
+
+func TestTheSalaryFollowsTheLatestCall(t *testing.T) {
+	d := func(day int) time.Time { return time.Date(2026, 11, day, 0, 0, 0, 0, time.UTC) }
+	latest := d(8)
+	assert.True(t, SalaryFollows(d(1), nil), "the first call")
+	assert.True(t, SalaryFollows(d(8), &latest), "a second call on the same day")
+	assert.True(t, SalaryFollows(d(9), &latest))
+	assert.False(t, SalaryFollows(d(7), &latest), "an earlier call logged late")
 }

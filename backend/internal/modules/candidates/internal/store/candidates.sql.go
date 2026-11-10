@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const candidateBriefs = `-- name: CandidateBriefs :many
@@ -450,6 +452,43 @@ func (q *Queries) InsertEducation(ctx context.Context, arg InsertEducationParams
 	return err
 }
 
+const insertScreeningCall = `-- name: InsertScreeningCall :one
+INSERT INTO screening_call (tenant_id, candidate_id, called_on, called_by, note_id, salary_recorded, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
+RETURNING id, tenant_id, candidate_id, called_on, called_by, note_id, salary_recorded, created_by, created_at
+`
+
+type InsertScreeningCallParams struct {
+	CandidateID    string
+	CalledOn       pgtype.Date
+	CalledBy       string
+	NoteID         *string
+	SalaryRecorded bool
+}
+
+func (q *Queries) InsertScreeningCall(ctx context.Context, arg InsertScreeningCallParams) (ScreeningCall, error) {
+	row := q.db.QueryRow(ctx, insertScreeningCall,
+		arg.CandidateID,
+		arg.CalledOn,
+		arg.CalledBy,
+		arg.NoteID,
+		arg.SalaryRecorded,
+	)
+	var i ScreeningCall
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.CandidateID,
+		&i.CalledOn,
+		&i.CalledBy,
+		&i.NoteID,
+		&i.SalaryRecorded,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertWork = `-- name: InsertWork :exec
 INSERT INTO candidate_work (tenant_id, candidate_id, position, title, company, start_date, end_date, is_current, description)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5,
@@ -479,6 +518,18 @@ func (q *Queries) InsertWork(ctx context.Context, arg InsertWorkParams) error {
 		arg.Description,
 	)
 	return err
+}
+
+const latestSalaryCall = `-- name: LatestSalaryCall :one
+SELECT max(called_on)::date AS called_on FROM screening_call WHERE candidate_id = $1 AND salary_recorded
+`
+
+// The date of the latest call that set the salary (none: no such call).
+func (q *Queries) LatestSalaryCall(ctx context.Context, candidateID string) (pgtype.Date, error) {
+	row := q.db.QueryRow(ctx, latestSalaryCall, candidateID)
+	var called_on pgtype.Date
+	err := row.Scan(&called_on)
+	return called_on, err
 }
 
 const listCandidates = `-- name: ListCandidates :many
@@ -649,6 +700,41 @@ func (q *Queries) ListEducation(ctx context.Context, candidateID string) ([]Cand
 			&i.Qualification,
 			&i.Institution,
 			&i.EndYear,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listScreeningCalls = `-- name: ListScreeningCalls :many
+SELECT id, tenant_id, candidate_id, called_on, called_by, note_id, salary_recorded, created_by, created_at FROM screening_call WHERE candidate_id = $1 ORDER BY called_on DESC, created_at DESC
+`
+
+// Screening calls, latest first (by when they were, then when logged).
+func (q *Queries) ListScreeningCalls(ctx context.Context, candidateID string) ([]ScreeningCall, error) {
+	rows, err := q.db.Query(ctx, listScreeningCalls, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScreeningCall
+	for rows.Next() {
+		var i ScreeningCall
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.CandidateID,
+			&i.CalledOn,
+			&i.CalledBy,
+			&i.NoteID,
+			&i.SalaryRecorded,
+			&i.CreatedBy,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -864,6 +950,21 @@ type MoveEducationIfNoneParams struct {
 
 func (q *Queries) MoveEducationIfNone(ctx context.Context, arg MoveEducationIfNoneParams) error {
 	_, err := q.db.Exec(ctx, moveEducationIfNone, arg.ToID, arg.FromID)
+	return err
+}
+
+const moveScreeningCalls = `-- name: MoveScreeningCalls :exec
+UPDATE screening_call SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveScreeningCallsParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging: the duplicate's screening calls go to the kept candidate.
+func (q *Queries) MoveScreeningCalls(ctx context.Context, arg MoveScreeningCallsParams) error {
+	_, err := q.db.Exec(ctx, moveScreeningCalls, arg.ToID, arg.FromID)
 	return err
 }
 

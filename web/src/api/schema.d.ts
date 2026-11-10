@@ -319,11 +319,12 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /** A candidate's screening calls, latest first */
+        get: operations["listScreeningCalls"];
         put?: never;
         /**
          * Record a screening call, updating the candidate from it
-         * @description In one step: the call's notes become a screening note, and the profile takes what was asked (notice period, work authorization, nationality; the source only when the candidate has none), with the salary (needs candidates.compensation:update). Fields left out are not changed. Notes need notes:create; sensitive ones notes.sensitive:read.
+         * @description In one step: the call's notes become a screening note, and the profile takes what was asked (notice period, work authorization, nationality; the source only when the candidate has none), with the salary (needs candidates.compensation:update). Fields left out are not changed. Notes need notes:create; sensitive ones notes.sensitive:read. Each call is kept with who made it and when (calledBy, calledOn: you and today when left out); the salary follows the latest call: one dated before a call already recorded with salary keeps that salary (salaryApplied false).
          */
         post: operations["recordScreeningCall"];
         delete?: never;
@@ -3404,12 +3405,38 @@ export interface components {
             source?: components["schemas"]["CandidateSource"];
             /** @description Current and expected salary, replacing both (needs candidates.compensation:update). */
             compensation?: components["schemas"]["CompensationUpdate"];
+            /**
+             * Format: date
+             * @description When the call was (today when left out; not in the future).
+             */
+            calledOn?: string;
+            /** @description Who made the call (you when left out). */
+            calledBy?: components["schemas"]["UserId"];
         };
         ScreeningCallResult: {
             candidate: components["schemas"]["Candidate"];
             noteId: components["schemas"]["NoteId"] | null;
             /** @description True when a source was sent but the candidate already had one. */
             sourceKept: boolean;
+            /** @description False when salary was sent but a later call (by its date) already set the salary: the salary follows the latest call. */
+            salaryApplied: boolean;
+            call: components["schemas"]["ScreeningCallSummary"];
+        };
+        ScreeningCallSummary: {
+            /** @example scl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+            id: string;
+            /** Format: date */
+            calledOn: string;
+            calledBy: components["schemas"]["UserId"];
+            calledByName: string | null;
+            noteId: components["schemas"]["NoteId"] | null;
+            /** @description The call set the candidate's salary. */
+            salaryRecorded: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ScreeningCallList: {
+            items: components["schemas"]["ScreeningCallSummary"][];
         };
         CandidateMerge: {
             /** @description The candidate to merge in (and delete). */
@@ -7133,6 +7160,31 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listScreeningCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["parameters"]["CandidateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningCallList"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

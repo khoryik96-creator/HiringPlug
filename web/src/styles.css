@@ -635,3 +635,10 @@ fieldset.invoicing .check { display: block; }
 .category-chip { display: inline-block; font-size: 0.78rem; font-weight: 650; padding: 0.15rem 0.6rem; border-radius: 999px; border: 1.5px solid; white-space: nowrap; }
 .color-input { width: 2.2rem; height: 2.2rem; padding: 0.1rem; border-radius: 8px; vertical-align: middle; margin-right: 0.4rem; cursor: pointer; }
 td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
+
+/* A candidate's screening calls, latest first. */
+.call-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; max-height: min(34rem, 70vh); overflow-y: auto; }
+.call-list li { border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.75rem; background: #fff; }
+.call-list li.latest { border-color: var(--accent); }
+.call-list summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.call-note { margin: 0.5rem 0 0; font-size: 0.92rem; }

@@ -664,7 +664,7 @@ paths:
       tags: [candidates]
       summary: Record a screening call, updating the candidate from it
       description: >
-        In one step: the call's notes become a screening note, and the profile takes what was asked (notice period, work authorization, nationality; the source only when the candidate has none), with the salary (needs candidates.compensation:update). Fields left out are not changed. Notes need notes:create; sensitive ones notes.sensitive:read.
+        In one step: the call's notes become a screening note, and the profile takes what was asked (notice period, work authorization, nationality; the source only when the candidate has none), with the salary (needs candidates.compensation:update). Fields left out are not changed. Notes need notes:create; sensitive ones notes.sensitive:read. Each call is kept with who made it and when (calledBy, calledOn: you and today when left out); the salary follows the latest call: one dated before a call already recorded with salary keeps that salary (salaryApplied false).
 
       x-permission: candidates:update
       requestBody:
@@ -683,6 +683,20 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+    get:
+      operationId: listScreeningCalls
+      tags: [candidates]
+      summary: A candidate's screening calls, latest first
+      x-permission: candidates:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScreeningCallList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/public/careers/{slug}:
     parameters:
       - $ref: '#/components/parameters/CareersSlugPath'
@@ -5254,15 +5268,41 @@ components:
         compensation:
           description: Current and expected salary, replacing both (needs candidates.compensation:update).
           allOf: [{$ref: '#/components/schemas/CompensationUpdate'}]
+        calledOn: {type: string, format: date, description: "When the call was (today when left out; not in the future)."}
+        calledBy:
+          description: Who made the call (you when left out).
+          allOf: [{$ref: '#/components/schemas/UserId'}]
     ScreeningCallResult:
       type: object
-      required: [candidate, noteId, sourceKept]
+      required: [candidate, noteId, sourceKept, salaryApplied, call]
       properties:
         candidate: {$ref: '#/components/schemas/Candidate'}
         noteId:
           allOf: [{$ref: '#/components/schemas/NoteId'}]
           nullable: true
         sourceKept: {type: boolean, description: True when a source was sent but the candidate already had one.}
+        salaryApplied:
+          type: boolean
+          description: "False when salary was sent but a later call (by its date) already set the salary: the salary follows the latest call."
+        call: {$ref: '#/components/schemas/ScreeningCallSummary'}
+    ScreeningCallSummary:
+      type: object
+      required: [id, calledOn, calledBy, calledByName, noteId, salaryRecorded, createdAt]
+      properties:
+        id: {type: string, example: scl_01jbz6w0m0k8q9x2r3s4t5v6w7}
+        calledOn: {type: string, format: date}
+        calledBy: {$ref: '#/components/schemas/UserId'}
+        calledByName: {type: string, nullable: true}
+        noteId:
+          allOf: [{$ref: '#/components/schemas/NoteId'}]
+          nullable: true
+        salaryRecorded: {type: boolean, description: The call set the candidate's salary.}
+        createdAt: {type: string, format: date-time}
+    ScreeningCallList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/ScreeningCallSummary'}}
     CandidateMerge:
       type: object
       additionalProperties: false

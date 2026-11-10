@@ -1,12 +1,12 @@
 // The screening call form: notes taken during the call, and what was asked
 // (salary and currency, notice period, work authorization, nationality, and
 // the source when the candidate has none), saved to the profile in one step.
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Candidate, type Permission, type Schemas, unwrap } from "../api/client";
-import { activityKey, candidateKey, candidatesKey, notesKey } from "../api/keys";
-import { regionName } from "../labels";
+import { activityKey, candidateKey, candidatesKey, notesKey, screeningCallsKey, usersKey } from "../api/keys";
+import { formatDay, regionName } from "../labels";
 import { CallItems, type CallAnswers, callNote, useCallItems } from "./CallItems";
 import { type CandidateFormState, formFromCandidate, toUpdateBody } from "./candidateFormState";
 import { Field } from "./Field";
@@ -17,6 +17,12 @@ import { SaveError } from "./SaveError";
 import { SourcePicker } from "./SourcePicker";
 import { NoticeField, WorkAuthFields } from "./ProfileFields";
 import { useFieldSettings } from "./useFieldSettings";
+
+/** Today's date where the recruiter is (YYYY-MM-DD). */
+const localToday = () => {
+  const d = new Date();
+  return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 interface Base {
   version: number;
@@ -59,6 +65,10 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   const items = useCallItems("screening_call");
   const [sensitive, setSensitive] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  // Who made the call and when: you and today unless said otherwise (a call logged later).
+  const [calledOn, setCalledOn] = useState(localToday);
+  const [calledBy, setCalledBy] = useState("");
+  const users = useQuery({ queryKey: usersKey, queryFn: async () => unwrap(await api.GET("/v1/users")).items, staleTime: 60_000 });
   const salaryShown = permissions.includes("candidates.compensation:update") && !candidate.restrictedFields.includes("compensation");
   const canNote = permissions.includes("notes:create");
   const startFrom = (c: Candidate) => {
@@ -72,7 +82,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
     mutationFn: async () => {
       const problems = salaryShown ? salaryProblems(salary) : {};
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
-      const body = screeningBody(base, profile, salary, callNote(items, answers, notes), sensitive, salaryShown);
+      const body = { ...screeningBody(base, profile, salary, callNote(items, answers, notes), sensitive, salaryShown), calledOn, ...(calledBy ? { calledBy } : {}) };
       return unwrap(await api.POST("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId: candidate.id } }, body }));
     },
     onSuccess: (res) => {
@@ -80,11 +90,17 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
       void queryClient.invalidateQueries({ queryKey: notesKey("candidate", candidate.id) });
       void queryClient.invalidateQueries({ queryKey: activityKey("candidate", candidate.id) });
+      void queryClient.invalidateQueries({ queryKey: screeningCallsKey(candidate.id) });
       startFrom(res.candidate);
       setNotes("");
       setAnswers({});
       setSensitive(false); // each note is marked on its own
-      setSaved(`Saved to ${res.candidate.fullName}'s profile${res.noteId ? ", with the notes" : ""}.${res.sourceKept ? " Their source was kept." : ""}`);
+      const sent = !!screeningBody(base, profile, salary, "", false, salaryShown).compensation;
+      setSaved(`Call of ${formatDay(res.call.calledOn)} saved to ${res.candidate.fullName}'s profile${res.noteId ? ", with the notes" : ""}.`
+        + (res.sourceKept ? " Their source was kept." : "")
+        + (sent && !res.salaryApplied ? " The salary was not changed: a later call already set it (the salary follows the latest call)." : ""));
+      setCalledOn(localToday());
+      setCalledBy("");
     },
   });
   const errors = fieldErrors(save.error);
@@ -100,6 +116,15 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   return (
     <form className="panel form-grid" aria-label="Screening call" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <h3 className="full">Screening call</h3>
+      <Field label="Call date" error={errors.calledOn}>
+        <input type="date" value={calledOn} max={localToday()} onChange={(e) => { setSaved(null); setCalledOn(e.target.value); }} />
+      </Field>
+      <Field label="Called by" error={errors.calledBy}>
+        <select value={calledBy} onChange={(e) => { setSaved(null); setCalledBy(e.target.value); }}>
+          <option value="">Me</option>
+          {users.data?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+      </Field>
       {canNote && (
         <div className="full">
           <p className="muted small">What to ask is set in Settings &gt; Screening call. Each answer is saved in the notes after its label (&ldquo;RFL: &hellip;&rdquo;).</p>
@@ -140,7 +165,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       </div>
       <SaveError
         error={save.error}
-        shown={["body", "notes", "nationality", "noticePeriod.value", "noticePeriod.unit", "workAuthorization.status", "workAuthorization.basis", "source", ...Object.values(SALARY_PATHS)]}
+        shown={["body", "notes", "calledOn", "calledBy", "nationality", "noticePeriod.value", "noticePeriod.unit", "workAuthorization.status", "workAuthorization.basis", "source", ...Object.values(SALARY_PATHS)]}
         reloadLabel="Reload their version (your notes are kept; other changes here are lost)"
         onReload={() => {
           // Someone saved first: start again from their version, keeping the notes typed so far.

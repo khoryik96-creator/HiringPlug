@@ -6,6 +6,7 @@ import { candidateKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CvPane, latestCv, useDocument } from "../components/CvPane";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { ScreeningCalls } from "../components/ScreeningCalls";
 import { ScreeningForm } from "../components/ScreeningForm";
 
 /** A screening call: the CV on one side, the call's notes and questions on the other, with the AI assistant. */
@@ -43,6 +44,7 @@ export function ScreeningCall({ candidateId, permissions }: { candidateId: strin
           {permissions.includes("candidates:update")
             ? <ScreeningForm candidate={c} permissions={permissions} />
             : <p className="muted">Your role may not update candidates.</p>}
+          <ScreeningCalls candidateId={c.id} permissions={permissions} />
           <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} />
         </div>
       </div>

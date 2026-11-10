@@ -121,6 +121,9 @@ func (s *Service) mergeRows(ctx context.Context, tx pgx.Tx, keepRow, dupRow stor
 	} else if err != nil {
 		return keepRow, err
 	}
+	if err := q.MoveScreeningCalls(ctx, store.MoveScreeningCallsParams{FromID: dupID, ToID: keepID}); err != nil {
+		return keepRow, err
+	}
 	// The duplicate's work history and education, if the kept candidate has none.
 	if err := q.MoveWorkIfNone(ctx, store.MoveWorkIfNoneParams{FromID: dupID, ToID: keepID}); err != nil {
 		return keepRow, err
