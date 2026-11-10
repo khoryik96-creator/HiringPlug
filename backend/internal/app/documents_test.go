@@ -29,7 +29,9 @@ var claimLock sync.Mutex
 
 // pdfWith is minimalPDF with a comment, so files are told apart (the same
 // bytes twice are a duplicate).
-func pdfWith(mark string) []byte { return append(append([]byte{}, minimalPDF...), []byte("% "+mark+"\n")...) }
+func pdfWith(mark string) []byte {
+	return append(append([]byte{}, minimalPDF...), []byte("% "+mark+"\n")...)
+}
 
 var minimalPDF = []byte("%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n")
 
