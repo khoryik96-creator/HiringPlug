@@ -75,10 +75,21 @@ func (s *Service) AddFile(ctx context.Context, p authz.Principal, importID, file
 			return err
 		}
 		params := store.InsertItemParams{ImportID: importID, FileName: fileName, Status: Reading}
-		if !s.deps.Documents.IsCVFile(fileName, data) { // recorded, so the import shows it; no candidate
+		sameOwner, sameName, sameFile, same, err := s.deps.Documents.SameCV(ctx, tx, data)
+		if err != nil {
+			return err
+		}
+		switch {
+		case !s.deps.Documents.IsCVFile(fileName, data): // recorded, so the import shows it; no candidate
 			msg := "Not a CV file that can be read: PDF, Word, text (.txt, .rtf, .odt) or a picture (PNG, JPG, TIFF, BMP, WEBP)."
 			params.Status, params.Error = Failed, &msg
-		} else {
+		case same: // exactly a CV already here: skipped, linked to whose it is
+			msg := "Already in HiringPlug: the same file as " + sameName + "'s CV (" + sameFile + "). Skipped."
+			if r := []rune(msg); len(r) > 500 {
+				msg = string(r[:500])
+			}
+			params.Status, params.Error, params.CandidateID = Duplicate, &msg, &sameOwner
+		default:
 			owner := p.UserID
 			candidateID, err := s.deps.Candidates.CreatePlaceholder(ctx, tx, fileName, imp.Source, &owner)
 			if err != nil {

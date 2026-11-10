@@ -38,6 +38,9 @@ type Deps struct {
 		// RTF, ODT or a picture) that can be read.
 		IsCVFile(fileName string, data []byte) bool
 		AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName string, data []byte) (string, func(), error)
+		// SameCV is a CV with exactly data's content already in HiringPlug:
+		// whose (candidateID), their name and its file name; found false: none.
+		SameCV(ctx context.Context, tx pgx.Tx, data []byte) (candidateID, candidateName, fileName string, found bool, err error)
 	}
 	// Sources checks a candidate source is in the company's list.
 	Sources interface {

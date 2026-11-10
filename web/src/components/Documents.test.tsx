@@ -52,6 +52,29 @@ describe("CVs and documents", () => {
     await waitFor(() => { expect(screen.getByRole("button", { name: "Upload" })).toBeTruthy(); }); // closed once uploaded
   });
 
+  it("skips exactly a CV they have, and asks about one with the same name", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [] }));
+    const existing = { documentId: "doc_1", candidateId: "cand_1", candidateName: "Siti", fileName: "Siti.pdf", createdAt: "2026-11-03T02:00:00Z" };
+    const post = vi.spyOn(api, "POST")
+      .mockResolvedValueOnce(ok({ items: [{ fileName: "copy.pdf", sha256: "a", sameContent: existing, sameName: [] }] }))
+      .mockResolvedValueOnce(ok({ items: [{ fileName: "Siti.pdf", sha256: "b", sameContent: null, sameName: [existing] }] }));
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 201 }));
+    renderWithClient(<Documents candidate={testCandidate({ id: "cand_1" })} canUpload canEdit={false} />);
+    await screen.findByText(/No CV yet/);
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+
+    fireEvent.change(screen.getByLabelText("Drop the file here"), { target: { files: [new File(["%PDF one"], "copy.pdf")] } });
+    expect((await screen.findByRole("status")).textContent).toContain("Skipped: copy.pdf is exactly Siti's CV (Siti.pdf, added 3 Nov 2026)");
+    expect(post.mock.calls[0]?.[1]).toMatchObject({ body: { candidateId: "cand_1" } });
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Drop the file here"), { target: { files: [new File(["%PDF two"], "Siti.pdf")] } });
+    expect((await screen.findByRole("alert")).textContent).toContain("already has a CV with this name");
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Upload anyway" }));
+    await waitFor(() => { expect(fetch).toHaveBeenCalledTimes(1); });
+  });
+
   it("deletes a formatted CV after asking, never the candidate's own", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx" }), doc({})] }));
     const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));

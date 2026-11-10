@@ -81,8 +81,8 @@ func TestImportingCVsAndLinkedInPDFs(t *testing.T) {
 	fresh := add("Profile_Siti-Aisyah.pdf", minimalPDF)
 	assert.Equal(t, api.CvImportItemStatusReading, fresh.Status)
 	assert.Equal(t, "Profile Siti Aisyah", fresh.CandidateName.MustGet(), "the answer names the new candidate too")
-	dup := add("Bala.pdf", minimalPDF)
-	unreadable := add("scan.pdf", minimalPDF)
+	dup := add("Bala.pdf", pdfWith("Bala"))
+	unreadable := add("scan.pdf", pdfWith("scan"))
 	notCV := add("slides.pptx", []byte("PK\x03\x04 not a CV"))
 	assert.Equal(t, api.CvImportItemStatusFailed, notCV.Status)
 	assert.True(t, notCV.CandidateId.IsNull(), "a file that is not a CV makes no candidate")
@@ -97,7 +97,7 @@ func TestImportingCVsAndLinkedInPDFs(t *testing.T) {
 	readImported(t, a, conn, unreadable.Id, "", nil)
 
 	got := a.cvImport(token, imp.Id)
-	assert.Equal(t, api.CvImportCounts{Reading: 0, Created: 1, Added: 1, Unread: 1, Failed: 1}, got.Counts)
+	assert.Equal(t, api.CvImportCounts{Reading: 0, Created: 1, Added: 1, Unread: 1, Failed: 1, Duplicate: 0}, got.Counts)
 	byID := map[string]api.CvImportItem{}
 	for _, it := range got.Items {
 		byID[it.Id] = it
@@ -153,7 +153,7 @@ func TestAnImportedCVIsFilledInSafely(t *testing.T) {
 	a.request(http.MethodPost, "/v1/cv-imports", token, map[string]any{"source": "linkedin"}).JSON(&imp)
 	add := func(name string) api.CvImportItem {
 		var it api.CvImportItem
-		a.upload("/v1/cv-imports/"+imp.Id+"/files", token, "", name, minimalPDF).JSON(&it)
+		a.upload("/v1/cv-imports/"+imp.Id+"/files", token, "", name, pdfWith(name)).JSON(&it)
 		return it
 	}
 

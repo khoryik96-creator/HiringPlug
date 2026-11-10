@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
-import { ok, renderWithClient, sentBody, testFieldSettings } from "../test-utils";
+import { ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
@@ -16,7 +16,7 @@ const item = (over: Partial<Schemas["CvImportItem"]>): Schemas["CvImportItem"] =
   candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w7", candidateName: "Siti Aisyah", error: null, updatedAt: "2026-11-05T02:00:00Z", ...over,
 });
 const anImport = (items: Schemas["CvImportItem"][]): Schemas["CvImport"] => {
-  const counts = { reading: 0, created: 0, added: 0, unread: 0, failed: 0 };
+  const counts = { reading: 0, created: 0, added: 0, unread: 0, failed: 0, duplicate: 0 };
   for (const i of items) counts[i.status]++;
   return { id: "cvi_01jbz6w0m0k8q9x2r3s4t5v6w7", source: "linkedin", createdAt: "2026-11-05T02:00:00Z", counts, items };
 };
@@ -64,8 +64,8 @@ describe("importing CVs and LinkedIn PDFs", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import 2 files" }));
 
     expect(await screen.findByText("huge.pdf: The file is too large.")).toBeTruthy();
-    expect(post).toHaveBeenCalledWith("/v1/cv-imports", expect.anything());
-    expect(sentBody(post)).toEqual({ source: "linkedin" });
+    expect(post).toHaveBeenCalledWith("/v1/cv-imports", { body: { source: "linkedin" } });
+    expect(post).toHaveBeenCalledWith("/v1/document-matches", expect.anything()); // looked for CVs already here first
     expect(send).toHaveBeenCalledTimes(2);
     const [url, init] = send.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/v1/cv-imports/cvi_01jbz6w0m0k8q9x2r3s4t5v6w7/files");
@@ -109,5 +109,35 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(row("photo.png").textContent).toContain("not a PDF, .docx or .doc file");
     expect(within(row("photo.png")).queryByRole("link")).toBeNull();
     await waitFor(() => { expect(row("new.pdf").textContent).toContain("Reading…"); });
+  });
+
+  it("skips files already in HiringPlug and asks about ones with the same name", async () => {
+    reads([]);
+    const match = (fileName: string) => ({ documentId: "doc_1", candidateId: "cand_9", candidateName: "Nurul Huda", fileName, createdAt: "2026-11-03T02:00:00Z" });
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/document-matches"
+      ? { items: [
+        { fileName: "same.pdf", sha256: "a", sameContent: match("Nurul CV.pdf"), sameName: [] },
+        { fileName: "Nurul CV.pdf", sha256: "b", sameContent: null, sameName: [match("Nurul CV.pdf")] },
+        { fileName: "new.pdf", sha256: "c", sameContent: null, sameName: [] },
+      ] }
+      : anImport([])))) as never);
+    const send = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(item({ status: "reading" })), { status: 201 })));
+    vi.stubGlobal("fetch", send);
+    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    await within(screen.getByRole("group", { name: "Source of these candidates" })).findByRole("button", { name: /LinkedIn/ });
+    fireEvent.change(screen.getByLabelText("Drop CVs here"), {
+      target: { files: [new File(["one"], "same.pdf"), new File(["two"], "Nurul CV.pdf"), new File(["three"], "new.pdf")] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import 3 files" }));
+
+    const skipped = await screen.findByRole("status", { name: "Skipped files" });
+    expect(skipped.textContent).toContain("same.pdf: Nurul Huda's CV (Nurul CV.pdf, added 3 Nov 2026)");
+    const ask = screen.getByRole("group", { name: "Files with the same name as a CV already here" });
+    expect(send).not.toHaveBeenCalled(); // waiting for the answer
+    fireEvent.click(screen.getByRole("button", { name: "Import 1 file" })); // only new.pdf: Nurul CV.pdf not ticked
+    await waitFor(() => { expect(send).toHaveBeenCalledTimes(1); });
+    expect(((send.mock.calls[0] as [string, RequestInit])[1].body as FormData).get("file")).toHaveProperty("name", "new.pdf");
+    expect(ask).toBeTruthy();
+    expect(post).toHaveBeenCalledWith("/v1/cv-imports", expect.anything());
   });
 });

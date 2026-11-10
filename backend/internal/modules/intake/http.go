@@ -104,6 +104,6 @@ func importToAPI(imp Import) api.CvImport {
 	n := Counts(statuses)
 	return api.CvImport{
 		Id: imp.ID, Source: imp.Source, CreatedAt: imp.CreatedAt, Items: items,
-		Counts: api.CvImportCounts{Reading: n[Reading], Created: n[Created], Added: n[Added], Unread: n[Unread], Failed: n[Failed]},
+		Counts: api.CvImportCounts{Reading: n[Reading], Created: n[Created], Added: n[Added], Unread: n[Unread], Failed: n[Failed], Duplicate: n[Duplicate]},
 	}
 }

@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Document, type Permission, unwrap } from "../api/client";
+import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadDocument, downloadFrom } from "../api/files";
 import { getToken } from "../auth";
 import { CvReview } from "./CvReview";
 import { CV_TYPES, DropZone } from "./DropZone";
+import { findMatches, matchText } from "./duplicateCvs";
 import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
 import { FormatCv } from "./FormatCv";
@@ -67,6 +68,25 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     mutationFn: async (d: Document) => { await downloadFrom(`/v1/documents/${d.id}/pdf`, d.fileName.replace(/\.docx$/, "") + ".pdf", "application/pdf"); },
   });
 
+  // Before uploading: exactly a CV they have is skipped; one with the same name is asked about.
+  const [checking, setChecking] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [asking, setAsking] = useState<{ file: File; others: Schemas["DocumentMatch"][] } | null>(null);
+  const check = async (file: File) => {
+    setNotice(null);
+    setAsking(null);
+    setChecking(true);
+    try {
+      const [m] = await findMatches([file], candidateId);
+      if (m?.sameContent) setNotice(`Skipped: ${file.name} is exactly ${matchText(m.sameContent)}, already here.`);
+      else if (m && m.sameName.length > 0) setAsking({ file, others: m.sameName });
+      else upload.mutate(file);
+    } catch {
+      upload.mutate(file); // the check is a help, not a gate: the server refuses an exact copy anyway
+    } finally {
+      setChecking(false);
+    }
+  };
   const upload = useMutation({
     mutationFn: async (file: File) => {
       const body = new FormData();
@@ -176,8 +196,21 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               </label>
             ))}
           </fieldset>
-          <DropZone accept={CV_TYPES} disabled={upload.isPending} label={upload.isPending ? "Uploading…" : "Drop the file here"}
-            hint="PDF, Word, text, or a photo of the CV" onFiles={(files) => { if (files[0]) upload.mutate(files[0]); }} />
+          <DropZone accept={CV_TYPES} disabled={upload.isPending || checking} label={upload.isPending ? "Uploading…" : checking ? "Checking…" : "Drop the file here"}
+            hint="PDF, Word, text, or a photo of the CV" onFiles={(files) => { if (files[0]) void check(files[0]); }} />
+          {notice && <p className="muted" role="status">{notice}</p>}
+          {asking && (
+            <div className="dup-ask" role="alert">
+              <p>
+                <strong>{asking.file.name}</strong>: this candidate already has a CV with this name, {asking.others.map(matchText).join("; ")}.
+                Upload it as well?
+              </p>
+              <div className="row">
+                <button type="button" className="doc-btn primary" onClick={() => { const f = asking.file; setAsking(null); upload.mutate(f); }}>Upload anyway</button>
+                <button type="button" className="doc-btn" onClick={() => { setNotice(`${asking.file.name} was not uploaded.`); setAsking(null); }}>Don&apos;t upload</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}

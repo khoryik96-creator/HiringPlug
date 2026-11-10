@@ -99,3 +99,11 @@ func cvFromParsed(p api.ParsedProfile) candidates.FromCV {
 	}
 	return cv
 }
+
+// documentCandidates gives the documents module whether a candidate exists
+// and their names (whose a CV already is).
+type documentCandidates struct{ *candidates.Module }
+
+func (a documentCandidates) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
+	return intakeCandidates(a).Names(ctx, tx, ids)
+}

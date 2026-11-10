@@ -141,3 +141,18 @@ LIMIT @row_limit;
 -- name: DeleteFormattedDocument :one
 DELETE FROM document WHERE id = @id AND source = 'formatted'
 RETURNING storage_key, pdf_key;
+
+-- CVs with exactly this content (oldest first), of one candidate or any.
+-- name: DocumentsWithContent :many
+SELECT id, candidate_id, file_name, sha256, created_at FROM document
+WHERE sha256 = ANY(@sums::text[]) AND (sqlc.narg(candidate_id)::text IS NULL OR candidate_id = sqlc.narg(candidate_id)::text)
+  AND source <> 'formatted'
+ORDER BY created_at;
+
+-- CVs with one of these file names, ignoring case, of one candidate or any.
+-- name: DocumentsNamed :many
+SELECT id, candidate_id, file_name, sha256, created_at FROM document
+WHERE lower(file_name) = ANY(@names::text[]) AND (sqlc.narg(candidate_id)::text IS NULL OR candidate_id = sqlc.narg(candidate_id)::text)
+  AND source <> 'formatted'
+ORDER BY created_at DESC
+LIMIT 500;

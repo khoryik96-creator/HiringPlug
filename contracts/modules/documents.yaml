@@ -16,6 +16,9 @@ x-module:
       description: "Delete formatted CVs (made by HiringPlug); candidates' own CVs are always kept."
       roles: [owner, admin, recruiter, sourcer]
   errorCodes:
+    DOCUMENT_DUPLICATE:
+      status: 409
+      description: "The candidate already has this exact file (the same bytes): it is not uploaded again. `details.existingDocumentId` is the one they have."
     DOCUMENT_NOT_DELETABLE:
       status: 409
       description: "Only formatted CVs can be deleted; the candidate's own CVs (and other files) are kept."
@@ -98,8 +101,39 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The candidate already has this exact file (DOCUMENT_DUPLICATE).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+
+  /v1/document-matches:
+    post:
+      operationId: findDocumentMatches
+      tags: [documents]
+      summary: CVs already in HiringPlug like the files about to be uploaded
+      description: >
+        For each file (its name and SHA-256, worked out before uploading):
+        a CV with exactly the same content (sameContent: skip it), and CVs
+        with the same file name (sameName: ask). With candidateId, only that
+        candidate's; without, any candidate's you may see.
+      x-permission: documents:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DocumentMatchRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentMatchList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/documents/{documentId}/parse:
     parameters:
@@ -251,6 +285,53 @@ components:
       schema: { $ref: '#/components/schemas/DocumentId' }
 
   schemas:
+    DocumentMatchRequest:
+      type: object
+      additionalProperties: false
+      required: [files]
+      properties:
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        files:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [fileName, sha256]
+            properties:
+              fileName: { type: string, minLength: 1, maxLength: 255 }
+              sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+    DocumentMatch:
+      type: object
+      required: [documentId, candidateId, candidateName, fileName, createdAt]
+      properties:
+        documentId: { $ref: '#/components/schemas/DocumentId' }
+        candidateId: { $ref: '#/components/schemas/CandidateId' }
+        candidateName: { type: string }
+        fileName: { type: string }
+        createdAt: { type: string, format: date-time }
+    DocumentMatchList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/DocumentMatchResult' }
+    DocumentMatchResult:
+      type: object
+      required: [fileName, sha256, sameContent, sameName]
+      properties:
+        fileName: { type: string }
+        sha256: { type: string }
+        sameContent:
+          description: A CV with exactly this content (skip uploading it again).
+          allOf: [{ $ref: '#/components/schemas/DocumentMatch' }]
+          nullable: true
+        sameName:
+          description: CVs with the same file name (ignoring case) but other content (ask before uploading).
+          type: array
+          items: { $ref: '#/components/schemas/DocumentMatch' }
     DocumentHighlights:
       type: object
       required: [parts, matches]

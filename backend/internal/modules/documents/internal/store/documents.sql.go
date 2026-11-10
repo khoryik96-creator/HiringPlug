@@ -120,6 +120,101 @@ func (q *Queries) DeleteFormattedDocument(ctx context.Context, id string) (Delet
 	return i, err
 }
 
+const documentsNamed = `-- name: DocumentsNamed :many
+SELECT id, candidate_id, file_name, sha256, created_at FROM document
+WHERE lower(file_name) = ANY($1::text[]) AND ($2::text IS NULL OR candidate_id = $2::text)
+  AND source <> 'formatted'
+ORDER BY created_at DESC
+LIMIT 500
+`
+
+type DocumentsNamedParams struct {
+	Names       []string
+	CandidateID *string
+}
+
+type DocumentsNamedRow struct {
+	ID          string
+	CandidateID string
+	FileName    string
+	Sha256      string
+	CreatedAt   time.Time
+}
+
+// CVs with one of these file names, ignoring case, of one candidate or any.
+func (q *Queries) DocumentsNamed(ctx context.Context, arg DocumentsNamedParams) ([]DocumentsNamedRow, error) {
+	rows, err := q.db.Query(ctx, documentsNamed, arg.Names, arg.CandidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DocumentsNamedRow
+	for rows.Next() {
+		var i DocumentsNamedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.FileName,
+			&i.Sha256,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const documentsWithContent = `-- name: DocumentsWithContent :many
+SELECT id, candidate_id, file_name, sha256, created_at FROM document
+WHERE sha256 = ANY($1::text[]) AND ($2::text IS NULL OR candidate_id = $2::text)
+  AND source <> 'formatted'
+ORDER BY created_at
+`
+
+type DocumentsWithContentParams struct {
+	Sums        []string
+	CandidateID *string
+}
+
+type DocumentsWithContentRow struct {
+	ID          string
+	CandidateID string
+	FileName    string
+	Sha256      string
+	CreatedAt   time.Time
+}
+
+// CVs with exactly this content (oldest first), of one candidate or any.
+func (q *Queries) DocumentsWithContent(ctx context.Context, arg DocumentsWithContentParams) ([]DocumentsWithContentRow, error) {
+	rows, err := q.db.Query(ctx, documentsWithContent, arg.Sums, arg.CandidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DocumentsWithContentRow
+	for rows.Next() {
+		var i DocumentsWithContentRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.FileName,
+			&i.Sha256,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error FROM document WHERE id = $1
 `

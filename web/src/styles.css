@@ -642,3 +642,5 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 .call-list li.latest { border-color: var(--accent); }
 .call-list summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .call-note { margin: 0.5rem 0 0; font-size: 0.92rem; }
+.dup-ask { border: 1px solid #f59e0b; background: #fffbeb; border-radius: 10px; padding: 0.7rem 0.9rem; display: grid; gap: 0.5rem; }
+.dup-ask p { margin: 0; }

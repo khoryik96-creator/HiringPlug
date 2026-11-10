@@ -118,7 +118,8 @@ func TestCareersPageAndApplying(t *testing.T) {
 		var same api.Candidate
 		a.request(http.MethodGet, "/v1/candidates/"+candidateID, token, nil).JSON(&same)
 		assert.Equal(t, "Nur", same.FirstName, "a public form never overwrites the profile")
-		assert.Len(t, a.request(http.MethodGet, "/v1/candidates/"+candidateID+"/documents", token, nil).Map()["items"], 2)
+		assert.Len(t, a.request(http.MethodGet, "/v1/candidates/"+candidateID+"/documents", token, nil).Map()["items"], 1,
+			"the same CV again is kept once")
 		assert.Len(t, a.request(http.MethodGet, "/v1/jobs/"+job.Id+"/applications", token, nil).Map()["items"], 1, "still once on the job")
 	})
 

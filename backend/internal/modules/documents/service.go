@@ -2,8 +2,6 @@ package documents
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"time"
 
@@ -61,6 +59,12 @@ func (s *Service) Upload(ctx context.Context, p authz.Principal, candidateID, so
 	var doc Document
 	var storedKey string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		// The candidate has this exact file already: never twice.
+		if same, err := s.sameContent(ctx, tx, &candidateID, data); err != nil {
+			return err
+		} else if same != nil {
+			return duplicateError(*same)
+		}
 		var err error
 		doc, storedKey, err = s.add(ctx, tx, p.TenantID, candidateID, source, fileName, contentType, data)
 		return err
@@ -100,10 +104,9 @@ func (s *Service) add(ctx context.Context, tx pgx.Tx, tenantID, candidateID, sou
 	if err := s.files.Put(key, data); err != nil {
 		return Document{}, "", err
 	}
-	sum := sha256.Sum256(data)
 	row, err := q.InsertDocument(ctx, store.InsertDocumentParams{
 		ID: id, CandidateID: candidateID, Source: source, FileName: CleanFileName(fileName),
-		ContentType: contentType, SizeBytes: int64(len(data)), Sha256: hex.EncodeToString(sum[:]), StorageKey: key,
+		ContentType: contentType, SizeBytes: int64(len(data)), Sha256: SumOf(data), StorageKey: key,
 	})
 	if err != nil {
 		return Document{}, key, err

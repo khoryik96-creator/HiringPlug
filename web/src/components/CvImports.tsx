@@ -7,6 +7,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
 import { CV_TYPES, DropZone } from "./DropZone";
+import { findMatches, matchText } from "./duplicateCvs";
 import { SourcePicker } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -19,8 +20,16 @@ export const STATUS_TEXT: Record<Status, string> = {
   added: "Added to existing candidate",
   unread: "New candidate — fill in the details",
   failed: "Failed",
+  duplicate: "Skipped: already in HiringPlug",
 };
-const BADGE: Record<Status, string> = { reading: "queued", created: "valid", added: "unknown", unread: "risky", failed: "invalid" };
+const BADGE: Record<Status, string> = { reading: "queued", created: "valid", added: "unknown", unread: "risky", failed: "invalid", duplicate: "closed" };
+
+/** Before importing: files exactly like a CV already here (skipped), and files sharing a CV's name (asked about). */
+type Review = {
+  skipped: { file: File; match: Schemas["DocumentMatch"] }[];
+  asks: { file: File; others: Schemas["DocumentMatch"][]; upload: boolean }[];
+  clean: File[];
+};
 
 /** Sends one file to an import (multipart, so not through the typed client). */
 async function sendFile(importId: string, file: File): Promise<void> {
@@ -41,6 +50,7 @@ export function CvImports() {
   const [files, setFiles] = useState<File[]>([]);
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
+  const [review, setReview] = useState<Review | null>(null);
 
   const imports = useQuery({
     queryKey: cvImportsKey,
@@ -49,12 +59,36 @@ export function CvImports() {
     refetchInterval: (q) => (q.state.data?.some((i) => i.counts.reading > 0) ? 3000 : false),
   });
 
-  const start = useMutation({
+  // Step one: look for CVs already in HiringPlug; import at once when nothing needs asking.
+  const check = useMutation({
     mutationFn: async () => {
+      const found = await findMatches(files);
+      const r: Review = { skipped: [], asks: [], clean: [] };
+      files.forEach((file, i) => {
+        const m = found[i];
+        if (m?.sameContent) r.skipped.push({ file, match: m.sameContent });
+        else if (m && m.sameName.length > 0) r.asks.push({ file, others: m.sameName, upload: false });
+        else r.clean.push(file);
+      });
+      return r;
+    },
+    onSuccess: (r) => {
+      if (r.asks.length === 0) {
+        setReview(r.skipped.length > 0 ? r : null); // what was skipped stays shown
+        start.mutate(r.clean);
+      } else setReview(r);
+    },
+    onError: () => { start.mutate(files); }, // the check is a help, not a gate
+  });
+  const toImport = review ? [...review.clean, ...review.asks.filter((a) => a.upload).map((a) => a.file)] : files;
+
+  const start = useMutation({
+    mutationFn: async (chosen: File[]) => {
       setFailures([]);
+      if (chosen.length === 0) return;
       const imp = unwrap(await api.POST("/v1/cv-imports", { body: { source } }));
       setSent(0);
-      for (const [i, f] of files.entries()) {
+      for (const [i, f] of chosen.entries()) {
         try {
           await sendFile(imp.id, f);
         } catch (e) {
@@ -67,6 +101,7 @@ export function CvImports() {
     onSettled: () => {
       setSent(null);
       setFiles([]);
+      setReview((r) => (r && r.skipped.length > 0 ? { ...r, asks: [], clean: [] } : null));
       void queryClient.invalidateQueries({ queryKey: cvImportsKey });
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
     },
@@ -80,6 +115,7 @@ export function CvImports() {
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
+          setReview(null);
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
         }} />
       {files.length > 0 && (
@@ -89,19 +125,44 @@ export function CvImports() {
               {f.name}
               {!start.isPending && (
                 <button type="button" className="link" aria-label={`Remove ${f.name}`}
-                  onClick={() => { setFiles(files.filter((x) => x !== f)); }}>×</button>
+                  onClick={() => { setFiles(files.filter((x) => x !== f)); setReview(null); }}>×</button>
               )}
             </li>
           ))}
         </ul>
       )}
       <div className="row">
-        <button type="button" className="primary" disabled={files.length === 0 || source === "" || start.isPending} onClick={() => { start.mutate(); }}>
-          Import {files.length === 1 ? "1 file" : `${String(files.length)} files`}
-        </button>
-        {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); }}>Clear</button>}
+        {review && review.asks.length > 0 ? (
+          <button type="button" className="primary" disabled={start.isPending} onClick={() => { start.mutate(toImport); }}>
+            Import {toImport.length === 1 ? "1 file" : `${String(toImport.length)} files`}
+          </button>
+        ) : (
+          <button type="button" className="primary" disabled={files.length === 0 || source === "" || start.isPending || check.isPending}
+            onClick={() => { check.mutate(); }}>
+            {check.isPending ? "Checking for CVs already here…" : `Import ${files.length === 1 ? "1 file" : `${String(files.length)} files`}`}
+          </button>
+        )}
+        {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); setReview(null); }}>Clear</button>}
         {sent !== null && <span className="muted">Sent {sent} of {files.length}…</span>}
       </div>
+      {review && review.skipped.length > 0 && (
+        <div className="dup-ask" role="status" aria-label="Skipped files">
+          <p><strong>Skipped {review.skipped.length === 1 ? "1 file" : `${String(review.skipped.length)} files`}</strong>: exactly the same file is already in HiringPlug.</p>
+          <ul>{review.skipped.map((x) => <li key={x.file.name}>{x.file.name}: <a href={`#/candidates/${x.match.candidateId}`}>{matchText(x.match)}</a></li>)}</ul>
+        </div>
+      )}
+      {review && review.asks.length > 0 && (
+        <div className="dup-ask" role="group" aria-label="Files with the same name as a CV already here">
+          <p>These have the same name as a CV already in HiringPlug, with other content. Tick the ones to import anyway:</p>
+          {review.asks.map((x, i) => (
+            <label key={x.file.name} className="check">
+              <input type="checkbox" checked={x.upload}
+                onChange={(e) => { setReview({ ...review, asks: review.asks.map((y, j) => (j === i ? { ...y, upload: e.target.checked } : y)) }); }} />{" "}
+              <strong>{x.file.name}</strong>: like {x.others.map(matchText).join("; ")}
+            </label>
+          ))}
+        </div>
+      )}
       {start.error && <p className="error">{start.error.message}</p>}
       {failures.map((f) => <p key={f} className="error">{f}</p>)}
 

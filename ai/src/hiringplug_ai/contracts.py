@@ -99,6 +99,7 @@ class ErrorCode(StrEnum):
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
     CV_NOT_BLIND = "CV_NOT_BLIND"
+    DOCUMENT_DUPLICATE = "DOCUMENT_DUPLICATE"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
@@ -1389,6 +1390,22 @@ class CvStudioFormattedJob(BaseModel):
     outputTokens: Annotated[int, Field(ge=0)]
 
 
+class File(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    fileName: Annotated[str, Field(max_length=255, min_length=1)]
+    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+
+
+class DocumentMatchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId | None = None
+    files: Annotated[list[File], Field(max_length=200, min_length=1)]
+
+
 class DocumentHighlightPart(BaseModel):
     text: str
     match: bool
@@ -2033,6 +2050,7 @@ class CvImportItemStatus(StrEnum):
     added = "added"
     unread = "unread"
     failed = "failed"
+    duplicate = "duplicate"
 
 
 class CvImportItem(BaseModel):
@@ -2053,6 +2071,7 @@ class CvImportCounts(BaseModel):
     added: int
     unread: int
     failed: int
+    duplicate: int
 
 
 class CvImport(BaseModel):
@@ -4302,6 +4321,28 @@ class FormattedCv(BaseModel):
     fileName: str
 
 
+class DocumentMatch(BaseModel):
+    documentId: DocumentId
+    candidateId: CandidateId
+    candidateName: str
+    fileName: str
+    createdAt: AwareDatetime
+
+
+class DocumentMatchResult(BaseModel):
+    fileName: str
+    sha256: str
+    sameContent: Annotated[
+        DocumentMatch | None, Field(description="A CV with exactly this content (skip uploading it again).")
+    ]
+    sameName: Annotated[
+        list[DocumentMatch],
+        Field(
+            description="CVs with the same file name (ignoring case) but other content (ask before uploading)."
+        ),
+    ]
+
+
 class DocumentHighlights(BaseModel):
     parts: Annotated[
         list[DocumentHighlightPart],
@@ -4937,6 +4978,10 @@ class Contact(BaseModel):
     ]
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
+
+
+class DocumentMatchList(BaseModel):
+    items: list[DocumentMatchResult]
 
 
 class JdFile(BaseModel):

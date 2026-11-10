@@ -152,3 +152,31 @@ func orNull[T any](p *T) nullable.Nullable[T] {
 	}
 	return nullable.NewNullableWithValue(*p)
 }
+
+// FindDocumentMatches handles POST /v1/document-matches.
+func (h *HTTP) FindDocumentMatches(ctx context.Context, req api.FindDocumentMatchesRequestObject) (api.FindDocumentMatchesResponseObject, error) {
+	files := make([]FileRef, len(req.Body.Files))
+	for i, f := range req.Body.Files {
+		files[i] = FileRef{FileName: f.FileName, SHA256: f.Sha256}
+	}
+	results, err := h.svc.Matches(ctx, authz.MustFromContext(ctx), req.Body.CandidateId, files)
+	if err != nil {
+		return nil, err
+	}
+	match := func(m Match) api.DocumentMatch {
+		return api.DocumentMatch{DocumentId: m.DocumentID, CandidateId: m.CandidateID, CandidateName: m.CandidateName, FileName: m.FileName, CreatedAt: m.CreatedAt}
+	}
+	out := api.FindDocumentMatches200JSONResponse{Items: make([]api.DocumentMatchResult, len(results))}
+	for i, r := range results {
+		item := api.DocumentMatchResult{FileName: r.FileName, Sha256: r.SHA256, SameName: make([]api.DocumentMatch, len(r.SameName))}
+		item.SameContent.SetNull()
+		if r.SameContent != nil {
+			item.SameContent.Set(match(*r.SameContent))
+		}
+		for j, m := range r.SameName {
+			item.SameName[j] = match(m)
+		}
+		out.Items[i] = item
+	}
+	return out, nil
+}

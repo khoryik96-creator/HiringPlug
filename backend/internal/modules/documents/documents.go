@@ -36,6 +36,7 @@ import (
 // small and lets tests substitute it.
 type Candidates interface {
 	Exists(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
+	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 }
 
 // Module is the documents module.
@@ -59,10 +60,29 @@ func (m *Module) AddFile(ctx context.Context, tx pgx.Tx, tenantID, candidateID, 
 }
 
 // AddFileAs is AddFile with the document's source (original, linkedin, ...).
+// SameCV is a CV with exactly data's content already in the tenant (tx's):
+// whose it is, their name and its file name. Imports skip such a file.
+func (m *Module) SameCV(ctx context.Context, tx pgx.Tx, data []byte) (candidateID, candidateName, fileName string, found bool, err error) {
+	match, err := m.service.sameContent(ctx, tx, nil, data)
+	if err != nil || match == nil {
+		return "", "", "", false, err
+	}
+	return match.CandidateID, match.CandidateName, match.FileName, true, nil
+}
+
 func (m *Module) AddFileAs(ctx context.Context, tx pgx.Tx, tenantID, candidateID, source, fileName string, data []byte) (documentID string, undo func(), err error) {
 	contentType, ok := DetectContentType(fileName, data)
 	if !ok {
 		return "", func() {}, apperr.New(api.ErrorCodeUNSUPPORTEDMEDIATYPE, "Upload "+filekind.Accepted+".")
+	}
+	// The candidate has this exact file already (e.g. applying again with
+	// the same CV): it is theirs once, and that one is used.
+	same, err := m.service.sameContent(ctx, tx, &candidateID, data)
+	if err != nil {
+		return "", func() {}, err
+	}
+	if same != nil {
+		return same.DocumentID, func() {}, nil
 	}
 	doc, key, err := m.service.add(ctx, tx, tenantID, candidateID, source, fileName, contentType, data)
 	undo = func() {

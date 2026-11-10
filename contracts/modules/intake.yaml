@@ -124,8 +124,10 @@ components:
         reading = being read; created = a new candidate, filled in from the
         file; added = the file went to the candidate who already has its email;
         unread = a new candidate named after the file (its details could not
-        be read: fill them in); failed = not a CV file (see error).
-      enum: [reading, created, added, unread, failed]
+        be read: fill them in); failed = not a CV file (see error);
+        duplicate = exactly the same file is already in HiringPlug (candidateId
+        is whose): skipped, no new candidate.
+      enum: [reading, created, added, unread, failed, duplicate]
     CvImportItem:
       type: object
       required: [id, fileName, status, candidateId, candidateName, error, updatedAt]
@@ -141,13 +143,14 @@ components:
         updatedAt: { type: string, format: date-time }
     CvImportCounts:
       type: object
-      required: [reading, created, added, unread, failed]
+      required: [reading, created, added, unread, failed, duplicate]
       properties:
         reading: { type: integer }
         created: { type: integer }
         added: { type: integer }
         unread: { type: integer }
         failed: { type: integer }
+        duplicate: { type: integer }
     CvImport:
       type: object
       required: [id, source, createdAt, counts, items]
