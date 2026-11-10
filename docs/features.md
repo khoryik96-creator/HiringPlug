@@ -224,7 +224,13 @@ A panel on candidate and job pages: **Summary**, **Gaps and red flags**, and
 your own questions. On a candidate's page, "About" switches to one of their
 jobs for **Fit for this job** ("how well does this candidate fit?").
 Answers come back in a few seconds and are kept, newest first; each person
-sees only their own.
+sees only their own. Each answer is a card; long ones past the newest are
+folded (**Show all**). **Dock right** moves the assistant to a panel on the
+right of the screen that stays put while you scroll (the page makes room for
+it; drag its edge to make it wider or narrower), **–** tucks it away as a tab
+on the right edge, and **Back in the page** returns it. The choice and width
+are remembered on that browser, on every page with the assistant (on a phone
+the panel takes the whole width).
 
 - **It sees only what you may see.** Go gathers the context with the asking
   user's permissions: the profile, work history, education and the newest
@@ -769,7 +775,7 @@ application.
 ✅ **Screening call** (candidate page: *Screening call*): the candidate's CV
 on one side (the newest one they sent; PDFs as they are, Word files as text;
 any version can be picked) and the call on the other, so the CV stays in view
-while you take notes, with the **AI assistant docked** underneath for
+while you take notes, with the **AI assistant** underneath (or docked to the right of the screen) for
 prompting (summary, questions to ask). One *Save the call* updates the
 profile with what was asked: **salary and currency** (current and expected;
 needs `candidates.compensation:update`), **notice period** (the company's

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
@@ -8,6 +8,7 @@ import { Assistant } from "./Assistant";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  try { window.localStorage.clear(); } catch { /* not there */ }
 });
 
 const on: Schemas["AssistantStatus"] = { enabled: true, usedTokens: 1500, monthlyTokens: 2_000_000 };
@@ -71,5 +72,39 @@ describe("AI assistant", () => {
     renderWithClient(<Assistant subjectType="job" subjectId="job_1" permissions={[...USE]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Summary" }));
     expect(await screen.findByText(/used this month's AI allowance/)).toBeTruthy();
+  });
+
+  it("docks to the right of the screen (the page makes room), tucks away as a tab, and remembers it", async () => {
+    reads(on, [answer({})]);
+    renderWithClient(<Assistant subjectType="candidate" subjectId="cand_1" permissions={[...USE]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Dock right ⇥" }));
+    const dock = await screen.findByRole("complementary", { name: "AI assistant" });
+    expect(dock.parentElement).toBe(document.body); // over the page, not in it
+    expect(document.body.classList.contains("dock-right")).toBe(true);
+    expect(document.body.style.getPropertyValue("--dock-w")).toBe("420px");
+    expect(screen.getByText(/docked on the right/)).toBeTruthy();
+
+    cleanup(); // another page: still docked
+    expect(document.body.classList.contains("dock-right")).toBe(false);
+    renderWithClient(<Assistant subjectType="job" subjectId="job_1" permissions={[...USE]} />);
+    expect(await screen.findByRole("complementary", { name: "AI assistant" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Minimise the AI assistant" }));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(document.body.classList.contains("dock-right")).toBe(false); // the page gets its room back
+    fireEvent.click(screen.getByRole("button", { name: "AI assistant" })); // the tab
+    fireEvent.click(await screen.findByRole("button", { name: "⇤ Back in the page" }));
+    expect(await screen.findByRole("region", { name: "AI assistant" })).toBeTruthy();
+  });
+
+  it("folds long answers but the newest", async () => {
+    const long = "A".repeat(600);
+    reads(on, [answer({ id: "ask_new", question: "Newest?", kind: "question", answer: long }), answer({ id: "ask_old", answer: long })]);
+    renderWithClient(<Assistant subjectType="candidate" subjectId="cand_1" permissions={[...USE]} />);
+    const old = await screen.findByRole("article", { name: "Summary" });
+    expect(old.className).toContain("folded");
+    expect(screen.getByRole("article", { name: "Newest?" }).className).not.toContain("folded");
+    fireEvent.click(within(old).getByRole("button", { name: "Show all" }));
+    expect(old.className).not.toContain("folded");
   });
 });
