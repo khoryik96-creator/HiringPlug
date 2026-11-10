@@ -52,6 +52,11 @@ func (h *HTTP) GetSalaryCalculationRules(ctx context.Context, _ api.GetSalaryCal
 	return api.GetSalaryCalculationRules200JSONResponse(rules), err
 }
 
+func (h *HTTP) GetScreeningSalaryCalculationRules(ctx context.Context, _ api.GetScreeningSalaryCalculationRulesRequestObject) (api.GetScreeningSalaryCalculationRulesResponseObject, error) {
+	rules, err := h.svc.salaryRules(ctx, authz.MustFromContext(ctx))
+	return api.GetScreeningSalaryCalculationRules200JSONResponse(rules), err
+}
+
 func (h *HTTP) PutSalaryCalculationRules(ctx context.Context, req api.PutSalaryCalculationRulesRequestObject) (api.PutSalaryCalculationRulesResponseObject, error) {
 	err := h.svc.setSalaryRules(ctx, authz.MustFromContext(ctx), *req.Body)
 	return api.PutSalaryCalculationRules200JSONResponse(*req.Body), err

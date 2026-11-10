@@ -30,6 +30,17 @@ interface Base {
   salaryVersion: number;
   salary: SalaryFormState;
 }
+
+interface CallDraft {
+  base: Base;
+  profile: CandidateFormState;
+  salary: SalaryFormState;
+  notes: string;
+  sensitive: boolean;
+  salaryShown: boolean;
+  calledOn: string;
+  calledBy: string;
+}
 const baseOf = (c: Candidate): Base => ({
   version: c.version,
   profile: formFromCandidate(c),
@@ -79,13 +90,14 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   };
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (draft: CallDraft) => {
+      const { base, profile, salary, notes, sensitive, salaryShown, calledOn, calledBy } = draft;
       const problems = salaryShown ? salaryProblems(salary) : {};
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
-      const body = { ...screeningBody(base, profile, salary, callNote(items, answers, notes), sensitive, salaryShown), calledOn, ...(calledBy ? { calledBy } : {}) };
+      const body = { ...screeningBody(base, profile, salary, notes, sensitive, salaryShown), calledOn, ...(calledBy ? { calledBy } : {}) };
       return unwrap(await api.POST("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId: candidate.id } }, body }));
     },
-    onSuccess: (res) => {
+    onSuccess: (res, draft) => {
       queryClient.setQueryData(candidateKey(candidate.id), res.candidate);
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
       void queryClient.invalidateQueries({ queryKey: notesKey("candidate", candidate.id) });
@@ -95,7 +107,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       setNotes("");
       setAnswers({});
       setSensitive(false); // each note is marked on its own
-      const sent = !!screeningBody(base, profile, salary, "", false, salaryShown).compensation;
+      const sent = !!screeningBody(draft.base, draft.profile, draft.salary, "", false, draft.salaryShown).compensation;
       setSaved(`Call of ${formatDay(res.call.calledOn)} saved to ${res.candidate.fullName}'s profile${res.noteId ? ", with the notes" : ""}.`
         + (res.sourceKept ? " Their source was kept." : "")
         + (sent && !res.salaryApplied ? " The salary was not changed: a later call already set it (the salary follows the latest call)." : ""));
@@ -115,7 +127,10 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   };
 
   return (
-    <form className="panel form-grid" aria-label="Screening call" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <form className="panel form-grid" aria-label="Screening call" onSubmit={(e) => {
+      e.preventDefault();
+      save.mutate({ base, profile, salary, notes: callNote(items, answers, notes), sensitive, salaryShown, calledOn, calledBy });
+    }}>
       <h3 className="full">Screening call</h3>
       <Field label="Call date" error={errors.calledOn}>
         <input type="date" value={calledOn} max={localToday()} onChange={(e) => { setSaved(null); setCalledOn(e.target.value); }} />

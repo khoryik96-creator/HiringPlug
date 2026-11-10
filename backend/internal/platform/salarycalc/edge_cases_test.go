@@ -158,3 +158,37 @@ func TestConflictingBonusFiguresInOneClause(t *testing.T) {
 		assert.True(t, Calculate("9k + "+bonus, "", DefaultRules(), "MYR").ReviewRequired, bonus)
 	}
 }
+
+func TestCommonFormattingDoesNotBlockFixedFigures(t *testing.T) {
+	for _, current := range []string{"9 600 + 400 allowance", "9\u00a0600 + 400 allowance", "9\u202f600 plus 400 allowance"} {
+		r := Calculate(current, "10—15%", DefaultRules(), "MYR")
+		assert.False(t, r.ReviewRequired, current)
+		assert.Equal(t, 10000.0, r.Monthly, current)
+		require.NotNil(t, r.ExpectedMin)
+		require.NotNil(t, r.ExpectedMax)
+		assert.Equal(t, 11000.0, *r.ExpectedMin)
+		assert.Equal(t, 11500.0, *r.ExpectedMax)
+	}
+	//nolint:misspell // Deliberate recruiter input typo.
+	for _, expected := range []string{"10 per cent", "10pct", "10 percen", "10 percentage", "+10%", "10k~12k"} {
+		r := Calculate("10k", expected, DefaultRules(), "MYR")
+		assert.False(t, r.ReviewRequired, expected)
+		require.NotNil(t, r.ExpectedMin, expected)
+		if expected == "10k~12k" {
+			assert.Equal(t, 10000.0, *r.ExpectedMin)
+			require.NotNil(t, r.ExpectedMax)
+			assert.Equal(t, 12000.0, *r.ExpectedMax)
+		} else {
+			assert.Equal(t, 11000.0, *r.ExpectedMin, expected)
+		}
+	}
+}
+
+func TestPercentageAliasesCannotHideCurrencyChanges(t *testing.T) {
+	//nolint:misspell // Deliberate percent-word typo.
+	for _, expected := range []string{"SGD10pct", "SGD10 per cent", "SGD10percen"} {
+		r := Calculate("MYR 10k", expected, DefaultRules(), "MYR")
+		assert.True(t, r.ReviewRequired, expected)
+		assert.Nil(t, r.ExpectedMin, expected)
+	}
+}

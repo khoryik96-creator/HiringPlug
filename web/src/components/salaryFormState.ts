@@ -76,10 +76,15 @@ export function salaryProblems(f: SalaryFormState): Record<string, string> {
     const amount = plainAmount(f[key]);
     if (amount !== "" && !AMOUNT.test(amount)) {
       problems[SALARY_PATHS[key]] = "Enter an amount like 8500 or 8,500.50 (a point before cents).";
+    } else if (amount !== "" && Number(amount) > 999999999999.99) {
+      problems[SALARY_PATHS[key]] = "The amount is outside the supported range.";
     }
   }
   if (plainAmount(f.expectedMin) === "" && plainAmount(f.expectedMax) !== "") {
     problems[SALARY_PATHS.expectedMin] = 'Enter the lower figure here. For a single figure, fill in "From" only.';
+  }
+  if (AMOUNT.test(plainAmount(f.expectedMin)) && AMOUNT.test(plainAmount(f.expectedMax)) && Number(plainAmount(f.expectedMax)) < Number(plainAmount(f.expectedMin))) {
+    problems[SALARY_PATHS.expectedMax] = "The upper figure must be at least the lower figure.";
   }
   const currencies = [
     ["currentCurrency", f.currentAmount],

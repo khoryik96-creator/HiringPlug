@@ -49,15 +49,16 @@ var (
 	bonusNumberRE  = regexp.MustCompile(`\d+(?:\.\d+)?`)
 	sameRE         = regexp.MustCompile(`(?i)\b(same|similar|maintain|match|follow|lateral|horizontal)\b|no\s+(increment|increase|change)|as\s+current|current\s+(salary|package)`)
 	percentRE      = regexp.MustCompile(`(?i)(-?\d+(?:\.\d+)?)\s*(?:%|percent)?\s*(?:-|–|~|to)\s*(-?\d+(?:\.\d+)?)\s*(?:%|percent)|(-?\d+(?:\.\d+)?)\s*(?:%|percent)`)
-	rangeRE        = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\b`)
+	rangeRE        = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\s*(?:-|–|~|to)\s*(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\b`)
 	annualRE       = regexp.MustCompile(`(?i)\bannual|per\s+(annum|annual|year)|yearly|\bpa\b|p\.a\.|\blpa\b|/\s*(?:yr|year|annum|annual|pa)\b`)
 	nonMonthlyRE   = regexp.MustCompile(`(?i)hourly|per\s+hour|p\.h\.|daily|per\s+day|p\.d\.|weekly|per\s+week|p\.w\.|fortnight|bi[- ]weekly|/\s*(?:h|hr|hour|d|day|w|wk|week)\b`)
 )
 
 func clean(raw string) string {
-	raw = strings.NewReplacer("−", "-", "％", "%").Replace(raw)
+	raw = strings.NewReplacer("−", "-", "—", "–", "％", "%").Replace(raw)
 	raw = regexp.MustCompile(`(^|[^0-9])\.(\d)`).ReplaceAllString(raw, "${1}0.${2}")
-	raw = correctSpelling(raw)
+	raw = percentWords(raw)
+	raw = componentPlus(raw)
 	raw = regexp.MustCompile(`([A-Za-z])(\d)`).ReplaceAllString(raw, "$1 $2")
 	raw = regexp.MustCompile(`(?i)\b(lpa|lakhs?|lacs?|crores?|cr)\s+(\d+(?:\.\d+)?)`).ReplaceAllString(raw, "$2 $1")
 	raw = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR)\b`).ReplaceAllString(raw, "$1 $2")
@@ -268,6 +269,8 @@ func bonusMonths(s string) (float64, bool, bool) {
 }
 
 func groupedNumbers(raw string) string {
+	raw = strings.NewReplacer("\u00a0", " ", "\u202f", " ").Replace(raw)
+	raw = regexp.MustCompile(`\b\d{1,3}(?: \d{3})+(?:\.\d+)?\b`).ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(s, " ", "") })
 	t := decimalGroupRE.ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, ".", ""), ",", ".") })
 	t = multipleDotRE.ReplaceAllStringFunc(t, func(s string) string { return strings.ReplaceAll(s, ".", "") })
 	t = groupedRE.ReplaceAllStringFunc(t, func(token string) string {
@@ -277,4 +280,14 @@ func groupedNumbers(raw string) string {
 		return " [unreadable number] "
 	})
 	return t
+}
+
+func componentPlus(raw string) string {
+	return regexp.MustCompile(`(?i)\bplus\b`).ReplaceAllString(raw, "+")
+}
+
+// Preserve glued currency-code boundaries while accepting common percentage wording.
+func percentWords(raw string) string {
+	//nolint:misspell // Common truncated percent word in recruiter input.
+	return regexp.MustCompile(`(?i)(\d)\s*(?:percent(?:age)?|per\s+cent|pct|percen)\b`).ReplaceAllString(correctSpelling(raw), "$1%")
 }

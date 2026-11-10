@@ -21,6 +21,20 @@ x-module:
   jobs: {}
 
 paths:
+  /v1/salary-calculation-rules:
+    get:
+      operationId: getScreeningSalaryCalculationRules
+      tags: [settings]
+      summary: Read company calculation rules for screening salaries
+      x-permission: candidates.compensation:update
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalaryCalculationRules' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/settings/salary-calculation:
     get:
       operationId: getSalaryCalculationRules

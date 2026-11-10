@@ -128,17 +128,17 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
     description: orNull(form.description),
   };
   const save = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (submitted: typeof body) =>
       ad
-        ? unwrap(await api.PATCH("/v1/job-ads/{adId}", { params: { path: { adId: ad.id } }, body: { version: opened.version, ...body } }))
-        : unwrap(await api.POST("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } }, body })),
+        ? unwrap(await api.PATCH("/v1/job-ads/{adId}", { params: { path: { adId: ad.id } }, body: { version: opened.version, ...submitted } }))
+        : unwrap(await api.POST("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } }, body: submitted })),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: jobAdsKey(job.id) });
       onDone();
     },
   });
   return (
-    <form className="panel form-grid" aria-label={ad ? "Edit ad" : "New ad"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <form className="panel form-grid" aria-label={ad ? "Edit ad" : "New ad"} onSubmit={(e) => { e.preventDefault(); save.mutate(body); }}>
       <div className="full"><JdDrop jobId={job.id} start={jd} onRead={fillFrom} /></div>
       <label className="field">Ad title<input value={form.title} onChange={(e) => { set("title", e.target.value); }} /></label>
       <label className="field">Location<input value={form.location} onChange={(e) => { set("location", e.target.value); }} /></label>

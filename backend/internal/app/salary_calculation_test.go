@@ -138,3 +138,24 @@ func TestScreeningCallSavesFixedFiguresWithUnconfirmedBonus(t *testing.T) {
 	require.NotNil(t, comp.CurrentSalary.MustGet().Description)
 	assert.Equal(t, current, *comp.CurrentSalary.MustGet().Description)
 }
+
+func TestScreeningRulesDoNotRequireSettingsAccess(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter, api.RoleSourcer)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	a.setRole(owner, "recruiter", map[string]any{"version": 0, "permissions": []api.Permission{api.PermissionCandidatesCompensationUpdate}, "candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	rules := api.SalaryCalculationRules{Allowances: true, Bonus: false, Cents: true}
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/settings/salary-calculation", owner, rules).Status)
+	require.Equal(t, http.StatusForbidden, a.request(http.MethodGet, "/v1/settings/salary-calculation", recruiter, nil).Status)
+	res := a.request(http.MethodGet, "/v1/salary-calculation-rules", recruiter, nil)
+	require.Equal(t, http.StatusOK, res.Status)
+	var got api.SalaryCalculationRules
+	res.JSON(&got)
+	assert.Equal(t, rules, got)
+	assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, "/v1/salary-calculation-rules", tenant.Users[api.RoleSourcer].Token, nil).Status)
+	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	var isolated api.SalaryCalculationRules
+	a.request(http.MethodGet, "/v1/salary-calculation-rules", other, nil).JSON(&isolated)
+	assert.True(t, isolated.Bonus)
+}

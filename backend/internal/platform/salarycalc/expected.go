@@ -10,7 +10,7 @@ func calculateExpected(out *Result, text string, rules Rules) {
 	if strings.TrimSpace(text) == "" {
 		return
 	}
-	parts := strings.FieldsFunc(groupedNumbers(text), func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
+	parts := strings.FieldsFunc(componentPlus(groupedNumbers(text)), func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
 	primary := []string{}
 	for _, part := range parts {
 		if strings.TrimSpace(part) == "" {
@@ -27,7 +27,7 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		return
 	}
 	raw := strings.TrimSpace(primary[0])
-	out.ExpectedCurrency = currencyHint(raw, true)
+	out.ExpectedCurrency = currencyHint(percentWords(raw), true)
 	s := clean(raw)
 	if nonMonthlyRE.MatchString(s) {
 		review(out, "Expected rate needs working-time information before monthly conversion.")

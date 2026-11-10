@@ -24,6 +24,7 @@ const CALLER: Permission[] = [...RECRUITER, "notes:create", "notes.sensitive:rea
 function reads(c: Candidate) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { path?: { documentId?: string } } }) => {
     if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+    if (path === "/v1/salary-calculation-rules") return Promise.resolve(ok({allowances:true,bonus:true,bonusOnAllowances:false,cents:false}));
     if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(c));
     if (path === "/v1/candidates/{candidateId}/documents") return Promise.resolve(ok({ items: docs }));
     if (path === "/v1/documents/{documentId}") return Promise.resolve(ok(docs.find((d) => d.id === init?.params?.path?.documentId)));
@@ -153,4 +154,21 @@ it("returns to the profile with a notice when a later call kept its salary", asy
   fireEvent.change(within(form).getByLabelText("Amount"), { target: { value: "9000" } });
   fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
   await waitFor(() => { expect(window.location.hash).toBe(`#/candidates/${c.id}?screeningSalary=kept`); });
+});
+
+it("saves the freshly applied salary when save is clicked immediately", async () => {
+  const c = testCandidate({ compensation: null });
+  reads(c);
+  const post = vi.spyOn(api,"POST").mockImplementation(((path: string) => Promise.resolve(path === "/v1/salary-calculations"
+    ? ok({base:"9000",allowances:"400",bonus:"0",monthly:"9400",annualMonths:12,hasCurrent:true,reviewRequired:false,expectedMin:"10340",warnings:[],excluded:[]})
+    : ok({candidate:c,noteId:null,sourceKept:false,call:{id:"scl_new",calledOn:today,calledBy:"usr_1",calledByName:"Aina",noteId:null,salaryRecorded:true,createdAt:"2026-11-09T00:00:00Z"},salaryApplied:true}))) as never);
+  renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
+  fireEvent.change(await screen.findByLabelText("Current salary breakdown"),{target:{value:"9k + 400 allowance"}});
+  fireEvent.change(screen.getByLabelText("Expected salary"),{target:{value:"10%"}});
+  await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false); });
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  fireEvent.click(await screen.findByRole("button",{name:"Use these figures"}));
+  fireEvent.click(screen.getByRole("button",{name:"Save the call"}));
+  await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+  expect(sentBody(post,1)).toMatchObject({compensation:{currentSalary:{amount:"9400"},expectedSalary:{min:"10340"}}});
 });

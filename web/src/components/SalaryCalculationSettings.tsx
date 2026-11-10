@@ -4,7 +4,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
 
 export const salaryRulesKey = ["salary-calculation-rules"] as const;
-export const useSalaryRules = () => useQuery({ queryKey: salaryRulesKey, queryFn: async () => unwrap(await api.GET("/v1/settings/salary-calculation")) });
+export const useSalaryRules = (screening = false) => useQuery({ queryKey: salaryRulesKey, queryFn: async () => unwrap(await api.GET(screening ? "/v1/salary-calculation-rules" : "/v1/settings/salary-calculation")) });
 
 export function SalaryCalculationSettings() {
   const query = useSalaryRules();
