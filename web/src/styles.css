@@ -647,7 +647,7 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 /* Notes and activity: the latest call pinned, then filters and search. */
 .pinned-call { border: 1.5px solid #0e7490; background: #ecfeff; border-radius: 12px; padding: 0.75rem 0.9rem; display: grid; gap: 0.45rem; margin: 0.75rem 0; }
 .pinned-label { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #0e7490; }
-.call-qa { margin: 0; display: grid; gap: 0.2rem; }
+.call-qa { margin: 0; display: grid; grid-template-columns: 1fr; gap: 0.2rem; }
 .call-qa > div { display: grid; grid-template-columns: max-content 1fr; gap: 0.7rem; }
 .call-qa > div.plain { grid-template-columns: 1fr; }
 .call-qa dt { font-weight: 700; color: #0e7490; }
