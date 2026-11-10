@@ -364,7 +364,7 @@ func fromCompensationRow(r store.CandidateCompensation) (Compensation, error) {
 		return Compensation{}, err
 	}
 	if current != nil && r.CurrentCurrency != nil && r.CurrentPeriod != nil {
-		c.Current = &SalaryAmount{Amount: *current, Currency: *r.CurrentCurrency, Period: *r.CurrentPeriod}
+		c.Current = &SalaryAmount{Description: r.CurrentDescription, Amount: *current, Currency: *r.CurrentCurrency, Period: *r.CurrentPeriod}
 	}
 	lo, err := database.DecimalString(r.ExpectedMin)
 	if err != nil {
@@ -375,7 +375,7 @@ func fromCompensationRow(r store.CandidateCompensation) (Compensation, error) {
 		return Compensation{}, err
 	}
 	if lo != nil && r.ExpectedCurrency != nil && r.ExpectedPeriod != nil {
-		c.Expected = &SalaryRange{Min: *lo, Max: hi, Currency: *r.ExpectedCurrency, Period: *r.ExpectedPeriod}
+		c.Expected = &SalaryRange{Description: r.ExpectedDescription, Min: *lo, Max: hi, Currency: *r.ExpectedCurrency, Period: *r.ExpectedPeriod}
 	}
 	return c, nil
 }
@@ -383,7 +383,7 @@ func fromCompensationRow(r store.CandidateCompensation) (Compensation, error) {
 func insertCompensationParams(candidateID string, current *SalaryAmount, expected *SalaryRange) store.InsertCompensationParams {
 	u := updateCompensationParams(candidateID, 0, current, expected)
 	return store.InsertCompensationParams{
-		CandidateID: candidateID, CurrentAmount: u.CurrentAmount, CurrentCurrency: u.CurrentCurrency,
+		CandidateID: candidateID, CurrentDescription: u.CurrentDescription, ExpectedDescription: u.ExpectedDescription, CurrentAmount: u.CurrentAmount, CurrentCurrency: u.CurrentCurrency,
 		CurrentPeriod: u.CurrentPeriod, ExpectedMin: u.ExpectedMin, ExpectedMax: u.ExpectedMax,
 		ExpectedCurrency: u.ExpectedCurrency, ExpectedPeriod: u.ExpectedPeriod,
 	}
@@ -392,9 +392,11 @@ func insertCompensationParams(candidateID string, current *SalaryAmount, expecte
 func updateCompensationParams(candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange) store.UpdateCompensationParams {
 	u := store.UpdateCompensationParams{CandidateID: candidateID, ExpectedVersion: int32(expectedVersion)} //nolint:gosec // small positive integer
 	if current != nil {
+		u.CurrentDescription = current.Description
 		u.CurrentAmount, u.CurrentCurrency, u.CurrentPeriod = &current.Amount, &current.Currency, &current.Period
 	}
 	if expected != nil {
+		u.ExpectedDescription = expected.Description
 		u.ExpectedMin, u.ExpectedMax, u.ExpectedCurrency, u.ExpectedPeriod = &expected.Min, expected.Max, &expected.Currency, &expected.Period
 	}
 	return u

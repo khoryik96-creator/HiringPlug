@@ -370,6 +370,26 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/AssistantOff'}
         '429': {$ref: '#/components/responses/AssistantLimitReached'}
+  /v1/salary-calculations:
+    post:
+      operationId: calculateSalary
+      tags: [candidates]
+      summary: Review a fixed monthly salary calculation without changing a candidate
+      x-permission: candidates.compensation:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SalaryCalculationInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SalaryCalculation'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/candidates:
     get:
       operationId: listCandidates
@@ -4222,6 +4242,39 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
+  /v1/settings/salary-calculation:
+    get:
+      operationId: getSalaryCalculationRules
+      tags: [settings]
+      summary: Fixed monthly salary calculation rules
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SalaryCalculationRules'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: putSalaryCalculationRules
+      tags: [settings]
+      summary: Choose the company's fixed monthly salary formula
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SalaryCalculationRules'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SalaryCalculationRules'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/settings/fields:
     get:
       operationId: getFieldSettings
@@ -4938,6 +4991,7 @@ components:
       additionalProperties: false
       required: [amount, currency, period]
       properties:
+        description: {type: string, maxLength: 2000}
         amount: {$ref: '#/components/schemas/DecimalAmount'}
         currency: {$ref: '#/components/schemas/CurrencyCode'}
         period: {$ref: '#/components/schemas/PayPeriod'}
@@ -4946,6 +5000,7 @@ components:
       additionalProperties: false
       required: [min, currency, period]
       properties:
+        description: {type: string, maxLength: 2000}
         min: {$ref: '#/components/schemas/DecimalAmount'}
         max:
           description: Leave empty for a single expected figure.
@@ -5471,6 +5526,29 @@ components:
         skills: {type: array, items: {type: string}}
         industries: {type: array, items: {type: string}}
         specializations: {type: array, items: {type: string}}
+    SalaryCalculationInput:
+      type: object
+      additionalProperties: false
+      required: [current, expected, rules]
+      properties:
+        current: {type: string, maxLength: 2000}
+        expected: {type: string, maxLength: 2000}
+        rules: {$ref: '#/components/schemas/SalaryCalculationRules'}
+    SalaryCalculation:
+      type: object
+      required: [base, allowances, bonus, monthly, annualMonths, warnings, excluded]
+      properties:
+        base: {type: string}
+        allowances: {type: string}
+        bonus: {type: string}
+        monthly: {type: string}
+        annualMonths: {type: number, format: double}
+        currentCurrency: {type: string}
+        expectedCurrency: {type: string}
+        expectedMin: {type: string}
+        expectedMax: {type: string}
+        warnings: {type: array, items: {type: string}}
+        excluded: {type: array, items: {type: string}}
     CareersPage:
       type: object
       required: [companyName, ads]
@@ -9236,6 +9314,15 @@ components:
         mandatory:
           type: array
           items: {$ref: '#/components/schemas/MandatoryField'}
+    SalaryCalculationRules:
+      type: object
+      additionalProperties: false
+      required: [allowances, bonus, bonusOnAllowances, cents]
+      properties:
+        allowances: {type: boolean}
+        bonus: {type: boolean}
+        bonusOnAllowances: {type: boolean}
+        cents: {type: boolean}
   parameters:
     AiProviderPath:
       name: aiProvider

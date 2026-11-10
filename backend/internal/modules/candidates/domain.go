@@ -93,17 +93,19 @@ type Compensation struct {
 
 // SalaryAmount is one figure, e.g. 8500.00 MYR per month.
 type SalaryAmount struct {
-	Amount   string
-	Currency string
-	Period   string // hour | day | month | year
+	Description *string
+	Amount      string
+	Currency    string
+	Period      string // hour | day | month | year
 }
 
 // SalaryRange is an expected salary: Min alone, or Min to Max.
 type SalaryRange struct {
-	Min      string
-	Max      *string
-	Currency string
-	Period   string
+	Description *string
+	Min         string
+	Max         *string
+	Currency    string
+	Period      string
 }
 
 // Change is one field of a partial update. Set is false when the client did

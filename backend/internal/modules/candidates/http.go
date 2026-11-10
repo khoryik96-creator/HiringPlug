@@ -166,10 +166,10 @@ func (h *HTTP) PutCandidateCompensation(ctx context.Context, req api.PutCandidat
 
 func salaryFromAPI(b api.CompensationUpdate) (current *SalaryAmount, expected *SalaryRange) {
 	if v, err := b.CurrentSalary.Get(); err == nil {
-		current = &SalaryAmount{Amount: v.Amount, Currency: v.Currency, Period: string(v.Period)}
+		current = &SalaryAmount{Description: v.Description, Amount: v.Amount, Currency: v.Currency, Period: string(v.Period)}
 	}
 	if v, err := b.ExpectedSalary.Get(); err == nil {
-		expected = &SalaryRange{Min: v.Min, Max: valueOrNil(v.Max), Currency: v.Currency, Period: string(v.Period)}
+		expected = &SalaryRange{Description: v.Description, Min: v.Min, Max: valueOrNil(v.Max), Currency: v.Currency, Period: string(v.Period)}
 	}
 	return current, expected
 }
@@ -238,11 +238,11 @@ func compensationToAPI(c Compensation) api.Compensation {
 		ExpectedSalary: nullable.NewNullNullable[api.SalaryRange](),
 	}
 	if s := c.Current; s != nil {
-		out.CurrentSalary = nullable.NewNullableWithValue(api.SalaryAmount{Amount: s.Amount, Currency: s.Currency, Period: api.PayPeriod(s.Period)})
+		out.CurrentSalary = nullable.NewNullableWithValue(api.SalaryAmount{Description: s.Description, Amount: s.Amount, Currency: s.Currency, Period: api.PayPeriod(s.Period)})
 	}
 	if r := c.Expected; r != nil {
 		out.ExpectedSalary = nullable.NewNullableWithValue(api.SalaryRange{
-			Min: r.Min, Max: orNull(r.Max), Currency: r.Currency, Period: api.PayPeriod(r.Period),
+			Description: r.Description, Min: r.Min, Max: orNull(r.Max), Currency: r.Currency, Period: api.PayPeriod(r.Period),
 		})
 	}
 	return out

@@ -2,6 +2,9 @@
 import type { Compensation, Schemas } from "../api/client";
 
 export interface SalaryFormState {
+  currentDescription?: string;
+  expectedDescription?: string;
+  calculationPending?: boolean;
   currentAmount: string;
   currentCurrency: string;
   currentPeriod: Schemas["PayPeriod"];
@@ -13,6 +16,9 @@ export interface SalaryFormState {
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
 export const SALARY_PATHS: Record<keyof SalaryFormState, string> = {
+  currentDescription: "currentSalary.description",
+  expectedDescription: "expectedSalary.description",
+  calculationPending: "currentSalary.description",
   currentAmount: "currentSalary.amount",
   currentCurrency: "currentSalary.currency",
   currentPeriod: "currentSalary.period",
@@ -30,6 +36,8 @@ export function formFromCompensation(c: Compensation | null | undefined): Salary
   const current = c?.currentSalary;
   const expected = c?.expectedSalary;
   return {
+    ...(current?.description !== undefined ? { currentDescription: current.description } : {}),
+    ...(expected?.description !== undefined ? { expectedDescription: expected.description } : {}),
     currentAmount: current?.amount ?? "",
     currentCurrency: current?.currency ?? expected?.currency ?? DEFAULT_CURRENCY,
     currentPeriod: current?.period ?? expected?.period ?? "month",
@@ -59,6 +67,7 @@ const CURRENCY = /^[A-Z]{3}$/;
  */
 export function salaryProblems(f: SalaryFormState): Record<string, string> {
   const problems: Record<string, string> = {};
+  if (f.calculationPending) problems["currentSalary.description"] = "Calculate and review the salary before saving.";
   for (const key of ["currentAmount", "expectedMin", "expectedMax"] as const) {
     const amount = plainAmount(f[key]);
     if (amount !== "" && !AMOUNT.test(amount)) {
@@ -88,10 +97,10 @@ export function toCompensationBody(f: SalaryFormState, expectedVersion: number):
   return {
     expectedVersion,
     currentSalary: current
-      ? { amount: current, currency: f.currentCurrency.trim().toUpperCase(), period: f.currentPeriod }
+      ? { ...(f.currentDescription !== undefined ? { description: f.currentDescription } : {}), amount: current, currency: f.currentCurrency.trim().toUpperCase(), period: f.currentPeriod }
       : null,
     expectedSalary: min
-      ? { min, max: max || null, currency: f.expectedCurrency.trim().toUpperCase(), period: f.expectedPeriod }
+      ? { ...(f.expectedDescription !== undefined ? { description: f.expectedDescription } : {}), min, max: max || null, currency: f.expectedCurrency.trim().toUpperCase(), period: f.expectedPeriod }
       : null,
   };
 }

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { fieldSettingsKey, policiesKey } from "../api/keys";
+import { SalaryCalculationSettings } from "../components/SalaryCalculationSettings";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { chipStyle } from "../components/companyCategory";
 import { fieldErrors } from "../components/forms";
@@ -25,6 +26,7 @@ export function Settings() {
           <AgencyName />
           <MandatoryFields fields={settings.data.mandatory} />
           <Policies />
+          <SalaryCalculationSettings />
           <h3>Dropdowns</h3>
           {settings.data.lists.filter((l) => !l.hints && !l.colors).map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="company-categories">Company categories</h3>

@@ -11,7 +11,7 @@ import { CallItems, type CallAnswers, callNote, useCallItems } from "./CallItems
 import { type CandidateFormState, formFromCandidate, toUpdateBody } from "./candidateFormState";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
-import { SalaryFields } from "./SalaryForm";
+import { ScreeningSalary } from "./ScreeningSalary";
 import { formFromCompensation, SALARY_PATHS, salaryProblems, type SalaryFormState, toCompensationBody } from "./salaryFormState";
 import { SaveError } from "./SaveError";
 import { SourcePicker } from "./SourcePicker";
@@ -158,7 +158,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
         )}
         {errors.source && <small className="error">{errors.source}</small>}
       </div>
-      {salaryShown && <SalaryFields form={salary} set={setSalaryField} errors={errors} />}
+      {salaryShown && <ScreeningSalary form={salary} set={setSalaryField} patch={(value) => { setSaved(null); setSalary((f) => ({ ...f, ...value })); }} errors={errors} />}
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save the call</button>
         {saved && <span role="status" className="muted">{saved}</span>}

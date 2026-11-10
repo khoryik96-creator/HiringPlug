@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { candidateKey } from "../api/keys";
 import { api, type Candidate, type Document, type Permission } from "../api/client";
 import { latestCv } from "../components/CvPane";
 import { failure, ok, RECRUITER, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
@@ -120,4 +121,18 @@ describe("screening call", () => {
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
     expect(sentBody(post, 1)).toMatchObject({ version: 5, notes: "Twenty minutes of notes" });
   });
+});
+
+
+it("clears a salary draft when switching to another cached candidate", async () => {
+  const first = testCandidate({ compensation: null });
+  reads(first);
+  const { client, rerender } = renderWithClient(<ScreeningCall candidateId={first.id} permissions={CALLER} />);
+  const input = await screen.findByLabelText("Current salary breakdown");
+  fireEvent.change(input, { target: { value: "16k + AWS" } });
+  const other = testCandidate({ id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Other Example", compensation: null });
+  client.setQueryDefaults(candidateKey(other.id), { staleTime: Infinity });
+  client.setQueryData(candidateKey(other.id), other);
+  rerender(<ScreeningCall candidateId={other.id} permissions={CALLER} />);
+  await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>("Current salary breakdown").value).toBe(""); });
 });

@@ -42,7 +42,7 @@ export function ScreeningCall({ candidateId, permissions }: { candidateId: strin
         </div>
         <div className="screening-side">
           {permissions.includes("candidates:update")
-            ? <ScreeningForm candidate={c} permissions={permissions} />
+            ? <ScreeningForm key={c.id} candidate={c} permissions={permissions} />
             : <p className="muted">Your role may not update candidates.</p>}
           <ScreeningCalls candidateId={c.id} permissions={permissions} />
           <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} />

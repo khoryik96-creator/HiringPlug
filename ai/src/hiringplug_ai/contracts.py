@@ -483,6 +483,7 @@ class SalaryAmount(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    description: Annotated[str | None, Field(max_length=2000)] = None
     amount: DecimalAmount
     currency: CurrencyCode
     period: PayPeriod
@@ -492,6 +493,7 @@ class SalaryRange(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    description: Annotated[str | None, Field(max_length=2000)] = None
     min: DecimalAmount
     max: Annotated[DecimalAmount | None, Field(description="Leave empty for a single expected figure.")] = (
         None
@@ -872,6 +874,20 @@ class UsedValues(BaseModel):
     skills: list[str]
     industries: list[str]
     specializations: list[str]
+
+
+class SalaryCalculation(BaseModel):
+    base: str
+    allowances: str
+    bonus: str
+    monthly: str
+    annualMonths: float
+    currentCurrency: str | None = None
+    expectedCurrency: str | None = None
+    expectedMin: str | None = None
+    expectedMax: str | None = None
+    warnings: list[str]
+    excluded: list[str]
 
 
 class ApplicationReceived(BaseModel):
@@ -4130,6 +4146,16 @@ class FieldSettings(BaseModel):
     mandatory: list[MandatoryField]
 
 
+class SalaryCalculationRules(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    allowances: bool
+    bonus: bool
+    bonusOnAllowances: bool
+    cents: bool
+
+
 class AiProviderEntry(BaseModel):
     provider: AiProviderName
     model: Annotated[str | None, Field(...)]
@@ -4215,6 +4241,15 @@ class CandidateFound(BaseModel):
         Field(description="With a company searched for: where they work or worked there."),
     ]
     score: Annotated[float | None, Field(description="For names alike, how alike (0 to 1).")]
+
+
+class SalaryCalculationInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    current: Annotated[str, Field(max_length=2000)]
+    expected: Annotated[str, Field(max_length=2000)]
+    rules: SalaryCalculationRules
 
 
 class PublicJobAd(BaseModel):

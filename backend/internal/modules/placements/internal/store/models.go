@@ -188,18 +188,20 @@ type Candidate struct {
 }
 
 type CandidateCompensation struct {
-	CandidateID      string
-	TenantID         string
-	Version          int32
-	CurrentAmount    pgtype.Numeric
-	CurrentCurrency  *string
-	CurrentPeriod    *string
-	ExpectedMin      pgtype.Numeric
-	ExpectedMax      pgtype.Numeric
-	ExpectedCurrency *string
-	ExpectedPeriod   *string
-	UpdatedBy        string
-	UpdatedAt        time.Time
+	CandidateID         string
+	TenantID            string
+	Version             int32
+	CurrentAmount       pgtype.Numeric
+	CurrentCurrency     *string
+	CurrentPeriod       *string
+	ExpectedMin         pgtype.Numeric
+	ExpectedMax         pgtype.Numeric
+	ExpectedCurrency    *string
+	ExpectedPeriod      *string
+	UpdatedBy           string
+	UpdatedAt           time.Time
+	CurrentDescription  *string
+	ExpectedDescription *string
 }
 
 type CandidateConsent struct {

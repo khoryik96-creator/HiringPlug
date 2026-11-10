@@ -796,6 +796,20 @@ one part is refused (e.g. a salary range that runs backwards, or someone saved
 the profile meanwhile), nothing is saved, and the notes typed are kept. The
 audit log records that a call was saved, never the salary.
 
+Salary descriptions on a screening call accept shorthand such as `16k`, `10% lateral`,
+AWS and contractual/13th-month bonuses. **Calculate** previews fixed monthly cash;
+**Use these figures** applies it to the form, and **Save the call** saves both the
+reviewed amounts and original wording in the protected compensation record. The
+candidate card shows the fixed figure, excluding performance pay, employer EPF and
+conditional allowances. Missing or conflicting guaranteed bonus terms need review.
+Daily/hourly/weekly rates need working-time information and cannot be assumed monthly.
+Salary is calculated in Go and is never sent to AI.
+
+**Settings → General → Salary calculation** chooses fixed allowances, guaranteed
+bonus, the bonus basis and rounding for the company. Defaults spread guaranteed
+extra months over 12 months using basic pay, then add fixed allowances. Changing
+settings affects future calculations; saved salaries remain as reviewed.
+
 The notes are asked item by item, as the company sets them in **Settings >
 Screening call** (starting with RFL and LF, reason for leaving and what
 they look for; notice period and salaries have their own fields; add,

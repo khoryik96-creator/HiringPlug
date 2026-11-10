@@ -21,6 +21,40 @@ x-module:
   jobs: {}
 
 paths:
+  /v1/settings/salary-calculation:
+    get:
+      operationId: getSalaryCalculationRules
+      tags: [settings]
+      summary: Fixed monthly salary calculation rules
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalaryCalculationRules' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: putSalaryCalculationRules
+      tags: [settings]
+      summary: Choose the company's fixed monthly salary formula
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SalaryCalculationRules' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalaryCalculationRules' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/settings/fields:
     get:
       operationId: getFieldSettings
@@ -313,3 +347,13 @@ components:
         mandatory:
           type: array
           items: { $ref: '#/components/schemas/MandatoryField' }
+
+    SalaryCalculationRules:
+      type: object
+      additionalProperties: false
+      required: [allowances, bonus, bonusOnAllowances, cents]
+      properties:
+        allowances: { type: boolean }
+        bonus: { type: boolean }
+        bonusOnAllowances: { type: boolean }
+        cents: { type: boolean }

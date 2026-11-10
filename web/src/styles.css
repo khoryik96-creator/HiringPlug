@@ -779,3 +779,13 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .separate-actions { margin-top: 0.6rem; }
 .recipients-table { margin-top: 0.75rem; }
 .recipients-table .ok { color: var(--ok, #157a3c); font-weight: 600; }
+
+/* The screening-call salary review uses the existing theme. */
+.screening-salary textarea, .screening-salary input { width: 100%; box-sizing: border-box; }
+.screening-salary > .field { margin-bottom: 0.75rem; }
+.salary-breakdown { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+.salary-breakdown h4 { margin-top: 0; }
+.salary-breakdown dl { grid-template-columns: 1fr auto; gap: 0.5rem; }
+.salary-total { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; border-top: 1px solid var(--line-strong); margin-top: 1rem; padding-top: 0.75rem; }
+.salary-total span { font: 700 2rem var(--display); color: var(--accent-dark); }
+.salary-formula { padding: 0.75rem; background: var(--soft); border-radius: 10px; }

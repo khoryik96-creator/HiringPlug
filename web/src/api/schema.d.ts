@@ -96,6 +96,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/salary-calculations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review a fixed monthly salary calculation without changing a candidate */
+        post: operations["calculateSalary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/candidates": {
         parameters: {
             query?: never;
@@ -2862,6 +2879,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/settings/salary-calculation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fixed monthly salary calculation rules */
+        get: operations["getSalaryCalculationRules"];
+        /** Choose the company's fixed monthly salary formula */
+        put: operations["putSalaryCalculationRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings/fields": {
         parameters: {
             query?: never;
@@ -3200,11 +3235,13 @@ export interface components {
          */
         CandidateSource: string;
         SalaryAmount: {
+            description?: string;
             amount: components["schemas"]["DecimalAmount"];
             currency: components["schemas"]["CurrencyCode"];
             period: components["schemas"]["PayPeriod"];
         };
         SalaryRange: {
+            description?: string;
             min: components["schemas"]["DecimalAmount"];
             /** @description Leave empty for a single expected figure. */
             max?: components["schemas"]["DecimalAmount"] | null;
@@ -3551,6 +3588,25 @@ export interface components {
             skills: string[];
             industries: string[];
             specializations: string[];
+        };
+        SalaryCalculationInput: {
+            current: string;
+            expected: string;
+            rules: components["schemas"]["SalaryCalculationRules"];
+        };
+        SalaryCalculation: {
+            base: string;
+            allowances: string;
+            bonus: string;
+            monthly: string;
+            /** Format: double */
+            annualMonths: number;
+            currentCurrency?: string;
+            expectedCurrency?: string;
+            expectedMin?: string;
+            expectedMax?: string;
+            warnings: string[];
+            excluded: string[];
         };
         CareersPage: {
             companyName: string;
@@ -6476,6 +6532,12 @@ export interface components {
             lists: components["schemas"]["FieldList"][];
             mandatory: components["schemas"]["MandatoryField"][];
         };
+        SalaryCalculationRules: {
+            allowances: boolean;
+            bonus: boolean;
+            bonusOnAllowances: boolean;
+            cents: boolean;
+        };
     };
     responses: {
         /** @description The request is invalid (VALIDATION_FAILED). */
@@ -6964,6 +7026,33 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["AssistantOff"];
             429: components["responses"]["AssistantLimitReached"];
+        };
+    };
+    calculateSalary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalaryCalculationInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryCalculation"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listCandidates: {
@@ -12128,6 +12217,55 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getSalaryCalculationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryCalculationRules"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putSalaryCalculationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalaryCalculationRules"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalaryCalculationRules"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getFieldSettings: {
