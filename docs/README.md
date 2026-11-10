@@ -18,6 +18,7 @@ Read in this order. Each page is short and links to the next.
 8. **[Roadmap](roadmap.md)**: the milestones, in order.
 
 - [HANDOVER.md](HANDOVER.md): where the work stands and what is next (read first when picking the project up).
+- [Turning HiringPlug into a SaaS: scaling to 20,000 users](saas-plan-scaling-to-20k-users.md): what to change, set-up and costs at each size, Python or Go.
 
 ## How-to guides
 

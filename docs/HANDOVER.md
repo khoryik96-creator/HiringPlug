@@ -89,6 +89,9 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 - In one-email-to-many, every copy's attachment row points at the **same
   stored file** (`storage_key`). Anything that later deletes email files
   must keep a file while another email still uses it.
+- **Selling it as a SaaS** (the owner's goal: ~1,000 agencies, 5,000–20,000
+  users online): what to change, the set-up and costs at each size, and why
+  Python stays, in [saas-plan-scaling-to-20k-users.md](saas-plan-scaling-to-20k-users.md).
 - Proposed before and still open: batch CV formatting; possible candidates
   by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
   PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft
