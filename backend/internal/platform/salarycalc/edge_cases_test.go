@@ -77,3 +77,25 @@ func TestNumericGroupingAndCurrencyReview(t *testing.T) {
 	assert.True(t, r.ReviewRequired)
 	assert.Nil(t, r.ExpectedMin)
 }
+
+func TestExcludedBonusCannotSetBaseCurrency(t *testing.T) {
+	assert.Equal(t, 22500.0, Calculate("annual 270kUSD base", "", DefaultRules()).Monthly)
+	assert.True(t, Calculate("IDR 15.5mil nett / 16mil gross", "", DefaultRules()).ReviewRequired)
+	r := Calculate("MYR 16k", "15k + USD 5k annual performance bonus", DefaultRules(), "MYR")
+	require.NotNil(t, r.ExpectedMin)
+	assert.Equal(t, 15000.0, *r.ExpectedMin)
+	assert.Empty(t, r.ExpectedCurrency, "an excluded bonus cannot relabel unlabelled expected base pay")
+	r = Calculate("16k + USD 5k performance bonus", "", DefaultRules())
+	assert.Empty(t, r.CurrentCurrency, "an excluded bonus cannot supply missing base currency")
+	r = Calculate("MYR 16k", "PHP7.4", DefaultRules(), "MYR")
+	assert.NotEqual(t, "PHP", r.ExpectedCurrency, "normalisation must not turn a software-version-shaped token into pesos")
+}
+
+func TestNegativeSignBeforeCurrencyRequiresReview(t *testing.T) {
+	for _, raw := range []string{"-MYR16k", "-USD 12000", "-RM.5k", "-S$8000", "−€12000"} {
+		assert.True(t, Calculate(raw, "", DefaultRules()).ReviewRequired, raw)
+		r := Calculate("16k", raw, DefaultRules())
+		assert.True(t, r.ReviewRequired, raw)
+		assert.Nil(t, r.ExpectedMin, raw)
+	}
+}

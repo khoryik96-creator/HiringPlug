@@ -58,15 +58,9 @@ func clean(raw string) string {
 	raw = correctSpelling(raw)
 	raw = regexp.MustCompile(`([A-Za-z])(\d)`).ReplaceAllString(raw, "$1 $2")
 	raw = regexp.MustCompile(`(?i)\b(lpa|lakhs?|lacs?|crores?|cr)\s+(\d+(?:\.\d+)?)`).ReplaceAllString(raw, "$2 $1")
+	raw = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR)\b`).ReplaceAllString(raw, "$1 $2")
 	raw = regexp.MustCompile(`(?i)\bbonu\b`).ReplaceAllString(raw, "bonus")
-	t := decimalGroupRE.ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, ".", ""), ",", ".") })
-	t = multipleDotRE.ReplaceAllStringFunc(t, func(s string) string { return strings.ReplaceAll(s, ".", "") })
-	t = groupedRE.ReplaceAllStringFunc(t, func(token string) string {
-		if westernGroupRE.MatchString(token) || indianGroupRE.MatchString(token) {
-			return strings.ReplaceAll(token, ",", "")
-		}
-		return " [unreadable number] "
-	})
+	t := groupedNumbers(raw)
 	//nolint:misspell // Deliberate recruiter input misspellings.
 	return strings.NewReplacer("fixedbonus", "fixed bonus", "contractualbonus", "contractual bonus", "bouns", "bonus", "bnous", "bonus", "bonous", "bonus", "bonsu", "bonus", "contracutal", "contractual", "contracual", "contractual", "contractul", "contractual", "guarenteed", "guaranteed", "guarnateed", "guaranteed", "garanteed", "guaranteed", "fixd", "fixed", "mths", "months", "mth", "month", "mnths", "months", "mnth", "month", "monhts", "months", "annual wage supplement", "aws").Replace(strings.ToLower(t))
 }
@@ -112,7 +106,6 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 	if len(currency) > 0 {
 		fallback = strings.ToUpper(strings.TrimSpace(currency[0]))
 	}
-	out.ExpectedCurrency = currencyHint(expected, true)
 	rawCurrency := Currency(current)
 	baseFound := false
 	parts := strings.FieldsFunc(clean(current), func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
@@ -122,7 +115,7 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 		if part == "" {
 			continue
 		}
-		if regexp.MustCompile(`(^|\s)-\s*\d`).MatchString(part) {
+		if negativeMoney(part) {
 			review(&out, "A negative salary component needs review.")
 			continue
 		}
@@ -168,6 +161,10 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 			out.Excluded = append(out.Excluded, part)
 			continue
 		}
+		if len(numberRE.FindAllString(part, -1)) > 1 {
+			review(&out, "Enter one fixed amount or separate package components with +.")
+			continue
+		}
 		n, ok := amount(part)
 		if !ok {
 			review(&out, "A salary component could not be read.")
@@ -185,9 +182,6 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 			out.CurrentCurrency = Currency(part)
 			if rawCurrency == "" || out.CurrentCurrency == "" {
 				out.CurrentCurrency = fallback
-				if out.CurrentCurrency == "" {
-					out.CurrentCurrency = rawCurrency
-				}
 			}
 		} else if rules.Allowances {
 			if c := Currency(part); c != "" && (out.CurrentCurrency == "" || c != out.CurrentCurrency) {
@@ -215,7 +209,7 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 		if strings.TrimSpace(current) != "" {
 			review(&out, "Enter a basic salary.")
 		}
-		calculateExpected(&out, clean(expected), rules)
+		calculateExpected(&out, expected, rules)
 		return out
 	}
 	// IDR gross already includes THR in Kano's input convention.
@@ -231,7 +225,7 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 	}
 	out.Monthly = rounded(out.Base+out.Allowances+out.Bonus, rules.Cents)
 	out.Bonus = rounded(out.Bonus, rules.Cents)
-	calculateExpected(&out, clean(expected), rules)
+	calculateExpected(&out, expected, rules)
 	return out
 }
 
@@ -258,4 +252,16 @@ func bonusMonths(s string) (float64, bool, bool) {
 		return 13, true, true
 	}
 	return 0, true, false
+}
+
+func groupedNumbers(raw string) string {
+	t := decimalGroupRE.ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, ".", ""), ",", ".") })
+	t = multipleDotRE.ReplaceAllStringFunc(t, func(s string) string { return strings.ReplaceAll(s, ".", "") })
+	t = groupedRE.ReplaceAllStringFunc(t, func(token string) string {
+		if westernGroupRE.MatchString(token) || indianGroupRE.MatchString(token) {
+			return strings.ReplaceAll(token, ",", "")
+		}
+		return " [unreadable number] "
+	})
+	return t
 }

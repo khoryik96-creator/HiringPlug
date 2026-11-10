@@ -10,13 +10,13 @@ func calculateExpected(out *Result, text string, rules Rules) {
 	if strings.TrimSpace(text) == "" {
 		return
 	}
-	parts := strings.FieldsFunc(text, func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
+	parts := strings.FieldsFunc(groupedNumbers(text), func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
 	primary := []string{}
 	for _, part := range parts {
 		if strings.TrimSpace(part) == "" {
 			continue
 		}
-		if bonusRE.MatchString(part) || variableRE.MatchString(part) {
+		if bonusRE.MatchString(clean(part)) || variableRE.MatchString(clean(part)) {
 			continue
 		}
 		primary = append(primary, part)
@@ -26,10 +26,9 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		review(out, "Expected salary needs review.")
 		return
 	}
-	s := strings.TrimSpace(primary[0])
-	if c := Currency(s); c != "" {
-		out.ExpectedCurrency = c
-	}
+	raw := strings.TrimSpace(primary[0])
+	out.ExpectedCurrency = currencyHint(raw, true)
+	s := clean(raw)
 	if nonMonthlyRE.MatchString(s) {
 		review(out, "Expected rate needs working-time information before monthly conversion.")
 		return
@@ -48,8 +47,7 @@ func calculateExpected(out *Result, text string, rules Rules) {
 	// Removing percentages first prevents 1000% from being read as salary 1000.
 	literal := percentRE.ReplaceAllString(s, "")
 	if numberRE.MatchString(literal) {
-		loc := numberRE.FindStringIndex(literal)
-		if strings.HasSuffix(strings.TrimSpace(literal[:loc[0]]), "-") {
+		if negativeMoney(literal) {
 			review(out, "Expected salary cannot be negative.")
 			return
 		}

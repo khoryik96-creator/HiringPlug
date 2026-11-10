@@ -38,3 +38,8 @@ converted amount. Negative amounts, ambiguous current ranges and malformed
 grouping cannot be applied automatically. Expected-only and known zero salaries
 are distinct from a missing current salary. Review status is an explicit API
 boolean, not inferred by the web app from English warning text.
+
+Currency hints are taken from the selected base-pay clause, before normalising
+amount spacing. Currency on an excluded bonus never relabels base pay, and
+normalisation cannot turn a PHP software-version token into a peso hint.
+Signs before a currency symbol/code are checked just like signs before digits.

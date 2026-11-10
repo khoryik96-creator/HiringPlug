@@ -13,6 +13,15 @@ func validMoney(n float64) bool {
 	return !math.IsNaN(n) && !math.IsInf(n, 0) && n >= 0 && n <= maxMoney
 }
 
+func negativeMoney(text string) bool {
+	first := numberRE.FindStringIndex(text)
+	if first == nil {
+		return false
+	}
+	prefix := strings.TrimSpace(text[:first[0]])
+	return strings.HasSuffix(prefix, "-") || regexp.MustCompile(`(?i)(^|\s)-\s*(?:[a-z]{1,3}\$|[a-z]{2,3}|[€£₹$])\s*$`).MatchString(prefix)
+}
+
 func review(out *Result, message string) {
 	out.ReviewRequired = true
 	inform(out, message)
@@ -51,6 +60,7 @@ func finish(out *Result) {
 func preferGross(parts []string) []string {
 	million := regexp.MustCompile(`(?i)\d\s*(mil|million|m)\b`)
 	alternative := func(s string) bool {
+		s = clean(s)
 		return million.MatchString(s) && !bonusRE.MatchString(s) && !variableRE.MatchString(s)
 	}
 	first, pick := -1, -1
@@ -62,7 +72,7 @@ func preferGross(parts []string) []string {
 			first = i
 			pick = i
 		}
-		if strings.Contains(part, "gross") {
+		if strings.Contains(clean(part), "gross") {
 			pick = i
 			break
 		}
@@ -76,7 +86,7 @@ func preferGross(parts []string) []string {
 			chosen = c + " " + chosen
 		}
 	}
-	if annualRE.MatchString(parts[first]) && !annualRE.MatchString(chosen) && !nonMonthlyRE.MatchString(chosen) {
+	if annualRE.MatchString(clean(parts[first])) && !annualRE.MatchString(clean(chosen)) && !nonMonthlyRE.MatchString(clean(chosen)) {
 		chosen = "annual " + chosen
 	}
 	out := []string{chosen}
