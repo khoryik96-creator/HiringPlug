@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 const company: Company = {
-  id: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, name: "Maybank", type: "client", category: null,
+  id: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 2, name: "Maybank", type: "client", category: null, linkedinUrl: null,
   website: "https://maybank.com", industry: "Banking", size: "enterprise", phone: null, address: null,
   city: "Kuala Lumpur", country: "MY", registrationNumber: null, about: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",

@@ -9,6 +9,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/linkedin"
 )
 
 // Details are the editable fields of a company.
@@ -17,6 +18,7 @@ type Details struct {
 	Type               string  // client, prospect or internal
 	Category           *string // a key of the company_category list; nil: not set (Unknown)
 	Website            *string
+	LinkedinURL        *string // the company's LinkedIn page
 	Industry           *string
 	Size               *string
 	Phone              *string
@@ -38,14 +40,15 @@ type Company struct {
 
 // Summary is a company in a list.
 type Summary struct {
-	ID        string
-	Name      string
-	Type      string
-	Category  *string
-	Industry  *string
-	City      *string
-	Website   *string
-	UpdatedAt time.Time
+	ID          string
+	Name        string
+	Type        string
+	Category    *string
+	Industry    *string
+	City        *string
+	Website     *string
+	LinkedinURL *string
+	UpdatedAt   time.Time
 }
 
 // Patch is a partial update of Details.
@@ -54,6 +57,7 @@ type Patch struct {
 	Type               apiconv.Change[string]
 	Category           apiconv.Change[*string]
 	Website            apiconv.Change[*string]
+	LinkedinURL        apiconv.Change[*string]
 	Industry           apiconv.Change[*string]
 	Size               apiconv.Change[*string]
 	Phone              apiconv.Change[*string]
@@ -70,6 +74,7 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.Type, p.Type)
 	apiconv.Apply(&d.Category, p.Category)
 	apiconv.Apply(&d.Website, p.Website)
+	apiconv.Apply(&d.LinkedinURL, p.LinkedinURL)
 	apiconv.Apply(&d.Industry, p.Industry)
 	apiconv.Apply(&d.Size, p.Size)
 	apiconv.Apply(&d.Phone, p.Phone)
@@ -100,6 +105,15 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 	}
 	for _, f := range []**string{&d.Address, &d.About} {
 		*f = trimmedOrNil(*f) // keep line breaks
+	}
+	if l := trimmedOrNil(d.LinkedinURL); l != nil {
+		normal, ok := linkedin.Normalize(*l)
+		if !ok {
+			errs.Add("linkedinUrl", "is not a LinkedIn address, e.g. linkedin.com/company/maju-logistik")
+		}
+		d.LinkedinURL = &normal
+	} else {
+		d.LinkedinURL = nil
 	}
 	if d.Country != nil {
 		c := strings.ToUpper(strings.TrimSpace(*d.Country))

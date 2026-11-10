@@ -73,6 +73,7 @@ export function CompanyBanner({ company: c, canEdit }: { company: Company; canEd
           <dl className="banner-facts">
             <div><dt>Based in</dt><dd>{place || "—"}</dd></div>
             <div><dt>Size</dt><dd>{c.size ? COMPANY_SIZE[c.size] : "—"}</dd></div>
+            {c.linkedinUrl && <div><dt>LinkedIn</dt><dd><a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl.replace(/^https:\/\/www\.linkedin\.com\//, "")}</a></dd></div>}
             <div><dt>Website</dt><dd>{c.website ? <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</dd></div>
           </dl>
         </div>

@@ -65,3 +65,25 @@ func TestCompanyCategories(t *testing.T) {
 	assert.Equal(t, vip.Id, page.Items[0].Id)
 	assert.Equal(t, "vip_client", page.Items[0].Category.MustGet())
 }
+
+func TestACompanysLinkedInPage(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	maju := a.createCompany(token, map[string]any{"name": "Maju Logistik", "linkedinUrl": "my.linkedin.com/company/maju-logistik/?trk=x"})
+	assert.Equal(t, "https://www.linkedin.com/company/maju-logistik", maju.LinkedinUrl.MustGet())
+	res := a.request(http.MethodPost, "/v1/companies", token, map[string]any{"name": "Contoh", "linkedinUrl": "facebook.com/contoh"})
+	assert.Equal(t, []string{"linkedinUrl"}, fieldNames(t, res.Error()))
+	res = a.request(http.MethodPatch, "/v1/companies/"+maju.Id, token, map[string]any{"version": maju.Version, "linkedinUrl": nil})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var cleared api.Company
+	res.JSON(&cleared)
+	assert.True(t, cleared.LinkedinUrl.IsNull())
+	res = a.request(http.MethodPatch, "/v1/companies/"+maju.Id, token, map[string]any{"version": cleared.Version, "linkedinUrl": "linkedin.com/company/maju"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	var page api.CompanyPage
+	a.request(http.MethodGet, "/v1/companies", token, nil).JSON(&page)
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, "https://www.linkedin.com/company/maju", page.Items[0].LinkedinUrl.MustGet(), "in the list too")
+}

@@ -1040,6 +1040,12 @@ class Company(BaseModel):
         ),
     ]
     website: Annotated[str | None, Field(description="Always with https://, e.g. https://example.com.")]
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik."
+        ),
+    ]
     industry: Annotated[str | None, Field(...)]
     size: Annotated[CompanySize | None, Field(...)]
     phone: Annotated[str | None, Field(...)]
@@ -1072,6 +1078,9 @@ class CompanyCreate(BaseModel):
         str | None,
         Field(description="example.com or a full address; https:// is added if missing.", max_length=300),
     ] = None
+    linkedinUrl: Annotated[
+        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
+    ] = None
     industry: Annotated[str | None, Field(max_length=100)] = None
     size: CompanySize | None = None
     phone: Annotated[str | None, Field(max_length=40)] = None
@@ -1097,6 +1106,9 @@ class CompanyUpdate(BaseModel):
         ),
     ] = None
     website: Annotated[str | None, Field(max_length=300)] = None
+    linkedinUrl: Annotated[
+        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
+    ] = None
     industry: Annotated[str | None, Field(max_length=100)] = None
     size: CompanySize | None = None
     phone: Annotated[str | None, Field(max_length=40)] = None
@@ -1115,6 +1127,7 @@ class CompanySummary(BaseModel):
     industry: Annotated[str | None, Field(...)]
     city: Annotated[str | None, Field(...)]
     website: Annotated[str | None, Field(...)]
+    linkedinUrl: Annotated[str | None, Field(...)]
     updatedAt: AwareDatetime
 
 

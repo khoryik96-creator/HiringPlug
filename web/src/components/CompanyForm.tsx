@@ -9,7 +9,7 @@ import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
 
-type TextKey = "name" | "website" | "industry" | "phone" | "city" | "country" | "registrationNumber";
+type TextKey = "name" | "website" | "linkedinUrl" | "industry" | "phone" | "city" | "country" | "registrationNumber";
 
 /**
  * Add a company (company = null) or edit one. Saving a new company calls
@@ -77,6 +77,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
         </select>
       </Field>
       {text("website", "Website", { placeholder: "example.com", inputMode: "url" })}
+      {text("linkedinUrl", "LinkedIn page", { placeholder: "linkedin.com/company/…", inputMode: "url" })}
       {text("industry", "Industry")}
       <Field label="Size" error={errors[COMPANY_PATHS.size]}>
         <select value={form.size} onChange={(e) => { set("size", e.target.value as CompanyFormState["size"]); }}>

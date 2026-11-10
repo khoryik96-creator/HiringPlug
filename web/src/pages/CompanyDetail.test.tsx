@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 const company: Company = {
-  id: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, name: "Grab", type: "prospect", category: "vip_client",
+  id: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, name: "Grab", type: "prospect", category: "vip_client", linkedinUrl: "https://www.linkedin.com/company/grab",
   website: "https://grab.com", industry: "Technology", size: "large", phone: null, address: "1 Fusionopolis\nSingapore",
   city: "Singapore", country: "SG", registrationNumber: "201221800W", about: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
@@ -44,6 +44,7 @@ describe("company pages", () => {
     expect(within(card).getByText("by salary band")).toBeTruthy();
     expect(within(card).getByRole("button", { name: "VIP client" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getAllByText("201–1,000 people").length).toBeGreaterThan(0);
+    expect(within(card).getByRole("link", { name: "company/grab" }).getAttribute("href")).toBe("https://www.linkedin.com/company/grab");
     expect(screen.getByRole("button", { name: "Edit company" })).toBeTruthy();
 
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...company, category: "signed_client", version: 2 }));

@@ -3648,6 +3648,8 @@ export interface components {
             category: string | null;
             /** @description Always with https://, e.g. https://example.com. */
             website: string | null;
+            /** @description The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik. */
+            linkedinUrl: string | null;
             industry: string | null;
             size: components["schemas"]["CompanySize"] | null;
             phone: string | null;
@@ -3670,6 +3672,8 @@ export interface components {
             category?: string | null;
             /** @description example.com or a full address; https:// is added if missing. */
             website?: string | null;
+            /** @description linkedin.com/company/... (https://www. is added). */
+            linkedinUrl?: string | null;
             industry?: string | null;
             size?: components["schemas"]["CompanySize"] | null;
             phone?: string | null;
@@ -3687,6 +3691,8 @@ export interface components {
             /** @description The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown). */
             category?: string | null;
             website?: string | null;
+            /** @description linkedin.com/company/... (https://www. is added). */
+            linkedinUrl?: string | null;
             industry?: string | null;
             size?: components["schemas"]["CompanySize"] | null;
             phone?: string | null;
@@ -3704,6 +3710,7 @@ export interface components {
             industry: string | null;
             city: string | null;
             website: string | null;
+            linkedinUrl: string | null;
             /** Format: date-time */
             updatedAt: string;
         };

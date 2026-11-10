@@ -3,10 +3,10 @@
 
 -- name: InsertCompany :one
 INSERT INTO company (
-  tenant_id, name, type, category, website, industry, size, phone, address, city, country,
+  tenant_id, name, type, category, website, linkedin_url, industry, size, phone, address, city, country,
   registration_number, about, created_by
 ) VALUES (
-  app_current_tenant(), @name, @type, sqlc.narg(category), sqlc.narg(website), sqlc.narg(industry), sqlc.narg(size),
+  app_current_tenant(), @name, @type, sqlc.narg(category), sqlc.narg(website), sqlc.narg(linkedin_url), sqlc.narg(industry), sqlc.narg(size),
   sqlc.narg(phone), sqlc.narg(address), sqlc.narg(city), sqlc.narg(country),
   sqlc.narg(registration_number), sqlc.narg(about), app_current_user()
 )
@@ -28,6 +28,7 @@ UPDATE company SET
   type = @type,
   category = sqlc.narg(category),
   website = sqlc.narg(website),
+  linkedin_url = sqlc.narg(linkedin_url),
   industry = sqlc.narg(industry),
   size = sqlc.narg(size),
   phone = sqlc.narg(phone),
@@ -43,7 +44,7 @@ RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, website, updated_at
+SELECT id, name, type, category, industry, city, website, linkedin_url, updated_at
 FROM company
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(type)::text IS NULL OR type = sqlc.narg(type)::text)

@@ -43,6 +43,8 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           <dl>
             <dt>Website</dt>
             <dd>{c.website ? <a href={c.website} target="_blank" rel="noreferrer">{c.website}</a> : "—"}</dd>
+            <dt>LinkedIn</dt>
+            <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl.replace(/^https:\/\/www\./, "")}</a> : "—"}</dd>
             <dt>Size</dt>
             <dd>{c.size ? COMPANY_SIZE[c.size] : "—"}</dd>
             <dt>Phone</dt>

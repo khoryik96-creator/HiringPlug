@@ -260,6 +260,7 @@ type Company struct {
 	AutofillCheckedAt  *time.Time
 	PhoneDigits        *string
 	Category           *string
+	LinkedinUrl        *string
 }
 
 type CompanyBenefit struct {

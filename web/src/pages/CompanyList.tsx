@@ -64,6 +64,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
             <th>Industry</th>
             <th>City</th>
             <th>Website</th>
+            <th>LinkedIn</th>
           </tr>
         </thead>
         <tbody>
@@ -79,10 +80,11 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
               <td>{c.industry}</td>
               <td>{c.city}</td>
               <td>{c.website && <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\//, "")}</a>}</td>
+              <td>{c.linkedinUrl && <a href={c.linkedinUrl} target="_blank" rel="noreferrer" aria-label={`${c.name} on LinkedIn`}>{c.linkedinUrl.replace(/^https:\/\/www\.linkedin\.com\/(company\/)?/, "")}</a>}</td>
             </tr>
           ))}
           {list.data?.items.length === 0 && (
-            <tr><td colSpan={6} className="muted">No companies yet{q || type || category ? " match" : ""}.</td></tr>
+            <tr><td colSpan={7} className="muted">No companies yet{q || type || category ? " match" : ""}.</td></tr>
           )}
         </tbody>
       </table>

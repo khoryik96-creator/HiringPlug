@@ -167,7 +167,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -198,6 +198,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
 		&i.Category,
+		&i.LinkedinUrl,
 	)
 	return i, err
 }
@@ -310,14 +311,14 @@ func (q *Queries) GetSuggestion(ctx context.Context, arg GetSuggestionParams) (C
 const insertCompany = `-- name: InsertCompany :one
 
 INSERT INTO company (
-  tenant_id, name, type, category, website, industry, size, phone, address, city, country,
+  tenant_id, name, type, category, website, linkedin_url, industry, size, phone, address, city, country,
   registration_number, about, created_by
 ) VALUES (
-  app_current_tenant(), $1, $2, $3, $4, $5, $6,
-  $7, $8, $9, $10,
-  $11, $12, app_current_user()
+  app_current_tenant(), $1, $2, $3, $4, $5, $6, $7,
+  $8, $9, $10, $11,
+  $12, $13, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url
 `
 
 type InsertCompanyParams struct {
@@ -325,6 +326,7 @@ type InsertCompanyParams struct {
 	Type               string
 	Category           *string
 	Website            *string
+	LinkedinUrl        *string
 	Industry           *string
 	Size               *string
 	Phone              *string
@@ -343,6 +345,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		arg.Type,
 		arg.Category,
 		arg.Website,
+		arg.LinkedinUrl,
 		arg.Industry,
 		arg.Size,
 		arg.Phone,
@@ -378,6 +381,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
 		&i.Category,
+		&i.LinkedinUrl,
 	)
 	return i, err
 }
@@ -505,7 +509,7 @@ func (q *Queries) InsertSuggestion(ctx context.Context, arg InsertSuggestionPara
 }
 
 const listCompanies = `-- name: ListCompanies :many
-SELECT id, name, type, category, industry, city, website, updated_at
+SELECT id, name, type, category, industry, city, website, linkedin_url, updated_at
 FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
@@ -526,14 +530,15 @@ type ListCompaniesParams struct {
 }
 
 type ListCompaniesRow struct {
-	ID        string
-	Name      string
-	Type      string
-	Category  *string
-	Industry  *string
-	City      *string
-	Website   *string
-	UpdatedAt time.Time
+	ID          string
+	Name        string
+	Type        string
+	Category    *string
+	Industry    *string
+	City        *string
+	Website     *string
+	LinkedinUrl *string
+	UpdatedAt   time.Time
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -560,6 +565,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 			&i.Industry,
 			&i.City,
 			&i.Website,
+			&i.LinkedinUrl,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -664,18 +670,19 @@ UPDATE company SET
   type = $2,
   category = $3,
   website = $4,
-  industry = $5,
-  size = $6,
-  phone = $7,
-  address = $8,
-  city = $9,
-  country = $10,
-  registration_number = $11,
-  about = $12,
+  linkedin_url = $5,
+  industry = $6,
+  size = $7,
+  phone = $8,
+  address = $9,
+  city = $10,
+  country = $11,
+  registration_number = $12,
+  about = $13,
   version = version + 1,
   updated_at = now()
-WHERE id = $13 AND version = $14
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category
+WHERE id = $14 AND version = $15
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url
 `
 
 type UpdateCompanyParams struct {
@@ -683,6 +690,7 @@ type UpdateCompanyParams struct {
 	Type               string
 	Category           *string
 	Website            *string
+	LinkedinUrl        *string
 	Industry           *string
 	Size               *string
 	Phone              *string
@@ -702,6 +710,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		arg.Type,
 		arg.Category,
 		arg.Website,
+		arg.LinkedinUrl,
 		arg.Industry,
 		arg.Size,
 		arg.Phone,
@@ -739,6 +748,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.AutofillCheckedAt,
 		&i.PhoneDigits,
 		&i.Category,
+		&i.LinkedinUrl,
 	)
 	return i, err
 }

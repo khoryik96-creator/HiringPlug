@@ -6,6 +6,7 @@ export interface CompanyFormState {
   name: string;
   type: Schemas["CompanyType"];
   website: string;
+  linkedinUrl: string;
   industry: string;
   size: "" | Schemas["CompanySize"];
   phone: string;
@@ -18,7 +19,7 @@ export interface CompanyFormState {
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
 export const COMPANY_PATHS: Record<keyof CompanyFormState, string> = {
-  name: "name", type: "type", website: "website", industry: "industry", size: "size", phone: "phone",
+  name: "name", type: "type", website: "website", linkedinUrl: "linkedinUrl", industry: "industry", size: "size", phone: "phone",
   address: "address", city: "city", country: "country", registrationNumber: "registrationNumber", about: "about",
 };
 
@@ -27,6 +28,7 @@ export function formFromCompany(c: Company | null): CompanyFormState {
     name: c?.name ?? "",
     type: c?.type ?? "client",
     website: c?.website ?? "",
+    linkedinUrl: c?.linkedinUrl ?? "",
     industry: c?.industry ?? "",
     size: c?.size ?? "",
     phone: c?.phone ?? "",
@@ -55,6 +57,7 @@ export function companyFields(f: CompanyFormState): Omit<Schemas["CompanyUpdate"
     name: f.name.trim(),
     type: f.type,
     website: orNull(f.website),
+    linkedinUrl: orNull(f.linkedinUrl),
     industry: orNull(f.industry),
     size: f.size === "" ? null : f.size,
     phone: orNull(f.phone),

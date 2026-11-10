@@ -512,7 +512,7 @@ components:
 
     Company:
       type: object
-      required: [id, version, name, type, category, website, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
+      required: [id, version, name, type, category, website, linkedinUrl, industry, size, phone, address, city, country, registrationNumber, about, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/CompanyId' }
         version: { type: integer, description: Send it back when you update. }
@@ -520,6 +520,7 @@ components:
         type: { $ref: '#/components/schemas/CompanyType' }
         category: { type: string, nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, nullable: true, description: 'Always with https://, e.g. https://example.com.' }
+        linkedinUrl: { type: string, nullable: true, description: "The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik." }
         industry: { type: string, nullable: true }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
@@ -546,6 +547,7 @@ components:
           description: Defaults to client.
         category: { type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, maxLength: 300, nullable: true, description: 'example.com or a full address; https:// is added if missing.' }
+        linkedinUrl: { type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).' }
         industry: { type: string, maxLength: 100, nullable: true }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
@@ -569,6 +571,7 @@ components:
         type: { $ref: '#/components/schemas/CompanyType' }
         category: { type: string, pattern: '^[a-z0-9_]{1,40}$', nullable: true, description: "The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)." }
         website: { type: string, maxLength: 300, nullable: true }
+        linkedinUrl: { type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).' }
         industry: { type: string, maxLength: 100, nullable: true }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
@@ -584,7 +587,7 @@ components:
 
     CompanySummary:
       type: object
-      required: [id, name, type, category, industry, city, website, updatedAt]
+      required: [id, name, type, category, industry, city, website, linkedinUrl, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/CompanyId' }
         name: { type: string }
@@ -593,6 +596,7 @@ components:
         industry: { type: string, nullable: true }
         city: { type: string, nullable: true }
         website: { type: string, nullable: true }
+        linkedinUrl: { type: string, nullable: true }
         updatedAt: { type: string, format: date-time }
     CompanyPage:
       type: object
