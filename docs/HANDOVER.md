@@ -6,12 +6,11 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Where things stand
 
-- **main = `0ff85c3`**. CI was green on every merge of 10 Nov up to
-  `8f6f502`; the run on `0ff85c3` was still going when this was written:
-  look at the latest CI run on main first.
+- **main = `455f021`**. The salary feature and bug fixes are merged; all jobs
+  passed in main CI run `42802569118`, including service and browser tests.
 - Nothing uncommitted, nothing half-built. Every `claude/*` branch is
   already in main; start new work on a fresh branch from main.
-- Latest migration: `00080_email_candidates.sql`. Migrations are append-only.
+- Latest migration: `00081_salary_calculation.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -56,6 +55,10 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## What was built 7–10 Nov (newest first; details in `docs/features.md`)
 
+- **Screening salary**: descriptive current and expected pay, fixed monthly
+  totals, percentage expectations and configurable component/bonus rules in
+  Settings. Variable pay stays excluded by default. Ambiguous amounts require
+  review; only the fixed monthly figure appears on candidate cards.
 - **Email**: one email to many people, each their own copy (`POST
   /v1/email-batches`, tick boxes on the candidate and contact lists and the
   pipeline); one email to the client about several candidates, each with
@@ -97,8 +100,12 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Things that cost time before
 
-- `service postgresql start` again if tests say they cannot reach the
-  database (it stops between sessions).
+- Reuse the existing environment and run targeted checks during edits; finish
+  with `task verify` before pushing. See
+  [development-workflow.md](playbooks/development-workflow.md) for the measured
+  CI mirror delay, bounded installer and verification sequence.
+- Check database health if tests cannot connect; start the existing service
+  only if stopped (a retained cloud session may already have Docker PostgreSQL).
 - Stop the dev stack (api, workers, `pnpm dev`) before `task verify`: on a
   busy machine the AI-queue tests time out and workers are killed for memory.
   Run `task verify` in the background; it takes about 10 minutes.
@@ -117,9 +124,11 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Working in a cloud session
 
-- `service postgresql start`; `export PATH=$PATH:/root/go/bin`.
-- `task setup` (Go, Python with `uv`, web with `pnpm`, and `npm ci` for CV
-  Studio's renderer); `task verify` takes about 10 minutes.
+- Inspect installed tools and database health first. Reuse the workspace's
+  existing environment activation script and caches when available.
+- Run `task setup` only for missing dependencies or changed lockfiles (Go,
+  Python with `uv`, web with `pnpm`, and `npm ci` for CV Studio's renderer).
+  Run targeted checks during edits, then `task verify` before pushing.
 - To run the real app: build `backend/cmd/{api,worker,hp}`, set the `HP_*`
   variables from `.env.example` against a local database, `hp dev-setup`
   prints demo users and tokens (owner, recruiter, sourcer, viewer; password

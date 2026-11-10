@@ -87,8 +87,9 @@ jobs:
       run: { working-directory: ai }
     steps:
       - uses: actions/checkout@v4
-      - name: Install Tesseract
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-eng antiword libreoffice-writer-nogui
+      - name: Install OCR and document tools
+        timeout-minutes: 6
+        run: sudo bash "$GITHUB_WORKSPACE/.github/scripts/install-document-tools.sh"
       - uses: astral-sh/setup-uv@v5
       - uses: arduino/setup-task@v2
         with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
@@ -126,7 +127,8 @@ jobs:
 
   e2e:
     name: End to end (API + Go worker + Python worker)
-    needs: [backend, ai, web]
+    # This job builds its own services and consumes no outputs from other jobs.
+    # Run it alongside the language checks; every job must still pass.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -149,8 +151,9 @@ jobs:
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - name: Install Tesseract
-        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-eng antiword libreoffice-writer-nogui
+      - name: Install OCR and document tools
+        timeout-minutes: 6
+        run: sudo bash "$GITHUB_WORKSPACE/.github/scripts/install-document-tools.sh"
       - uses: astral-sh/setup-uv@v5
       - name: Build and prepare the database
         working-directory: backend

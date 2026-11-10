@@ -16,4 +16,7 @@
    version-named file.
 6. Database problem? **Never edit a committed migration**; add a new one that
    corrects the data or schema.
-7. `task verify`, then a pull request that explains the cause.
+7. Finish targeted checks and review, then `task verify` before pushing the
+   branch. Follow `HANDOVER.md` for merging; create a pull request only when
+   asked. See [development-workflow.md](development-workflow.md) for environment
+   reuse and CI diagnosis.
