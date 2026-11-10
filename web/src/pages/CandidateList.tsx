@@ -9,7 +9,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
-import { COLUMNS, ColumnPicker, useCandidateColumns, WaBar, WaLegend } from "../components/candidateColumns";
+import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
@@ -102,10 +102,11 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
               <Fragment key={c.id}>
                 <tr className={cvSnippet ? "has-snippet" : undefined}>
                   <td className="name-cell">
-                    <WaBar c={c} />
-                    <a href={`#/candidates/${c.id}${hl}`}>{c.fullName}</a>{" "}
-                    {!cols.columns.includes("tags") && c.tags.length > 0 && <Chips labels={c.tags} />}
-                    {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
+                    <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
+                      {" "}
+                      {!cols.columns.includes("tags") && c.tags.length > 0 && <Chips labels={c.tags} />}
+                      {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
+                    </WaName>
                   </td>
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
                 </tr>

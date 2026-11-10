@@ -22,9 +22,11 @@ const change: ActivityEntry = {
   changes: { currentTitle: { from: "Accountant", to: "Senior Accountant" } },
 };
 
-function mockReads(hiddenSensitive = 0) {
-  return vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-    Promise.resolve(path === "/v1/notes" ? ok({ items: [note], hiddenSensitive }) : ok({ items: [change] }))));
+function mockReads(hiddenSensitive = 0, notes: Note[] = [note], calls: unknown[] = []) {
+  return vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(
+    path === "/v1/notes" ? ok({ items: notes, hiddenSensitive })
+      : path === "/v1/candidates/{candidateId}/screening-calls" ? ok({ items: calls })
+        : ok({ items: [change] }))) as never);
 }
 
 describe("activity sentences", () => {
@@ -59,12 +61,44 @@ describe("activity sentences", () => {
 
 describe("timeline", () => {
   it("shows notes and changes together, newest first", async () => {
-    mockReads();
+    mockReads(0, [{ ...note, kind: "general" }]);
     renderWithClient(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["notes:read", "notes.activity:read"]} />);
     const change = await screen.findByText("Aina changed current title from Accountant to Senior Accountant");
     const noteText = screen.getByText("Strong IFRS.");
     expect(change.compareDocumentPosition(noteText) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("form", { name: "Add a note" })).toBeNull();
+  });
+
+  it("pins the latest call, filters by kind, searches, and folds long notes", async () => {
+    const older = { ...note, id: "note_old", body: "RFL: restructuring\nLF: stable MNC", createdAt: "2026-10-21T09:00:00Z", authorName: "Hafiz" };
+    const latest = { ...note, id: "note_new", body: "Call on 8 Nov 2026 by Aina\n\nRFL: wants regional scope\nLF: logistics, hybrid", createdAt: "2026-11-09T09:00:00Z", authorName: "Hafiz" };
+    const long = { ...note, id: "note_long", kind: "general" as const, body: `Client feedback: ${"strong on hub operations. ".repeat(12)}Wants a second round.` };
+    mockReads(0, [latest, long, older], [
+      { id: "scl_2", calledOn: "2026-11-08", calledBy: "usr_1", calledByName: "Aina", noteId: "note_new", salaryRecorded: true, createdAt: "2026-11-09T09:00:00Z" },
+      { id: "scl_1", calledOn: "2026-10-21", calledBy: "usr_2", calledByName: "Hafiz", noteId: "note_old", salaryRecorded: false, createdAt: "2026-10-21T09:00:00Z" },
+    ]);
+    renderWithClient(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["notes:read", "notes.activity:read", "candidates:read"]} />);
+    const pinned = await screen.findByLabelText("Latest call");
+    expect(pinned.textContent).toContain("Latest screening call · 8 Nov 2026 · by Aina"); // when it was, not when it was logged
+    expect(pinned.textContent).toContain("RFLwants regional scope");
+    expect(pinned.textContent).not.toContain("Call on 8 Nov 2026"); // in the header already
+    expect(screen.queryAllByText(/wants regional scope/)).toHaveLength(1); // not twice
+
+    const folded = screen.getByText(/Client feedback/);
+    expect(folded.className).toContain("folded");
+    fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+    expect(folded.className).not.toContain("folded");
+
+    fireEvent.click(screen.getByRole("button", { name: "1 earlier call" }));
+    expect(screen.getByRole("button", { name: /^Calls/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByText(/Client feedback/)).toBeNull();
+    expect(screen.getByText(/restructuring/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /^All/ }));
+    fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "second round" } });
+    expect(screen.getByText(/Client feedback/)).toBeTruthy();
+    expect(screen.queryByText(/restructuring/)).toBeNull();
+    expect(screen.queryByText(/changed current title/)).toBeNull();
   });
 
   it("says how many sensitive notes are hidden", async () => {

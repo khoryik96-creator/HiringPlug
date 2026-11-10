@@ -76,19 +76,34 @@ export function useCandidateColumns() {
   return { columns: prefs.data?.candidateColumns ?? DEFAULT_COLUMNS, chosen: prefs.data?.candidateColumns != null, save, look: fs };
 }
 
-/** The coloured bar beside a name: local, PR, RP-T / spouse, needs a pass, or not known. */
-export function WaBar({ c }: { c: Summary }) {
+/** A name's initials: "Nurul Huda" -> "NH". */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return ((words[0]?.[0] ?? "") + (words.length > 1 ? words[words.length - 1]?.[0] ?? "" : "")).toUpperCase() || "?";
+}
+
+/** Work authorization of a candidate in a list: their initials in a disc of its colour, its name under theirs. */
+export function WaName({ c, href, children }: { c: Summary; href: string; children?: React.ReactNode }) {
   const wa = workAuth(c);
   const kind = WA_KIND[waKind(wa)];
   const label = wa ? waColumnLabel(wa) : kind.label;
-  return <span className="wa-bar" style={{ background: kind.color }} title={`Work authorization: ${label}`} aria-label={`Work authorization: ${label}`} role="img" />;
+  return (
+    <span className="wa-who">
+      <span className="wa-disc" style={{ background: kind.color, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${kind.color}` }}
+        role="img" aria-label={`Work authorization: ${label}`} title={`Work authorization: ${label}`}>{initials(c.fullName)}</span>
+      <span className="wa-name">
+        <span><a href={href}>{c.fullName}</a>{children}</span>
+        <small className="wa-label" style={{ color: kind.color }}>{label}</small>
+      </span>
+    </span>
+  );
 }
 
 export function WaLegend() {
   return (
-    <p className="wa-legend small muted" aria-label="Colours beside the names">
+    <p className="wa-legend small muted" aria-label="Work authorization colours">
       {(Object.keys(WA_KIND) as (keyof typeof WA_KIND)[]).map((k) => (
-        <span key={k}><span className="wa-bar" style={{ background: WA_KIND[k].color }} />{WA_KIND[k].label}</span>
+        <span key={k}><span className="wa-dot" style={{ background: WA_KIND[k].color }} />{WA_KIND[k].label}</span>
       ))}
     </p>
   );

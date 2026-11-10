@@ -347,7 +347,6 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .status-dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1.5px solid; margin-right: 0.35rem; vertical-align: -0.05rem; }
 .candidates-table .small { display: block; }
 /* The candidate list: a bar beside each name coloured by work authorization, and the column picker. */
-.wa-bar { display: inline-block; width: 4px; height: 1.15em; border-radius: 2px; margin-right: 0.45rem; vertical-align: -0.2em; }
 .candidates-table .name-cell { white-space: nowrap; }
 .wa-legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin: 0.4rem 0; }
 .column-picker { position: relative; }
@@ -644,3 +643,30 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 .call-note { margin: 0.5rem 0 0; font-size: 0.92rem; }
 .dup-ask { border: 1px solid #f59e0b; background: #fffbeb; border-radius: 10px; padding: 0.7rem 0.9rem; display: grid; gap: 0.5rem; }
 .dup-ask p { margin: 0; }
+
+/* Notes and activity: the latest call pinned, then filters and search. */
+.pinned-call { border: 1.5px solid #0e7490; background: #ecfeff; border-radius: 12px; padding: 0.75rem 0.9rem; display: grid; gap: 0.45rem; margin: 0.75rem 0; }
+.pinned-label { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #0e7490; }
+.call-qa { margin: 0; display: grid; gap: 0.2rem; }
+.call-qa > div { display: grid; grid-template-columns: max-content 1fr; gap: 0.7rem; }
+.call-qa > div.plain { grid-template-columns: 1fr; }
+.call-qa dt { font-weight: 700; color: #0e7490; }
+.call-qa dd { margin: 0; white-space: pre-wrap; }
+.pinned-call .link { justify-self: start; }
+.timeline-tools { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; margin: 0.5rem 0; }
+.timeline-tools .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chip { font: inherit; font-size: 0.8rem; font-weight: 600; padding: 0.25rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: inherit; cursor: pointer; }
+.chip[aria-pressed="true"] { background: #1B2230; border-color: #1B2230; color: #fff; }
+.chip .n { opacity: 0.65; margin-left: 0.3rem; font-variant-numeric: tabular-nums; }
+.timeline-search { flex: 1; min-width: 12rem; }
+.timeline .folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.kind-tag { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.05rem 0.45rem; border-radius: 5px; margin-right: 0.45rem; background: var(--accent-soft); color: var(--accent); }
+.kind-tag.k-calls { background: #cffafe; color: #0e7490; }
+.kind-tag.k-references { background: #ffedd5; color: #9a3412; }
+
+/* Candidate list: work authorization as a coloured initials disc, its name under the candidate's. */
+.wa-who { display: flex; align-items: center; gap: 0.7rem; }
+.wa-disc { flex: none; width: 2.1rem; height: 2.1rem; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.02em; }
+.wa-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.wa-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.wa-dot { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 50%; margin-right: 0.35rem; vertical-align: -0.1em; }

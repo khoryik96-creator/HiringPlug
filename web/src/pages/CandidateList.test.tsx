@@ -99,6 +99,9 @@ describe("candidate list", () => {
     expect(screen.getByRole("img", { name: "Work authorization: Local" }).closest("tr")?.textContent).toContain("Siti Aisyah");
     expect(screen.getByRole("img", { name: "Work authorization: RP-T" }).closest("tr")?.textContent).toContain("Ali");
     expect(screen.getByRole("img", { name: "Work authorization: PR" }).closest("tr")?.textContent).toContain("Mei");
+    const local = screen.getByRole("img", { name: "Work authorization: Local" });
+    expect(local.textContent).toBe("SA"); // their initials, in the disc of its colour
+    expect(local.closest("td")?.textContent).toContain("Local"); // its name under theirs
   });
 
   it("shows the columns the person chose, and saves a new choice for them", async () => {
