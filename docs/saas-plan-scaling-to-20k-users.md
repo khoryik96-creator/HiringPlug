@@ -6,7 +6,9 @@ it up at each size, what it costs, and what limits growth.
 
 **The target.** About **1,000 agencies** (freelancers to agencies of 20
 recruiters, about 5 on average), **5,000 to 20,000 users online at the same
-time**.
+time**. That is more agencies than Malaysia has of HiringPlug's kind: reaching
+it means selling across Southeast Asia (see [The market](#10-the-market-agencies-you-can-sell-to)).
+The first goals are much smaller: about 10 agencies covers a lean set-up.
 
 **How sure these numbers are.** The speeds come from a load test on one small
 machine (see [What we measured](#what-we-measured)); the sizes and costs are
@@ -30,6 +32,7 @@ Contents:
 7. [What we measured](#what-we-measured)
 8. [Keeping costs down](#8-keeping-costs-down)
 9. [Order of work](#9-order-of-work)
+10. [The market: agencies you can sell to](#10-the-market-agencies-you-can-sell-to)
 
 ---
 
@@ -334,3 +337,65 @@ uploads and AI calls.
 7. At ~2,000 users online: read copies of the database, PgBouncer, workers
    that scale with the queue; then a CV search engine and split tables as
    you approach Stage 3.
+
+## 10. The market: agencies you can sell to
+
+How many recruitment agencies there are in each country, and how many are
+the kind HiringPlug is for: agencies placing professionals and executives
+with companies, and freelance recruiters. Searched November 2026.
+
+**Read the counts with care.** No country publishes a count of that kind of
+agency. Licence lists include agencies that bring in foreign workers or
+domestic helpers (a different business with different software needs), and
+business registers include staffing and outsourcing firms. The "likely
+targets" column is **our rough estimate** of the professional-recruitment
+share, not a statistic: check it against the official lists before planning
+on it.
+
+| Country | What is counted | Count | Likely targets (estimate) | Source |
+|---|---|---|---|---|
+| **Malaysia** | Registered private employment agencies, Peninsular Malaysia only (Labour Department list, March 2026, as reported by a business-services firm; not verified against the list) | **1,273**, of which 833 in the Klang Valley | 300–500 | [MISHU](https://mishu.my/blog/company-incorporation-and-formation/open-private-employment-agency/); for comparison 453 licensed agencies in 2018 after the 2017 amendments ([The Star](https://thestar.com.my/news/nation/2018/12/20/only-453-employment-agencies-left)) |
+| **Singapore** | Licensed employment agencies (Ministry of Manpower, 2020; the live list is MOM's EA Directory). Many place foreign domestic workers | **about 3,900** | 1,300–2,000 | [People Matters](https://sea.peoplemattersglobal.com/news/recruiting-and-onboarding/employment-agencies-in-singapore-to-follow-new-licensing-conditions-from-october-26098); [MOM: check a licensed EA](https://www.mom.gov.sg/faq/employment-agencies/why-should-i-work-with-a-licensed-ea-and-how-can-i-check-if-they-are-licensed) |
+| **Indonesia** | Recruitment and staffing companies in the business register (NACE 78, a commercial directory); includes outsourcing. No count of headhunters found | **1,322** | 300–600 | [InfobelPRO Indonesia](https://www.infobelpro.com/companies/indonesia/recruitment-and-staffing) |
+| **Thailand** | Recruitment and staffing companies in the business register (NACE 78, a commercial directory); Department of Employment licence counts found were small and undated (130; 218 in an older study) | **3,736** registered | 200–500 | [InfobelPRO Thailand](https://www.infobelpro.com/companies/thailand/recruitment-and-staffing); [Bangkok Post](https://www.bangkokpost.com/thailand/general/2938190/job-seekers-told-to-verify-recruitment-agencies) |
+| **Vietnam** | Headhunting firms, as estimated by a Vietnamese HR firm; 11,076 recruitment and staffing companies in the business register (much broader) | **300–500** headhunters | 300–500 | [Talentnet](https://talentnetgroup.com/vn/featured-insights/trends-developing-headhunters-in-vietnam); [InfobelPRO Vietnam](https://www.infobelpro.com/companies/vietnam/recruitment-and-staffing) |
+| **Philippines** | Private employment agencies are licensed by DOLE's regional offices; no total count found | — | not estimated | [DOLE rules for private employment agencies](https://www.digest.ph/labor/rules-and-regulations-governing-private-recruitment-and-placement-agency-for-local-employment) |
+
+Freelance recruiters are not in these counts, and in every country they add
+to the market (on the Solo plan).
+
+**What it means for the targets.** Across the five countries with figures,
+the likely targets come to roughly **2,400–4,100 agencies**, plus the
+Philippines and freelancers.
+
+| Goal | Share of the likely targets |
+|---|---|
+| 10 agencies (covers a lean set-up) | Malaysia alone, about 2–3% of its likely targets |
+| 60 agencies | Malaysia alone, about 12–20%: possible, most of it in the Klang Valley |
+| 200–400 agencies | 5–15% of the region: a realistic regional business in a few years |
+| 1,000 agencies | 25–40% of the region: a market leader's share; plan for it only after the first two countries work |
+
+**Order of countries.**
+
+1. **Malaysia**: home, Hyppies as the reference customer, the app already
+   fits (ringgit, SST, PDPA, Malaysian work permits).
+2. **Singapore**: the most agencies, English, the same time zone, and higher
+   prices than Malaysia (charge in Singapore dollars).
+3. **Philippines**: English, a large recruitment and outsourcing industry.
+4. **Indonesia, Vietnam, Thailand**: large markets, but each needs the app in
+   its own language and a local partner or sales person.
+
+**What the app needs for each country** (check the rates before launch):
+
+| Country | Currency and tax on the subscription | Language | Data protection law | Work passes to track |
+|---|---|---|---|---|
+| Malaysia | RM; SST (8%) | English, Malay | PDPA 2010 (built) | Built (local, RP-T, PR, spouse visa, needs a visa) |
+| Singapore | SGD; GST 9% | English | PDPA 2012 | Employment Pass, S Pass, Work Permit, Dependant's Pass |
+| Indonesia | IDR; VAT (PPN) 11–12% | Bahasa Indonesia | PDP Law 2022 | KITAS and work permits for foreigners |
+| Thailand | THB; VAT 7% | Thai | PDPA 2019 | Work permit and visa for foreigners |
+| Vietnam | VND; VAT 10% (8% while a temporary cut lasts) | Vietnamese | Decree 13/2023 and the personal data law | Work permit for foreigners |
+| Philippines | PHP; VAT 12% | English | Data Privacy Act 2012 | Alien Employment Permit, 9(g) visa |
+
+The app already keeps settings per agency; these would become per-country
+settings (currency, tax, work pass types, language), chosen when an agency
+signs up.
