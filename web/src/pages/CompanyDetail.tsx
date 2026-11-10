@@ -64,7 +64,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       <Timeline subjectType="company" subjectId={c.id} permissions={permissions} />
       {permissions.includes("companies:update") && !editing && <CompanyAutofill companyId={c.id} website={c.website} />}
       <CompanyJobs company={c} canCreate={permissions.includes("jobs:create")} />
-      <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} />
+      <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} canEmail={permissions.includes("emails:send")} />
     </main>
   );
 }

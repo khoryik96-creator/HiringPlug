@@ -29,6 +29,27 @@ function answer(items: unknown[], columns: string[] | null | (() => string[] | n
 }
 
 describe("candidate list", () => {
+  it("ticks candidates (one, or all shown) to email each separately", async () => {
+    const wei = { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Wei Tan", email: "wei@example.com" };
+    vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
+    renderWithClient(<CandidateList canCreate={false} canEmail />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Choose Wei Tan" }));
+    expect(screen.getByText("1 chosen")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Choose all shown" }));
+    expect(screen.getByText("2 chosen")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Email each separately" }));
+    const panel = await screen.findByRole("region", { name: "Email each separately" });
+    expect(panel.querySelectorAll(".person-chip")).toHaveLength(2);
+    expect(panel.textContent).toContain("Siti Aisyah · no email");
+  });
+
+  it("offers no ticks to those who may not send email", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate={false} />);
+    await screen.findByText("Siti Aisyah");
+    expect(screen.queryByRole("checkbox", { name: /Choose/ })).toBeNull();
+  });
+
   it("shows tags by the name", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);

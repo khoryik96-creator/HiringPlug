@@ -284,3 +284,27 @@ func shortlistFrom(list *[]api.EmailCandidate) []Shortlisted {
 	}
 	return out
 }
+
+// SendEmailsSeparately handles POST /v1/email-batches.
+func (h *HTTP) SendEmailsSeparately(ctx context.Context, req api.SendEmailsSeparatelyRequestObject) (api.SendEmailsSeparatelyResponseObject, error) {
+	b := req.Body
+	r := BatchRequest{Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml), TimeZone: deref(b.TimeZone), CheckOnly: deref(b.CheckOnly)}
+	for _, x := range b.Recipients {
+		r.Recipients = append(r.Recipients, Recipient{CandidateID: x.CandidateId, ContactID: x.ContactId})
+	}
+	if b.AttachmentIds != nil {
+		r.AttachmentIDs = *b.AttachmentIds
+	}
+	res, err := h.svc.SendSeparately(ctx, authz.MustFromContext(ctx), r)
+	if err != nil {
+		return nil, err
+	}
+	out := api.SendEmailsSeparately200JSONResponse{Sent: res.Sent, Recipients: make([]api.EmailBatchRecipient, len(res.Recipients))}
+	for i, x := range res.Recipients {
+		out.Recipients[i] = api.EmailBatchRecipient{
+			CandidateId: c.OrNull(x.CandidateID), ContactId: c.OrNull(x.ContactID), Name: x.Name,
+			To: c.OrNull(x.To), EmailId: c.OrNull(x.EmailID), Problem: c.OrNull(x.Problem),
+		}
+	}
+	return out, nil
+}

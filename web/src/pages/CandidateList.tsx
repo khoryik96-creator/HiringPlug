@@ -10,16 +10,21 @@ import { Chips } from "../components/LabelInput";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
+import { PickBar, SeparateEmail } from "../components/SeparateEmail";
+import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean }) {
+export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
   const [adding, setAdding] = useState(false);
   const cols = useCandidateColumns();
+  const pick = usePicked();
+  const [emailing, setEmailing] = useState(false);
+  const personOf = (c: Schemas["CandidateSummary"]) => ({ id: c.id, person: { candidateId: c.id, name: c.fullName, email: c.email } });
   const advanced = !isEmpty(adv);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
   const list = useQuery({
@@ -45,7 +50,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k));
-  const width = cols.columns.length + 1;
+  const width = cols.columns.length + (canEmail ? 2 : 1);
+  const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
 
   return (
     <main className="candidates-page wide">
@@ -89,10 +95,18 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         </span>
         <WaLegend />
       </div>
+      {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
+      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
       <div className="table-scroll">
         <table className="candidates-table">
           <thead>
             <tr>
+              {canEmail && (
+                <th className="pick-col">
+                  <input type="checkbox" aria-label="Choose all shown" checked={allShown}
+                    onChange={(e) => { pick.pick(hits.map((h) => personOf(h.candidate)), e.target.checked); }} />
+                </th>
+              )}
               <th>Name</th>
               {cols.columns.map((col) => <th key={col}>{COLUMNS[col].header}</th>)}
             </tr>
@@ -101,6 +115,12 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             {hits.map(({ candidate: c, matchedIn, cvSnippet }) => (
               <Fragment key={c.id}>
                 <tr className={cvSnippet ? "has-snippet" : undefined}>
+                  {canEmail && (
+                    <td className="pick-col">
+                      <input type="checkbox" aria-label={`Choose ${c.fullName}`} checked={pick.ids.has(c.id)}
+                        onChange={(e) => { pick.pick([personOf(c)], e.target.checked); }} />
+                    </td>
+                  )}
                   <td className="name-cell">
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}

@@ -6,10 +6,14 @@ import { contactsKey } from "../api/keys";
 import { ContactForm } from "./ContactForm";
 import { ContactTable } from "./ContactTable";
 import { ErrorMessage } from "./ErrorMessage";
+import { PickBar, SeparateEmail } from "./SeparateEmail";
+import { contactPerson, usePicked } from "./usePicked";
 
 /** A company's contacts, with "Add contact" already set to this company. */
-export function CompanyContacts({ company, canCreate }: { company: Company; canCreate: boolean }) {
+export function CompanyContacts({ company, canCreate, canEmail = false }: { company: Company; canCreate: boolean; canEmail?: boolean }) {
   const [adding, setAdding] = useState(false);
+  const pick = usePicked();
+  const [emailing, setEmailing] = useState(false);
   const list = useQuery({
     queryKey: [...contactsKey, "company", company.id],
     queryFn: async () =>
@@ -25,7 +29,12 @@ export function CompanyContacts({ company, canCreate }: { company: Company; canC
         <ContactForm contact={null} company={{ id: company.id, name: company.name }} onDone={() => { setAdding(false); }} />
       )}
       <ErrorMessage error={list.error} />
-      {list.data && <ContactTable contacts={list.data} empty="No contacts at this company yet." />}
+      {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
+      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
+      {list.data && (
+        <ContactTable contacts={list.data} empty="No contacts at this company yet." picked={pick.ids}
+          onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
+      )}
     </section>
   );
 }

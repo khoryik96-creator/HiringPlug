@@ -7,6 +7,7 @@ import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
 import { ApplicationCard, MoveMenu } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
+import { type Person, SeparateEmail } from "./SeparateEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
@@ -41,6 +42,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   // Candidates chosen for one email to the client, in the board's order.
   const [picked, setPicked] = useState<string[]>([]);
   const [shortlist, setShortlist] = useState<Shortlisted[] | null>(null);
+  const [separately, setSeparately] = useState<Person[] | null>(null);
   const canEmail = permissions.includes("emails:send");
   const pick = (a: Application, on: boolean) => { setPicked((cur) => (on ? [...cur, a.id] : cur.filter((id) => id !== a.id))); };
   const startShortlist = () => {
@@ -65,14 +67,19 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
           <input type="checkbox" checked={bestFirst} onChange={(e) => { setBestFirst(e.target.checked); }} /> Best fit first
         </label>
       )}
-      {canEmail && picked.length > 0 && !shortlist && (
+      {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}
+      {canEmail && picked.length > 0 && !shortlist && !separately && (
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
           <button type="button" className="primary" disabled={picked.length > 10} onClick={startShortlist}>
             Email client about {picked.length} candidate{picked.length === 1 ? "" : "s"}
           </button>
+          <button type="button" onClick={() => {
+            setSeparately(apps.filter((a) => picked.includes(a.id)).map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
+            setEmailing(null);
+          }}>Email each candidate separately</button>
           <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
-          {picked.length > 10 && <span className="warning small">At most 10 in one email.</span>}
+          {picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
       )}
       {shortlist && (

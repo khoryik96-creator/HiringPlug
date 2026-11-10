@@ -6,12 +6,16 @@ import { contactsKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { PickBar, SeparateEmail } from "../components/SeparateEmail";
+import { contactPerson, usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
 /** Search and add contacts across all companies. */
-export function ContactList({ canCreate }: { canCreate: boolean }) {
+export function ContactList({ canCreate, canEmail = false }: { canCreate: boolean; canEmail?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [adding, setAdding] = useState(false);
+  const pick = usePicked();
+  const [emailing, setEmailing] = useState(false);
   const list = useQuery({
     queryKey: [...contactsKey, q],
     queryFn: async () =>
@@ -35,7 +39,12 @@ export function ContactList({ canCreate }: { canCreate: boolean }) {
         />
       )}
       <ErrorMessage error={list.error} />
-      {list.data && <ContactTable contacts={list.data.items} showCompany empty={q ? "No contacts match." : "No contacts yet."} />}
+      {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
+      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
+      {list.data && (
+        <ContactTable contacts={list.data.items} showCompany empty={q ? "No contacts match." : "No contacts yet."}
+          picked={pick.ids} onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
+      )}
     </main>
   );
 }

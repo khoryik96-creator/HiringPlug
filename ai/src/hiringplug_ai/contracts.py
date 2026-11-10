@@ -1691,6 +1691,25 @@ class EmailCvAttachment(BaseModel):
     ] = None
 
 
+class EmailRecipient(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    candidateId: CandidateId | None = None
+    contactId: ContactId | None = None
+
+
+class EmailBatchRecipient(BaseModel):
+    candidateId: Annotated[str | None, Field(...)]
+    contactId: Annotated[str | None, Field(...)]
+    name: str
+    to: Annotated[str | None, Field(description="Their address.")]
+    emailId: Annotated[str | None, Field(description="Their email, once sent.")]
+    problem: Annotated[
+        str | None, Field(description='Why they do not get it, e.g. "has no email address"; null: they do.')
+    ]
+
+
 class EmailPreview(BaseModel):
     fieldValues: Annotated[
         dict[str, str],
@@ -4418,6 +4437,29 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class EmailBatch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    recipients: Annotated[list[EmailRecipient], Field(max_length=50, min_length=1)]
+    subject: Annotated[str, Field(max_length=200, min_length=1)]
+    body: Annotated[str | None, Field(max_length=20000)] = None
+    bodyHtml: Annotated[str | None, Field(max_length=100000)] = None
+    timeZone: Annotated[str | None, Field(max_length=64)] = None
+    attachmentIds: Annotated[
+        list[EmailAttachmentId] | None,
+        Field(
+            description="Files you uploaded to /v1/email-attachments; each email carries them.", max_length=10
+        ),
+    ] = None
+    checkOnly: Annotated[bool | None, Field(description="Send nothing; say who would get it.")] = None
+
+
+class EmailBatchResult(BaseModel):
+    sent: Annotated[int, Field(description="How many emails were sent (0 with checkOnly).")]
+    recipients: list[EmailBatchRecipient]
 
 
 class EmailCandidate(BaseModel):

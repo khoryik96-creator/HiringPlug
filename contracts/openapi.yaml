@@ -1848,6 +1848,31 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/email-batches:
+    post:
+      operationId: sendEmailsSeparately
+      tags: [emails]
+      summary: Send one email to several candidates or contacts, each their own copy
+      description: >
+        Each person gets their own email, to them alone, with the fields filled from them ([First name] is theirs), kept on their emails. Those who cannot be sent to (no email address, an address that is not valid, withdrew consent to be contacted, or no value for a field the message uses) are listed with the reason and left out; the others are sent. With checkOnly nothing is sent: the list says who would get it.
+
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EmailBatch'}
+      responses:
+        '200':
+          description: Who got it (or would get it) and who did not, in the order given
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/EmailBatchResult'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
   /v1/emails:
     get:
       operationId: listEmails
@@ -6414,6 +6439,51 @@ components:
           description: As for sending to the client about several candidates; fieldValues are then the job's, its client's and the sender's.
           items: {$ref: '#/components/schemas/EmailCandidate'}
         timeZone: {type: string, maxLength: 64, example: Asia/Kuala_Lumpur}
+    EmailBatch:
+      type: object
+      additionalProperties: false
+      required: [recipients, subject]
+      properties:
+        recipients:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: '#/components/schemas/EmailRecipient'}
+        subject: {type: string, minLength: 1, maxLength: 200}
+        body: {type: string, maxLength: 20000}
+        bodyHtml: {type: string, maxLength: 100000}
+        timeZone: {type: string, maxLength: 64}
+        attachmentIds:
+          type: array
+          maxItems: 10
+          description: "Files you uploaded to /v1/email-attachments; each email carries them."
+          items: {$ref: '#/components/schemas/EmailAttachmentId'}
+        checkOnly: {type: boolean, description: "Send nothing; say who would get it."}
+    EmailRecipient:
+      type: object
+      additionalProperties: false
+      description: A candidate or one of a client's contacts.
+      properties:
+        candidateId: {$ref: '#/components/schemas/CandidateId'}
+        contactId: {$ref: '#/components/schemas/ContactId'}
+    EmailBatchResult:
+      type: object
+      required: [recipients, sent]
+      properties:
+        sent: {type: integer, description: "How many emails were sent (0 with checkOnly)."}
+        recipients:
+          type: array
+          items: {$ref: '#/components/schemas/EmailBatchRecipient'}
+    EmailBatchRecipient:
+      type: object
+      required: [candidateId, contactId, name, to, emailId, problem]
+      properties:
+        candidateId: {type: string, nullable: true}
+        contactId: {type: string, nullable: true}
+        name: {type: string}
+        to: {type: string, nullable: true, description: Their address.}
+        emailId: {type: string, nullable: true, description: "Their email, once sent."}
+        problem: {type: string, nullable: true, description: "Why they do not get it, e.g. \"has no email address\"; null: they do."}
     EmailCandidate:
       type: object
       additionalProperties: false

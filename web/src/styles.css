@@ -765,3 +765,17 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
   body.dock-right { padding-right: 0; }
   .assistant-dock { width: 100vw !important; }
 }
+
+/* One email to several people, each their own copy. */
+.pick-col { width: 2rem; padding-right: 0 !important; }
+.pick-col input { margin: 0; }
+.people-chips { list-style: none; padding: 0; margin: 0.5rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; max-height: 8rem; overflow-y: auto; }
+.person-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.3rem 0.2rem 0.7rem; border-radius: 999px; background: var(--accent-soft); font-size: 0.85rem; }
+.person-chip button { min-height: 0; padding: 0 0.4rem; border: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 1rem; line-height: 1; }
+.separate-email label.field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; margin: 0.5rem 0; }
+.separate-email label.field input { font-weight: 400; }
+.separate-email .grow { flex: 1; }
+.separate-email .grow select { flex: 1; }
+.separate-actions { margin-top: 0.6rem; }
+.recipients-table { margin-top: 0.75rem; }
+.recipients-table .ok { color: var(--ok, #157a3c); font-weight: 600; }

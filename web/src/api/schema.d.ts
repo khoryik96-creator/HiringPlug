@@ -1124,6 +1124,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/email-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send one email to several candidates or contacts, each their own copy
+         * @description Each person gets their own email, to them alone, with the fields filled from them ([First name] is theirs), kept on their emails. Those who cannot be sent to (no email address, an address that is not valid, withdrew consent to be contacted, or no value for a field the message uses) are listed with the reason and left out; the others are sent. With checkOnly nothing is sent: the list says who would get it.
+         */
+        post: operations["sendEmailsSeparately"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/emails": {
         parameters: {
             query?: never;
@@ -4258,6 +4278,38 @@ export interface components {
             candidates?: components["schemas"]["EmailCandidate"][];
             /** @example Asia/Kuala_Lumpur */
             timeZone: string;
+        };
+        EmailBatch: {
+            recipients: components["schemas"]["EmailRecipient"][];
+            subject: string;
+            body?: string;
+            bodyHtml?: string;
+            timeZone?: string;
+            /** @description Files you uploaded to /v1/email-attachments; each email carries them. */
+            attachmentIds?: components["schemas"]["EmailAttachmentId"][];
+            /** @description Send nothing; say who would get it. */
+            checkOnly?: boolean;
+        };
+        /** @description A candidate or one of a client's contacts. */
+        EmailRecipient: {
+            candidateId?: components["schemas"]["CandidateId"];
+            contactId?: components["schemas"]["ContactId"];
+        };
+        EmailBatchResult: {
+            /** @description How many emails were sent (0 with checkOnly). */
+            sent: number;
+            recipients: components["schemas"]["EmailBatchRecipient"][];
+        };
+        EmailBatchRecipient: {
+            candidateId: string | null;
+            contactId: string | null;
+            name: string;
+            /** @description Their address. */
+            to: string | null;
+            /** @description Their email, once sent. */
+            emailId: string | null;
+            /** @description Why they do not get it, e.g. "has no email address"; null: they do. */
+            problem: string | null;
         };
         EmailCandidate: {
             candidateId: components["schemas"]["CandidateId"];
@@ -8835,6 +8887,35 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    sendEmailsSeparately: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailBatch"];
+            };
+        };
+        responses: {
+            /** @description Who got it (or would get it) and who did not, in the order given */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailBatchResult"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            413: components["responses"]["PayloadTooLarge"];
         };
     };
     listEmails: {

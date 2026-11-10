@@ -622,6 +622,16 @@ lead's company (with the built-in email check).
   job's, its client's and the sender's, never one candidate's. The email is
   kept on each candidate's emails, and the job's activity says "emailed the
   client about N candidates".
+- **One email to many, each their own copy** ✅: tick candidates (the
+  candidates list, or a job's board), or contacts (the contacts list, or a
+  company's contacts), and **Email each separately**. Up to 50 people get
+  the same email, each their own: to them alone (nobody sees the others; no
+  cc or bcc), with fields such as [First name] filled from them, and kept on
+  their emails. Pick a template, write with the toolbar, attach files (each
+  copy carries them), **Preview as** any of them, and **Check who gets it**:
+  those with no email address, an address that is not valid, who withdrew
+  consent to be contacted, or with no value for a field the message uses are
+  listed with the reason and left out; the rest are sent.
 - **Email** ✅: write email from a candidate's page (or "Email candidate" on
   an interview). Pick a template, optionally for one of their jobs: it is
   filled from the candidate, the job and its company, the interview (time in
