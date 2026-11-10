@@ -14,7 +14,7 @@ func correctSpelling(text string) string {
 	text = strings.ReplaceAll(text, "bonuses", "bonus")
 	text = strings.ReplaceAll(text, "fixed annual bonus", "fixed bonus")
 	return salaryWords.ReplaceAllStringFunc(text, func(word string) string {
-		for _, known := range []string{"bonus", "contractual", "guaranteed", "allowance", "months", "monthly"} {
+		for _, known := range []string{"bonus", "contractual", "guaranteed", "allowance", "months", "monthly", "annual", "annum", "yearly", "daily", "weekly", "hourly"} {
 			if word == known {
 				return word
 			}

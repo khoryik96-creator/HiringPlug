@@ -3591,10 +3591,13 @@ export interface components {
         };
         SalaryCalculationInput: {
             current: string;
+            currentCurrency?: components["schemas"]["CurrencyCode"];
             expected: string;
             rules: components["schemas"]["SalaryCalculationRules"];
         };
         SalaryCalculation: {
+            hasCurrent: boolean;
+            reviewRequired: boolean;
             base: string;
             allowances: string;
             bonus: string;

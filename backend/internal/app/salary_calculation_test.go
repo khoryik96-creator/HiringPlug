@@ -67,3 +67,41 @@ func TestSalaryCalculationRulesAndProtectedDescriptions(t *testing.T) {
 	assert.Nil(t, fresh.CurrentSalary.MustGet().Description)
 
 }
+
+func TestSalaryCalculationReviewFlagsAndCurrencies(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	for _, tc := range []struct {
+		current, expected, want string
+		review, has             bool
+		currency                string
+	}{
+		{"16k", "1000%", "", true, true, ""},
+		{"MYR 16k + USD 400 fixed allowance", "", "", true, true, ""},
+		{"-16k + 400 allowance", "", "", true, true, ""},
+		{"16k", "SGD 10% lateral", "", true, true, ""},
+		{"SGD 16k", "maintain", "16000.00", false, true, "SGD"},
+		{"16k", "15k + 20% annual bonus", "15000.00", false, true, ""},
+		{"16k + 2400 yearly fixed allowance", "10%", "17820.00", false, true, "MYR"},
+		{"", "22k", "22000.00", false, false, ""},
+		{"0", "lateral", "0.00", false, true, "MYR"},
+	} {
+		res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{"current": tc.current, "expected": tc.expected, "currentCurrency": "MYR", "rules": api.SalaryCalculationRules{Allowances: true, Bonus: true}})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var out api.SalaryCalculation
+		res.JSON(&out)
+		assert.Equal(t, tc.review, out.ReviewRequired, tc.current+" / "+tc.expected)
+		assert.Equal(t, tc.has, out.HasCurrent)
+		if tc.want == "" {
+			assert.Nil(t, out.ExpectedMin)
+		} else {
+			require.NotNil(t, out.ExpectedMin)
+			assert.Equal(t, tc.want, *out.ExpectedMin)
+		}
+		if tc.currency != "" {
+			require.NotNil(t, out.ExpectedCurrency)
+			assert.Equal(t, tc.currency, *out.ExpectedCurrency)
+		}
+	}
+}

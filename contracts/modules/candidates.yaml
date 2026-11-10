@@ -1044,12 +1044,15 @@ components:
       required: [current, expected, rules]
       properties:
         current: { type: string, maxLength: 2000 }
+        currentCurrency: { $ref: '#/components/schemas/CurrencyCode' }
         expected: { type: string, maxLength: 2000 }
         rules: { $ref: '#/components/schemas/SalaryCalculationRules' }
     SalaryCalculation:
       type: object
-      required: [base, allowances, bonus, monthly, annualMonths, warnings, excluded]
+      required: [base, allowances, bonus, monthly, annualMonths, warnings, excluded, hasCurrent, reviewRequired]
       properties:
+        hasCurrent: { type: boolean }
+        reviewRequired: { type: boolean }
         base: { type: string }
         allowances: { type: string }
         bonus: { type: string }

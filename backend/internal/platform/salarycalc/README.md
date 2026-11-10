@@ -29,3 +29,12 @@ Intentional differences from Kano:
 
 The fixtures in salary_test.go use synthetic amounts. Extend them when a recruiter
 reports a miss. Do not add real candidates or CVs to tests.
+
+Bug-review guarantees: percentages are separated from literal amounts before
+parsing; bonus clauses cannot change the pay period of expected base salary.
+Annual fixed allowances are divided by 12. Mixed-currency components and
+relative expectations require a known matching base currency or a reviewed
+converted amount. Negative amounts, ambiguous current ranges and malformed
+grouping cannot be applied automatically. Expected-only and known zero salaries
+are distinct from a missing current salary. Review status is an explicit API
+boolean, not inferred by the web app from English warning text.

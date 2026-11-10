@@ -5,6 +5,8 @@ export interface SalaryFormState {
   currentDescription?: string;
   expectedDescription?: string;
   calculationPending?: boolean;
+  currentNeedsReview?: boolean;
+  expectedNeedsReview?: boolean;
   currentAmount: string;
   currentCurrency: string;
   currentPeriod: Schemas["PayPeriod"];
@@ -19,6 +21,8 @@ export const SALARY_PATHS: Record<keyof SalaryFormState, string> = {
   currentDescription: "currentSalary.description",
   expectedDescription: "expectedSalary.description",
   calculationPending: "currentSalary.description",
+  currentNeedsReview: "currentSalary.description",
+  expectedNeedsReview: "expectedSalary.description",
   currentAmount: "currentSalary.amount",
   currentCurrency: "currentSalary.currency",
   currentPeriod: "currentSalary.period",
@@ -67,7 +71,7 @@ const CURRENCY = /^[A-Z]{3}$/;
  */
 export function salaryProblems(f: SalaryFormState): Record<string, string> {
   const problems: Record<string, string> = {};
-  if (f.calculationPending) problems["currentSalary.description"] = "Calculate and review the salary before saving.";
+  if (f.calculationPending) problems[f.expectedNeedsReview && !f.currentNeedsReview ? "expectedSalary.description" : "currentSalary.description"] = "Calculate and review the salary before saving.";
   for (const key of ["currentAmount", "expectedMin", "expectedMax"] as const) {
     const amount = plainAmount(f[key]);
     if (amount !== "" && !AMOUNT.test(amount)) {

@@ -877,6 +877,8 @@ class UsedValues(BaseModel):
 
 
 class SalaryCalculation(BaseModel):
+    hasCurrent: bool
+    reviewRequired: bool
     base: str
     allowances: str
     bonus: str
@@ -4248,6 +4250,7 @@ class SalaryCalculationInput(BaseModel):
         extra="forbid",
     )
     current: Annotated[str, Field(max_length=2000)]
+    currentCurrency: CurrencyCode | None = None
     expected: Annotated[str, Field(max_length=2000)]
     rules: SalaryCalculationRules
 

@@ -803,7 +803,11 @@ reviewed amounts and original wording in the protected compensation record. The
 candidate card shows the fixed figure, excluding performance pay, employer EPF and
 conditional allowances. Missing or conflicting guaranteed bonus terms need review.
 Daily/hourly/weekly rates need working-time information and cannot be assumed monthly.
-Salary is calculated in Go and is never sent to AI.
+Salary is calculated in Go and is never sent to AI. Annual fixed allowances are
+spread over 12 months. Mixed currencies, negative amounts and ambiguous current
+ranges require review; percentage expectations cannot silently change currency.
+An expected salary can be recorded without a current salary. Changing the
+currency or calculation rules invalidates an unapplied preview.
 
 **Settings → General → Salary calculation** chooses fixed allowances, guaranteed
 bonus, the bonus basis and rounding for the company. Defaults spread guaranteed
