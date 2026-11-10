@@ -26,6 +26,7 @@ Read in this order. Each page is short and links to the next.
 - [Add a module](playbooks/add-a-module.md)
 - [Add an endpoint or a field](playbooks/add-an-endpoint.md)
 - [Fix a bug](playbooks/fix-a-bug.md)
+- [Efficient development and CI diagnosis](playbooks/development-workflow.md)
 - [Debug a problem](playbooks/debug-a-problem.md)
 - [Run it on your own machine or server](playbooks/run-locally.md)
 

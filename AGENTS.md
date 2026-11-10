@@ -7,6 +7,10 @@ checked in review.
 ## Commands
 
 - `task verify` before every push. It must pass. Commit any files it regenerates.
+- Reuse installed dependencies and running databases. Run targeted tests while
+  editing, then `task verify` once the change is ready to push. Repeat full
+  verification only after a change or failure warrants it. See
+  [the efficient development workflow](docs/playbooks/development-workflow.md).
 - `task gen` after editing anything in `contracts/` or `backend/db/`.
 - `task new:module -- name=<plural> entity=<singular>` to start a module.
 - `task test` needs PostgreSQL (`task db:up`) and its client tools of the same version (pg_dump, for backups), Tesseract, antiword, LibreOffice (old .doc files) and Node (CV Studio's renderer; `task setup` installs its package).
