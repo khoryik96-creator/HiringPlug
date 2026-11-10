@@ -37,6 +37,23 @@ func (q *Queries) CloseJobAds(ctx context.Context, jobOrderID string) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const deleteJdFile = `-- name: DeleteJdFile :one
+DELETE FROM job_description_file WHERE id = $1 RETURNING job_id, file_name, storage_key
+`
+
+type DeleteJdFileRow struct {
+	JobID      *string
+	FileName   string
+	StorageKey string
+}
+
+func (q *Queries) DeleteJdFile(ctx context.Context, id string) (DeleteJdFileRow, error) {
+	row := q.db.QueryRow(ctx, deleteJdFile, id)
+	var i DeleteJdFileRow
+	err := row.Scan(&i.JobID, &i.FileName, &i.StorageKey)
+	return i, err
+}
+
 const deleteJobSalary = `-- name: DeleteJobSalary :execrows
 DELETE FROM job_order_salary WHERE job_order_id = $1 AND version = $2
 `
@@ -132,17 +149,19 @@ func (q *Queries) GetBlindRewrite(ctx context.Context, id string) (JobAdBlindRew
 }
 
 const getJdFile = `-- name: GetJdFile :one
-SELECT id, job_id, file_name, status, error, details, created_at FROM job_description_file WHERE id = $1
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file WHERE id = $1
 `
 
 type GetJdFileRow struct {
-	ID        string
-	JobID     *string
-	FileName  string
-	Status    string
-	Error     *string
-	Details   []byte
-	CreatedAt time.Time
+	ID          string
+	JobID       *string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	Status      string
+	Error       *string
+	Details     []byte
+	CreatedAt   time.Time
 }
 
 func (q *Queries) GetJdFile(ctx context.Context, id string) (GetJdFileRow, error) {
@@ -152,11 +171,30 @@ func (q *Queries) GetJdFile(ctx context.Context, id string) (GetJdFileRow, error
 		&i.ID,
 		&i.JobID,
 		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
 		&i.Status,
 		&i.Error,
 		&i.Details,
 		&i.CreatedAt,
 	)
+	return i, err
+}
+
+const getJdFileStorage = `-- name: GetJdFileStorage :one
+SELECT storage_key, file_name, content_type FROM job_description_file WHERE id = $1
+`
+
+type GetJdFileStorageRow struct {
+	StorageKey  string
+	FileName    string
+	ContentType string
+}
+
+func (q *Queries) GetJdFileStorage(ctx context.Context, id string) (GetJdFileStorageRow, error) {
+	row := q.db.QueryRow(ctx, getJdFileStorage, id)
+	var i GetJdFileStorageRow
+	err := row.Scan(&i.StorageKey, &i.FileName, &i.ContentType)
 	return i, err
 }
 
@@ -337,7 +375,7 @@ func (q *Queries) InsertBlindRewrite(ctx context.Context, arg InsertBlindRewrite
 const insertJdFile = `-- name: InsertJdFile :one
 INSERT INTO job_description_file (id, tenant_id, job_id, file_name, content_type, size_bytes, storage_key, created_by, status, text, details)
 VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, app_current_user(), $7, $8, $9)
-RETURNING id, job_id, file_name, status, error, details, created_at
+RETURNING id, job_id, file_name, content_type, size_bytes, status, error, details, created_at
 `
 
 type InsertJdFileParams struct {
@@ -353,13 +391,15 @@ type InsertJdFileParams struct {
 }
 
 type InsertJdFileRow struct {
-	ID        string
-	JobID     *string
-	FileName  string
-	Status    string
-	Error     *string
-	Details   []byte
-	CreatedAt time.Time
+	ID          string
+	JobID       *string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	Status      string
+	Error       *string
+	Details     []byte
+	CreatedAt   time.Time
 }
 
 // Job descriptions uploaded to fill in an ad.
@@ -380,6 +420,8 @@ func (q *Queries) InsertJdFile(ctx context.Context, arg InsertJdFileParams) (Ins
 		&i.ID,
 		&i.JobID,
 		&i.FileName,
+		&i.ContentType,
+		&i.SizeBytes,
 		&i.Status,
 		&i.Error,
 		&i.Details,
@@ -620,6 +662,24 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 	return items, nil
 }
 
+const linkJdFileToJob = `-- name: LinkJdFileToJob :execrows
+UPDATE job_description_file SET job_id = $1 WHERE id = $2 AND job_id IS NULL
+`
+
+type LinkJdFileToJobParams struct {
+	JobID *string
+	ID    string
+}
+
+// A job description read on the Add job form stays with the job made from it.
+func (q *Queries) LinkJdFileToJob(ctx context.Context, arg LinkJdFileToJobParams) (int64, error) {
+	result, err := q.db.Exec(ctx, linkJdFileToJob, arg.JobID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listBlindRewrites = `-- name: ListBlindRewrites :many
 SELECT id, tenant_id, ad_id, status, tone, strength, error, warnings, retried, model, tokens, created_by, created_at, finished_at, source_hash FROM job_ad_blind_rewrite WHERE ad_id = $1 ORDER BY created_at DESC, id DESC LIMIT 5
 `
@@ -697,6 +757,53 @@ func (q *Queries) ListJobAds(ctx context.Context, jobOrderID string) ([]JobAd, e
 			&i.BlindEdited,
 			&i.BlindSourceHash,
 			&i.PublishBlind,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listJobJdFiles = `-- name: ListJobJdFiles :many
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file
+WHERE job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50
+`
+
+type ListJobJdFilesRow struct {
+	ID          string
+	JobID       *string
+	FileName    string
+	ContentType string
+	SizeBytes   int32
+	Status      string
+	Error       *string
+	Details     []byte
+	CreatedAt   time.Time
+}
+
+func (q *Queries) ListJobJdFiles(ctx context.Context, jobID *string) ([]ListJobJdFilesRow, error) {
+	rows, err := q.db.Query(ctx, listJobJdFiles, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListJobJdFilesRow
+	for rows.Next() {
+		var i ListJobJdFilesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.FileName,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.Status,
+			&i.Error,
+			&i.Details,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

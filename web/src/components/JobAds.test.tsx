@@ -106,8 +106,30 @@ describe("job ads", () => {
     renderWithClient(<JobAds job={job} canEdit={false} />);
     await screen.findByRole("article", { name: "Senior Auditor" });
     expect((await screen.findByRole("link", { name: "Careers page" })).getAttribute("href")).toBe(`${window.location.origin}/careers/demo-company`);
-    // They may download the ad (Word, PDF), not change it.
-    expect(screen.queryAllByRole("button").map((b) => b.textContent)).toEqual(["Word", "PDF", "Word", "PDF"]);
+    // They may fold the panel and the ad, pick a version to read, and download the ad (Word, PDF); not change it.
+    expect(screen.queryAllByRole("button").map((b) => b.textContent)).toEqual(
+      ["Job ads", "Senior Auditor", "Side by side", "As written", "Blind", "Word", "PDF", "Word", "PDF"],
+    );
+  });
+
+  it("folds into a card per ad: the newest open, older ones closed; one version at a time if wanted", async () => {
+    const older = { ...draft, id: "ad_01jbz6w0m0k8q9x2r3s4t5v6w0", title: "Auditor (old)" };
+    reads([draft, older]);
+    renderWithClient(<JobAds job={job} canEdit={false} />);
+    const newest = await screen.findByRole("article", { name: "Senior Auditor" });
+    const old = screen.getByRole("article", { name: "Auditor (old)" });
+    expect(within(newest).getByRole("region", { name: "Blind" })).toBeTruthy();
+    expect(within(old).queryByRole("region", { name: "Blind" })).toBeNull();
+    expect(screen.getByText("2 ads · 0 on the careers page")).toBeTruthy();
+
+    fireEvent.click(within(newest).getByRole("button", { name: "Blind" }));
+    expect(within(newest).queryByRole("region", { name: "As written" })).toBeNull();
+    expect(within(newest).getByRole("region", { name: "Blind" })).toBeTruthy();
+
+    fireEvent.click(within(old).getByRole("button", { name: "Auditor (old)" }));
+    expect(within(old).getByRole("region", { name: "As written" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Job ads" }));
+    expect(screen.queryByRole("article")).toBeNull();
   });
 
   it("gives published ads a link per job board", async () => {

@@ -49,6 +49,7 @@ class Permission(StrEnum):
     interviews_feedback = "interviews:feedback"
     interviews_read = "interviews:read"
     interviews_schedule = "interviews:schedule"
+    jobs_documents_delete = "jobs.documents:delete"
     jobs_salary_read = "jobs.salary:read"
     jobs_salary_update = "jobs.salary:update"
     jobs_create = "jobs:create"
@@ -2652,6 +2653,12 @@ class JobOrderCreate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    jdFileId: Annotated[
+        JdFileId | None,
+        Field(
+            description="The job description the form was filled in from (uploaded without a job); it is kept with the new job."
+        ),
+    ] = None
     companyId: CompanyId
     contactId: ContactId | None = None
     title: Annotated[str, Field(max_length=200, min_length=1)]
@@ -4999,6 +5006,8 @@ class DocumentMatchList(BaseModel):
 
 class JdFile(BaseModel):
     id: JdFileId
+    contentType: str
+    sizeBytes: int
     jobId: Annotated[
         JobOrderId | None,
         Field(description="The job it was uploaded for; null for one read before its job was added."),
@@ -5059,6 +5068,10 @@ class Report(BaseModel):
 class CandidateFind(BaseModel):
     searches: list[CandidateFindSearch]
     skipped: Annotated[int, Field(description="Searches past the sixth that were left out.")]
+
+
+class JdFileList(BaseModel):
+    items: list[JdFile]
 
 
 class MarketMap(BaseModel):

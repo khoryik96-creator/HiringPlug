@@ -28,8 +28,9 @@ type Service struct {
 	ai        AI          // the company's AI, for blind ad rewrites (nil: off)
 }
 
-// Create adds a job.
-func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (View, error) {
+// Create adds a job; jdFileID (or "") is the job description its form was
+// filled in from, kept with the job.
+func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, jdFileID string) (View, error) {
 	d, errs := Normalize(in)
 	if err := errs.Err(); err != nil {
 		return View{}, err
@@ -54,6 +55,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Vi
 			Action: "job.created", EntityType: "job", EntityID: row.ID, Changes: audit.Diff(map[string]any{}, fields(d)),
 		}); err != nil {
 			return err
+		}
+		if jdFileID != "" {
+			if err := linkJD(ctx, tx, jdFileID, row.ID); err != nil {
+				return err
+			}
 		}
 		out, err = s.view(ctx, tx, p, fromRow(row))
 		return err

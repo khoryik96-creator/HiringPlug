@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
@@ -16,7 +16,11 @@ import { useMoveApplication } from "./useMoveApplication";
  * With matching, each card shows its fit score and the board can put the
  * best fits first.
  */
-export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: string; canUpdate: boolean; permissions?: Permission[] }) {
+export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: {
+  jobId: string; canUpdate: boolean; permissions?: Permission[];
+  /** Shown under the board (the job's possible candidates). */
+  children?: ReactNode;
+}) {
   const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: jobApplicationsKey(jobId),
@@ -101,8 +105,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: s
         })}
       </div>
       {closed.length > 0 && (
-        <details>
-          <summary>Rejected or withdrawn ({String(closed.length)})</summary>
+        <details className="fold">
+          <summary><span className="fold-title">Rejected or withdrawn</span> <span className="count-chip">{String(closed.length)}</span></summary>
           <ul className="closed-list">
             {closed.map((a) => (
               <li key={a.id}>
@@ -115,6 +119,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [] }: { jobId: s
           </ul>
         </details>
       )}
+      {children}
     </section>
   );
 }

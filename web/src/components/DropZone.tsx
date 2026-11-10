@@ -16,8 +16,10 @@ export function acceptable(files: File[], accept: string): { ok: File[]; skipped
   return { ok, skipped };
 }
 
-export function DropZone({ accept, multiple = false, disabled = false, label, hint, onFiles }: {
+export function DropZone({ accept, multiple = false, disabled = false, compact = false, label, hint, onFiles }: {
   accept: string;
+  /** One slim line instead of a big box (where it sits beside other things). */
+  compact?: boolean;
   multiple?: boolean;
   disabled?: boolean;
   /** What to drop, e.g. "Drop CVs here". */
@@ -38,7 +40,7 @@ export function DropZone({ accept, multiple = false, disabled = false, label, hi
 
   return (
     <div
-      className={`drop-zone${over ? " over" : ""}${disabled ? " disabled" : ""}`}
+      className={`drop-zone${compact ? " compact" : ""}${over ? " over" : ""}${disabled ? " disabled" : ""}`}
       onDragOver={(e) => { e.preventDefault(); if (!disabled) setOver(true); }}
       onDragLeave={() => { setOver(false); }}
       onDrop={(e) => {

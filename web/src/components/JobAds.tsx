@@ -4,10 +4,10 @@ import { useCallback, useState } from "react";
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobAdsKey } from "../api/keys";
 import { careersUrl } from "../careersRoute";
-import { CHANNEL, regionName } from "../labels";
+import { regionName } from "../labels";
 import { useFieldSettings } from "./useFieldSettings";
 import { AdText } from "./AdText";
-import { AdVersions } from "./AdVersions";
+import { AdCard } from "./JobAdCard";
 import { ErrorMessage } from "./ErrorMessage";
 import { COUNTRIES } from "./forms";
 import { JdDrop, type JdDetails, JD_TYPES } from "./JdDrop";
@@ -15,14 +15,17 @@ import { DropZone } from "./DropZone";
 import { SaveError } from "./SaveError";
 
 type Ad = Schemas["JobAd"];
-const STATUS: Record<Ad["status"], string> = { draft: "Draft", published: "Published", closed: "Closed" };
 const orNull = (v: string) => (v.trim() === "" ? null : v);
 
-/** A job's ads: the advertised text, separate from the internal job order. */
+/**
+ * A job's ads: the advertised text, separate from the internal job order.
+ * The panel folds away; each ad is a card that opens to its two versions.
+ */
 export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Ad | "new" | null>(null);
   const [dropped, setDropped] = useState<File | null>(null); // a job description dropped before writing the ad
+  const [shown, setShown] = useState(true);
   const ads = useQuery({
     queryKey: jobAdsKey(job.id),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/ads", { params: { path: { jobId: job.id } } })).items,
@@ -33,51 +36,49 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
       unwrap(await api.PATCH("/v1/job-ads/{adId}", { params: { path: { adId: ad.id } }, body: { version: ad.version, status } })),
     onSettled: () => queryClient.invalidateQueries({ queryKey: jobAdsKey(job.id) }),
   });
+  const list = ads.data ?? [];
+  const live = list.filter((a) => a.status === "published").length;
 
   return (
-    <section className="panel" aria-label="Job ads">
+    <section className="panel job-ads" aria-label="Job ads">
       <div className="row spread">
-        <h3>Job ads</h3>
-        {canEdit && !editing && <button type="button" onClick={() => { setEditing("new"); }}>Write an ad</button>}
+        <h3 className="fold-head">
+          <button type="button" className="fold-toggle" aria-expanded={shown} onClick={() => { setShown(!shown); }}>Job ads</button>
+          {ads.data && (
+            <span className="muted small">
+              {list.length === 0 ? "none yet" : `${String(list.length)} ad${list.length === 1 ? "" : "s"} · ${String(live)} on the careers page`}
+            </span>
+          )}
+        </h3>
+        <div className="row">
+          {me.data && (
+            <span className="muted small">
+              <a href={careersUrl(window.location.origin, me.data.tenant.careersSlug)} target="_blank" rel="noreferrer">Careers page</a>
+              {" · "}
+              <a href={`${window.location.origin}/v1/public/careers/${me.data.tenant.careersSlug}/jobs.xml`} target="_blank" rel="noreferrer">Job feed</a>
+            </span>
+          )}
+          {canEdit && !editing && <button type="button" onClick={() => { setShown(true); setEditing("new"); }}>Write an ad</button>}
+        </div>
       </div>
-      {me.data && (
-        <p className="muted small">
-          <a href={careersUrl(window.location.origin, me.data.tenant.careersSlug)} target="_blank" rel="noreferrer">Careers page</a>
-          {" · "}
-          <a href={`${window.location.origin}/v1/public/careers/${me.data.tenant.careersSlug}/jobs.xml`} target="_blank" rel="noreferrer">Job feed</a>
-        </p>
-      )}
-      <ErrorMessage error={ads.error ?? setStatus.error} />
-      {canEdit && !editing && (
-        <DropZone accept={JD_TYPES} label="Drop the client's JD to write an ad"
-          hint="PDF, Word or text" onFiles={([f]) => { if (f) { setDropped(f); setEditing("new"); } }} />
-      )}
-      {editing && <AdForm job={job} ad={editing === "new" ? null : editing} jd={dropped}
-        onDone={() => { setEditing(null); setDropped(null); }} />}
-      {ads.data?.length === 0 && !editing && <p className="muted">No ads yet.</p>}
-      {ads.data?.map((ad) => (
-        <article key={ad.id} className="ad" aria-label={ad.title}>
-          <div className="row spread">
-            <h4>{ad.title} <span className={`badge ${ad.status}`}>{STATUS[ad.status]}</span></h4>
-            {canEdit && editing === null && (
-              <div className="row">
-                <button type="button" className="link" onClick={() => { setEditing(ad); }}>Edit</button>
-                {ad.status !== "published" && (
-                  <button type="button" disabled={setStatus.isPending} onClick={() => { setStatus.mutate({ ad, status: "published" }); }}>Publish</button>
-                )}
-                {ad.status === "published" && (
-                  <button type="button" className="link" onClick={() => { setStatus.mutate({ ad, status: "draft" }); }}>Unpublish</button>
-                )}
-                {ad.status !== "closed" && (
-                  <button type="button" className="link" onClick={() => { setStatus.mutate({ ad, status: "closed" }); }}>Close</button>
-                )}
-              </div>
-            )}
+      {shown && (
+        <>
+          <ErrorMessage error={ads.error ?? setStatus.error} />
+          {canEdit && !editing && (
+            <DropZone compact accept={JD_TYPES} label="Drop the client's JD to write an ad"
+              hint="PDF, Word or text" onFiles={([f]) => { if (f) { setDropped(f); setEditing("new"); } }} />
+          )}
+          {editing && <AdForm job={job} ad={editing === "new" ? null : editing} jd={dropped}
+            onDone={() => { setEditing(null); setDropped(null); }} />}
+          <div className="ad-cards">
+            {list.map((ad, i) => (
+              <AdCard key={ad.id} ad={ad} startOpen={i === 0 /* the newest; older ones folded */} canEdit={canEdit && editing === null} busy={setStatus.isPending}
+                careersSlug={me.data?.tenant.careersSlug}
+                onEdit={() => { setEditing(ad); }} onStatus={(status) => { setStatus.mutate({ ad, status }); }} />
+            ))}
           </div>
-          <AdVersions ad={ad} canEdit={canEdit && editing === null} />
-          {ad.status === "published" && me.data && <ShareLinks slug={me.data.tenant.careersSlug} adId={ad.id} />}
-        </article>
-      ))}
+        </>
+      )}
     </section>
   );
 }
@@ -186,38 +187,5 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
       </div>
       <SaveError error={save.error} shown={[]} onReload={() => { void queryClient.invalidateQueries({ queryKey: jobAdsKey(job.id) }); onDone(); }} />
     </form>
-  );
-}
-
-const BOARDS = ["jobstreet", "linkedin", "indeed", "facebook"] as const;
-
-/**
- * Links to this ad for each job board: post the ad there with its link, and
- * applicants who come through it are recorded as coming from that board.
- */
-function ShareLinks({ slug, adId }: { slug: string; adId: string }) {
-  const [copied, setCopied] = useState<string | null>(null);
-  return (
-    <details className="share">
-      <summary>Links for job boards</summary>
-      <table>
-        <tbody>
-          {BOARDS.map((board) => {
-            const url = careersUrl(window.location.origin, slug, adId, board);
-            return (
-              <tr key={board}>
-                <td>{CHANNEL[board]}</td>
-                <td><code>{url}</code></td>
-                <td>
-                  <button type="button" className="link" onClick={() => {
-                    void navigator.clipboard.writeText(url).then(() => { setCopied(board); });
-                  }}>{copied === board ? "Copied" : "Copy"}</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </details>
   );
 }

@@ -16,7 +16,7 @@ describe("possible candidates", () => {
   it("are not looked for without the permissions", () => {
     const get = vi.spyOn(api, "GET");
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={["matching:read"]} />);
-    expect(screen.queryByRole("region", { name: "Possible candidates" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Possible candidates" })).toBeNull();
     expect(get).not.toHaveBeenCalled();
   });
 
@@ -26,6 +26,8 @@ describe("possible candidates", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({}));
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={[...SEE, "pipeline:update"]} />);
     expect(await screen.findByText("Aina")).toBeTruthy();
+    // Folded under the pipeline, with how many there are.
+    expect(screen.getByRole("group", { name: "Possible candidates" }).querySelector("summary")?.textContent).toBe("Possible candidates1CVs that share this job's words");
     expect(screen.getByLabelText("Matched words").textContent).toBe("2 matched:auditgroups"); // once each
     const excerpt = document.querySelector(".suggestion-snippet");
     expect(excerpt?.textContent).toBe("Aina statutory audit of listed groups … Audit lead"); // contact details are on the profile

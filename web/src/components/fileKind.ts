@@ -5,3 +5,7 @@ const KIND: Record<string, string> = {
 };
 
 export const fileKind = (contentType: string) => KIND[contentType] ?? (contentType.startsWith("image/") ? "IMG" : "DOCX");
+
+/** A file's size for people: "84 KB", "1.2 MB". */
+export const fileSize = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${String(Math.max(1, Math.round(bytes / 1024)))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;

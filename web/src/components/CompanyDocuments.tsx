@@ -11,7 +11,7 @@ import { formatWhen } from "../labels";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
 import { FileViewer } from "./FileViewer";
-import { fileKind } from "./fileKind";
+import { fileKind, fileSize } from "./fileKind";
 
 type Doc = Schemas["CompanyDocument"];
 type Section = Doc["section"];
@@ -19,7 +19,6 @@ type Section = Doc["section"];
 export const companyDocumentsKey = (id: string) => ["company", id, "documents"] as const;
 
 const kindOf = (d: Doc) => fileKind(d.contentType);
-const sizeOf = (bytes: number) => (bytes < 1024 * 1024 ? `${String(Math.max(1, Math.round(bytes / 1024)))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
 
 export function CompanyDocuments({ companyId, section, permissions }: { companyId: string; section: Section; permissions: Permission[] }) {
   const queryClient = useQueryClient();
@@ -71,7 +70,7 @@ export function CompanyDocuments({ companyId, section, permissions }: { companyI
               <div className="doc-main">
                 <button type="button" className="doc-name" title={viewable(d) ? "View" : "Download"}
                   onClick={() => { if (viewable(d)) setViewing(d); else download.mutate(d); }}>{d.fileName}</button>
-                <div className="doc-meta">{sizeOf(d.sizeBytes)} · added {formatWhen(d.createdAt)}{d.createdByName ? ` by ${d.createdByName}` : ""}</div>
+                <div className="doc-meta">{fileSize(d.sizeBytes)} · added {formatWhen(d.createdAt)}{d.createdByName ? ` by ${d.createdByName}` : ""}</div>
               </div>
               <div className="doc-buttons">
                 {viewable(d) && <button type="button" className="doc-btn" onClick={() => { setViewing(d); }}>View</button>}

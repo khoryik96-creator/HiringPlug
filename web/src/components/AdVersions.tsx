@@ -38,8 +38,11 @@ function Exports({ ad, version, title }: { ad: Ad; version: Version; title: stri
   );
 }
 
-/** An ad as written and its blind version (client not named), side by side. */
-export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
+/** Which of an ad's versions to show. */
+export type Shown = "both" | "original" | "blind";
+
+/** An ad as written and its blind version (client not named), side by side (or one of them). */
+export function AdVersions({ ad, canEdit, show = "both" }: { ad: Ad; canEdit: boolean; show?: Shown }) {
   const fs = useFieldSettings();
   const factsOf = (location: string | null, salary: string | null) => [
     [location, ad.country ? countryName(ad.country) : null].filter(Boolean).join(", "),
@@ -47,8 +50,8 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
   ].filter(Boolean).join(" · ") + (ad.closesOn ? ` · closes ${ad.closesOn}` : "");
   const live = ad.status === "published";
   return (
-    <div className="ad-columns">
-      <section aria-label="As written">
+    <div className={show === "both" ? "ad-columns" : "ad-columns single"}>
+      {show !== "blind" && <section aria-label="As written">
         <div className="row spread">
           <h5>As written {live && !ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="original" title={ad.title} />
@@ -56,15 +59,15 @@ export function AdVersions({ ad, canEdit }: { ad: Ad; canEdit: boolean }) {
         <p className="muted">{factsOf(ad.location, ad.salaryText)}</p>
         <strong>{ad.title}</strong>
         {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
-      </section>
-      <section aria-label="Blind">
+      </section>}
+      {show !== "original" && <section aria-label="Blind">
         <div className="row spread">
           <h5>Blind {live && ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="blind" title={ad.blindTitle} />
         </div>
         <BlindRewrite adId={ad.id} jobId={ad.jobId} canEdit={canEdit} />
         <BlindText ad={ad} canEdit={canEdit} facts={factsOf(ad.blindLocation, ad.blindSalaryText)} />
-      </section>
+      </section>}
     </div>
   );
 }

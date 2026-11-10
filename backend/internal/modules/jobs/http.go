@@ -57,7 +57,11 @@ func (h *HTTP) CreateJob(ctx context.Context, req api.CreateJobRequestObject) (a
 	if b.Openings != nil {
 		in.Openings = *b.Openings
 	}
-	view, err := h.svc.Create(ctx, authz.MustFromContext(ctx), in)
+	var jdFileID string
+	if b.JdFileId != nil {
+		jdFileID = *b.JdFileId
+	}
+	view, err := h.svc.Create(ctx, authz.MustFromContext(ctx), in, jdFileID)
 	if err != nil {
 		return nil, err
 	}

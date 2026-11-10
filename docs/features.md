@@ -326,7 +326,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   used.
 - **Outdated scores**: once the job's description or ad changes, its scores
   say "outdated"; **Score all again** refreshes them.
-- **Possible candidates** on each job's page: people not on the job whose CVs
+- **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
   share the most words with its description and ad (a keyword search of CVs,
   not the AI, so it works without one), best first, with where their CV has
   those words. Those who withdrew consent, and those the user may not see, are
@@ -456,6 +456,17 @@ lead's company (with the built-in email check).
   title, location, country, work type and arrangement and the description are
   read from it into the form (fields already typed are kept), to check and
   save.
+- **Job descriptions kept with the job** ✅: every JD dropped on a job (on its
+  details, on an ad, or on the Add job form it was added from) stays with the
+  job under Job details: a PDF, picture or text file opens in the app, any
+  file downloads as sent, and those given "Delete job descriptions"
+  (`jobs.documents:delete`, admins to start with) delete it; what was filled
+  in from it stays.
+- **The job page** ✅: the pipeline comes first, with the possible candidates
+  folded under it, then notes and activity, the job's details and JDs, and the
+  ads. The ads panel folds away, and each ad is a card (title, status, facts and
+  its buttons) that opens to its versions, side by side or one at a time; the
+  newest is open, older ones folded.
 - **Blind ads** ✅: every ad is shown in two columns, as written and blind.
   The blind version is made from the ad when it is read: the client's name
   (also without "Sdn Bhd", "Berhad" and the like, and however the JD writes

@@ -29,7 +29,7 @@ describe("pipeline board", () => {
     await showBoard();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByText("Siti Aisyah")).toBeTruthy();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3 days in screening")).toBeTruthy();
-    expect(screen.getByText("Rejected or withdrawn (1)")).toBeTruthy();
+    expect(screen.getByText("Rejected or withdrawn").closest("summary")?.textContent).toBe("Rejected or withdrawn 1");
     expect(screen.getByText(/Salary does not match: Wants 15k/)).toBeTruthy();
   });
 

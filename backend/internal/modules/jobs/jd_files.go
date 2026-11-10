@@ -35,6 +35,8 @@ const jdLinkTTL = 30 * time.Minute
 // JDFile is an uploaded job description and, once read, the ad details in it.
 type JDFile struct {
 	ID, FileName, Status string
+	ContentType          string
+	SizeBytes            int
 	JobID                *string // nil: read before its job was added
 	Error                *string
 	Details              *JDDetails
@@ -118,7 +120,7 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 		}); err != nil {
 			return err
 		}
-		out, err = jdFrom(row.ID, row.JobID, row.FileName, row.Status, row.Error, row.Details, row.CreatedAt)
+		out, err = jdFrom(store.GetJdFileRow(row))
 		return err
 	})
 	if err != nil && key != "" {
@@ -138,7 +140,7 @@ func (s *Service) JD(ctx context.Context, p authz.Principal, id string) (JDFile,
 		if err != nil {
 			return err
 		}
-		out, err = jdFrom(row.ID, row.JobID, row.FileName, row.Status, row.Error, row.Details, row.CreatedAt)
+		out, err = jdFrom(row)
 		return err
 	})
 	return out, err
@@ -177,11 +179,14 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	return err
 }
 
-func jdFrom(id string, jobID *string, fileName, status string, errMsg *string, details []byte, created time.Time) (JDFile, error) {
-	out := JDFile{ID: id, JobID: jobID, FileName: fileName, Status: status, Error: errMsg, CreatedAt: created}
-	if len(details) > 0 {
+func jdFrom(r store.GetJdFileRow) (JDFile, error) {
+	out := JDFile{
+		ID: r.ID, JobID: r.JobID, FileName: r.FileName, ContentType: r.ContentType, SizeBytes: int(r.SizeBytes),
+		Status: r.Status, Error: r.Error, CreatedAt: r.CreatedAt,
+	}
+	if len(r.Details) > 0 {
 		var d JDDetails
-		if err := json.Unmarshal(details, &d); err != nil {
+		if err := json.Unmarshal(r.Details, &d); err != nil {
 			return out, err
 		}
 		out.Details = &d
@@ -253,7 +258,7 @@ func readJDForm(r *multipart.Reader, limit int64) (string, []byte, error) {
 }
 
 func jdToAPI(f JDFile) api.JdFile {
-	out := api.JdFile{Id: f.ID, JobId: c.OrNull(f.JobID), FileName: f.FileName, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error)}
+	out := api.JdFile{Id: f.ID, JobId: c.OrNull(f.JobID), FileName: f.FileName, ContentType: f.ContentType, SizeBytes: f.SizeBytes, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error)}
 	out.Details.SetNull()
 	if d := f.Details; d != nil {
 		v := api.JdDetails{

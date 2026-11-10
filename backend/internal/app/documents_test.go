@@ -211,7 +211,7 @@ func claimAIJobWhere(t *testing.T, conn *pgx.Conn, key, value string) claimedJob
 			Scan(&j.ID, &j.TenantID, &j.Kind, &j.Payload, &reqID)
 		require.NoError(t, err, "no AI job found for %s", value)
 		var mine bool
-		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT payload->>$1 = $2 FROM job WHERE id = $3`, key, value, j.ID).Scan(&mine))
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT coalesce(payload->>$1 = $2, false) FROM job WHERE id = $3`, key, value, j.ID).Scan(&mine))
 		if mine {
 			break
 		}

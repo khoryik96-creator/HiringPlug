@@ -25,6 +25,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
   const queryClient = useQueryClient();
   const [opened] = useState(() => ({ id: job?.id, version: job?.version ?? 0, form: formFromJob(job, company) }));
   const [form, setForm] = useState(opened.form);
+  const [jdFileId, setJdFileId] = useState<string | null>(null); // the JD the form was filled in from: kept with the new job
   const companyId = form.company?.id;
   const contacts = useQuery({
     queryKey: [...contactsKey, "company", companyId],
@@ -37,7 +38,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
       const problems = jobProblems(form);
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
       const fields = jobFields(form);
-      if (!opened.id) return unwrap(await api.POST("/v1/jobs", { body: fields }));
+      if (!opened.id) return unwrap(await api.POST("/v1/jobs", { body: { ...fields, ...(jdFileId ? { jdFileId } : {}) } }));
       if (sameBody(fields, jobFields(opened.form))) return null; // nothing changed
       return unwrap(await api.PATCH("/v1/jobs/{jobId}", {
         params: { path: { jobId: opened.id } }, body: { ...fields, version: opened.version },
@@ -75,7 +76,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
     >
       {!opened.id && (
         <div className="full">
-          <JdDrop onRead={(d) => { setForm((f) => fillFromJd(f, d)); }} />
+          <JdDrop readText="Check it, then add the job: the file is kept with it." onRead={(d, _name, id) => { setForm((f) => fillFromJd(f, d)); setJdFileId(id); }} />
         </div>
       )}
       {text("title", req("Job title", "title"))}

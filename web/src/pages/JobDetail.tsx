@@ -8,6 +8,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
 import { JobAds } from "../components/JobAds";
 import { MarketMap } from "../components/MarketMap";
+import { JdFiles } from "../components/JdFiles";
 import { JobForm } from "../components/JobForm";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
@@ -60,21 +61,25 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
             await queryClient.invalidateQueries({ queryKey: applicationsKey }); // who sees its candidates may change
           }} />
       </p>
-      {editing ? (
-        <JobForm job={j} onDone={() => { setEditing(false); }} />
-      ) : (
+      {editing && <JobForm job={j} onDone={() => { setEditing(false); }} />}
+      {permissions.includes("pipeline:read") && (
+        <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions}>
+          <PossibleCandidates jobId={j.id} permissions={permissions} />
+        </PipelineBoard>
+      )}
+      <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
+      {!editing && (
         <section className="panel" aria-label="Job details">
+          <h3>Job details</h3>
           <p>{facts}</p>
           <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
+          <JdFiles jobId={j.id} permissions={permissions} />
         </section>
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
       <MarketMap jobId={j.id} permissions={permissions} />
-      {permissions.includes("pipeline:read") && <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions} />}
-      <PossibleCandidates jobId={j.id} permissions={permissions} />
       <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
-      <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
     </main>
   );
 }

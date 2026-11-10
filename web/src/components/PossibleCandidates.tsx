@@ -45,7 +45,7 @@ export function tidySnippet(snippet: string): string {
 /**
  * Possible candidates for a job: people not on it whose CVs share the most
  * words with the job's text (a keyword search, not the AI). Added to the job,
- * they are scored like everyone else.
+ * they are scored like everyone else. Folded under the pipeline.
  */
 export function PossibleCandidates({ jobId, permissions }: { jobId: string; permissions: Permission[] }) {
   const queryClient = useQueryClient();
@@ -66,8 +66,12 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
   if (!allowed) return null;
   const noText = list.error instanceof ApiError && list.error.code === "MATCH_NEEDS_TEXT";
   return (
-    <section className="panel" aria-label="Possible candidates">
-      <h3>Possible candidates</h3>
+    <details className="fold" aria-label="Possible candidates">
+      <summary>
+        <span className="fold-title">Possible candidates</span>
+        {list.data && <span className="count-chip">{String(list.data.length)}</span>}
+        <span className="muted small">CVs that share this job&apos;s words</span>
+      </summary>
       {noText ? <p className="muted">Add a description or an ad to see possible candidates.</p> : <ErrorMessage error={list.error ?? add.error} />}
       {list.data?.length === 0 && <p className="muted">No CV shares this job&apos;s words yet.</p>}
       <ul className="suggestions scroll-box">
@@ -96,6 +100,6 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
           );
         })}
       </ul>
-    </section>
+    </details>
   );
 }

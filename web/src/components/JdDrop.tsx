@@ -1,9 +1,10 @@
 // The client's job description, dropped on an ad: sent up, read (a PDF or
 // Word file takes a moment), and its details handed to the ad form.
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
+import { jobJdFilesKey } from "../api/keys";
 import { getToken } from "../auth";
 import { DropZone } from "./DropZone";
 
@@ -11,7 +12,7 @@ export type JdDetails = Schemas["JdDetails"];
 export const JD_TYPES = ".pdf,.docx,.doc,.txt,.rtf,.odt,.md,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp";
 
 /** Sends a job description (multipart, so not through the typed client); without a job, for one being added. */
-async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["JdFile"]> {
+export async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["JdFile"]> {
   const body = new FormData();
   body.append("file", file);
   const res = await fetch(jobId ? `/v1/jobs/${jobId}/jd-files` : "/v1/jd-files", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
@@ -27,11 +28,14 @@ async function sendJd(jobId: string | undefined, file: File): Promise<Schemas["J
 export function JdDrop({ jobId, start, onRead, readText = "Check it, then save." }: {
   jobId?: string;
   start?: File | null;
-  onRead: (d: JdDetails, fileName: string) => void;
+  onRead: (d: JdDetails, fileName: string, jdFileId: string) => void;
   /** What to say once it is read (after "Filled in from <file>."). */
   readText?: string;
 }) {
-  const upload = useMutation({ mutationFn: (file: File) => sendJd(jobId, file) });
+  const queryClient = useQueryClient();
+  // Kept with the job: its list of job descriptions shows it.
+  const refreshList = () => { if (jobId) void queryClient.invalidateQueries({ queryKey: jobJdFilesKey(jobId) }); };
+  const upload = useMutation({ mutationFn: (file: File) => sendJd(jobId, file), onSuccess: refreshList });
   const uploaded = upload.data;
   // A PDF or Word file is read by the worker: follow it until it is done.
   const file = useQuery({
@@ -45,7 +49,7 @@ export function JdDrop({ jobId, start, onRead, readText = "Check it, then save."
   useEffect(() => {
     if (latest?.status === "read" && latest.details && handed.current !== latest.id) {
       handed.current = latest.id;
-      onRead(latest.details, latest.fileName);
+      onRead(latest.details, latest.fileName, latest.id);
     }
   }, [latest, onRead]);
   const started = useRef(false);

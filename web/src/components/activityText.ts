@@ -48,6 +48,12 @@ export function describe(entry: ActivityEntry): string | null {
       const fields = Object.keys(entry.changes).map(fieldName);
       return fields.length > 0 ? `filled in from their CV: ${fields.join(", ")}` : "read their CV";
     }
+    case "job.jd_uploaded":
+      return `uploaded the job description ${show(entry.changes.fileName)}`;
+    case "job.jd_deleted":
+      return `deleted the job description ${show(entry.changes.fileName)}`;
+    case "job.jd_kept":
+      return "kept the job description the job was added from";
     case "contact.employment_check_started":
       return `checked their LinkedIn profile (${show(entry.changes.fileName)})`;
     case "contact.employment_checked":
