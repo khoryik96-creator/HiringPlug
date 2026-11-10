@@ -106,8 +106,8 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 - Reuse the existing environment and run targeted checks during edits; finish
   with `task verify` before pushing. See
-  [development-workflow.md](playbooks/development-workflow.md) for the measured
-  CI mirror delay, bounded installer and verification sequence.
+  [development-workflow.md](playbooks/development-workflow.md) for dependency
+  caching, bounded installation and the verification sequence.
 - Check database health if tests cannot connect; start the existing service
   only if stopped (a retained cloud session may already have Docker PostgreSQL).
 - Stop the dev stack (api, workers, `pnpm dev`) before `task verify`: on a
@@ -128,8 +128,11 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Working in a cloud session
 
-- Inspect installed tools and database health first. Reuse the workspace's
-  existing environment activation script and caches when available.
+- Inspect installed tools and database health first. If the local PostgreSQL
+  service is stopped, start it with `service postgresql start`. If Docker
+  already provides PostgreSQL, reuse it instead of starting another server.
+- `export PATH=$PATH:/root/go/bin` makes installed Go tools available in the
+  service-based cloud environment. Keep existing dependency caches.
 - Run `task setup` only for missing dependencies or changed lockfiles (Go,
   Python with `uv`, web with `pnpm`, and `npm ci` for CV Studio's renderer).
   Run targeted checks during edits, then `task verify` before pushing.

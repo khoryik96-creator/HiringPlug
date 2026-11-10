@@ -1,83 +1,53 @@
 # Efficient development and CI diagnosis
 
-Read `AGENTS.md` and `docs/HANDOVER.md` once when picking up work. Keep a short
-record of the branch, changes, environment, checks and remaining work so a
-resumed session does not repeat discovery.
+Read `AGENTS.md` and `docs/HANDOVER.md` when picking up work. Check the current
+branch, existing changes, installed tools and database health before setup.
+Reuse Go, uv, pnpm and browser caches, `ai/.venv` and `web/node_modules`. Install
+dependencies only when missing or their lockfile changes. Start PostgreSQL
+only if stopped; the cloud setup commands are in `HANDOVER.md`.
 
-## Reuse the environment
+## Verification
 
-Check the current checkout, installed tools and database health before setup.
-Keep Go, uv, pnpm and browser caches. Reuse `ai/.venv` and `web/node_modules`;
-install dependencies only when missing or their lockfile changes. In a retained
-cloud workspace, reuse its existing environment activation script when present.
-Start PostgreSQL only if it is stopped. Rebuild binaries only after their
-sources or embedded migrations change; do not run an older migration binary.
+Reproduce bugs at the lowest relevant layer and run focused tests while editing.
+Check changed screens in the real app and inspect their screenshots. Rebuild
+binaries after source or embedded migration changes before using them.
 
-## Verify at the right scope
+Finish editing and review, stop the dev API, workers and web server to avoid
+queue and memory contention, then run `task verify` before pushing. Keep its log
+and exit status. Repeat full verification after changes or failures that warrant
+it; do not repeat a successful suite on an unchanged tree.
 
-During development, reproduce a bug at the lowest relevant layer and run that
-test while fixing it. For example:
+`task lint:shell` checks the CI scripts with ShellCheck. `task test:ci` runs their
+tests from `.github/scripts/tests` using Python 3's standard library, without
+the AI worker or external services. Both are included in `task verify` and CI.
 
-```bash
-(cd backend && go test ./internal/platform/salarycalc)
-(cd web && pnpm exec vitest run src/path/to/changed.test.tsx)
-(cd ai && uv run pytest tests/test_changed.py)
-```
+CI on the exact commit also covers the generated-module check, service
+end-to-end tests, browser smoke tests and Docker builds. A green run counts for
+those pre-merge checks under `HANDOVER.md`. Push the branch, inspect CI, merge
+when requested, then check main CI.
 
-Run each command from the repository root (the paths above are examples).
-Check changed screens in the real app and inspect their screenshots. Finish
-editing and reviewing before the required `task verify` run; stop the dev
-API, workers and web server first to avoid queue and memory contention. Keep
-its log and exit status. Do not run another full suite on an unchanged tree
-that already passed. Source changes after verification need another pass
-before pushing; targeted checks do not replace that requirement.
+End-to-end tests run alongside the language checks because they build their own
+services. This reduces waiting but can spend CI minutes on end-to-end tests
+even when another job fails. Every job must still pass before merging.
 
-CI on the exact commit also runs the generated-module check, service end-to-end
-tests, browser smoke tests and Docker builds. A green run counts for those
-pre-merge checks, as described in `HANDOVER.md`; do not duplicate them locally
-without a failure or another reason. Push the branch, inspect CI, and merge only
-when requested. Check main CI after merging.
-
-The end-to-end CI job builds its own services and runs alongside the language
-checks. It does not need their outputs; removing that dependency avoids waiting
-for those jobs before it starts. All jobs must still pass before merging.
-
-## Investigate slow CI
+## Slow CI and document tools
 
 Inspect job and step timestamps, then the slow step's log. Compare with a recent
-successful run. A long setup step is not evidence that application tests hang.
-If `gh` cannot retrieve redirected logs, use the connected GitHub job-log tool;
-do not repeatedly retry the same blocked download.
+successful run to separate setup delays from test failures. If CLI log downloads
+are blocked, use another available GitHub log client rather than repeating the
+same failed request. Retry only the failed infrastructure job after diagnosing
+the error; preserve successful jobs.
 
-The OCR/document installer in `.github/scripts/install-document-tools.sh`
-limits index updates to 30 seconds and package downloads to 90 seconds per
-attempt, then retries once using Ubuntu's archive mirror instead of the Azure
-mirror. It updates both direct source URLs and the runner's `apt-mirrors.txt`
-used by `mirror+file:` sources. It downloads before configuring packages, fails if downloads still
-fail, and never skips the document tests. Both callers have a six-minute step
-limit. Inspect the error before rerunning only the failed infrastructure job;
-preserve successful jobs. Do not restart a run that is progressing normally.
+The AI and end-to-end jobs share the document-tool action in
+`.github/actions/document-tools`. It caches downloaded `.deb` files by package
+list, runner image and architecture. APT still refreshes signed package indexes
+and validates versions and checksums; new package versions may need downloading.
+Changing the runner image or package list creates a fresh cache. A cold cache
+can require downloads in both jobs; later runs reuse the saved packages.
 
-Report what finished and the cause of a significant delay. During longer work,
-give brief updates about once a minute with useful new information instead of
-repeated unchanged status dumps. Batch independent reads, avoid rereading large
-files, and keep exploration proportional to the change.
-
-## Measured delay on 10 November 2026
-
-- Main run `42802569118`, commit `455f021`: the document-tool installation took
-  764 seconds in end-to-end CI, versus 17 seconds in the Python job. Its log
-  shows a 651-second gap during downloads from `azure.archive.ubuntu.com`,
-  after the 40 MB LibreOffice core package was requested. The entire 101 MB
-  download took 12 minutes 32 seconds. CI ultimately passed all jobs.
-- The preceding run on the same commit, `42801396203`, installed the same
-  tools in 16 seconds in end-to-end CI. The variability was in the package
-  mirror/download path, rather than HiringPlug's tests.
-- Four retained local verification logs span about 29 minutes in total
-  (12m28s, 6m07s, 5m48s and 5m04s). Later runs reused the installed environment;
-  they do not support blaming repeated dependency installation for the whole
-  delay. Late follow-up fixes caused repeated full runs. Finishing targeted
-  checks before the final suite avoids this avoidable work.
-
-These measurements do not establish a speed comparison with another coding
-tool; they identify concrete delays in this session.
+The installer keeps index updates bounded to 30 seconds and package downloads
+to 90 seconds per attempt, then retries once. It recognises regional/runner
+Ubuntu archive names in direct sources and `apt-mirrors.txt`, switches them to
+the main archive, and warns explicitly if no URL changed. Package downloads
+finish before configuration starts. Installation failures stop CI and never
+skip document tests. Each caller has a six-minute limit.

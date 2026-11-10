@@ -1,0 +1,25 @@
+name: OCR and document tools
+description: Reuse downloaded Ubuntu packages and bound installation retries
+runs:
+  using: composite
+  steps:
+    - name: Runner image identity
+      id: image
+      shell: bash
+      run: printf 'version=%s-%s\n' "${ImageOS:?}" "${ImageVersion:?}" >> "$GITHUB_OUTPUT"
+    - name: Restore document-tool packages
+      id: packages
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/document-tools/*.deb
+        key: document-tools-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image.outputs.version }}-${{ hashFiles('.github/scripts/document-tools.packages') }}
+    - name: Install OCR and document tools
+      shell: bash
+      run: sudo bash "$GITHUB_WORKSPACE/.github/scripts/install-document-tools.sh" "$RUNNER_TEMP/document-tools"
+    # Publish immediately: a later test failure must not discard valid packages.
+    - name: Save document-tool packages
+      if: steps.packages.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/document-tools/*.deb
+        key: ${{ steps.packages.outputs.cache-primary-key }}

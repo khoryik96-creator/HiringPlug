@@ -7,6 +7,9 @@ checked in review.
 ## Commands
 
 - `task verify` before every push. It must pass. Commit any files it regenerates.
+- ShellCheck is required by `task lint:shell` (Debian/Ubuntu:
+  `apt-get install shellcheck`; macOS: `brew install shellcheck`; Windows: use
+  WSL). `task test:ci` runs CI-script tests with Python 3's standard library.
 - Reuse installed dependencies and running databases. Run targeted tests while
   editing, then `task verify` once the change is ready to push. Repeat full
   verification only after a change or failure warrants it. See

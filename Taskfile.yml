@@ -90,7 +90,11 @@ tasks:
 
   lint:
     desc: Lint and type-check all three parts
-    cmds: [task: lint:go, task: lint:py, task: lint:web]
+    cmds: [task: lint:shell, task: lint:go, task: lint:py, task: lint:web]
+
+  lint:shell:
+    desc: Check CI shell scripts (requires ShellCheck)
+    cmds: [shellcheck .github/scripts/*.sh]
 
   lint:go:
     dir: backend
@@ -106,7 +110,11 @@ tasks:
 
   test:
     desc: Run every test (needs PostgreSQL - `task db:up` - and Tesseract)
-    cmds: [task: test:go, task: test:py, task: test:web]
+    cmds: [task: test:ci, task: test:go, task: test:py, task: test:web]
+
+  test:ci:
+    desc: Test CI scripts without the application or external services (Python 3 standard library)
+    cmds: [python3 -m unittest discover -s .github/scripts/tests -v]
 
   test:go:
     dir: backend
