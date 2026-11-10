@@ -39,12 +39,16 @@ describe("documents kept with a client's terms or benefits", () => {
 
   it("are deleted only by those given companies.documents:delete", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: listed }));
-    const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));
+    // As the API answers a delete: 204, no body (this showed "Unexpected response 204").
+    const del = vi.spyOn(api, "DELETE").mockResolvedValue({ data: undefined, error: undefined, response: new Response(null, { status: 204 }) });
+    const get = vi.mocked(api.GET);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithClient(<CompanyDocuments companyId="comp_1" section="benefits" permissions={["companies:read", "companies.documents:delete"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "Delete Benefits brochure.pdf" }));
     await waitFor(() => { expect(del).toHaveBeenCalled(); });
     expect(del.mock.calls[0]?.[1]).toEqual({ params: { path: { companyId: "comp_1", documentId: "cdoc_2" } } });
+    await waitFor(() => { expect(get.mock.calls.length).toBeGreaterThan(1); }); // the list is read again
+    expect(screen.queryByText(/Unexpected response/)).toBeNull();
     expect(screen.queryByLabelText("Drop a benefits document here"), "adding needs companies:update").toBeNull();
   });
 });

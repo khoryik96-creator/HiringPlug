@@ -52,6 +52,8 @@ export class ApiError extends Error {
 /** Returns the data of a call, or throws ApiError for an error response. */
 export function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
   if (result.data !== undefined) return result.data;
+  // 204 No Content (a delete): done, with nothing to return.
+  if (result.response.status === 204) return undefined as T;
   if (isErrorBody(result.error)) throw new ApiError(result.error);
   throw new Error(`Unexpected response ${String(result.response.status)}`);
 }
