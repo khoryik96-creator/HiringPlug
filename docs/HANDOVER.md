@@ -6,12 +6,12 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Where things stand
 
-- **main = `0ff85c3`**. CI was green on every merge of 10 Nov up to
-  `8f6f502`; the run on `0ff85c3` was still going when this was written:
-  look at the latest CI run on main first.
-- Nothing uncommitted, nothing half-built. Every `claude/*` branch is
-  already in main; start new work on a fresh branch from main.
-- Latest migration: `00080_email_candidates.sql`. Migrations are append-only.
+- **main** has everything below, plus descriptive screening salaries and
+  configurable fixed monthly salary calculations (built in another session on
+  10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
+- Nothing uncommitted, nothing half-built. Start new work on a fresh branch
+  from main.
+- Latest migration: `00081_salary_calculation.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
