@@ -1,16 +1,17 @@
-# Handover (7 Nov 2026)
+# Handover (10 Nov 2026)
 
 For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
-first (the rules, enforced by `task verify`), then `docs/README.md`.
+first (the rules, enforced by `task verify`), then `docs/README.md`;
+`docs/features.md` says what every screen does.
 
 ## Where things stand
 
-- **main = `a7a1e7c`**, CI green up to `1b0106e`; the check on `a7a1e7c`
-  (CV Studio formatting) was still running at handover: look at the latest
-  CI run on main first.
-- Working branch: `claude/brave-thompson-k08hlg` (equal to main). Nothing
-  uncommitted, nothing half-built.
-- Latest migration: `00056_studio_cv.sql`. Migrations are append-only.
+- **main = `0ff85c3`**. CI was green on every merge of 10 Nov up to
+  `8f6f502`; the run on `0ff85c3` was still going when this was written:
+  look at the latest CI run on main first.
+- Nothing uncommitted, nothing half-built. Every `claude/*` branch is
+  already in main; start new work on a fresh branch from main.
+- Latest migration: `00080_email_candidates.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -29,11 +30,22 @@ first (the rules, enforced by `task verify`), then `docs/README.md`.
   show it. Every bug fix: a test that fails without it (rule 11).
 - No model names in commits. Write to the owner in plain words; they are a
   recruiter, not a developer.
+- The owner likes to **see options before a screen is redesigned**: a small
+  HTML mock-up with two or three choices, then they pick ("1.a and 2.C").
+- They name other tools to copy: **CV Studio** (their CV formatter; its
+  engine is vendored in `ai/cvstudio`) and **Kano** (their browser tool; only
+  its /find code was ever shared, as an upload, not in the repo). If asked to
+  copy something from them that you cannot see, say so and ask for it.
+- **Deleting an uploaded document is admin-only**, as a permission of its own
+  per kind of document (`companies.documents:delete`,
+  `jobs.documents:delete`): the button is always shown, disabled for others.
+  A new permission needs a migration adding it to admins who chose their own
+  permissions (see `00079_job_documents_delete.sql`).
 
 ## Must never happen
 
 - **Real CVs are never committed.** The owner uploaded real people's CVs for
-  testing (in this session's uploads); use them only locally. Tests use
+  testing (in earlier sessions' uploads); use them only locally. Tests use
   invented people and CV Studio's synthetic example (`ai/cvstudio/examples`).
 - **Salary** never goes into audit entries, logs or AI prompts. Salary in
   client emails only per the rules in `docs/features.md` (only senders who may
@@ -42,75 +54,72 @@ first (the rules, enforced by `task verify`), then `docs/README.md`.
   stating the candidate's own pay before the AI sees the CV.
 - No secrets in code; settings are `HP_*` variables listed in `.env.example`.
 
-## What was built most recently (newest first)
+## What was built 7–10 Nov (newest first; details in `docs/features.md`)
 
-0. **Last, after the merge of `a7a1e7c`** (on the branch, not merged yet when
-   this was written): the client's JD can be dropped on the **Add job** form
-   (`POST /v1/jd-files` without a job, migration 00057 makes
-   `job_description_file.job_id` nullable; `fillFromJd` keeps typed fields),
-   and **Settings shows "AI provider" to everyone**: owners and admins get the
-   keys page, others a page saying only owners and admins can set it (the
-   owner could not find it while signed in with another role).
+- **Email**: one email to many people, each their own copy (`POST
+  /v1/email-batches`, tick boxes on the candidate and contact lists and the
+  pipeline); one email to the client about several candidates, each with
+  their own details as a block or a table row and their own profile attached
+  (`candidates` on `/v1/emails`, table `email_candidate`); attachments up to
+  20 MB in all; contacts emailed from their page; templates with a formatting
+  toolbar and field picker (only admins change them; anyone saves a new one).
+- **AI assistant** can be docked to the right of the screen (remembered in
+  the browser, `web/src/components/useDock.ts`); answers are cards.
+- **Job page**: pipeline first with possible candidates folded under it,
+  notes next; uploaded JDs kept with the job (view, download, admin delete);
+  job ads as foldable cards.
+- **Candidates**: duplicate CV uploads caught (same file skipped, same name
+  asks); screening calls with who and when (salary follows the latest);
+  notes timeline with the latest call pinned, filters and search; list with
+  your own columns and work authorization as a coloured initials disc;
+  advanced search (dropdowns and a boolean on CVs) and AI search (CV Studio's
+  AI Crawler); home search by Kano's /find rules.
+- **Companies**: categories with colours (Settings) and a card; LinkedIn
+  page; benefits and pre-offer process; documents; terms of business as
+  rates by salary band.
+- **Placements**: invoicing (terms, recipient, due date, invoice emailed on
+  the start date), invoice preview in the app.
+- **CV Studio's way**: blind CVs, blind job ads rewritten by the AI,
+  formatted CVs (Word and PDF, "About him/her", agency file names, delete).
 
-1. **Formatted CVs CV Studio's way** (`a7a1e7c`): "Make formatted CV" → "From
-   their CV". CV Studio's engine is vendored **unchanged** in `ai/cvstudio`
-   (rules, prompts, Node renderer `generate.js`, Hyppies template); only
-   `ai/src/hiringplug_ai/cvstudio.py` touches it. Job `cv.format_studio`
-   (AI worker) → `cv.studio_formatted` (Go, cvformats module, `studio.go`).
-   Design in `docs/ai-worker.md` ("CV Studio's way"). **Only tested with a
-   stand-in AI** (CV Studio's synthetic parse); the owner was asked to try it
-   with a real DeepSeek/Claude key on a real CV.
-   LibreOffice cannot open a .docx ending on a framed paragraph (CV Studio's
-   closing terms), so `render_pdf.py` retries with an empty paragraph after it.
-2. **Architecture fixes** (`a3dce91`…`1b0106e`): finished jobs keep no payload
-   and are pruned after 30 days; job priorities in the contract (`priority:
-   high|normal|low`) and several jobs at once per worker; `hp backup` /
-   `hp restore` with a nightly Docker `backup` service (tools must match the
-   database's major version, see `platform/backup/tools.go`; CI runs
-   PostgreSQL 16's tools from the postgres:16 image because the runner's
-   Ubuntu 26.04 has no postgresql-client-16); Settings > System (background
-   jobs, Try again, last backup); one route table for the web app
-   (`web/src/routes.tsx`, pages lazy-loaded); security headers
-   (`deploy/security-headers.conf`, shared by nginx and the browser tests);
-   sign-out ends the session on the server; Playwright smoke tests in CI.
-3. One **Settings** button for everything; CV preview on the candidate page
-   (Word CVs get a PDF copy); blind job ads catch the JD's own spelling of the
-   client's name.
-4. Earlier this week: AI provider settings (DeepSeek / Claude / ChatGPT keys
-   per company), contacts' LinkedIn employment check, booking links (a small
-   Calendly for Gmail/Outlook), review fixes.
+## Open ends and ideas (none started)
 
-## What is next (proposed to the owner, not started)
+- The assistant's dock is a standard side panel: the owner compared it with
+  Kano's; if they share how Kano docks, match it.
+- In one-email-to-many, every copy's attachment row points at the **same
+  stored file** (`storage_key`). Anything that later deletes email files
+  must keep a file while another email still uses it.
+- Proposed before and still open: batch CV formatting; possible candidates
+  by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
+  PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft
+  calendar sync (OAuth apps), posting ads to job boards (partner accounts),
+  a test of CV Studio formatting with their real AI key.
 
-Can be built now:
+## Things that cost time before
 
-1. **CV Studio's summary bullets**: generate the "About him/her" summary
-   from the CV (`ai/cvstudio/prompts/SUMMARY_NORMAL.txt`, `SUMMARY_BLIND.txt`,
-   `candidate-summary.js`; pay filtered), and insert a chosen summary into an
-   existing Word CV without regenerating it (`ADAPTERS_AND_MIGRATION.md`,
-   "generate-docx multipart"). Proposed as the next step.
-2. **Batch formatting**: several CVs at once (the queue already runs jobs in
-   parallel; mostly a screen).
-3. **Possible candidates by meaning** (embeddings) instead of word search.
-4. **Cloud readiness** (only needed with more than one server): files in S3
-   (`platform/blob` is ready for it), sign-in rate limits in PostgreSQL
-   instead of memory, rotating `HP_AI_KEYS_SECRET` (sealed keys carry a `v1.`
-   prefix for this), error alerts and tracing.
-
-Waiting on the owner:
-
-5. Their real-key test of CV Studio formatting.
-6. Google / Microsoft calendar sync for interviews and replies back into the
-   app: needs registered OAuth apps and their keys.
-7. Posting ads directly to JobStreet / LinkedIn / Indeed: needs partner
-   accounts.
-8. The "FIFA card" candidate intro: the owner will share more; do it last.
+- `service postgresql start` again if tests say they cannot reach the
+  database (it stops between sessions).
+- Stop the dev stack (api, workers, `pnpm dev`) before `task verify`: on a
+  busy machine the AI-queue tests time out and workers are killed for memory.
+  Run `task verify` in the background; it takes about 10 minutes.
+- `hp migrate` runs the migrations built into the binary: rebuild `hp`
+  after adding one.
+- `task gen` regenerates every module's `internal/store/models.go` when a
+  table is added: expected, commit them.
+- In contract YAML, a `description:` inside `{ ... }` with a comma or colon
+  must be quoted, or the contract stops being valid OpenAPI.
+- Two files whose names differ only in case (`shortlist.ts`,
+  `Shortlist.tsx`) are refused by a test.
+- The test server takes uploads of at most 256 KB (`testMaxUpload`): test
+  big-file limits as unit tests.
+- In the dev stack there is no mail server: sent emails show "failed: no
+  mail server is set up". That is expected; the integration tests have one.
 
 ## Working in a cloud session
 
 - `service postgresql start`; `export PATH=$PATH:/root/go/bin`.
 - `task setup` (Go, Python with `uv`, web with `pnpm`, and `npm ci` for CV
-  Studio's renderer); `task verify` takes about 8 minutes.
+  Studio's renderer); `task verify` takes about 10 minutes.
 - To run the real app: build `backend/cmd/{api,worker,hp}`, set the `HP_*`
   variables from `.env.example` against a local database, `hp dev-setup`
   prints demo users and tokens (owner, recruiter, sourcer, viewer; password
