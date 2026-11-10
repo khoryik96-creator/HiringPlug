@@ -790,7 +790,9 @@ prompting (summary, questions to ask). One *Save the call* updates the
 profile with what was asked: **salary and currency** (current and expected;
 needs `candidates.compensation:update`), **notice period** (the company's
 list), **work authorization**, **nationality**, and the **source only when the
-candidate has none** (an existing source is kept and the page says so). The
+candidate has none** (an existing source is kept and the page says so). After
+a successful save, the candidate profile opens; failed saves keep the form and
+its entries open. The profile explains when a later call's salary was kept. The
 notes become a screening note (sensitive if ticked). It is all or nothing: if
 one part is refused (e.g. a salary range that runs backwards, or someone saved
 the profile meanwhile), nothing is saved, and the notes typed are kept. The
@@ -801,11 +803,20 @@ AWS and contractual/13th-month bonuses. **Calculate** previews fixed monthly cas
 **Use these figures** applies it to the form, and **Save the call** saves both the
 reviewed amounts and original wording in the protected compensation record. The
 candidate card shows the fixed figure, excluding performance pay, employer EPF and
-conditional allowances. Missing or conflicting guaranteed bonus terms need review.
+conditional allowances. Bonuses without guaranteed terms stay visibly excluded
+and do not block applying the fixed figures. Missing or conflicting explicitly
+guaranteed bonus terms need review.
 Daily/hourly/weekly rates need working-time information and cannot be assumed monthly.
 Salary is calculated in Go and is never sent to AI. Annual fixed allowances are
 spread over 12 months. Mixed currencies, negative amounts and ambiguous current
 ranges require review; percentage expectations cannot silently change currency.
+Slash yearly periods such as `/yr` are converted to monthly; hourly, daily,
+weekly and fortnightly rates require review. Negated bonuses such as `no AWS`
+are excluded. Multiple expected figures or clauses must be clarified rather
+than silently dropping amounts; decreases use a negative percentage.
+Named allowances cannot become basic pay, even when entered first or when the
+basic pay is missing or invalid. A fixed bonus expressed as a percentage needs
+its basis clarified before applying the figures.
 An expected salary can be recorded without a current salary. Changing the
 currency or calculation rules invalidates an unapplied preview.
 

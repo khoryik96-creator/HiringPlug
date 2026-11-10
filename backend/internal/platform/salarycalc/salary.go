@@ -38,18 +38,20 @@ var (
 	indianGroupRE  = regexp.MustCompile(`^\d{1,3}(?:,\d{2})*,\d{3}$`)
 	decimalGroupRE = regexp.MustCompile(`\b\d{1,3}(?:\.\d{3})+,\d+\b`)
 	multipleDotRE  = regexp.MustCompile(`\b\d{1,3}(?:\.\d{3}){2,}\b`)
-	variableRE     = regexp.MustCompile(`(?i)rsu|stock|option|incentive|commission|variable|performance|epf|socso|eis|claim|reimburse|discretionary|up\s+to|not\s+guaranteed|non[- ]guaranteed`)
+	variableRE     = regexp.MustCompile(`(?i)rsu|stock|option|incentive|commission|variable|performance|epf|socso|eis|claim|reimburse|discretionary|up\s+to|not\s+(?:guaranteed|fixed)|non[- ](?:guaranteed|fixed)|\b(?:no|not|without)\s+(?:\d+(?:\.\d+)?(?:th|st|nd|rd)?\s*(?:months?\s*)?)?(?:aws|thr|(?:fixed\s+|guaranteed\s+|contractual\s+)?bonus)\b`)
 	conditionalRE  = regexp.MustCompile(`(?i)shift|overtime|attendance|conditional`)
+	allowanceRE    = regexp.MustCompile(`(?i)allowance|transport|housing|meal|phone|mobile|internet|parking|petrol|fuel|travel|living`)
 	tenureRE       = regexp.MustCompile(`(?i)\b(experience|tenure|service)\b`)
-	guaranteedRE   = regexp.MustCompile(`(?i)\b(aws|fixed\s+bonus|guaranteed\s+bonus|contractual\s+bonus|thr|festive|hari\s*raya)\b`)
+	guaranteedRE   = regexp.MustCompile(`(?i)\b(aws|(?:fixed|guaranteed|contractual)\s+(?:(?:annual|yearly)\s+)?bonus|thr|festive|hari\s*raya)\b`)
 	ordinalRE      = regexp.MustCompile(`(?i)\b(1[3-6](?:\.5)?)\s*(th|st|nd|rd)\s*(months?\s*)?(bonus|pay|salary|months?)\b`)
 	monthBonusRE   = regexp.MustCompile(`(?i)\b(1[3-6](?:\.5)?)\s*months?\s*(bonus|guaranteed|salary|pay|package)\b`)
 	bonusRE        = regexp.MustCompile(`(?i)bonus|^\s*\d+(?:\.\d+)?\s*months?\s*$`)
+	bonusNumberRE  = regexp.MustCompile(`\d+(?:\.\d+)?`)
 	sameRE         = regexp.MustCompile(`(?i)\b(same|similar|maintain|match|follow|lateral|horizontal)\b|no\s+(increment|increase|change)|as\s+current|current\s+(salary|package)`)
 	percentRE      = regexp.MustCompile(`(?i)(-?\d+(?:\.\d+)?)\s*(?:%|percent)?\s*(?:-|–|~|to)\s*(-?\d+(?:\.\d+)?)\s*(?:%|percent)|(-?\d+(?:\.\d+)?)\s*(?:%|percent)`)
 	rangeRE        = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(k|million|mil|lakhs?|lacs?|lpa|l|crores?|cr|m)?\b`)
-	annualRE       = regexp.MustCompile(`(?i)\bannual|per\s+(annum|annual|year)|yearly|\bpa\b|p\.a\.|\blpa\b`)
-	nonMonthlyRE   = regexp.MustCompile(`(?i)hourly|per\s+hour|p\.h\.|daily|per\s+day|p\.d\.|weekly|per\s+week|p\.w\.`)
+	annualRE       = regexp.MustCompile(`(?i)\bannual|per\s+(annum|annual|year)|yearly|\bpa\b|p\.a\.|\blpa\b|/\s*(?:yr|year|annum|annual|pa)\b`)
+	nonMonthlyRE   = regexp.MustCompile(`(?i)hourly|per\s+hour|p\.h\.|daily|per\s+day|p\.d\.|weekly|per\s+week|p\.w\.|fortnight|bi[- ]weekly|/\s*(?:h|hr|hour|d|day|w|wk|week)\b`)
 )
 
 func clean(raw string) string {
@@ -109,7 +111,7 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 	rawCurrency := Currency(current)
 	baseFound := false
 	parts := strings.FieldsFunc(clean(current), func(r rune) bool { return r == '+' || r == ';' || r == ',' || r == '\n' })
-	parts = preferGross(parts)
+	parts = preferBase(preferGross(parts))
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -120,6 +122,9 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 			continue
 		}
 		if variableRE.MatchString(part) || tenureRE.MatchString(part) || strings.Contains(part, "%") {
+			if strings.Contains(part, "%") && guaranteedRE.MatchString(part) && !variableRE.MatchString(part) {
+				review(&out, "Enter the guaranteed bonus as extra months or total annual months; its percentage basis needs review.")
+			}
 			out.Excluded = append(out.Excluded, part)
 			continue
 		}
@@ -138,6 +143,10 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 				out.Excluded = append(out.Excluded, part)
 				continue
 			}
+			if len(bonusNumberRE.FindAllString(part, -1)) > 1 {
+				review(&out, "Enter one guaranteed bonus figure without additional alternatives.")
+				continue
+			}
 			if known {
 				if c := Currency(part); c != "" {
 					if out.bonusCurrency != "" && out.bonusCurrency != c {
@@ -150,13 +159,13 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 				}
 				out.AnnualMonths = months
 			} else {
-				review(&out, "Enter the guaranteed bonus amount or months.")
+				review(&out, "Enter the guaranteed bonus as extra months or total annual months.")
 			}
 			continue
 		}
 		if bonusRE.MatchString(part) {
 			if rules.Bonus && strings.Contains(part, "bonus") {
-				review(&out, "Enter the guaranteed bonus months, or mark this bonus as variable.")
+				inform(&out, "Bonuses without guaranteed terms are excluded.")
 			}
 			out.Excluded = append(out.Excluded, part)
 			continue
@@ -171,6 +180,10 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 			continue
 		}
 		if !baseFound {
+			if allowanceRE.MatchString(part) {
+				review(&out, "Enter the basic salary separately from fixed allowances.")
+				continue
+			}
 			if nonMonthlyRE.MatchString(part) {
 				review(&out, "Working hours or days are needed to convert this rate to monthly pay.")
 				return out

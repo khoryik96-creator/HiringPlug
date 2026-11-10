@@ -97,3 +97,32 @@ func preferGross(parts []string) []string {
 	}
 	return out
 }
+
+// Named allowances cannot supply the basic-pay figure used for bonus accrual.
+// Prefer an explicitly named base; otherwise retain the first eligible amount.
+func preferBase(parts []string) []string {
+	baseRE := regexp.MustCompile(`(?i)\b(?:basic|base)\b`)
+	best := -1
+	for i, part := range parts {
+		if allowanceRE.MatchString(part) || bonusRE.MatchString(part) || guaranteedRE.MatchString(part) ||
+			variableRE.MatchString(part) || conditionalRE.MatchString(part) || tenureRE.MatchString(part) {
+			continue
+		}
+		if _, ok := amount(part); !ok {
+			continue
+		}
+		if best < 0 {
+			best = i
+		}
+		if baseRE.MatchString(part) {
+			best = i
+			break
+		}
+	}
+	if best <= 0 {
+		return parts
+	}
+	out := []string{parts[best]}
+	out = append(out, parts[:best]...)
+	return append(out, parts[best+1:]...)
+}

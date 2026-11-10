@@ -91,6 +91,23 @@ func TestCompanyFormulaAndReview(t *testing.T) {
 	assert.NotEmpty(t, r.Warnings, "unrecognised bonus wording must not turn into a fixed allowance")
 }
 
+func TestUnconfirmedBonusDoesNotBlockFixedFigures(t *testing.T) {
+	current := "rm 9.6k + 2k allowance + 13percen epf + 13.5 month bonus + 3 months bonus + 200 allowance +"
+	r := Calculate(current, "14-18%", DefaultRules(), "MYR")
+	assert.False(t, r.ReviewRequired)
+	assert.Equal(t, 13000.0, r.Monthly)
+	assert.Equal(t, 1200.0, r.Bonus)
+	assert.Contains(t, r.Excluded, "3 months bonus")
+	assert.NotEmpty(t, r.Warnings, "the excluded unconfirmed bonus stays visible for review")
+	require.NotNil(t, r.ExpectedMin)
+	require.NotNil(t, r.ExpectedMax)
+	assert.Equal(t, 14820.0, *r.ExpectedMin)
+	assert.Equal(t, 15340.0, *r.ExpectedMax)
+	for _, bonus := range []string{"fixed bonus", "contractual bonus", "guaranteed bonus", "13th bonus + 15th bonus"} {
+		assert.True(t, Calculate("9.6k + "+bonus, "", DefaultRules()).ReviewRequired, bonus)
+	}
+}
+
 func TestCurrencyOnlyFromExplicitSalaryText(t *testing.T) {
 	for raw, want := range map[string]string{
 		"SGD12,000": "SGD", "270kUSD": "USD", "SGD 5000 / MYR 15000": "SGD",

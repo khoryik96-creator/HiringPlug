@@ -99,3 +99,62 @@ func TestNegativeSignBeforeCurrencyRequiresReview(t *testing.T) {
 		assert.Nil(t, r.ExpectedMin, raw)
 	}
 }
+
+func TestAmbiguousExpectedClausesRequireReview(t *testing.T) {
+	for _, expected := range []string{"10% + 15%", "10k + 500 allowance", "10-12k or 15k", "MYR 10-12k / SGD 3k", "20% decrease"} {
+		r := Calculate("9k", expected, DefaultRules(), "MYR")
+		assert.True(t, r.ReviewRequired, expected)
+		assert.Nil(t, r.ExpectedMin, expected)
+	}
+}
+
+func TestNegatedAndExplicitGuaranteedBonuses(t *testing.T) {
+	for _, bonus := range []string{"no AWS", "not AWS", "without AWS", "no fixed bonus", "no 13th bonus", "without 3 months fixed bonus", "3 months not fixed bonus", "3 months non-fixed bonus"} {
+		r := Calculate("9k + "+bonus, "", DefaultRules())
+		assert.False(t, r.ReviewRequired, bonus)
+		assert.Equal(t, 9000.0, r.Monthly, bonus)
+	}
+	for _, bonus := range []string{"3 months guaranteed annual bonus", "3 months contractual yearly bonus"} {
+		r := Calculate("9k + "+bonus, "", DefaultRules())
+		assert.False(t, r.ReviewRequired, bonus)
+		assert.Equal(t, 11250.0, r.Monthly, bonus)
+	}
+	assert.True(t, Calculate("9k + 15% contractual bonus", "", DefaultRules()).ReviewRequired)
+}
+
+func TestSlashPayPeriods(t *testing.T) {
+	for _, suffix := range []string{"/yr", "/year", "/annum"} {
+		r := Calculate("108k"+suffix, "120k"+suffix, DefaultRules())
+		assert.False(t, r.ReviewRequired, suffix)
+		assert.Equal(t, 9000.0, r.Monthly, suffix)
+		require.NotNil(t, r.ExpectedMin)
+		assert.Equal(t, 10000.0, *r.ExpectedMin, suffix)
+	}
+	for _, suffix := range []string{"/hr", "/hour", "/day", "/wk", "/week", " fortnightly"} {
+		assert.True(t, Calculate("900"+suffix, "", DefaultRules()).ReviewRequired, suffix)
+		assert.True(t, Calculate("9k + 200 allowance"+suffix, "", DefaultRules()).ReviewRequired, suffix)
+		r := Calculate("9k", "900"+suffix, DefaultRules())
+		assert.True(t, r.ReviewRequired, suffix)
+		assert.Nil(t, r.ExpectedMin, suffix)
+	}
+}
+
+func TestNamedAllowanceCannotBecomeBasicPay(t *testing.T) {
+	for _, current := range []string{"300 allowance + 9k + AWS", "300 allowance + 9k basic + AWS"} {
+		r := Calculate(current, "", DefaultRules())
+		assert.False(t, r.ReviewRequired, current)
+		assert.Equal(t, 9000.0, r.Base, current)
+		assert.Equal(t, 10050.0, r.Monthly, current)
+	}
+	for _, current := range []string{"300 allowance", "300 allowance + 500 housing", "-9k + 300 allowance"} {
+		r := Calculate(current, "", DefaultRules())
+		assert.True(t, r.ReviewRequired, current)
+		assert.False(t, r.HasCurrent, current)
+	}
+}
+
+func TestConflictingBonusFiguresInOneClause(t *testing.T) {
+	for _, bonus := range []string{"13th bonus or 15th bonus", "1.5 months fixed bonus or 2 months contractual bonus", "MYR 13.5 month bonus / SGD 14 month bonus"} {
+		assert.True(t, Calculate("9k + "+bonus, "", DefaultRules(), "MYR").ReviewRequired, bonus)
+	}
+}

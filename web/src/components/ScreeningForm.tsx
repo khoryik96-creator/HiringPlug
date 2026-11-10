@@ -101,6 +101,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
         + (sent && !res.salaryApplied ? " The salary was not changed: a later call already set it (the salary follows the latest call)." : ""));
       setCalledOn(localToday());
       setCalledBy("");
+      window.location.hash = `#/candidates/${candidate.id}${sent && !res.salaryApplied ? "?screeningSalary=kept" : ""}`;
     },
   });
   const errors = fieldErrors(save.error);

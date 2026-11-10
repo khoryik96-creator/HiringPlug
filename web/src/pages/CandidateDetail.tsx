@@ -55,6 +55,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   return (
     <main className="roomy">
       <a href="#/candidates">← Candidates</a>
+      {hashParam("screeningSalary") === "kept" && <p role="status" className="panel muted">Call saved. A later call already set the salary, so the profile keeps that salary.</p>}
       {/* A failed background refresh keeps the page (and any open form) and says so. */}
       {candidate.error && (
         <ErrorMessage error={candidate.error}>

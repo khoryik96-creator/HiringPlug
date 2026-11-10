@@ -20,6 +20,7 @@ Intentional differences from Kano:
 - AWS and fixed/contractual bonus aliases include common typing mistakes.
 - Extra bonus months (2) differ from total guaranteed months (14).
 - Generic fixed bonus without a size and conflicting totals require review.
+- Unconfirmed bonuses are visibly excluded without blocking fixed figures.
 - Conditional shift pay and “up to” bonus are excluded.
 - All reviewed figures are monthly equivalents. Annual base is divided by 12;
   hourly/daily/weekly conversion needs working-time information and is refused.
@@ -43,3 +44,12 @@ Currency hints are taken from the selected base-pay clause, before normalising
 amount spacing. Currency on an excluded bonus never relabels base pay, and
 normalisation cannot turn a PHP software-version token into a peso hint.
 Signs before a currency symbol/code are checked just like signs before digits.
+
+Unconfirmed bonuses are excluded with an informational warning; explicitly
+guaranteed bonuses with missing, conflicting or percentage-based terms still
+require correction. Negated bonuses never add fixed pay. Named allowances do
+not supply basic salary or the bonus basis when entered before it. Slash annual
+periods are normalised, while shorter rates need working-time information.
+Multiple expected clauses and extra alternative amounts require review rather
+than being ignored. Positive percentages described as decreases require a
+negative percentage instead of silently increasing expected pay.

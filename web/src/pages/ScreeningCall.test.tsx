@@ -10,6 +10,7 @@ import { ScreeningCall } from "./ScreeningCall";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.location.hash = "";
 });
 
 const doc = (id: string, source: Document["source"], createdAt: string): Document => ({
@@ -42,6 +43,7 @@ describe("screening call", () => {
 
   it("shows the CV beside the call, and saves what was asked in one step", async () => {
     const c = testCandidate({ source: null, nationality: "MY", noticePeriod: null, compensation: null });
+    window.location.hash = `#/candidates/${c.id}/screening`;
     reads(c);
     const saved = testCandidate({ ...c, version: 4, source: "referral" });
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: saved, noteId: "note_1", sourceKept: false, call: { id: "scl_1", calledOn: "2026-11-09", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: false, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: true }));
@@ -61,6 +63,7 @@ describe("screening call", () => {
     fireEvent.change(within(form).getAllByLabelText("From (or the single figure)")[0] as HTMLElement, { target: { value: "9,500" } });
     fireEvent.change(within(form).getAllByLabelText("Currency")[1] as HTMLElement, { target: { value: "sgd" } });
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
+    expect(window.location.hash).toBe(`#/candidates/${c.id}/screening`);
 
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/screening-calls");
@@ -74,6 +77,7 @@ describe("screening call", () => {
       },
     });
     expect((await screen.findByRole("status")).textContent).toContain("with the notes");
+    await waitFor(() => { expect(window.location.hash).toBe(`#/candidates/${c.id}`); });
     expect(within(form).getByLabelText<HTMLTextAreaElement>("Other notes").value).toBe("");
     expect(within(form).getByLabelText<HTMLTextAreaElement>("RFL").value).toBe("");
     expect(within(form).getByLabelText<HTMLInputElement>(/Sensitive note/).checked).toBe(false); // each note is marked on its own
@@ -101,6 +105,7 @@ describe("screening call", () => {
 
   it("when someone saved first, starts again from their version and keeps the notes typed", async () => {
     const c = testCandidate({ source: "jobstreet" });
+    window.location.hash = `#/candidates/${c.id}/screening`;
     const get = reads(c);
     const post = vi.spyOn(api, "POST").mockResolvedValueOnce(failure("CONFLICT_STALE_VERSION", "Someone else saved first.", undefined, 409));
     renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
@@ -109,6 +114,7 @@ describe("screening call", () => {
     fireEvent.change(within(form).getByLabelText("Nationality"), { target: { value: "SG" } });
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     const reload = await within(form).findByRole("button", { name: "Reload their version (your notes are kept; other changes here are lost)" });
+    expect(window.location.hash).toBe(`#/candidates/${c.id}/screening`);
 
     get.mockRestore();
     reads(testCandidate({ ...c, version: 5, nationality: "ID" }));
@@ -135,4 +141,16 @@ it("clears a salary draft when switching to another cached candidate", async () 
   client.setQueryData(candidateKey(other.id), other);
   rerender(<ScreeningCall candidateId={other.id} permissions={CALLER} />);
   await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>("Current salary breakdown").value).toBe(""); });
+});
+
+it("returns to the profile with a notice when a later call kept its salary", async () => {
+  const c = testCandidate({ compensation: null });
+  reads(c);
+  vi.spyOn(api, "POST").mockResolvedValue(ok({ candidate: c, noteId: null, sourceKept: false,
+    call: { id: "scl_older", calledOn: "2026-11-01", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: true, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: false }));
+  renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
+  const form = await screen.findByRole("form", { name: "Screening call" });
+  fireEvent.change(within(form).getByLabelText("Amount"), { target: { value: "9000" } });
+  fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
+  await waitFor(() => { expect(window.location.hash).toBe(`#/candidates/${c.id}?screeningSalary=kept`); });
 });

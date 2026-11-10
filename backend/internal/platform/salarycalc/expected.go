@@ -22,8 +22,8 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		primary = append(primary, part)
 	}
 	primary = preferGross(primary)
-	if len(primary) == 0 {
-		review(out, "Expected salary needs review.")
+	if len(primary) != 1 {
+		review(out, "Enter one expected salary or percentage range; combine fixed components into a reviewed monthly figure.")
 		return
 	}
 	raw := strings.TrimSpace(primary[0])
@@ -52,6 +52,10 @@ func calculateExpected(out *Result, text string, rules Rules) {
 			return
 		}
 		if m := rangeRE.FindStringSubmatch(literal); m != nil {
+			if len(numberRE.FindAllString(literal, -1)) != 2 {
+				review(out, "Enter one expected range without additional alternative amounts.")
+				return
+			}
 			a, errA := strconv.ParseFloat(m[1], 64)
 			b, errB := strconv.ParseFloat(m[3], 64)
 			if errA != nil || errB != nil {
@@ -111,6 +115,10 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		}
 		if lo <= -100 || hi > 500 || lo > hi || lo > 500 || hi <= -100 {
 			review(out, "Expected increase must be above -100% and at most 500%.")
+			return
+		}
+		if (lo > 0 || hi > 0) && regexp.MustCompile(`\b(decrease|decrement|reduction|reduce|less|lower|cut)\b`).MatchString(s) {
+			review(out, "Use a negative percentage for an expected salary decrease.")
 			return
 		}
 		out.relativeExpected = true

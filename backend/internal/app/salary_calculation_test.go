@@ -79,7 +79,7 @@ func TestSalaryCalculationReviewFlagsAndCurrencies(t *testing.T) {
 	}{
 		{"16k", "1000%", "", true, true, ""},
 		{"MYR 16k + USD 400 fixed allowance", "", "", true, true, ""},
-		{"-16k + 400 allowance", "", "", true, true, ""},
+		{"-16k + 400 allowance", "", "", true, false, ""},
 		{"16k", "SGD 10% lateral", "", true, true, ""},
 		{"SGD 16k", "maintain", "16000.00", false, true, "SGD"},
 		{"16k", "15k + 20% annual bonus", "15000.00", false, true, ""},
@@ -104,4 +104,37 @@ func TestSalaryCalculationReviewFlagsAndCurrencies(t *testing.T) {
 			assert.Equal(t, tc.currency, *out.ExpectedCurrency)
 		}
 	}
+}
+
+func TestScreeningCallSavesFixedFiguresWithUnconfirmedBonus(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	current := "9.6k + 2k allowance + 13.5 month bonus + 3 months bonus + 200 allowance + 13% EPF"
+	res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{
+		"current": current, "expected": "14-18%", "currentCurrency": "MYR",
+		"rules": api.SalaryCalculationRules{Allowances: true, Bonus: true},
+	})
+	require.Equal(t, http.StatusOK, res.Status)
+	var calculation api.SalaryCalculation
+	res.JSON(&calculation)
+	require.False(t, calculation.ReviewRequired)
+	require.Equal(t, "13000.00", calculation.Monthly)
+	require.NotNil(t, calculation.ExpectedMin)
+	require.NotNil(t, calculation.ExpectedMax)
+	assert.Equal(t, "14820.00", *calculation.ExpectedMin)
+	assert.Equal(t, "15340.00", *calculation.ExpectedMax)
+	c := a.createCandidate(token, map[string]any{"firstName": "Synthetic Bonus Review"})
+	call := a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/screening-calls", token, map[string]any{
+		"version": c.Version, "compensation": map[string]any{"expectedVersion": 0,
+			"currentSalary":  map[string]any{"amount": calculation.Monthly, "currency": "MYR", "period": "month", "description": current},
+			"expectedSalary": map[string]any{"min": *calculation.ExpectedMin, "max": *calculation.ExpectedMax, "currency": "MYR", "period": "month", "description": "14-18%"}},
+	})
+	require.Equal(t, http.StatusOK, call.Status)
+	var saved api.ScreeningCallResult
+	call.JSON(&saved)
+	comp := saved.Candidate.Compensation.MustGet()
+	assert.Equal(t, "13000.00", comp.CurrentSalary.MustGet().Amount)
+	require.NotNil(t, comp.CurrentSalary.MustGet().Description)
+	assert.Equal(t, current, *comp.CurrentSalary.MustGet().Description)
 }

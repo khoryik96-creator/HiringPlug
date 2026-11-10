@@ -9,6 +9,7 @@ import { CandidateDetail } from "./CandidateDetail";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.location.hash = "";
 });
 
 /** Answers the page's reads: the candidate (or `candidateResult`) and an empty document list. */
@@ -30,6 +31,12 @@ async function show(candidate: Candidate, permissions: Permission[]) {
 const buttons = () => screen.queryAllByRole("button").map((b) => b.textContent);
 
 describe("candidate page", () => {
+  it("explains when a saved screening call kept the later salary", async () => {
+    const c = testCandidate();
+    window.location.hash = `#/candidates/${c.id}?screeningSalary=kept`;
+    await show(c, RECRUITER);
+    expect(screen.getByRole("status").textContent).toContain("A later call already set the salary");
+  });
   it("gives viewers no edit buttons", async () => {
     await show(testCandidate(), ["candidates:read", "candidates.compensation:read", "documents:read"]);
     expect(buttons()).not.toContain("Edit profile");
