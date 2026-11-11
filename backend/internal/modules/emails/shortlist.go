@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
@@ -21,8 +22,9 @@ import (
 
 // Shortlisted is one of the candidates an email to the client is about.
 type Shortlisted struct {
-	CandidateID   string
-	ApplicationID *string // their application to the job
+	CandidateVersion, CompensationVersion *int
+	CandidateID                           string
+	ApplicationID                         *string // their application to the job
 }
 
 func notBoth() error {
@@ -33,7 +35,10 @@ func notBoth() error {
 
 // checkShortlist checks each candidate (once each, their own application,
 // and willing to be put forward) and returns the first.
-func (s *Service) checkShortlist(ctx context.Context, tx pgx.Tx, list []Shortlisted) (Shortlisted, error) {
+func (s *Service) checkShortlist(ctx context.Context, tx pgx.Tx, p authz.Principal, list []Shortlisted) (Shortlisted, error) {
+	if !p.Can(api.PermissionCandidatesRead) {
+		return Shortlisted{}, apperr.New(api.ErrorCodeFORBIDDEN, "Selecting candidate details needs permission to read candidates.")
+	}
 	seen := map[string]bool{}
 	for _, c := range list {
 		if seen[c.CandidateID] {
@@ -42,6 +47,16 @@ func (s *Service) checkShortlist(ctx context.Context, tx pgx.Tx, list []Shortlis
 			return Shortlisted{}, errs.Err()
 		}
 		seen[c.CandidateID] = true
+		candidate, err := s.deps.Candidates.Detailed(ctx, tx, p, c.CandidateID)
+		if err != nil {
+			return Shortlisted{}, err
+		}
+		if c.CandidateVersion != nil && candidate.Version != *c.CandidateVersion {
+			return Shortlisted{}, apperr.StaleVersion("selected candidate details").WithDetail("candidateId", c.CandidateID)
+		}
+		if c.CompensationVersion != nil && candidate.CompensationVersion != *c.CompensationVersion {
+			return Shortlisted{}, apperr.StaleVersion("selected candidate salary").WithDetail("candidateId", c.CandidateID)
+		}
 		if c.ApplicationID != nil {
 			if _, err := s.application(ctx, tx, *c.ApplicationID, &c.CandidateID); err != nil {
 				return Shortlisted{}, err

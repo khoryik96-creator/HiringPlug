@@ -83,8 +83,8 @@ func (h *HTTP) ListEmails(ctx context.Context, req api.ListEmailsRequestObject) 
 func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (api.SendEmailResponseObject, error) {
 	b := req.Body
 	r := SendRequest{
-		Outgoing:    Outgoing{To: convert[string](b.To), Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)},
-		CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, ContactID: b.ContactId, TimeZone: deref(b.TimeZone),
+		Outgoing:             Outgoing{To: convert[string](b.To), Subject: b.Subject, Body: deref(b.Body), BodyHTML: deref(b.BodyHtml)},
+		RecipientCandidateID: b.RecipientCandidateId, CandidateID: b.CandidateId, ApplicationID: b.ApplicationId, ContactID: b.ContactId, TimeZone: deref(b.TimeZone),
 	}
 	if b.Cc != nil {
 		r.Cc = convert[string](*b.Cc)
@@ -111,11 +111,11 @@ func (h *HTTP) SendEmail(ctx context.Context, req api.SendEmailRequestObject) (a
 // PreviewEmail handles POST /v1/email-previews.
 func (h *HTTP) PreviewEmail(ctx context.Context, req api.PreviewEmailRequestObject) (api.PreviewEmailResponseObject, error) {
 	b := req.Body
-	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, shortlistFrom(b.Candidates), b.TimeZone)
+	p, err := h.svc.Preview(ctx, authz.MustFromContext(ctx), b.Subject, b.BodyHtml, b.CandidateId, b.ApplicationId, b.InterviewId, b.ContactId, shortlistFrom(b.Candidates), b.TimeZone, b.RecipientCandidateId)
 	if err != nil {
 		return nil, err
 	}
-	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail), FieldValues: p.FieldValues}, nil
+	return api.PreviewEmail200JSONResponse{Subject: p.Subject, BodyHtml: p.BodyHTML, Missing: nonNil(p.Missing), Salary: p.Salary, ClientEmail: c.OrNull(p.ClientEmail), FieldValues: p.FieldValues, CandidateVersion: p.CandidateVersion, CompensationVersion: p.CompensationVersion}, nil
 }
 
 // DeleteEmailTemplate handles DELETE /v1/email-templates/{templateId}.
@@ -280,7 +280,7 @@ func shortlistFrom(list *[]api.EmailCandidate) []Shortlisted {
 	}
 	out := make([]Shortlisted, len(*list))
 	for i, c := range *list {
-		out[i] = Shortlisted{CandidateID: c.CandidateId, ApplicationID: c.ApplicationId}
+		out[i] = Shortlisted{CandidateID: c.CandidateId, ApplicationID: c.ApplicationId, CandidateVersion: c.CandidateVersion, CompensationVersion: c.CompensationVersion}
 	}
 	return out
 }

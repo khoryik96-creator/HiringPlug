@@ -31,6 +31,7 @@ func (m *Module) WriteNotesWith(n Notes) { m.service.notes = n }
 
 // SalaryInput is salary details to save, as PUT .../compensation takes them.
 type SalaryInput struct {
+	SalaryNotes     Change[*string]
 	ExpectedVersion int
 	Current         *SalaryAmount
 	Expected        *SalaryRange
@@ -66,6 +67,7 @@ type ScreeningCall struct {
 	CalledOn       time.Time
 	NoteID         *string
 	SalaryRecorded bool
+	SalarySnapshot *api.ScreeningSalarySnapshot
 	CreatedAt      time.Time
 }
 
@@ -146,7 +148,7 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 		}
 		out.SalaryApplied = in.Salary != nil && SalaryFollows(calledOn, latestOn)
 		if out.SalaryApplied {
-			comp, err := setCompensationIn(ctx, tx, id, in.Salary.ExpectedVersion, in.Salary.Current, in.Salary.Expected)
+			comp, err := setCompensationIn(ctx, tx, id, in.Salary.ExpectedVersion, in.Salary.Current, in.Salary.Expected, in.Salary.SalaryNotes)
 			if err != nil {
 				return err
 			}
@@ -177,6 +179,9 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 			return err
 		}
 		out.Call = callFromRow(row, &byName)
+		if err := saveCallSalary(ctx, tx, p, &out.Call, view.Compensation, in.Salary); err != nil {
+			return err
+		}
 		// What was recorded, never the values (salary stays out of the log).
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "candidate.screened", EntityType: "candidate", EntityID: id,
@@ -217,7 +222,7 @@ func (s *Service) ScreeningCalls(ctx context.Context, p authz.Principal, id stri
 			}
 			out[i] = callFromRow(r, name)
 		}
-		return nil
+		return loadCallSalaries(ctx, tx, out)
 	})
 	return out, err
 }
@@ -242,7 +247,7 @@ func (h *HTTP) ListScreeningCalls(ctx context.Context, req api.ListScreeningCall
 
 func callToAPI(c ScreeningCall) api.ScreeningCallSummary {
 	return api.ScreeningCallSummary{Id: c.ID, CalledOn: openapi_types.Date{Time: c.CalledOn}, CalledBy: c.CalledBy, CalledByName: orNull(c.CalledByName),
-		NoteId: orNull(c.NoteID), SalaryRecorded: c.SalaryRecorded, CreatedAt: c.CreatedAt}
+		NoteId: orNull(c.NoteID), SalaryRecorded: c.SalaryRecorded, CreatedAt: c.CreatedAt, SalarySnapshot: c.SalarySnapshot}
 }
 
 // RecordScreeningCall handles POST /v1/candidates/{candidateId}/screening-calls.
@@ -251,13 +256,14 @@ func (h *HTTP) RecordScreeningCall(ctx context.Context, req api.RecordScreeningC
 	in := Screening{
 		Version: b.Version, Notes: deref(b.Notes), Sensitive: deref(b.Sensitive), Source: b.Source, CalledBy: b.CalledBy,
 		Patch: ProfilePatch{
-			Nationality:       change(b.Nationality, identity[string]),
-			WorkAuthorization: Change[*WorkAuthorization]{Set: b.WorkAuthorization.IsSpecified(), Value: workAuthorizationFromAPI(b.WorkAuthorization)},
-			NoticePeriod:      Change[*NoticePeriod]{Set: b.NoticePeriod.IsSpecified(), Value: noticePeriodFromAPI(b.NoticePeriod)},
+			IndustrySelections: choicesFromAPI(b.IndustrySelections),
+			Nationality:        change(b.Nationality, identity[string]),
+			WorkAuthorization:  Change[*WorkAuthorization]{Set: b.WorkAuthorization.IsSpecified(), Value: workAuthorizationFromAPI(b.WorkAuthorization)},
+			NoticePeriod:       Change[*NoticePeriod]{Set: b.NoticePeriod.IsSpecified(), Value: noticePeriodFromAPI(b.NoticePeriod)},
 		},
 	}
 	if c := b.Compensation; c != nil {
-		in.Salary = &SalaryInput{ExpectedVersion: c.ExpectedVersion}
+		in.Salary = &SalaryInput{ExpectedVersion: c.ExpectedVersion, SalaryNotes: change(c.SalaryNotes, identity[string])}
 		in.Salary.Current, in.Salary.Expected = salaryFromAPI(*c)
 	}
 	if b.CalledOn != nil {

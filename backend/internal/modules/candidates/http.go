@@ -160,7 +160,7 @@ func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateReque
 // PutCandidateCompensation handles PUT /v1/candidates/{candidateId}/compensation.
 func (h *HTTP) PutCandidateCompensation(ctx context.Context, req api.PutCandidateCompensationRequestObject) (api.PutCandidateCompensationResponseObject, error) {
 	current, expected := salaryFromAPI(*req.Body)
-	comp, err := h.svc.SetCompensation(ctx, authz.MustFromContext(ctx), req.CandidateId, req.Body.ExpectedVersion, current, expected)
+	comp, err := h.svc.SetCompensation(ctx, authz.MustFromContext(ctx), req.CandidateId, req.Body.ExpectedVersion, current, expected, change(req.Body.SalaryNotes, identity[string]))
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +237,7 @@ func candidateToAPI(v View) api.Candidate {
 func compensationToAPI(c Compensation) api.Compensation {
 	out := api.Compensation{
 		Version:        c.Version,
+		SalaryNotes:    orNull(c.SalaryNotes),
 		UpdatedAt:      c.UpdatedAt,
 		CurrentSalary:  nullable.NewNullNullable[api.SalaryAmount](),
 		ExpectedSalary: nullable.NewNullNullable[api.SalaryRange](),

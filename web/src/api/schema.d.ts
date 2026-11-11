@@ -3341,6 +3341,8 @@ export interface components {
             period: components["schemas"]["PayPeriod"];
         };
         Compensation: {
+            /** @description Salary context kept separately from the calculation. */
+            salaryNotes?: string | null;
             version: number;
             currentSalary: components["schemas"]["SalaryAmount"] | null;
             expectedSalary: components["schemas"]["SalaryRange"] | null;
@@ -3348,6 +3350,8 @@ export interface components {
             updatedAt: string;
         };
         CompensationUpdate: {
+            /** @description Salary context kept separately from the calculation. */
+            salaryNotes?: string | null;
             /** @description 0 if no salary details exist yet, otherwise the version you loaded. */
             expectedVersion: number;
             currentSalary: components["schemas"]["SalaryAmount"] | null;
@@ -3585,6 +3589,7 @@ export interface components {
             items: components["schemas"]["SimilarCandidate"][];
         };
         ScreeningCallInput: {
+            industrySelections?: components["schemas"]["IndustrySelections"];
             /** @description The candidate's version you loaded. */
             version: number;
             /** @description What was said; empty for no note. */
@@ -3616,6 +3621,7 @@ export interface components {
             call: components["schemas"]["ScreeningCallSummary"];
         };
         ScreeningCallSummary: {
+            salarySnapshot?: components["schemas"]["ScreeningSalarySnapshot"];
             /** @example scl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
             id: string;
             /** Format: date */
@@ -3705,6 +3711,12 @@ export interface components {
             expectedMax?: string;
             warnings: string[];
             excluded: string[];
+        };
+        /** @description Salary recorded on this call; visible only with compensation read permission. */
+        ScreeningSalarySnapshot: {
+            currentSalary: components["schemas"]["SalaryAmount"] | null;
+            expectedSalary: components["schemas"]["SalaryRange"] | null;
+            salaryNotes?: string | null;
         };
         CareersPage: {
             companyName: string;
@@ -4427,6 +4439,8 @@ export interface components {
             asPdf?: boolean;
         };
         EmailPreviewRequest: {
+            /** @description Candidate recipient when the message contains details about selected candidates. */
+            recipientCandidateId?: components["schemas"]["CandidateId"];
             subject: string;
             bodyHtml: string;
             candidateId?: components["schemas"]["CandidateId"];
@@ -4471,11 +4485,17 @@ export interface components {
             problem: string | null;
         };
         EmailCandidate: {
+            /** @description Profile version used when inserting details. */
+            candidateVersion?: number;
+            /** @description Salary version used when inserting salary details; 0 means none existed. */
+            compensationVersion?: number;
             candidateId: components["schemas"]["CandidateId"];
             /** @description Their application to the job the email is about. */
             applicationId?: components["schemas"]["ApplicationId"];
         };
         EmailPreview: {
+            candidateVersion?: number;
+            compensationVersion?: number;
             /** @description Each field that has a value for this candidate, by its token: "[Expected salary]" -> "RM 12,000 / month" (salary only for roles that may see salaries). The composer puts the value in the message, where it can be edited; the candidate's record is not changed. */
             fieldValues: {
                 [key: string]: string;
@@ -4582,6 +4602,8 @@ export interface components {
         };
         /** @description Give body (plain text) or bodyHtml (formatted). Fields in the subject and the formatted message ([Expected salary], ...) are filled from the candidate and application; one with no value refuses the email. */
         EmailSend: {
+            /** @description Candidate recipient when the message contains details about selected candidates. */
+            recipientCandidateId?: components["schemas"]["CandidateId"];
             to: string[];
             cc?: string[];
             bcc?: string[];
@@ -4594,7 +4616,7 @@ export interface components {
             applicationId?: components["schemas"]["ApplicationId"];
             /** @description To one of a client's contacts (from their page): fields are filled from the contact ([First name] is theirs) and their company. */
             contactId?: components["schemas"]["ContactId"];
-            /** @description An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails. */
+            /** @description An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId; may include contactId or recipientCandidateId for the recipient. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails. */
             candidates?: components["schemas"]["EmailCandidate"][];
             /** @description Files you uploaded to /v1/email-attachments. */
             attachmentIds?: components["schemas"]["EmailAttachmentId"][];

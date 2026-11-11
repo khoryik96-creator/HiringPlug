@@ -10,6 +10,8 @@ compatibility fallbacks.
 ## Selection and recognition
 
 Candidates and companies use the same searchable, two-column hierarchy.
+Candidate selections are editable in profile editing and screening calls, and
+can be included as named industries/subindustries in selected-candidate emails.
 Recruiters can select several industries/subindustries or an industry alone.
 One selection is current; earlier selections stay. Specialization is a
 separate job-function field. Advanced candidate search matches both current

@@ -11,6 +11,7 @@ import { CallItems, type CallAnswers, callNote, useCallItems } from "./CallItems
 import { type CandidateFormState, formFromCandidate, toUpdateBody } from "./candidateFormState";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { IndustryPicker } from "./IndustryPicker";
 import { ScreeningSalary } from "./ScreeningSalary";
 import { formFromCompensation, SALARY_PATHS, salaryProblems, type SalaryFormState, toCompensationBody } from "./salaryFormState";
 import { SaveError } from "./SaveError";
@@ -59,6 +60,7 @@ export function screeningBody(
   if (!sameBody(p.nationality, was.nationality)) body.nationality = p.nationality;
   if (!sameBody(p.workAuthorization, was.workAuthorization)) body.workAuthorization = p.workAuthorization;
   if (!sameBody(p.noticePeriod, was.noticePeriod)) body.noticePeriod = p.noticePeriod;
+  if (!sameBody(profile.industrySelections,base.profile.industrySelections) && profile.industrySelections) body.industrySelections=profile.industrySelections;
   if (profile.source && !base.profile.source) body.source = profile.source;
   const comp = toCompensationBody(salary, base.salaryVersion);
   if (withSalary && !sameBody(comp, toCompensationBody(base.salary, base.salaryVersion))) body.compensation = comp;
@@ -174,7 +176,8 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
         )}
         {errors.source && <small className="error">{errors.source}</small>}
       </div>
-      {salaryShown && <ScreeningSalary form={salary} set={setSalaryField} patch={(value) => { setSaved(null); setSalary((f) => ({ ...f, ...value })); }} errors={errors} />}
+      <IndustryPicker value={profile.industrySelections} legacy={profile.industry} candidate={candidate} onChange={(industrySelections,industry) => { change({industrySelections,industry}); }} />
+      {salaryShown && <ScreeningSalary key={base.salaryVersion} form={salary} set={setSalaryField} patch={(value) => { setSaved(null); setSalary((f) => ({ ...f, ...value })); }} errors={errors} />}
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save the call</button>
         {saved && <span role="status" className="muted">{saved}</span>}
@@ -187,7 +190,14 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
           // Someone saved first: start again from their version, keeping the notes typed so far.
           void queryClient.invalidateQueries({ queryKey: candidateKey(candidate.id) }).then(() => {
             const fresh = queryClient.getQueryData<Candidate>(candidateKey(candidate.id));
-            if (fresh) startFrom(fresh);
+            if (fresh) {
+              const draft=salary;const previous=base.salary;startFrom(fresh);
+              setSalary((next)=>({ ...next,
+                ...(draft.salaryNotes!==previous.salaryNotes?{salaryNotes:draft.salaryNotes}:{}),
+                ...(draft.currentDescription!==previous.currentDescription?{currentDescription:draft.currentDescription,currentNeedsReview:true,calculationPending:true}:{}),
+                ...(draft.expectedDescription!==previous.expectedDescription?{expectedDescription:draft.expectedDescription,expectedNeedsReview:true,calculationPending:true}:{})
+              }));
+            }
             save.reset();
           });
         }}

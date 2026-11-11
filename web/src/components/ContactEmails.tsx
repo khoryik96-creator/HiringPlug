@@ -24,7 +24,7 @@ export function ContactEmails({ contactId, email, permissions }: { contactId: st
         {permissions.includes("emails:send") && !writing && <button type="button" onClick={() => { setWriting(true); }}>Write email</button>}
       </div>
       {writing && (
-        <EmailComposer contactId={contactId} defaultTo={email ?? ""}
+        <EmailComposer permissions={permissions} contactId={contactId} defaultTo={email ?? ""}
           canManageTemplates={permissions.includes("emails.templates:manage")}
           canCreateTemplates={permissions.includes("emails.templates:create")}
           onDone={() => { setWriting(false); }} />

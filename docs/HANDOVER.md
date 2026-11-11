@@ -1,4 +1,4 @@
-# Handover (10 Nov 2026)
+# Handover (11 Nov 2026)
 
 For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
 first (the rules, enforced by `task verify`), then `docs/README.md`;
@@ -11,7 +11,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
 - Nothing uncommitted, nothing half-built. Start new work on a fresh branch
   from main.
-- Latest migration: `00082_industries.sql`. Migrations are append-only.
+- Latest migration: `00083_screening_salary_notes.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -53,6 +53,17 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   access unless Settings says otherwise). CV Studio formatting removes lines
   stating the candidate's own pay before the AI sees the CV.
 - No secrets in code; settings are `HP_*` variables listed in `.env.example`.
+
+## Candidate email packages and salary history
+
+- Candidate/contact composers and job-client submissions share multi-candidate
+  selection, per-candidate CV choice and optional profile/salary fields. An
+  explicit recipient is separate from the referenced candidates; inserted data
+  carries versions checked at send time. See `docs/features.md`.
+- Free salary notes are preserved independently of calculations. New screening
+  calls store immutable compensation-protected snapshots, exposed under Salary
+  history. Older overwritten figures cannot be recovered. Industries and
+  subindustries are also editable while screening.
 
 ## Industry catalogue (11 Nov 2026)
 

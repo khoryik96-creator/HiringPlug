@@ -54,7 +54,7 @@ describe("emailing the client about several candidates", () => {
     expect(within(panel).getByRole("heading", { name: "Email client about 2 candidates" })).toBeTruthy();
     // Nurul's newest formatted profile, as PDF, unless another is chosen.
     const nurul = await within(panel).findByLabelText<HTMLSelectElement>("Profile to attach for Nurul Huda");
-    await waitFor(() => { expect(nurul.selectedOptions[0]?.textContent).toBe("📎 Hyppies CV - Nurul Huda (PDF)"); });
+    await waitFor(() => { expect(nurul.selectedOptions[0]?.textContent).toContain("📎 Hyppies CV - Nurul Huda (PDF)"); });
     fireEvent.change(within(panel).getByLabelText("Profile to attach for Farid Hassan"), { target: { value: "" } }); // no attachment
 
     fireEvent.click(within(panel).getByRole("button", { name: "Move Nurul Huda up" }));

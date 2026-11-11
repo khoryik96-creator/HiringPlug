@@ -2,6 +2,7 @@
 import type { Compensation, Schemas } from "../api/client";
 
 export interface SalaryFormState {
+  salaryNotes?: string;
   currentDescription?: string;
   expectedDescription?: string;
   calculationPending?: boolean;
@@ -18,6 +19,7 @@ export interface SalaryFormState {
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
 export const SALARY_PATHS: Record<keyof SalaryFormState, string> = {
+ salaryNotes:"salaryNotes",
   currentDescription: "currentSalary.description",
   expectedDescription: "expectedSalary.description",
   calculationPending: "currentSalary.description",
@@ -40,6 +42,7 @@ export function formFromCompensation(c: Compensation | null | undefined): Salary
   const current = c?.currentSalary;
   const expected = c?.expectedSalary;
   return {
+    ...(c?.salaryNotes != null ? { salaryNotes: c.salaryNotes } : {}),
     ...(current?.description !== undefined ? { currentDescription: current.description } : {}),
     ...(expected?.description !== undefined ? { expectedDescription: expected.description } : {}),
     currentAmount: current?.amount ?? "",
@@ -105,6 +108,7 @@ export function toCompensationBody(f: SalaryFormState, expectedVersion: number):
   const max = plainAmount(f.expectedMax);
   return {
     expectedVersion,
+    ...(f.salaryNotes !== undefined ? { salaryNotes: f.salaryNotes.trim() || null } : {}),
     currentSalary: current
       ? { ...(f.currentDescription !== undefined ? { description: f.currentDescription } : {}), amount: current, currency: f.currentCurrency.trim().toUpperCase(), period: f.currentPeriod }
       : null,

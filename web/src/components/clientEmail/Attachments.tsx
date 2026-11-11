@@ -12,8 +12,9 @@ type Upload = Schemas["EmailAttachment"];
 const SOURCE: Record<string, string> = { original: "Original", jobstreet: "JobStreet", linkedin: "LinkedIn", formatted: "Formatted", other: "Other" };
 const mb = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 104858 ? 2 : 1)} MB`;
 
-export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUploads, others = 0 }: {
+export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUploads, others = 0, onBusy }: {
   candidateId: string;
+  onBusy?: (busy:boolean)=>void;
   /** Files chosen elsewhere (each candidate's profile, on an email about several). */
   others?: number;
   canSeeCvs: boolean;
@@ -28,6 +29,8 @@ export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUpl
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
   });
   const upload = useMutation({
+    onMutate:()=>{onBusy?.(true);},
+    onSettled:()=>{onBusy?.(false);},
     mutationFn: async (files: File[]) => {
       const out: Upload[] = [];
       for (const f of files) {

@@ -514,6 +514,7 @@ components:
       type: object
       required: [version, currentSalary, expectedSalary, updatedAt]
       properties:
+        salaryNotes: { type: string, maxLength: 10000, nullable: true, description: 'Salary context kept separately from the calculation.' }
         version: { type: integer, minimum: 1 }
         currentSalary:
           allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
@@ -527,6 +528,7 @@ components:
       additionalProperties: false
       required: [expectedVersion, currentSalary, expectedSalary]
       properties:
+        salaryNotes: { type: string, maxLength: 10000, nullable: true, description: 'Salary context kept separately from the calculation.' }
         expectedVersion:
           type: integer
           minimum: 0
@@ -920,6 +922,7 @@ components:
       additionalProperties: false
       required: [version]
       properties:
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         version:
           type: integer
           minimum: 1
@@ -962,6 +965,7 @@ components:
       type: object
       required: [id, calledOn, calledBy, calledByName, noteId, salaryRecorded, createdAt]
       properties:
+        salarySnapshot: { $ref: '#/components/schemas/ScreeningSalarySnapshot' }
         id: { type: string, example: scl_01jbz6w0m0k8q9x2r3s4t5v6w7 }
         calledOn: { type: string, format: date }
         calledBy: { $ref: '#/components/schemas/UserId' }
@@ -1067,3 +1071,17 @@ components:
         expectedMax: { type: string }
         warnings: { type: array, items: { type: string } }
         excluded: { type: array, items: { type: string } }
+
+    ScreeningSalarySnapshot:
+      type: object
+      additionalProperties: false
+      required: [currentSalary, expectedSalary]
+      description: Salary recorded on this call; visible only with compensation read permission.
+      properties:
+        currentSalary:
+          allOf: [{ $ref: '#/components/schemas/SalaryAmount' }]
+          nullable: true
+        expectedSalary:
+          allOf: [{ $ref: '#/components/schemas/SalaryRange' }]
+          nullable: true
+        salaryNotes: { type: string, nullable: true }

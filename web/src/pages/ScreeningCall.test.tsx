@@ -112,6 +112,7 @@ describe("screening call", () => {
     renderWithClient(<ScreeningCall candidateId={c.id} permissions={CALLER} />);
     const form = await screen.findByRole("form", { name: "Screening call" });
     fireEvent.change(within(form).getByLabelText("Other notes"), { target: { value: "Twenty minutes of notes" } });
+    fireEvent.change(within(form).getByLabelText("Salary notes"), { target: { value: "Keep my pay discussion" } });
     fireEvent.change(within(form).getByLabelText("Nationality"), { target: { value: "SG" } });
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     const reload = await within(form).findByRole("button", { name: "Reload their version (your notes are kept; other changes here are lost)" });
@@ -122,11 +123,12 @@ describe("screening call", () => {
     fireEvent.click(reload);
     await waitFor(() => { expect(within(form).getByLabelText<HTMLSelectElement>("Nationality").value).toBe("ID"); });
     expect(within(form).getByLabelText<HTMLTextAreaElement>("Other notes").value).toBe("Twenty minutes of notes");
+    expect(within(form).getByLabelText<HTMLTextAreaElement>("Salary notes").value).toBe("Keep my pay discussion");
 
     post.mockResolvedValueOnce(ok({ candidate: testCandidate({ ...c, version: 5 }), noteId: "note_2", sourceKept: false, call: { id: "scl_1", calledOn: "2026-11-09", calledBy: "usr_1", calledByName: "Aina", noteId: null, salaryRecorded: false, createdAt: "2026-11-09T00:00:00Z" }, salaryApplied: true }));
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
-    expect(sentBody(post, 1)).toMatchObject({ version: 5, notes: "Twenty minutes of notes" });
+    expect(sentBody(post, 1)).toMatchObject({ version: 5, notes: "Twenty minutes of notes", compensation: {salaryNotes:"Keep my pay discussion"} });
   });
 });
 

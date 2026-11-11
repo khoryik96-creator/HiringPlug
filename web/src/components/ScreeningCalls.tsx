@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { notesKey, screeningCallsKey } from "../api/keys";
+import { ScreeningSalarySnapshot } from "./ScreeningSalarySnapshot";
 import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 
@@ -38,6 +39,7 @@ export function ScreeningCalls({ candidateId, permissions }: { candidateId: stri
                 </summary>
                 {note ? <p className="pre call-note">{note.body}</p>
                   : <p className="muted small">{c.noteId ? "The note is hidden for your role." : "No notes were written on this call."}</p>}
+                {permissions.includes("candidates.compensation:read") && c.salarySnapshot && <ScreeningSalarySnapshot value={c.salarySnapshot} />}
               </details>
             </li>
           );

@@ -143,12 +143,12 @@ SELECT * FROM candidate_compensation WHERE candidate_id = @candidate_id;
 -- name: InsertCompensation :one
 INSERT INTO candidate_compensation (
   candidate_id, tenant_id, current_amount, current_currency, current_period,
-  expected_min, expected_max, expected_currency, expected_period, current_description, expected_description, updated_by
+  expected_min, expected_max, expected_currency, expected_period, current_description, expected_description, salary_notes, updated_by
 ) VALUES (
   @candidate_id, app_current_tenant(),
   sqlc.narg(current_amount)::text::numeric, sqlc.narg(current_currency), sqlc.narg(current_period),
   sqlc.narg(expected_min)::text::numeric, sqlc.narg(expected_max)::text::numeric,
-  sqlc.narg(expected_currency), sqlc.narg(expected_period), sqlc.narg(current_description), sqlc.narg(expected_description), app_current_user()
+  sqlc.narg(expected_currency), sqlc.narg(expected_period), sqlc.narg(current_description), sqlc.narg(expected_description), sqlc.narg(salary_notes), app_current_user()
 )
 ON CONFLICT (candidate_id) DO NOTHING
 RETURNING *;
@@ -164,6 +164,7 @@ UPDATE candidate_compensation SET
   expected_period = sqlc.narg(expected_period),
   current_description = CASE WHEN sqlc.narg(current_amount)::text IS NULL THEN NULL ELSE COALESCE(sqlc.narg(current_description), current_description) END,
   expected_description = CASE WHEN sqlc.narg(expected_min)::text IS NULL THEN NULL ELSE COALESCE(sqlc.narg(expected_description), expected_description) END,
+  salary_notes = CASE WHEN @salary_notes_set::boolean THEN sqlc.narg(salary_notes)::text ELSE salary_notes END,
   version = version + 1,
   updated_by = app_current_user(),
   updated_at = now()
@@ -329,3 +330,8 @@ SELECT id, industry::text FROM candidate WHERE industry IS NOT NULL;
 -- name: SetIndustrySummary :exec
 UPDATE candidate SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
 WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);
+
+-- name: InsertScreeningSalarySnapshot :exec
+INSERT INTO screening_call_salary(call_id,snapshot) VALUES (@call_id,@snapshot);
+-- name: ScreeningSalarySnapshots :many
+SELECT * FROM screening_call_salary WHERE call_id=ANY(@call_ids::text[]);

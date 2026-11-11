@@ -34,6 +34,8 @@ var policy = func() *bluemonday.Policy {
 	p.AddTargetBlankToFullyQualifiedLinks(true)
 	p.AllowAttrs("data-banner-id").Matching(bannerIDRe).OnElements("img")
 	p.AllowAttrs("data-field").Matching(fieldKeyRe).OnElements("span")
+	p.AllowAttrs("data-candidate-summary").Matching(regexp.MustCompile(`^true$`)).OnElements("div")
+	p.AllowAttrs("data-candidate-id").Matching(regexp.MustCompile(`^cand_[0-9a-hjkmnp-tv-z]{26}$`)).OnElements("p", "tr")
 	p.AllowAttrs("alt").OnElements("img")
 	p.AllowAttrs("color", "face", "size").OnElements("font")
 	p.AllowAttrs("align").OnElements("p", "div", "td", "th")

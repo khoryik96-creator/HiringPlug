@@ -151,7 +151,7 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	}
 	before := fromRow(row).Profile
 	after, errs := NormalizeProfile(change(before), s.phoneRegion)
-	if unchangedOK && len(errs) == 0 && len(audit.Diff(profileFields(before), profileFields(after))) == 0 {
+	if unchangedOK && after.IndustrySelections == nil && len(errs) == 0 && len(audit.Diff(profileFields(before), profileFields(after))) == 0 {
 		return s.loadView(ctx, tx, s.users, p, fromRow(row))
 	}
 	if int(row.Version) != expectedVersion {
@@ -199,7 +199,7 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 
 // SetCompensation replaces a candidate's salary details. expectedVersion is 0
 // when none exist yet, otherwise the version the user loaded.
-func (s *Service) SetCompensation(ctx context.Context, p authz.Principal, candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange) (Compensation, error) {
+func (s *Service) SetCompensation(ctx context.Context, p authz.Principal, candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange, notes Change[*string]) (Compensation, error) {
 	if err := ValidateCompensation(current, expected).Err(); err != nil {
 		return Compensation{}, err
 	}
@@ -211,14 +211,14 @@ func (s *Service) SetCompensation(ctx context.Context, p authz.Principal, candid
 			}
 		}
 		var err error
-		result, err = setCompensationIn(ctx, tx, candidateID, expectedVersion, current, expected)
+		result, err = setCompensationIn(ctx, tx, candidateID, expectedVersion, current, expected, notes)
 		return err
 	})
 	return result, err
 }
 
 // setCompensationIn writes checked salary details in the caller's transaction.
-func setCompensationIn(ctx context.Context, tx pgx.Tx, candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange) (Compensation, error) {
+func setCompensationIn(ctx context.Context, tx pgx.Tx, candidateID string, expectedVersion int, current *SalaryAmount, expected *SalaryRange, notes Change[*string]) (Compensation, error) {
 	q := store.New(tx)
 	exists, err := q.CandidateExists(ctx, candidateID)
 	if err != nil {
@@ -229,9 +229,14 @@ func setCompensationIn(ctx context.Context, tx pgx.Tx, candidateID string, expec
 	}
 	var row store.CandidateCompensation
 	if expectedVersion == 0 {
-		row, err = q.InsertCompensation(ctx, insertCompensationParams(candidateID, current, expected))
+		params := insertCompensationParams(candidateID, current, expected)
+		params.SalaryNotes = notes.Value
+		row, err = q.InsertCompensation(ctx, params)
 	} else {
-		row, err = q.UpdateCompensation(ctx, updateCompensationParams(candidateID, expectedVersion, current, expected))
+		params := updateCompensationParams(candidateID, expectedVersion, current, expected)
+		params.SalaryNotes = notes.Value
+		params.SalaryNotesSet = notes.Set
+		row, err = q.UpdateCompensation(ctx, params)
 	}
 	if database.IsNoRows(err) {
 		return Compensation{}, apperr.StaleVersion("salary record")
@@ -425,7 +430,7 @@ func profileFields(p Profile) map[string]any {
 }
 
 func fromCompensationRow(r store.CandidateCompensation) (Compensation, error) {
-	c := Compensation{Version: int(r.Version), UpdatedAt: r.UpdatedAt}
+	c := Compensation{Version: int(r.Version), UpdatedAt: r.UpdatedAt, SalaryNotes: r.SalaryNotes}
 	current, err := database.DecimalString(r.CurrentAmount)
 	if err != nil {
 		return Compensation{}, err

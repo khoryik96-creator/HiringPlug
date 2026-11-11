@@ -5140,6 +5140,7 @@ components:
       type: object
       required: [version, currentSalary, expectedSalary, updatedAt]
       properties:
+        salaryNotes: {type: string, maxLength: 10000, nullable: true, description: 'Salary context kept separately from the calculation.'}
         version: {type: integer, minimum: 1}
         currentSalary:
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
@@ -5153,6 +5154,7 @@ components:
       additionalProperties: false
       required: [expectedVersion, currentSalary, expectedSalary]
       properties:
+        salaryNotes: {type: string, maxLength: 10000, nullable: true, description: 'Salary context kept separately from the calculation.'}
         expectedVersion:
           type: integer
           minimum: 0
@@ -5538,6 +5540,7 @@ components:
       additionalProperties: false
       required: [version]
       properties:
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         version:
           type: integer
           minimum: 1
@@ -5580,6 +5583,7 @@ components:
       type: object
       required: [id, calledOn, calledBy, calledByName, noteId, salaryRecorded, createdAt]
       properties:
+        salarySnapshot: {$ref: '#/components/schemas/ScreeningSalarySnapshot'}
         id: {type: string, example: scl_01jbz6w0m0k8q9x2r3s4t5v6w7}
         calledOn: {type: string, format: date}
         calledBy: {$ref: '#/components/schemas/UserId'}
@@ -5683,6 +5687,19 @@ components:
         expectedMax: {type: string}
         warnings: {type: array, items: {type: string}}
         excluded: {type: array, items: {type: string}}
+    ScreeningSalarySnapshot:
+      type: object
+      additionalProperties: false
+      required: [currentSalary, expectedSalary]
+      description: Salary recorded on this call; visible only with compensation read permission.
+      properties:
+        currentSalary:
+          allOf: [{$ref: '#/components/schemas/SalaryAmount'}]
+          nullable: true
+        expectedSalary:
+          allOf: [{$ref: '#/components/schemas/SalaryRange'}]
+          nullable: true
+        salaryNotes: {type: string, nullable: true}
     CareersPage:
       type: object
       required: [companyName, ads]
@@ -6642,6 +6659,9 @@ components:
       additionalProperties: false
       required: [subject, bodyHtml, timeZone]
       properties:
+        recipientCandidateId:
+          description: Candidate recipient when the message contains details about selected candidates.
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
         subject: {type: string, maxLength: 200}
         bodyHtml: {type: string, maxLength: 100000}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
@@ -6705,6 +6725,8 @@ components:
       additionalProperties: false
       required: [candidateId]
       properties:
+        candidateVersion: {type: integer, minimum: 1, description: Profile version used when inserting details.}
+        compensationVersion: {type: integer, minimum: 0, description: Salary version used when inserting salary details; 0 means none existed.}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         applicationId:
           description: Their application to the job the email is about.
@@ -6713,6 +6735,8 @@ components:
       type: object
       required: [subject, bodyHtml, missing, salary, clientEmail, fieldValues]
       properties:
+        candidateVersion: {type: integer, minimum: 1}
+        compensationVersion: {type: integer, minimum: 0}
         fieldValues:
           type: object
           additionalProperties: {type: string}
@@ -6861,6 +6885,9 @@ components:
         Give body (plain text) or bodyHtml (formatted). Fields in the subject and the formatted message ([Expected salary], ...) are filled from the candidate and application; one with no value refuses the email.
 
       properties:
+        recipientCandidateId:
+          description: Candidate recipient when the message contains details about selected candidates.
+          allOf: [{$ref: '#/components/schemas/CandidateId'}]
         to:
           type: array
           minItems: 1
@@ -6888,7 +6915,7 @@ components:
           minItems: 1
           maxItems: 10
           description: >
-            An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.
+            An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId; may include contactId or recipientCandidateId for the recipient. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.
 
           items: {$ref: '#/components/schemas/EmailCandidate'}
         attachmentIds:

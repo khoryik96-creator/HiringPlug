@@ -6,11 +6,12 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
 import { jobApplicationsKey } from "../../api/keys";
+import { EmailCandidateSearch } from "./EmailCandidateSearch";
 import { STAGE } from "../../labels";
 import { blocksHtml, choiceKey, type CvChoice, DEFAULT_DETAILS, DETAILS, type Layout, missingDetails, type Person, type Profile, profilesOf, tableHtml } from "./shortlistHtml";
 
 /** A candidate on the email; profile undefined: their newest profile (none if they have none). */
-export type Shortlisted = { candidateId: string; applicationId?: string; name: string; title?: string | null; stage?: Schemas["Stage"]; profile?: CvChoice | null };
+export type Shortlisted = { candidateId: string; applicationId?: string; name: string; title?: string | null; stage?: Schemas["Stage"]; profile?: CvChoice | null; candidateVersion?: number; compensationVersion?: number };
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -33,13 +34,19 @@ export function useShortlist(people: Shortlisted[], canSeeCvs: boolean) {
   });
   const profiles: Profile[][] = docs.map((d) => profilesOf(d.data ?? []));
   const profileOf = (i: number): CvChoice | null => {
+    if(!canSeeCvs) return null;
     const chosen = people[i]?.profile;
     return chosen === undefined ? profiles[i]?.[0]?.choice ?? null : chosen;
   };
   const cvs = people.map((_, i) => profileOf(i)).filter((c): c is CvChoice => c !== null);
-  const personAt = (i: number): Person => ({ name: people[i]?.name ?? "", values: values[i]?.data?.fieldValues ?? {} });
-  const loading = values.some((v) => v.isPending);
-  return { profiles, profileOf, cvs, personAt, loading, error: values.find((v) => v.error)?.error ?? docs.find((d) => d.error)?.error };
+  const personAt = (i: number): Person => ({ id:people[i]?.candidateId, name: values[i]?.data?.fieldValues["[Full name]"] ?? people[i]?.name ?? "", values: values[i]?.data?.fieldValues ?? {} });
+  const loading = values.some((v) => v.isPending) || (canSeeCvs && docs.some((d,i)=>people[i]?.profile!==null && d.isPending));
+  const snapshot = (includeSalary:boolean):Shortlisted[]=>people.map((p,i)=>({ ...p,
+   ...(values[i]?.data?.candidateVersion !== undefined ? {candidateVersion:values[i].data.candidateVersion}:{}),
+   ...(includeSalary && values[i]?.data?.compensationVersion !== undefined ? {compensationVersion:values[i].data.compensationVersion}:{compensationVersion:undefined})
+  }));
+  const refresh = () => Promise.all([...values.map((q)=>q.refetch()),...(canSeeCvs?docs.map((q)=>q.refetch()):[])]);
+  return { profiles, profileOf, cvs, personAt, loading, snapshot, refresh, error: values.find((v) => v.error)?.error ?? docs.find((d,i) => people[i]?.profile!==null && d.error)?.error };
 }
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -54,13 +61,14 @@ const keep = (key: string, value: unknown) => {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* only a convenience */ }
 };
 
-export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, onInsert }: {
+export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSeeSalary = false, allowEmpty = false, onRefresh, onInsert }: {
   jobId?: string;
   people: Shortlisted[];
   onPeople: (people: Shortlisted[]) => void;
   list: ReturnType<typeof useShortlist>;
   canSeeCvs: boolean;
-  onInsert: (html: string) => void;
+  canSeeSalary?: boolean;allowEmpty?:boolean;onRefresh?:()=>void;
+  onInsert: (html: string,snapshot:Shortlisted[]) => void;
 }) {
   const [layout, setLayout] = useState<Layout>(() => read("hiringplug.shortlist.layout", "blocks"));
   const [details, setDetails] = useState<string[]>(() => read("hiringplug.shortlist.details", DEFAULT_DETAILS));
@@ -70,7 +78,8 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, onIns
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/applications", { params: { path: { jobId: jobId ?? "" } } })),
   });
   const more = (onJob.data?.items ?? []).filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn" && !people.some((p) => p.candidateId === a.candidateId));
-  const chosen = DETAILS.filter((d) => details.includes(d.id));
+  const available=DETAILS.filter((d)=>!d.salary || canSeeSalary);
+  const chosen = available.filter((d) => details.includes(d.id));
   const shown = people.map((_, i) => list.personAt(i));
   const gaps = list.loading ? [] : missingDetails(shown, chosen);
   const move = (i: number, by: number) => {
@@ -82,7 +91,8 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, onIns
 
   return (
     <fieldset className="shortlist" aria-label="Candidates">
-      <legend>Candidates ({people.length}) · each one&apos;s profile is attached</legend>
+      <legend>Selected candidates ({people.length}/10)</legend>
+      <EmailCandidateSearch people={people} onAdd={(p)=>{onPeople([...people,p]);}} />
       <ol className="shortlist-rows">
         {people.map((p, i) => (
           <li key={p.candidateId} className="shortlist-row">
@@ -103,7 +113,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, onIns
             <span className="row shortlist-buttons">
               <button type="button" className="link" aria-label={`Move ${p.name} up`} disabled={i === 0} onClick={() => { move(i, -1); }}>↑</button>
               <button type="button" className="link" aria-label={`Move ${p.name} down`} disabled={i === people.length - 1} onClick={() => { move(i, 1); }}>↓</button>
-              <button type="button" className="link" disabled={people.length === 1} onClick={() => { onPeople(people.filter((_, j) => j !== i)); }}>Remove</button>
+              <button type="button" className="link" disabled={people.length === 1 && !allowEmpty} onClick={() => { onPeople(people.filter((_, j) => j !== i)); }}>Remove</button>
             </span>
           </li>
         ))}
@@ -124,26 +134,27 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, onIns
         <div className="segmented" role="group" aria-label="Write them as">
           {(["blocks", "table"] as const).map((l) => (
             <button key={l} type="button" aria-pressed={layout === l} className={layout === l ? "on" : undefined}
-              onClick={() => { setLayout(l); keep("hiringplug.shortlist.layout", l); }}>
+              onClick={() => { onRefresh?.();setLayout(l); keep("hiringplug.shortlist.layout", l); }}>
               {l === "blocks" ? "A block each" : "One table"}
             </button>
           ))}
         </div>
         <span className="shortlist-details" role="group" aria-label="Details to show">
-          {DETAILS.map((d) => (
+          {available.map((d) => (
             <label key={d.id} className="small">
               <input type="checkbox" checked={details.includes(d.id)} onChange={(e) => {
                 const next = e.target.checked ? DETAILS.filter((x) => details.includes(x.id) || x.id === d.id).map((x) => x.id) : details.filter((x) => x !== d.id);
-                setDetails(next);
+                onRefresh?.();setDetails(next);
                 keep("hiringplug.shortlist.details", next);
               }} /> {d.label}
             </label>
           ))}
         </span>
-        <button type="button" disabled={list.loading} onClick={() => { onInsert(layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen)); }}>
+        <button type="button" disabled={list.loading || !!list.error || people.length===0} onClick={() => { onInsert(layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen),list.snapshot(chosen.some((d)=>d.salary))); }}>
           Insert candidates into the message
         </button>
       </div>
+      {people.length>0 && <button type="button" className="link" onClick={()=>{onRefresh?.();void list.refresh();}}>Refresh candidate details and CVs</button>}
       {gaps.length > 0 && <p className="warning small">Not on record (shown as —): {gaps.join("; ")}.</p>}
     </fieldset>
   );

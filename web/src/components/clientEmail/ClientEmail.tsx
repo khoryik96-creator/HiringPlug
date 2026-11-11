@@ -6,7 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { api, type Permission, type Schemas, unwrap } from "../../api/client";
+import { api, ApiError, type Permission, type Schemas, unwrap } from "../../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../../api/keys";
 import { addresses } from "../EmailComposer";
 import { ErrorMessage } from "../ErrorMessage";
@@ -16,6 +16,7 @@ import { RichEditor } from "./RichEditor";
 import { atCursor, fillTokens, plainToHtml, showBanners, valuesToTokens, withoutCaretMarks } from "./richText";
 import { SaveAsTemplate } from "./SaveAsTemplate";
 import { type Shortlisted, ShortlistPanel, useShortlist } from "./Shortlist";
+import { useCandidatePackages } from "./useCandidatePackages";
 import { useBanners } from "./useBanners";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -42,18 +43,19 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
   const [html, setHtml] = useState("");
   const [reset, setReset] = useState(0);
   const [cvs, setCvs] = useState<CvChoice[]>([]);
+  const [uploading,setUploading]=useState(false);
   const [uploads, setUploads] = useState<Schemas["EmailAttachment"][]>([]);
   const [preview, setPreview] = useState<Schemas["EmailPreview"] | null>(null);
   const [sent, setSent] = useState(false);
   const previewBox = useRef<HTMLDivElement>(null);
-  const multi = shortlist !== undefined;
-  const [people, setPeople] = useState<Shortlisted[]>(shortlist ?? []);
+  const [multi,setMulti]=useState(shortlist !== undefined);
+  const packages=useCandidatePackages(shortlist ?? []);
+  const people=packages.people;
   const canSeeCvs = permissions.includes("documents:read");
   const list = useShortlist(people, canSeeCvs);
-  const [inserting, setInserting] = useState<{ id: number; html: string }>();
   // Who the email is about: several candidates, or one.
   const about = multi
-    ? { candidates: people.map((p) => ({ candidateId: p.candidateId, applicationId: p.applicationId })) }
+    ? { candidates: packages.references(html) }
     : { candidateId, applicationId };
 
   // The job's hiring contact, to send to, and the candidate's value for each field.
@@ -162,16 +164,18 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       <label className="field">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
 
+      {!multi && permissions.includes("candidates:read") && <button type="button" className="link" onClick={()=>{packages.change([{candidateId,applicationId,name:values?.["[Full name]"] ?? "This candidate"}]);setMulti(true);}}>Select candidates and details</button>}
       {multi && (
         <>
-          <ShortlistPanel jobId={jobId} people={people} onPeople={setPeople} list={list} canSeeCvs={canSeeCvs}
-            onInsert={(h) => { setInserting((cur) => ({ id: (cur?.id ?? 0) + 1, html: h })); }} />
+          <ShortlistPanel jobId={jobId} people={people} onPeople={packages.change} list={list} canSeeCvs={canSeeCvs} canSeeSalary={permissions.includes("candidates.compensation:read")} onRefresh={packages.clear}
+            onInsert={packages.insert} />
+          {packages.notice && <p className="muted small" role="status">{packages.notice}</p>}
           <ErrorMessage error={list.error} />
         </>
       )}
       <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
-        values={values} inserting={inserting} onFocus={() => { inSubject.current = false; }}
+        values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {
           if (!inSubject.current) return false;
           setForm((cur) => ({ ...cur, subject: atCursor(subjectBox.current, subject, value ?? f.token) }));
@@ -180,13 +184,14 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       <ErrorMessage error={uploadBanner.error} />
       {!permissions.includes("candidates.compensation:read") && <p className="muted small">Salary fields need a role that may see salaries.</p>}
 
-      <Attachments candidateId={candidateId} canSeeCvs={!multi && canSeeCvs} others={multi ? list.cvs.length : 0} cvs={cvs} onCvs={setCvs} uploads={uploads} onUploads={setUploads} />
+      <Attachments candidateId={candidateId} canSeeCvs={!multi && canSeeCvs} others={multi ? list.cvs.length : 0} cvs={multi?[]:cvs} onCvs={setCvs} uploads={uploads} onUploads={setUploads} onBusy={setUploading} />
 
       <div className="row">
         <button type="button" disabled={show.isPending} onClick={() => { show.mutate(); }}>Preview</button>
-        <button type="button" className="primary" disabled={send.isPending} onClick={() => { send.mutate(); }}>Send email</button>
+        <button type="button" className="primary" disabled={uploading || send.isPending || (multi && (list.loading || !!list.error))} onClick={() => { send.mutate(); }}>Send email</button>
       </div>
       <ErrorMessage error={show.error ?? send.error} />
+      {send.error instanceof ApiError && send.error.code==="CONFLICT_STALE_VERSION" && <button type="button" className="link" onClick={()=>{packages.clear();void list.refresh();send.reset();}}>Refresh candidate details (your message is kept)</button>}
       {preview && (
         <div className="email-preview" aria-label="Preview">
           {preview.missing.length > 0 && <p className="warning">No value for this candidate: {preview.missing.join(", ")}. Fill it in or take it out before sending.</p>}

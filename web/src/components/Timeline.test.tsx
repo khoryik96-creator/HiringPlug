@@ -135,3 +135,12 @@ describe("dashboard", () => {
     expect(screen.getByText(/Nobody has waited more than 14 days/)).toBeTruthy();
   });
 });
+
+it("shows protected call history even when the call had no general note", async()=>{
+ mockReads(0,[],[{id:"scl_salary",calledOn:"2026-11-08",calledBy:"usr_1",calledByName:"Aina",noteId:null,salaryRecorded:true,createdAt:"2026-11-08T10:00:00Z",salarySnapshot:{currentSalary:null,expectedSalary:null,salaryNotes:"Recorded salary discussion"}}]);
+ const view=renderWithClient(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["candidates:read","candidates.compensation:read"]}/>);
+ const summary=await screen.findByText("Salary history");fireEvent.click(summary);
+ expect(await screen.findByText("Recorded salary discussion")).toBeTruthy();
+ view.rerender(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["candidates:read"]}/>);
+ expect(screen.queryByText("Salary history")).toBeNull();expect(screen.queryByText("Recorded salary discussion")).toBeNull();
+});

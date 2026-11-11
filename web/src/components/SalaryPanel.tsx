@@ -46,8 +46,11 @@ export function SalaryPanel({ candidate, canEdit = false }: { candidate: Candida
         <dl>
           <dt>Current</dt>
           <dd>{comp.currentSalary ? formatSalary(comp.currentSalary) : "—"}</dd>
+          {comp.currentSalary?.description && <><dt>Current breakdown</dt><dd className="pre">{comp.currentSalary.description}</dd></>}
           <dt>Expected</dt>
           <dd>{comp.expectedSalary ? formatRange(comp.expectedSalary) : "—"}</dd>
+          {comp.expectedSalary?.description && <><dt>Expected salary notes</dt><dd className="pre">{comp.expectedSalary.description}</dd></>}
+          {comp.salaryNotes && <><dt>Salary notes</dt><dd className="pre">{comp.salaryNotes}</dd></>}
         </dl>
       )}
     </section>

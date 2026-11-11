@@ -59,6 +59,7 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
       }}
     >
       <SalaryFields form={form} set={set} errors={errors} />
+      <div className="full"><Field label="Salary notes" error={errors.salaryNotes}><textarea rows={3} maxLength={10000} value={form.salaryNotes ?? ""} onChange={(e) => { set("salaryNotes",e.target.value); }} /></Field></div>
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save salary</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>

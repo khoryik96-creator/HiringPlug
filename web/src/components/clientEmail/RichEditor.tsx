@@ -26,7 +26,7 @@ type Props = {
    */
   values?: Record<string, string>;
   /** Something to put in where the cursor was (a booking link); a new id puts it in. */
-  inserting?: { id: number; html: string } | undefined;
+  inserting?: { id: number; html: string; managed?: boolean; removeIds?:string[];order?:string[] } | undefined;
   /**
    * A field picked while the cursor was last outside the message (in the
    * subject): put it there and say true; false puts it in the message.
@@ -82,7 +82,31 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
     changed();
   };
   useEffect(() => {
-    if (inserting) insert(inserting.html);
+    if (!inserting || !box.current) return;
+    if (inserting.removeIds || inserting.order) {
+      for(const section of box.current.querySelectorAll('[data-candidate-summary="true"]')) {
+        for(const row of section.querySelectorAll('[data-candidate-id]')) if(inserting.removeIds?.includes(row.getAttribute("data-candidate-id") ?? "")) row.remove();
+        const rows=[...section.querySelectorAll<HTMLElement>('[data-candidate-id]')];
+        if(rows.length===0){section.remove();continue;}
+        const parents=[...new Set(rows.map((r)=>r.parentElement))];
+        for(const parent of parents) for(const id of inserting.order ?? []) {const row=rows.find((r)=>r.parentElement===parent && r.dataset.candidateId===id);if(row)parent?.appendChild(row);}
+        rows.forEach((r)=>{const at=inserting.order?.indexOf(r.dataset.candidateId ?? "") ?? -1;const title=r.tagName==="P"?r.querySelector("b"):null;const first=title?.firstChild;if(at>=0 && first?.nodeType===Node.TEXT_NODE)first.textContent=first.textContent?.replace(/^\d+\./,`${String(at+1)}.`) ?? "";});
+      }
+      cursor.current=null;changed();return;
+    }
+    if (inserting.managed) {
+      const nodes=[...box.current.querySelectorAll('[data-candidate-summary="true"]')];
+      if (nodes.length>0) {
+        const first=nodes.shift();if(first) first.outerHTML=inserting.html;
+        nodes.forEach((n)=>{n.remove();});cursor.current=null;changed();return;
+      }
+      if (!inserting.html) return;
+      // Insert a standalone block. Browser insertHTML can merge its first row
+      // into the introduction, which would delete that writing with the candidate.
+      box.current.insertAdjacentHTML("beforeend", inserting.html);
+      cursor.current=null;changed();return;
+    }
+    insert(inserting.html);
     // Once per request, not when insert is made again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inserting?.id]);

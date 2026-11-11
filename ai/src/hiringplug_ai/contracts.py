@@ -503,6 +503,10 @@ class SalaryRange(BaseModel):
 
 
 class Compensation(BaseModel):
+    salaryNotes: Annotated[
+        str | None,
+        Field(description="Salary context kept separately from the calculation.", max_length=10000),
+    ] = None
     version: Annotated[int, Field(ge=1)]
     currentSalary: Annotated[SalaryAmount | None, Field(...)]
     expectedSalary: Annotated[SalaryRange | None, Field(...)]
@@ -513,6 +517,10 @@ class CompensationUpdate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    salaryNotes: Annotated[
+        str | None,
+        Field(description="Salary context kept separately from the calculation.", max_length=10000),
+    ] = None
     expectedVersion: Annotated[
         int, Field(description="0 if no salary details exist yet, otherwise the version you loaded.", ge=0)
     ]
@@ -672,36 +680,6 @@ class SimilarCandidateList(BaseModel):
     items: list[SimilarCandidate]
 
 
-class ScreeningCallInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    version: Annotated[int, Field(description="The candidate's version you loaded.", ge=1)]
-    notes: Annotated[str | None, Field(description="What was said; empty for no note.", max_length=10000)] = (
-        None
-    )
-    sensitive: Annotated[
-        bool | None,
-        Field(description="Make the note sensitive (needs notes.sensitive:read). Defaults to false."),
-    ] = None
-    nationality: CountryCode | None = None
-    workAuthorization: WorkAuthorization | None = None
-    noticePeriod: NoticePeriod | None = None
-    source: Annotated[
-        CandidateSource | None, Field(description="Set only when the candidate has no source yet.")
-    ] = None
-    compensation: Annotated[
-        CompensationUpdate | None,
-        Field(
-            description="Current and expected salary, replacing both (needs candidates.compensation:update)."
-        ),
-    ] = None
-    calledOn: Annotated[
-        date | None, Field(description="When the call was (today when left out; not in the future).")
-    ] = None
-    calledBy: Annotated[UserId | None, Field(description="Who made the call (you when left out).")] = None
-
-
 class CandidateMerge(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -743,6 +721,15 @@ class SalaryCalculation(BaseModel):
     expectedMax: str | None = None
     warnings: list[str]
     excluded: list[str]
+
+
+class ScreeningSalarySnapshot(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    currentSalary: Annotated[SalaryAmount | None, Field(...)]
+    expectedSalary: Annotated[SalaryRange | None, Field(...)]
+    salaryNotes: str | None = None
 
 
 class ApplicationReceived(BaseModel):
@@ -1499,6 +1486,8 @@ class EmailBatchRecipient(BaseModel):
 
 
 class EmailPreview(BaseModel):
+    candidateVersion: Annotated[int | None, Field(ge=1)] = None
+    compensationVersion: Annotated[int | None, Field(ge=0)] = None
     fieldValues: Annotated[
         dict[str, str],
         Field(
@@ -4212,7 +4201,39 @@ class CandidateSearch(BaseModel):
     cursor: CandidateId | None = None
 
 
+class ScreeningCallInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    industrySelections: IndustrySelections | None = None
+    version: Annotated[int, Field(description="The candidate's version you loaded.", ge=1)]
+    notes: Annotated[str | None, Field(description="What was said; empty for no note.", max_length=10000)] = (
+        None
+    )
+    sensitive: Annotated[
+        bool | None,
+        Field(description="Make the note sensitive (needs notes.sensitive:read). Defaults to false."),
+    ] = None
+    nationality: CountryCode | None = None
+    workAuthorization: WorkAuthorization | None = None
+    noticePeriod: NoticePeriod | None = None
+    source: Annotated[
+        CandidateSource | None, Field(description="Set only when the candidate has no source yet.")
+    ] = None
+    compensation: Annotated[
+        CompensationUpdate | None,
+        Field(
+            description="Current and expected salary, replacing both (needs candidates.compensation:update)."
+        ),
+    ] = None
+    calledOn: Annotated[
+        date | None, Field(description="When the call was (today when left out; not in the future).")
+    ] = None
+    calledBy: Annotated[UserId | None, Field(description="Who made the call (you when left out).")] = None
+
+
 class ScreeningCallSummary(BaseModel):
+    salarySnapshot: ScreeningSalarySnapshot | None = None
     id: Annotated[str, Field(examples=["scl_01jbz6w0m0k8q9x2r3s4t5v6w7"])]
     calledOn: date
     calledBy: UserId
@@ -4593,6 +4614,13 @@ class EmailCandidate(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    candidateVersion: Annotated[
+        int | None, Field(description="Profile version used when inserting details.", ge=1)
+    ] = None
+    compensationVersion: Annotated[
+        int | None,
+        Field(description="Salary version used when inserting salary details; 0 means none existed.", ge=0),
+    ] = None
     candidateId: CandidateId
     applicationId: Annotated[
         ApplicationId | None, Field(description="Their application to the job the email is about.")
@@ -4648,6 +4676,10 @@ class EmailSend(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    recipientCandidateId: Annotated[
+        CandidateId | None,
+        Field(description="Candidate recipient when the message contains details about selected candidates."),
+    ] = None
     to: Annotated[list[ToItem], Field(max_length=10, min_length=1)]
     cc: Annotated[list[CcItem] | None, Field(max_length=10)] = None
     bcc: Annotated[list[BccItem] | None, Field(max_length=10)] = None
@@ -4669,7 +4701,7 @@ class EmailSend(BaseModel):
     candidates: Annotated[
         list[EmailCandidate] | None,
         Field(
-            description="An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.\n",
+            description="An email to the client about several candidates (a shortlist), in the order given; instead of candidateId and applicationId; may include contactId or recipientCandidateId for the recipient. Their details are put in the message by the composer (a block or a table row each); fields left in the message are filled from the job, its client and the sender, not from one candidate. The email is kept on each candidate's emails.\n",
             max_length=10,
             min_length=1,
         ),
@@ -5185,6 +5217,10 @@ class EmailPreviewRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    recipientCandidateId: Annotated[
+        CandidateId | None,
+        Field(description="Candidate recipient when the message contains details about selected candidates."),
+    ] = None
     subject: Annotated[str, Field(max_length=200)]
     bodyHtml: Annotated[str, Field(max_length=100000)]
     candidateId: CandidateId | None = None

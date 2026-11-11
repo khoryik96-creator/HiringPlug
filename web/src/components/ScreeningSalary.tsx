@@ -68,6 +68,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     <Field label="Expected salary" error={errors["expectedSalary.description"]}>
       <input maxLength={2000} value={expected} onChange={(e) => { edit({ expectedDescription: e.target.value }); }} />
     </Field>
+    <Field label="Salary notes" error={errors.salaryNotes}><textarea rows={3} maxLength={10000} value={form.salaryNotes ?? ""} onChange={(e) => { set("salaryNotes",e.target.value); }} /></Field>
     <div className="row"><button type="button" disabled={!rules.data || calculate.isPending || (!current.trim() && !expected.trim())} onClick={() => {
       if (rules.data) { setApplied(false); calculate.mutate({ current, expected, ...(selectedCurrency ? { currentCurrency: selectedCurrency } : {}), rules: rules.data }); }
     }}>Calculate</button></div>

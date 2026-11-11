@@ -19,7 +19,7 @@ it("requires review, preserves the wording, and only applies the calculated mont
   vi.spyOn(api,"GET").mockResolvedValue(ok({ allowances:true, bonus:true, bonusOnAllowances:false, cents:false }));
   const post = vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"16000.00", allowances:"400.00", bonus:"2000.00", monthly:"18400.00", annualMonths:13.5, hasCurrent:true, reviewRequired:false,
     expectedMin:"20240.00", warnings:[], excluded:["3 months performance", "16% epf"], currentCurrency:"MYR", expectedCurrency:"MYR" }));
-  renderWithClient(<Harness />);
+  renderWithClient(<Harness initial={{...formFromCompensation(null),salaryNotes:"Original pay notes: confirm next review date."}} />);
   const description="16k monthly + 400 allowance + 13.5th bonus + 3 months performance + 16% epf";
   fireEvent.change(screen.getByLabelText("Current salary breakdown"),{target:{value:description}});
   fireEvent.change(screen.getByLabelText("Expected salary"),{target:{value:"10% lateral"}});
@@ -31,6 +31,7 @@ it("requires review, preserves the wording, and only applies the calculated mont
   fireEvent.click(screen.getByRole("button",{name:"Use these figures"}));
   expect(screen.getByTestId("body").textContent).toContain('"amount":"18400.00"');
   expect(screen.getByTestId("body").textContent).toContain(description);
+  expect(screen.getByLabelText<HTMLTextAreaElement>("Salary notes").value).toBe("Original pay notes: confirm next review date.");
   expect(screen.getByTestId("body").textContent).toContain('"min":"20240.00"');
   expect(screen.getByTestId("problems").textContent).toBe("{}");
   expect(sentBody(post)).toMatchObject({current:description,expected:"10% lateral"});
@@ -42,6 +43,7 @@ it("requires review, preserves the wording, and only applies the calculated mont
   fireEvent.change(screen.getByLabelText("From (or the single figure)"), { target: { value: "19800" } });
   expect(screen.getByTestId("problems").textContent).toBe("{}");
   expect(screen.getByTestId("body").textContent).toContain('"amount":"18000"');
+  expect(screen.getByTestId("body").textContent).toContain("Original pay notes: confirm next review date.");
 });
 
 it.each([{current:"",expected:"22k",hasCurrent:false,expectedMin:"22000.00"},{current:"0",expected:"",hasCurrent:true,expectedMin:undefined}])("supports expected-only and known zero salaries: $current / $expected", async ({current,expected,hasCurrent,expectedMin}) => {

@@ -42,6 +42,7 @@ func Values(c Context) map[string]string {
 			"candidate.currentTitle": d.CurrentTitle, "candidate.currentCompany": d.CurrentCompany,
 			"candidate.noticePeriod": d.NoticePeriod, "candidate.workAuthorization": d.WorkAuthorization,
 			"candidate.currentSalary": d.CurrentSalary, "candidate.expectedSalary": d.ExpectedSalary,
+			"candidate.salaryNotes": d.SalaryNotes, "candidate.currentBreakdown": d.CurrentBreakdown, "candidate.expectedNotes": d.ExpectedNotes, "candidate.industries": d.Industries,
 		} {
 			if val != nil && strings.TrimSpace(*val) != "" {
 				v[key] = *val

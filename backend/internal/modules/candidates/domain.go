@@ -87,10 +87,11 @@ type View struct {
 
 // Compensation holds salary details. Amounts are exact decimal strings.
 type Compensation struct {
-	Version   int
-	Current   *SalaryAmount
-	Expected  *SalaryRange
-	UpdatedAt time.Time
+	SalaryNotes *string
+	Version     int
+	Current     *SalaryAmount
+	Expected    *SalaryRange
+	UpdatedAt   time.Time
 }
 
 // SalaryAmount is one figure, e.g. 8500.00 MYR per month.

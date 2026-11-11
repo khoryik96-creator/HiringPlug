@@ -37,7 +37,7 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Country of residence | ISO country code; not known is shown as **NA**. Read from a CV: the country in their address, else Malaysian place names near the top (Kuala Lumpur, Selangor, KL, ...), else their phone's country code (`+65` → SG, `012-...` → MY). Unlike Kano's check, an employer's "Sdn Bhd" or an address further down the CV says nothing about where they live |
 | Work authorization | `local`; `expat_eligible` with basis `rp_t` (Residence Pass-Talent), `permanent_resident`, `spouse_visa` or `other`; `requires_visa`. The basis is required exactly when the status is `expat_eligible` (checked in Go and again by the database). |
 | Notice period | Value and unit (days, weeks, months); 0 means immediate |
-| Industry, specialization | Industry from the company's list (Settings; Kano's ten industries to start); specialization free text with suggestions. From a CV, the industry of the latest employer is **inferred** like Kano's local rules: known employers first (Maybank, Infineon, Deloitte, Petronas, ...), then words in the name, then the job title (SAP/ERP work is IT); the review shows the words it was inferred from. When the AI is on it fills what the rules leave empty, Kano's way: rules first, a full AI read only when the core details are missing, otherwise only the industry; every value must still quote the CV |
+| Industry, specialization | Shared industries/subindustries catalogue in Settings, applied to both candidates and companies. Select multiple current/historical categories in profile editing or during a screening call. Go suggests the employer’s business using saved company selections and explicit employer-name rules; ambiguous employers are chosen manually. Specialization stays a separate job-function field. See [industries.md](industries.md). |
 | Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. The form suggests labels already in use; the candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
@@ -608,6 +608,7 @@ lead's company (with the built-in email check).
   JPEG or GIF, up to 1 MB) and shown inside the email, not linked. Only the
   toolbar's formatting is kept (no scripts, no images loading from elsewhere),
   and every email also carries a plain-text version.
+- **Selected candidates in one email** ✅: candidate, contact and job/client composers share a candidate search (up to 10). Each selected candidate has their own CV choice (including formatted Word/PDF versions), optional salary details/wording/notes, industries and other profile fields. Recipients are independent of the selected profiles: greeting fields use the contact or candidate receiving the email. Preview before sending. Updating the inserted section preserves the rest of the message; removing/reordering candidates preserves edits on retained candidates. Profile/salary versions are checked again when sending inserted details, so changed source records require refresh and review. Emails appear on every referenced candidate and the contact/job where applicable.
 - **Email the client about several candidates** ✅: tick candidates on the
   job's board (up to 10) and **Email client about N candidates**. Each
   candidate has a row: the profile to attach (their newest formatted CV, as
@@ -797,6 +798,8 @@ notes become a screening note (sensitive if ticked). It is all or nothing: if
 one part is refused (e.g. a salary range that runs backwards, or someone saved
 the profile meanwhile), nothing is saved, and the notes typed are kept. The
 audit log records that a call was saved, never the salary.
+
+Salary notes are separate from calculation input and remain when figures are applied or an older API client updates pay. New screening calls keep an immutable, salary-protected snapshot of the reviewed figures, original descriptions and notes, shown under **Salary history** on the candidate profile. Backdated calls keep their supplied figures without replacing a later profile salary. Older calls whose original amounts were never stored cannot be reconstructed.
 
 Salary descriptions on a screening call accept shorthand such as `16k`, `10% lateral`,
 AWS and contractual/13th-month bonuses. **Calculate** previews fixed monthly cash;

@@ -125,3 +125,26 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 	}
 	return nil
 }
+
+// DisplayLabelsIn gives other modules readable labels without sharing SQL ownership.
+func (m *Module) DisplayLabelsIn(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error) {
+	if err := m.service.ensureIn(ctx, tx); err != nil {
+		return nil, err
+	}
+	c, err := catalogueIn(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	items := catalogueMap(c.Items)
+	out := []string{}
+	for _, id := range ids {
+		if i, ok := items[id]; ok {
+			label := i.Label
+			if i.ParentId != nil {
+				label = items[*i.ParentId].Label + " / " + label
+			}
+			out = append(out, label)
+		}
+	}
+	return out, nil
+}

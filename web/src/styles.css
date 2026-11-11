@@ -794,3 +794,6 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .multi-menu.align-end { left: auto; right: 0; }
 .multi-button > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .multi-caret, .multi-options input { flex-shrink: 0; }
+.email-candidate-search { margin: .4rem 0 .8rem; }
+.call-salary { border-top: 1px solid var(--line); margin-top: .7rem; padding-top: .5rem; }
+.call-salary dl { margin: .3rem 0; }

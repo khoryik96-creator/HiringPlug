@@ -38,6 +38,7 @@ import (
 
 // Candidate is what this module needs to know about a candidate.
 type Candidate struct {
+	Version, CompensationVersion  int
 	FullName, FirstName, LastName string
 	Email                         *string
 	Details                       *Details // for fields; nil when only a brief was read
@@ -46,9 +47,10 @@ type Candidate struct {
 // Details are a candidate's values for fields, written as an email shows them
 // (FormatSalary, FormatNotice, ...); nil when not known.
 type Details struct {
-	Nationality, Residence, CurrentTitle, CurrentCompany *string
-	NoticePeriod, WorkAuthorization                      *string
-	CurrentSalary, ExpectedSalary                        *string // nil also when the sender may not see salaries
+	Nationality, Residence, CurrentTitle, CurrentCompany     *string
+	NoticePeriod, WorkAuthorization                          *string
+	SalaryNotes, CurrentBreakdown, ExpectedNotes, Industries *string
+	CurrentSalary, ExpectedSalary                            *string // nil also when the sender may not see salaries
 }
 
 // Application is what this module needs to know about an application.

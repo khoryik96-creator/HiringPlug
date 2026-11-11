@@ -12,6 +12,11 @@ export type CvChoice = Schemas["EmailCvAttachment"];
 export type Detail = { id: string; token: string; key: string; label: string; salary?: boolean };
 
 export const DETAILS: Detail[] = [
+ {id:"currentTitle",token:"[Current title]",key:"candidate.currentTitle",label:"Current title"},
+ {id:"industries",token:"[Industries]",key:"candidate.industries",label:"Industries"},
+ {id:"currentBreakdown",token:"[Current salary breakdown]",key:"candidate.currentBreakdown",label:"Current breakdown",salary:true},
+ {id:"expectedNotes",token:"[Expected salary notes]",key:"candidate.expectedNotes",label:"Expected salary notes",salary:true},
+ {id:"salaryNotes",token:"[Salary notes]",key:"candidate.salaryNotes",label:"Salary notes",salary:true},
   { id: "currentSalary", token: "[Current salary]", key: "candidate.currentSalary", label: "Current salary", salary: true },
   { id: "expectedSalary", token: "[Expected salary]", key: "candidate.expectedSalary", label: "Expected salary", salary: true },
   { id: "noticePeriod", token: "[Notice period]", key: "candidate.noticePeriod", label: "Notice period" },
@@ -23,7 +28,7 @@ export const DETAILS: Detail[] = [
 export const DEFAULT_DETAILS = ["currentSalary", "expectedSalary", "noticePeriod", "residence"];
 
 /** One candidate as the message shows them: their values by field token ("[Expected salary]"). */
-export type Person = { name: string; values: Record<string, string> };
+export type Person = { id?:string; name: string; values: Record<string, string> };
 
 const field = (d: Detail, value: string) => `<span data-field="${d.key}">${escapeHtml(value)}</span>`;
 const heading = (p: Person) => {
@@ -38,7 +43,7 @@ export function blocksHtml(people: Person[], details: Detail[]): string {
       const v = p.values[d.token];
       return `${escapeHtml(d.label)}: ${v ? field(d, v) : "—"}`;
     }).join(" · ");
-    return `<p><b>${String(i + 1)}. ${heading(p)}</b>${facts ? `<br>${facts}` : ""}</p>`;
+    return `<p${p.id?` data-candidate-id="${escapeHtml(p.id)}"`:""}><b>${String(i + 1)}. ${heading(p)}</b>${facts ? `<br>${facts}` : ""}</p>`;
   }).join("") + "<p><br></p>";
 }
 
@@ -53,7 +58,7 @@ export function tableHtml(people: Person[], details: Detail[]): string {
       const v = p.values[d.token];
       return `<td style="${cell}">${v ? field(d, v) : "—"}</td>`;
     }).join("");
-    return `<tr><td style="${cell}">${who}</td>${cells}</tr>`;
+    return `<tr${p.id?` data-candidate-id="${escapeHtml(p.id)}"`:""}><td style="${cell}">${who}</td>${cells}</tr>`;
   }).join("");
   return `<table style="border-collapse:collapse"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table><p><br></p>`;
 }
@@ -73,13 +78,14 @@ const SOURCE: Record<string, string> = { original: "Original", jobstreet: "JobSt
 
 /** A candidate's profiles to choose from, formatted ones (newest first) first; the first is the default. */
 export function profilesOf(docs: Schemas["Document"][]): Profile[] {
+  const stamp=(d:Schemas["Document"])=>{const date=new Date(d.createdAt);return Number.isNaN(date.getTime())?"":` · ${date.toLocaleString()}`;};
   const newest = [...docs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const formatted = newest.filter((d) => d.source === "formatted").flatMap((d) => [
-    ...(d.pdfStatus === "ready" ? [{ choice: { documentId: d.id, asPdf: true }, label: `${d.fileName.replace(/\.docx$/i, "")} (PDF)` }] : []),
-    { choice: { documentId: d.id, asPdf: false }, label: `${d.fileName} (Word)` },
+    ...(d.pdfStatus === "ready" ? [{ choice: { documentId: d.id, asPdf: true }, label: `${d.fileName.replace(/\.docx$/i, "")} (PDF)${stamp(d)}` }] : []),
+    { choice: { documentId: d.id, asPdf: false }, label: `${d.fileName} (Word)${stamp(d)}` },
   ]);
   const others = newest.filter((d) => d.source !== "formatted")
-    .map((d) => ({ choice: { documentId: d.id, asPdf: false }, label: `${SOURCE[d.source] ?? d.source}: ${d.fileName}` }));
+    .map((d) => ({ choice: { documentId: d.id, asPdf: false }, label: `${SOURCE[d.source] ?? d.source}: ${d.fileName}${stamp(d)}` }));
   return [...formatted, ...others];
 }
 

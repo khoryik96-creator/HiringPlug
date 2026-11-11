@@ -9,7 +9,7 @@ import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** Emails sent about a candidate, newest first, and writing a new one. */
-export function CandidateEmails({ candidateId, permissions }: { candidateId: string; permissions: Permission[] }) {
+export function CandidateEmails({ candidateId, email, permissions }: { candidateId: string; email?:string|null;permissions: Permission[] }) {
   const [writing, setWriting] = useState(false);
   const canSend = permissions.includes("emails:send");
   const list = useQuery({
@@ -30,8 +30,8 @@ export function CandidateEmails({ candidateId, permissions }: { candidateId: str
         {canSend && !writing && <button type="button" onClick={() => { setWriting(true); }}>Write email</button>}
       </div>
       {writing && (
-        <EmailComposer
-          candidateId={candidateId}
+        <EmailComposer permissions={permissions}
+          candidateId={candidateId} defaultTo={email ?? ""}
           applications={apps.data?.items.map((a) => ({ id: a.id, label: `${a.jobTitle} at ${a.companyName}` }))}
           canManageTemplates={permissions.includes("emails.templates:manage")}
           canCreateTemplates={permissions.includes("emails.templates:create")}

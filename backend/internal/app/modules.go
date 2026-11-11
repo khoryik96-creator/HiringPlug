@@ -84,6 +84,7 @@ func NewModules(d Deps) *Modules {
 	m := &Modules{}
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
 	m.Settings = settings.New(d.Pool)
+	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
@@ -105,7 +106,7 @@ func NewModules(d Deps) *Modules {
 		CVs: m.Documents, Pipeline: m.Pipeline, Consent: m.Privacy,
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
 	m.Emails = emails.New(d.Pool, emails.Deps{
-		Candidates: emailCandidates{m.Candidates}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
+		Candidates: emailCandidates{m.Candidates, m.Industries}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
 	}, d.Mail, d.Files)
@@ -156,7 +157,6 @@ func NewModules(d Deps) *Modules {
 		PublicURL: d.Config.PublicURL, OrganizerEmail: d.Config.SMTP.From, DefaultTimeZone: d.Config.TimeZone,
 		AllowPrivateNetworks: d.Config.AllowPrivateNetworks,
 	})
-	m.Industries = industries.New(d.Pool)
 	m.Industries.UseRecords(industryRecords{m}, m.Settings)
 	m.Candidates.UseIndustries(m.Industries)
 	m.Companies.UseIndustries(m.Industries)

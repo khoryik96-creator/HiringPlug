@@ -7,6 +7,7 @@ import { formatDay, keysOf, NOTE_KIND } from "../labels";
 import { describe } from "./activityText";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
+import { ScreeningCalls } from "./ScreeningCalls";
 import { fieldErrors } from "./forms";
 
 type Subject = Schemas["NoteSubjectType"];
@@ -125,6 +126,7 @@ export function Timeline({ subjectType, subjectId, permissions }: { subjectType:
           )}
         </div>
       )}
+      {permissions.includes("candidates.compensation:read") && calls.data?.some((c)=>c.salarySnapshot) && <details className="salary-history"><summary>Salary history</summary><ScreeningCalls candidateId={subjectId} permissions={permissions}/></details>}
       {items.length > 0 && (
         <div className="timeline-tools">
           <div className="chips" role="group" aria-label="Show">

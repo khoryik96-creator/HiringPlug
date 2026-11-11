@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
@@ -23,7 +24,10 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
 )
 
-type emailCandidates struct{ candidates *candidates.Module }
+type emailCandidates struct {
+	candidates *candidates.Module
+	industries *industries.Module
+}
 
 // Detailed is a candidate with what fields show, as p may see them: salary
 // only with permission (row-level security leaves it out otherwise).
@@ -33,6 +37,7 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 		return emails.Candidate{}, err
 	}
 	pr := v.Profile
+	compensationVersion := 0
 	d := &emails.Details{CurrentTitle: pr.CurrentTitle, CurrentCompany: pr.CurrentCompany}
 	if pr.Nationality != nil {
 		d.Nationality = ptr(countryName(*pr.Nationality))
@@ -47,6 +52,14 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 		d.WorkAuthorization = ptr(emails.FormatWorkAuthorization(wa.Status, wa.Basis))
 	}
 	if c := v.Compensation; c != nil && !v.CompensationRestricted {
+		compensationVersion = c.Version
+		d.SalaryNotes = c.SalaryNotes
+		if c.Current != nil {
+			d.CurrentBreakdown = c.Current.Description
+		}
+		if c.Expected != nil {
+			d.ExpectedNotes = c.Expected.Description
+		}
 		if c.Current != nil {
 			d.CurrentSalary = ptr(emails.FormatSalary(c.Current.Amount, c.Current.Currency, c.Current.Period))
 		}
@@ -54,7 +67,18 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 			d.ExpectedSalary = ptr(emails.FormatRange(e.Min, e.Max, e.Currency, e.Period))
 		}
 	}
+	if a.industries != nil && pr.IndustrySelections != nil {
+		labels, e := a.industries.DisplayLabelsIn(ctx, tx, pr.IndustrySelections.Ids)
+		if e != nil {
+			return emails.Candidate{}, e
+		}
+		if len(labels) > 0 {
+			joined := strings.Join(labels, "; ")
+			d.Industries = &joined
+		}
+	}
 	return emails.Candidate{
+		Version: v.Version, CompensationVersion: compensationVersion,
 		FullName: candidates.FullName(pr), FirstName: pr.FirstName, LastName: pr.LastName, Email: pr.Email, Details: d,
 	}, nil
 }

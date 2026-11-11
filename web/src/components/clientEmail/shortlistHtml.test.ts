@@ -43,9 +43,10 @@ describe("candidates in an email to the client", () => {
       doc("d2", "formatted", "Hyppies CV - Nurul Huda.docx", "2026-11-05T00:00:00Z", "ready"),
       doc("d3", "formatted", "Hyppies CV - Nurul Huda (old).docx", "2026-11-02T00:00:00Z", "failed"),
     ]);
-    expect(profiles.map((p) => p.label)).toEqual([
+    expect(profiles.map((p) => p.label.split(" · ")[0])).toEqual([
       "Hyppies CV - Nurul Huda (PDF)", "Hyppies CV - Nurul Huda.docx (Word)", "Hyppies CV - Nurul Huda (old).docx (Word)", "Original: Nurul Huda CV.pdf",
     ]);
     expect(profiles[0]?.choice).toEqual({ documentId: "d2", asPdf: true });
+    expect(profiles.every((p) => p.label.includes("2026"))).toBe(true);
   });
 });

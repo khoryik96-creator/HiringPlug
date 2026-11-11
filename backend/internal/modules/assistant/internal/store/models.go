@@ -202,6 +202,7 @@ type CandidateCompensation struct {
 	UpdatedAt           time.Time
 	CurrentDescription  *string
 	ExpectedDescription *string
+	SalaryNotes         *string
 }
 
 type CandidateConsent struct {
@@ -918,6 +919,12 @@ type ScreeningCall struct {
 	SalaryRecorded bool
 	CreatedBy      string
 	CreatedAt      time.Time
+}
+
+type ScreeningCallSalary struct {
+	CallID   string
+	TenantID string
+	Snapshot []byte
 }
 
 type StudioCv struct {

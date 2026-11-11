@@ -243,7 +243,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 }
 
 const getCompensation = `-- name: GetCompensation :one
-SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description FROM candidate_compensation WHERE candidate_id = $1
+SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description, salary_notes FROM candidate_compensation WHERE candidate_id = $1
 `
 
 func (q *Queries) GetCompensation(ctx context.Context, candidateID string) (CandidateCompensation, error) {
@@ -264,6 +264,7 @@ func (q *Queries) GetCompensation(ctx context.Context, candidateID string) (Cand
 		&i.UpdatedAt,
 		&i.CurrentDescription,
 		&i.ExpectedDescription,
+		&i.SalaryNotes,
 	)
 	return i, err
 }
@@ -379,15 +380,15 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 const insertCompensation = `-- name: InsertCompensation :one
 INSERT INTO candidate_compensation (
   candidate_id, tenant_id, current_amount, current_currency, current_period,
-  expected_min, expected_max, expected_currency, expected_period, current_description, expected_description, updated_by
+  expected_min, expected_max, expected_currency, expected_period, current_description, expected_description, salary_notes, updated_by
 ) VALUES (
   $1, app_current_tenant(),
   $2::text::numeric, $3, $4,
   $5::text::numeric, $6::text::numeric,
-  $7, $8, $9, $10, app_current_user()
+  $7, $8, $9, $10, $11, app_current_user()
 )
 ON CONFLICT (candidate_id) DO NOTHING
-RETURNING candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description
+RETURNING candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description, salary_notes
 `
 
 type InsertCompensationParams struct {
@@ -401,6 +402,7 @@ type InsertCompensationParams struct {
 	ExpectedPeriod      *string
 	CurrentDescription  *string
 	ExpectedDescription *string
+	SalaryNotes         *string
 }
 
 func (q *Queries) InsertCompensation(ctx context.Context, arg InsertCompensationParams) (CandidateCompensation, error) {
@@ -415,6 +417,7 @@ func (q *Queries) InsertCompensation(ctx context.Context, arg InsertCompensation
 		arg.ExpectedPeriod,
 		arg.CurrentDescription,
 		arg.ExpectedDescription,
+		arg.SalaryNotes,
 	)
 	var i CandidateCompensation
 	err := row.Scan(
@@ -432,6 +435,7 @@ func (q *Queries) InsertCompensation(ctx context.Context, arg InsertCompensation
 		&i.UpdatedAt,
 		&i.CurrentDescription,
 		&i.ExpectedDescription,
+		&i.SalaryNotes,
 	)
 	return i, err
 }
@@ -495,6 +499,20 @@ func (q *Queries) InsertScreeningCall(ctx context.Context, arg InsertScreeningCa
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const insertScreeningSalarySnapshot = `-- name: InsertScreeningSalarySnapshot :exec
+INSERT INTO screening_call_salary(call_id,snapshot) VALUES ($1,$2)
+`
+
+type InsertScreeningSalarySnapshotParams struct {
+	CallID   string
+	Snapshot []byte
+}
+
+func (q *Queries) InsertScreeningSalarySnapshot(ctx context.Context, arg InsertScreeningSalarySnapshotParams) error {
+	_, err := q.db.Exec(ctx, insertScreeningSalarySnapshot, arg.CallID, arg.Snapshot)
+	return err
 }
 
 const insertWork = `-- name: InsertWork :exec
@@ -677,7 +695,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 }
 
 const listCompensations = `-- name: ListCompensations :many
-SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description FROM candidate_compensation WHERE candidate_id = ANY($1::text[])
+SELECT candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description, salary_notes FROM candidate_compensation WHERE candidate_id = ANY($1::text[])
 `
 
 // Amounts are numeric in the database; the Go code converts them to and
@@ -708,6 +726,7 @@ func (q *Queries) ListCompensations(ctx context.Context, candidateIds []string) 
 			&i.UpdatedAt,
 			&i.CurrentDescription,
 			&i.ExpectedDescription,
+			&i.SalaryNotes,
 		); err != nil {
 			return nil, err
 		}
@@ -1023,6 +1042,30 @@ type MoveWorkIfNoneParams struct {
 func (q *Queries) MoveWorkIfNone(ctx context.Context, arg MoveWorkIfNoneParams) error {
 	_, err := q.db.Exec(ctx, moveWorkIfNone, arg.ToID, arg.FromID)
 	return err
+}
+
+const screeningSalarySnapshots = `-- name: ScreeningSalarySnapshots :many
+SELECT call_id, tenant_id, snapshot FROM screening_call_salary WHERE call_id=ANY($1::text[])
+`
+
+func (q *Queries) ScreeningSalarySnapshots(ctx context.Context, callIds []string) ([]ScreeningCallSalary, error) {
+	rows, err := q.db.Query(ctx, screeningSalarySnapshots, callIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScreeningCallSalary
+	for rows.Next() {
+		var i ScreeningCallSalary
+		if err := rows.Scan(&i.CallID, &i.TenantID, &i.Snapshot); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const searchCandidates = `-- name: SearchCandidates :many
@@ -1483,11 +1526,12 @@ UPDATE candidate_compensation SET
   expected_period = $7,
   current_description = CASE WHEN $1::text IS NULL THEN NULL ELSE COALESCE($8, current_description) END,
   expected_description = CASE WHEN $4::text IS NULL THEN NULL ELSE COALESCE($9, expected_description) END,
+  salary_notes = CASE WHEN $10::boolean THEN $11::text ELSE salary_notes END,
   version = version + 1,
   updated_by = app_current_user(),
   updated_at = now()
-WHERE candidate_id = $10 AND version = $11
-RETURNING candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description
+WHERE candidate_id = $12 AND version = $13
+RETURNING candidate_id, tenant_id, version, current_amount, current_currency, current_period, expected_min, expected_max, expected_currency, expected_period, updated_by, updated_at, current_description, expected_description, salary_notes
 `
 
 type UpdateCompensationParams struct {
@@ -1500,6 +1544,8 @@ type UpdateCompensationParams struct {
 	ExpectedPeriod      *string
 	CurrentDescription  *string
 	ExpectedDescription *string
+	SalaryNotesSet      bool
+	SalaryNotes         *string
 	CandidateID         string
 	ExpectedVersion     int32
 }
@@ -1515,6 +1561,8 @@ func (q *Queries) UpdateCompensation(ctx context.Context, arg UpdateCompensation
 		arg.ExpectedPeriod,
 		arg.CurrentDescription,
 		arg.ExpectedDescription,
+		arg.SalaryNotesSet,
+		arg.SalaryNotes,
 		arg.CandidateID,
 		arg.ExpectedVersion,
 	)
@@ -1534,6 +1582,7 @@ func (q *Queries) UpdateCompensation(ctx context.Context, arg UpdateCompensation
 		&i.UpdatedAt,
 		&i.CurrentDescription,
 		&i.ExpectedDescription,
+		&i.SalaryNotes,
 	)
 	return i, err
 }

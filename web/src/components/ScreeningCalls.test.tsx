@@ -34,3 +34,14 @@ describe("a candidate's screening calls", () => {
     expect(items[2]?.textContent).toContain("No notes were written on this call.");
   });
 });
+
+it("keeps a call's salary wording and notes separate from the current profile and hides them without salary access", async () => {
+  vi.spyOn(api,"GET").mockResolvedValue(ok({items:[{...call("scl_old","2026-10-21","Hafiz",null,true),salarySnapshot:{currentSalary:{amount:"9500",currency:"MYR",period:"month",description:"9k + 500 fixed allowance"},expectedSalary:{min:"11000",max:"12000",currency:"MYR",period:"month",description:"Negotiable"},salaryNotes:"Old discussion retained"}}]}));
+  const view=renderWithClient(<ScreeningCalls candidateId="cand_1" permissions={["candidates:read","candidates.compensation:read"]}/>);
+  expect(await screen.findByText("9k + 500 fixed allowance")).toBeTruthy();
+  expect(screen.getByText("Old discussion retained")).toBeTruthy();
+  expect(screen.getByText("MYR 11000 – 12000 / month")).toBeTruthy();
+  view.rerender(<ScreeningCalls candidateId="cand_1" permissions={["candidates:read"]}/>);
+  expect(screen.queryByText("Old discussion retained")).toBeNull();
+  expect(screen.queryByText("9k + 500 fixed allowance")).toBeNull();
+});

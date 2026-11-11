@@ -42,6 +42,7 @@ type CVRef struct {
 type SendRequest struct {
 	Outgoing
 	CandidateID, ApplicationID *string
+	RecipientCandidateID       *string
 	ContactID                  *string // to one of a client's contacts (their page)
 	TimeZone                   string
 	AttachmentIDs              []string
@@ -51,10 +52,11 @@ type SendRequest struct {
 
 // Preview is a message with its fields filled, as it will be sent.
 type Preview struct {
-	Subject, BodyHTML string
-	Missing           []string
-	Salary            bool
-	ClientEmail       *string // the job's hiring contact, for an application
+	CandidateVersion, CompensationVersion *int
+	Subject, BodyHTML                     string
+	Missing                               []string
+	Salary                                bool
+	ClientEmail                           *string // the job's hiring contact, for an application
 	// FieldValues: each field with a value, by token ("[Expected salary]"),
 	// for the composer to put in the message, where they can be edited.
 	FieldValues map[string]string
@@ -73,7 +75,7 @@ func fieldValues(values map[string]string) map[string]string {
 
 // Preview fills a message's fields for a candidate (and an application or
 // interview) without sending anything.
-func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, list []Shortlisted, zone string) (Preview, error) {
+func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyHTML string, candidateID, appID, interviewID, contactID *string, list []Shortlisted, zone string, recipientCandidateID *string) (Preview, error) {
 	loc, err := location(zone)
 	if err != nil {
 		return Preview{}, err
@@ -81,11 +83,18 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 	var out Preview
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var values map[string]string
+		var candidateVersion, compensationVersion *int
+		if recipientCandidateID != nil && len(list) == 0 {
+			return invalidRecipient()
+		}
+		if contactID != nil && recipientCandidateID != nil {
+			return invalidRecipient()
+		}
 		if len(list) > 0 {
-			if candidateID != nil || appID != nil || interviewID != nil || contactID != nil {
+			if candidateID != nil || appID != nil || interviewID != nil {
 				return notBoth()
 			}
-			first, err := s.checkShortlist(ctx, tx, list)
+			first, err := s.checkShortlist(ctx, tx, p, list)
 			if err != nil {
 				return err
 			}
@@ -94,9 +103,29 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 			if err != nil {
 				return err
 			}
+		} else if candidateID != nil && contactID == nil {
+			dc, err := s.context(ctx, tx, p, *candidateID, appID, interviewID)
+			if err != nil {
+				return err
+			}
+			dc.Location = loc
+			values = Values(dc)
+			v := dc.Candidate.Version
+			if v > 0 {
+				candidateVersion = &v
+			}
+			if p.Can(api.PermissionCandidatesCompensationRead) {
+				v := dc.Candidate.CompensationVersion
+				compensationVersion = &v
+			}
 		} else {
 			var err error
 			if values, err = s.values(ctx, tx, p, candidateID, appID, interviewID, contactID, loc); err != nil {
+				return err
+			}
+		}
+		if len(list) > 0 {
+			if err := s.recipientValues(ctx, tx, p, values, contactID, recipientCandidateID, loc); err != nil {
 				return err
 			}
 		}
@@ -105,7 +134,7 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 		body := FillFields(clean, values, true)
 		out = Preview{
 			Subject: sub.Text, BodyHTML: WithoutFieldMarks(body.Text), Missing: union(sub.Missing, body.Missing),
-			Salary: sub.Salary || body.Salary || ShowsSalaryField(clean), FieldValues: fieldValues(values),
+			Salary: sub.Salary || body.Salary || ShowsSalaryField(clean), FieldValues: fieldValues(values), CandidateVersion: candidateVersion, CompensationVersion: compensationVersion,
 		}
 		if appID != nil {
 			app, err := s.application(ctx, tx, *appID, nil)
@@ -183,13 +212,19 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 	var stored []string // files written for this email, removed if it is not saved
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		candidateID, appID := r.CandidateID, r.ApplicationID
+		if r.ContactID != nil && r.RecipientCandidateID != nil {
+			return invalidRecipient()
+		}
+		if r.RecipientCandidateID != nil && len(r.Candidates) == 0 {
+			return invalidRecipient()
+		}
 		var first Shortlisted // the first of several candidates
 		if len(r.Candidates) > 0 {
-			if candidateID != nil || appID != nil || r.ContactID != nil {
+			if candidateID != nil || appID != nil {
 				return notBoth()
 			}
 			var err error
-			if first, err = s.checkShortlist(ctx, tx, r.Candidates); err != nil {
+			if first, err = s.checkShortlist(ctx, tx, p, r.Candidates); err != nil {
 				return err
 			}
 			candidateID, appID = &first.CandidateID, first.ApplicationID
@@ -206,7 +241,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 				return err
 			}
 		}
-		if r.ContactID != nil && (candidateID != nil || appID != nil) {
+		if r.ContactID != nil && len(r.Candidates) == 0 && (candidateID != nil || appID != nil) {
 			var errs apperr.FieldErrors
 			errs.Add("contactId", "an email is to a contact or about a candidate, not both")
 			return errs.Err()
@@ -220,6 +255,18 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		}
 		if err != nil {
 			return err
+		}
+		if len(r.Candidates) > 0 {
+			if err := s.recipientValues(ctx, tx, p, values, r.ContactID, r.RecipientCandidateID, loc); err != nil {
+				return err
+			}
+		}
+		if r.RecipientCandidateID != nil {
+			if err := s.contactable(ctx, tx, *r.RecipientCandidateID); err != nil {
+				return err
+			}
+			candidateID = r.RecipientCandidateID
+			appID = nil
 		}
 		filled, err := fill(o, values)
 		if err != nil {
