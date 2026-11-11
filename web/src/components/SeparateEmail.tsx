@@ -1,6 +1,7 @@
 // One email to several candidates or contacts, each their own copy: to them
 // alone, fields such as [First name] filled from them, kept on their emails.
 // A check says who gets it and who does not (and why) before sending.
+import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -55,7 +56,8 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
     const missed = send.data.recipients.filter((r) => r.problem);
     return (
       <section className="panel separate-email" aria-label="Email each separately">
-        <h3>Sent to {send.data.sent} {send.data.sent === 1 ? "person" : "people"}, each their own copy</h3>
+        <h3>Queued for {send.data.sent} {send.data.sent === 1 ? "person" : "people"}, each their own copy</h3>
+        <MailDeliveryNotice/>
         {missed.length > 0 && <RecipientTable rows={missed} title="Not sent to" />}
         <p className="muted small">Each email is on that person&apos;s emails; they go out in a moment.</p>
         <button type="button" onClick={onClose}>Close</button>
@@ -68,6 +70,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
         <h3>Email {people.length} {people.length === 1 ? "person" : "people"} separately</h3>
         <button type="button" onClick={onClose}>Close</button>
       </div>
+      <MailDeliveryNotice/>
       <p className="muted small">Each gets their own copy, to them alone: nobody sees the others. Fields such as [First name] are filled for each person.</p>
       <ul className="people-chips" aria-label="Recipients">
         {people.map((p) => (
@@ -134,7 +137,7 @@ function RecipientTable({ rows, title }: { rows: Schemas["EmailBatchRecipient"][
           <tr key={r.candidateId ?? r.contactId ?? r.name}>
             <td>{r.name}</td>
             <td>{r.to ?? "—"}</td>
-            <td>{r.problem ? <span className="warning">✗ {r.problem}</span> : <span className="ok">✓ {r.emailId ? "sent" : "gets it"}</span>}</td>
+            <td>{r.problem ? <span className="warning">✗ {r.problem}</span> : <span className="ok">✓ {r.emailId ? "queued" : "gets it"}</span>}</td>
           </tr>
         ))}
       </tbody>

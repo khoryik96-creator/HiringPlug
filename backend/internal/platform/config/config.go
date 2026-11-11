@@ -65,7 +65,8 @@ type Config struct {
 	PublicURL string // HP_PUBLIC_URL
 	// SMTP is the mail server email from the app is sent through. Without a
 	// host, emails are recorded but fail with "no mail server is set up".
-	SMTP SMTP
+	SMTP            SMTP
+	MailConnections MailConnections
 	// AllowPrivateNetworks lets the server fetch from and post to private and
 	// local network addresses users typed (webhooks, careers pages), and
 	// webhooks use plain HTTP. Off by default: such an address must not reach
@@ -139,6 +140,17 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if c.AI.MonthlyTokens < 0 {
 		r.fail("HP_AI_MONTHLY_TOKENS must not be negative")
+	}
+	c.MailConnections = MailConnections{
+		KeysSecret:        []byte(r.str("HP_MAIL_KEYS_SECRET", "")),
+		MicrosoftClientID: r.str("HP_MAIL_MICROSOFT_CLIENT_ID", ""), MicrosoftClientSecret: r.str("HP_MAIL_MICROSOFT_CLIENT_SECRET", ""),
+		GoogleClientID: r.str("HP_MAIL_GOOGLE_CLIENT_ID", ""), GoogleClientSecret: r.str("HP_MAIL_GOOGLE_CLIENT_SECRET", ""),
+	}
+	if len(c.MailConnections.KeysSecret) == 0 && c.Env != EnvProduction {
+		c.MailConnections.KeysSecret = []byte(devSecret)
+	}
+	if n := len(c.MailConnections.KeysSecret); n > 0 && n < 32 {
+		r.fail("HP_MAIL_KEYS_SECRET must be at least 32 characters")
 	}
 	zone := r.str("HP_TIME_ZONE", "Asia/Kuala_Lumpur")
 	if loc, err := time.LoadLocation(zone); err != nil || zone == "Local" {

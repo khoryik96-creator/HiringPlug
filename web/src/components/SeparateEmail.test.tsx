@@ -21,7 +21,7 @@ const row = (candidateId: string, name: string, to: string | null, problem: stri
 
 function setup() {
   vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-    Promise.resolve(ok(path === "/v1/email-templates" ? { items: [], placeholders: [], fields: [] } : { items: [] }))) as never);
+    Promise.resolve(ok(path === "/v1/mailbox" ? { storageReady: true, connected: false, serverMode: "test", microsoftReady: false, googleReady: false, version: 0 } : path === "/v1/email-templates" ? { items: [], placeholders: [], fields: [] } : { items: [] }))) as never);
   const post = vi.spyOn(api, "POST").mockImplementation(((path: string, init: { body: { checkOnly?: boolean; candidateId?: string } }) => {
     if (path === "/v1/email-previews") {
       return Promise.resolve(ok({ subject: "Hi Rajesh", bodyHtml: "<p>Hi Rajesh,</p>", missing: [], salary: false, clientEmail: null, fieldValues: {} }));
@@ -44,6 +44,7 @@ describe("one email to each person separately", () => {
     const { post, panel } = setup();
     expect(within(panel).getByRole("heading", { name: "Email 3 people separately" })).toBeTruthy();
     expect(within(panel).getByText(/no email/)).toBeTruthy();
+    expect(await within(panel).findByText(/Local test inbox only/)).toBeTruthy();
     fireEvent.click(within(panel).getByRole("button", { name: "Leave out Rajesh Kumar" }));
     fireEvent.change(within(panel).getByLabelText("Subject"), { target: { value: "A role for you, [First name]" } });
 
@@ -62,7 +63,7 @@ describe("one email to each person separately", () => {
     expect(sentBody(post, 1)).toMatchObject({ candidateId: "cand_1", subject: "A role for you, [First name]" });
 
     fireEvent.click(within(panel).getByRole("button", { name: "Send to each separately" }));
-    expect(await screen.findByRole("heading", { name: "Sent to 1 person, each their own copy" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Queued for 1 person, each their own copy" })).toBeTruthy();
     expect(within(screen.getByRole("table", { name: "Not sent to" })).getByText("Farid Hassan")).toBeTruthy();
     expect(sentBody(post, 2)).toMatchObject({ checkOnly: false });
   });

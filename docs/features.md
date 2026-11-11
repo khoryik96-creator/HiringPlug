@@ -1059,3 +1059,7 @@ manual tags, and leaves unclear cases open for manual selection. See
 [industries.md](industries.md) for rules, compatibility and module ownership.
 
 Job details can be expanded or collapsed below the pipeline and start collapsed.
+
+**Settings → Email connection** supports Microsoft/Google sign-in and SMTP, separately per user and agency. Stored credentials are encrypted and never returned. Composers show the selected account or warn that Mailpit captures mail locally. Test messages say Captured in test inbox; provider acceptance does not prove inbox arrival. Queued messages do not silently change sender after disconnect. See [email connection setup](mailbox-connections.md).
+
+Email composers show Cc and Bcc on demand beside To. Filled copy recipients and invalid fields stay visible.

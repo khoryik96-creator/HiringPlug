@@ -3,6 +3,8 @@
 // and banner), To / CC / BCC, a formatted message with fields such as
 // [Expected salary] showing the candidate's value at once (editable, the
 // record untouched), and attachments.
+import { MailDeliveryNotice, useMailbox } from "../MailDeliveryNotice";
+import { EmailRecipients } from "../EmailRecipients";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -32,6 +34,7 @@ type Props = {
 
 export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId, permissions, onClose }: Props) {
   const queryClient = useQueryClient();
+  const mailbox=useMailbox();
   const canManage = permissions.includes("emails.templates:manage");
   const canCreate = permissions.includes("emails.templates:create");
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
@@ -121,7 +124,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
   if (sent) {
     return (
       <section className="panel" aria-label="Email client">
-        <p role="status">Sent. It is on {multi ? "each candidate's" : "the candidate's"} emails, and goes out in a moment.</p>
+        <p role="status">Email queued. It is on {multi ? "each candidate's" : "the candidate's"} emails, and goes out in a moment.</p>
         <button type="button" onClick={onClose}>Close</button>
       </section>
     );
@@ -132,7 +135,8 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
         <h3>{multi ? `Email client about ${String(people.length)} candidate${people.length === 1 ? "" : "s"}` : "Email client"}</h3>
         <button type="button" onClick={onClose}>Close</button>
       </div>
-      <p>From: {me.data ? `${me.data.user.name} (${me.data.tenant.name}) · replies go to ${me.data.user.email}` : "you"}</p>
+      <MailDeliveryNotice/>
+      <p>From: {me.data ? `${me.data.user.name} (${me.data.tenant.name}) · replies go to ${mailbox.data?.connected ? mailbox.data.address ?? me.data.user.email : me.data.user.email}` : "you"}</p>
 
       <div className="row">
         <label className="row grow">Template
@@ -156,12 +160,8 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={subject} html={html} values={values} /></div>}
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
 
-      <label className="field">To<input aria-invalid={!!errors.to || undefined} value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
-      {errors.to && <small className="error">{errors.to}</small>}
-      <div className="two">
-        <label className="field">CC<input aria-invalid={!!errors.cc || undefined} value={form.cc} onChange={set("cc")} /></label>
-        <label className="field">BCC<input aria-invalid={!!errors.bcc || undefined} value={form.bcc} onChange={set("bcc")} /></label>
-      </div>
+      <EmailRecipients to={to} cc={form.cc} bcc={form.bcc} errors={errors}
+        onChange={(field, value) => { if (field === "to") setTypedTo(value); else setForm((current) => ({ ...current, [field]: value })); }}/>
       <label className="field">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
 

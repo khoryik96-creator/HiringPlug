@@ -64,11 +64,12 @@ var ErrPermanent = errors.New("permanent")
 
 // Config is how to reach the mail server.
 type Config struct {
-	Addr     string // host:port, e.g. smtp.example.com:587
-	Username string
-	Password string
-	From     string // the envelope sender and From address, e.g. no-reply@example.com
-	TLS      string // starttls (default), tls (implicit, port 465) or none (local catchers only)
+	Addr        string // host:port, e.g. smtp.example.com:587
+	Username    string
+	Password    string
+	From        string                                                  // the envelope sender and From address, e.g. no-reply@example.com
+	DialContext func(context.Context, string, string) (net.Conn, error) // Optional guarded dialer for user-supplied servers.
+	TLS         string                                                  // starttls (default), tls (implicit, port 465) or none (local catchers only)
 }
 
 // SMTP sends through an SMTP server.
@@ -88,17 +89,27 @@ func (s *SMTP) Send(ctx context.Context, m Message) error {
 		return fmt.Errorf("%w: mail server address %q: %w", ErrPermanent, s.cfg.Addr, err)
 	}
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
-	var conn net.Conn
-	if s.cfg.TLS == "tls" {
-		tlsDialer := &tls.Dialer{NetDialer: dialer, Config: &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}}
-		conn, err = tlsDialer.DialContext(ctx, "tcp", s.cfg.Addr)
-	} else {
-		conn, err = dialer.DialContext(ctx, "tcp", s.cfg.Addr)
+	dial := dialer.DialContext
+	if s.cfg.DialContext != nil {
+		dial = s.cfg.DialContext
 	}
+	conn, err := dial(ctx, "tcp", s.cfg.Addr)
 	if err != nil {
-		return err // the server may be down for a moment: retry
+		return err
 	}
+	// Bound the handshake too: an SMTP endpoint may accept TCP and never speak TLS.
 	_ = conn.SetDeadline(time.Now().Add(60 * time.Second))
+	if s.cfg.TLS == "tls" {
+		secured := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+		handshake, cancel := context.WithTimeout(ctx, 15*time.Second)
+		err := secured.HandshakeContext(handshake)
+		cancel()
+		if err != nil {
+			_ = conn.Close()
+			return err
+		}
+		conn = secured
+	}
 	c, err := smtp.NewClient(conn, host)
 	if err != nil {
 		_ = conn.Close()

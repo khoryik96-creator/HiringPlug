@@ -106,3 +106,32 @@ SELECT * FROM email_attachment WHERE email_id = ANY(@email_ids::text[]) ORDER BY
 -- Uploads never sent, left for a day: removed (their files too).
 -- name: DeleteStaleAttachments :many
 DELETE FROM email_attachment WHERE email_id IS NULL AND created_at < now() - interval '1 day' RETURNING storage_key;
+
+-- name: MailboxForUser :one
+SELECT * FROM email_mailbox WHERE user_id = @user_id FOR UPDATE;
+-- name: SaveMailbox :one
+INSERT INTO email_mailbox(provider,address,host,port,tls,username,sealed_secret)
+VALUES (@provider,@address,@host,@port,@tls,@username,@sealed_secret)
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET id=new_id('mbx'),provider=excluded.provider,address=excluded.address,
+ host=excluded.host,port=excluded.port,tls=excluded.tls,username=excluded.username,sealed_secret=excluded.sealed_secret,version=email_mailbox.version+1,updated_at=now()
+RETURNING *;
+-- name: DeleteMailbox :exec
+DELETE FROM email_mailbox WHERE user_id=app_current_user();
+-- name: RefreshMailboxSecret :exec
+UPDATE email_mailbox SET sealed_secret = @sealed_secret,updated_at=now() WHERE id = @id;
+-- name: SaveMailboxState :exec
+INSERT INTO email_mailbox_state(state_hash,provider,sealed_verifier,expires_at) VALUES (@state_hash,@provider,@sealed_verifier,@expires_at)
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false;
+-- name: ConsumeMailboxState :one
+UPDATE email_mailbox_state SET consumed=true WHERE state_hash = @state_hash AND expires_at>now() AND NOT consumed RETURNING *;
+-- name: ClearMailboxStates :exec
+DELETE FROM email_mailbox_state WHERE user_id=app_current_user();
+-- name: BindEmailDelivery :exec
+UPDATE email SET mailbox_ref=sqlc.narg(mailbox_ref),delivery_mode = @delivery_mode WHERE id = @id;
+
+-- name: FinishMailboxState :execrows
+DELETE FROM email_mailbox_state WHERE state_hash = @state_hash AND consumed;
+-- name: LockMailboxUser :exec
+SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':' || app_current_user(),0));
+-- name: MailboxForDelivery :one
+SELECT * FROM email_mailbox WHERE user_id = @user_id;

@@ -1,3 +1,5 @@
+import { MailDeliveryNotice } from "./MailDeliveryNotice";
+import { EmailRecipients } from "./EmailRecipients";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
@@ -141,6 +143,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
 
   return (
     <form className="panel form-grid" aria-label="Write email" onSubmit={(e) => { e.preventDefault(); send.mutate(); }}>
+      <MailDeliveryNotice/>
       <ErrorMessage error={templates.error ?? draft.error ?? uploadBanner.error} />
       <label className="field">Template
         <select value={form.templateId} onChange={(e) => { pick(e.target.value); }}>
@@ -156,9 +159,8 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
           </select>
         </label>
       )}
-      <label className="field full">To<input aria-invalid={!!errors.to || undefined} value={form.to} onChange={set("to")} /></label>
-      <label className="field full">Cc<input aria-invalid={!!errors.cc || undefined} value={form.cc} onChange={set("cc")} /></label>
-      <label className="field full">Bcc<input aria-invalid={!!errors.bcc || undefined} value={form.bcc} onChange={set("bcc")} /></label>
+      <EmailRecipients to={form.to} cc={form.cc} bcc={form.bcc} errors={errors}
+        onChange={(field, value) => { setForm((current) => ({ ...current, [field]: value })); }}/>
       <label className="field full">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
       {permissions.includes("candidates:read") && <div className="full">

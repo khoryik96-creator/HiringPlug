@@ -75,6 +75,8 @@ describe("candidate emails", () => {
     expect(send.disabled).toBe(true);
     typeMessage("<p>Dear <b>Contoh</b> team</p>");
     expect(send.disabled).toBe(false);
+    expect(screen.queryByRole("textbox", { name: "Cc" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cc" }));
     fireEvent.change(screen.getByLabelText("Cc"), { target: { value: "me@agency.test; boss@agency.test" } });
     fireEvent.click(send);
     await waitFor(() => { expect(bodyTo(post, "/v1/emails")).toBeTruthy(); });
@@ -155,4 +157,10 @@ describe("candidate emails", () => {
         .toBe("Hi Siti,Please pick a time that suits you (30 minutes): https://ats.example/book/abc");
     });
   });
+});
+
+it("labels captured test mail without implying external delivery",async()=>{
+ reads([{...sent,status:"sent",error:null,deliveryMode:"test"}]);
+ renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read"]}/>);
+ expect(await screen.findByText("Captured in test inbox")).toBeTruthy();expect(screen.getByText(/not delivered to a real mailbox/)).toBeTruthy();
 });

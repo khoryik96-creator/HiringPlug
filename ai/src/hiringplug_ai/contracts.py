@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import IntEnum, StrEnum
 from typing import Annotated, Any
-from pydantic import AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, RootModel
+from pydantic import AnyUrl, AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, RootModel
 from datetime import date
 
 
@@ -1406,6 +1406,74 @@ class DocumentCvParsedJob(BaseModel):
     ] = None
 
 
+class MailboxProvider(StrEnum):
+    microsoft = "microsoft"
+    google = "google"
+    smtp = "smtp"
+
+
+class DeliveryMode(StrEnum):
+    test = "test"
+    live = "live"
+
+
+class ServerMode(StrEnum):
+    test = "test"
+    live = "live"
+    unconfigured = "unconfigured"
+
+
+class MailboxStatus(BaseModel):
+    deliveryMode: DeliveryMode | None = None
+    storageReady: bool
+    microsoftReady: bool
+    googleReady: bool
+    serverMode: ServerMode
+    connected: bool
+    version: Annotated[int, Field(ge=0)]
+    provider: MailboxProvider | None = None
+    address: EmailStr | None = None
+    host: str | None = None
+    port: int | None = None
+    tls: str | None = None
+    username: str | None = None
+
+
+class Tls(StrEnum):
+    starttls = "starttls"
+    tls = "tls"
+    none = "none"
+
+
+class SmtpMailboxInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    expectedVersion: Annotated[int, Field(ge=0)]
+    address: Annotated[EmailStr, Field(max_length=254)]
+    host: Annotated[str, Field(max_length=253, min_length=1)]
+    port: Annotated[int, Field(ge=1, le=65535)]
+    tls: Tls
+    username: Annotated[str, Field(max_length=320)]
+    password: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class Provider(StrEnum):
+    microsoft = "microsoft"
+    google = "google"
+
+
+class MailboxAuthorizeInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: Provider
+
+
+class MailboxAuthorization(BaseModel):
+    url: AnyUrl
+
+
 class EmailTemplateId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["etpl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^etpl_[0-9a-hjkmnp-tv-z]{26}$")
@@ -1585,6 +1653,12 @@ class EmailStatus(StrEnum):
     queued = "queued"
     sent = "sent"
     failed = "failed"
+
+
+class DeliveryMode1(StrEnum):
+    test = "test"
+    live = "live"
+    unknown = "unknown"
 
 
 class ToItem(RootModel[EmailStr]):
@@ -4649,6 +4723,10 @@ class EmailDraftRequest(BaseModel):
 
 
 class Email(BaseModel):
+    deliveryMode: Annotated[
+        DeliveryMode1 | None,
+        Field(description="Local test inbox, live provider acceptance, or unknown historical delivery."),
+    ] = None
     id: EmailId
     candidateId: Annotated[CandidateId | None, Field(...)]
     contactId: Annotated[

@@ -1658,6 +1658,126 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/mailbox:
+    get:
+      operationId: getMailboxConnection
+      tags:
+        - emails
+      summary: getMailboxConnection
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailboxStatus'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      operationId: saveSmtpMailbox
+      tags:
+        - emails
+      summary: saveSmtpMailbox
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailboxStatus'
+        '409': {$ref: '#/components/responses/Conflict'}
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmtpMailboxInput'
+    delete:
+      operationId: disconnectMailbox
+      tags:
+        - emails
+      summary: disconnectMailbox
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/mailbox/authorize:
+    post:
+      operationId: authorizeMailbox
+      tags:
+        - emails
+      summary: authorizeMailbox
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MailboxAuthorization'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MailboxAuthorizeInput'
+  /v1/mailbox/callback:
+    get:
+      operationId: completeMailboxAuthorization
+      tags:
+        - emails
+      summary: Complete mailbox sign-in
+      x-permission: public
+      security: []
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+            maxLength: 4096
+        - in: query
+          name: state
+          schema:
+            type: string
+            maxLength: 4096
+        - in: query
+          name: error
+          schema:
+            type: string
+            maxLength: 4096
+      responses:
+        '303':
+          description: Return to email connection settings
+          headers:
+            Cache-Control: {schema: {type: string}}
+            Referrer-Policy: {schema: {type: string}}
+            Location:
+              schema:
+                type: string
   /v1/email-templates:
     get:
       operationId: listEmailTemplates
@@ -6599,6 +6719,110 @@ components:
         profile: {allOf: [{$ref: '#/components/schemas/ParsedProfile'}], nullable: true}
         errorMessage: {type: string, nullable: true}
         aiTokens: {type: integer, minimum: 0, description: Tokens the AI used (counted in the monthly allowance).}
+    MailboxProvider:
+      type: string
+      enum:
+        - microsoft
+        - google
+        - smtp
+    MailboxStatus:
+      type: object
+      required:
+        - storageReady
+        - microsoftReady
+        - googleReady
+        - serverMode
+        - connected
+        - version
+      properties:
+        deliveryMode: {type: string, enum: [test, live]}
+        storageReady:
+          type: boolean
+        microsoftReady:
+          type: boolean
+        googleReady:
+          type: boolean
+        serverMode:
+          type: string
+          enum:
+            - test
+            - live
+            - unconfigured
+        connected:
+          type: boolean
+        version:
+          type: integer
+          minimum: 0
+        provider:
+          $ref: '#/components/schemas/MailboxProvider'
+        address:
+          type: string
+          format: email
+        host:
+          type: string
+        port:
+          type: integer
+        tls:
+          type: string
+        username:
+          type: string
+    SmtpMailboxInput:
+      type: object
+      additionalProperties: false
+      required:
+        - expectedVersion
+        - address
+        - host
+        - port
+        - tls
+        - username
+      properties:
+        expectedVersion:
+          type: integer
+          minimum: 0
+        address:
+          type: string
+          format: email
+          maxLength: 254
+        host:
+          type: string
+          minLength: 1
+          maxLength: 253
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        tls:
+          type: string
+          enum:
+            - starttls
+            - tls
+            - none
+        username:
+          type: string
+          maxLength: 320
+        password:
+          type: string
+          maxLength: 4000
+    MailboxAuthorizeInput:
+      type: object
+      additionalProperties: false
+      required:
+        - provider
+      properties:
+        provider:
+          type: string
+          enum:
+            - microsoft
+            - google
+    MailboxAuthorization:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
     EmailTemplateId:
       type: string
       pattern: '^etpl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -6843,6 +7067,7 @@ components:
       type: object
       required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
       properties:
+        deliveryMode: {type: string, enum: [test, live, unknown], description: 'Local test inbox, live provider acceptance, or unknown historical delivery.'}
         id: {$ref: '#/components/schemas/EmailId'}
         candidateId:
           allOf: [{$ref: '#/components/schemas/CandidateId'}]

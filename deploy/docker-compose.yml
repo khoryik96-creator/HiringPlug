@@ -25,6 +25,11 @@ x-backend-env: &backend-env
   # Email from the app. By default it goes to Mailpit, which catches every
   # message (nothing reaches real inboxes): read it at http://localhost:8025.
   # For real email set these to your mail server (see .env.example).
+  HP_MAIL_KEYS_SECRET: ${HP_MAIL_KEYS_SECRET:-}
+  HP_MAIL_MICROSOFT_CLIENT_ID: ${HP_MAIL_MICROSOFT_CLIENT_ID:-}
+  HP_MAIL_MICROSOFT_CLIENT_SECRET: ${HP_MAIL_MICROSOFT_CLIENT_SECRET:-}
+  HP_MAIL_GOOGLE_CLIENT_ID: ${HP_MAIL_GOOGLE_CLIENT_ID:-}
+  HP_MAIL_GOOGLE_CLIENT_SECRET: ${HP_MAIL_GOOGLE_CLIENT_SECRET:-}
   HP_SMTP_HOST: ${HP_SMTP_HOST:-mailpit:1025}
   HP_SMTP_USERNAME: ${HP_SMTP_USERNAME:-}
   HP_SMTP_PASSWORD: ${HP_SMTP_PASSWORD:-}

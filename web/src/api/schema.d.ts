@@ -987,6 +987,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mailbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** getMailboxConnection */
+        get: operations["getMailboxConnection"];
+        /** saveSmtpMailbox */
+        put: operations["saveSmtpMailbox"];
+        post?: never;
+        /** disconnectMailbox */
+        delete: operations["disconnectMailbox"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mailbox/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** authorizeMailbox */
+        post: operations["authorizeMailbox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/mailbox/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete mailbox sign-in */
+        get: operations["completeMailboxAuthorization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/email-templates": {
         parameters: {
             query?: never;
@@ -4399,6 +4452,45 @@ export interface components {
             /** @description Tokens the AI used (counted in the monthly allowance). */
             aiTokens?: number;
         };
+        /** @enum {string} */
+        MailboxProvider: "microsoft" | "google" | "smtp";
+        MailboxStatus: {
+            /** @enum {string} */
+            deliveryMode?: "test" | "live";
+            storageReady: boolean;
+            microsoftReady: boolean;
+            googleReady: boolean;
+            /** @enum {string} */
+            serverMode: "test" | "live" | "unconfigured";
+            connected: boolean;
+            version: number;
+            provider?: components["schemas"]["MailboxProvider"];
+            /** Format: email */
+            address?: string;
+            host?: string;
+            port?: number;
+            tls?: string;
+            username?: string;
+        };
+        SmtpMailboxInput: {
+            expectedVersion: number;
+            /** Format: email */
+            address: string;
+            host: string;
+            port: number;
+            /** @enum {string} */
+            tls: "starttls" | "tls" | "none";
+            username: string;
+            password?: string;
+        };
+        MailboxAuthorizeInput: {
+            /** @enum {string} */
+            provider: "microsoft" | "google";
+        };
+        MailboxAuthorization: {
+            /** Format: uri */
+            url: string;
+        };
         /** @example etpl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         EmailTemplateId: string;
         /** @example eml_01jbz6w0m0k8q9x2r3s4t5v6w7 */
@@ -4572,6 +4664,11 @@ export interface components {
          */
         EmailStatus: "queued" | "sent" | "failed";
         Email: {
+            /**
+             * @description Local test inbox, live provider acceptance, or unknown historical delivery.
+             * @enum {string}
+             */
+            deliveryMode?: "test" | "live" | "unknown";
             id: components["schemas"]["EmailId"];
             candidateId: components["schemas"]["CandidateId"] | null;
             /** @description The client's contact it was written to (from the contact's page). */
@@ -8857,6 +8954,130 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getMailboxConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxStatus"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveSmtpMailbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmtpMailboxInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxStatus"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    disconnectMailbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    authorizeMailbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailboxAuthorizeInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxAuthorization"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    completeMailboxAuthorization: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return to email connection settings */
+            303: {
+                headers: {
+                    "Cache-Control"?: string;
+                    "Referrer-Policy"?: string;
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listEmailTemplates: {

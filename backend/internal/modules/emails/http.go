@@ -253,6 +253,7 @@ func templateToAPI(r store.EmailTemplate) api.EmailTemplate {
 
 func emailToAPI(v EmailView) api.Email {
 	r := v.Email
+	mode := api.EmailDeliveryMode(r.DeliveryMode)
 	files := make([]api.EmailAttachment, len(v.Attachments))
 	for i, f := range v.Attachments {
 		files[i] = attachmentToAPI(f)
@@ -260,7 +261,7 @@ func emailToAPI(v EmailView) api.Email {
 	return api.Email{
 		Id: r.ID, CandidateId: c.OrNull(r.CandidateID), ApplicationId: c.OrNull(r.ApplicationID), ContactId: c.OrNull(r.ContactID),
 		To: r.ToAddresses, Cc: r.CcAddresses, Bcc: r.BccAddresses, Subject: r.Subject, Body: r.Body, BodyHtml: c.OrNull(r.BodyHtml),
-		Attachments: files, Salary: r.Salary, Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
+		DeliveryMode: &mode, Attachments: files, Salary: r.Salary, Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
 		SentBy: r.SentBy, SentByName: r.SenderName, CreatedAt: r.CreatedAt, SentAt: c.OrNull(r.SentAt),
 	}
 }

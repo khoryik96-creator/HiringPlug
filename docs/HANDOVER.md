@@ -11,7 +11,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
 - Nothing uncommitted, nothing half-built. Start new work on a fresh branch
   from main.
-- Latest migration: `00083_screening_salary_notes.sql`. Migrations are append-only.
+- Latest migration: `00084_mailbox_connections.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -53,6 +53,11 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   access unless Settings says otherwise). CV Studio formatting removes lines
   stating the candidate's own pay before the AI sees the CV.
 - No secrets in code; settings are `HP_*` variables listed in `.env.example`.
+
+## Email connections
+
+- Settings > Email connection supports Microsoft, Google and SMTP per user per agency, with encrypted credentials, PKCE and replay/cancellation protection. Queued messages bind their sender; refresh rotation survives retries. New test deliveries are labelled clearly.
+- Microsoft/Google need deployment app registrations and `HP_MAIL_*` secrets before live sign-in. System mail still uses server SMTP. See [mailbox-connections.md](mailbox-connections.md) for scopes, redirects, setup and validation limits.
 
 ## Candidate email packages and salary history
 

@@ -46,7 +46,7 @@ describe("the route table", () => {
     expect(menu("main", RECRUITER).map((r) => r.menu?.label)).toEqual(["Jobs", "Candidates", "Companies", "Contacts", "Import"]);
     expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account"]);
     expect(menu("main", OWNERISH).map((r) => r.menu?.label)).toEqual(["Dashboard", "Jobs", "Candidates", "Companies", "Contacts", "Reports", "Import"]);
-    expect(menu("settings", OWNERISH).map((r) => r.menu?.label)).toEqual(["General", "Industries", "AI provider", "Email templates", "System", "Your account"]);
+    expect(menu("settings", OWNERISH).map((r) => r.menu?.label)).toEqual(["General", "Industries", "AI provider", "Email connection", "Email templates", "System", "Your account"]);
   });
 
   it("gives every menu entry an address it answers", () => {

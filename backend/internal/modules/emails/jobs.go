@@ -61,7 +61,7 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	case partsErr != nil:
 		return partsErr
 	default:
-		sendErr = s.sender.Send(ctx, msg)
+		sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
 	}
 	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
 		return sendErr

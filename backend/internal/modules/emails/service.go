@@ -21,10 +21,11 @@ import (
 
 // Service holds the email use cases.
 type Service struct {
-	pool   *pgxpool.Pool
-	deps   Deps
-	sender mail.Sender
-	files  *blob.Store // banners and attachments
+	connections ConnectionSettings
+	pool        *pgxpool.Pool
+	deps        Deps
+	sender      mail.Sender
+	files       *blob.Store // banners and attachments
 }
 
 const templateNameIndex = "email_template_name_idx"
@@ -360,6 +361,9 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees,
 	})
 	if err != nil {
+		return err
+	}
+	if _, err := s.bindDelivery(ctx, tx, row.ID, row.SentBy); err != nil {
 		return err
 	}
 	for _, f := range n.Files {

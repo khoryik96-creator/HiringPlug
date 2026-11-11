@@ -66,8 +66,11 @@ describe("emailing the client", () => {
     expect(message.innerHTML).toContain('<span data-field="candidate.fullName">Siti Aisyah</span>');
 
     fireEvent.change(within(panel).getByLabelText("To"), { target: { value: "hr@client.test, boss@client.test" } });
-    fireEvent.change(within(panel).getByLabelText("CC"), { target: { value: "lead@agency.test" } });
-    fireEvent.change(within(panel).getByLabelText("BCC"), { target: { value: "me@agency.test" } });
+    expect(within(panel).queryByRole("textbox", { name: "Cc" })).toBeNull();
+    fireEvent.click(within(panel).getByRole("button", { name: "Cc" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Bcc" }));
+    fireEvent.change(within(panel).getByLabelText("Cc"), { target: { value: "lead@agency.test" } });
+    fireEvent.change(within(panel).getByLabelText("Bcc"), { target: { value: "me@agency.test" } });
     fireEvent.click(await within(panel).findByLabelText(/Original: Siti CV.pdf/));
     fireEvent.click(within(panel).getByLabelText("as PDF"));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "eat_1", fileName: "JD.pdf", contentType: "application/pdf", sizeBytes: 2048 }), { status: 201 })));

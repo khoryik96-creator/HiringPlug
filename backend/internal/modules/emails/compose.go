@@ -322,6 +322,11 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err != nil {
 			return err
 		}
+		mode, err := s.bindDelivery(ctx, tx, row.ID, p.UserID)
+		if err != nil {
+			return err
+		}
+		row.DeliveryMode = mode
 		// Claimed only if still unsent: another email sent at the same moment
 		// with the same upload refuses this one rather than going without it.
 		claimed, err := q.AttachToEmail(ctx, store.AttachToEmailParams{EmailID: &row.ID, Ids: r.AttachmentIDs})

@@ -444,6 +444,8 @@ type Email struct {
 	Calendar         *string
 	FeesRestricted   bool
 	ContactID        *string
+	MailboxRef       *string
+	DeliveryMode     string
 }
 
 type EmailAttachment struct {
@@ -476,6 +478,31 @@ type EmailCandidate struct {
 	CandidateID   string
 	ApplicationID *string
 	Position      int16
+}
+
+type EmailMailbox struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	Provider     string
+	Address      string
+	Host         string
+	Port         int32
+	Tls          string
+	Username     string
+	SealedSecret string
+	Version      int32
+	UpdatedAt    time.Time
+}
+
+type EmailMailboxState struct {
+	TenantID       string
+	UserID         string
+	StateHash      string
+	Provider       string
+	SealedVerifier string
+	Consumed       bool
+	ExpiresAt      time.Time
 }
 
 type EmailTemplate struct {

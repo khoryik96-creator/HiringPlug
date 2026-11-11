@@ -65,7 +65,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           Settings
         </a>
         <div className="who">
-          <a href="#/account" aria-current={route.section === "account" ? "page" : undefined}>
+          <a href="#/account" aria-label={`Your account: ${me.data.user.name}`} aria-current={route.section === "account" ? "page" : undefined}>
             <span className="avatar" aria-hidden="true">{initials(me.data.user.name)}</span>
             <span className="name"><strong>{me.data.user.name}</strong><small>{me.data.role.replace("_", " ")} · {me.data.tenant.name}</small></span>
           </a>

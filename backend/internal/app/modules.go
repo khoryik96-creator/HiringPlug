@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
@@ -110,6 +112,12 @@ func NewModules(d Deps) *Modules {
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
 	}, d.Mail, d.Files)
+	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
+	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
+		KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, ServerMode: mode, AllowPrivate: d.Config.AllowPrivateNetworks,
+		Microsoft: emails.OAuthApplication{ClientID: d.Config.MailConnections.MicrosoftClientID, ClientSecret: d.Config.MailConnections.MicrosoftClientSecret},
+		Google:    emails.OAuthApplication{ClientID: d.Config.MailConnections.GoogleClientID, ClientSecret: d.Config.MailConnections.GoogleClientSecret},
+	})
 	m.Interviews = interviews.New(d.Pool, interviewApplications{m.Pipeline}, m.Identity, interviewMailer{m.Identity, m.Emails},
 		interviews.Settings{TimeZone: d.Config.TimeZone, PublicURL: d.Config.PublicURL})
 	m.Placements = placements.New(d.Pool, placementApplications{m.Pipeline, m.Jobs}, m.Identity, placements.Invoicing{

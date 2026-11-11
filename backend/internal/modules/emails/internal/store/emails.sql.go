@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 )
 
 const attachToEmail = `-- name: AttachToEmail :execrows
@@ -26,6 +27,49 @@ func (q *Queries) AttachToEmail(ctx context.Context, arg AttachToEmailParams) (i
 	return result.RowsAffected(), nil
 }
 
+const bindEmailDelivery = `-- name: BindEmailDelivery :exec
+UPDATE email SET mailbox_ref=$1,delivery_mode = $2 WHERE id = $3
+`
+
+type BindEmailDeliveryParams struct {
+	MailboxRef   *string
+	DeliveryMode string
+	ID           string
+}
+
+func (q *Queries) BindEmailDelivery(ctx context.Context, arg BindEmailDeliveryParams) error {
+	_, err := q.db.Exec(ctx, bindEmailDelivery, arg.MailboxRef, arg.DeliveryMode, arg.ID)
+	return err
+}
+
+const clearMailboxStates = `-- name: ClearMailboxStates :exec
+DELETE FROM email_mailbox_state WHERE user_id=app_current_user()
+`
+
+func (q *Queries) ClearMailboxStates(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, clearMailboxStates)
+	return err
+}
+
+const consumeMailboxState = `-- name: ConsumeMailboxState :one
+UPDATE email_mailbox_state SET consumed=true WHERE state_hash = $1 AND expires_at>now() AND NOT consumed RETURNING tenant_id, user_id, state_hash, provider, sealed_verifier, consumed, expires_at
+`
+
+func (q *Queries) ConsumeMailboxState(ctx context.Context, stateHash string) (EmailMailboxState, error) {
+	row := q.db.QueryRow(ctx, consumeMailboxState, stateHash)
+	var i EmailMailboxState
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.StateHash,
+		&i.Provider,
+		&i.SealedVerifier,
+		&i.Consumed,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const deleteBanner = `-- name: DeleteBanner :execrows
 UPDATE email_banner SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
 `
@@ -36,6 +80,15 @@ func (q *Queries) DeleteBanner(ctx context.Context, id string) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteMailbox = `-- name: DeleteMailbox :exec
+DELETE FROM email_mailbox WHERE user_id=app_current_user()
+`
+
+func (q *Queries) DeleteMailbox(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteMailbox)
+	return err
 }
 
 const deleteStaleAttachments = `-- name: DeleteStaleAttachments :many
@@ -125,6 +178,18 @@ func (q *Queries) EmailAttachments(ctx context.Context, emailIds []string) ([]Em
 	return items, nil
 }
 
+const finishMailboxState = `-- name: FinishMailboxState :execrows
+DELETE FROM email_mailbox_state WHERE state_hash = $1 AND consumed
+`
+
+func (q *Queries) FinishMailboxState(ctx context.Context, stateHash string) (int64, error) {
+	result, err := q.db.Exec(ctx, finishMailboxState, stateHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getBanners = `-- name: GetBanners :many
 SELECT id, tenant_id, name, content_type, size_bytes, storage_key, created_by, created_at, deleted_at FROM email_banner WHERE id = ANY($1::text[])
 `
@@ -161,7 +226,7 @@ func (q *Queries) GetBanners(ctx context.Context, ids []string) ([]EmailBanner, 
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE id = $1
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode FROM email WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
@@ -190,6 +255,8 @@ func (q *Queries) GetEmail(ctx context.Context, id string) (Email, error) {
 		&i.Calendar,
 		&i.FeesRestricted,
 		&i.ContactID,
+		&i.MailboxRef,
+		&i.DeliveryMode,
 	)
 	return i, err
 }
@@ -294,7 +361,7 @@ INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addre
 VALUES (app_current_tenant(), $1, $2, $3, $4::text[],
         $5::text[], $6::text[], $7, $8, $9, $10, $11,
         $12, app_current_user(), $13, $14)
-RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id
+RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode
 `
 
 type InsertEmailParams struct {
@@ -355,6 +422,8 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		&i.Calendar,
 		&i.FeesRestricted,
 		&i.ContactID,
+		&i.MailboxRef,
+		&i.DeliveryMode,
 	)
 	return i, err
 }
@@ -452,7 +521,7 @@ func (q *Queries) ListBanners(ctx context.Context) ([]EmailBanner, error) {
 }
 
 const listCandidateEmails = `-- name: ListCandidateEmails :many
-SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id FROM email e
+SELECT e.id, e.tenant_id, e.candidate_id, e.application_id, e.to_addresses, e.cc_addresses, e.subject, e.body, e.sent_by, e.sender_name, e.reply_to, e.status, e.error, e.created_at, e.sent_at, e.body_html, e.bcc_addresses, e.salary, e.salary_restricted, e.calendar, e.fees_restricted, e.contact_id, e.mailbox_ref, e.delivery_mode FROM email e
 WHERE e.candidate_id = $1
    OR e.id IN (SELECT ec.email_id FROM email_candidate ec WHERE ec.candidate_id = $1::text)
 ORDER BY e.id DESC LIMIT 200
@@ -491,6 +560,8 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 			&i.Calendar,
 			&i.FeesRestricted,
 			&i.ContactID,
+			&i.MailboxRef,
+			&i.DeliveryMode,
 		); err != nil {
 			return nil, err
 		}
@@ -503,7 +574,7 @@ func (q *Queries) ListCandidateEmails(ctx context.Context, candidateID *string) 
 }
 
 const listContactEmails = `-- name: ListContactEmails :many
-SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode FROM email WHERE contact_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]Email, error) {
@@ -538,6 +609,8 @@ func (q *Queries) ListContactEmails(ctx context.Context, contactID *string) ([]E
 			&i.Calendar,
 			&i.FeesRestricted,
 			&i.ContactID,
+			&i.MailboxRef,
+			&i.DeliveryMode,
 		); err != nil {
 			return nil, err
 		}
@@ -586,6 +659,63 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]EmailTemplate, error) {
 	return items, nil
 }
 
+const lockMailboxUser = `-- name: LockMailboxUser :exec
+SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':' || app_current_user(),0))
+`
+
+func (q *Queries) LockMailboxUser(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockMailboxUser)
+	return err
+}
+
+const mailboxForDelivery = `-- name: MailboxForDelivery :one
+SELECT id, tenant_id, user_id, provider, address, host, port, tls, username, sealed_secret, version, updated_at FROM email_mailbox WHERE user_id = $1
+`
+
+func (q *Queries) MailboxForDelivery(ctx context.Context, userID string) (EmailMailbox, error) {
+	row := q.db.QueryRow(ctx, mailboxForDelivery, userID)
+	var i EmailMailbox
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Provider,
+		&i.Address,
+		&i.Host,
+		&i.Port,
+		&i.Tls,
+		&i.Username,
+		&i.SealedSecret,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const mailboxForUser = `-- name: MailboxForUser :one
+SELECT id, tenant_id, user_id, provider, address, host, port, tls, username, sealed_secret, version, updated_at FROM email_mailbox WHERE user_id = $1 FOR UPDATE
+`
+
+func (q *Queries) MailboxForUser(ctx context.Context, userID string) (EmailMailbox, error) {
+	row := q.db.QueryRow(ctx, mailboxForUser, userID)
+	var i EmailMailbox
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Provider,
+		&i.Address,
+		&i.Host,
+		&i.Port,
+		&i.Tls,
+		&i.Username,
+		&i.SealedSecret,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markEmail = `-- name: MarkEmail :exec
 UPDATE email SET status = $1, error = $2,
   sent_at = CASE WHEN $1 = 'sent' THEN now() ELSE sent_at END
@@ -632,6 +762,88 @@ type MoveShortlistsToCandidateParams struct {
 
 func (q *Queries) MoveShortlistsToCandidate(ctx context.Context, arg MoveShortlistsToCandidateParams) error {
 	_, err := q.db.Exec(ctx, moveShortlistsToCandidate, arg.ToID, arg.FromID)
+	return err
+}
+
+const refreshMailboxSecret = `-- name: RefreshMailboxSecret :exec
+UPDATE email_mailbox SET sealed_secret = $1,updated_at=now() WHERE id = $2
+`
+
+type RefreshMailboxSecretParams struct {
+	SealedSecret string
+	ID           string
+}
+
+func (q *Queries) RefreshMailboxSecret(ctx context.Context, arg RefreshMailboxSecretParams) error {
+	_, err := q.db.Exec(ctx, refreshMailboxSecret, arg.SealedSecret, arg.ID)
+	return err
+}
+
+const saveMailbox = `-- name: SaveMailbox :one
+INSERT INTO email_mailbox(provider,address,host,port,tls,username,sealed_secret)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET id=new_id('mbx'),provider=excluded.provider,address=excluded.address,
+ host=excluded.host,port=excluded.port,tls=excluded.tls,username=excluded.username,sealed_secret=excluded.sealed_secret,version=email_mailbox.version+1,updated_at=now()
+RETURNING id, tenant_id, user_id, provider, address, host, port, tls, username, sealed_secret, version, updated_at
+`
+
+type SaveMailboxParams struct {
+	Provider     string
+	Address      string
+	Host         string
+	Port         int32
+	Tls          string
+	Username     string
+	SealedSecret string
+}
+
+func (q *Queries) SaveMailbox(ctx context.Context, arg SaveMailboxParams) (EmailMailbox, error) {
+	row := q.db.QueryRow(ctx, saveMailbox,
+		arg.Provider,
+		arg.Address,
+		arg.Host,
+		arg.Port,
+		arg.Tls,
+		arg.Username,
+		arg.SealedSecret,
+	)
+	var i EmailMailbox
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Provider,
+		&i.Address,
+		&i.Host,
+		&i.Port,
+		&i.Tls,
+		&i.Username,
+		&i.SealedSecret,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const saveMailboxState = `-- name: SaveMailboxState :exec
+INSERT INTO email_mailbox_state(state_hash,provider,sealed_verifier,expires_at) VALUES ($1,$2,$3,$4)
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false
+`
+
+type SaveMailboxStateParams struct {
+	StateHash      string
+	Provider       string
+	SealedVerifier string
+	ExpiresAt      time.Time
+}
+
+func (q *Queries) SaveMailboxState(ctx context.Context, arg SaveMailboxStateParams) error {
+	_, err := q.db.Exec(ctx, saveMailboxState,
+		arg.StateHash,
+		arg.Provider,
+		arg.SealedVerifier,
+		arg.ExpiresAt,
+	)
 	return err
 }
 
