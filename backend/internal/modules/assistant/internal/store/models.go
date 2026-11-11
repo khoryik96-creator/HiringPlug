@@ -515,6 +515,30 @@ type FieldRule struct {
 	Mandatory bool
 }
 
+type Industry struct {
+	ID        string
+	TenantID  string
+	ParentID  *string
+	Label     string
+	LabelKey  string
+	Aliases   []string
+	Retired   bool
+	SourceKey *string
+}
+
+type IndustryAssignment struct {
+	TenantID    string
+	CategoryID  string
+	CandidateID *string
+	CompanyID   *string
+	IsPrimary   bool
+}
+
+type IndustryCatalogue struct {
+	TenantID string
+	Version  int32
+}
+
 type Interview struct {
 	ID              string
 	TenantID        string

@@ -7,6 +7,7 @@ import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
 import { DuplicateEmail } from "../components/DuplicateEmail";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
+import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
@@ -49,7 +50,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     : (list.data?.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null })) ?? []);
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
-  const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k));
+  const industries = useIndustries();
+  const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
   const width = cols.columns.length + (canEmail ? 2 : 1);
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
 

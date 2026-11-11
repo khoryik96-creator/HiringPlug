@@ -9,6 +9,7 @@ import { AVAILABILITY } from "../candidateLook";
 import { useFieldSettings } from "../useFieldSettings";
 import { useUsedValues } from "../useUsedValues";
 import { booleanTokens, EMPTY, NOTICE_CHOICES, type SearchState, UPDATED_CHOICES, WORK_KINDS } from "./candidateSearch";
+import { categoryLabel, useIndustries } from "../IndustryPicker";
 import { MultiSelect } from "./MultiSelect";
 
 const COUNTRY_CHOICES = COUNTRIES.map((c) => ({ value: c, label: countryName(c) }));
@@ -71,6 +72,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
   canSeeSalary: boolean;
 }) {
   const used = useUsedValues();
+  const industries = useIndustries();
   const fs = useFieldSettings();
   const set = <K extends keyof SearchState>(k: K) => (v: SearchState[K]) => { setDraft((d) => ({ ...d, [k]: v })); };
   const plain = (vs: string[]) => vs.map((v) => ({ value: v, label: v }));
@@ -86,7 +88,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       <MultiSelect label="Lives in" choices={COUNTRY_CHOICES} value={draft.residence} onChange={set("residence")} />
       <MultiSelect label="Source" choices={fs.options("candidate_source").map((o) => ({ value: o.key, label: o.label }))}
         value={draft.source} onChange={set("source")} />
-      <MultiSelect label="Industry" choices={withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />
+      <MultiSelect label="Industry" align="end" choices={industries.data ? industries.data.items.map((i) => ({ value: i.id, label: categoryLabel(i, industries.data.items) + (i.retired ? " · Retired" : "") })) : withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />
       <div className="adv-skills">
         <MultiSelect label="Skills" choices={withChosen(used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} />
         {draft.skills.length > 1 && (

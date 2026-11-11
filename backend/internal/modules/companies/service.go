@@ -19,6 +19,7 @@ const nameUniqueIndex = "company_tenant_name_uq"
 
 // Service holds the companies use cases.
 type Service struct {
+	industries   IndustryCatalogue
 	pool         *pgxpool.Pool
 	allowPrivate bool        // company websites on private networks (local testing only)
 	files        *blob.Store // documents kept with terms and benefits
@@ -33,7 +34,19 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 	}
 	var out Company
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
+		if s.industries != nil {
+			var e error
+			d.Industry, e = s.industries.SummaryIn(ctx, tx, d.IndustrySelections, d.Industry)
+			if e != nil {
+				return e
+			}
+		}
 		if err := checkNameFree(ctx, q, d.Name, ""); err != nil {
 			return err
 		}
@@ -48,7 +61,17 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 		if err != nil {
 			return err
 		}
+		if err := s.saveIndustries(ctx, tx, row.ID, d); err != nil {
+			return err
+		}
+		row, err = q.GetCompany(ctx, row.ID)
+		if err != nil {
+			return err
+		}
 		out = fromRow(row)
+		if err := s.readIndustries(ctx, tx, &out); err != nil {
+			return err
+		}
 		return audit.Record(ctx, tx, audit.Entry{
 			Action: "company.created", EntityType: "company", EntityID: row.ID,
 			Changes: audit.Diff(map[string]any{}, fields(d)),
@@ -61,6 +84,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Company, error) {
 	var out Company
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if _, err := s.industries.ReadIn(ctx, tx, "companie", ""); err != nil {
+				return err
+			}
+		}
 		row, err := store.New(tx).GetCompany(ctx, id)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("company")
@@ -69,7 +97,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Compan
 			return err
 		}
 		out = fromRow(row)
-		return nil
+		return s.readIndustries(ctx, tx, &out)
 	})
 	return out, err
 }
@@ -80,6 +108,11 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Compan
 func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expectedVersion int, patch Patch) (Company, error) {
 	var out Company
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
 		row, err := q.GetCompany(ctx, id)
 		if database.IsNoRows(err) {
@@ -91,8 +124,34 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if int(row.Version) != expectedVersion {
 			return apperr.StaleVersion("company").WithDetail("currentVersion", row.Version)
 		}
+		if s.industries != nil && patch.IndustrySelections != nil {
+			label, e := s.industries.SummaryIn(ctx, tx, patch.IndustrySelections, nil)
+			if e != nil {
+				return e
+			}
+			patch.Industry.Set = true
+			patch.Industry.Value = label
+		}
 		out, err = update(ctx, tx, q, row, patch, nil)
-		return err
+		if err != nil {
+			return err
+		}
+		if patch.IndustrySelections != nil && out.Version == expectedVersion {
+			row, err = q.TouchCompany(ctx, store.TouchCompanyParams{ID: id, ExpectedVersion: int32(expectedVersion)}) //nolint:gosec // positive record version from the contract
+			if err != nil {
+				return err
+			}
+			out = fromRow(row)
+		}
+		if err := s.saveIndustries(ctx, tx, out.ID, patch.Apply(out.Details)); err != nil {
+			return err
+		}
+		row, err = q.GetCompany(ctx, out.ID)
+		if err != nil {
+			return err
+		}
+		out = fromRow(row)
+		return s.readIndustries(ctx, tx, &out)
 	})
 	return out, err
 }
@@ -145,6 +204,11 @@ type Page struct {
 func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, category, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
 			Cursor: cursor, Type: companyType, Category: category, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})

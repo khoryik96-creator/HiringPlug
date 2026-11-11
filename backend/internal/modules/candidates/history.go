@@ -51,7 +51,7 @@ func (s *Service) ReplaceHistory(ctx context.Context, p authz.Principal, id stri
 		}); err != nil {
 			return err
 		}
-		view, err = loadView(ctx, tx, s.users, p, fromRow(row))
+		view, err = s.loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
 	})
 	return view, err

@@ -4,12 +4,13 @@ import { useEffect, useId, useRef, useState } from "react";
 
 export type Choice = { value: string; label: string };
 
-export function MultiSelect({ label, choices, value, onChange, searchable = choices.length > 8 }: {
+export function MultiSelect({ label, choices, value, onChange, searchable = choices.length > 8, align = "start" }: {
   label: string;
   choices: Choice[];
   value: string[];
   onChange: (v: string[]) => void;
   searchable?: boolean;
+  align?: "start" | "end";
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -34,7 +35,7 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
         <span id={`${id}-v`}>{summary}</span><span aria-hidden="true" className="multi-caret">▾</span>
       </button>
       {open && (
-        <div className="multi-menu" role="listbox" aria-multiselectable="true" aria-label={label}>
+        <div className={`multi-menu${align === "end" ? " align-end" : ""}`} role="listbox" aria-multiselectable="true" aria-label={label}>
           {searchable && (
             <input className="multi-filter" placeholder="Type to narrow" aria-label={`Narrow ${label}`} value={filter} autoFocus
               onChange={(e) => { setFilter(e.target.value); }} />

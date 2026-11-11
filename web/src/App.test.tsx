@@ -74,7 +74,7 @@ describe("top bar", () => {
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
     // The profile is fetched again on each page load (an earlier test may have left another one cached).
     await waitFor(() => {
-      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "AI provider", "Team", "System", "Your account"]);
+      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "Industries", "AI provider", "Team", "System", "Your account"]);
     });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
     expect(screen.queryByText("Admin")).toBeNull();

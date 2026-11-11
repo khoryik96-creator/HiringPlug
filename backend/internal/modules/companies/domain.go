@@ -9,6 +9,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/classification"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/linkedin"
 )
 
@@ -20,6 +21,7 @@ type Details struct {
 	Website            *string
 	LinkedinURL        *string // the company's LinkedIn page
 	Industry           *string
+	IndustrySelections *classification.Selections
 	Size               *string
 	Phone              *string
 	Address            *string
@@ -40,15 +42,16 @@ type Company struct {
 
 // Summary is a company in a list.
 type Summary struct {
-	ID          string
-	Name        string
-	Type        string
-	Category    *string
-	Industry    *string
-	City        *string
-	Website     *string
-	LinkedinURL *string
-	UpdatedAt   time.Time
+	ID                 string
+	Name               string
+	Type               string
+	Category           *string
+	Industry           *string
+	IndustrySelections *classification.Selections
+	City               *string
+	Website            *string
+	LinkedinURL        *string
+	UpdatedAt          time.Time
 }
 
 // Patch is a partial update of Details.
@@ -59,6 +62,7 @@ type Patch struct {
 	Website            apiconv.Change[*string]
 	LinkedinURL        apiconv.Change[*string]
 	Industry           apiconv.Change[*string]
+	IndustrySelections *classification.Selections
 	Size               apiconv.Change[*string]
 	Phone              apiconv.Change[*string]
 	Address            apiconv.Change[*string]
@@ -76,6 +80,7 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.Website, p.Website)
 	apiconv.Apply(&d.LinkedinURL, p.LinkedinURL)
 	apiconv.Apply(&d.Industry, p.Industry)
+	d.IndustrySelections = p.IndustrySelections
 	apiconv.Apply(&d.Size, p.Size)
 	apiconv.Apply(&d.Phone, p.Phone)
 	apiconv.Apply(&d.Address, p.Address)

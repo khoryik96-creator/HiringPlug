@@ -1043,3 +1043,12 @@ log. Details: [access-control.md](access-control.md).
   company setting switches the screens.
 - **Many companies from day one.** Every table is isolated per company in the
   database, so your own team is simply the first company.
+
+### Industry catalogue and recognition
+
+Candidates and companies share a two-column industry/subindustry browser, with
+multiple selections and one current sector. Settings > Industries manages the
+10/81 starting taxonomy, aliases, moves, retirement and replacement before used
+categories are deleted. Go recognises the selected employer's business, keeps
+manual tags, and leaves unclear cases open for manual selection. See
+[industries.md](industries.md) for rules, compatibility and module ownership.

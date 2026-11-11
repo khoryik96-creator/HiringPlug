@@ -130,3 +130,8 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 		api.JobKindDocumentPdfRendered:   m.service.savePdf,
 	}
 }
+
+// UseIndustryRecognition enriches grounded employer evidence using the shared Go rules.
+func (m *Module) UseIndustryRecognition(f func(context.Context, pgx.Tx, *api.ParsedProfile) error) {
+	m.service.enrichIndustry = f
+}

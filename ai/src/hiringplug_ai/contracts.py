@@ -554,159 +554,12 @@ class CandidateHistoryUpdate(BaseModel):
     education: Annotated[list[EducationEntry], Field(max_length=20)]
 
 
-class Candidate(BaseModel):
-    ownerId: Annotated[
-        UserId | None,
-        Field(
-            description="The recruiter the candidate belongs to; null for none (e.g. applied on the careers page)."
-        ),
-    ]
-    ownerName: Annotated[str | None, Field(...)]
-    experience: Annotated[list[WorkEntry], Field(description="Work history, newest first.")]
-    education: list[EducationEntry]
-    id: CandidateId
-    version: Annotated[int, Field(ge=1)]
-    firstName: str
-    lastName: str
-    fullName: str
-    email: Annotated[EmailStr | None, Field(...)]
-    phone: Annotated[str | None, Field(description="International (E.164) format, e.g. +60123456789.")]
-    nationality: Annotated[CountryCode | None, Field(...)]
-    residenceCountry: Annotated[
-        CountryCode | None,
-        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
-    ]
-    linkedinUrl: Annotated[
-        str | None,
-        Field(
-            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
-            max_length=300,
-        ),
-    ]
-    availability: Annotated[
-        CandidateAvailability | None,
-        Field(description="Whether they are open to a move (colours their page); null = not set."),
-    ]
-    availabilitySince: Annotated[
-        AwareDatetime | None,
-        Field(
-            description='When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.'
-        ),
-    ]
-    workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
-    noticePeriod: Annotated[NoticePeriod | None, Field(...)]
-    industry: Annotated[str | None, Field(...)]
-    specialization: Annotated[str | None, Field(...)]
-    currentTitle: Annotated[str | None, Field(...)]
-    currentCompany: Annotated[str | None, Field(...)]
-    location: Annotated[str | None, Field(...)]
-    source: Annotated[CandidateSource | None, Field(...)]
-    tags: list[str]
-    skills: list[str]
-    compensation: Annotated[
-        Compensation | None,
-        Field(
-            description="Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded."
-        ),
-    ] = None
-    restrictedFields: list[RestrictedField]
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
 class Tag(RootModel[str]):
     root: Annotated[str, Field(max_length=60, min_length=1)]
 
 
 class Skill(RootModel[str]):
     root: Annotated[str, Field(max_length=60, min_length=1)]
-
-
-class CandidateCreate(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    firstName: Annotated[str, Field(max_length=100, min_length=1)]
-    lastName: Annotated[str | None, Field(max_length=100)] = None
-    email: Annotated[EmailStr | None, Field(max_length=254)] = None
-    phone: Annotated[
-        str | None, Field(description="Any common format; stored in international format.", max_length=40)
-    ] = None
-    nationality: CountryCode | None = None
-    residenceCountry: Annotated[
-        CountryCode | None,
-        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
-    ] = None
-    linkedinUrl: Annotated[
-        str | None,
-        Field(
-            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
-            max_length=300,
-        ),
-    ] = None
-    availability: Annotated[
-        CandidateAvailability | None,
-        Field(description="Whether they are open to a move (colours their page); null = not set."),
-    ] = None
-    workAuthorization: WorkAuthorization | None = None
-    noticePeriod: NoticePeriod | None = None
-    industry: Annotated[str | None, Field(max_length=100)] = None
-    specialization: Annotated[str | None, Field(max_length=100)] = None
-    currentTitle: Annotated[str | None, Field(max_length=200)] = None
-    currentCompany: Annotated[str | None, Field(max_length=200)] = None
-    location: Annotated[str | None, Field(max_length=200)] = None
-    source: CandidateSource | None = None
-    tags: Annotated[
-        list[Tag] | None,
-        Field(
-            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
-            max_length=50,
-        ),
-    ] = None
-    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
-
-
-class CandidateUpdate(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
-    firstName: Annotated[str | None, Field(max_length=100, min_length=1)] = None
-    lastName: Annotated[str | None, Field(max_length=100)] = None
-    email: Annotated[EmailStr | None, Field(max_length=254)] = None
-    phone: Annotated[str | None, Field(max_length=40)] = None
-    nationality: CountryCode | None = None
-    residenceCountry: Annotated[
-        CountryCode | None,
-        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
-    ] = None
-    linkedinUrl: Annotated[
-        str | None,
-        Field(
-            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
-            max_length=300,
-        ),
-    ] = None
-    availability: Annotated[
-        CandidateAvailability | None,
-        Field(description="Whether they are open to a move (colours their page); null = not set."),
-    ] = None
-    workAuthorization: WorkAuthorization | None = None
-    noticePeriod: NoticePeriod | None = None
-    industry: Annotated[str | None, Field(max_length=100)] = None
-    specialization: Annotated[str | None, Field(max_length=100)] = None
-    currentTitle: Annotated[str | None, Field(max_length=200)] = None
-    currentCompany: Annotated[str | None, Field(max_length=200)] = None
-    location: Annotated[str | None, Field(max_length=200)] = None
-    source: CandidateSource | None = None
-    tags: Annotated[
-        list[Tag] | None,
-        Field(
-            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
-            max_length=50,
-        ),
-    ] = None
-    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
 
 
 class CandidateSummary(BaseModel):
@@ -1045,97 +898,6 @@ class CompanySize(StrEnum):
     medium = "medium"
     large = "large"
     enterprise = "enterprise"
-
-
-class Company(BaseModel):
-    id: CompanyId
-    version: Annotated[int, Field(description="Send it back when you update.")]
-    name: str
-    type: CompanyType
-    category: Annotated[
-        str | None,
-        Field(
-            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."
-        ),
-    ]
-    website: Annotated[str | None, Field(description="Always with https://, e.g. https://example.com.")]
-    linkedinUrl: Annotated[
-        str | None,
-        Field(
-            description="The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik."
-        ),
-    ]
-    industry: Annotated[str | None, Field(...)]
-    size: Annotated[CompanySize | None, Field(...)]
-    phone: Annotated[str | None, Field(...)]
-    address: Annotated[str | None, Field(...)]
-    city: Annotated[str | None, Field(...)]
-    country: Annotated[CountryCode | None, Field(...)]
-    registrationNumber: Annotated[
-        str | None,
-        Field(description="Business registration number, e.g. SSM in Malaysia or UEN in Singapore."),
-    ]
-    about: Annotated[str | None, Field(...)]
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
-class CompanyCreate(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    name: Annotated[str, Field(max_length=200, min_length=1)]
-    type: Annotated[CompanyType | None, Field(description="Defaults to client.")] = None
-    category: Annotated[
-        str | None,
-        Field(
-            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
-            pattern="^[a-z0-9_]{1,40}$",
-        ),
-    ] = None
-    website: Annotated[
-        str | None,
-        Field(description="example.com or a full address; https:// is added if missing.", max_length=300),
-    ] = None
-    linkedinUrl: Annotated[
-        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
-    ] = None
-    industry: Annotated[str | None, Field(max_length=100)] = None
-    size: CompanySize | None = None
-    phone: Annotated[str | None, Field(max_length=40)] = None
-    address: Annotated[str | None, Field(max_length=500)] = None
-    city: Annotated[str | None, Field(max_length=100)] = None
-    country: CountryCode | None = None
-    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
-    about: Annotated[str | None, Field(max_length=4000)] = None
-
-
-class CompanyUpdate(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
-    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
-    type: CompanyType | None = None
-    category: Annotated[
-        str | None,
-        Field(
-            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
-            pattern="^[a-z0-9_]{1,40}$",
-        ),
-    ] = None
-    website: Annotated[str | None, Field(max_length=300)] = None
-    linkedinUrl: Annotated[
-        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
-    ] = None
-    industry: Annotated[str | None, Field(max_length=100)] = None
-    size: CompanySize | None = None
-    phone: Annotated[str | None, Field(max_length=40)] = None
-    address: Annotated[str | None, Field(max_length=500)] = None
-    city: Annotated[str | None, Field(max_length=100)] = None
-    country: CountryCode | None = None
-    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
-    about: Annotated[str | None, Field(max_length=4000)] = None
 
 
 class CompanySummary(BaseModel):
@@ -1506,6 +1268,14 @@ class ParsedProfile(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    selectedEmployerIndex: Annotated[
+        int | None,
+        Field(
+            description="Go-selected current or latest dated employer; omitted when review is needed.",
+            ge=0,
+            le=199,
+        ),
+    ] = None
     parser: Annotated[str, Field(description="name@version of the parser(s), e.g. rules@1.")]
     fullName: Annotated[SourcedText | None, Field(...)]
     email: Annotated[SourcedText | None, Field(...)]
@@ -2083,6 +1853,81 @@ class TeamMemberUpdate(BaseModel):
     teamId: Annotated[TeamGroupId | None, Field(description="The team they are in; null for none.")] = None
 
 
+class IndustryId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^industry_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class Industry(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: IndustryId
+    parentId: IndustryId | None = None
+    sourceKey: str | None = None
+    label: str
+    aliases: list[str]
+    retired: bool
+    candidateCount: int
+    companyCount: int
+
+
+class IndustryCatalogue(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: int
+    items: list[Industry]
+
+
+class Alias(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, min_length=1)]
+
+
+class IndustryEdit(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    catalogueVersion: Annotated[int, Field(ge=1)]
+    label: Annotated[str, Field(max_length=100, min_length=1)]
+    parentId: IndustryId | None = None
+    aliases: Annotated[list[Alias], Field(max_length=30)]
+    retired: bool
+
+
+class IndustrySelections(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    catalogueVersion: Annotated[int, Field(ge=1)]
+    ids: Annotated[list[IndustryId], Field(max_length=50)]
+    primaryId: IndustryId | None = None
+
+
+class IndustryEmployer(BaseModel):
+    index: int
+    name: str
+    title: str
+    current: bool
+
+
+class Status2(StrEnum):
+    ready = "ready"
+    needs_review = "needs_review"
+
+
+class IndustrySuggestion(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    catalogueVersion: int
+    candidateVersion: int
+    status: Status2
+    reason: str
+    categoryId: IndustryId | None = None
+    employerIndex: int | None = None
+    employers: list[IndustryEmployer]
+
+
 class CvImportId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["cvi_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cvi_[0-9a-hjkmnp-tv-z]{26}$")
@@ -2433,7 +2278,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -3899,7 +3744,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -3912,7 +3757,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status3
+    status: Status4
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -4014,7 +3859,7 @@ class FailedJob(BaseModel):
     failedAt: AwareDatetime
 
 
-class Status4(StrEnum):
+class Status5(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -4024,7 +3869,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status4
+    status: Status5
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -4168,6 +4013,156 @@ class AiProviderEntry(BaseModel):
     check: Annotated[AiProviderCheck | None, Field(...)]
 
 
+class Candidate(BaseModel):
+    ownerId: Annotated[
+        UserId | None,
+        Field(
+            description="The recruiter the candidate belongs to; null for none (e.g. applied on the careers page)."
+        ),
+    ]
+    ownerName: Annotated[str | None, Field(...)]
+    experience: Annotated[list[WorkEntry], Field(description="Work history, newest first.")]
+    education: list[EducationEntry]
+    id: CandidateId
+    version: Annotated[int, Field(ge=1)]
+    firstName: str
+    lastName: str
+    fullName: str
+    email: Annotated[EmailStr | None, Field(...)]
+    phone: Annotated[str | None, Field(description="International (E.164) format, e.g. +60123456789.")]
+    nationality: Annotated[CountryCode | None, Field(...)]
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ]
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
+    ]
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
+    ]
+    availabilitySince: Annotated[
+        AwareDatetime | None,
+        Field(
+            description='When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.'
+        ),
+    ]
+    workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
+    noticePeriod: Annotated[NoticePeriod | None, Field(...)]
+    industry: Annotated[str | None, Field(...)]
+    industrySelections: IndustrySelections | None = None
+    specialization: Annotated[str | None, Field(...)]
+    currentTitle: Annotated[str | None, Field(...)]
+    currentCompany: Annotated[str | None, Field(...)]
+    location: Annotated[str | None, Field(...)]
+    source: Annotated[CandidateSource | None, Field(...)]
+    tags: list[str]
+    skills: list[str]
+    compensation: Annotated[
+        Compensation | None,
+        Field(
+            description="Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded."
+        ),
+    ] = None
+    restrictedFields: list[RestrictedField]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class CandidateCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    firstName: Annotated[str, Field(max_length=100, min_length=1)]
+    lastName: Annotated[str | None, Field(max_length=100)] = None
+    email: Annotated[EmailStr | None, Field(max_length=254)] = None
+    phone: Annotated[
+        str | None, Field(description="Any common format; stored in international format.", max_length=40)
+    ] = None
+    nationality: CountryCode | None = None
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ] = None
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
+    ] = None
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
+    ] = None
+    workAuthorization: WorkAuthorization | None = None
+    noticePeriod: NoticePeriod | None = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    industrySelections: IndustrySelections | None = None
+    specialization: Annotated[str | None, Field(max_length=100)] = None
+    currentTitle: Annotated[str | None, Field(max_length=200)] = None
+    currentCompany: Annotated[str | None, Field(max_length=200)] = None
+    location: Annotated[str | None, Field(max_length=200)] = None
+    source: CandidateSource | None = None
+    tags: Annotated[
+        list[Tag] | None,
+        Field(
+            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
+            max_length=50,
+        ),
+    ] = None
+    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
+
+
+class CandidateUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    firstName: Annotated[str | None, Field(max_length=100, min_length=1)] = None
+    lastName: Annotated[str | None, Field(max_length=100)] = None
+    email: Annotated[EmailStr | None, Field(max_length=254)] = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    nationality: CountryCode | None = None
+    residenceCountry: Annotated[
+        CountryCode | None,
+        Field(description="Where the candidate lives now (null = not known, shown as NA)."),
+    ] = None
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="Their LinkedIn profile, e.g. https://www.linkedin.com/in/siti-aisyah.",
+            max_length=300,
+        ),
+    ] = None
+    availability: Annotated[
+        CandidateAvailability | None,
+        Field(description="Whether they are open to a move (colours their page); null = not set."),
+    ] = None
+    workAuthorization: WorkAuthorization | None = None
+    noticePeriod: NoticePeriod | None = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    industrySelections: IndustrySelections | None = None
+    specialization: Annotated[str | None, Field(max_length=100)] = None
+    currentTitle: Annotated[str | None, Field(max_length=200)] = None
+    currentCompany: Annotated[str | None, Field(max_length=200)] = None
+    location: Annotated[str | None, Field(max_length=200)] = None
+    source: CandidateSource | None = None
+    tags: Annotated[
+        list[Tag] | None,
+        Field(
+            description="Your own labels, e.g. relocate (duplicates ignoring case are removed).",
+            max_length=50,
+        ),
+    ] = None
+    skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
+
+
 class CandidateSearch(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -4266,6 +4261,100 @@ class PublicJobAd(BaseModel):
     description: Annotated[str, Field(description="The blind text when the ad is published blind.")]
     closesOn: Annotated[date | None, Field(...)]
     publishedAt: AwareDatetime
+
+
+class Company(BaseModel):
+    id: CompanyId
+    version: Annotated[int, Field(description="Send it back when you update.")]
+    name: str
+    type: CompanyType
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown)."
+        ),
+    ]
+    website: Annotated[str | None, Field(description="Always with https://, e.g. https://example.com.")]
+    linkedinUrl: Annotated[
+        str | None,
+        Field(
+            description="The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik."
+        ),
+    ]
+    industry: Annotated[str | None, Field(...)]
+    industrySelections: IndustrySelections | None = None
+    size: Annotated[CompanySize | None, Field(...)]
+    phone: Annotated[str | None, Field(...)]
+    address: Annotated[str | None, Field(...)]
+    city: Annotated[str | None, Field(...)]
+    country: Annotated[CountryCode | None, Field(...)]
+    registrationNumber: Annotated[
+        str | None,
+        Field(description="Business registration number, e.g. SSM in Malaysia or UEN in Singapore."),
+    ]
+    about: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class CompanyCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=200, min_length=1)]
+    type: Annotated[CompanyType | None, Field(description="Defaults to client.")] = None
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
+    website: Annotated[
+        str | None,
+        Field(description="example.com or a full address; https:// is added if missing.", max_length=300),
+    ] = None
+    linkedinUrl: Annotated[
+        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
+    ] = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    industrySelections: IndustrySelections | None = None
+    size: CompanySize | None = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    address: Annotated[str | None, Field(max_length=500)] = None
+    city: Annotated[str | None, Field(max_length=100)] = None
+    country: CountryCode | None = None
+    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
+    about: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class CompanyUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    name: Annotated[str | None, Field(max_length=200, min_length=1)] = None
+    type: CompanyType | None = None
+    category: Annotated[
+        str | None,
+        Field(
+            description="The company's category (a key of the company_category list in Settings, e.g. signed_client, vip_client); null: not set (shown as Unknown).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
+    website: Annotated[str | None, Field(max_length=300)] = None
+    linkedinUrl: Annotated[
+        str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
+    ] = None
+    industry: Annotated[str | None, Field(max_length=100)] = None
+    industrySelections: IndustrySelections | None = None
+    size: CompanySize | None = None
+    phone: Annotated[str | None, Field(max_length=40)] = None
+    address: Annotated[str | None, Field(max_length=500)] = None
+    city: Annotated[str | None, Field(max_length=100)] = None
+    country: CountryCode | None = None
+    registrationNumber: Annotated[str | None, Field(max_length=50)] = None
+    about: Annotated[str | None, Field(max_length=4000)] = None
 
 
 class ContactEmployment(BaseModel):
@@ -4656,7 +4745,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status2, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status3, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]

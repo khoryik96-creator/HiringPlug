@@ -14,6 +14,7 @@ import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { IndustrySummary } from "../components/IndustryPicker";
 import { History } from "../components/History";
 import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
@@ -94,8 +95,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
             <dt>Work authorization</dt>
             <dd>{workAuthorization(c)}</dd>
-            <dt>Industry / specialization</dt>
-            <dd>{[c.industry, c.specialization].filter(Boolean).join(" / ") || "—"}</dd>
+            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
+            <dt>Specialization</dt><dd>{c.specialization ?? "—"}</dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
           </dl>

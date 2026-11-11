@@ -522,6 +522,7 @@ components:
         website: { type: string, nullable: true, description: 'Always with https://, e.g. https://example.com.' }
         linkedinUrl: { type: string, nullable: true, description: "The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik." }
         industry: { type: string, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
           nullable: true
@@ -549,6 +550,7 @@ components:
         website: { type: string, maxLength: 300, nullable: true, description: 'example.com or a full address; https:// is added if missing.' }
         linkedinUrl: { type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).' }
         industry: { type: string, maxLength: 100, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
           nullable: true
@@ -573,6 +575,7 @@ components:
         website: { type: string, maxLength: 300, nullable: true }
         linkedinUrl: { type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).' }
         industry: { type: string, maxLength: 100, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         size:
           allOf: [{ $ref: '#/components/schemas/CompanySize' }]
           nullable: true

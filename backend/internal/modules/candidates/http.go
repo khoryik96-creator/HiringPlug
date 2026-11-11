@@ -12,6 +12,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/classification"
 )
 
 const defaultPageSize = 25
@@ -89,24 +90,25 @@ func (h *HTTP) ListCandidateUsedValues(ctx context.Context, _ api.ListCandidateU
 func (h *HTTP) CreateCandidate(ctx context.Context, req api.CreateCandidateRequestObject) (api.CreateCandidateResponseObject, error) {
 	b := req.Body
 	in := Profile{
-		FirstName:         b.FirstName,
-		LastName:          deref(b.LastName),
-		Email:             emailPtr(b.Email),
-		Phone:             valueOrNil(b.Phone),
-		Nationality:       valueOrNil(b.Nationality),
-		ResidenceCountry:  valueOrNil(b.ResidenceCountry),
-		LinkedinURL:       valueOrNil(b.LinkedinUrl),
-		Availability:      convertPtr[string](valueOrNil(b.Availability)),
-		WorkAuthorization: workAuthorizationFromAPI(b.WorkAuthorization),
-		NoticePeriod:      noticePeriodFromAPI(b.NoticePeriod),
-		Industry:          valueOrNil(b.Industry),
-		Specialization:    valueOrNil(b.Specialization),
-		CurrentTitle:      valueOrNil(b.CurrentTitle),
-		CurrentCompany:    valueOrNil(b.CurrentCompany),
-		Tags:              deref(b.Tags),
-		Skills:            deref(b.Skills),
-		Location:          valueOrNil(b.Location),
-		Source:            convertPtr[string](valueOrNil(b.Source)),
+		FirstName:          b.FirstName,
+		LastName:           deref(b.LastName),
+		Email:              emailPtr(b.Email),
+		Phone:              valueOrNil(b.Phone),
+		Nationality:        valueOrNil(b.Nationality),
+		ResidenceCountry:   valueOrNil(b.ResidenceCountry),
+		LinkedinURL:        valueOrNil(b.LinkedinUrl),
+		Availability:       convertPtr[string](valueOrNil(b.Availability)),
+		WorkAuthorization:  workAuthorizationFromAPI(b.WorkAuthorization),
+		NoticePeriod:       noticePeriodFromAPI(b.NoticePeriod),
+		Industry:           valueOrNil(b.Industry),
+		IndustrySelections: choicesFromAPI(b.IndustrySelections),
+		Specialization:     valueOrNil(b.Specialization),
+		CurrentTitle:       valueOrNil(b.CurrentTitle),
+		CurrentCompany:     valueOrNil(b.CurrentCompany),
+		Tags:               deref(b.Tags),
+		Skills:             deref(b.Skills),
+		Location:           valueOrNil(b.Location),
+		Source:             convertPtr[string](valueOrNil(b.Source)),
 	}
 	view, err := h.svc.Create(ctx, authz.MustFromContext(ctx), in)
 	if err != nil {
@@ -128,24 +130,25 @@ func (h *HTTP) GetCandidate(ctx context.Context, req api.GetCandidateRequestObje
 func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateRequestObject) (api.UpdateCandidateResponseObject, error) {
 	b := req.Body
 	patch := ProfilePatch{
-		FirstName:         Change[string]{Set: b.FirstName != nil, Value: deref(b.FirstName)},
-		LastName:          Change[string]{Set: b.LastName != nil, Value: deref(b.LastName)},
-		Email:             change(b.Email, func(e openapi_types.Email) string { return string(e) }),
-		Phone:             change(b.Phone, identity[string]),
-		Nationality:       change(b.Nationality, identity[string]),
-		ResidenceCountry:  change(b.ResidenceCountry, identity[string]),
-		LinkedinURL:       change(b.LinkedinUrl, identity[string]),
-		Availability:      change(b.Availability, func(a api.CandidateAvailability) string { return string(a) }),
-		WorkAuthorization: Change[*WorkAuthorization]{Set: b.WorkAuthorization.IsSpecified(), Value: workAuthorizationFromAPI(b.WorkAuthorization)},
-		NoticePeriod:      Change[*NoticePeriod]{Set: b.NoticePeriod.IsSpecified(), Value: noticePeriodFromAPI(b.NoticePeriod)},
-		Industry:          change(b.Industry, identity[string]),
-		Specialization:    change(b.Specialization, identity[string]),
-		CurrentTitle:      change(b.CurrentTitle, identity[string]),
-		CurrentCompany:    change(b.CurrentCompany, identity[string]),
-		Location:          change(b.Location, identity[string]),
-		Source:            change(b.Source, func(s api.CandidateSource) string { return s }),
-		Tags:              Change[[]string]{Set: b.Tags != nil, Value: deref(b.Tags)},
-		Skills:            Change[[]string]{Set: b.Skills != nil, Value: deref(b.Skills)},
+		FirstName:          Change[string]{Set: b.FirstName != nil, Value: deref(b.FirstName)},
+		LastName:           Change[string]{Set: b.LastName != nil, Value: deref(b.LastName)},
+		Email:              change(b.Email, func(e openapi_types.Email) string { return string(e) }),
+		Phone:              change(b.Phone, identity[string]),
+		Nationality:        change(b.Nationality, identity[string]),
+		ResidenceCountry:   change(b.ResidenceCountry, identity[string]),
+		LinkedinURL:        change(b.LinkedinUrl, identity[string]),
+		Availability:       change(b.Availability, func(a api.CandidateAvailability) string { return string(a) }),
+		WorkAuthorization:  Change[*WorkAuthorization]{Set: b.WorkAuthorization.IsSpecified(), Value: workAuthorizationFromAPI(b.WorkAuthorization)},
+		NoticePeriod:       Change[*NoticePeriod]{Set: b.NoticePeriod.IsSpecified(), Value: noticePeriodFromAPI(b.NoticePeriod)},
+		Industry:           change(b.Industry, identity[string]),
+		IndustrySelections: choicesFromAPI(b.IndustrySelections),
+		Specialization:     change(b.Specialization, identity[string]),
+		CurrentTitle:       change(b.CurrentTitle, identity[string]),
+		CurrentCompany:     change(b.CurrentCompany, identity[string]),
+		Location:           change(b.Location, identity[string]),
+		Source:             change(b.Source, func(s api.CandidateSource) string { return s }),
+		Tags:               Change[[]string]{Set: b.Tags != nil, Value: deref(b.Tags)},
+		Skills:             Change[[]string]{Set: b.Skills != nil, Value: deref(b.Skills)},
 	}
 	view, err := h.svc.Update(ctx, authz.MustFromContext(ctx), req.CandidateId, b.Version, patch)
 	if err != nil {
@@ -179,33 +182,34 @@ func salaryFromAPI(b api.CompensationUpdate) (current *SalaryAmount, expected *S
 func candidateToAPI(v View) api.Candidate {
 	p := v.Profile
 	out := api.Candidate{
-		Id:                v.ID,
-		Version:           v.Version,
-		FirstName:         p.FirstName,
-		LastName:          p.LastName,
-		FullName:          FullName(p),
-		Email:             orNull(convertPtr[openapi_types.Email](p.Email)),
-		Phone:             orNull(p.Phone),
-		Nationality:       orNull(p.Nationality),
-		ResidenceCountry:  orNull(p.ResidenceCountry),
-		LinkedinUrl:       orNull(p.LinkedinURL),
-		Availability:      orNull(convertPtr[api.CandidateAvailability](p.Availability)),
-		AvailabilitySince: orNull(v.AvailabilitySince),
-		WorkAuthorization: nullable.NewNullNullable[api.WorkAuthorization](),
-		NoticePeriod:      nullable.NewNullNullable[api.NoticePeriod](),
-		Industry:          orNull(p.Industry),
-		Specialization:    orNull(p.Specialization),
-		CurrentTitle:      orNull(p.CurrentTitle),
-		CurrentCompany:    orNull(p.CurrentCompany),
-		Location:          orNull(p.Location),
-		Source:            orNull(convertPtr[api.CandidateSource](p.Source)),
-		Tags:              nonNil(p.Tags),
-		Skills:            nonNil(p.Skills),
-		RestrictedFields:  []api.RestrictedField{},
-		OwnerId:           orNull(v.OwnerID),
-		OwnerName:         orNull(v.OwnerName),
-		CreatedAt:         v.CreatedAt,
-		UpdatedAt:         v.UpdatedAt,
+		Id:                 v.ID,
+		Version:            v.Version,
+		FirstName:          p.FirstName,
+		LastName:           p.LastName,
+		FullName:           FullName(p),
+		Email:              orNull(convertPtr[openapi_types.Email](p.Email)),
+		Phone:              orNull(p.Phone),
+		Nationality:        orNull(p.Nationality),
+		ResidenceCountry:   orNull(p.ResidenceCountry),
+		LinkedinUrl:        orNull(p.LinkedinURL),
+		Availability:       orNull(convertPtr[api.CandidateAvailability](p.Availability)),
+		AvailabilitySince:  orNull(v.AvailabilitySince),
+		WorkAuthorization:  nullable.NewNullNullable[api.WorkAuthorization](),
+		NoticePeriod:       nullable.NewNullNullable[api.NoticePeriod](),
+		Industry:           orNull(p.Industry),
+		IndustrySelections: choicesToAPI(p.IndustrySelections),
+		Specialization:     orNull(p.Specialization),
+		CurrentTitle:       orNull(p.CurrentTitle),
+		CurrentCompany:     orNull(p.CurrentCompany),
+		Location:           orNull(p.Location),
+		Source:             orNull(convertPtr[api.CandidateSource](p.Source)),
+		Tags:               nonNil(p.Tags),
+		Skills:             nonNil(p.Skills),
+		RestrictedFields:   []api.RestrictedField{},
+		OwnerId:            orNull(v.OwnerID),
+		OwnerName:          orNull(v.OwnerName),
+		CreatedAt:          v.CreatedAt,
+		UpdatedAt:          v.UpdatedAt,
 	}
 	out.Experience, out.Education = historyToAPI(v.History)
 	if wa := p.WorkAuthorization; wa != nil {
@@ -338,4 +342,19 @@ func (h *HTTP) SetCandidateOwner(ctx context.Context, req api.SetCandidateOwnerR
 		return nil, err
 	}
 	return api.SetCandidateOwner204Response{}, nil
+}
+
+func choicesFromAPI(v *api.IndustrySelections) *classification.Selections {
+	if v == nil {
+		return nil
+	}
+	out := classification.Selections(*v)
+	return &out
+}
+func choicesToAPI(v *classification.Selections) *api.IndustrySelections {
+	if v == nil {
+		return nil
+	}
+	out := api.IndustrySelections(*v)
+	return &out
 }

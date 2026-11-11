@@ -14,9 +14,8 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
-// Every list in Settings can be saved: the call lists and the benefits
-// template could not (the database knew only the first five lists).
-func TestEveryListCanBeSaved(t *testing.T) {
+// Mutable flat lists save here; industry writes belong to the versioned catalogue.
+func TestSettingsListsRespectTheirOwningEndpoints(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	owner := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
@@ -31,6 +30,10 @@ func TestEveryListCanBeSaved(t *testing.T) {
 			}
 		}
 		res := a.request(http.MethodPut, "/v1/settings/fields/lists/"+string(l.Name), owner, map[string]any{"options": options})
+		if l.Name == api.FieldListNameIndustry {
+			assert.Equal(t, http.StatusBadRequest, res.Status, "the industry compatibility view is read-only")
+			continue
+		}
 		assert.Equal(t, http.StatusOK, res.Status, "%s: %s", l.Name, res.Body)
 	}
 }

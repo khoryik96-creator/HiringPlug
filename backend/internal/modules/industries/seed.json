@@ -1,0 +1,465 @@
+[
+  {
+    "id": "ind_9d3ff0d57ad4",
+    "label": "Digital & E-Commerce",
+    "subindustries": [
+      {
+        "id": "sub_79ea1243abb3",
+        "label": "Digital – FinTech/Payment Getaway/E-Wallet",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_3ff979a1c22a",
+        "label": "Digital – MarTech",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_43e422b06a2a",
+        "label": "Digital – EduTech",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_0aa85f61f5a6",
+        "label": "Digital - InsurTech",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_6dbeb0412909",
+        "label": "Digital - HealthTech/MedTech",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_b8da3c706a32",
+        "label": "Digital - LogTech",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_128776b47b49",
+        "label": "E-Commerce – Marketplace/Digital Platform",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_dfbd3ba6fcb6",
+        "label": "E-Commerce – Fulfillment/Enabler",
+        "parent_id": "ind_9d3ff0d57ad4"
+      },
+      {
+        "id": "sub_63e1f7ae7965",
+        "label": "E-Commerce – Food & Grocery Delivery",
+        "parent_id": "ind_9d3ff0d57ad4"
+      }
+    ]
+  },
+  {
+    "id": "ind_fbe065970201",
+    "label": "Financial Services",
+    "subindustries": [
+      {
+        "id": "sub_f25238b7cfa6",
+        "label": "FSI - Asset Management",
+        "parent_id": "ind_fbe065970201"
+      },
+      {
+        "id": "sub_d9102d124a15",
+        "label": "FSI – Banking",
+        "parent_id": "ind_fbe065970201"
+      },
+      {
+        "id": "sub_1970a7419148",
+        "label": "FSI - Hedge/Mutual Funds",
+        "parent_id": "ind_fbe065970201"
+      },
+      {
+        "id": "sub_d482b4f7fb7f",
+        "label": "FSI - Investment Bank",
+        "parent_id": "ind_fbe065970201"
+      },
+      {
+        "id": "sub_97c5b77ac45d",
+        "label": "FSI - Insurance",
+        "parent_id": "ind_fbe065970201"
+      },
+      {
+        "id": "sub_c917c485772e",
+        "label": "FSI - Private Equity/Venture Capital",
+        "parent_id": "ind_fbe065970201"
+      }
+    ]
+  },
+  {
+    "id": "ind_e5ef32d1f607",
+    "label": "FMCG",
+    "subindustries": [
+      {
+        "id": "sub_3186b4bea4e0",
+        "label": "FMCG – Consumer Durables",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_0d64c26c0afc",
+        "label": "FMCG – Consumer Electronics",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_04f080052502",
+        "label": "FMCG – Food & Beverage",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_b70ba43a2011",
+        "label": "FMCG – Fashion & Apparel/Accessories",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_c969ea635cbb",
+        "label": "FMCG – Luxury Goods",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_cf05b3614d13",
+        "label": "FMCG – MLM",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_cdc55a363f83",
+        "label": "FMCG – Personal Care/Cosmetics",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_a12293753213",
+        "label": "FMCG – Retail",
+        "parent_id": "ind_e5ef32d1f607"
+      },
+      {
+        "id": "sub_fb1dd0db3780",
+        "label": "FMCG – Sporting Goods",
+        "parent_id": "ind_e5ef32d1f607"
+      }
+    ]
+  },
+  {
+    "id": "ind_5d4f6b307762",
+    "label": "Industrial/Manufacturing",
+    "subindustries": [
+      {
+        "id": "sub_2fe13bc0a515",
+        "label": "Industrial/Manufacturing - Aerospace",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_08e9dfaa6380",
+        "label": "Agriculture – Agriculture Supply",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_105856674334",
+        "label": "Agriculture – Crop/Plantation",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_d0ecfd727f4d",
+        "label": "Agriculture – Livestock/Feed Mill",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_7458b014c547",
+        "label": "Industrial/Manufacturing - Automation",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_2e0fb58654ad",
+        "label": "Industrial/Manufacturing - Automotive",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_99df751254a7",
+        "label": "Chemicals – Food/Health/Additives",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_b1db34be13b1",
+        "label": "Chemicals – Paint/Coat/Adhesive",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_85eed038df70",
+        "label": "Chemicals – Plastic/Package/Print",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_f0755dc8521e",
+        "label": "Chemicals – Textiles",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_c6879435f906",
+        "label": "Distributions & Logistics",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_5c50b1199c9d",
+        "label": "Industrial/Manufacturing - Diversified Manufacturing",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_9b82d3f5c0f0",
+        "label": "Industrial/Manufacturing - Electronic Components/EMS/CMS",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_424f008bd660",
+        "label": "Energy/Power/Utilities – EPC",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_d050b8ae1d7d",
+        "label": "Energy/Power/Utilities – Mining",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_bdb43116e3e6",
+        "label": "Oil & Gas – Upstream",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_067bddac7db7",
+        "label": "Oil & Gas – DownStream",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_2cd6031c3f16",
+        "label": "Energy/Power/Utilities - Renewable/Power",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_be07dc4d7810",
+        "label": "Industrial/Manufacturing - Heavy Industry/Equipment",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_2fa3cfcf0503",
+        "label": "Industrial/Manufacturing - Marine & Shipping",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_3b7ebbdd477b",
+        "label": "Industrial/Manufacturing - Metalwork",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_00c0d7294272",
+        "label": "Industrial/Manufacturing - Railway & Transportation",
+        "parent_id": "ind_5d4f6b307762"
+      },
+      {
+        "id": "sub_b951cee64042",
+        "label": "Industrial/Manufacturing - Semiconductor",
+        "parent_id": "ind_5d4f6b307762"
+      }
+    ]
+  },
+  {
+    "id": "ind_539f6845962b",
+    "label": "Information Technology & Services",
+    "subindustries": [
+      {
+        "id": "sub_7efa9c11df97",
+        "label": "Tech - Call Centre/BPO",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_c2783b0867a9",
+        "label": "Tech - Gaming",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_336344ff3e0a",
+        "label": "Tech – ERP/CRM/HCM/Application",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_a8683b3da6ca",
+        "label": "Tech - Hardware",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_16463c95935a",
+        "label": "Tech - Networks",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_a566814697e8",
+        "label": "Tech - Security",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_5190fe874a4a",
+        "label": "Tech – Software/Software House",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_2f5af6f5b13d",
+        "label": "Tech - Cloud/SaaS",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_f3db0b3f4d89",
+        "label": "Tech - Sys Integrator/Svc Provider",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_bda89fa94ee7",
+        "label": "Tech – Telecommunications",
+        "parent_id": "ind_539f6845962b"
+      },
+      {
+        "id": "sub_7f2f2eba6993",
+        "label": "Tech - Blockchain",
+        "parent_id": "ind_539f6845962b"
+      }
+    ]
+  },
+  {
+    "id": "ind_a09c453435ec",
+    "label": "Life Science/Medical",
+    "subindustries": [
+      {
+        "id": "sub_6e5f631efa0b",
+        "label": "Life Science/Medical - Biotechnology",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_e593738e0703",
+        "label": "Life Science/Medical - Hospitals/Nursing",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_0567e7f5a373",
+        "label": "Life Science/Medical - Labs/CROs",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_c5a136c1ac8e",
+        "label": "Life Science/Medical - Medical devices/Equipment",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_4fb38070a488",
+        "label": "Life Science/Medical - OTC/Healthcare",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_5e46ae2db7ce",
+        "label": "Life Science/Medical - Pharmaceutical",
+        "parent_id": "ind_a09c453435ec"
+      },
+      {
+        "id": "sub_8331150739e9",
+        "label": "Life Science/Medical - Veterinary",
+        "parent_id": "ind_a09c453435ec"
+      }
+    ]
+  },
+  {
+    "id": "ind_1087cb8e2a98",
+    "label": "Property & Construction",
+    "subindustries": [
+      {
+        "id": "sub_c034c54835e0",
+        "label": "P&C – Architecture",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_a52972a22cd4",
+        "label": "P&C – Building Materials",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_2b0ca2a4c7b1",
+        "label": "P&C – Construction",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_f3a3091436b1",
+        "label": "P&C – General Practice",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_b53566362dd7",
+        "label": "P&C – Hospitality & Tourism",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_f1073c2f0012",
+        "label": "P&C – Interior Design",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_af00efde8c59",
+        "label": "P&C – Property Development",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_dbfaa0553c0c",
+        "label": "P&C – Real Estate Consultancy",
+        "parent_id": "ind_1087cb8e2a98"
+      },
+      {
+        "id": "sub_3b774a7c87bd",
+        "label": "P&C – REITS",
+        "parent_id": "ind_1087cb8e2a98"
+      }
+    ]
+  },
+  {
+    "id": "ind_c4ede4b993b7",
+    "label": "Professional Services",
+    "subindustries": [
+      {
+        "id": "sub_5b489022cbc8",
+        "label": "Professional Services - Accounting Outsourcing",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_cef426b07d7c",
+        "label": "Professional Services- Advertising & Marketing",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_7fad13318b12",
+        "label": "Professional Services - Corporate Secretary",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_607dffe3a212",
+        "label": "Professional Services - Financial Advisory",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_d68aed632a81",
+        "label": "Professional Services - IT Outsourcing",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_fdf295db08c7",
+        "label": "Professional Services - Recruitment & Staffing",
+        "parent_id": "ind_c4ede4b993b7"
+      },
+      {
+        "id": "sub_5b37bf8f113d",
+        "label": "Professional Services - Consulting",
+        "parent_id": "ind_c4ede4b993b7"
+      }
+    ]
+  },
+  {
+    "id": "ind_512ab3c6b986",
+    "label": "Education",
+    "subindustries": []
+  },
+  {
+    "id": "ind_dc8f5679a75a",
+    "label": "Government Sector",
+    "subindustries": []
+  }
+]

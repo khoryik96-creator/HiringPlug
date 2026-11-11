@@ -13,7 +13,10 @@ import (
 )
 
 // Service holds the settings use cases.
-type Service struct{ pool *pgxpool.Pool }
+type Service struct {
+	pool       *pgxpool.Pool
+	industries IndustryCatalogue
+}
 
 // Settings is every dropdown and every field's mandatory choice.
 type Settings struct {
@@ -64,13 +67,19 @@ func (s *Service) Get(ctx context.Context, p authz.Principal) (Settings, error) 
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
 		out, err = settingsIn(ctx, store.New(tx))
-		return err
+		if err != nil {
+			return err
+		}
+		return s.industryList(ctx, tx, &out)
 	})
 	return out, err
 }
 
 // PutList replaces one dropdown's options.
 func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, in []OptionInput) (List, error) {
+	if name == "industry" {
+		return List{}, invalidIndustryList()
+	}
 	options, err := CheckList(name, in)
 	if err != nil {
 		return List{}, err

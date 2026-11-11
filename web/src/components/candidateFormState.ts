@@ -16,6 +16,7 @@ export interface CandidateFormState {
   noticeValue: string;
   noticeUnit: Schemas["NoticePeriodUnit"];
   industry: string;
+  industrySelections?: Schemas["IndustrySelections"];
   specialization: string;
   currentTitle: string;
   currentCompany: string;
@@ -40,6 +41,7 @@ export const FIELD_PATHS: Record<keyof CandidateFormState, string> = {
   noticeValue: "noticePeriod.value",
   noticeUnit: "noticePeriod.unit",
   industry: "industry",
+  industrySelections: "industrySelections",
   specialization: "specialization",
   currentTitle: "currentTitle",
   currentCompany: "currentCompany",
@@ -64,6 +66,7 @@ export function formFromCandidate(c: Candidate): CandidateFormState {
     noticeValue: c.noticePeriod ? String(c.noticePeriod.value) : "",
     noticeUnit: c.noticePeriod?.unit ?? "month",
     industry: c.industry ?? "",
+    industrySelections: c.industrySelections,
     specialization: c.specialization ?? "",
     currentTitle: c.currentTitle ?? "",
     currentCompany: c.currentCompany ?? "",
@@ -107,6 +110,7 @@ export function toUpdateBody(f: CandidateFormState, version: number): Schemas["C
       : null,
     noticePeriod: f.noticeValue.trim() === "" ? null : { value: Number(f.noticeValue), unit: f.noticeUnit },
     industry: orNull(f.industry),
+    ...(f.industrySelections ? { industrySelections: f.industrySelections } : {}),
     specialization: orNull(f.specialization),
     currentTitle: orNull(f.currentTitle),
     currentCompany: orNull(f.currentCompany),

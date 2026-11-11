@@ -308,6 +308,17 @@ func (q *Queries) GetSuggestion(ctx context.Context, arg GetSuggestionParams) (C
 	return i, err
 }
 
+const industryEmployerID = `-- name: IndustryEmployerID :one
+SELECT id FROM company WHERE name_key = app_normalize_text($1::text)
+`
+
+func (q *Queries) IndustryEmployerID(ctx context.Context, name string) (string, error) {
+	row := q.db.QueryRow(ctx, industryEmployerID, name)
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertCompany = `-- name: InsertCompany :one
 
 INSERT INTO company (
@@ -508,6 +519,35 @@ func (q *Queries) InsertSuggestion(ctx context.Context, arg InsertSuggestionPara
 	return err
 }
 
+const legacyIndustries = `-- name: LegacyIndustries :many
+SELECT id, industry::text FROM company WHERE industry IS NOT NULL
+`
+
+type LegacyIndustriesRow struct {
+	ID       string
+	Industry string
+}
+
+func (q *Queries) LegacyIndustries(ctx context.Context) ([]LegacyIndustriesRow, error) {
+	rows, err := q.db.Query(ctx, legacyIndustries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LegacyIndustriesRow
+	for rows.Next() {
+		var i LegacyIndustriesRow
+		if err := rows.Scan(&i.ID, &i.Industry); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCompanies = `-- name: ListCompanies :many
 SELECT id, name, type, category, industry, city, website, linkedin_url, updated_at
 FROM company
@@ -662,6 +702,63 @@ type SetAutofillParams struct {
 func (q *Queries) SetAutofill(ctx context.Context, arg SetAutofillParams) error {
 	_, err := q.db.Exec(ctx, setAutofill, arg.AutofillStatus, arg.AutofillError, arg.ID)
 	return err
+}
+
+const setIndustrySummary = `-- name: SetIndustrySummary :exec
+UPDATE company SET industry = $1, version = version + 1, updated_at = now()
+WHERE id = $2 AND industry IS DISTINCT FROM $1
+`
+
+type SetIndustrySummaryParams struct {
+	Industry *string
+	ID       string
+}
+
+func (q *Queries) SetIndustrySummary(ctx context.Context, arg SetIndustrySummaryParams) error {
+	_, err := q.db.Exec(ctx, setIndustrySummary, arg.Industry, arg.ID)
+	return err
+}
+
+const touchCompany = `-- name: TouchCompany :one
+UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url
+`
+
+type TouchCompanyParams struct {
+	ID              string
+	ExpectedVersion int32
+}
+
+func (q *Queries) TouchCompany(ctx context.Context, arg TouchCompanyParams) (Company, error) {
+	row := q.db.QueryRow(ctx, touchCompany, arg.ID, arg.ExpectedVersion)
+	var i Company
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.Type,
+		&i.Website,
+		&i.Industry,
+		&i.Size,
+		&i.Phone,
+		&i.Address,
+		&i.City,
+		&i.Country,
+		&i.RegistrationNumber,
+		&i.About,
+		&i.SearchText,
+		&i.NameKey,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AutofillStatus,
+		&i.AutofillError,
+		&i.AutofillCheckedAt,
+		&i.PhoneDigits,
+		&i.Category,
+		&i.LinkedinUrl,
+	)
+	return i, err
 }
 
 const updateCompany = `-- name: UpdateCompany :one

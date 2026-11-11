@@ -11,7 +11,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
 - Nothing uncommitted, nothing half-built. Start new work on a fresh branch
   from main.
-- Latest migration: `00081_salary_calculation.sql`. Migrations are append-only.
+- Latest migration: `00082_industries.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -53,6 +53,17 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   access unless Settings says otherwise). CV Studio formatting removes lines
   stating the candidate's own pay before the AI sees the CV.
 - No secrets in code; settings are `HP_*` variables listed in `.env.example`.
+
+## Industry catalogue (11 Nov 2026)
+
+- The approved option B is the shared candidate/company hierarchy browser.
+  Settings > Industries supports add, rename, aliases, move, retirement and
+  replacement before deleting used categories. The seed has 10 parents and
+  81 children. See [industries.md](industries.md) for Go module boundaries,
+  recognition rules, compatibility, migration and safety checks.
+- Go owns employer selection and industry recognition; Python keeps extraction
+  and optional missing-detail reads. Unknown employers remain manually
+  selectable. No industry-only AI call is made.
 
 ## What was built 7–10 Nov (newest first; details in `docs/features.md`)
 

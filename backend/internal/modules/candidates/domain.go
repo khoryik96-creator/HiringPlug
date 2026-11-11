@@ -14,6 +14,7 @@ import (
 	"github.com/nyaruka/phonenumbers"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/classification"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/linkedin"
 )
 
@@ -26,24 +27,25 @@ const (
 
 // Profile is everything about a candidate except salary details.
 type Profile struct {
-	FirstName         string
-	LastName          string
-	Email             *string
-	Phone             *string
-	Nationality       *string
-	ResidenceCountry  *string // ISO code; nil = not known (NA)
-	LinkedinURL       *string // https://www.linkedin.com/in/...
-	Availability      *string // looking, passive, not_looking, placed; nil = not set
-	WorkAuthorization *WorkAuthorization
-	NoticePeriod      *NoticePeriod
-	Industry          *string
-	Specialization    *string
-	CurrentTitle      *string
-	CurrentCompany    *string
-	Location          *string
-	Source            *string
-	Tags              []string // your own labels, e.g. relocate
-	Skills            []string
+	FirstName          string
+	LastName           string
+	Email              *string
+	Phone              *string
+	Nationality        *string
+	ResidenceCountry   *string // ISO code; nil = not known (NA)
+	LinkedinURL        *string // https://www.linkedin.com/in/...
+	Availability       *string // looking, passive, not_looking, placed; nil = not set
+	WorkAuthorization  *WorkAuthorization
+	NoticePeriod       *NoticePeriod
+	Industry           *string
+	IndustrySelections *classification.Selections
+	Specialization     *string
+	CurrentTitle       *string
+	CurrentCompany     *string
+	Location           *string
+	Source             *string
+	Tags               []string // your own labels, e.g. relocate
+	Skills             []string
 }
 
 // WorkAuthorization says whether the candidate can work here, and why.
@@ -117,24 +119,25 @@ type Change[T any] struct {
 
 // ProfilePatch is a partial update of a Profile.
 type ProfilePatch struct {
-	FirstName         Change[string]
-	LastName          Change[string]
-	Email             Change[*string]
-	Phone             Change[*string]
-	Nationality       Change[*string]
-	ResidenceCountry  Change[*string]
-	LinkedinURL       Change[*string]
-	Availability      Change[*string]
-	WorkAuthorization Change[*WorkAuthorization]
-	NoticePeriod      Change[*NoticePeriod]
-	Industry          Change[*string]
-	Specialization    Change[*string]
-	CurrentTitle      Change[*string]
-	CurrentCompany    Change[*string]
-	Location          Change[*string]
-	Source            Change[*string]
-	Tags              Change[[]string]
-	Skills            Change[[]string]
+	FirstName          Change[string]
+	LastName           Change[string]
+	Email              Change[*string]
+	Phone              Change[*string]
+	Nationality        Change[*string]
+	ResidenceCountry   Change[*string]
+	LinkedinURL        Change[*string]
+	Availability       Change[*string]
+	WorkAuthorization  Change[*WorkAuthorization]
+	NoticePeriod       Change[*NoticePeriod]
+	Industry           Change[*string]
+	IndustrySelections *classification.Selections
+	Specialization     Change[*string]
+	CurrentTitle       Change[*string]
+	CurrentCompany     Change[*string]
+	Location           Change[*string]
+	Source             Change[*string]
+	Tags               Change[[]string]
+	Skills             Change[[]string]
 }
 
 // Apply returns p with the patch's fields replaced.
@@ -150,6 +153,7 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.WorkAuthorization, pp.WorkAuthorization)
 	apply(&p.NoticePeriod, pp.NoticePeriod)
 	apply(&p.Industry, pp.Industry)
+	p.IndustrySelections = pp.IndustrySelections
 	apply(&p.Specialization, pp.Specialization)
 	apply(&p.CurrentTitle, pp.CurrentTitle)
 	apply(&p.CurrentCompany, pp.CurrentCompany)

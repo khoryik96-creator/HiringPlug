@@ -2310,6 +2310,120 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/industries:
+    get:
+      operationId: listIndustries
+      tags: [industries]
+      summary: Read the agency industry catalogue and usage counts
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IndustryCatalogue'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    post:
+      operationId: createIndustry
+      tags: [industries]
+      summary: Add an industry or subindustry
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IndustryEdit'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IndustryCatalogue'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/industries/{industryId}:
+    parameters:
+      - {name: industryId, in: path, required: true, schema: {$ref: '#/components/schemas/IndustryId'}}
+    patch:
+      operationId: updateIndustry
+      tags: [industries]
+      summary: Rename or move a category without breaking existing selections
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IndustryEdit'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IndustryCatalogue'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/industries/{industryId}/remove:
+    parameters:
+      - {name: industryId, in: path, required: true, schema: {$ref: '#/components/schemas/IndustryId'}}
+    post:
+      operationId: removeIndustry
+      tags: [industries]
+      summary: Retire a category or delete it after explicitly reassigning its records
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [catalogueVersion, action]
+              properties:
+                catalogueVersion: {type: integer, minimum: 1}
+                action: {type: string, enum: [retire, delete]}
+                replacementId: {$ref: '#/components/schemas/IndustryId'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IndustryCatalogue'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/candidates/{candidateId}/industry-suggestion:
+    parameters:
+      - {name: candidateId, in: path, required: true, schema: {$ref: '#/components/schemas/CandidateId'}}
+    get:
+      operationId: suggestCandidateIndustry
+      tags: [industries]
+      summary: Suggest an industry from the selected employer without changing saved tags
+      x-permission: candidates:read
+      parameters:
+        - {name: employerIndex, in: query, schema: {type: integer, minimum: 0, maximum: 199}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IndustrySuggestion'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/cv-imports:
     get:
       operationId: listCvImports
@@ -5167,6 +5281,7 @@ components:
           allOf: [{$ref: '#/components/schemas/NoticePeriod'}]
           nullable: true
         industry: {type: string, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         specialization: {type: string, nullable: true}
         currentTitle: {type: string, nullable: true}
         currentCompany: {type: string, nullable: true}
@@ -5217,6 +5332,7 @@ components:
           allOf: [{$ref: '#/components/schemas/NoticePeriod'}]
           nullable: true
         industry: {type: string, maxLength: 100, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         specialization: {type: string, maxLength: 100, nullable: true}
         currentTitle: {type: string, maxLength: 200, nullable: true}
         currentCompany: {type: string, maxLength: 200, nullable: true}
@@ -5265,6 +5381,7 @@ components:
           allOf: [{$ref: '#/components/schemas/NoticePeriod'}]
           nullable: true
         industry: {type: string, maxLength: 100, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         specialization: {type: string, maxLength: 100, nullable: true}
         currentTitle: {type: string, maxLength: 200, nullable: true}
         currentCompany: {type: string, maxLength: 200, nullable: true}
@@ -5734,6 +5851,7 @@ components:
         website: {type: string, nullable: true, description: 'Always with https://, e.g. https://example.com.'}
         linkedinUrl: {type: string, nullable: true, description: "The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik."}
         industry: {type: string, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         size:
           allOf: [{$ref: '#/components/schemas/CompanySize'}]
           nullable: true
@@ -5760,6 +5878,7 @@ components:
         website: {type: string, maxLength: 300, nullable: true, description: 'example.com or a full address; https:// is added if missing.'}
         linkedinUrl: {type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).'}
         industry: {type: string, maxLength: 100, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         size:
           allOf: [{$ref: '#/components/schemas/CompanySize'}]
           nullable: true
@@ -5783,6 +5902,7 @@ components:
         website: {type: string, maxLength: 300, nullable: true}
         linkedinUrl: {type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).'}
         industry: {type: string, maxLength: 100, nullable: true}
+        industrySelections: {$ref: '#/components/schemas/IndustrySelections'}
         size:
           allOf: [{$ref: '#/components/schemas/CompanySize'}]
           nullable: true
@@ -6337,6 +6457,7 @@ components:
         Details read from a CV, as suggestions to review. nationality is an ISO country code; noticePeriod is "<number> day|week|month".
 
       properties:
+        selectedEmployerIndex: {type: integer, minimum: 0, maximum: 199, description: 'Go-selected current or latest dated employer; omitted when review is needed.'}
         parser: {type: string, description: 'name@version of the parser(s), e.g. rules@1.'}
         fullName: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
         email: {allOf: [{$ref: '#/components/schemas/SourcedText'}], nullable: true}
@@ -7026,6 +7147,67 @@ components:
           description: The team they are in; null for none.
           nullable: true
           allOf: [{$ref: '#/components/schemas/TeamGroupId'}]
+    IndustryId:
+      type: string
+      pattern: '^industry_[0-9a-hjkmnp-tv-z]{26}$'
+    Industry:
+      type: object
+      additionalProperties: false
+      required: [id, label, aliases, retired, candidateCount, companyCount]
+      properties:
+        id: {$ref: '#/components/schemas/IndustryId'}
+        parentId: {$ref: '#/components/schemas/IndustryId'}
+        sourceKey: {type: string}
+        label: {type: string}
+        aliases: {type: array, items: {type: string}}
+        retired: {type: boolean}
+        candidateCount: {type: integer}
+        companyCount: {type: integer}
+    IndustryCatalogue:
+      type: object
+      additionalProperties: false
+      required: [version, items]
+      properties:
+        version: {type: integer}
+        items: {type: array, items: {$ref: '#/components/schemas/Industry'}}
+    IndustryEdit:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, label, aliases, retired]
+      properties:
+        catalogueVersion: {type: integer, minimum: 1}
+        label: {type: string, minLength: 1, maxLength: 100}
+        parentId: {$ref: '#/components/schemas/IndustryId'}
+        aliases: {type: array, maxItems: 30, items: {type: string, minLength: 1, maxLength: 100}}
+        retired: {type: boolean}
+    IndustrySelections:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, ids]
+      properties:
+        catalogueVersion: {type: integer, minimum: 1}
+        ids: {type: array, maxItems: 50, uniqueItems: true, items: {$ref: '#/components/schemas/IndustryId'}}
+        primaryId: {$ref: '#/components/schemas/IndustryId'}
+    IndustryEmployer:
+      type: object
+      required: [index, name, title, current]
+      properties:
+        index: {type: integer}
+        name: {type: string}
+        title: {type: string}
+        current: {type: boolean}
+    IndustrySuggestion:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, candidateVersion, status, reason, employers]
+      properties:
+        catalogueVersion: {type: integer}
+        candidateVersion: {type: integer}
+        status: {type: string, enum: [ready, needs_review]}
+        reason: {type: string}
+        categoryId: {$ref: '#/components/schemas/IndustryId'}
+        employerIndex: {type: integer}
+        employers: {type: array, items: {$ref: '#/components/schemas/IndustryEmployer'}}
     CvImportId:
       type: string
       pattern: '^cvi_[0-9a-hjkmnp-tv-z]{26}$'
@@ -9963,6 +10145,8 @@ x-modules:
     description: 'Email from the app: formatted templates with fields ([First name], [Expected salary], ...) filled from the candidate, job, interview and sender; cc and bcc; image banners; attachments (the candidate''s CVs or files from the computer); messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it. Salary fields fill only for senders who may see salaries, and by default an email with salary in it is hidden from roles that may not (Settings can show it to all).'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
+  - name: industries
+    description: Editable industries and subindustries shared by candidates and companies.
   - name: intake
     description: CV imports. Each file (a CV, or a LinkedIn profile saved as PDF) becomes a candidate named after the file, owned by whoever uploaded it, and is read like any CV. When the reading is done the candidate is filled in from it (name, email, phone, location, LinkedIn link, current job, work history, education, skills, industry), or, when its email already belongs to a candidate, merged into that candidate (one candidate per email). Files are sent one per request, so a batch shows each file's progress.
   - name: integrations

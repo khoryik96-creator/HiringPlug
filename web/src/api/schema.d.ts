@@ -1495,6 +1495,81 @@ export interface paths {
         patch: operations["renameTeam"];
         trace?: never;
     };
+    "/v1/industries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the agency industry catalogue and usage counts */
+        get: operations["listIndustries"];
+        put?: never;
+        /** Add an industry or subindustry */
+        post: operations["createIndustry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/industries/{industryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                industryId: components["schemas"]["IndustryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename or move a category without breaking existing selections */
+        patch: operations["updateIndustry"];
+        trace?: never;
+    };
+    "/v1/industries/{industryId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                industryId: components["schemas"]["IndustryId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire a category or delete it after explicitly reassigning its records */
+        post: operations["removeIndustry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/candidates/{candidateId}/industry-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidateId: components["schemas"]["CandidateId"];
+            };
+            cookie?: never;
+        };
+        /** Suggest an industry from the selected employer without changing saved tags */
+        get: operations["suggestCandidateIndustry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cv-imports": {
         parameters: {
             query?: never;
@@ -3336,6 +3411,7 @@ export interface components {
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             specialization: string | null;
             currentTitle: string | null;
             currentCompany: string | null;
@@ -3368,6 +3444,7 @@ export interface components {
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             specialization?: string | null;
             currentTitle?: string | null;
             currentCompany?: string | null;
@@ -3395,6 +3472,7 @@ export interface components {
             workAuthorization?: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod?: components["schemas"]["NoticePeriod"] | null;
             industry?: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             specialization?: string | null;
             currentTitle?: string | null;
             currentCompany?: string | null;
@@ -3768,6 +3846,7 @@ export interface components {
             /** @description The company's LinkedIn page, e.g. https://www.linkedin.com/company/maju-logistik. */
             linkedinUrl: string | null;
             industry: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             size: components["schemas"]["CompanySize"] | null;
             phone: string | null;
             address: string | null;
@@ -3792,6 +3871,7 @@ export interface components {
             /** @description linkedin.com/company/... (https://www. is added). */
             linkedinUrl?: string | null;
             industry?: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             size?: components["schemas"]["CompanySize"] | null;
             phone?: string | null;
             address?: string | null;
@@ -3811,6 +3891,7 @@ export interface components {
             /** @description linkedin.com/company/... (https://www. is added). */
             linkedinUrl?: string | null;
             industry?: string | null;
+            industrySelections?: components["schemas"]["IndustrySelections"];
             size?: components["schemas"]["CompanySize"] | null;
             phone?: string | null;
             address?: string | null;
@@ -4229,6 +4310,8 @@ export interface components {
         };
         /** @description Details read from a CV, as suggestions to review. nationality is an ISO country code; noticePeriod is "<number> day|week|month". */
         ParsedProfile: {
+            /** @description Go-selected current or latest dated employer; omitted when review is needed. */
+            selectedEmployerIndex?: number;
             /** @description name@version of the parser(s), e.g. rules@1. */
             parser: string;
             fullName: components["schemas"]["SourcedText"] | null;
@@ -4690,6 +4773,49 @@ export interface components {
             active?: boolean;
             /** @description The team they are in; null for none. */
             teamId?: components["schemas"]["TeamGroupId"] | null;
+        };
+        IndustryId: string;
+        Industry: {
+            id: components["schemas"]["IndustryId"];
+            parentId?: components["schemas"]["IndustryId"];
+            sourceKey?: string;
+            label: string;
+            aliases: string[];
+            retired: boolean;
+            candidateCount: number;
+            companyCount: number;
+        };
+        IndustryCatalogue: {
+            version: number;
+            items: components["schemas"]["Industry"][];
+        };
+        IndustryEdit: {
+            catalogueVersion: number;
+            label: string;
+            parentId?: components["schemas"]["IndustryId"];
+            aliases: string[];
+            retired: boolean;
+        };
+        IndustrySelections: {
+            catalogueVersion: number;
+            ids: components["schemas"]["IndustryId"][];
+            primaryId?: components["schemas"]["IndustryId"];
+        };
+        IndustryEmployer: {
+            index: number;
+            name: string;
+            title: string;
+            current: boolean;
+        };
+        IndustrySuggestion: {
+            catalogueVersion: number;
+            candidateVersion: number;
+            /** @enum {string} */
+            status: "ready" | "needs_review";
+            reason: string;
+            categoryId?: components["schemas"]["IndustryId"];
+            employerIndex?: number;
+            employers: components["schemas"]["IndustryEmployer"][];
         };
         /** @example cvi_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CvImportId: string;
@@ -9627,6 +9753,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamGroup"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listIndustries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryCatalogue"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    createIndustry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndustryEdit"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryCatalogue"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateIndustry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                industryId: components["schemas"]["IndustryId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndustryEdit"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryCatalogue"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    removeIndustry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                industryId: components["schemas"]["IndustryId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    catalogueVersion: number;
+                    /** @enum {string} */
+                    action: "retire" | "delete";
+                    replacementId?: components["schemas"]["IndustryId"];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustryCatalogue"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    suggestCandidateIndustry: {
+        parameters: {
+            query?: {
+                employerIndex?: number;
+            };
+            header?: never;
+            path: {
+                candidateId: components["schemas"]["CandidateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndustrySuggestion"];
                 };
             };
             400: components["responses"]["ValidationFailed"];

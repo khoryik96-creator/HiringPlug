@@ -144,3 +144,13 @@ SELECT * FROM company_document WHERE id = @id AND company_id = @company_id;
 
 -- name: DeleteCompanyDocument :one
 DELETE FROM company_document WHERE id = @id AND company_id = @company_id RETURNING storage_key;
+
+-- name: LegacyIndustries :many
+SELECT id, industry::text FROM company WHERE industry IS NOT NULL;
+-- name: SetIndustrySummary :exec
+UPDATE company SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
+WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);
+-- name: IndustryEmployerID :one
+SELECT id FROM company WHERE name_key = app_normalize_text(@name::text);
+-- name: TouchCompany :one
+UPDATE company SET version = version + 1, updated_at = now() WHERE id = @id AND version = @expected_version RETURNING *;

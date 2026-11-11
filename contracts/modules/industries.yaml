@@ -1,0 +1,186 @@
+# Shared tenant catalogue and employer-based industry recognition. Go owns the rules.
+x-module:
+  name: industries
+  description: Editable industries and subindustries shared by candidates and companies.
+  permissions: {}
+  errorCodes: {}
+  jobs: {}
+
+paths:
+  /v1/industries:
+    get:
+      operationId: listIndustries
+      tags: [industries]
+      summary: Read the agency industry catalogue and usage counts
+      x-permission: settings:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndustryCatalogue' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    post:
+      operationId: createIndustry
+      tags: [industries]
+      summary: Add an industry or subindustry
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IndustryEdit' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndustryCatalogue' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/industries/{industryId}:
+    parameters:
+      - { name: industryId, in: path, required: true, schema: { $ref: '#/components/schemas/IndustryId' } }
+    patch:
+      operationId: updateIndustry
+      tags: [industries]
+      summary: Rename or move a category without breaking existing selections
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IndustryEdit' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndustryCatalogue' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/industries/{industryId}/remove:
+    parameters:
+      - { name: industryId, in: path, required: true, schema: { $ref: '#/components/schemas/IndustryId' } }
+    post:
+      operationId: removeIndustry
+      tags: [industries]
+      summary: Retire a category or delete it after explicitly reassigning its records
+      x-permission: settings:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [catalogueVersion, action]
+              properties:
+                catalogueVersion: { type: integer, minimum: 1 }
+                action: { type: string, enum: [retire, delete] }
+                replacementId: { $ref: '#/components/schemas/IndustryId' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndustryCatalogue' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/candidates/{candidateId}/industry-suggestion:
+    parameters:
+      - { name: candidateId, in: path, required: true, schema: { $ref: '#/components/schemas/CandidateId' } }
+    get:
+      operationId: suggestCandidateIndustry
+      tags: [industries]
+      summary: Suggest an industry from the selected employer without changing saved tags
+      x-permission: candidates:read
+      parameters:
+        - { name: employerIndex, in: query, schema: { type: integer, minimum: 0, maximum: 199 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IndustrySuggestion' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  schemas:
+    IndustryId:
+      type: string
+      pattern: '^industry_[0-9a-hjkmnp-tv-z]{26}$'
+    Industry:
+      type: object
+      additionalProperties: false
+      required: [id, label, aliases, retired, candidateCount, companyCount]
+      properties:
+        id: { $ref: '#/components/schemas/IndustryId' }
+        parentId: { $ref: '#/components/schemas/IndustryId' }
+        sourceKey: { type: string }
+        label: { type: string }
+        aliases: { type: array, items: { type: string } }
+        retired: { type: boolean }
+        candidateCount: { type: integer }
+        companyCount: { type: integer }
+    IndustryCatalogue:
+      type: object
+      additionalProperties: false
+      required: [version, items]
+      properties:
+        version: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Industry' } }
+    IndustryEdit:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, label, aliases, retired]
+      properties:
+        catalogueVersion: { type: integer, minimum: 1 }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        parentId: { $ref: '#/components/schemas/IndustryId' }
+        aliases: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 100 } }
+        retired: { type: boolean }
+    IndustrySelections:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, ids]
+      properties:
+        catalogueVersion: { type: integer, minimum: 1 }
+        ids: { type: array, maxItems: 50, uniqueItems: true, items: { $ref: '#/components/schemas/IndustryId' } }
+        primaryId: { $ref: '#/components/schemas/IndustryId' }
+    IndustryEmployer:
+      type: object
+      required: [index, name, title, current]
+      properties:
+        index: { type: integer }
+        name: { type: string }
+        title: { type: string }
+        current: { type: boolean }
+    IndustrySuggestion:
+      type: object
+      additionalProperties: false
+      required: [catalogueVersion, candidateVersion, status, reason, employers]
+      properties:
+        catalogueVersion: { type: integer }
+        candidateVersion: { type: integer }
+        status: { type: string, enum: [ready, needs_review] }
+        reason: { type: string }
+        categoryId: { $ref: '#/components/schemas/IndustryId' }
+        employerIndex: { type: integer }
+        employers: { type: array, items: { $ref: '#/components/schemas/IndustryEmployer' } }

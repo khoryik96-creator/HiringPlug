@@ -11,9 +11,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/oapi-codegen/nullable"
 
+	"time"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 )
 
 type intakeCandidates struct{ *candidates.Module }
@@ -78,17 +81,13 @@ func cvFromParsed(p api.ParsedProfile) candidates.FromCV {
 	for _, s := range p.Skills {
 		cv.Profile.Skills = append(cv.Profile.Skills, s.Value)
 	}
-	latest := -1 // the job marked current, else the first listed (as the CV review)
-	for i, j := range p.Experience {
+	jobs := []industries.Employment{}
+	for _, j := range p.Experience {
 		job := candidates.Job{Title: value(j.Title), Company: value(j.Company), StartDate: plain(j.StartDate), EndDate: plain(j.EndDate), Current: j.Current}
-		if latest < 0 && j.Current {
-			latest = i
-		}
 		cv.History.Work = append(cv.History.Work, job)
+		jobs = append(jobs, industries.Employment{Name: plainString(job.Company), Title: plainString(job.Title), Start: plainString(job.StartDate), End: plainString(job.EndDate), Current: job.Current})
 	}
-	if latest < 0 && len(cv.History.Work) > 0 {
-		latest = 0
-	}
+	latest, _ := industries.SelectEmployer(jobs, time.Now())
 	if latest >= 0 {
 		cv.Profile.CurrentTitle, cv.Profile.CurrentCompany = cv.History.Work[latest].Title, cv.History.Work[latest].Company
 	}

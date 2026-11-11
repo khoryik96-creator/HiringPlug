@@ -25,12 +25,13 @@ const downloadLinkTTL = 7 * 24 * time.Hour
 
 // Service holds the document use cases.
 type Service struct {
-	pool       *pgxpool.Pool
-	files      *blob.Store
-	candidates Candidates
-	whenRead   []TextReadHook
-	whenDone   []ReadDoneHook
-	ai         AIAllowance // nil: the AI never fills in CV readings
+	pool           *pgxpool.Pool
+	files          *blob.Store
+	candidates     Candidates
+	whenRead       []TextReadHook
+	whenDone       []ReadDoneHook
+	enrichIndustry func(context.Context, pgx.Tx, *api.ParsedProfile) error
+	ai             AIAllowance // nil: the AI never fills in CV readings
 }
 
 // AIAllowance says whether the AI may be used now (the company has one,

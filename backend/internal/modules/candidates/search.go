@@ -106,9 +106,17 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 			inCV[id] = true
 		}
 	}
+	industryIDs := []string{}
+	if len(f.Industries) > 0 && s.industries != nil {
+		var err error
+		industryIDs, err = s.industries.CandidateIDsIn(ctx, tx, f.Industries)
+		if err != nil {
+			return page, err
+		}
+	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	rows, err := store.New(tx).SearchCandidates(ctx, store.SearchCandidatesParams{
-		Ts: ts, Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
+		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,

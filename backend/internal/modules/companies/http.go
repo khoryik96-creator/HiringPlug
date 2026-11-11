@@ -6,6 +6,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/classification"
 )
 
 const defaultPageSize = 25
@@ -41,7 +42,8 @@ func (h *HTTP) CreateCompany(ctx context.Context, req api.CreateCompanyRequestOb
 	b := req.Body
 	in := Details{
 		Name: b.Name, Category: c.ValueOrNil(b.Category), Website: c.ValueOrNil(b.Website), LinkedinURL: c.ValueOrNil(b.LinkedinUrl), Industry: c.ValueOrNil(b.Industry),
-		Size: c.Convert[string](c.ValueOrNil(b.Size)), Phone: c.ValueOrNil(b.Phone), Address: c.ValueOrNil(b.Address),
+		IndustrySelections: choicesFromAPI(b.IndustrySelections),
+		Size:               c.Convert[string](c.ValueOrNil(b.Size)), Phone: c.ValueOrNil(b.Phone), Address: c.ValueOrNil(b.Address),
 		City: c.ValueOrNil(b.City), Country: c.ValueOrNil(b.Country),
 		RegistrationNumber: c.ValueOrNil(b.RegistrationNumber), About: c.ValueOrNil(b.About),
 	}
@@ -74,6 +76,7 @@ func (h *HTTP) UpdateCompany(ctx context.Context, req api.UpdateCompanyRequestOb
 		Website:            c.Optional(b.Website, c.Same[string]),
 		LinkedinURL:        c.Optional(b.LinkedinUrl, c.Same[string]),
 		Industry:           c.Optional(b.Industry, c.Same[string]),
+		IndustrySelections: choicesFromAPI(b.IndustrySelections),
 		Size:               c.Optional(b.Size, func(s api.CompanySize) string { return string(s) }),
 		Phone:              c.Optional(b.Phone, c.Same[string]),
 		Address:            c.Optional(b.Address, c.Same[string]),
@@ -92,10 +95,26 @@ func (h *HTTP) UpdateCompany(ctx context.Context, req api.UpdateCompanyRequestOb
 func toAPI(co Company) api.Company {
 	d := co.Details
 	return api.Company{
-		Id: co.ID, Version: co.Version, Name: d.Name, Type: api.CompanyType(d.Type), Category: c.OrNull(d.Category),
+		IndustrySelections: choicesToAPI(d.IndustrySelections),
+		Id:                 co.ID, Version: co.Version, Name: d.Name, Type: api.CompanyType(d.Type), Category: c.OrNull(d.Category),
 		Website: c.OrNull(d.Website), LinkedinUrl: c.OrNull(d.LinkedinURL), Industry: c.OrNull(d.Industry), Size: c.OrNull(c.Convert[api.CompanySize](d.Size)),
 		Phone: c.OrNull(d.Phone), Address: c.OrNull(d.Address), City: c.OrNull(d.City), Country: c.OrNull(d.Country),
 		RegistrationNumber: c.OrNull(d.RegistrationNumber), About: c.OrNull(d.About),
 		CreatedAt: co.CreatedAt, UpdatedAt: co.UpdatedAt,
 	}
+}
+
+func choicesFromAPI(v *api.IndustrySelections) *classification.Selections {
+	if v == nil {
+		return nil
+	}
+	out := classification.Selections(*v)
+	return &out
+}
+func choicesToAPI(v *classification.Selections) *api.IndustrySelections {
+	if v == nil {
+		return nil
+	}
+	out := api.IndustrySelections(*v)
+	return &out
 }

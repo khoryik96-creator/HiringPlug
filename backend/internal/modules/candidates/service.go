@@ -22,6 +22,7 @@ const emailUniqueIndex = "candidate_tenant_email_uq"
 
 // Service holds the candidate use cases.
 type Service struct {
+	industries  IndustryCatalogue
 	pool        *pgxpool.Pool
 	phoneRegion string
 	users       Users
@@ -39,7 +40,19 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 	}
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
+		if s.industries != nil {
+			var e error
+			profile.Industry, e = s.industries.SummaryIn(ctx, tx, profile.IndustrySelections, profile.Industry)
+			if e != nil {
+				return e
+			}
+		}
 		if err := s.checkFields(ctx, tx, nil, profile); err != nil {
 			return err
 		}
@@ -58,7 +71,21 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 		}); err != nil {
 			return err
 		}
+		if err := s.saveIndustries(ctx, tx, row.ID, profile); err != nil {
+			return err
+		}
+		row, err = q.GetCandidate(ctx, row.ID)
+		if err != nil {
+			return err
+		}
 		view = View{Candidate: fromRow(row), CompensationRestricted: !canSeeSalary(p)}
+		if s.industries != nil {
+			choices, e := s.industries.ReadIn(ctx, tx, "candidate", row.ID)
+			if e != nil {
+				return e
+			}
+			view.Profile.IndustrySelections = &choices
+		}
 		view.OwnerName, err = ownerName(ctx, tx, s.users, view.OwnerID)
 		return err
 	})
@@ -69,6 +96,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, error) {
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if _, err := s.industries.ReadIn(ctx, tx, "candidate", ""); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
 		row, err := q.GetCandidate(ctx, id)
 		if database.IsNoRows(err) {
@@ -77,7 +109,7 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 		if err != nil {
 			return err
 		}
-		view, err = loadView(ctx, tx, s.users, p, fromRow(row))
+		view, err = s.loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
 	})
 	return view, err
@@ -88,6 +120,11 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expectedVersion int, patch ProfilePatch) (View, error) {
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		var err error
 		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply, false)
 		return err
@@ -99,6 +136,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 // profile as stored into the new one. With unchangedOK, a change that alters
 // nothing writes nothing and needs no version check.
 func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string, expectedVersion int, change func(Profile) Profile, unchangedOK bool) (View, error) {
+	if s.industries != nil {
+		if err := s.industries.LockIn(ctx, tx); err != nil {
+			return View{}, err
+		}
+	}
 	q := store.New(tx)
 	row, err := q.GetCandidate(ctx, id)
 	if database.IsNoRows(err) {
@@ -110,7 +152,7 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	before := fromRow(row).Profile
 	after, errs := NormalizeProfile(change(before), s.phoneRegion)
 	if unchangedOK && len(errs) == 0 && len(audit.Diff(profileFields(before), profileFields(after))) == 0 {
-		return loadView(ctx, tx, s.users, p, fromRow(row))
+		return s.loadView(ctx, tx, s.users, p, fromRow(row))
 	}
 	if int(row.Version) != expectedVersion {
 		return View{}, apperr.StaleVersion("candidate").WithDetail("currentVersion", row.Version)
@@ -118,13 +160,19 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	if err := errs.Err(); err != nil {
 		return View{}, err
 	}
+	if s.industries != nil {
+		after.Industry, err = s.industries.SummaryIn(ctx, tx, after.IndustrySelections, after.Industry)
+		if err != nil {
+			return View{}, err
+		}
+	}
 	if err := s.checkFields(ctx, tx, &before, after); err != nil {
 		return View{}, err
 	}
 	if err := s.checkEmailFree(ctx, tx, after.Email, id); err != nil {
 		return View{}, err
 	}
-	updated, err := q.UpdateCandidate(ctx, updateParams(id, expectedVersion, after))
+	_, err = q.UpdateCandidate(ctx, updateParams(id, expectedVersion, after))
 	switch {
 	case database.IsNoRows(err):
 		return View{}, apperr.StaleVersion("candidate") // changed between our read and our write
@@ -139,7 +187,14 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	}); err != nil {
 		return View{}, err
 	}
-	return loadView(ctx, tx, s.users, p, fromRow(updated))
+	if err := s.saveIndustries(ctx, tx, id, after); err != nil {
+		return View{}, err
+	}
+	updated, err := q.GetCandidate(ctx, id)
+	if err != nil {
+		return View{}, err
+	}
+	return s.loadView(ctx, tx, s.users, p, fromRow(updated))
 }
 
 // SetCompensation replaces a candidate's salary details. expectedVersion is 0
@@ -150,6 +205,11 @@ func (s *Service) SetCompensation(ctx context.Context, p authz.Principal, candid
 	}
 	var result Compensation
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		var err error
 		result, err = setCompensationIn(ctx, tx, candidateID, expectedVersion, current, expected)
 		return err
@@ -218,13 +278,20 @@ func canSeeSalary(p authz.Principal) bool {
 // rather than "none recorded".
 // loadView reads what the candidate page shows besides the profile: work
 // history, education and (if the user may see it) salary.
-func loadView(ctx context.Context, tx pgx.Tx, users Users, p authz.Principal, c Candidate) (View, error) {
+func (s *Service) loadView(ctx context.Context, tx pgx.Tx, users Users, p authz.Principal, c Candidate) (View, error) {
 	q := store.New(tx)
 	history, err := loadHistory(ctx, q, c.ID)
 	if err != nil {
 		return View{}, err
 	}
 	view := View{Candidate: c, History: history}
+	if s.industries != nil {
+		choices, err := s.industries.ReadIn(ctx, tx, "candidate", c.ID)
+		if err != nil {
+			return View{}, err
+		}
+		view.Profile.IndustrySelections = &choices
+	}
 	if view.OwnerName, err = ownerName(ctx, tx, users, c.OwnerID); err != nil {
 		return View{}, err
 	}
@@ -400,32 +467,4 @@ func updateCompensationParams(candidateID string, expectedVersion int, current *
 		u.ExpectedMin, u.ExpectedMax, u.ExpectedCurrency, u.ExpectedPeriod = &expected.Min, expected.Max, &expected.Currency, &expected.Period
 	}
 	return u
-}
-
-// UsedValues are tags, skills, industries and specializations already used in
-// the company, most used first.
-type UsedValues struct {
-	Tags, Skills, Industries, Specializations []string
-}
-
-// Used returns the values already used, for suggestions.
-func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, error) {
-	out := UsedValues{Tags: []string{}, Skills: []string{}, Industries: []string{}, Specializations: []string{}}
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		rows, err := store.New(tx).UsedValues(ctx)
-		for _, r := range rows {
-			switch r.Kind {
-			case "tag":
-				out.Tags = append(out.Tags, r.Value)
-			case "skill":
-				out.Skills = append(out.Skills, r.Value)
-			case "industry":
-				out.Industries = append(out.Industries, r.Value)
-			case "specialization":
-				out.Specializations = append(out.Specializations, r.Value)
-			}
-		}
-		return err
-	})
-	return out, err
 }

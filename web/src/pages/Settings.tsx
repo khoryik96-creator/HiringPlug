@@ -27,8 +27,9 @@ export function Settings() {
           <MandatoryFields fields={settings.data.mandatory} />
           <Policies />
           <SalaryCalculationSettings />
+          <p><a href="#/industries">Manage industries &amp; subindustries</a></p>
           <h3>Dropdowns</h3>
-          {settings.data.lists.filter((l) => !l.hints && !l.colors).map((l) => <ListEditor key={l.name} list={l} />)}
+          {settings.data.lists.filter((l) => !l.hints && !l.colors && l.name !== "industry").map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="company-categories">Company categories</h3>
           <p className="muted">
             The categories a company can be in (signed client, prospect, VIP…), each with its colour: the colour of its card on the

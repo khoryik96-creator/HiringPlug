@@ -41,6 +41,11 @@ func PlaceholderName(fileName string) string {
 // CreatePlaceholder adds a candidate for an imported file, named after it,
 // owned by owner (nil for none), in the caller's transaction.
 func (m *Module) CreatePlaceholder(ctx context.Context, tx pgx.Tx, fileName, source string, owner *string) (string, error) {
+	if m.service.industries != nil {
+		if err := m.service.industries.LockIn(ctx, tx); err != nil {
+			return "", err
+		}
+	}
 	p := Profile{FirstName: PlaceholderName(fileName), Source: &source}
 	row, err := store.New(tx).InsertCandidate(ctx, insertParams(p, owner))
 	if err != nil {
@@ -57,6 +62,11 @@ func (m *Module) CreatePlaceholder(ctx context.Context, tx pgx.Tx, fileName, sou
 // the CV's email belongs to another candidate, the email is not set and
 // emailOwner names that candidate (the import then merges into them).
 func (m *Module) FillFromCV(ctx context.Context, tx pgx.Tx, id string, cv FromCV) (emailOwner string, err error) {
+	if m.service.industries != nil {
+		if err := m.service.industries.LockIn(ctx, tx); err != nil {
+			return "", err
+		}
+	}
 	q := store.New(tx)
 	row, err := q.GetCandidate(ctx, id)
 	if err != nil {
@@ -96,6 +106,9 @@ func (m *Module) FillFromCV(ctx context.Context, tx pgx.Tx, id string, cv FromCV
 		normal, errs = NormalizeProfile(after, m.service.phoneRegion)
 	}
 	if _, err := q.UpdateCandidate(ctx, updateParams(id, int(row.Version), normal)); err != nil {
+		return "", err
+	}
+	if err := m.service.saveIndustries(ctx, tx, id, normal); err != nil {
 		return "", err
 	}
 	if h, err := loadHistory(ctx, q, id); err != nil {

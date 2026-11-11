@@ -65,6 +65,11 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 	}
 	var out View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.industries != nil {
+			if err := s.industries.LockIn(ctx, tx); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
 		keepRow, err := q.GetCandidate(ctx, keepID)
 		if database.IsNoRows(err) {
@@ -89,7 +94,7 @@ func (s *Service) Merge(ctx context.Context, p authz.Principal, keepID, dupID st
 		if err != nil {
 			return err
 		}
-		out, err = loadView(ctx, tx, s.users, p, fromRow(row))
+		out, err = s.loadView(ctx, tx, s.users, p, fromRow(row))
 		return err
 	})
 	return out, err
@@ -107,6 +112,11 @@ func (h *HTTP) MergeCandidate(ctx context.Context, req api.MergeCandidateRequest
 // mergeRows moves dupRow's records and empty-field values into keepRow and
 // deletes dupRow, in the caller's transaction (see Merge).
 func (s *Service) mergeRows(ctx context.Context, tx pgx.Tx, keepRow, dupRow store.Candidate, version int) (store.Candidate, error) {
+	if s.industries != nil {
+		if err := s.industries.LockIn(ctx, tx); err != nil {
+			return keepRow, err
+		}
+	}
 	q := store.New(tx)
 	keepID, dupID := keepRow.ID, dupRow.ID
 	for _, m := range s.movers {
@@ -137,10 +147,16 @@ func (s *Service) mergeRows(ctx context.Context, tx pgx.Tx, keepRow, dupRow stor
 	if _, err := q.DeleteCandidate(ctx, dupID); err != nil {
 		return keepRow, err
 	}
-	row := keepRow
+	var row store.Candidate
 	if len(filled) > 0 {
 		var err error
 		if row, err = q.UpdateCandidate(ctx, updateParams(keepID, version, after)); err != nil {
+			return keepRow, err
+		}
+	} else {
+		var err error
+		row, err = q.TouchCandidate(ctx, store.TouchCandidateParams{ID: keepID, ExpectedVersion: int32(version)}) //nolint:gosec // checked record version
+		if err != nil {
 			return keepRow, err
 		}
 	}

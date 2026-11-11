@@ -19,6 +19,7 @@ import { useUsedValues } from "./useUsedValues";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
+import { IndustryPicker } from "./IndustryPicker";
 import { SourcePicker } from "./SourcePicker";
 
 type TextKey = "firstName" | "lastName" | "email" | "phone" | "linkedinUrl" | "nationality" | "waNote" | "industry"
@@ -96,12 +97,9 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       {form.waStatus !== "" && text("waNote", "Work authorization note")}
 
       <NoticeField form={form} onChange={change} label={req("Notice period", "noticePeriod")} error={errorFor("noticeValue") ?? errorFor("noticeUnit")} />
-      <Field label={req("Industry", "industry")} error={errorFor("industry")}>
-        <select value={form.industry} onChange={(e) => { set("industry", e.target.value); }}>
-          <option value="">—</option>
-          {fs.options("industry", form.industry).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
-      </Field>
+      <IndustryPicker value={form.industrySelections} legacy={form.industry} candidate={candidate}
+        sourceChanged={form.currentCompany !== opened.form.currentCompany || form.currentTitle !== opened.form.currentTitle}
+        onChange={(industrySelections, industry) => { change({ industrySelections, industry }); }} />
       {text("specialization", "Specialization", { list: "specializations" })}
       <datalist id="specializations">{used.specializations.map((v) => <option key={v} value={v} />)}</datalist>
       {text("currentTitle", req("Current title", "currentTitle"))}

@@ -460,6 +460,7 @@ components:
         Details read from a CV, as suggestions to review. nationality is an
         ISO country code; noticePeriod is "<number> day|week|month".
       properties:
+        selectedEmployerIndex: { type: integer, minimum: 0, maximum: 199, description: 'Go-selected current or latest dated employer; omitted when review is needed.' }
         parser: { type: string, description: 'name@version of the parser(s), e.g. rules@1.' }
         fullName: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }
         email: { allOf: [{ $ref: '#/components/schemas/SourcedText' }], nullable: true }

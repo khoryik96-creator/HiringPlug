@@ -21,6 +21,8 @@ Read in this order. Each page is short and links to the next.
 - [Turning HiringPlug into a SaaS: scaling to 20,000 users](saas-plan-scaling-to-20k-users.md): what to change, set-up and costs at each size, Python or Go.
 - [Profit Planner](https://claude.ai/artifact/SXZUgNHU16BkqiUHX6uU2G) (source: [pricing-calculator.html](pricing-calculator.html)): prices, users, costs and tax in, margin, break-even and a forecast out.
 
+- [Industries and subindustries](industries.md): catalogue settings, employer recognition and legacy data.
+
 ## How-to guides
 
 - [Add a module](playbooks/add-a-module.md)

@@ -146,6 +146,11 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	var kept *api.ParsedProfile
 	if profile, err := result.Profile.Get(); err == nil && hasText(row.ExtractedText) {
 		grounded := groundProfile(*row.ExtractedText, profile)
+		if s.enrichIndustry != nil {
+			if err := s.enrichIndustry(ctx, tx, &grounded); err != nil {
+				return err
+			}
+		}
 		kept = &grounded
 		data, err := json.Marshal(grounded)
 		if err != nil {

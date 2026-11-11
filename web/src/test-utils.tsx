@@ -53,6 +53,8 @@ export function invalidField(field: string, message: string): never {
 /** Renders with a fresh query client that, like the app's, does not retry. */
 export function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(["industries"], testIndustryCatalogue());
+  client.setQueryDefaults(["industries"], { staleTime: Infinity });
   const wrap = (node: ReactElement) => <QueryClientProvider client={client}>{node}</QueryClientProvider>;
   const result = render(wrap(ui));
   return { client, rerender: (next: ReactElement) => { result.rerender(wrap(next)); } };
@@ -85,4 +87,15 @@ export function testFieldSettings(mandatory: { form: "candidate" | "job"; field:
     ],
     mandatory: mandatory.map((m) => ({ ...m, label: m.field, mandatory: true, alwaysRequired: false })),
   } as never;
+}
+
+/** Synthetic shared catalogue for form tests. Recognition and CRUD tests mock their own requests. */
+export function testIndustryCatalogue() {
+  return { version: 1, items: [
+    { id: "industry_bank", label: "Financial Services", aliases: [], retired: false, candidateCount: 0, companyCount: 0 },
+    { id: "industry_banking", parentId: "industry_bank", label: "FSI – Banking", aliases: ["banking"], retired: false, candidateCount: 0, companyCount: 0 },
+    { id: "industry_it", label: "Information Technology & Services", aliases: [], retired: false, candidateCount: 0, companyCount: 0 },
+    { id: "industry_erp", parentId: "industry_it", label: "Tech – ERP/CRM/HCM/Application", aliases: ["SAP"], retired: false, candidateCount: 0, companyCount: 0 },
+    { id: "industry_education", label: "Education", aliases: [], retired: false, candidateCount: 0, companyCount: 0 },
+  ] };
 }

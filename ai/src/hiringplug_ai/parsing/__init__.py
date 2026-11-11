@@ -11,7 +11,6 @@ from ..contracts import ParsedEducation, ParsedJob, ParsedProfile, SourcedText
 from . import contacts
 from .education import education
 from .experience import experience
-from .industry import industry
 from .layout import read_lines
 from .names import name
 from .residence import residence_country
@@ -37,7 +36,6 @@ def parse_cv(text: str, file_name: str | None = None) -> ParsedProfile:
     email, linkedin = contacts.email(lines), contacts.linkedin(lines)
     phone, place = contacts.phone(lines), contacts.location(lines)
     found = experience(lines)
-    latest = found[0] if found else None  # CVs list the newest job first
     jobs = [
         ParsedJob(
             title=_text(job.title),
@@ -67,7 +65,7 @@ def parse_cv(text: str, file_name: str | None = None) -> ParsedProfile:
         location=_sourced(place),
         nationality=_sourced(contacts.nationality(lines)),
         residenceCountry=_sourced(residence_country(lines, place, phone)),
-        industry=_sourced(industry(latest.company, latest.title) if latest else None),
+        industry=None,  # Go classifies grounded, date-selected employer evidence.
         noticePeriod=_sourced(contacts.notice_period(lines)),
         skills=[s for s in (_sourced(x) for x in skills(lines)) if s],
         experience=jobs,

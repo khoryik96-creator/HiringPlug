@@ -26,6 +26,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/intake"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
@@ -72,6 +73,7 @@ type Modules struct {
 	Market       *market.Module
 	AIProviders  *aiproviders.Module
 	Scheduling   *scheduling.Module
+	Industries   *industries.Module
 	// scaffold:fields
 }
 
@@ -154,9 +156,15 @@ func NewModules(d Deps) *Modules {
 		PublicURL: d.Config.PublicURL, OrganizerEmail: d.Config.SMTP.From, DefaultTimeZone: d.Config.TimeZone,
 		AllowPrivateNetworks: d.Config.AllowPrivateNetworks,
 	})
+	m.Industries = industries.New(d.Pool)
+	m.Industries.UseRecords(industryRecords{m}, m.Settings)
+	m.Candidates.UseIndustries(m.Industries)
+	m.Companies.UseIndustries(m.Industries)
+	m.Documents.UseIndustryRecognition(m.Industries.EnrichParsed)
+	m.Settings.UseIndustries(m.Industries)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
-	m.Candidates.MoveRecordsWith(m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
+	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
@@ -198,6 +206,7 @@ type (
 	marketHTTP       = market.HTTP
 	aiprovidersHTTP  = aiproviders.HTTP
 	schedulingHTTP   = scheduling.HTTP
+	industriesHTTP   = industries.HTTP
 	// scaffold:aliases
 )
 
@@ -230,6 +239,7 @@ type Server struct {
 	*marketHTTP
 	*aiprovidersHTTP
 	*schedulingHTTP
+	*industriesHTTP
 	// scaffold:embeds
 }
 
@@ -263,6 +273,7 @@ func (m *Modules) Server() *Server {
 		marketHTTP:       m.Market.HTTP,
 		aiprovidersHTTP:  m.AIProviders.HTTP,
 		schedulingHTTP:   m.Scheduling.HTTP,
+		industriesHTTP:   m.Industries.HTTP,
 		// scaffold:server-fields
 	}
 }

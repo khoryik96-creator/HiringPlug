@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
+import { IndustrySummary } from "../components/IndustryPicker";
 import { companyKey } from "../api/keys";
 import { CompanyAutofill } from "../components/CompanyAutofill";
 import { CompanyBanner } from "../components/CompanyBanner";
@@ -45,6 +46,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
             <dd>{c.website ? <a href={c.website} target="_blank" rel="noreferrer">{c.website}</a> : "—"}</dd>
             <dt>LinkedIn</dt>
             <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl.replace(/^https:\/\/www\./, "")}</a> : "—"}</dd>
+            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
             <dt>Size</dt>
             <dd>{c.size ? COMPANY_SIZE[c.size] : "—"}</dd>
             <dt>Phone</dt>

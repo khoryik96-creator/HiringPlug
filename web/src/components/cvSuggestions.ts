@@ -28,9 +28,11 @@ export function noticeFrom(text: string): Notice | null {
   return m ? { value: Number(m[1]), unit: m[2] as Notice["unit"] } : null;
 }
 
-/** The job the candidate has now (marked current), else the first one listed. */
+/** Use the employer selected by Go. Older parsed documents need an unambiguous current job. */
 export function latestJob(p: Profile): Profile["experience"][number] | undefined {
-  return p.experience.find((j) => j.current) ?? p.experience[0];
+  if (p.selectedEmployerIndex !== undefined) return p.experience[p.selectedEmployerIndex];
+  const current = p.experience.filter((j) => j.current);
+  return current.length === 1 ? current[0] : undefined;
 }
 
 const same = (a: string | null, b: string) => (a ?? "").trim().toLowerCase() === b.trim().toLowerCase();
@@ -70,6 +72,8 @@ export function newSkills(p: Profile, c: Candidate): Sourced[] {
 /** The profile update for the ticked suggestions and skills (sent with the version it was read at). */
 export function applyBody(p: Profile, c: Candidate, ticked: Set<SuggestionKey>, skills: string[]): Schemas["CandidateUpdate"] {
   const body = toUpdateBody(formFromCandidate(c), c.version);
+  // A legacy scalar suggestion must use the server catalogue adapter, not resend old choices.
+  if (ticked.has("industry")) delete body.industrySelections;
   const job = latestJob(p);
   if (ticked.has("name") && p.fullName) {
     const [first, last] = splitName(p.fullName.value);

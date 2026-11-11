@@ -62,7 +62,7 @@ func TestTheAIFillsCVReadingsOnlyWhenOnAndCounts(t *testing.T) {
 		}),
 	})
 	got := on.getDocument(token, doc.Id)
-	assert.Equal(t, "Professional Services", got.ParsedProfile.MustGet().Industry.MustGet().Value)
+	assert.True(t, got.ParsedProfile.MustGet().Industry.IsNull(), "unverified provider sectors cannot classify an employer without employment evidence")
 
 	var status api.AssistantStatus
 	on.request(http.MethodGet, "/v1/assistant", token, nil).JSON(&status)

@@ -28,18 +28,14 @@ class FakeAI:
         return Completion(text=json.dumps(self.reply), model="m", input_tokens=400, output_tokens=60)
 
 
-def test_core_found_asks_only_for_the_industry() -> None:
+def test_complete_extraction_does_not_spend_tokens_classifying_industry() -> None:
     profile = rules(FULL_CV)
     assert cv_ai.core_found(profile)
-    assert profile.industry is None, "the rules know nothing of Contoh"
     ai = FakeAI({"industry": {"value": "Professional Services", "quote": "Contoh Sdn Bhd"}})
     got = cv_ai.fill(profile, FULL_CV, ai)
-    [(system, _)] = ai.calls
-    assert system == cv_ai.INDUSTRY_SYSTEM, "Kano's gate: no full read when the core is there"
-    assert got.profile.industry is not None
-    assert got.profile.industry.value == "Professional Services"
-    assert got.profile.parser == "rules@1+ai"
-    assert got.tokens == 460
+    assert ai.calls == []
+    assert got.profile.industry is None
+    assert got.tokens == 0
 
 
 def test_nothing_to_ask_asks_nothing() -> None:
@@ -71,11 +67,9 @@ def test_a_thin_reading_is_filled_but_never_overwritten() -> None:
     assert got.email.value == "siti@example.com", "the rules' email stands"
     assert got.phone is None, "a value without its quote is dropped"
     assert got.industry is None, "only Kano's industries"
-    job = got.experience[0]
-    assert (job.title and job.title.value, job.company and job.company.value) == (
-        "Senior Accountant",
-        "Contoh Sdn Bhd",
-    )
+    assert got.experience[0].company is not None
+    assert got.experience[0].company.value == "Contoh Sdn Bhd"
+    assert got.experience[0].current is False, "undated employer evidence never asserts current employment"
 
 
 def test_an_unexpected_ai_error_keeps_the_rules_reading() -> None:
@@ -114,8 +108,8 @@ def test_the_job_uses_the_ai_only_when_go_allows_it() -> None:
     assert isinstance(off.payload, DocumentCvParsedJob)
     assert off.payload.aiTokens == 0
 
-    salaried = FULL_CV + "Expected salary: RM 8,500\n"
-    ai_text = FULL_CV + "Expected [salary removed]\n"  # as Go sends it
+    salaried = THIN_CV + "Expected salary: RM 8,500\n"
+    ai_text = THIN_CV + "Expected [salary removed]\n"  # as Go sends it
     with_ai: dict[str, object] = {**payload, "text": salaried, "useAi": True}
     parse_cv.run(DocumentParseCvJob.model_validate(with_ai), deps)
     assert ai.calls == [], "without the salary-free copy the AI is not asked"
@@ -126,4 +120,4 @@ def test_the_job_uses_the_ai_only_when_go_allows_it() -> None:
     [(_, prompt)] = ai.calls
     assert "8,500" not in prompt, "salary never goes to the AI"
     assert result.profile is not None
-    assert result.profile.industry is not None
+    assert result.profile.industry is None, "Go owns employer-sector rules"

@@ -171,3 +171,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/scheduling/internal/store
+  - <<: *module
+    queries: db/queries/industries.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/industries/internal/store

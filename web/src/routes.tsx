@@ -43,6 +43,7 @@ const Privacy = page(() => import("./pages/Privacy"), "Privacy");
 const Reports = page(() => import("./pages/Reports"), "Reports");
 const ScreeningCall = page(() => import("./pages/ScreeningCall"), "ScreeningCall");
 const ReferenceCheck = page(() => import("./pages/ReferenceCheck"), "ReferenceCheck");
+const Industries = page(() => import("./pages/Industries"), "Industries");
 const Settings = page(() => import("./pages/Settings"), "Settings");
 const System = page(() => import("./pages/System"), "System");
 const Team = page(() => import("./pages/Team"), "Team");
@@ -104,6 +105,7 @@ export const ROUTES: Route[] = [
   // Settings, in its menu's order.
   { section: "settings", path: /^#\/settings/, permission: "settings:manage", menu: { in: "settings", label: "General", href: "#/settings" },
     render: () => <Settings /> },
+  { section: "industries", path: /^#\/industries/, permission: "settings:manage", menu: { in: "settings", label: "Industries", href: "#/industries" }, render: () => <Industries /> },
   { section: "ai-provider", path: /^#\/ai-provider/, permission: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
     render: () => <AiProvider /> },
   // Everyone else sees where the AI is set up, and who may do it.

@@ -658,6 +658,7 @@ components:
           allOf: [{ $ref: '#/components/schemas/NoticePeriod' }]
           nullable: true
         industry: { type: string, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         specialization: { type: string, nullable: true }
         currentTitle: { type: string, nullable: true }
         currentCompany: { type: string, nullable: true }
@@ -709,6 +710,7 @@ components:
           allOf: [{ $ref: '#/components/schemas/NoticePeriod' }]
           nullable: true
         industry: { type: string, maxLength: 100, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         specialization: { type: string, maxLength: 100, nullable: true }
         currentTitle: { type: string, maxLength: 200, nullable: true }
         currentCompany: { type: string, maxLength: 200, nullable: true }
@@ -758,6 +760,7 @@ components:
           allOf: [{ $ref: '#/components/schemas/NoticePeriod' }]
           nullable: true
         industry: { type: string, maxLength: 100, nullable: true }
+        industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         specialization: { type: string, maxLength: 100, nullable: true }
         currentTitle: { type: string, maxLength: 200, nullable: true }
         currentCompany: { type: string, maxLength: 200, nullable: true }

@@ -110,7 +110,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (cardinality(@nationality::text[]) = 0 OR c.nationality = ANY (@nationality::text[]))
   AND (cardinality(@residence::text[]) = 0 OR c.residence_country = ANY (@residence::text[]))
   AND (cardinality(@sources::text[]) = 0 OR c.source = ANY (@sources::text[]))
-  AND (cardinality(@industries::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array(@industries::text[])))
+  AND (cardinality(@industries::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array(@industries::text[])) OR c.id = ANY(@industry_candidate_ids::text[]))
   AND (cardinality(@skills::text[]) = 0
        OR (@all_skills::boolean AND app_lower_array(c.skills) @> app_lower_array(@skills::text[]))
        OR (NOT @all_skills::boolean AND app_lower_array(c.skills) && app_lower_array(@skills::text[])))
@@ -323,3 +323,9 @@ RETURNING *;
 -- Merging: the duplicate's screening calls go to the kept candidate.
 -- name: MoveScreeningCalls :exec
 UPDATE screening_call SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- name: LegacyIndustries :many
+SELECT id, industry::text FROM candidate WHERE industry IS NOT NULL;
+-- name: SetIndustrySummary :exec
+UPDATE candidate SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
+WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);

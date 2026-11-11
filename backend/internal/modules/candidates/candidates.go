@@ -85,5 +85,5 @@ func (m *Module) ViewIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id st
 	if err != nil {
 		return View{}, err
 	}
-	return loadView(ctx, tx, m.service.users, p, fromRow(row))
+	return m.service.loadView(ctx, tx, m.service.users, p, fromRow(row))
 }

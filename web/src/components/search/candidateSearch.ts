@@ -71,7 +71,7 @@ export function toBody(s: SearchState, q: string, mine: boolean, cursor?: string
 }
 
 /** What is set, as removable chips: "Status: Looking out". */
-export function activeChips(s: SearchState, sourceLabel: (key: string) => string): { label: string; clear: (s: SearchState) => SearchState }[] {
+export function activeChips(s: SearchState, sourceLabel: (key: string) => string, industryLabel: (key: string) => string = (key) => key): { label: string; clear: (s: SearchState) => SearchState }[] {
   const out: { label: string; clear: (s: SearchState) => SearchState }[] = [];
   const many = (name: string, values: string[], show: (v: string) => string, clear: (s: SearchState) => SearchState) => {
     if (values.length > 0) out.push({ label: `${name}: ${values.map(show).join(", ")}`, clear });
@@ -82,7 +82,7 @@ export function activeChips(s: SearchState, sourceLabel: (key: string) => string
   many("Nationality", s.nationality, countryName, (x) => ({ ...x, nationality: [] }));
   many("Lives in", s.residence, countryName, (x) => ({ ...x, residence: [] }));
   many("Source", s.source, sourceLabel, (x) => ({ ...x, source: [] }));
-  many("Industry", s.industry, (v) => v, (x) => ({ ...x, industry: [] }));
+  many("Industry", s.industry, industryLabel, (x) => ({ ...x, industry: [] }));
   many(s.skillsMatch === "any" && s.skills.length > 1 ? "Any skill of" : "Skills", s.skills, (v) => v, (x) => ({ ...x, skills: [] }));
   many("Tags", s.tags, (v) => v, (x) => ({ ...x, tags: [] }));
   if (s.location.trim()) out.push({ label: `Location: ${s.location.trim()}`, clear: (x) => ({ ...x, location: "" }) });

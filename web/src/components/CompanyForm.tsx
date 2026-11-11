@@ -5,6 +5,7 @@ import { api, type Company, unwrap } from "../api/client";
 import { companiesKey, companyKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, keysOf, regionName } from "../labels";
 import { COMPANY_PATHS, companyFields, type CompanyFormState, companyProblems, formFromCompany } from "./companyFormState";
+import { IndustryPicker } from "./IndustryPicker";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
@@ -78,7 +79,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
       </Field>
       {text("website", "Website", { placeholder: "example.com", inputMode: "url" })}
       {text("linkedinUrl", "LinkedIn page", { placeholder: "linkedin.com/company/…", inputMode: "url" })}
-      {text("industry", "Industry")}
+      <IndustryPicker value={form.industrySelections} legacy={form.industry} onChange={(industrySelections, industry) => { setForm((f) => ({ ...f, industrySelections, industry })); }} />
       <Field label="Size" error={errors[COMPANY_PATHS.size]}>
         <select value={form.size} onChange={(e) => { set("size", e.target.value as CompanyFormState["size"]); }}>
           <option value="">—</option>

@@ -122,9 +122,8 @@ old .doc files):
   address or LinkedIn link wins. Honorifics ("Ts.", "Dr."), letters after the
   name (", PMP"), nicknames ("(Aaron)") and OCR's "BINT]" are handled.
 - `residence.py`: country of residence (address, places near the top, phone's
-  country code); `industry.py`: the latest employer's industry (Kano's
-  industries; known names, then words, then the title), quoted with the words
-  it came from (Go checks the quote is in the CV; the value is an inference).
+  country code). Employer-sector classification runs in the Go industries
+  module after extraction/grounding; see [industries.md](industries.md).
 - `contacts.py`: email; phone (labelled anywhere, including a label on the line
   above; never a year range; never joined across lines; bare 8-digit runs only
   as Singapore mobiles); LinkedIn; location; nationality; notice period.
@@ -156,24 +155,25 @@ and `tests/test_columns.py`, so a rule change that breaks one fails the build.
 Each result records the parser version (`rules@1`), and **Read details
 again** re-runs it, so CVs can be re-parsed when the parser improves.
 
-**Kano's detection, with the AI (built; used once the AI is on).** The rules
-read every CV first. If they find the five core details (name, email, phone,
-current title and company), the full AI read is skipped, as in Kano, and only
-the latest employer's industry is asked for when the rules found none (Kano's
-industry prompt and list). Otherwise the AI fills what the rules left empty
-(`jobs/cv_ai.py`), never replacing what they found. Every AI value carries
-its quote and goes through the same check in Go, so an invented value is
-dropped like any other; an industry outside Kano's list is dropped in Python.
-Go offers the AI only while it is on and the company has allowance left
-(`useAi` on the job), with a copy of the text from which salary figures are
-taken out (`aiText`, `redact.WithoutSalary`): salary never goes to the AI.
-Unlike the assistant, the CV reader does send names and contact details, since
-reading them is its job. An unexpected error in the AI step keeps the rules'
-reading. A job title only counts towards the industry for IT work (as Kano's
-ERP rules), and only header lines that read like an address set the country
-of residence; the tokens it used come back and count in the one
-monthly allowance the assistant and matching share. The parser then reads
-`rules@1+ai`.
+**Rule extraction with an optional AI supplement.** Python reads each CV first.
+If the core contact details and employer evidence are already present, no AI
+request is made. Otherwise `jobs/cv_ai.py` fills missing contact details and,
+when no jobs were extracted, keeps explicitly associated title/company evidence
+as undated employment. It never asserts current employment without evidence or
+fills a first-listed historical job with a different employer's details.
+Every returned value carries an exact quote checked by Go. An unexpected AI
+error leaves the local extraction available.
+
+Go selects the current/latest dated employer and recognises its business using
+the agency's shared industry catalogue. Unknown, concurrent and undated cases
+stay available for manual review. Python no longer classifies industries or
+makes an industry-only request. A job title alone never establishes a sector.
+
+Go offers AI extraction only when enabled and within the agency's allowance,
+using a copy with salary removed (`aiText`, `redact.WithoutSalary`). The reader
+receives identity/contact information because extracting it is its purpose;
+salary never goes to the provider. Token usage counts towards the shared
+monthly allowance. The parser records `rules@1+ai` when AI added evidence.
 
 ## CV formatting and blind CVs (M4)
 

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import pytest
-
 from hiringplug_ai.parsing import parse_cv
-from hiringplug_ai.parsing.industry import industry
 from hiringplug_ai.parsing.layout import read_lines
 from hiringplug_ai.parsing.residence import residence_country
 
@@ -40,46 +37,13 @@ def test_an_employer_further_down_says_nothing_about_where_they_live() -> None:
     assert where("AHMAD\nAnalyst | Shopee Malaysia") is None, "whom they work for"
 
 
-@pytest.mark.parametrize(
-    ("company", "title", "expected"),
-    [
-        ("Maybank Berhad", "Software Engineer", "Financial Services"),
-        ("Grab", None, "Digital & E-Commerce"),
-        ("Deloitte PLT", "Audit Associate", "Professional Services"),
-        (
-            "Contoh Sdn Bhd",
-            "SAP FICO Consultant",
-            "Information Technology & Services",
-        ),  # as Kano: SAP/ERP work is IT
-        ("Contoh Sdn Bhd", "Software Engineer", "Information Technology & Services"),
-        ("Infineon Technologies", None, "Industrial/Manufacturing"),
-        ("Nestlé Products Sdn Bhd", None, "FMCG"),
-        ("Universiti Malaya", "Lecturer", "Education"),
-        ("Kementerian Kewangan", None, "Government Sector"),
-        ("KPJ Healthcare", None, "Life Science/Medical"),
-        ("Contoh Sdn Bhd", "Clerk", None),
-        ("Contoh Sdn Bhd", "Java Developer", "Information Technology & Services"),
-        ("Contoh Sdn Bhd", "Power BI Analyst", "Information Technology & Services"),
-        ("Contoh Sdn Bhd", "Audit Associate", None),  # a title says little about the employer
-        ("Sunrise Property Developer Sdn Bhd", None, "Property & Construction"),
-    ],
-)
-def test_industry_of_the_latest_employer(company: str, title: str | None, expected: str | None) -> None:
-    got = industry(company, title)
-    assert (got[0] if got else None) == expected
-
-
-def test_infineon_is_a_maker_not_a_tech_services_firm() -> None:
-    # A known name wins over general words such as "Technologies".
-    assert industry("Infineon Technologies", None) == ("Industrial/Manufacturing", "Infineon Technologies")
-
-
-def test_parse_cv_fills_both_with_their_evidence() -> None:
+def test_parser_extracts_employer_evidence_for_go_classification() -> None:
     p = parse_cv(
         "SITI AISYAH\nsiti@example.com | +60 12-345 6789\n\n"
         "EXPERIENCE\nSenior Accountant | Maybank Berhad\nJan 2020 - Present\n"
     )
     assert p.residenceCountry is not None
     assert (p.residenceCountry.value, p.residenceCountry.quote) == ("MY", "+60 12-345 6789")
-    assert p.industry is not None
-    assert (p.industry.value, p.industry.quote) == ("Financial Services", "Maybank Berhad")
+    assert p.industry is None, "the Go catalogue owns employer-sector rules"
+    assert p.experience[0].company is not None
+    assert p.experience[0].company.value == "Maybank Berhad"

@@ -540,6 +540,35 @@ func (q *Queries) LatestSalaryCall(ctx context.Context, candidateID string) (pgt
 	return called_on, err
 }
 
+const legacyIndustries = `-- name: LegacyIndustries :many
+SELECT id, industry::text FROM candidate WHERE industry IS NOT NULL
+`
+
+type LegacyIndustriesRow struct {
+	ID       string
+	Industry string
+}
+
+func (q *Queries) LegacyIndustries(ctx context.Context) ([]LegacyIndustriesRow, error) {
+	rows, err := q.db.Query(ctx, legacyIndustries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LegacyIndustriesRow
+	for rows.Next() {
+		var i LegacyIndustriesRow
+		if err := rows.Scan(&i.ID, &i.Industry); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
        c.location, c.work_authorization, c.tags, c.updated_at,
@@ -1020,50 +1049,51 @@ WHERE ($2::text IS NULL OR c.id < $2::text)
   AND (cardinality($9::text[]) = 0 OR c.nationality = ANY ($9::text[]))
   AND (cardinality($10::text[]) = 0 OR c.residence_country = ANY ($10::text[]))
   AND (cardinality($11::text[]) = 0 OR c.source = ANY ($11::text[]))
-  AND (cardinality($12::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($12::text[])))
-  AND (cardinality($13::text[]) = 0
-       OR ($14::boolean AND app_lower_array(c.skills) @> app_lower_array($13::text[]))
-       OR (NOT $14::boolean AND app_lower_array(c.skills) && app_lower_array($13::text[])))
-  AND (cardinality($15::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($15::text[]))
-  AND ($16::text IS NULL
-       OR c.location ILIKE '%' || replace(replace(replace($16::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-  AND ($17::int IS NULL OR (c.notice_period_value IS NOT NULL AND
-       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $17::int))
+  AND (cardinality($12::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($12::text[])) OR c.id = ANY($13::text[]))
+  AND (cardinality($14::text[]) = 0
+       OR ($15::boolean AND app_lower_array(c.skills) @> app_lower_array($14::text[]))
+       OR (NOT $15::boolean AND app_lower_array(c.skills) && app_lower_array($14::text[])))
+  AND (cardinality($16::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($16::text[]))
+  AND ($17::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($17::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($18::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $18::int))
   -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
-  AND ($18::text IS NULL OR EXISTS (
+  AND ($19::text IS NULL OR EXISTS (
        SELECT 1 FROM candidate_compensation cc
-       WHERE cc.candidate_id = c.id AND cc.expected_currency = $19::text
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $20::text
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
-             <= ($18::text)::numeric))
-  AND ($20::text IS NULL OR c.owner_id = $20::text)
-  AND ($21::int IS NULL OR c.updated_at >= now() - make_interval(days => $21::int))
+             <= ($19::text)::numeric))
+  AND ($21::text IS NULL OR c.owner_id = $21::text)
+  AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
 ORDER BY c.id DESC
-LIMIT $22
+LIMIT $23
 `
 
 type SearchCandidatesParams struct {
-	Ts                *string
-	Cursor            *string
-	Query             *string
-	Phones            []string
-	ExcludedIds       []string
-	CvIds             []string
-	Availability      []string
-	WaKinds           []string
-	Nationality       []string
-	Residence         []string
-	Sources           []string
-	Industries        []string
-	Skills            []string
-	AllSkills         bool
-	Tags              []string
-	Location          *string
-	NoticeMaxDays     *int32
-	SalaryMax         *string
-	SalaryCurrency    *string
-	Owner             *string
-	UpdatedWithinDays *int32
-	RowLimit          int32
+	Ts                   *string
+	Cursor               *string
+	Query                *string
+	Phones               []string
+	ExcludedIds          []string
+	CvIds                []string
+	Availability         []string
+	WaKinds              []string
+	Nationality          []string
+	Residence            []string
+	Sources              []string
+	Industries           []string
+	IndustryCandidateIds []string
+	Skills               []string
+	AllSkills            bool
+	Tags                 []string
+	Location             *string
+	NoticeMaxDays        *int32
+	SalaryMax            *string
+	SalaryCurrency       *string
+	Owner                *string
+	UpdatedWithinDays    *int32
+	RowLimit             int32
 }
 
 type SearchCandidatesRow struct {
@@ -1110,6 +1140,7 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.Residence,
 		arg.Sources,
 		arg.Industries,
+		arg.IndustryCandidateIds,
 		arg.Skills,
 		arg.AllSkills,
 		arg.Tags,
@@ -1177,6 +1208,21 @@ func (q *Queries) SetCandidateOwner(ctx context.Context, arg SetCandidateOwnerPa
 	var changed bool
 	err := row.Scan(&changed)
 	return changed, err
+}
+
+const setIndustrySummary = `-- name: SetIndustrySummary :exec
+UPDATE candidate SET industry = $1, version = version + 1, updated_at = now()
+WHERE id = $2 AND industry IS DISTINCT FROM $1
+`
+
+type SetIndustrySummaryParams struct {
+	Industry *string
+	ID       string
+}
+
+func (q *Queries) SetIndustrySummary(ctx context.Context, arg SetIndustrySummaryParams) error {
+	_, err := q.db.Exec(ctx, setIndustrySummary, arg.Industry, arg.ID)
+	return err
 }
 
 const similarCandidates = `-- name: SimilarCandidates :many
