@@ -6,11 +6,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
+import { emailFieldErrors } from "./emailFieldErrors";
 import { api, ApiError, type Permission, type Schemas, unwrap } from "../../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../../api/keys";
 import { addresses } from "../EmailComposer";
 import { ErrorMessage } from "../ErrorMessage";
-import { fieldErrors } from "../forms";
+
 import { Attachments, type CvChoice } from "./Attachments";
 import { RichEditor } from "./RichEditor";
 import { atCursor, fillTokens, plainToHtml, showBanners, valuesToTokens, withoutCaretMarks } from "./richText";
@@ -114,7 +115,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       for (const id of multi ? people.map((p) => p.candidateId) : [candidateId]) await queryClient.invalidateQueries({ queryKey: candidateEmailsKey(id) });
     },
   });
-  const errors = fieldErrors(send.error);
+  const errors = emailFieldErrors(send.error);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => { setForm((f) => ({ ...f, [k]: e.target.value })); };
 
   if (sent) {
@@ -155,15 +156,16 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={subject} html={html} values={values} /></div>}
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
 
-      <label className="field">To<input value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
+      <label className="field">To<input aria-invalid={!!errors.to || undefined} value={to} onChange={(e) => { setTypedTo(e.target.value); }} /></label>
       {errors.to && <small className="error">{errors.to}</small>}
       <div className="two">
-        <label className="field">CC<input value={form.cc} onChange={set("cc")} /></label>
-        <label className="field">BCC<input value={form.bcc} onChange={set("bcc")} /></label>
+        <label className="field">CC<input aria-invalid={!!errors.cc || undefined} value={form.cc} onChange={set("cc")} /></label>
+        <label className="field">BCC<input aria-invalid={!!errors.bcc || undefined} value={form.bcc} onChange={set("bcc")} /></label>
       </div>
-      <label className="field">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
+      <label className="field">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
 
+      {["cc","bcc","subject","body","bodyHtml"].map((key)=>errors[key] && <p className="error small" key={key}>{key}: {errors[key]}</p>)}
       {!multi && permissions.includes("candidates:read") && <button type="button" className="link" onClick={()=>{packages.change([{candidateId,applicationId,name:values?.["[Full name]"] ?? "This candidate"}]);setMulti(true);}}>Select candidates and details</button>}
       {multi && (
         <>
@@ -173,7 +175,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
           <ErrorMessage error={list.error} />
         </>
       )}
-      <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+      <RichEditor invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
         values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {

@@ -126,6 +126,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               }}
             >
               <h4>{STAGE[stage]} ({String(cards.length)})</h4>
+              {canEmail && (stage==="applied" || stage==="screening") && cards.length>0 && <div className="row">
+                <button type="button" className="link small" aria-label={`Select all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>[...new Set([...ids,...cards.map((a)=>a.id)])]);}}>Select all</button>
+                <button type="button" className="link small" aria-label={`Unselect all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>ids.filter((id)=>!cards.some((a)=>a.id===id)));}}>Unselect all</button>
+              </div>}
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
                   <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}

@@ -797,3 +797,8 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .email-candidate-search { margin: .4rem 0 .8rem; }
 .call-salary { border-top: 1px solid var(--line); margin-top: .7rem; padding-top: .5rem; }
 .call-salary dl { margin: .3rem 0; }
+
+/* Invalid values stay identifiable at the exact control or candidate cell. */
+[aria-invalid="true"] { outline: 2px solid #dc2626 !important; outline-offset: 1px; }
+.rich-box [data-missing-detail] { outline: 2px solid #dc2626; outline-offset: 2px; }
+.rich-box td:has([data-missing-detail]) { outline: 2px solid #dc2626; outline-offset: -2px; }

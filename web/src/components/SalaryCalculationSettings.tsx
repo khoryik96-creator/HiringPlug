@@ -19,9 +19,11 @@ function RulesForm({ initial, onSaved, onEdited }: { initial: Schemas["SalaryCal
   const client = useQueryClient();
   const [rules, set] = useState(initial);
   const save = useMutation({ mutationFn: async () => unwrap(await api.PUT("/v1/settings/salary-calculation", { body: rules })),
-    onSuccess: (data) => { onSaved(); client.setQueryData(salaryRulesKey, data); } });
+    onSuccess: (data) => { onSaved(); client.setQueryData(salaryRulesKey, data); void client.invalidateQueries({queryKey:["email-context"]}); } });
   const change = (next: Schemas["SalaryCalculationRules"]) => { onEdited(); set(next); };
   return <form className="form-grid" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <label className="field full">Salary in emails<select disabled={save.isPending} value={rules.emailSalaryDisplay ?? "monthly"} onChange={(e)=>{change({...rules,emailSalaryDisplay:e.target.value as "monthly"|"breakdown"});}}>
+      <option value="monthly">Monthly salary</option><option value="breakdown">Monthly salary breakdown</option></select></label>
     <label className="row full"><input type="checkbox" disabled={save.isPending} checked={rules.allowances} onChange={(e) => { change({ ...rules, allowances: e.target.checked }); }} /> Include fixed allowances</label>
     <label className="row full"><input type="checkbox" disabled={save.isPending} checked={rules.bonus} onChange={(e) => { change({ ...rules, bonus: e.target.checked }); }} /> Include guaranteed bonus</label>
     <label className="field">Bonus basis<select disabled={save.isPending} value={rules.bonusOnAllowances ? "with_allowances" : "basic"} onChange={(e) => { change({ ...rules, bonusOnAllowances: e.target.value === "with_allowances" }); }}>

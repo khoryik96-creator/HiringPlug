@@ -10,10 +10,13 @@ const nurul = { name: "Nurul Huda", values: { "[Notice period]": "1 month" } }; 
 describe("candidates in an email to the client", () => {
   it("are a block each: their own values, marked as their fields; what is not on record is a dash", () => {
     const html = blocksHtml([farid, nurul], chosen);
-    expect(html).toContain("<b>1. Farid Hassan, Hub Supervisor</b>");
+    expect(html).toContain("<b>1. Farid Hassan</b>");
+    expect(html).not.toContain("Hub Supervisor");
     expect(html).toContain(`Expected salary: <span data-field="candidate.expectedSalary">RM 9,000 per month</span>`);
+    expect(html).toContain("</span><br>Expected salary:");
     expect(html).toContain(`Location: <span data-field="candidate.residence">Klang</span>`);
-    expect(html).toContain("<b>2. Nurul Huda</b><br>Current salary: — · Expected salary: — · Notice period: <span");
+    expect(html).toContain('data-missing-detail="Current salary"');
+    expect(html).toContain('data-missing-detail="Expected salary"');
     expect(missingDetails([farid, nurul], chosen)).toEqual(["Nurul Huda: Current salary, Expected salary, Location"]);
   });
 
@@ -23,7 +26,7 @@ describe("candidates in an email to the client", () => {
     expect([...doc.querySelectorAll("th")].map((th) => th.textContent)).toEqual(["Candidate", "Current salary", "Expected salary", "Notice period", "Location"]);
     const rows = [...doc.querySelectorAll("tbody tr")].map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     expect(rows).toEqual([
-      ["Farid HassanHub Supervisor", "RM 7,500 per month", "RM 9,000 per month", "2 months", "Klang"],
+      ["Farid Hassan", "RM 7,500 per month", "RM 9,000 per month", "2 months", "Klang"],
       ["Nurul Huda", "—", "—", "1 month", "—"],
     ]);
     expect(doc.querySelector("td")?.getAttribute("style")).toContain("border:1px solid");

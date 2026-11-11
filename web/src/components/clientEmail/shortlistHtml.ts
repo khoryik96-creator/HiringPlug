@@ -30,20 +30,17 @@ export const DEFAULT_DETAILS = ["currentSalary", "expectedSalary", "noticePeriod
 /** One candidate as the message shows them: their values by field token ("[Expected salary]"). */
 export type Person = { id?:string; name: string; values: Record<string, string> };
 
-const field = (d: Detail, value: string) => `<span data-field="${d.key}">${escapeHtml(value)}</span>`;
-const heading = (p: Person) => {
-  const title = p.values["[Current title]"];
-  return escapeHtml(title ? `${p.name}, ${title}` : p.name);
-};
+const missing = (d: Detail) => `<span data-field="${d.key}" data-missing-detail="${escapeHtml(d.label)}" title="${escapeHtml(d.label)}: not on record">—</span>`;
+const field = (d: Detail, value: string) => `<span data-field="${d.key}"${value.includes("(unit not specified)") ? ' data-missing-detail="Confirm salary unit" title="Confirm the salary unit"' : ""}>${escapeHtml(value)}</span>`;
 
 /** A block for each candidate: "1. Name, title" then "Label: value · Label: value". */
 export function blocksHtml(people: Person[], details: Detail[]): string {
   return people.map((p, i) => {
     const facts = details.map((d) => {
       const v = p.values[d.token];
-      return `${escapeHtml(d.label)}: ${v ? field(d, v) : "—"}`;
-    }).join(" · ");
-    return `<p${p.id?` data-candidate-id="${escapeHtml(p.id)}"`:""}><b>${String(i + 1)}. ${heading(p)}</b>${facts ? `<br>${facts}` : ""}</p>`;
+      return `${escapeHtml(d.label)}: ${v ? field(d, v) : missing(d)}`;
+    }).join("<br>");
+    return `<p${p.id?` data-candidate-id="${escapeHtml(p.id)}"`:""}><b>${String(i + 1)}. ${escapeHtml(p.name)}</b>${facts ? `<br>${facts}` : ""}</p>`;
   }).join("") + "<p><br></p>";
 }
 
@@ -52,11 +49,10 @@ export function tableHtml(people: Person[], details: Detail[]): string {
   const cell = "border:1px solid #c8c8d0;padding:6px 8px;text-align:left;vertical-align:top";
   const head = ["Candidate", ...details.map((d) => d.label)].map((h) => `<th style="${cell};background:#f0edf9">${escapeHtml(h)}</th>`).join("");
   const rows = people.map((p) => {
-    const title = p.values["[Current title]"];
-    const who = `${escapeHtml(p.name)}${title ? `<br><span style="color:#666">${escapeHtml(title)}</span>` : ""}`;
+    const who = escapeHtml(p.name);
     const cells = details.map((d) => {
       const v = p.values[d.token];
-      return `<td style="${cell}">${v ? field(d, v) : "—"}</td>`;
+      return `<td style="${cell}">${v ? field(d, v) : missing(d)}</td>`;
     }).join("");
     return `<tr${p.id?` data-candidate-id="${escapeHtml(p.id)}"`:""}><td style="${cell}">${who}</td>${cells}</tr>`;
   }).join("");

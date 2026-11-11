@@ -61,8 +61,8 @@ describe("emailing the client about several candidates", () => {
     await waitFor(() => { expect(within(panel).getByRole<HTMLButtonElement>("button", { name: "Insert candidates into the message" }).disabled).toBe(false); });
     fireEvent.click(within(panel).getByRole("button", { name: "Insert candidates into the message" }));
     const message = within(panel).getByRole("textbox", { name: "Message" });
-    await waitFor(() => { expect(message.textContent).toContain("1. Nurul HudaCurrent salary: — · Expected salary: RM 11,000 per month"); });
-    expect(message.textContent).toContain("2. Farid Hassan, Hub SupervisorCurrent salary: —");
+    await waitFor(() => { expect(message.textContent).toContain("1. Nurul HudaCurrent salary: —Expected salary: RM 11,000 per month"); });
+    expect(message.textContent).toContain("2. Farid HassanCurrent salary: —");
     expect(within(panel).getByText(/Not on record \(shown as —\): Nurul Huda: Current salary, Location; Farid Hassan: Current salary, Location/)).toBeTruthy();
 
     fireEvent.blur(message);

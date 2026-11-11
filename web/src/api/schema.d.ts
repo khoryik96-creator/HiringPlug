@@ -6701,6 +6701,11 @@ export interface components {
             mandatory: components["schemas"]["MandatoryField"][];
         };
         SalaryCalculationRules: {
+            /**
+             * @description Current salary presentation in emails only; omitted defaults to monthly.
+             * @enum {string}
+             */
+            emailSalaryDisplay?: "monthly" | "breakdown";
             allowances: boolean;
             bonus: boolean;
             bonusOnAllowances: boolean;

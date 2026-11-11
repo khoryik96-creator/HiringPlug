@@ -82,3 +82,10 @@ describe("the message box", () => {
     expect(box.textContent).toBe("Hi Siti,Pick a time: https://ats.example/book/abcRegards, Aina");
   });
 });
+
+it("outlines invalid messages and clears corrected candidate placeholders while retaining salary protection",()=>{
+ render(<RichEditor html='<table><tbody><tr><td><span data-field="candidate.currentSalary" data-missing-detail="Current salary">—</span></td></tr></tbody></table>' resetKey={0} invalid onChange={vi.fn()} fields={fields} banners={[]} bannerUrls={{}}/>);
+ const editor=screen.getByRole("textbox",{name:"Message"});expect(editor.getAttribute("aria-invalid")).toBe("true");
+ const missing=editor.querySelector("[data-missing-detail]");if(!missing)throw new Error("Missing highlight");missing.textContent="RM 9,000";fireEvent.input(editor);
+ expect(editor.querySelector("[data-missing-detail]")).toBeNull();expect(editor.querySelector('[data-field="candidate.currentSalary"]')?.textContent).toBe("RM 9,000");
+});

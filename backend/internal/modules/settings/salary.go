@@ -61,3 +61,19 @@ func (h *HTTP) PutSalaryCalculationRules(ctx context.Context, req api.PutSalaryC
 	err := h.svc.setSalaryRules(ctx, authz.MustFromContext(ctx), *req.Body)
 	return api.PutSalaryCalculationRules200JSONResponse(*req.Body), err
 }
+
+// SalaryEmailBreakdown reads the email-only presentation preference in the caller's transaction.
+func (m *Module) SalaryEmailBreakdown(ctx context.Context, tx pgx.Tx) (bool, error) {
+	value, err := store.New(tx).GetPolicy(ctx, "salary_calculation")
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var rules struct {
+		EmailSalaryDisplay string `json:"emailSalaryDisplay"`
+	}
+	err = json.Unmarshal([]byte(value), &rules)
+	return rules.EmailSalaryDisplay == "breakdown", err
+}

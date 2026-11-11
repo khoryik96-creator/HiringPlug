@@ -19,14 +19,17 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salarycalc"
 )
 
 type emailCandidates struct {
 	candidates *candidates.Module
 	industries *industries.Module
+	settings   *settings.Module
 }
 
 // Detailed is a candidate with what fields show, as p may see them: salary
@@ -53,15 +56,24 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 	}
 	if c := v.Compensation; c != nil && !v.CompensationRestricted {
 		compensationVersion = c.Version
-		d.SalaryNotes = c.SalaryNotes
+		d.SalaryNotes = cleanSalaryWording(c.SalaryNotes)
 		if c.Current != nil {
-			d.CurrentBreakdown = c.Current.Description
+			d.CurrentBreakdown = cleanSalaryWording(c.Current.Description)
 		}
 		if c.Expected != nil {
-			d.ExpectedNotes = c.Expected.Description
+			d.ExpectedNotes = cleanSalaryWording(c.Expected.Description)
 		}
 		if c.Current != nil {
 			d.CurrentSalary = ptr(emails.FormatSalary(c.Current.Amount, c.Current.Currency, c.Current.Period))
+		}
+		if a.settings != nil {
+			breakdown, err := a.settings.SalaryEmailBreakdown(ctx, tx)
+			if err != nil {
+				return emails.Candidate{}, err
+			}
+			if breakdown && d.CurrentBreakdown != nil && strings.TrimSpace(*d.CurrentBreakdown) != "" {
+				d.CurrentSalary = d.CurrentBreakdown
+			}
 		}
 		if e := c.Expected; e != nil {
 			d.ExpectedSalary = ptr(emails.FormatRange(e.Min, e.Max, e.Currency, e.Period))
@@ -235,4 +247,13 @@ func (a emailContacts) Contact(ctx context.Context, tx pgx.Tx, id string) (email
 	}
 	first, last, _ := strings.Cut(strings.TrimSpace(b.Name), " ")
 	return emails.Contact{FirstName: first, LastName: strings.TrimSpace(last), FullName: b.Name, CompanyName: names[b.CompanyID], Email: b.Email}, nil
+}
+
+// Presentation cleanup leaves the stored salary record untouched.
+func cleanSalaryWording(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	clean := salarycalc.CleanWording(*value)
+	return &clean
 }

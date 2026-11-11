@@ -69,12 +69,12 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       )}
       <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
       {!editing && (
-        <section className="panel" aria-label="Job details">
-          <h3>Job details</h3>
+        <details className="panel fold" aria-label="Job details">
+          <summary><span className="fold-title">Job details</span></summary>
           <p>{facts}</p>
           <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
           <JdFiles jobId={j.id} permissions={permissions} />
-        </section>
+        </details>
       )}
       <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
       <MarketMap jobId={j.id} permissions={permissions} />

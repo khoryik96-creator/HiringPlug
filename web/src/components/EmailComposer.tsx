@@ -12,6 +12,7 @@ import { SaveAsTemplate } from "./clientEmail/SaveAsTemplate";
 import { atCursor, fillTokens, plainToHtml, showBanners, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
 import { ErrorMessage } from "./ErrorMessage";
+import { emailFieldErrors } from "./clientEmail/emailFieldErrors";
 import { SaveError } from "./SaveError";
 
 /** "a@x.com, b@y.com; c@z.com" -> the addresses. */
@@ -134,6 +135,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       onDone();
     },
   });
+  const errors = emailFieldErrors(send.error);
   const unfilled = missing.filter((key) => `${subject}\n${textOf(html)}`.includes(`[${key}]`));
   const set = (field: keyof typeof form) => (e: { target: { value: string } }) => { setForm({ ...form, [field]: e.target.value }); };
 
@@ -154,10 +156,10 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
           </select>
         </label>
       )}
-      <label className="field full">To<input value={form.to} onChange={set("to")} /></label>
-      <label className="field full">Cc<input value={form.cc} onChange={set("cc")} /></label>
-      <label className="field full">Bcc<input value={form.bcc} onChange={set("bcc")} /></label>
-      <label className="field full">Subject<input ref={subjectBox} value={subject} onChange={set("subject")}
+      <label className="field full">To<input aria-invalid={!!errors.to || undefined} value={form.to} onChange={set("to")} /></label>
+      <label className="field full">Cc<input aria-invalid={!!errors.cc || undefined} value={form.cc} onChange={set("cc")} /></label>
+      <label className="field full">Bcc<input aria-invalid={!!errors.bcc || undefined} value={form.bcc} onChange={set("bcc")} /></label>
+      <label className="field full">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
       {permissions.includes("candidates:read") && <div className="full">
         <ShortlistPanel people={packages.people} onPeople={packages.change} list={list} canSeeCvs={permissions.includes("documents:read")} canSeeSalary={permissions.includes("candidates.compensation:read")} allowEmpty onRefresh={packages.clear} onInsert={packages.insert}/>
@@ -167,7 +169,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       </div>}
       <div className="field full">
         <span>Message</span>
-        <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+        <RichEditor invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
           values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {

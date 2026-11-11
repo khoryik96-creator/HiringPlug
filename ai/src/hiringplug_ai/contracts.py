@@ -3982,10 +3982,19 @@ class FieldSettings(BaseModel):
     mandatory: list[MandatoryField]
 
 
+class EmailSalaryDisplay(StrEnum):
+    monthly = "monthly"
+    breakdown = "breakdown"
+
+
 class SalaryCalculationRules(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    emailSalaryDisplay: Annotated[
+        EmailSalaryDisplay | None,
+        Field(description="Current salary presentation in emails only; omitted defaults to monthly."),
+    ] = None
     allowances: bool
     bonus: bool
     bonusOnAllowances: bool

@@ -56,6 +56,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Candidate email packages and salary history
 
+- General Settings chooses monthly figures or cleaned salary breakdowns for emails only. Stored salary wording and screening inputs are unchanged. Unknown units require review. Applied/Screening have stage-specific bulk email selection; job details start collapsed. Invalid fields and missing candidate cells are outlined in red.
 - Candidate/contact composers and job-client submissions share multi-candidate
   selection, per-candidate CV choice and optional profile/salary fields. An
   explicit recipient is separate from the referenced candidates; inserted data

@@ -11,6 +11,7 @@ const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tah
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
 
 type Props = {
+  invalid?: boolean;
   /** What the box starts with; changing `resetKey` puts it back in. */
   html: string;
   resetKey: number;
@@ -36,7 +37,7 @@ type Props = {
   onFocus?: () => void;
 };
 
-export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+export function RichEditor({ invalid = false, html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
   const vals = values ?? NONE;
   const box = useRef<HTMLDivElement>(null);
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
@@ -65,6 +66,10 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
   const remember = () => { if (box.current) cursor.current = saveRange(box.current) ?? cursor.current; };
   const changed = () => { remember(); if (box.current) onChange(box.current.innerHTML); };
   const typed = () => {
+    box.current?.querySelectorAll<HTMLElement>("[data-missing-detail]").forEach((node)=>{
+      const text=node.textContent.trim();
+      if(text && text!=="—" && !text.includes("(unit not specified)")){delete node.dataset.missingDetail;node.removeAttribute("title");}
+    });
     if (box.current) fillTypedFields(box.current, fields, vals); // "[Expected salary]" typed in full becomes its value
     changed();
   };
@@ -173,7 +178,7 @@ export function RichEditor({ html, resetKey, onChange, fields, banners, bannerUr
         )}
       </div>
       <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
-        aria-label="Message" tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />
+        aria-label="Message" aria-invalid={invalid || undefined} tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />
     </div>
   );
 }

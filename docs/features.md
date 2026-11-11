@@ -608,9 +608,11 @@ lead's company (with the built-in email check).
   JPEG or GIF, up to 1 MB) and shown inside the email, not linked. Only the
   toolbar's formatting is kept (no scripts, no images loading from elsewhere),
   and every email also carries a plain-text version.
-- **Selected candidates in one email** ✅: candidate, contact and job/client composers share a candidate search (up to 10). Each selected candidate has their own CV choice (including formatted Word/PDF versions), optional salary details/wording/notes, industries and other profile fields. Recipients are independent of the selected profiles: greeting fields use the contact or candidate receiving the email. Preview before sending. Updating the inserted section preserves the rest of the message; removing/reordering candidates preserves edits on retained candidates. Profile/salary versions are checked again when sending inserted details, so changed source records require refresh and review. Emails appear on every referenced candidate and the contact/job where applicable.
+- **Selected candidates in one email** ✅: headings show candidate names only and block layout puts each selected category on its own line; title/company can be explicitly selected as separate details. **Settings → General → Salary calculation → Salary in emails** chooses the numeric monthly figure or the stored breakdown (falling back to the figure when no breakdown exists). Go tidies known salary spelling/shorthand for emails without changing amounts or saved notes. Unspecified EPF units remain marked for review. Invalid controls and missing candidate cells have red outlines in the editor; optional missing values do not block sending.
+
+   candidate, contact and job/client composers share a candidate search (up to 10). Each selected candidate has their own CV choice (including formatted Word/PDF versions), optional salary details/wording/notes, industries and other profile fields. Recipients are independent of the selected profiles: greeting fields use the contact or candidate receiving the email. Preview before sending. Updating the inserted section preserves the rest of the message; removing/reordering candidates preserves edits on retained candidates. Profile/salary versions are checked again when sending inserted details, so changed source records require refresh and review. Emails appear on every referenced candidate and the contact/job where applicable.
 - **Email the client about several candidates** ✅: tick candidates on the
-  job's board (up to 10) and **Email client about N candidates**. Each
+  job's board (up to 10) and **Email client about N candidates**. Applied and Screening columns support Select all / Unselect all independently; other stage selections are preserved. Each
   candidate has a row: the profile to attach (their newest formatted CV, as
   PDF once made, by default; any of their CVs, or no attachment), up and down
   for their order, and Remove; more can be added from the job. **Insert
@@ -1055,3 +1057,5 @@ multiple selections and one current sector. Settings > Industries manages the
 categories are deleted. Go recognises the selected employer's business, keeps
 manual tags, and leaves unclear cases open for manual selection. See
 [industries.md](industries.md) for rules, compatibility and module ownership.
+
+Job details can be expanded or collapsed below the pipeline and start collapsed.

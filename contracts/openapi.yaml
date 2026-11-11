@@ -9545,6 +9545,10 @@ components:
       additionalProperties: false
       required: [allowances, bonus, bonusOnAllowances, cents]
       properties:
+        emailSalaryDisplay:
+          type: string
+          enum: [monthly, breakdown]
+          description: Current salary presentation in emails only; omitted defaults to monthly.
         allowances: {type: boolean}
         bonus: {type: boolean}
         bonusOnAllowances: {type: boolean}

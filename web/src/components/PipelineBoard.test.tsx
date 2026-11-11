@@ -100,3 +100,18 @@ describe("pipeline board", () => {
     expect(screen.queryByRole("checkbox", { name: /for an email to the client/ })).toBeNull();
   });
 });
+
+it("selects and clears each early stage without losing candidates in other stages",async()=>{
+ const applied={...siti,id:"appl_applied",candidateId:"cand_applied",candidateName:"Applied Person",stage:"applied"};
+ vi.spyOn(api,"GET").mockResolvedValue(ok({items:[siti,applied,wei]}));
+ renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read","emails:send"]}/>);
+ fireEvent.click(await screen.findByRole("button",{name:"Select all Applied candidates"}));
+ fireEvent.click(screen.getByRole("button",{name:"Select all Screening candidates"}));
+ fireEvent.click(screen.getByRole("button",{name:"Select all Screening candidates"}));
+ expect(screen.getByText("2 chosen")).toBeTruthy();
+ fireEvent.click(screen.getByRole("button",{name:"Unselect all Applied candidates"}));
+ expect(screen.getByRole<HTMLInputElement>("checkbox",{name:"Choose Siti Aisyah for an email to the client"}).checked).toBe(true);
+ expect(screen.getByRole<HTMLInputElement>("checkbox",{name:"Choose Applied Person for an email to the client"}).checked).toBe(false);
+ fireEvent.click(screen.getByRole("button",{name:"Unselect all Screening candidates"}));
+ expect(screen.queryByText("1 chosen")).toBeNull();
+});
