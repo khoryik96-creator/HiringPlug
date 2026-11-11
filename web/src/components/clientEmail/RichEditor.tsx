@@ -68,7 +68,7 @@ export function RichEditor({ invalid = false, html, resetKey, onChange, fields, 
   const typed = () => {
     box.current?.querySelectorAll<HTMLElement>("[data-missing-detail]").forEach((node)=>{
       const text=node.textContent.trim();
-      if(text && text!=="—" && !text.includes("(unit not specified)")){delete node.dataset.missingDetail;node.removeAttribute("title");}
+      if(text && text!=="—" && !/\((?:unit not specified|component needs review|amount needs review)\)/.test(text)){delete node.dataset.missingDetail;node.removeAttribute("title");}
     });
     if (box.current) fillTypedFields(box.current, fields, vals); // "[Expected salary]" typed in full becomes its value
     changed();

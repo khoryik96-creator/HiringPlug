@@ -58,7 +58,10 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 		compensationVersion = c.Version
 		d.SalaryNotes = cleanSalaryWording(c.SalaryNotes)
 		if c.Current != nil {
-			d.CurrentBreakdown = cleanSalaryWording(c.Current.Description)
+			if c.Current.Description != nil {
+				value := salarycalc.FormatBreakdown(*c.Current.Description, c.Current.Currency, c.Current.Period)
+				d.CurrentBreakdown = &value
+			}
 		}
 		if c.Expected != nil {
 			d.ExpectedNotes = cleanSalaryWording(c.Expected.Description)

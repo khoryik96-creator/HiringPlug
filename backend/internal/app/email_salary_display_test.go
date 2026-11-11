@@ -30,7 +30,7 @@ func TestEmailSalaryPreferenceCleansWordingWithoutChangingStoredNotes(t *testing
 	r = a.request("PUT", "/v1/settings/salary-calculation", token, map[string]any{"allowances": true, "bonus": true, "bonusOnAllowances": false, "cents": false, "emailSalaryDisplay": "breakdown"})
 	require.Equal(t, 200, r.Status)
 	out := preview(token)
-	assert.Equal(t, "16k + 400 allowance + performance bonus + 13% EPF", out.FieldValues["[Current salary]"])
+	assert.Equal(t, "RM 16,000 + RM 400 fixed allowance + performance bonus + 13% EPF per month", out.FieldValues["[Current salary]"])
 	assert.Equal(t, "performance bonus is variable", out.FieldValues["[Salary notes]"])
 	var stored api.Candidate
 	a.request("GET", "/v1/candidates/"+c.Id, token, nil).JSON(&stored)

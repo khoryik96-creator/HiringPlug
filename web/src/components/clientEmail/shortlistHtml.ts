@@ -31,7 +31,7 @@ export const DEFAULT_DETAILS = ["currentSalary", "expectedSalary", "noticePeriod
 export type Person = { id?:string; name: string; values: Record<string, string> };
 
 const missing = (d: Detail) => `<span data-field="${d.key}" data-missing-detail="${escapeHtml(d.label)}" title="${escapeHtml(d.label)}: not on record">—</span>`;
-const field = (d: Detail, value: string) => `<span data-field="${d.key}"${value.includes("(unit not specified)") ? ' data-missing-detail="Confirm salary unit" title="Confirm the salary unit"' : ""}>${escapeHtml(value)}</span>`;
+const field = (d: Detail, value: string) => `<span data-field="${d.key}"${/\((?:unit not specified|component needs review|amount needs review)\)/.test(value) ? ' data-missing-detail="Review salary component" title="Review the salary component"' : ""}>${escapeHtml(value)}</span>`;
 
 /** A block for each candidate: "1. Name, title" then "Label: value · Label: value". */
 export function blocksHtml(people: Person[], details: Detail[]): string {
