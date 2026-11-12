@@ -18,8 +18,10 @@ type Placement = Schemas["Placement"];
  * start, guarantee, recruiter credited, what happened, the invoice, and (for
  * those allowed) the salary and fee.
  */
-export function PlacementForm({ applicationId, placement, permissions, onDone }: {
+export function PlacementForm({ applicationId, placement, permissions, onDone, onCancel }: {
   applicationId: string; placement?: Placement; permissions: Permission[]; onDone: () => void;
+  /** Leaving without saving (default: onDone). */
+  onCancel?: () => void;
 }) {
   const queryClient = useQueryClient();
   const users = useQuery({ queryKey: usersKey, queryFn: async () => unwrap(await api.GET("/v1/users")).items, staleTime: 60_000 });
@@ -175,7 +177,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone }:
       <SaveError error={save.error} shown={shown} onReload={onDone} />
       <div className="row full">
         <button type="submit" disabled={save.isPending || !form.startDate}>{placement ? "Save" : "Record placement"}</button>
-        <button type="button" className="link" onClick={onDone}>Cancel</button>
+        <button type="button" className="link" onClick={onCancel ?? onDone}>Cancel</button>
       </div>
     </form>
   );

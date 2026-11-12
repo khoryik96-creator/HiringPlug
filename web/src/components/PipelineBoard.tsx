@@ -11,6 +11,7 @@ import { type Person, SeparateEmail } from "./SeparateEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
+import { needsDetails, StagePrompt } from "./StagePrompt";
 import { type MoveRequest, useMoveApplication, useMoveApplications } from "./useMoveApplication";
 
 /**
@@ -46,9 +47,23 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const chosenApps = apps.filter((a) => picked.includes(a.id));
   // The chosen cards move together; those that moved are unticked, a stale one reports itself.
   const moveMany = useMoveApplications((ids) => { setPicked((cur) => cur.filter((id) => !ids.includes(id))); });
-  const moveChosen = (to: Omit<MoveRequest, "app">) => {
-    moveMany.mutate(chosenApps.filter((a) => a.stage !== to.stage).map((app) => ({ app, ...to })));
+  // Offer and Placed ask for the offer or the placement report first, one candidate at a time.
+  const [asking, setAsking] = useState<MoveRequest[]>([]);
+  const requestMove = (m: MoveRequest) => {
+    if (needsDetails(m, permissions)) setAsking((q) => [...q, m]);
+    else move.mutate(m);
   };
+  const moveChosen = (to: Omit<MoveRequest, "app">) => {
+    const requests = chosenApps.filter((a) => a.stage !== to.stage).map((app) => ({ app, ...to }));
+    const ask = requests.filter((m) => needsDetails(m, permissions));
+    if (ask.length > 0) {
+      setAsking((q) => [...q, ...ask]);
+      setPicked((cur) => cur.filter((id) => !ask.some((m) => m.app.id === id)));
+    }
+    const plain = requests.filter((m) => !needsDetails(m, permissions));
+    if (plain.length > 0) moveMany.mutate(plain);
+  };
+  const askingNow = asking[0];
   const [emailing, setEmailing] = useState<Application | null>(null);
   const moveError = move.error ?? moveMany.error;
   const stale = moveError instanceof ApiError && moveError.code === "CONFLICT_STALE_VERSION";
@@ -93,6 +108,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
           {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
       )}
+      {askingNow && (askingNow.stage === "offer" || askingNow.stage === "placed") && (
+        <StagePrompt key={`${askingNow.app.id}-${askingNow.stage}`} app={askingNow.app} stage={askingNow.stage} permissions={permissions}
+          onMove={(m) => { move.mutate(m); }} onClose={() => { setAsking((q) => q.slice(1)); }} />
+      )}
       {emailing && (
         <ClientEmail key={emailing.id} candidateId={emailing.candidateId} applicationId={emailing.id} permissions={permissions}
           onClose={() => { setEmailing(null); setPicked([]); }} />
@@ -132,7 +151,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               onDrop={(e) => {
                 e.preventDefault();
                 setOver(null);
-                if (dragging && dragging.stage !== stage) move.mutate({ app: dragging, stage });
+                if (dragging && dragging.stage !== stage) requestMove({ app: dragging, stage });
                 setDragging(null);
               }}
             >
@@ -160,7 +179,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                 <a href={`#/candidates/${a.candidateId}`}>{a.candidateName}</a>{" "}
                 <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>{" "}
                 <span className="muted">{a.reason ? CLOSE_REASON[a.reason] : ""}{a.reasonNote ? `: ${a.reasonNote}` : ""}</span>{" "}
-                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={requestMove} />}
               </li>
             ))}
           </ul>

@@ -12,7 +12,8 @@ import { ClientEmail } from "./clientEmail/ClientEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { ApplicationInterviews } from "./Interviews";
 import { type Picked, SearchPicker } from "./SearchPicker";
-import { useMoveApplication } from "./useMoveApplication";
+import { needsDetails, StagePrompt } from "./StagePrompt";
+import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
 
 /** The jobs a candidate is on, with their stage; add them to another job. */
 export function CandidateApplications({ candidateId, canUpdate, permissions }: { candidateId: string; canUpdate: boolean; permissions: Permission[] }) {
@@ -22,6 +23,9 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
   });
   const move = useMoveApplication();
+  // Offer and Placed ask for the offer or the placement report first.
+  const [asking, setAsking] = useState<MoveRequest | null>(null);
+  const requestMove = (m: MoveRequest) => { if (needsDetails(m, permissions)) setAsking(m); else move.mutate(m); };
   const [job, setJob] = useState<Picked | null>(null);
   const [emailing, setEmailing] = useState<string | null>(null); // the application the client email is about
   const add = useMutation({
@@ -51,12 +55,15 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
                 <span className="muted small">{a.reason ? CLOSE_REASON[a.reason] : `${timeInStage(a)} in this stage`}</span>
               </div>
               <div className="app-card-actions">
-                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={(m) => { move.mutate(m); }} />}
+                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={requestMove} />}
                 {permissions.includes("emails:send") && (
                   <button type="button" className="small-button" onClick={() => { setEmailing(a.id); }}>Email client</button>
                 )}
               </div>
             </div>
+            {asking?.app.id === a.id && (asking.stage === "offer" || asking.stage === "placed") && (
+              <StagePrompt app={a} stage={asking.stage} permissions={permissions} onMove={(m) => { move.mutate(m); }} onClose={() => { setAsking(null); }} />
+            )}
             <div className="app-card-body">
               {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
               {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}

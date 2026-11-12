@@ -115,7 +115,8 @@ export function OfferItem({ offer: o, permissions, showCandidate = false }: { of
 }
 
 /** Draft an offer, or change its terms. */
-function OfferForm({ applicationId, offer, permissions, onDone }: { applicationId: string; offer?: Offer; permissions: Permission[]; onDone: () => void }) {
+/** Make an offer (the application moves to offer) or change one. onCancel: leaving without saving (default: onDone). */
+export function OfferForm({ applicationId, offer, permissions, onDone, onCancel }: { applicationId: string; offer?: Offer; permissions: Permission[]; onDone: () => void; onCancel?: () => void }) {
   const queryClient = useQueryClient();
   const withSalary = permissions.includes("offers.salary:update");
   const [opened] = useState(() => ({ version: offer?.version ?? 0 }));
@@ -175,7 +176,7 @@ function OfferForm({ applicationId, offer, permissions, onDone }: { applicationI
       <SaveError error={save.error} shown={["salary.amount"]} onReload={onDone} />
       <div className="row full">
         <button type="submit" disabled={save.isPending}>{offer ? "Save" : "Draft offer"}</button>
-        <button type="button" className="link" onClick={onDone}>Cancel</button>
+        <button type="button" className="link" onClick={onCancel ?? onDone}>Cancel</button>
       </div>
     </form>
   );
