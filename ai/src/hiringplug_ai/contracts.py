@@ -5514,7 +5514,18 @@ class CompanyBilling(BaseModel):
 
 
 class PlacementList(BaseModel):
-    items: list[Placement]
+    items: Annotated[
+        list[Placement], Field(description="Newest start date first, at most 500; total says how many match.")
+    ]
+    total: Annotated[
+        int, Field(description="How many placements match: more than the items when the list stopped at 500.")
+    ]
+    today: Annotated[
+        date,
+        Field(
+            description="Today in the agency's time zone: what counts as started, in guarantee or overdue (not the browser's clock)."
+        ),
+    ]
     feeTotals: Annotated[
         list[FeeTotal] | None, Field(description="Left out without placements.fees:read.")
     ] = None

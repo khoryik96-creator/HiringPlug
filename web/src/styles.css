@@ -934,9 +934,31 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .backup-download { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; white-space: normal; }
 .backup-download progress { width: 9rem; }
 
-/* CV formatting: how the About Him / Her summary is written. */
-.summary-options { border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.9rem 0.8rem; display: grid; gap: 0.55rem; margin: 0; }
-.summary-options legend { font-weight: 600; padding: 0 0.3rem; }
-.summary-options .row { flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+/* CV formatting: how the About Him / Her summary is written, on one line. */
+.summary-options { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.summary-options select { width: auto; }
+.summary-options .summary-direction { flex: 1 1 16rem; min-width: 12rem; }
+.summary-options .error { flex-basis: 100%; }
+
+/* Placements dashboard: cards that count and filter, the fees, the filters. */
+.kpi-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.6rem; margin: 0.75rem 0; }
+.kpi-card { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 0.1rem; padding: 0.7rem 0.85rem; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface, #fff); color: var(--text); cursor: pointer; box-shadow: var(--shadow); }
+.kpi-card strong { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-size: 1.9rem; line-height: 1; }
+.kpi-card span { font-weight: 600; font-size: 0.9rem; }
+.kpi-card small { color: var(--muted); font-size: 0.75rem; }
+.kpi-card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.billing-strip { display: grid; gap: 0.4rem; margin: 0 0 0.75rem; }
+.billing-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface, #fff); border: 1px solid var(--line); border-radius: 12px; }
+.billing-row > div { padding: 0.6rem 0.9rem; display: flex; flex-direction: column; gap: 0.15rem; font-variant-numeric: tabular-nums; }
+.billing-row > div + div { border-left: 1px solid var(--line); }
+.billing-row .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 650; }
+.placements-filters { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem; }
+.placements-filters input { flex: 1 1 14rem; }
+.placements-filters select { width: auto; }
+.pill.guarantee-in_guarantee { background: #e3f5ec; border-color: transparent; color: #067647; }
+.pill.guarantee-ending_soon { background: #fdf1dc; border-color: transparent; color: #9a5b00; }
+.pill.guarantee-not_started { background: #e8f0fe; border-color: transparent; color: #1d4ed8; }
+.pill.guarantee-fell_through { background: #fde7e4; border-color: transparent; color: #b42318; }
+@media (max-width: 760px) { .billing-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .billing-row > div:nth-child(3) { border-left: 0; } }
 .choice-pill { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; min-height: 34px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
-.choice-pill[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.choice-pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }

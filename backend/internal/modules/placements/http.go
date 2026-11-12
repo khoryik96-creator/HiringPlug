@@ -18,19 +18,20 @@ type HTTP struct{ svc *Service }
 // ListPlacements handles GET /v1/placements.
 func (h *HTTP) ListPlacements(ctx context.Context, req api.ListPlacementsRequestObject) (api.ListPlacementsResponseObject, error) {
 	q := req.Params
-	views, totals, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
+	listed, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
 		ApplicationID: q.ApplicationId, Status: c.Convert[string](q.Status), InvoiceStatus: c.Convert[string](q.InvoiceStatus),
 		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo),
 	})
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListPlacements200JSONResponse{Items: make([]api.Placement, len(views))}
-	for i, v := range views {
+	out := api.ListPlacements200JSONResponse{Items: make([]api.Placement, len(listed.Items)), Total: listed.Total,
+		Today: openapi_types.Date{Time: h.svc.Today(time.Now())}}
+	for i, v := range listed.Items {
 		out.Items[i] = toAPI(v)
 	}
 	if authz.MustFromContext(ctx).Can(api.PermissionPlacementsFeesRead) {
-		list := feeTotalsToAPI(totals)
+		list := feeTotalsToAPI(listed.Totals)
 		out.FeeTotals = &list
 	}
 	return out, nil

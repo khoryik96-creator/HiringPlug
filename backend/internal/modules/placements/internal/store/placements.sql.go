@@ -66,6 +66,37 @@ func (q *Queries) ClearInvoiceSchedule(ctx context.Context, placementID string) 
 	return err
 }
 
+const countPlacements = `-- name: CountPlacements :one
+SELECT count(*) FROM placement
+WHERE ($1::text IS NULL OR application_id = $1)
+  AND ($2::text IS NULL OR status = $2)
+  AND ($3::text IS NULL OR invoice_status = $3)
+  AND ($4::date IS NULL OR start_date >= $4)
+  AND ($5::date IS NULL OR start_date <= $5)
+`
+
+type CountPlacementsParams struct {
+	ApplicationID *string
+	Status        *string
+	InvoiceStatus *string
+	StartFrom     *time.Time
+	StartTo       *time.Time
+}
+
+// How many placements the list's filters match (the list stops at 500).
+func (q *Queries) CountPlacements(ctx context.Context, arg CountPlacementsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPlacements,
+		arg.ApplicationID,
+		arg.Status,
+		arg.InvoiceStatus,
+		arg.StartFrom,
+		arg.StartTo,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deletePlacementMoney = `-- name: DeletePlacementMoney :exec
 DELETE FROM placement_money WHERE placement_id = $1
 `

@@ -95,6 +95,10 @@ func TestPlacementTotalsCountEveryPlacement(t *testing.T) {
 
 	list := a.placements(recruiter.Token, "")
 	assert.Len(t, list.Items, 500, "the list stops at 500")
+	assert.Equal(t, 505, list.Total, "and says how many there are, so it is never taken for all of them")
+	y, m, d := time.Now().In(a.deps.Config.TimeZone).Date()
+	assert.Equal(t, time.Date(y, m, d, 0, 0, 0, 0, time.UTC), list.Today.Time, "today in the agency's time zone")
+	assert.Equal(t, 0, a.placements(recruiter.Token, "?startFrom=2027-01-01").Total)
 	require.NotNil(t, list.FeeTotals)
 	require.Len(t, *list.FeeTotals, 1)
 	assert.Equal(t, "505000.00", (*list.FeeTotals)[0].Total, "the totals count all 505")

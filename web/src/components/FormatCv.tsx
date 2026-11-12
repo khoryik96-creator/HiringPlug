@@ -53,8 +53,8 @@ export type SummaryChoice = { write: boolean; length: SummaryLength; focus: Summ
 
 const SUMMARY_KEY = "hiringplug.studio.summary";
 const SUMMARY_DEFAULT: SummaryChoice = { write: true, length: "normal", focus: "general", direction: "" };
-const LENGTHS: [SummaryLength, string][] = [["short", "Short (4-5 points)"], ["normal", "Normal (6-7)"], ["detailed", "Detailed (8-10)"]];
-const FOCUSES: [SummaryFocus, string][] = [["general", "General"], ["technology", "Technology"], ["leadership", "Leadership"], ["commercial", "Commercial"]];
+const LENGTHS: [SummaryLength, string][] = [["short", "Short (4-5)"], ["normal", "Normal (6-7)"], ["detailed", "Detailed (8-10)"]];
+const FOCUSES: [SummaryFocus, string][] = [["general", "General focus"], ["technology", "Technology"], ["leadership", "Leadership"], ["commercial", "Commercial"]];
 
 export function loadSummaryChoice(): SummaryChoice {
   try {
@@ -116,11 +116,7 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
           &ldquo;The candidate&rdquo; instead of he or she
         </label>
       )}
-      {form.blind ? (
-        <p className="muted small full">A blind CV keeps the CV&apos;s own About Him / Her summary.</p>
-      ) : (
-        <SummaryOptions choice={summary} onChange={setSummary} error={fieldErrors(start.error).summaryDirection} />
-      )}
+      {!form.blind && <SummaryOptions choice={summary} onChange={setSummary} error={fieldErrors(start.error).summaryDirection} />}
       <label className="field">Paragraphs
         <select value={form.alignment} onChange={(e) => { setForm({ ...form, alignment: e.target.value === "justify" ? "justify" : "left" }); }}>
           <option value="left">Aligned left</option>
@@ -139,39 +135,25 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
 /** The About Him / Her summary: whether the AI writes one, and how (CV Studio's lengths and focus, and your own direction and tone). */
 function SummaryOptions({ choice, onChange, error }: { choice: SummaryChoice; onChange: (c: SummaryChoice) => void; error?: string }) {
   return (
-    <fieldset className="full summary-options">
-      <legend>About Him / Her summary</legend>
+    <div className="full summary-options">
       <label className="row">
-        <input type="checkbox" checked={choice.write} onChange={(e) => { onChange({ ...choice, write: e.target.checked }); }} />{" "}
-        Write a summary with the AI
+        <input type="checkbox" checked={choice.write} onChange={(e) => { onChange({ ...choice, write: e.target.checked }); }} /> AI summary
       </label>
-      {!choice.write && <p className="muted small">No summary is written: the CV&apos;s own summary is kept, if it has one.</p>}
       {choice.write && (
         <>
-          <div className="row" role="radiogroup" aria-label="Length">
-            <span className="small muted">Length</span>
-            {LENGTHS.map(([key, label]) => (
-              <button key={key} type="button" role="radio" aria-checked={choice.length === key} className="choice-pill"
-                onClick={() => { onChange({ ...choice, length: key }); }}>{label}</button>
-            ))}
-          </div>
-          <div className="row" role="radiogroup" aria-label="Focus">
-            <span className="small muted">Bring out</span>
-            {FOCUSES.map(([key, label]) => (
-              <button key={key} type="button" role="radio" aria-checked={choice.focus === key} className="choice-pill"
-                onClick={() => { onChange({ ...choice, focus: key }); }}>{label}</button>
-            ))}
-          </div>
-          <label className="field">Your direction and tone (optional)
-            <textarea rows={3} maxLength={500} value={choice.direction}
-              placeholder="e.g. Confident and concise. Lead with the S/4HANA migration and team leadership; written for a CFO."
-              onChange={(e) => { onChange({ ...choice, direction: e.target.value }); }} />
-          </label>
-          {error ? <small className="error">{error}</small>
-            : <p className="muted small">The summary sticks to what the CV says and never mentions pay. Your choices are remembered for the next CV.</p>}
+          <select aria-label="Summary length" value={choice.length} onChange={(e) => { onChange({ ...choice, length: e.target.value as SummaryLength }); }}>
+            {LENGTHS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <select aria-label="Summary focus" value={choice.focus} onChange={(e) => { onChange({ ...choice, focus: e.target.value as SummaryFocus }); }}>
+            {FOCUSES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <input className="summary-direction" aria-label="Direction and tone" maxLength={500} value={choice.direction}
+            placeholder="Direction & tone (optional)" title="e.g. Confident, concise; lead with team leadership"
+            onChange={(e) => { onChange({ ...choice, direction: e.target.value }); }} />
         </>
       )}
-    </fieldset>
+      {error && <small className="error">{error}</small>}
+    </div>
   );
 }
 

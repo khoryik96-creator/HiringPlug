@@ -203,8 +203,8 @@ stating the candidate's own salary are left out before the AI sees the CV. When
 CV Studio's check finds something the result may have lost or changed, the
 page says what, to compare before sending. It needs the AI (Settings > AI
 provider) and counts in the monthly AI allowance. Its summary box carries
-CV Studio's "ABOUT HIM / HER" heading. The summary is optional ("Write a
-summary with the AI"; off keeps the CV's own): its length (short 4-5 points,
+CV Studio's "ABOUT HIM / HER" heading. The summary is optional (one line:
+"AI summary" on or off, off keeps the CV's own): its length (short 4-5 points,
 normal 6-7, detailed 8-10), what it brings out (CV Studio's General,
 Technology, Leadership or Commercial) and your own direction and tone in a
 sentence or two ("confident and concise, lead with the S/4HANA migration"),
@@ -814,11 +814,20 @@ its own invoice state, and only the balance under the placement's. Like
 salary and fees, retainers are hidden by the database from those without
 `placements.fees:read`, and the audit log never records their amounts.
 
-The **Placements** page lists them all, filtered by what happened or the
-invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
-paid; fall-throughs and no-starts not counted; added up by the database over
-every matching placement, though the list stops at 500) and the placements whose
-guarantee ends within two weeks. A fall-through means the client is owed a
+The **Placements** page is a dashboard of the placements that started in
+the dates chosen (this year by default, last year, all time or your own
+dates). Cards count and filter them: starting soon, in guarantee, guarantee
+ending within 30 days, not invoiced, overdue (invoiced and past the due date)
+and replacement owed; a second click shows all again. The fees strip shows
+what was billed, paid, invoiced but unpaid and not invoiced, per currency
+(fall-throughs and no-starts not counted; added up by the database over every
+matching placement). The table shows each guarantee's state with the days
+left and its end date, the fee, the invoice and the placement's own recruiter,
+with search, filters (recruiter, company, guarantee, invoice) and sorting,
+100 at a time; the choices are remembered in the browser. "Today" is the
+agency's (Malaysia time), from the server. The list stops at 500 placements:
+when there are more, the page says how many and asks to narrow the dates,
+rather than counting only part of them as if they were all. A fall-through means the client is owed a
 **replacement**: the placement shows "Replacement owed" (listed at the top of
 the Placements page) until it is marked provided or refunded.
 

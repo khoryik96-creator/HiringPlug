@@ -19,6 +19,15 @@ WHERE (sqlc.narg(application_id)::text IS NULL OR application_id = sqlc.narg(app
 ORDER BY start_date DESC, id DESC
 LIMIT 500;
 
+-- How many placements the list's filters match (the list stops at 500).
+-- name: CountPlacements :one
+SELECT count(*) FROM placement
+WHERE (sqlc.narg(application_id)::text IS NULL OR application_id = sqlc.narg(application_id))
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status))
+  AND (sqlc.narg(invoice_status)::text IS NULL OR invoice_status = sqlc.narg(invoice_status))
+  AND (sqlc.narg(start_from)::date IS NULL OR start_date >= sqlc.narg(start_from))
+  AND (sqlc.narg(start_to)::date IS NULL OR start_date <= sqlc.narg(start_to));
+
 -- The fees of every placement the list's filters match (not only the 500
 -- listed) that stood, per currency and invoice status. Visible only with
 -- placements.fees:read (row-level security on placement_money).

@@ -9889,11 +9889,17 @@ components:
         paid: {$ref: '#/components/schemas/DecimalAmount'}
     PlacementList:
       type: object
-      required: [items]
+      required: [items, total, today]
       properties:
         items:
           type: array
+          description: Newest start date first, at most 500; total says how many match.
           items: {$ref: '#/components/schemas/Placement'}
+        total: {type: integer, description: "How many placements match: more than the items when the list stopped at 500."}
+        today:
+          type: string
+          format: date
+          description: "Today in the agency's time zone: what counts as started, in guarantee or overdue (not the browser's clock)."
         feeTotals:
           description: Left out without placements.fees:read.
           type: array

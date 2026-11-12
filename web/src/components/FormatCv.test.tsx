@@ -78,20 +78,19 @@ describe("formatted CVs", () => {
     studioReads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
-    const write = await screen.findByLabelText<HTMLInputElement>("Write a summary with the AI");
+    const write = await screen.findByLabelText<HTMLInputElement>("AI summary");
     expect(write.checked).toBe(true);
-    expect(screen.getByRole("radio", { name: "Normal (6-7)" }).getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(screen.getByRole("radio", { name: "Detailed (8-10)" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Leadership" }));
-    fireEvent.change(screen.getByLabelText("Your direction and tone (optional)"), { target: { value: "  Confident; lead with team leadership " } });
+    expect(screen.getByLabelText<HTMLSelectElement>("Summary length").value).toBe("normal");
+    fireEvent.change(screen.getByLabelText("Summary length"), { target: { value: "detailed" } });
+    fireEvent.change(screen.getByLabelText("Summary focus"), { target: { value: "leadership" } });
+    fireEvent.change(screen.getByLabelText("Direction and tone"), { target: { value: "  Confident; lead with team leadership " } });
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toMatchObject({ blind: false, summary: "detailed", summaryFocus: "leadership", summaryDirection: "Confident; lead with team leadership" });
     await waitFor(() => { expect(localStorage.getItem("hiringplug.studio.summary")).toContain("leadership"); });
 
     fireEvent.click(screen.getByLabelText(/Blind CV/));
-    expect(screen.queryByLabelText("Write a summary with the AI")).toBeNull();
-    expect(screen.getByText(/A blind CV keeps the CV's own About Him \/ Her summary/)).toBeTruthy();
+    expect(screen.queryByLabelText("AI summary"), "a blind CV keeps its own summary").toBeNull();
   });
 
   it("remembers the choice for the next CV, and makes the summary optional", async () => {
@@ -99,13 +98,12 @@ describe("formatted CVs", () => {
     studioReads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
-    expect((await screen.findByRole("radio", { name: "Short (4-5 points)" })).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("radio", { name: "Commercial" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByLabelText<HTMLTextAreaElement>("Your direction and tone (optional)").value).toBe("Punchy");
+    expect((await screen.findByLabelText<HTMLSelectElement>("Summary length")).value).toBe("short");
+    expect(screen.getByLabelText<HTMLSelectElement>("Summary focus").value).toBe("commercial");
+    expect(screen.getByLabelText<HTMLInputElement>("Direction and tone").value).toBe("Punchy");
 
-    fireEvent.click(screen.getByLabelText("Write a summary with the AI"));
-    expect(screen.getByText(/No summary is written/)).toBeTruthy();
-    expect(screen.queryByRole("radio", { name: "Commercial" })).toBeNull();
+    fireEvent.click(screen.getByLabelText("AI summary"));
+    expect(screen.queryByLabelText("Summary focus"), "no summary: no options").toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: false, neutralGender: false, correctLanguage: true, alignment: "left", summary: "none" });
@@ -117,7 +115,7 @@ describe("formatted CVs", () => {
     studioReads();
     vi.spyOn(api, "POST").mockResolvedValue(invalidField("summaryDirection", "Leave pay out of the direction: the summary never mentions the candidate's pay, and pay is never sent to the AI."));
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
-    fireEvent.change(await screen.findByLabelText("Your direction and tone (optional)"), { target: { value: "mention RM 9,000" } });
+    fireEvent.change(await screen.findByLabelText("Direction and tone"), { target: { value: "mention RM 9,000" } });
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     expect(await screen.findByText(/Leave pay out of the direction/)).toBeTruthy();
   });

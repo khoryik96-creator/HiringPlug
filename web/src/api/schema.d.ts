@@ -6891,7 +6891,15 @@ export interface components {
             paid: components["schemas"]["DecimalAmount"];
         };
         PlacementList: {
+            /** @description Newest start date first, at most 500; total says how many match. */
             items: components["schemas"]["Placement"][];
+            /** @description How many placements match: more than the items when the list stopped at 500. */
+            total: number;
+            /**
+             * Format: date
+             * @description Today in the agency's time zone: what counts as started, in guarantee or overdue (not the browser's clock).
+             */
+            today: string;
             /** @description Left out without placements.fees:read. */
             feeTotals?: components["schemas"]["FeeTotal"][];
         };

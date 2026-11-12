@@ -216,15 +216,29 @@ type Filter struct {
 
 // List returns placements, newest start first (at most 500), and (with
 // placements.fees:read) the fee totals of every matching one that stands.
-func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) ([]View, []FeeTotal, error) {
+// Listed is a page of the list: the placements (at most 500), how many match
+// in all, and with placements.fees:read their fee totals.
+type Listed struct {
+	Items  []View
+	Total  int
+	Totals []FeeTotal
+}
+
+func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) (Listed, error) {
 	var out []View
 	var totals []FeeTotal
+	var total int64
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
 		rows, err := q.ListPlacements(ctx, store.ListPlacementsParams{
 			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
 		})
 		if err != nil {
+			return err
+		}
+		if total, err = q.CountPlacements(ctx, store.CountPlacementsParams{
+			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
+		}); err != nil {
 			return err
 		}
 		if out, err = s.views(ctx, tx, p, rows); err != nil || !p.Can(api.PermissionPlacementsFeesRead) {
@@ -243,7 +257,14 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) ([]View
 		totals = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total }, moved...)
 		return err
 	})
-	return out, totals, err
+	return Listed{Items: out, Total: int(total), Totals: totals}, err
+}
+
+// Today is today's date in the agency's time zone (what counts as started,
+// in guarantee or overdue), at midnight UTC.
+func (s *Service) Today(now time.Time) time.Time {
+	y, m, d := now.In(s.inv.TimeZone).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 // Billing is what a client was billed: this year (in the agency's time
