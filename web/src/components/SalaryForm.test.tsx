@@ -40,6 +40,18 @@ describe("salary form", () => {
     expect(sentBody(put)).toMatchObject({ expectedVersion: 1 });
   });
 
+  it("does not send the old breakdown with a new figure, so emails never show a stale package", async () => {
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(recorded));
+    const described: Compensation = { ...recorded, currentSalary: { amount: "8500.00", currency: "MYR", period: "month", description: "8k + 500 allowance" } };
+    const onDone = vi.fn();
+    renderWithClient(<SalaryForm candidate={testCandidate({ compensation: described })} onDone={onDone} />);
+    change("Current salary", "Amount", "9500");
+    save();
+    await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
+    expect(sentBody(put)).toMatchObject({ currentSalary: { amount: "9500" } });
+    expect((sentBody(put) as { currentSalary: Record<string, unknown> }).currentSalary).not.toHaveProperty("description");
+  });
+
   it("closes without saving when Add salary is saved empty", async () => {
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(recorded));
     const onDone = vi.fn();

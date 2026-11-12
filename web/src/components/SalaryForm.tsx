@@ -7,6 +7,7 @@ import { keysOf, PAY_PERIOD } from "../labels";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import {
+  figuresOnly,
   formFromCompensation,
   SALARY_PATHS,
   salaryProblems,
@@ -22,7 +23,7 @@ export function SalaryForm({ candidate, onDone }: { candidate: Candidate; onDone
   const [opened] = useState(() => ({
     id: candidate.id,
     version: candidate.compensation?.version ?? 0,
-    form: formFromCompensation(candidate.compensation),
+    form: figuresOnly(formFromCompensation(candidate.compensation)),
   }));
   const [form, setForm] = useState(opened.form);
   const save = useMutation({

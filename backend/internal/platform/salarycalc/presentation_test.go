@@ -21,6 +21,10 @@ func TestFormatBreakdownForEmail(t *testing.T) {
 		{"12k + 200 shift allowance + 2 months variable bonus", "MYR", "month", "RM 12,000 + RM 200 shift allowance + 2 months variable bonus per month"},
 		{"12k + SGD 400 allowance", "MYR", "month", "RM 12,000 + SGD 400 fixed allowance per month"},
 		{"12k + 13.5 + epf13", "MYR", "month", "RM 12,000 + 13.5 (component needs review) + EPF 13 (unit not specified) per month"},
+		// "per month" belongs to an amount; wording without one stays as written.
+		{"personal loan deducted", "MYR", "month", "personal loan deducted"},
+		{"contract role, permanent later", "MYR", "month", "contract role, permanent later"},
+		{"16% EPF", "MYR", "month", "16% EPF"},
 		{"RM 12,000 + RM 3,200 fixed allowance + 13.5th month fixed/contractual bonus + performance bonus + 13% EPF per month", "MYR", "month", "RM 12,000 + RM 3,200 fixed allowance + 13.5th month fixed/contractual bonus + performance bonus + 13% EPF per month"},
 	} {
 		got := FormatBreakdown(tc.raw, tc.currency, tc.period)

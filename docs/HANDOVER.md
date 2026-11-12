@@ -134,6 +134,22 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 - **Selling it as a SaaS** (the owner's goal: ~1,000 agencies, 5,000–20,000
   users online): what to change, the set-up and costs at each size, and why
   Python stays, in [saas-plan-scaling-to-20k-users.md](saas-plan-scaling-to-20k-users.md).
+- **Review of the 10–12 Nov work (12 Nov).** Fixed: a salary breakdown
+  stayed on the record after the figure changed on the Salary form, so client
+  emails showed the old package beside the new number (the server now keeps a
+  breakdown only while its figure is unchanged; the Salary form no longer
+  sends it); "per month" was added to salary wording with no amount in it.
+  Still open, none urgent: the salary calculator takes the company's rules
+  from the browser instead of loading them on the server (a preview only; the
+  recruiter reviews the figures); salary maths uses float64 (fine to the cent
+  at salary sizes, but `shopspring/decimal` would be exact); refreshing a
+  Microsoft/Google token opens a one-connection database pool each time
+  (rare, about hourly per user); the Microsoft connection asks for
+  `Mail.ReadWrite` because large attachments go through a draft;
+  "Payment Getaway" in the industry list is CV Studio's spelling, shared with
+  its AI prompt, so change both together or neither; several new web files
+  (`ScreeningSalary.tsx`, `Shortlist.tsx`, `SalaryCalculationSettings.tsx`)
+  pack many statements on one line and would read better formatted.
 - Proposed before and still open: batch CV formatting; possible candidates
   by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
   PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft

@@ -162,8 +162,16 @@ UPDATE candidate_compensation SET
   expected_max = sqlc.narg(expected_max)::text::numeric,
   expected_currency = sqlc.narg(expected_currency),
   expected_period = sqlc.narg(expected_period),
-  current_description = CASE WHEN sqlc.narg(current_amount)::text IS NULL THEN NULL ELSE COALESCE(sqlc.narg(current_description), current_description) END,
-  expected_description = CASE WHEN sqlc.narg(expected_min)::text IS NULL THEN NULL ELSE COALESCE(sqlc.narg(expected_description), expected_description) END,
+  -- A breakdown explains one figure: keep it only while that figure stays
+  -- the same, unless new wording comes with the change.
+  current_description = CASE WHEN sqlc.narg(current_amount)::text IS NULL THEN NULL
+    WHEN sqlc.narg(current_description)::text IS NOT NULL THEN sqlc.narg(current_description)::text
+    WHEN sqlc.narg(current_amount)::text::numeric = current_amount AND sqlc.narg(current_currency)::text = current_currency
+      AND sqlc.narg(current_period)::text = current_period THEN current_description END,
+  expected_description = CASE WHEN sqlc.narg(expected_min)::text IS NULL THEN NULL
+    WHEN sqlc.narg(expected_description)::text IS NOT NULL THEN sqlc.narg(expected_description)::text
+    WHEN sqlc.narg(expected_min)::text::numeric = expected_min AND sqlc.narg(expected_max)::text::numeric IS NOT DISTINCT FROM expected_max
+      AND sqlc.narg(expected_currency)::text = expected_currency AND sqlc.narg(expected_period)::text = expected_period THEN expected_description END,
   salary_notes = CASE WHEN @salary_notes_set::boolean THEN sqlc.narg(salary_notes)::text ELSE salary_notes END,
   version = version + 1,
   updated_by = app_current_user(),

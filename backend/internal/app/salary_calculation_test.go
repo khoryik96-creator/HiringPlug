@@ -159,3 +159,40 @@ func TestScreeningRulesDoNotRequireSettingsAccess(t *testing.T) {
 	a.request(http.MethodGet, "/v1/salary-calculation-rules", other, nil).JSON(&isolated)
 	assert.True(t, isolated.Bonus)
 }
+
+// A breakdown explains the figure it was saved with. Changing the figure on a
+// form that does not show the breakdown must drop it, or client emails would
+// show the old package next to the new number.
+func TestSalaryDescriptionFollowsItsFigure(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "Synthetic Breakdown Example"})
+	path := "/v1/candidates/" + c.Id + "/compensation"
+	put := func(version int, amount string, description *string) api.Compensation {
+		current := map[string]any{"amount": amount, "currency": "MYR", "period": "month"}
+		if description != nil {
+			current["description"] = *description
+		}
+		res := a.request(http.MethodPut, path, token, map[string]any{"expectedVersion": version, "currentSalary": current, "expectedSalary": nil})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var out api.Compensation
+		res.JSON(&out)
+		return out
+	}
+	breakdown := "8k + 500 allowance"
+	saved := put(0, "8500", &breakdown)
+	require.NotNil(t, saved.CurrentSalary.MustGet().Description)
+
+	same := put(1, "8500.00", nil)
+	require.NotNil(t, same.CurrentSalary.MustGet().Description, "an unchanged figure keeps its breakdown")
+	assert.Equal(t, breakdown, *same.CurrentSalary.MustGet().Description)
+
+	changed := put(2, "9500", nil)
+	assert.Nil(t, changed.CurrentSalary.MustGet().Description, "a new figure must not keep the old breakdown")
+
+	reworded := "9k + 500 allowance"
+	explained := put(3, "9500", &reworded)
+	require.NotNil(t, explained.CurrentSalary.MustGet().Description)
+	assert.Equal(t, reworded, *explained.CurrentSalary.MustGet().Description)
+}

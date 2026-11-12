@@ -10,6 +10,10 @@ import (
 var displayMoney = regexp.MustCompile(`(?i)^\s*((?:RM|MYR|SGD|USD|HKD|AUD|GBP|EUR|INR|IDR|BND|THB|PHP|VND|CNY|S\$|US\$|HK\$|A\$|\$|£|€)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*(k|mil|million|m)?\b(.*)$`)
 var displayMonths = regexp.MustCompile(`(?i)^\s*(\d+(?:\.\d+)?)(?:th|st|nd|rd)?\s*(?:months?|mths?)\b`)
 var displayPeriod = regexp.MustCompile(`(?i)\s*(?:per\s+month|monthly|/\s*(?:month|mth|mo))\b`)
+
+// displayedMoney: a component written as an amount ("RM 12,000"); only then
+// does the breakdown get "per month".
+var displayedMoney = regexp.MustCompile(`(?:^|\+ )(?:RM|[A-Z]{3}) [0-9]`)
 var totalMonths = regexp.MustCompile(`(?i)^\s*(1[3-6](?:\.5)?)\s*months?\s+total\s*$`)
 
 // FormatBreakdown expands recruiter shorthand for email presentation. Stored
@@ -28,7 +32,7 @@ func FormatBreakdown(raw, currency, period string) string {
 	if len(parts) > 0 {
 		base = strings.ToLower(parts[0])
 	}
-	if period == "month" && !annualRE.MatchString(base) && !nonMonthlyRE.MatchString(base) && !strings.Contains(strings.ToLower(result), "per month") {
+	if period == "month" && displayedMoney.MatchString(result) && !annualRE.MatchString(base) && !nonMonthlyRE.MatchString(base) && !strings.Contains(strings.ToLower(result), "per month") {
 		result += " per month"
 	}
 	return result

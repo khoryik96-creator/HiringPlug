@@ -1524,8 +1524,16 @@ UPDATE candidate_compensation SET
   expected_max = $5::text::numeric,
   expected_currency = $6,
   expected_period = $7,
-  current_description = CASE WHEN $1::text IS NULL THEN NULL ELSE COALESCE($8, current_description) END,
-  expected_description = CASE WHEN $4::text IS NULL THEN NULL ELSE COALESCE($9, expected_description) END,
+  -- A breakdown explains one figure: keep it only while that figure stays
+  -- the same, unless new wording comes with the change.
+  current_description = CASE WHEN $1::text IS NULL THEN NULL
+    WHEN $8::text IS NOT NULL THEN $8::text
+    WHEN $1::text::numeric = current_amount AND $2::text = current_currency
+      AND $3::text = current_period THEN current_description END,
+  expected_description = CASE WHEN $4::text IS NULL THEN NULL
+    WHEN $9::text IS NOT NULL THEN $9::text
+    WHEN $4::text::numeric = expected_min AND $5::text::numeric IS NOT DISTINCT FROM expected_max
+      AND $6::text = expected_currency AND $7::text = expected_period THEN expected_description END,
   salary_notes = CASE WHEN $10::boolean THEN $11::text ELSE salary_notes END,
   version = version + 1,
   updated_by = app_current_user(),

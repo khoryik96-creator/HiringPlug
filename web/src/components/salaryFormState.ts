@@ -56,6 +56,18 @@ export function formFromCompensation(c: Compensation | null | undefined): Salary
 }
 
 /**
+ * The figures without their breakdowns, for forms that do not show the
+ * breakdown: the server keeps it while the figure stays the same and drops
+ * it when the figure changes, so it never describes a different amount.
+ */
+export function figuresOnly(f: SalaryFormState): SalaryFormState {
+  const figures = { ...f };
+  delete figures.currentDescription;
+  delete figures.expectedDescription;
+  return figures;
+}
+
+/**
  * "8,500" -> "8500", "1,00,000" -> "100000", "10 000" -> "10000". A comma
  * counts as a thousands separator only when 3 digits follow the last one, so
  * "8500,50" (a decimal comma) is left as typed and refused, not read as 850050.
