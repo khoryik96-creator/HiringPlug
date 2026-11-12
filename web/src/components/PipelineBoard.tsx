@@ -11,7 +11,7 @@ import { type Person, SeparateEmail } from "./SeparateEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
-import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
+import { type MoveRequest, useMoveApplication, useMoveApplications } from "./useMoveApplication";
 
 /**
  * A job's pipeline: a column per stage, closed applications listed below.
@@ -33,7 +33,6 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const [over, setOver] = useState<Schemas["Stage"] | null>(null);
   const apps = list.data?.items ?? [];
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
-  const stale = move.error instanceof ApiError && move.error.code === "CONFLICT_STALE_VERSION";
   const matches = useJobMatches(jobId, permissions.includes("matching:read"));
   const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
   const [bestFirst, setBestFirst] = useState(false);
@@ -45,18 +44,19 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const canEmail = permissions.includes("emails:send");
   const canPick = canEmail || canUpdate;
   const chosenApps = apps.filter((a) => picked.includes(a.id));
-  // Each chosen card moves on its own (a stale one reports itself); those that moved are unticked.
-  const moveChosen = async (to: Omit<MoveRequest, "app">) => {
-    for (const app of chosenApps.filter((a) => a.stage !== to.stage)) {
-      try {
-        await move.mutateAsync({ app, ...to });
-        setPicked((cur) => cur.filter((id) => id !== app.id));
-      } catch { return; } // the error is shown above the board
-    }
+  // The chosen cards move together; those that moved are unticked, a stale one reports itself.
+  const moveMany = useMoveApplications((ids) => { setPicked((cur) => cur.filter((id) => !ids.includes(id))); });
+  const moveChosen = (to: Omit<MoveRequest, "app">) => {
+    moveMany.mutate(chosenApps.filter((a) => a.stage !== to.stage).map((app) => ({ app, ...to })));
   };
+  const [emailing, setEmailing] = useState<Application | null>(null);
+  const moveError = move.error ?? moveMany.error;
+  const stale = moveError instanceof ApiError && moveError.code === "CONFLICT_STALE_VERSION";
   const pick = (a: Application, on: boolean) => { setPicked((cur) => (on ? [...cur, a.id] : cur.filter((id) => id !== a.id))); };
   const startShortlist = () => {
     const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)));
+    // One candidate: the email about their application, with their own fields filled in.
+    if (chosen.length === 1 && chosen[0]) { setEmailing(chosen[0]); return; }
     setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
   };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
@@ -77,7 +77,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         </label>
       )}
       {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}
-      {canPick && picked.length > 0 && !shortlist && !separately && (
+      {canPick && picked.length > 0 && !shortlist && !separately && !emailing && (
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
           {canEmail && <>
@@ -88,10 +88,14 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
             }}>Email each candidate separately</button>
           </>}
-          {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending} onMove={(to) => { void moveChosen(to); }} />}
+          {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} />}
           <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
           {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
+      )}
+      {emailing && (
+        <ClientEmail key={emailing.id} candidateId={emailing.candidateId} applicationId={emailing.id} permissions={permissions}
+          onClose={() => { setEmailing(null); setPicked([]); }} />
       )}
       {shortlist && (
         <ClientEmail key={shortlist.map((p) => p.candidateId).join()} shortlist={shortlist} jobId={jobId} permissions={permissions}
@@ -106,9 +110,9 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
           <FitReasons match={shownMatch} open />
         </section>
       )}
-      <ErrorMessage error={list.error ?? move.error}>
+      <ErrorMessage error={list.error ?? moveError}>
         {stale && (
-          <button type="button" className="link" onClick={() => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); move.reset(); }}>
+          <button type="button" className="link" onClick={() => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); move.reset(); moveMany.reset(); }}>
             Reload the board
           </button>
         )}

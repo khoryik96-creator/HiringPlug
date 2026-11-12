@@ -25,6 +25,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   const blockedId = useId();
   const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
   const [applied, setApplied] = useState(false);
+  const [unusedWording, setUnusedWording] = useState<string[]>([]);
   const current = form.currentDescription ?? describeCurrent(form);
   const expected = form.expectedDescription ?? describeExpected(form);
   const selectedCurrency = form.currentCurrency.trim().toUpperCase();
@@ -56,23 +57,26 @@ export function ScreeningSalary({ form, patch, set, errors }: {
 
   const useFigures = () => {
     if (!fresh || nothingToUse) return;
-    // A figure the calculation could not read keeps what the form had.
+    // A figure the calculation could not read keeps what the form had, and so
+    // does its wording: new wording never sits next to a figure it did not give.
     const expectedRead = !!result.expectedMin;
+    const unread = [!result.hasCurrent && current.trim() ? "current" : "", !expectedRead && expected.trim() ? "expected" : ""].filter(Boolean);
     patch({
       currentAmount: result.hasCurrent ? result.monthly : form.currentAmount,
       currentPeriod: result.hasCurrent ? "month" : form.currentPeriod,
       currentCurrency: result.currentCurrency ?? form.currentCurrency,
-      currentDescription: current,
+      currentDescription: result.hasCurrent ? current : undefined,
       expectedMin: expectedRead ? result.expectedMin ?? "" : form.expectedMin,
       expectedMax: expectedRead ? result.expectedMax ?? "" : form.expectedMax,
       expectedPeriod: expectedRead ? "month" : form.expectedPeriod,
       expectedCurrency: result.expectedCurrency ?? form.expectedCurrency,
-      expectedDescription: expected,
+      expectedDescription: expectedRead ? expected : undefined,
       calculationPending: false,
       currentNeedsReview: false,
       expectedNeedsReview: false,
     });
     setApplied(true);
+    setUnusedWording(unread);
   };
 
   const useManualFigures = () => {
@@ -181,6 +185,11 @@ export function ScreeningSalary({ form, patch, set, errors }: {
         <button type="button" onClick={useManualFigures}>Use entered figures</button>
       </details>
       {applied && <p className="small" role="status">Figures applied. Save the call.</p>}
+      {applied && unusedWording.length > 0 && (
+        <p className="warning small">
+          The {unusedWording.join(" and ")} salary could not be read, so its figure and wording stay as they were. Enter it under Salary figures to change it.
+        </p>
+      )}
       {form.calculationPending && !fresh && <p className="small">Calculate and review the salary before saving.</p>}
     </section>
   );

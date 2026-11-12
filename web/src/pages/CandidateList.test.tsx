@@ -34,14 +34,24 @@ describe("candidate list", () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
     renderWithClient(<CandidateList canCreate={false} canEmail />);
     expect(screen.queryByRole("checkbox", { name: /Choose/ })).toBeNull(); // no tick boxes
-    const row = await screen.findByRole("row", { name: "Wei Tan" });
+    const row = (await screen.findByText("Wei Tan")).closest("tr") as HTMLElement;
     fireEvent.click(row.querySelector("td:last-child") as Element);
     expect(screen.getByText("1 chosen")).toBeTruthy();
-    expect(screen.getByRole("row", { name: "Wei Tan (chosen)" }).className).toContain("chosen");
+    expect(row.className).toContain("chosen");
+    expect(row.textContent).toContain("(chosen)"); // said to screen readers
     fireEvent.click(screen.getByRole("link", { name: "Siti Aisyah" })); // the name opens the candidate, not chooses
     expect(screen.getByText("1 chosen")).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("row", { name: "Wei Tan (chosen)" }), { key: " " }); // Space unchooses
+    fireEvent.keyDown(screen.getByRole("link", { name: "Wei Tan" }), { key: " " }); // Space on the name unchooses
     expect(screen.queryByText("1 chosen")).toBeNull();
+    // Selecting text to copy it does not choose the row.
+    const cell = row.querySelector("td:nth-child(2)") as HTMLElement;
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    fireEvent.click(cell);
+    expect(screen.queryByText("1 chosen")).toBeNull();
+    window.getSelection()?.removeAllRanges();
     fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
     expect(screen.getByText("2 chosen")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Email each separately" }));
@@ -55,7 +65,8 @@ describe("candidate list", () => {
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByText("Siti Aisyah");
     expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull();
-    expect(screen.queryByRole("row", { name: "Siti Aisyah" })).toBeNull();
+    fireEvent.click((screen.getByText("Siti Aisyah").closest("tr") as HTMLElement).querySelector("td:last-child") as Element);
+    expect(screen.queryByText("1 chosen")).toBeNull();
   });
 
   it("shows tags by the name", async () => {

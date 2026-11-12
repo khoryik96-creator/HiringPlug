@@ -15,22 +15,42 @@ export interface MoveRequest {
  * showed, so if someone else moved it meanwhile the API answers
  * CONFLICT_STALE_VERSION instead of silently overwriting their move.
  */
+async function moveOne({ app, stage, reason, reasonNote }: MoveRequest) {
+  const body: Schemas["ApplicationMove"] = { version: app.version, stage };
+  if (reason) body.reason = reason;
+  if (reasonNote?.trim()) body.reasonNote = reasonNote.trim();
+  return unwrap(await api.POST("/v1/applications/{applicationId}/move", {
+    params: { path: { applicationId: app.id } }, body,
+  }));
+}
+
 export function useMoveApplication() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ app, stage, reason, reasonNote }: MoveRequest) => {
-      const body: Schemas["ApplicationMove"] = { version: app.version, stage };
-      if (reason) body.reason = reason;
-      if (reasonNote?.trim()) body.reasonNote = reasonNote.trim();
-      return unwrap(await api.POST("/v1/applications/{applicationId}/move", {
-        params: { path: { applicationId: app.id } }, body,
-      }));
-    },
+    mutationFn: moveOne,
     onSuccess: (moved) => {
       // Update every cached list showing this application, then refetch them.
       queryClient.setQueriesData<{ items: Application[] }>({ queryKey: applicationsKey }, (list) =>
         list ? { items: list.items.map((a) => (a.id === moved.id ? moved : a)) } : list);
       void queryClient.invalidateQueries({ queryKey: applicationsKey });
     },
+  });
+}
+
+/**
+ * Moves several applications at once (all sent together), then refreshes the
+ * lists once. Each keeps its own version check; onMoved gets the ids that
+ * moved, and the first failure (if any) is the mutation's error.
+ */
+export function useMoveApplications(onMoved: (ids: string[]) => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requests: MoveRequest[]) => {
+      const results = await Promise.allSettled(requests.map(moveOne));
+      onMoved(requests.filter((_, i) => results[i]?.status === "fulfilled").map((r) => r.app.id));
+      const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      if (failed) throw failed.reason;
+    },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); },
   });
 }

@@ -34,7 +34,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
         <div className="stat"><strong>{s.placedLast30Days}</strong><span>placed in 30 days</span></div>
       </div>
 
-      {permissions.includes("intake:create") && <CvImports />}
+      {permissions.includes("intake:create") && <CvImports foldedHistory />}
       {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
       {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
 

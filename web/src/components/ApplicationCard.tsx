@@ -110,17 +110,19 @@ export function MoveChosen({ apps, onMove, busy }: { apps: Application[]; onMove
   const [closing, setClosing] = useState<Stage | null>(null);
   const [reason, setReason] = useState<"" | Schemas["CloseReason"]>("");
   const [note, setNote] = useState("");
+  // Each batch is asked afresh: the last one's reason and note never carry over.
+  const reset = () => { setClosing(null); setReason(""); setNote(""); };
   if (closing) {
     return (
       <form className="close-form row" aria-label={`${STAGE[closing]}: why?`}
-        onSubmit={(e) => { e.preventDefault(); if (reason) { onMove({ stage: closing, reason, reasonNote: note }); setClosing(null); } }}>
+        onSubmit={(e) => { e.preventDefault(); if (reason) { onMove({ stage: closing, reason, reasonNote: note }); reset(); } }}>
         <select aria-label="Reason" value={reason} onChange={(e) => { setReason(e.target.value as typeof reason); }}>
           <option value="">Why {closing}?</option>
           {keysOf(CLOSE_REASON).map((r) => <option key={r} value={r}>{CLOSE_REASON[r]}</option>)}
         </select>
         <input aria-label="Note (optional)" placeholder="Note (optional)" value={note} onChange={(e) => { setNote(e.target.value); }} />
         <button type="submit" disabled={!reason || busy}>{STAGE[closing]} {apps.length}</button>
-        <button type="button" className="link" onClick={() => { setClosing(null); }}>Cancel</button>
+        <button type="button" className="link" onClick={reset}>Cancel</button>
       </form>
     );
   }

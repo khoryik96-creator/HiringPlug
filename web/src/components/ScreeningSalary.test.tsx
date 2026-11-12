@@ -108,6 +108,22 @@ it("highlights what needs review but still lets the recruiter use the figures", 
   expect(screen.getByTestId("body").textContent).toContain('"min":"19113"');
 });
 
+it("keeps the saved figure and its wording for a salary the calculation could not read", async () => {
+  vi.spyOn(api, "POST").mockResolvedValue(ok({ base:"15000",allowances:"0",bonus:"0",monthly:"15000",annualMonths:12,hasCurrent:true,reviewRequired:true,
+    warnings:["Enter one expected salary or percentage range."],excluded:[] }));
+  const saved = { ...formFromCompensation(null), expectedMin: "11000", expectedDescription: "11k flexible" };
+  renderWithClient(<Harness initial={saved} />);
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"), { target: { value: "rm15k" } });
+  fireEvent.change(screen.getByLabelText("Expected salary"), { target: { value: "12k or 20% whichever higher" } });
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  fireEvent.click(await screen.findByRole("button",{name:"Use these figures"}));
+  const body = JSON.parse(screen.getByTestId("body").textContent) as { currentSalary: { amount: string; description?: string }; expectedSalary: { min: string; description?: string } };
+  expect(body.currentSalary).toMatchObject({ amount: "15000", description: "rm15k" });
+  expect(body.expectedSalary.min).toBe("11000"); // the figure it had
+  expect(body.expectedSalary.description).toBeUndefined(); // not the new wording beside the old figure
+  expect(screen.getByText(/expected salary could not be read, so its figure and wording stay as they were/)).toBeTruthy();
+});
+
 it("cannot use a calculation that read no figure at all", async () => {
   vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"0",allowances:"0",bonus:"0",monthly:"0",annualMonths:12,hasCurrent:false,reviewRequired:true,warnings:["Enter a basic salary."],excluded:[] }));
   renderWithClient(<Harness />);

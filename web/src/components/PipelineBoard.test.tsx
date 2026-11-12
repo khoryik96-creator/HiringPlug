@@ -84,6 +84,45 @@ describe("pipeline board", () => {
     expect(await screen.findByRole("button", { name: "Reload the board" })).toBeTruthy();
   });
 
+  it("asks each batch's reason afresh, and moves the chosen cards together", async () => {
+    const aina: Application = { ...siti, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w3", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w3", candidateName: "Aina Yusof" };
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, aina, wei] }));
+    const post = vi.spyOn(api, "POST").mockImplementation(((_: string, init: { params: { path: { applicationId: string } } }) =>
+      Promise.resolve(ok({ ...siti, id: init.params.path.applicationId, stage: "rejected", version: 4 }))) as never);
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate />);
+    await screen.findByText("Aina Yusof");
+    choose("Siti Aisyah");
+    moveChosen("rejected");
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "not_qualified" } });
+    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "No CPA" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rejected 1" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    choose("Aina Yusof");
+    moveChosen("rejected");
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "salary_mismatch" } });
+    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Wants 15k" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" })); // changed their mind
+    moveChosen("rejected");
+    expect(screen.getByLabelText<HTMLSelectElement>("Reason").value).toBe(""); // asked afresh
+    expect(screen.getByLabelText<HTMLInputElement>("Note (optional)").value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    choose("Siti Aisyah");
+    moveChosen("interview");
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(3); }); // both sent together
+    expect(screen.queryByText(/chosen$/)).toBeNull(); // moved ones are unticked
+  });
+
+  it("emails the client about one ticked candidate with that candidate's own fields", async () => {
+    vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} }));
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
+    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
+    await screen.findByText("Siti Aisyah");
+    choose("Siti Aisyah");
+    fireEvent.click(screen.getByRole("button", { name: "Email client about 1 candidate" }));
+    const email = await screen.findByRole("region", { name: "Email client" });
+    expect(within(email).getByRole("heading", { name: "Email client" })).toBeTruthy(); // about this application, not a list
+  });
+
   it("is read-only without pipeline:update", async () => {
     await showBoard(false);
     expect(screen.queryByRole("combobox")).toBeNull();

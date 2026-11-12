@@ -59,7 +59,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
     if (!canEmail) return { className: snippet ? "has-snippet" : undefined };
     const chosen = pick.ids.has(c.id);
-    const row = pickRowProps(chosen, () => { pick.pick([personOf(c)], !chosen); }, c.fullName);
+    const row = pickRowProps(chosen, () => { pick.pick([personOf(c)], !chosen); });
     return { ...row, className: `${row.className}${snippet ? " has-snippet" : ""}` };
   };
 
@@ -129,6 +129,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
                       {" "}
                       {!cols.columns.includes("tags") && c.tags.length > 0 && <Chips labels={c.tags} />}
                       {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
+                      {canEmail && pick.ids.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
                     </WaName>
                   </td>
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}

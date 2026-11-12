@@ -272,7 +272,7 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err != nil {
 			return err
 		}
-		if err := salaryOnlyTheirOwn(r.RecipientCandidateID, r.Candidates, filled.salary); err != nil {
+		if err := salaryOnlyTheirOwn(r.RecipientCandidateID, o.BodyHTML, filled.salary); err != nil { // as written: its field marks say whose salary it is
 			return err
 		}
 		q := store.New(tx)

@@ -43,7 +43,8 @@ async function sendFile(importId: string, file: File): Promise<void> {
   if (!res.ok) unwrap({ error: await res.json(), response: res });
 }
 
-export function CvImports() {
+/** foldedHistory (the dashboard): past imports load only when opened, or once an import starts here. */
+export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean } = {}) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
   const [source, setSource] = useState("linkedin");
@@ -51,10 +52,12 @@ export function CvImports() {
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [review, setReview] = useState<Review | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(!foldedHistory);
 
   const imports = useQuery({
     queryKey: cvImportsKey,
     queryFn: async () => unwrap(await api.GET("/v1/cv-imports")).items,
+    enabled: historyOpen,
     // Follow the files still being read.
     refetchInterval: (q) => (q.state.data?.some((i) => i.counts.reading > 0) ? 3000 : false),
   });
@@ -87,6 +90,7 @@ export function CvImports() {
       setFailures([]);
       if (chosen.length === 0) return;
       const imp = unwrap(await api.POST("/v1/cv-imports", { body: { source } }));
+      setHistoryOpen(true); // follow this import's files
       setSent(0);
       for (const [i, f] of chosen.entries()) {
         try {
@@ -166,6 +170,9 @@ export function CvImports() {
       {start.error && <p className="error">{start.error.message}</p>}
       {failures.map((f) => <p key={f} className="error">{f}</p>)}
 
+      {foldedHistory && !historyOpen && (
+        <button type="button" className="link small" onClick={() => { setHistoryOpen(true); }}>Show recent imports</button>
+      )}
       {imports.data?.map((imp) => (
         <div key={imp.id} aria-label={`Import of ${new Date(imp.createdAt).toLocaleString()}`}>
           <h4>

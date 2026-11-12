@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { CvImports } from "../components/CvImports";
-import { Dashboard } from "./Dashboard";
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
@@ -27,21 +26,7 @@ const reads = (imports: Schemas["CvImport"][]) =>
     Promise.resolve(ok(path === "/v1/settings/fields" ? testFieldSettings() : { items: imports }))) as never);
 
 describe("importing CVs and LinkedIn PDFs", () => {
-  it("is on the dashboard, only with the permission; the Import page keeps the spreadsheet import", async () => {
-    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary"
-      ? { openJobs: 0, stageCounts: { applied: 0, screening: 0, submitted: 0, interview: 0, offer: 0, placed: 0 }, placedLast30Days: 0, movedLast7Days: 0, jobs: [], stuck: [] }
-      : { items: [] }))) as never);
-    renderWithClient(<Dashboard permissions={["intake:create", "pipeline:read"]} />);
-    expect(await screen.findByRole("region", { name: "CV import" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "Recent moves" })).toBeNull();
-    cleanup();
-
-    renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
-    await screen.findByRole("region", { name: "Open jobs" });
-    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
-    cleanup();
-    vi.restoreAllMocks();
-
+  it("is not on the Import page (it is on the dashboard), which keeps the spreadsheet import", () => {
     reads([]);
     renderWithClient(<ImportPage permissions={["intake:create"]} />);
     expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();

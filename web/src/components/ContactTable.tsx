@@ -29,9 +29,10 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
       </thead>
       <tbody>
         {contacts.map((c) => (
-          <tr key={c.id} {...(onPick ? pickRowProps(picked?.has(c.id) ?? false, () => { onPick([c], !(picked?.has(c.id) ?? false)); }, c.fullName) : {})}>
+          <tr key={c.id} {...(onPick ? pickRowProps(picked?.has(c.id) ?? false, () => { onPick([c], !(picked?.has(c.id) ?? false)); }) : {})}>
             <td>
               <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
+              {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
               {c.status === "left" && <span className="muted"> (has left)</span>}
             </td>
             <td>{c.title}</td>

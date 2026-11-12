@@ -90,4 +90,8 @@ func TestCandidateRecipientNeverGetsOtherCandidatesSalary(t *testing.T) {
 	assert.Contains(t, string(r.Body), "salary")
 	assert.Equal(t, 202, send(other, fmt.Sprintf(`<div data-candidate-summary="true"><p data-candidate-id="%s">Notice: 1 month</p></div>`, other.Id)).Status, "details without salary may go")
 	assert.Equal(t, 202, send(recipient, fmt.Sprintf(salaryBlock, recipient.Id)).Status, "their own salary may go to them")
+	// Their own salary in the message, next to another candidate's notice period, is fine too.
+	own := fmt.Sprintf(`<p>Your expected salary: <span data-field="candidate.expectedSalary">RM 9,000 per month</span></p><div data-candidate-summary="true"><p data-candidate-id="%s">Notice: 1 month</p></div>`, other.Id)
+	r = send(other, own)
+	assert.Equal(t, 202, r.Status, "%s", r.Body)
 }

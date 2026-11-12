@@ -80,10 +80,11 @@ describe("ticking contacts", () => {
     const onPick = vi.fn();
     renderWithClient(<ContactTable contacts={list} empty="none" picked={new Set(["cont_1"])} onPick={onPick} />);
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByRole("row", { name: "Mei Tan (chosen)" }).className).toContain("chosen");
-    fireEvent.click(screen.getByRole("row", { name: "Ali Hassan" }).querySelector("td:nth-child(2)") as Element);
+    const mei = screen.getByText("Mei Tan").closest("tr") as HTMLElement;
+    expect(mei.className).toContain("chosen");
+    fireEvent.click((screen.getByText("Ali Hassan").closest("tr") as HTMLElement).querySelector("td:nth-child(2)") as Element);
     expect(onPick).toHaveBeenLastCalledWith([list[1]], true);
-    fireEvent.click(screen.getByRole("row", { name: "Mei Tan (chosen)" }).querySelector("td:nth-child(2)") as Element);
+    fireEvent.click(mei.querySelector("td:nth-child(2)") as Element);
     expect(onPick).toHaveBeenLastCalledWith([list[0]], false);
     onPick.mockClear();
     fireEvent.click(screen.getByRole("link", { name: "Ali Hassan" }));
@@ -95,6 +96,6 @@ describe("ticking contacts", () => {
   it("does not choose rows for those who may not send email", async () => {
     renderWithClient(<ContactTable contacts={list} empty="none" />);
     await waitFor(() => { expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull(); });
-    expect(screen.queryByRole("row", { name: "Mei Tan" })).toBeNull();
+    expect((screen.getByText("Mei Tan").closest("tr") as HTMLElement).className).not.toContain("pick-row");
   });
 });
