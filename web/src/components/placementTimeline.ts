@@ -1,26 +1,59 @@
-// A placement's billing timeline: what happened and what is coming, by day
-// (pure, unit tested).
+// A placement at a glance: its billing timeline, where the invoice stands and
+// how the fee was worked out (pure, unit tested).
 import type { Schemas } from "../api/client";
-import { formatMoney } from "../labels";
+import { PAY_PERIOD, formatDay, formatMoney } from "../labels";
 
 type Placement = Schemas["Placement"];
 
-export type TimelineEntry = { day: string; label: string; state?: "paid" | "due" | "overdue" | "done" };
+export type TimelineEntry = { day: string; label: string; state: "done" | "due" | "overdue" | "later" };
 
 /** The placement's days in order: start, invoice, payment, guarantee and end. */
 export function billingTimeline(p: Placement, today: string): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ day: p.startDate, label: "Starts" }];
+  const at = (day: string, label: string): TimelineEntry => ({ day, label, state: day <= today ? "done" : "later" });
   const inv = p.invoicing;
-  const fee = p.money?.feeAmount && p.money.feeCurrency ? ` · ${formatMoney(p.money.feeAmount, p.money.feeCurrency)}` : "";
-  if (p.invoicedOn) out.push({ day: p.invoicedOn, label: p.invoiceNumber ? `Invoiced · ${p.invoiceNumber}` : "Invoiced", state: "done" });
-  else if (inv.sendsAt) out.push({ day: inv.sendsAt.slice(0, 10), label: "Invoice goes out" });
-  if (p.paidOn) out.push({ day: p.paidOn, label: `Paid${fee}`, state: "paid" });
-  else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: `Payment due${fee}`, state: inv.dueOn < today ? "overdue" : "due" });
-  if (p.leftOn) out.push({ day: p.leftOn, label: "Left" });
-  out.push({ day: p.guaranteeEndsOn, label: "Guarantee ends" });
-  if (p.endDate) out.push({ day: p.endDate, label: p.jobType === "contract" ? "Contract ends" : "Ends" });
+  const out: TimelineEntry[] = [at(p.startDate, "Starts")];
+  if (p.invoicedOn) out.push({ day: p.invoicedOn, label: "Invoiced", state: "done" });
+  else if (inv.sendsAt) out.push(at(inv.sendsAt.slice(0, 10), "Invoice goes out"));
+  if (p.paidOn) out.push({ day: p.paidOn, label: "Paid", state: "done" });
+  else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
+  if (p.leftOn) out.push(at(p.leftOn, "Left"));
+  out.push(at(p.guaranteeEndsOn, "Guarantee ends"));
+  if (p.endDate) out.push(at(p.endDate, p.jobType === "contract" ? "Contract ends" : "Ends"));
   return out.sort((a, b) => a.day.localeCompare(b.day));
+}
+
+export type InvoiceBadge = { state: "paid" | "due" | "overdue" | "none"; label: string; note: string };
+
+/** Where the invoice stands, as a pill and a line under it. */
+export function invoiceBadge(p: Placement, today: string): InvoiceBadge {
+  const due = `due ${formatDay(p.invoicing.dueOn)}`;
+  if (p.status === "cancelled" && p.invoiceStatus === "not_invoiced") return { state: "none", label: "No invoice", note: "" };
+  if (p.invoiceStatus === "paid") return { state: "paid", label: "Paid", note: p.paidOn ? formatDay(p.paidOn) : "" };
+  if (p.invoiceStatus === "invoiced") {
+    const late = p.invoicing.dueOn < today;
+    return { state: late ? "overdue" : "due", label: late ? "Overdue" : "Invoiced", note: [p.invoiceNumber, due].filter(Boolean).join(" · ") };
+  }
+  return { state: "none", label: "Not invoiced", note: due };
+}
+
+/** "20% of MYR 14,000.00 / month", or "Fixed fee". */
+export function feeBasis(m: Schemas["PlacementMoney"]): string {
+  if (m.feePercent && m.salary) return `${trimZeros(m.feePercent)}% of ${formatMoney(m.salary.amount, m.salary.currency)} / ${PAY_PERIOD[m.salary.period].toLowerCase()}`;
+  return m.feeAmount ? "Fixed fee" : "";
+}
+
+/** Whole months from one day to another ("12 months"), for a placement's length. */
+export function monthsLong(start: string, end: string): string {
+  const s = new Date(`${start}T00:00:00Z`);
+  const e = new Date(`${end}T00:00:00Z`);
+  e.setUTCDate(e.getUTCDate() + 1); // the end day counts
+  const months = (e.getUTCFullYear() - s.getUTCFullYear()) * 12 + e.getUTCMonth() - s.getUTCMonth() - (e.getUTCDate() < s.getUTCDate() ? 1 : 0);
+  if (months < 1) return "under a month";
+  return months === 1 ? "1 month" : `${String(months)} months`;
 }
 
 /** "20.00" -> "20", "17.50" -> "17.5". */
 export const trimZeros = (n: string) => (n.includes(".") ? n.replace(/0+$/, "").replace(/\.$/, "") : n);
+
+/** Today in the user's time zone (YYYY-MM-DD). */
+export const todayISO = () => new Date().toLocaleDateString("en-CA");

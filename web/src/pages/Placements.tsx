@@ -3,11 +3,11 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey } from "../api/keys";
-import { PlacementSummary } from "../components/ApplicationPlacement";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { PlacementForm } from "../components/PlacementForm";
 import { PlacementInvoice } from "../components/PlacementInvoicing";
-import { INVOICE_STATUS, keysOf, PLACEMENT_STATUS, formatMoney } from "../labels";
+import { invoiceBadge, todayISO } from "../components/placementTimeline";
+import { INVOICE_STATUS, keysOf, PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMoney } from "../labels";
 
 type Filters = { status: Schemas["PlacementStatus"] | ""; invoiceStatus: Schemas["InvoiceStatus"] | "" };
 
@@ -29,6 +29,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
   });
   const ending = list.data?.items.filter((p) => p.status === "active" && daysUntil(p.guaranteeEndsOn) >= 0 && daysUntil(p.guaranteeEndsOn) <= 14) ?? [];
   const owed = list.data?.items.filter((p) => p.replacement === "owed") ?? [];
+  const today = todayISO();
   return (
     <main>
       <h2>Placements</h2>
@@ -72,24 +73,46 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
         </p>
       )}
       {list.data?.items.length === 0 && <p className="muted">No placements yet.</p>}
-      {list.data?.items.map((p) => editing === p.id ? (
-        <PlacementForm key={p.id} applicationId={p.applicationId} placement={p} permissions={permissions} onDone={() => { setEditing(null); }} />
-      ) : (
-        <article key={p.id} className="panel" aria-label={`${p.candidateName}, ${p.jobTitle}`}>
-          <div className="row spread">
-            <div>
-              <a href={`#/candidates/${p.candidateId}`}><strong>{p.candidateName}</strong></a> as{" "}
-              <a href={`#/jobs/${p.jobId}`}>{p.jobTitle}</a> <span className="muted">at {p.companyName}</span>
-              <div><PlacementSummary p={p} /></div>
-              <PlacementInvoice p={p} permissions={permissions} />
-              {p.statusNote && <div className="muted">{p.statusNote}</div>}
-            </div>
-            {permissions.includes("placements:manage") && (
-              <button type="button" className="link" onClick={() => { setEditing(p.id); }}>Change</button>
-            )}
-          </div>
-        </article>
-      ))}
+      {list.data && list.data.items.length > 0 && (
+        <div className="panel table-wrap">
+          <table className="placements-table">
+            <thead><tr><th>Candidate</th><th>Job</th><th>Type</th><th>Dates</th><th>Fee</th><th>Invoice</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>
+              {list.data.items.map((p) => editing === p.id ? (
+                <tr key={p.id}><td colSpan={7}>
+                  <PlacementForm applicationId={p.applicationId} placement={p} permissions={permissions} onDone={() => { setEditing(null); }} />
+                </td></tr>
+              ) : (
+                <PlacementRow key={p.id} p={p} permissions={permissions} today={today} onEdit={() => { setEditing(p.id); }} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </main>
+  );
+}
+
+/** One placement in the table; its menu has Change and the invoice. */
+function PlacementRow({ p, permissions, today, onEdit }: { p: Schemas["Placement"]; permissions: Permission[]; today: string; onEdit: () => void }) {
+  const fee = p.money?.feeAmount && p.money.feeCurrency ? formatMoney(p.money.feeAmount, p.money.feeCurrency) : null;
+  const badge = invoiceBadge(p, today);
+  const change = permissions.includes("placements:manage")
+    ? (close: () => void) => <button type="button" onClick={() => { close(); onEdit(); }}>Change</button>
+    : undefined;
+  return (
+    <tr>
+      <td>
+        <a href={`#/candidates/${p.candidateId}`}>{p.candidateName}</a>
+        {p.status !== "active" && <div><span className={`badge ${p.status}`}>{PLACEMENT_STATUS[p.status]}</span></div>}
+        {p.replacement !== "none" && <div className="muted small">{REPLACEMENT[p.replacement]}</div>}
+      </td>
+      <td><a href={`#/jobs/${p.jobId}`}>{p.jobTitle}</a><div className="muted small">{p.companyName}</div></td>
+      <td>{PLACEMENT_JOB_TYPE[p.jobType]}{p.poNumber && <div className="muted small">{p.poNumber}</div>}</td>
+      <td className="num">{formatDay(p.startDate)}{p.endDate && <div className="muted small">to {formatDay(p.endDate)}</div>}</td>
+      <td className="num">{fee ? <strong>{fee}</strong> : <span className="muted">—</span>}</td>
+      <td><span className={`pill ${badge.state}`}>{badge.label}</span>{badge.note && <div className="muted small">{badge.note}</div>}</td>
+      <td className="actions"><PlacementInvoice p={p} permissions={permissions} variant="menu" extra={change} /></td>
+    </tr>
   );
 }

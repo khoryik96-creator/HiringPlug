@@ -8,10 +8,11 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
 import { placementsKey } from "../api/keys";
-import { formatDay, formatWhen } from "../labels";
+import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { FileViewer } from "./FileViewer";
 import { Field } from "./Field";
+import { Menu } from "./Menu";
 import { autoDueOn, type PlacementFormState } from "./placementFormState";
 import { bySalary, guaranteeLabel, rangeLabel } from "./termsTiers";
 
@@ -91,8 +92,19 @@ function TermsNote({ terms, tier }: { terms: Schemas["PlacementDefaults"]; tier:
 
 const TYPES = { pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" } as const;
 
-/** Where a placement's invoice stands, and what can be done with it. */
-export function PlacementInvoice({ p, permissions }: { p: Placement; permissions: Permission[] }) {
+/** A day from a timestamp, in the user's time zone ("1 Dec 2026"). */
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+/**
+ * Where a placement's invoice stands, and what can be done with it: on the
+ * placement, a line, an Invoice menu (preview, PDF, Word) and Send now; in a
+ * list row ("menu"), one menu with those and any extra items first.
+ */
+export function PlacementInvoice({ p, permissions, variant = "full", extra }: {
+  p: Placement; permissions: Permission[]; variant?: "full" | "menu";
+  /** More menu items, before the invoice's (given close(), to call when one is chosen). */
+  extra?: (close: () => void) => React.ReactNode;
+}) {
   const queryClient = useQueryClient();
   const [error, setError] = useState<unknown>(null);
   const inv = p.invoicing;
@@ -107,38 +119,61 @@ export function PlacementInvoice({ p, permissions }: { p: Placement; permissions
       .catch((e: unknown) => { setError(e); });
   };
   const [viewing, setViewing] = useState(false);
-  const to = inv.contactName ? `${inv.contactName}${inv.contactEmail ? ` (${inv.contactEmail})` : ""}` : null;
+  const to = inv.contactName ?? null;
   let status: string;
-  if (inv.sentAt) status = `Invoice ${p.invoiceNumber ?? ""} emailed to ${to ?? "the client"} on ${formatWhen(inv.sentAt)}`;
-  else if (p.invoiceStatus !== "not_invoiced") status = `Invoiced${p.invoiceNumber ? ` (${p.invoiceNumber})` : ""}`;
-  else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${formatWhen(inv.sendsAt)}`;
-  else status = to ? `To ${to}; not emailed automatically` : "No invoice recipient yet";
-  const sendButton = (
-    <button type="button" className="small-button primary" disabled={send.isPending || !inv.contactEmail}
-      onClick={() => { if (window.confirm(`Email the invoice to ${to ?? "the client"} now?`)) { send.mutate(); setViewing(false); } }}>Send invoice now</button>
-  );
+  if (inv.sentAt) status = `Emailed to ${to ?? "the client"} on ${dayOf(inv.sentAt)}`;
+  else if (p.invoiceStatus !== "not_invoiced") status = `Invoiced${p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}`;
+  else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${dayOf(inv.sendsAt)}`;
+  else status = to ? `To ${to} · not emailed automatically` : "No invoice recipient yet";
   const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled";
+  const sendNow = () => {
+    if (window.confirm(`Email the invoice to ${to ?? "the client"}${inv.contactEmail ? ` (${inv.contactEmail})` : ""} now?`)) { send.mutate(); setViewing(false); }
+  };
+  const sendButton = (className: string) => (
+    <button type="button" className={className} disabled={send.isPending || !inv.contactEmail} onClick={sendNow}>Send now</button>
+  );
+  const items = (close: () => void) => {
+    const pick = (f: () => void) => () => { close(); f(); };
+    return seeFees && (
+      <>
+        <button type="button" onClick={pick(() => { setViewing(true); })}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "View invoice"}</button>
+        <button type="button" onClick={pick(() => { get("pdf"); })}>PDF</button>
+        <button type="button" onClick={pick(() => { get("docx"); })}>Word</button>
+        {canSend && variant === "menu" && (
+          <button type="button" disabled={send.isPending || !inv.contactEmail} onClick={pick(sendNow)}>Send invoice now</button>
+        )}
+      </>
+    );
+  };
+  const viewer = viewing && (
+    <FileViewer title={p.invoiceNumber ? `Invoice ${p.invoiceNumber}` : `Invoice preview: ${p.candidateName} (numbered when sent)`}
+      path={`/v1/placements/${p.id}/invoice/file?format=pdf`} type={TYPES.pdf} onClose={() => { setViewing(false); }}
+      actions={<>
+        <button type="button" onClick={() => { get("pdf"); }}>Download PDF</button>
+        <button type="button" onClick={() => { get("docx"); }}>Word</button>
+        {canSend && sendButton("")}
+      </>} />
+  );
+  const failed = inv.sendError && !inv.sentAt && <span className="warning small" role="alert">Not emailed: {inv.sendError}</span>;
+  if (variant === "menu") {
+    if (!extra && !seeFees) return null;
+    return (
+      <>
+        <Menu label="⋯" ariaLabel={`Actions for ${p.candidateName}`}>
+          {(close) => <>{extra?.(close)}{items(close)}</>}
+        </Menu>
+        {viewer}
+        <ErrorMessage error={error ?? send.error} />
+      </>
+    );
+  }
   return (
     <div className="placement-invoice">
-      <span className="muted small">{status} · due {formatDay(inv.dueOn)}</span>
-      {inv.sendError && !inv.sentAt && <span className="warning small" role="alert"> Not emailed: {inv.sendError}</span>}
-      {seeFees && (
-        <span className="row">
-          <button type="button" className="small-button" onClick={() => { setViewing(true); }}>{p.invoiceStatus === "not_invoiced" ? "Preview invoice" : "View invoice"}</button>
-          <button type="button" className="link small" onClick={() => { get("pdf"); }}>PDF</button>
-          <button type="button" className="link small" onClick={() => { get("docx"); }}>Word</button>
-          {canSend && sendButton}
-        </span>
-      )}
-      {viewing && (
-        <FileViewer title={p.invoiceNumber ? `Invoice ${p.invoiceNumber}` : `Invoice preview: ${p.candidateName} (numbered when sent)`}
-          path={`/v1/placements/${p.id}/invoice/file?format=pdf`} type={TYPES.pdf} onClose={() => { setViewing(false); }}
-          actions={<>
-            <button type="button" onClick={() => { get("pdf"); }}>Download PDF</button>
-            <button type="button" onClick={() => { get("docx"); }}>Word</button>
-            {canSend && sendButton}
-          </>} />
-      )}
+      <span className="muted small placement-invoice-status">{status}</span>
+      {failed}
+      {seeFees && <Menu label="Invoice" className="small-button">{items}</Menu>}
+      {canSend && sendButton("small-button primary")}
+      {viewer}
       <ErrorMessage error={error ?? send.error} />
     </div>
   );

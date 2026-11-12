@@ -784,9 +784,13 @@ the job's. The client's **PO number** and the **end date** (a contract's end,
 or whenever the placement ends) are optional; the end cannot be before the
 start. The invoice uses the sheet's title and company, and its template can
 show the PO number (`{{placement.poNumber}}`). On the candidate's job, the
-placement shows the sheet on the left (with salary, fee %, fee and guarantee)
-and a **billing timeline** on the right: start, invoice, payment due (overdue
-once past) or paid, guarantee end and contract end.
+placement shows the job and company with its type and PO number, four figures
+(fee and how it was worked out, dates, guarantee, where the invoice stands), a
+**billing timeline** (start, invoice, payment due, overdue once past, or paid,
+guarantee end, contract end) and, folded under **Details**, the salary, fee %,
+recruiter and the rest. The invoice's preview, PDF and Word are in one Invoice
+menu beside Send now. The **Placements** page is a table (candidate, job, type,
+dates, fee, invoice) with each row's actions in a ⋯ menu.
 
 The **Placements** page lists them all, filtered by what happened or the
 invoice, with fee totals per currency (not invoiced / invoiced and unpaid /

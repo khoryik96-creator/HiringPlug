@@ -38,9 +38,23 @@ describe("placements", () => {
     reads({ items: [placement()], feeTotals: [{ currency: "MYR", total: "20400.00", notInvoiced: "0.00", invoiced: "20400.00", paid: "0.00" }] });
     renderWithClient(<Placements permissions={["placements:read"]} />);
     expect(await screen.findByText("Siti Aisyah")).toBeTruthy();
-    expect(screen.getByText(/fee MYR 20,400.00/)).toBeTruthy();
-    expect(screen.getAllByText("MYR 20,400.00").length).toBeGreaterThan(0);
+    const row = screen.getByRole("row", { name: /Siti Aisyah/ });
+    expect(row.textContent).toContain("MYR 20,400.00");
+    expect(row.textContent).toContain("Permanent");
+    expect(row.textContent).toContain("Invoiced");
     expect(screen.queryByRole("button", { name: "Change" })).toBeNull();
+    expect(screen.queryByText("⋯"), "nothing to do: no menu").toBeNull();
+  });
+
+  it("opens a placement's form from its menu", async () => {
+    reads({ items: [placement({ poNumber: "PO-1", endDate: "2027-05-31", jobType: "contract" })], feeTotals: [] });
+    renderWithClient(<Placements permissions={["placements:read", "placements:manage", "placements.fees:read"]} />);
+    const row = await screen.findByRole("row", { name: /Siti Aisyah/ });
+    expect(row.textContent).toContain("PO-1");
+    expect(row.textContent).toContain("to 31 May 2027");
+    fireEvent.click(screen.getByText("⋯"));
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
+    expect(await screen.findByRole("form", { name: "Change placement" })).toBeTruthy();
   });
 
   it("records a placement with its fee, from an offer", async () => {

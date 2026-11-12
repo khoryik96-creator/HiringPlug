@@ -543,7 +543,6 @@ td:has(> .hint-input) > input { display: block; width: 100%; }
 .term-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; }
 .term-value { font-weight: 650; color: var(--ink); }
 /* A placement's invoice: where it stands, and its actions. */
-.placement-invoice { display: flex; flex-wrap: wrap; gap: 0.2rem 0.75rem; align-items: center; margin-top: 0.25rem; }
 fieldset.invoicing .check { display: block; }
 .invoicing-settings .field textarea, .invoicing-settings .field input, .invoicing-settings .field select { width: 100%; }
 .email-preview { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 0.9rem; }
@@ -617,24 +616,58 @@ fieldset.invoicing .check { display: block; }
 @media (max-width: 640px) { .app-card-head { grid-template-columns: 1fr; } .app-card-stage { align-items: flex-start; flex-direction: row; } }
 
 /* A placement on a candidate's job. */
-.placement-box { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); padding: 0.6rem 0.75rem; display: grid; gap: 0.5rem; }
-.placement-box-head { display: flex; align-items: center; gap: 0.5rem; }
-.placement-box-head .link { margin-left: auto; }
-.placement-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.4rem 0.9rem; }
-.placement-fact { display: flex; flex-direction: column; font-size: 0.9rem; }
-.placement-fact-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 650; }
-.placement-sheet { display: grid; grid-template-columns: 1.4fr 1fr; gap: 0.75rem 1.25rem; align-items: start; }
-.placement-sheet .placement-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 760px) { .placement-sheet { grid-template-columns: 1fr; } }
-.placement-timeline { list-style: none; margin: 0; padding: 0 0 0 0.9rem; border-left: 2px solid var(--line); display: grid; gap: 0.55rem; font-size: 0.88rem; }
-.placement-timeline li { position: relative; }
-.placement-timeline li::before { content: ""; position: absolute; left: -1.27rem; top: 0.3rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--line); }
-.placement-timeline li.paid::before, .placement-timeline li.done::before { background: var(--accent); }
-.placement-timeline li.overdue::before { background: #b42318; }
-.placement-timeline .pill { margin-left: 0.4rem; font-size: 0.7rem; font-weight: 650; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); }
-.placement-timeline .pill.paid { color: #067647; border-color: currentColor; }
-.placement-timeline .pill.overdue { color: #b42318; border-color: currentColor; }
-.placement-box .placement-invoice { border-top: 1px dashed var(--line); padding-top: 0.45rem; margin-top: 0; }
+.placement-box { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 0.9rem 1rem; display: grid; gap: 0.9rem; }
+.placement-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.placement-title { font-size: 1.02rem; margin-right: 0.15rem; }
+.placement-head .link { margin-left: auto; }
+.placement-chip { font-size: 0.75rem; font-weight: 600; padding: 0.1rem 0.55rem; border-radius: 999px; border: 1px solid var(--line); background: var(--soft); color: var(--muted); }
+.placement-chip.accent { border-color: transparent; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.placement-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.75rem 1rem; font-variant-numeric: tabular-nums; }
+.placement-figure { display: grid; gap: 0.15rem; align-content: start; }
+.placement-figure-label { font-size: 0.78rem; color: var(--muted); }
+.placement-figure strong { font-weight: 600; }
+.pill { display: inline-block; font-size: 0.75rem; font-weight: 650; padding: 0.1rem 0.55rem; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); color: var(--muted); }
+.pill.paid { background: #e3f5ec; border-color: transparent; color: #067647; }
+.pill.due { background: #fdf1dc; border-color: transparent; color: #9a5b00; }
+.pill.overdue { background: #fde7e4; border-color: transparent; color: #b42318; }
+.placement-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: relative; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.placement-steps::before { content: ""; position: absolute; left: 0.4rem; right: 0.4rem; top: 0.36rem; height: 2px; background: var(--line); }
+.placement-steps li { position: relative; display: grid; gap: 0.1rem; padding: 1.15rem 0.5rem 0 0; }
+.placement-steps li::before { content: ""; position: absolute; top: 0; left: 0; width: 0.8rem; height: 0.8rem; border-radius: 50%; box-sizing: border-box; border: 2px solid var(--line); background: var(--surface); }
+.placement-steps li.done::before { background: var(--accent); border-color: var(--accent); }
+.placement-steps li.due::before { border-color: #d08a1e; }
+.placement-steps li.overdue::before { border-color: #b42318; background: #b42318; }
+@media (max-width: 640px) {
+  .placement-steps { grid-auto-flow: row; gap: 0.6rem; }
+  .placement-steps::before { left: 0.36rem; right: auto; top: 0.4rem; bottom: 0.4rem; width: 2px; height: auto; }
+  .placement-steps li { padding: 0 0 0 1.4rem; }
+}
+.placement-details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.85rem; width: max-content; }
+.placement-details dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.35rem 1.25rem; margin: 0.6rem 0 0; font-size: 0.88rem; }
+.placement-details dt { color: var(--muted); }
+.placement-details dd { margin: 0; }
+.placement-invoice { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.placement-box .placement-invoice { border-top: 1px solid var(--line); padding-top: 0.75rem; }
+.placement-invoice-status { margin-right: auto; }
+.table-wrap { overflow-x: auto; padding: 0; }
+.placements-table { width: 100%; }
+.placements-table td { vertical-align: top; }
+.placements-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.placements-table td.actions { width: 1%; text-align: right; }
+.placements-table td[colspan] .panel { margin: 0; }
+/* A small dropdown of actions. */
+.menu { position: relative; }
+.menu > summary { list-style: none; cursor: pointer; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary:not(.small-button) { padding: 0.15rem 0.55rem; border-radius: 8px; font-weight: 700; color: var(--muted); }
+.menu > summary:not(.small-button):hover { background: var(--soft); }
+.menu > summary.small-button { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--text); font-weight: 600; }
+.menu > summary.small-button::after { content: "▾"; margin-left: 0.35rem; font-size: 0.75em; }
+.menu > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 10rem; display: grid; padding: 0.3rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.menu-list button { text-align: left; background: none; border: 0; border-radius: 6px; padding: 0.4rem 0.6rem; font: inherit; font-size: 0.88rem; color: var(--text); cursor: pointer; }
+.menu-list button:hover, .menu-list button:focus-visible { background: var(--soft); }
+.menu-list button:disabled { color: var(--muted); cursor: default; }
 .small-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 /* A company's card: like a candidate's, coloured by its category. */

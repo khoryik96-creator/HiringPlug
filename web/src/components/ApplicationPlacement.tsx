@@ -3,31 +3,13 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationPlacementKey } from "../api/keys";
-import { INVOICE_STATUS, PAY_PERIOD, PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMoney } from "../labels";
+import { PAY_PERIOD, PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatDay, formatMoney } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
 import { PlacementForm } from "./PlacementForm";
 import { PlacementInvoice } from "./PlacementInvoicing";
-import { billingTimeline, trimZeros } from "./placementTimeline";
+import { billingTimeline, feeBasis, invoiceBadge, monthsLong, todayISO, trimZeros } from "./placementTimeline";
 
 type Placement = Schemas["Placement"];
-
-/** One line about a placement: job type, start and end, guarantee, PO, what happened, invoice, fee. */
-export function PlacementSummary({ p }: { p: Placement }) {
-  const fee = p.money?.feeAmount && p.money.feeCurrency ? formatMoney(p.money.feeAmount, p.money.feeCurrency) : null;
-  return (
-    <>
-      <span className={`badge ${p.status}`}>{PLACEMENT_STATUS[p.status]}</span>{" "}
-      <span className="muted">
-        {PLACEMENT_JOB_TYPE[p.jobType]} · starts {formatDay(p.startDate)}{p.endDate && <> · ends {formatDay(p.endDate)}</>} · guarantee to {formatDay(p.guaranteeEndsOn)}
-        {p.poNumber && <> · {p.poNumber}</>}
-        {p.leftOn && <> · left {formatDay(p.leftOn)}</>}
-        {p.replacement !== "none" && <> · <strong>{REPLACEMENT[p.replacement]}</strong></>}
-        {fee && <> · fee {fee}</>} · {INVOICE_STATUS[p.invoiceStatus]}
-        {p.recruiterName && <> · {p.recruiterName}</>}
-      </span>
-    </>
-  );
-}
 
 /** An application's placement, or recording one (offer and placed stages). */
 export function ApplicationPlacement({ applicationId, stage, permissions }: { applicationId: string; stage: string; permissions: Permission[] }) {
@@ -53,47 +35,62 @@ export function ApplicationPlacement({ applicationId, stage, permissions }: { ap
       </div>
     );
   }
-  const money = placement.money;
+  return <PlacementCard p={placement} permissions={permissions} onEdit={canManage ? () => { setEditing(true); } : undefined} />;
+}
+
+/** A placement: what and where, four figures, the billing timeline, details on request, and the invoice. */
+function PlacementCard({ p, permissions, onEdit }: { p: Placement; permissions: Permission[]; onEdit?: () => void }) {
+  const today = todayISO();
+  const money = p.money;
   const fee = money?.feeAmount && money.feeCurrency ? formatMoney(money.feeAmount, money.feeCurrency) : null;
-  const salary = money?.salary ? `${formatMoney(money.salary.amount, money.salary.currency)} / ${PAY_PERIOD[money.salary.period].toLowerCase()}` : null;
-  const fact = (label: string, value: React.ReactNode) => (
-    <div className="placement-fact"><span className="placement-fact-label">{label}</span><span>{value}</span></div>
+  const badge = invoiceBadge(p, today);
+  const figure = (label: string, value: React.ReactNode, note?: string) => (
+    <div className="placement-figure">
+      <span className="placement-figure-label">{label}</span>
+      <strong>{value}</strong>
+      {note && <span className="muted small">{note}</span>}
+    </div>
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const detail = (label: string, value: React.ReactNode) => <><dt>{label}</dt><dd>{value}</dd></>;
   return (
     <div className="placement-box" aria-label="Placement">
-      <div className="placement-box-head">
-        <span className={`badge ${placement.status}`}>{PLACEMENT_STATUS[placement.status]}</span>
-        <strong>Placement</strong>
-        {canManage && <button type="button" className="link small" onClick={() => { setEditing(true); }}>Change placement</button>}
+      <div className="placement-head">
+        <strong className="placement-title">{p.jobTitle} · {p.companyName}</strong>
+        <span className="placement-chip accent">{PLACEMENT_JOB_TYPE[p.jobType]}</span>
+        {p.poNumber && <span className="placement-chip">{p.poNumber}</span>}
+        {p.status !== "active" && <span className={`badge ${p.status}`}>{PLACEMENT_STATUS[p.status]}</span>}
+        {onEdit && <button type="button" className="link small" onClick={onEdit}>Edit</button>}
       </div>
-      <div className="placement-sheet">
-        <div className="placement-facts">
-          {fact("Job title", placement.jobTitle)}
-          {fact("Company", placement.companyName)}
-          {fact("Job type", PLACEMENT_JOB_TYPE[placement.jobType])}
-          {fact("PO number", placement.poNumber ?? "—")}
-          {fact("Start", formatDay(placement.startDate))}
-          {fact("End", placement.endDate ? formatDay(placement.endDate) : "—")}
-          {salary && fact("Salary", salary)}
-          {money?.feePercent && fact("Fee %", `${trimZeros(money.feePercent)}%`)}
-          {fee && fact("Fee", <strong>{fee}</strong>)}
-          {fact("Guarantee", `${String(placement.guaranteeDays)} days · to ${formatDay(placement.guaranteeEndsOn)}`)}
-          {placement.recruiterName && fact("Recruiter", placement.recruiterName)}
-          {fact("Invoice", INVOICE_STATUS[placement.invoiceStatus])}
-          {placement.leftOn && fact("Left", formatDay(placement.leftOn))}
-          {placement.replacement !== "none" && fact("Replacement", REPLACEMENT[placement.replacement])}
-        </div>
-        <ol className="placement-timeline" aria-label="Billing">
-          {billingTimeline(placement, today).map((e) => (
-            <li key={`${e.day}-${e.label}`} className={e.state ?? ""}>
-              <strong>{formatDay(e.day)}</strong> · {e.label}
-              {e.state && e.state !== "done" && <span className={`pill ${e.state}`}>{e.state}</span>}
-            </li>
-          ))}
-        </ol>
+      <div className="placement-figures">
+        {fee && money && figure("Fee", fee, feeBasis(money))}
+        {figure("Dates", p.endDate ? `${formatDay(p.startDate)} – ${formatDay(p.endDate)}` : `From ${formatDay(p.startDate)}`,
+          p.endDate ? monthsLong(p.startDate, p.endDate) : undefined)}
+        {figure("Guarantee", `to ${formatDay(p.guaranteeEndsOn)}`, `${String(p.guaranteeDays)} days`)}
+        {figure("Invoice", <span className={`pill ${badge.state}`}>{badge.label}</span>, badge.note)}
       </div>
-      <PlacementInvoice p={placement} permissions={permissions} />
+      <ol className="placement-steps" aria-label="Billing">
+        {billingTimeline(p, today).map((e) => (
+          <li key={`${e.day}-${e.label}`} className={e.state}>
+            <strong>{formatDay(e.day)}</strong>
+            <span className="muted">{e.label}</span>
+          </li>
+        ))}
+      </ol>
+      <details className="placement-details">
+        <summary>Details</summary>
+        <dl>
+          {money?.salary && detail("Salary", `${formatMoney(money.salary.amount, money.salary.currency)} / ${PAY_PERIOD[money.salary.period].toLowerCase()}`)}
+          {money?.feePercent && detail("Fee %", `${trimZeros(money.feePercent)}%`)}
+          {detail("PO number", p.poNumber ?? "—")}
+          {detail("Recruiter", p.recruiterName ?? "—")}
+          {p.invoiceNumber && detail("Invoice number", p.invoiceNumber)}
+          {p.invoicedOn && detail("Invoiced on", formatDay(p.invoicedOn))}
+          {p.leftOn && detail("Left", formatDay(p.leftOn))}
+          {p.replacement !== "none" && detail("Replacement", REPLACEMENT[p.replacement])}
+          {p.statusNote && detail("Note", p.statusNote)}
+        </dl>
+      </details>
+      <PlacementInvoice p={p} permissions={permissions} />
     </div>
   );
 }
