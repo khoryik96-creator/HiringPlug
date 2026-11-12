@@ -48,6 +48,11 @@ type Config struct {
 
 	FilesDir       string // HP_FILES_DIR: where uploaded files are stored
 	FilesURLSecret []byte // HP_FILES_URL_SECRET: signs download links for workers
+	// BackupDir is where the server's backups are (shown in Settings ›
+	// Backups); empty: this API shows none. BackupTenant is the agency that
+	// runs the server and may see them; empty: the only agency, if just one.
+	BackupDir    string // HP_BACKUP_DIR
+	BackupTenant string // HP_BACKUP_TENANT
 	// InternalBaseURL is how workers reach this API to download files,
 	// e.g. http://localhost:8080 or http://api:8080 inside Docker.
 	InternalBaseURL  string // HP_INTERNAL_BASE_URL
@@ -116,6 +121,8 @@ func Load(getenv func(string) string) (Config, error) {
 		AuthAudience:      r.str("HP_AUTH_AUDIENCE", "hiringplug-api"),
 		FilesDir:          r.str("HP_FILES_DIR", "./data/files"),
 		FilesURLSecret:    []byte(r.str("HP_FILES_URL_SECRET", devSecret)),
+		BackupDir:         r.str("HP_BACKUP_DIR", ""),
+		BackupTenant:      r.str("HP_BACKUP_TENANT", ""),
 		InternalBaseURL:   strings.TrimRight(r.url("HP_INTERNAL_BASE_URL", "http://localhost:8080"), "/"),
 		MaxUploadBytes:    r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
 		DefaultPhoneArea:  strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),

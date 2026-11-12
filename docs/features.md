@@ -1094,6 +1094,19 @@ waiting, running or being retried, what failed for good in the last 30 days
 and why, with **Try again**; and the server's last backup, with a warning
 when it failed or is more than two days old.
 
+**Backups** (the owner of the agency that runs the server; permission
+`settings.backups:manage`) turns the nightly backup on or off, makes one now
+(the backup service, which checks in every 30 seconds, makes it within a
+minute, and the page says when that service is not running), and lists the
+backups on the server with when each was made, how many files it holds and
+its size, with the total. **Download** saves one as a single .tar file (the
+backup's folder, ready to restore) through a link that works for 10 minutes;
+Chrome and Edge ask which folder to save it in and stream it there with
+progress, other browsers save it to their downloads folder. **Delete** removes
+one after asking. Another agency on the same server sees none of it: a backup
+holds every agency's data (`HP_BACKUP_TENANT` names the agency that runs the
+server; unset, it is the only one while there is just one).
+
 **General** (owners and admins) has these parts.
 
 - **Dropdowns.** Candidate source, notice period and industry are the

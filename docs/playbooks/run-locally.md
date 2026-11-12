@@ -78,9 +78,15 @@ in a region you pick, or your own server, keeps it where you choose.
 
 With Docker, a backup of the database and the CVs is made every night into
 the `backups` folder next to this repository; the newest 14 are kept
-(`HP_BACKUP_KEEP`). **Settings > System** shows the last one. Copy that
-folder to another disk or cloud storage too: a backup on the same disk does
-not survive the disk. To make one now:
+(`HP_BACKUP_KEEP`). **Settings > System** shows the last one, and
+**Settings > Backups** (the owner of the agency that runs the server) turns
+the nightly backup off or on, makes one now, shows each backup's size, and
+downloads one as a single .tar file to a folder you choose (Chrome and Edge
+ask where; other browsers save to their downloads folder). Only that agency
+sees them, because a backup holds every agency's data: set `HP_BACKUP_TENANT`
+to its id once the server holds more than one agency. Copy backups to another
+disk or cloud storage too: a backup on the same disk does not survive the
+disk. To make one now from the command line:
 
 ```bash
 docker compose -f deploy/docker-compose.yml run --rm backup /app/hp backup

@@ -184,6 +184,7 @@ func init() {
 	}
 	openapi3filter.RegisterBodyDecoder("application/xml", asText)
 	openapi3filter.RegisterBodyDecoder("text/calendar", asText)
+	openapi3filter.RegisterBodyDecoder("application/x-tar", asText) // a backup download
 }
 
 // checkAgainstContract fails the test if a response does not match what the

@@ -86,6 +86,7 @@ class Permission(StrEnum):
     privacy_record = "privacy:record"
     reports_read = "reports:read"
     scheduling_use = "scheduling:use"
+    settings_backups_manage = "settings.backups:manage"
     settings_manage = "settings:manage"
     settings_read = "settings:read"
 
@@ -4056,6 +4057,27 @@ class BackupStatus(BaseModel):
     error: Annotated[str | None, Field(...)]
 
 
+class BackupFile(BaseModel):
+    name: Annotated[str, Field(description="e.g. hiringplug-20261107-020000")]
+    createdAt: AwareDatetime
+    sizeBytes: Annotated[int, Field(description="The download's size.")]
+    files: Annotated[
+        int, Field(description="How many uploaded files (CVs, documents and the like) it holds.")
+    ]
+
+
+class BackupDownloadLink(BaseModel):
+    url: Annotated[
+        str,
+        Field(
+            description="A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?exp=…&sig=…"
+        ),
+    ]
+    fileName: Annotated[str, Field(description="e.g. hiringplug-20261107-020000.tar")]
+    sizeBytes: int
+    expiresAt: AwareDatetime
+
+
 class EmailSalaryVisibility(StrEnum):
     salary_roles = "salary_roles"
     everyone = "everyone"
@@ -5543,6 +5565,31 @@ class SystemStatus(BaseModel):
     backup: Annotated[
         BackupStatus | None, Field(description="The server's last backup; null when none was ever made.")
     ]
+
+
+class Backups(BaseModel):
+    available: Annotated[
+        bool,
+        Field(
+            description="False for an agency that does not run the server, or when this server keeps no backups (HP_BACKUP_DIR unset)."
+        ),
+    ]
+    auto: Annotated[bool, Field(description="The nightly backup is on.")]
+    serviceSeenAt: Annotated[
+        AwareDatetime | None,
+        Field(
+            description="When the backup service last checked in (it does every 30 seconds while running)."
+        ),
+    ]
+    requestedAt: Annotated[
+        AwareDatetime | None, Field(description='A backup asked for with "Back up now" and not made yet.')
+    ]
+    last: Annotated[
+        BackupStatus | None,
+        Field(description="The latest backup run (it may have failed); null before the first."),
+    ]
+    backups: Annotated[list[BackupFile], Field(description="The backups on the server, newest first.")]
+    totalBytes: Annotated[int, Field(description="The space all of them take.")]
 
 
 class AiProviders(BaseModel):

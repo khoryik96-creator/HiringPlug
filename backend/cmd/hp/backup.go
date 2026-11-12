@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
 )
 
@@ -36,7 +38,7 @@ func backupOptions() (backup.Options, error) {
 
 func runBackup(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
-	every := fs.Duration("every", 0, "keep running, one backup every this long (e.g. 24h); 0 = once")
+	every := fs.Duration("every", 0, "keep running: a backup every this long while the nightly backup is on (Settings), and whenever one is asked for; 0 = one now")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -49,26 +51,45 @@ func runBackup(ctx context.Context, args []string) error {
 		return err
 	}
 	defer pool.Close()
+	if *every == 0 {
+		dir, err := backup.Run(ctx, pool, o)
+		if err == nil {
+			fmt.Println(dir)
+		}
+		return err
+	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "backup")
 	for {
-		dir, err := backup.Run(ctx, pool, o)
-		if *every == 0 {
-			if err == nil {
-				fmt.Println(dir)
-			}
-			return err
-		}
-		if err != nil {
+		if err := backupTurn(ctx, pool, o, *every, log); err != nil {
 			log.Error("backup failed", "error", err)
-		} else {
-			log.Info("backup made", "dir", dir, "keep", o.Keep)
 		}
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(*every):
+		case <-time.After(backup.PollEvery):
 		}
 	}
+}
+
+// backupTurn checks in, and makes a backup when one was asked for or the
+// nightly one is on and due.
+func backupTurn(ctx context.Context, pool *pgxpool.Pool, o backup.Options, every time.Duration, log *slog.Logger) error {
+	c, err := backup.CheckIn(ctx, pool)
+	if err != nil {
+		return err
+	}
+	last, err := backup.LastStarted(ctx, pool)
+	if err != nil || !backup.Due(time.Now(), c, last, every) {
+		return err
+	}
+	dir, runErr := backup.Run(ctx, pool, o)
+	if err := backup.Answered(ctx, pool); err != nil {
+		return errors.Join(runErr, err)
+	}
+	if runErr == nil {
+		log.Info("backup made", "dir", dir, "keep", o.Keep, "asked", c.RequestedAt != nil)
+	}
+	return runErr
 }
 
 func runRestore(ctx context.Context, args []string) error {

@@ -20,6 +20,7 @@ type Service struct {
 	pool       *pgxpool.Pool
 	industries IndustryCatalogue
 	uses       Uses
+	backups    BackupSetup
 }
 
 // Settings is every dropdown and every field's mandatory choice.

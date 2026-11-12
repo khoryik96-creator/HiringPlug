@@ -17,6 +17,12 @@ x-module:
     settings:manage:
       description: Change dropdown options and mandatory fields.
       roles: [owner, admin]
+    settings.backups:manage:
+      description: >
+        See, make, download and delete backups of the whole server, and turn
+        the nightly backup on or off. Only for the agency that runs the server
+        (a backup holds every agency's data on it).
+      roles: [owner]
   errorCodes: {}
   jobs: {}
 
@@ -187,7 +193,142 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/settings/backups:
+    get:
+      operationId: getBackups
+      tags: [settings]
+      summary: The server's backups (with sizes), the nightly backup switch and the backup service's state
+      description: >
+        Only the agency that runs the server sees them (HP_BACKUP_TENANT, or
+        the only agency when there is just one); for any other, `available`
+        is false and nothing else is filled in.
+      x-permission: settings.backups:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backups' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/settings/backups/auto:
+    put:
+      operationId: setAutoBackup
+      tags: [settings]
+      summary: Turn the nightly backup on or off
+      x-permission: settings.backups:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [auto]
+              properties:
+                auto: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backups' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/settings/backups/run:
+    post:
+      operationId: requestBackup
+      tags: [settings]
+      summary: Make a backup now (the backup service makes it within a minute)
+      x-permission: settings.backups:manage
+      responses:
+        '202':
+          description: Asked for
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backups' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/settings/backups/{backupName}:
+    parameters:
+      - $ref: '#/components/parameters/BackupNamePath'
+    delete:
+      operationId: deleteBackup
+      tags: [settings]
+      summary: Delete one backup from the server
+      x-permission: settings.backups:manage
+      responses:
+        '200':
+          description: Deleted; the backups left
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backups' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/settings/backups/{backupName}/link:
+    parameters:
+      - $ref: '#/components/parameters/BackupNamePath'
+    post:
+      operationId: createBackupDownloadLink
+      tags: [settings]
+      summary: A download link for one backup, valid for 10 minutes
+      description: >
+        The browser saves from this link where the person chooses, without
+        loading a large backup into memory. The link names one backup and
+        stops working after 10 minutes (a download already going finishes).
+      x-permission: settings.backups:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BackupDownloadLink' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/backup-downloads/{backupName}:
+    parameters:
+      - $ref: '#/components/parameters/BackupNamePath'
+    get:
+      operationId: downloadBackup
+      tags: [settings]
+      summary: One backup as a single .tar file (from a link made by createBackupDownloadLink)
+      description: >
+        The backup's folder (database.dump, files.tar.gz, manifest.json) in
+        one .tar file; unpack it to get the folder back. Needs the link's
+        `exp` and `sig`, not a sign-in.
+      x-permission: public
+      security: []
+      parameters:
+        - { name: exp, in: query, required: true, schema: { type: integer, format: int64 } }
+        - { name: sig, in: query, required: true, schema: { type: string, pattern: '^[0-9a-f]{64}$' } }
+      responses:
+        '200':
+          description: The backup
+          headers:
+            Content-Disposition:
+              description: attachment, with the file name.
+              schema: { type: string }
+          content:
+            application/x-tar:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
+  parameters:
+    BackupNamePath:
+      name: backupName
+      in: path
+      required: true
+      schema: { type: string, pattern: '^hiringplug-[0-9]{8}-[0-9]{6}$' }
   schemas:
     SystemStatus:
       type: object
@@ -234,6 +375,39 @@ components:
         status: { type: string, enum: [running, done, failed] }
         sizeBytes: { type: integer, format: int64, nullable: true }
         error: { type: string, nullable: true }
+    Backups:
+      type: object
+      required: [available, auto, serviceSeenAt, requestedAt, last, backups, totalBytes]
+      properties:
+        available: { type: boolean, description: "False for an agency that does not run the server, or when this server keeps no backups (HP_BACKUP_DIR unset)." }
+        auto: { type: boolean, description: The nightly backup is on. }
+        serviceSeenAt: { type: string, format: date-time, nullable: true, description: When the backup service last checked in (it does every 30 seconds while running). }
+        requestedAt: { type: string, format: date-time, nullable: true, description: A backup asked for with "Back up now" and not made yet. }
+        last:
+          description: The latest backup run (it may have failed); null before the first.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/BackupStatus' }]
+        backups:
+          type: array
+          description: The backups on the server, newest first.
+          items: { $ref: '#/components/schemas/BackupFile' }
+        totalBytes: { type: integer, format: int64, description: The space all of them take. }
+    BackupFile:
+      type: object
+      required: [name, createdAt, sizeBytes, files]
+      properties:
+        name: { type: string, description: "e.g. hiringplug-20261107-020000" }
+        createdAt: { type: string, format: date-time }
+        sizeBytes: { type: integer, format: int64, description: The download's size. }
+        files: { type: integer, description: "How many uploaded files (CVs, documents and the like) it holds." }
+    BackupDownloadLink:
+      type: object
+      required: [url, fileName, sizeBytes, expiresAt]
+      properties:
+        url: { type: string, description: "A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?exp=…&sig=…" }
+        fileName: { type: string, description: "e.g. hiringplug-20261107-020000.tar" }
+        sizeBytes: { type: integer, format: int64 }
+        expiresAt: { type: string, format: date-time }
     EmailSalaryVisibility:
       type: string
       description: >

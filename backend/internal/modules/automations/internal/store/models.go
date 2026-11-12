@@ -155,6 +155,14 @@ type AutomationSetting struct {
 	UpdatedAt       time.Time
 }
 
+type BackupControl struct {
+	ID            bool
+	Auto          bool
+	RequestedAt   *time.Time
+	ServiceSeenAt *time.Time
+	UpdatedAt     time.Time
+}
+
 type BackupRun struct {
 	ID         int64
 	Name       string

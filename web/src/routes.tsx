@@ -48,6 +48,7 @@ const ReferenceCheck = page(() => import("./pages/ReferenceCheck"), "ReferenceCh
 const Industries = page(() => import("./pages/Industries"), "Industries");
 const Settings = page(() => import("./pages/Settings"), "Settings");
 const System = page(() => import("./pages/System"), "System");
+const BackupsPage = page(() => import("./pages/Backups"), "BackupsPage");
 const Team = page(() => import("./pages/Team"), "Team");
 
 /** What a page is given: who is signed in, and the record its address names. */
@@ -140,6 +141,8 @@ export const ROUTES: Route[] = [
     render: (c) => <Invoicing canManage={can(c, "settings:manage")} /> },
   { section: "system", path: /^#\/system/, permission: "settings:manage", menu: { in: "settings", label: "System", href: "#/system" },
     render: () => <System /> },
+  { section: "backups", path: /^#\/backups/, permission: "settings.backups:manage", menu: { in: "settings", label: "Backups", href: "#/backups" },
+    render: () => <BackupsPage /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
     render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
 ];

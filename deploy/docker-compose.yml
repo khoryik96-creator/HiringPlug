@@ -67,9 +67,11 @@ services:
     build: { context: .., dockerfile: deploy/backend.Dockerfile }
     command: ["/app/api"]
     restart: unless-stopped
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      HP_BACKUP_DIR: /backups # Settings > Backups: list, download, delete
     ports: ["8080:8080"]
-    volumes: [files:/data/files]
+    volumes: [files:/data/files, ../backups:/backups]
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 
@@ -98,7 +100,8 @@ services:
 
   # A backup of the database and the uploaded files every night, the newest
   # 14 kept, in the backups folder next to this repository (copy them to
-  # another disk or the cloud too). Restore one with:
+  # another disk or the cloud too). Settings > Backups turns the nightly
+  # backup off or on, makes one now, and downloads one. Restore one with:
   #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
   #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
   #   docker compose -f deploy/docker-compose.yml up -d
