@@ -63,21 +63,35 @@ func TestCandidateListSorts(t *testing.T) {
 	assert.Equal(t, []string{"Badrul", "Aina", "Zara", "Mei"}, got, "monthly equivalents: Aina's 120k a year is 10k a month")
 	got, _ = names("/v1/candidates?sort=expected_salary_asc", token)
 	assert.Equal(t, []string{"Zara", "Aina", "Badrul", "Mei"}, got)
+	got, _ = names("/v1/candidates?sort=name_desc", token)
+	assert.Equal(t, []string{"Zara", "Mei", "Badrul", "Aina"}, got)
+	got, _ = names("/v1/candidates?sort=notice_desc", token)
+	assert.Equal(t, []string{"Badrul", "Zara", "Aina", "Mei"}, got, "longest first, unknown still last")
+
+	// Accents do not change the order, and another currency is never mixed in with ringgit.
+	elise := a.createCandidate(token, map[string]any{"firstName": "Élise"})
+	r := a.request(http.MethodPut, "/v1/candidates/"+elise.Id+"/compensation", token, map[string]any{"expectedVersion": 0,
+		"currentSalary": map[string]any{"amount": "20000", "currency": "SGD", "period": "month"}, "expectedSalary": nil})
+	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
+	got, _ = names("/v1/candidates?sort=name", token)
+	assert.Equal(t, []string{"Aina", "Badrul", "Élise", "Mei", "Zara"}, got)
+	got, _ = names("/v1/candidates?sort=current_salary_desc", token)
+	assert.Equal(t, []string{"Badrul", "Aina", "Zara", "Élise", "Mei"}, got, "ringgit first, then SGD on its own")
 
 	// Pages of a sorted list continue with nextOffset.
 	first, next := names("/v1/candidates?sort=name&limit=3", token)
-	assert.Equal(t, []string{"Aina", "Badrul", "Mei"}, first)
+	assert.Equal(t, []string{"Aina", "Badrul", "Élise"}, first)
 	require.NotNil(t, next)
 	rest, more := names(fmt.Sprintf("/v1/candidates?sort=name&limit=3&offset=%d", *next), token)
-	assert.Equal(t, []string{"Zara"}, rest)
+	assert.Equal(t, []string{"Mei", "Zara"}, rest)
 	assert.Nil(t, more)
 
 	// Without salary access a salary sort is just newest first (nothing about salaries leaks).
 	got, _ = names("/v1/candidates?sort=current_salary_desc", tenant.Users[api.RoleSourcer].Token)
-	assert.Equal(t, []string{"Badrul", "Mei", "Aina", "Zara"}, got)
+	assert.Equal(t, []string{"Élise", "Badrul", "Mei", "Aina", "Zara"}, got)
 
 	// The advanced search sorts too.
-	r := a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"sort": "notice", "noticeMaxDays": 90})
+	r = a.request(http.MethodPost, "/v1/candidates/search", token, map[string]any{"sort": "notice", "noticeMaxDays": 90})
 	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
 	var found api.CandidateSearchPage
 	r.JSON(&found)

@@ -885,10 +885,12 @@ components:
           description: "Where the CV matches, the words found between [[ and ]] (\"... led [[SAP]] [[BW]] upgrades ...\")."
     CandidateSort:
       type: string
-      enum: [newest, name, notice, current_salary_asc, current_salary_desc, expected_salary_asc, expected_salary_desc]
+      enum: [newest, name, name_desc, notice, notice_desc, current_salary_asc, current_salary_desc, expected_salary_asc, expected_salary_desc]
       description: >-
-        newest (the default) pages with nextCursor; the others page with nextOffset. Unknown notice periods
-        and salaries come last; salary sorts use monthly equivalents and only for roles that may see salaries.
+        newest (the default) pages with nextCursor; the others page with nextOffset (up to 10,000 rows). name is
+        A to Z (accents ignored), notice shortest first; unknown notice periods and salaries come last. Salary
+        sorts use monthly equivalents, ringgit first and each other currency together, and only for roles
+        that may see salaries.
     CandidateSearchPage:
       type: object
       required: [items, nextCursor, terms]

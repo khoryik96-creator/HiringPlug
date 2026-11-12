@@ -118,14 +118,15 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
-	rows, err := store.New(tx).SearchCandidates(ctx, store.SearchCandidatesParams{
-		Sort: sort, RowOffset: offset, IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
+	in := store.SearchCandidatesParams{
+		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
 		NoticeMaxDays: notice, SalaryMax: f.SalaryMax, SalaryCurrency: f.SalaryCurrency, Owner: f.Owner,
 		UpdatedWithinDays: updated, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
-	})
+	}
+	rows, err := searchRows(ctx, store.New(tx), in, sort, offset)
 	if err != nil {
 		return page, err
 	}
@@ -180,4 +181,24 @@ func int32Ptr(n *int) *int32 {
 	}
 	v := int32(*n) //nolint:gosec // bounded by the contract
 	return &v
+}
+
+// searchRows runs the newest-first search (which keeps its index plan) or
+// the sorted one, with the same filters and columns.
+func searchRows(ctx context.Context, q *store.Queries, in store.SearchCandidatesParams, sort string, offset int32) ([]store.SearchCandidatesRow, error) {
+	if sort == "newest" {
+		return q.SearchCandidates(ctx, in)
+	}
+	sorted, err := q.SearchCandidatesSorted(ctx, store.SearchCandidatesSortedParams{
+		Sort: sort, RowOffset: offset, IndustryCandidateIds: in.IndustryCandidateIds, Ts: in.Ts, Query: in.Query, Phones: in.Phones,
+		CvIds: in.CvIds, ExcludedIds: in.ExcludedIds, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
+		Residence: in.Residence, Sources: in.Sources, Industries: in.Industries, Skills: in.Skills, AllSkills: in.AllSkills,
+		Tags: in.Tags, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
+		Owner: in.Owner, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,
+	})
+	rows := make([]store.SearchCandidatesRow, len(sorted))
+	for i, r := range sorted {
+		rows[i] = store.SearchCandidatesRow(r)
+	}
+	return rows, err
 }

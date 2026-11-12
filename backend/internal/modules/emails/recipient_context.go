@@ -50,7 +50,8 @@ func salaryOnlyTheirOwn(recipientID *string, bodyHTML string, showsSalary bool) 
 }
 
 // salaryOwners: for each salary field in the message, the candidate whose
-// details block holds it ("" when it is in the message itself).
+// details row holds it ("" when it is in the message itself, outside the
+// inserted details).
 func salaryOwners(bodyHTML string) []string {
 	nodes, err := html.ParseFragment(strings.NewReader(bodyHTML), &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div})
 	if err != nil {
@@ -60,6 +61,12 @@ func salaryOwners(bodyHTML string) []string {
 	var walk func(n *html.Node, owner string)
 	walk = func(n *html.Node, owner string) {
 		if n.Type == html.ElementNode {
+			// Inside inserted candidate details, a salary whose row lost its
+			// owner (Enter split the paragraph, or it was pasted) is not the
+			// recipient's: it is refused unless its row says whose it is.
+			if attr(n, "data-candidate-summary") == "true" && owner == "" {
+				owner = "unknown candidate"
+			}
 			if id := attr(n, "data-candidate-id"); id != "" {
 				owner = id
 			}

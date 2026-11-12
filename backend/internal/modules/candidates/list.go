@@ -67,6 +67,9 @@ func (o Order) paging(p authz.Principal, cursor *string) (string, *string, int32
 	return sort, nil, int32(o.Offset) //nolint:gosec // 0..10000 per the contract
 }
 
+// maxOffset is the contract's limit on offset: a sorted list pages that far.
+const maxOffset = 10000
+
 // nextPage records where the next page starts, when there are more rows.
 func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*string, *int) {
 	if !more {
@@ -76,7 +79,31 @@ func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*stri
 		return &lastID, nil
 	}
 	next := o.Offset + limit
+	if next > maxOffset {
+		return nil, nil
+	}
 	return nil, &next
+}
+
+// listRows runs the newest-first query (which keeps its index plan) or the
+// sorted one; both give the same columns.
+func (s *Service) listRows(ctx context.Context, tx pgx.Tx, f Filter, similar bool, sort string, cursor *string, offset int32, limit int) ([]store.ListCandidatesRow, error) {
+	q := store.New(tx)
+	if sort == "newest" {
+		return q.ListCandidates(ctx, store.ListCandidatesParams{
+			Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar,
+			RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+		})
+	}
+	sorted, err := q.ListCandidatesSorted(ctx, store.ListCandidatesSortedParams{
+		Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: false,
+		Sort: sort, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+	})
+	rows := make([]store.ListCandidatesRow, len(sorted))
+	for i, r := range sorted {
+		rows[i] = store.ListCandidatesRow(r)
+	}
+	return rows, err
 }
 
 // Filter narrows a list: text, tag and skill (each optional).
@@ -98,10 +125,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		if similar {
 			cur, sort, offset = nil, "newest", 0 // ordered by likeness: one page
 		}
-		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar,
-			Sort: sort, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
-		})
+		rows, err := s.listRows(ctx, tx, f, similar, sort, cur, offset, limit)
 		if err != nil {
 			return err
 		}

@@ -136,6 +136,10 @@ func (s *Service) Preview(ctx context.Context, p authz.Principal, subject, bodyH
 			Subject: sub.Text, BodyHTML: WithoutFieldMarks(body.Text), Missing: union(sub.Missing, body.Missing),
 			Salary: sub.Salary || body.Salary || ShowsSalaryField(clean), FieldValues: fieldValues(values), CandidateVersion: candidateVersion, CompensationVersion: compensationVersion,
 		}
+		// Said at preview, not only on send: another candidate's salary never goes to a candidate.
+		if err := salaryOnlyTheirOwn(recipientCandidateID, bodyHTML, out.Salary); err != nil {
+			return err
+		}
 		if appID != nil {
 			app, err := s.application(ctx, tx, *appID, nil)
 			if err != nil {

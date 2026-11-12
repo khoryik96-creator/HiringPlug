@@ -77,17 +77,8 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
--- @sort: see CandidateSort. Salaries come from the protected table: for roles
--- that may not see them, row-level security leaves them empty (newest order).
-ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC,
-  CASE WHEN @sort::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  c.id DESC
-LIMIT @row_limit OFFSET @row_offset;
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC, c.id DESC
+LIMIT @row_limit;
 
 -- Advanced search: every filter given must hold. With @ts (a boolean
 -- search as a text search query), a candidate is found when their profile
@@ -136,15 +127,8 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
              <= (sqlc.narg(salary_max)::text)::numeric))
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
-ORDER BY
-  CASE WHEN @sort::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN @sort::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  c.id DESC
-LIMIT @row_limit OFFSET @row_offset;
+ORDER BY c.id DESC
+LIMIT @row_limit;
 
 -- Amounts are numeric in the database; the Go code converts them to and
 -- from exact decimal strings, so no precision is ever lost.
@@ -364,3 +348,99 @@ WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry;
 INSERT INTO screening_call_salary(call_id,snapshot) VALUES (@call_id,@snapshot);
 -- name: ScreeningSalarySnapshots :many
 SELECT * FROM screening_call_salary WHERE call_id=ANY(@call_ids::text[]);
+
+-- ListCandidates in another order (CandidateSort, not newest), paged by
+-- offset. A separate query so the newest-first list keeps its index plan.
+-- Keep its filters in step with ListCandidates.
+-- name: ListCandidatesSorted :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry
+FROM candidate c
+-- Salaries only for roles that may see them (row-level security); for others the sort is newest first.
+LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+WHERE (sqlc.narg(query)::text IS NULL
+       OR CASE WHEN sqlc.arg(similar_names)::boolean
+            THEN app_normalize_text(sqlc.narg(query)::text) <% c.name_text
+            ELSE c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+              OR c.phone = ANY (@phones::text[])
+          END)
+  AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
+  AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
+  AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+ORDER BY
+  CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN @sort::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
+  CASE WHEN @sort::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN @sort::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  c.id DESC
+LIMIT @row_limit OFFSET @row_offset;
+
+-- SearchCandidates in another order (CandidateSort, not newest), paged by
+-- offset. A separate query so the newest-first search keeps its index plan.
+-- Keep its filters in step with SearchCandidates (a test runs both).
+-- name: SearchCandidatesSorted :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry,
+       (sqlc.narg(ts)::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text))::boolean AS profile_hit
+FROM candidate c
+-- Salaries only for roles that may see them (row-level security); for others the sort is newest first.
+LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+WHERE (sqlc.narg(query)::text IS NULL
+       OR c.search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
+       OR c.phone = ANY (@phones::text[]))
+  AND (sqlc.narg(ts)::text IS NULL
+       OR (c.profile_terms @@ to_tsquery('english', sqlc.narg(ts)::text) AND NOT c.id = ANY (@excluded_ids::text[]))
+       OR c.id = ANY (@cv_ids::text[]))
+  AND (cardinality(@availability::text[]) = 0 OR c.availability = ANY (@availability::text[]))
+  AND (cardinality(@wa_kinds::text[]) = 0 OR (CASE
+         WHEN c.work_authorization = 'local' THEN 'local'
+         WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
+         WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
+         WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
+         ELSE 'unknown' END) = ANY (@wa_kinds::text[]))
+  AND (cardinality(@nationality::text[]) = 0 OR c.nationality = ANY (@nationality::text[]))
+  AND (cardinality(@residence::text[]) = 0 OR c.residence_country = ANY (@residence::text[]))
+  AND (cardinality(@sources::text[]) = 0 OR c.source = ANY (@sources::text[]))
+  AND (cardinality(@industries::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array(@industries::text[])) OR c.id = ANY(@industry_candidate_ids::text[]))
+  AND (cardinality(@skills::text[]) = 0
+       OR (@all_skills::boolean AND app_lower_array(c.skills) @> app_lower_array(@skills::text[]))
+       OR (NOT @all_skills::boolean AND app_lower_array(c.skills) && app_lower_array(@skills::text[])))
+  AND (cardinality(@tags::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array(@tags::text[]))
+  AND (sqlc.narg(location)::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace(sqlc.narg(location)::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND (sqlc.narg(notice_max_days)::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= sqlc.narg(notice_max_days)::int))
+  -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
+  AND (sqlc.narg(salary_max)::text IS NULL OR EXISTS (
+       SELECT 1 FROM candidate_compensation cc
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = sqlc.narg(salary_currency)::text
+         AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
+             <= (sqlc.narg(salary_max)::text)::numeric))
+  AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
+ORDER BY
+  CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN @sort::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
+  CASE WHEN @sort::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN @sort::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  c.id DESC
+LIMIT @row_limit OFFSET @row_offset;
+

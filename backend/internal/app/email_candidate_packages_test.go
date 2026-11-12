@@ -88,6 +88,13 @@ func TestCandidateRecipientNeverGetsOtherCandidatesSalary(t *testing.T) {
 	r := send(other, fmt.Sprintf(salaryBlock, other.Id))
 	assert.Equal(t, 400, r.Status, "%s", r.Body)
 	assert.Contains(t, string(r.Body), "salary")
+	// The preview says so too, before the recruiter finishes.
+	r = a.request("POST", "/v1/email-previews", token, map[string]any{"recipientCandidateId": recipient.Id, "candidates": []map[string]any{{"candidateId": other.Id}},
+		"subject": "Details", "bodyHtml": fmt.Sprintf(salaryBlock, other.Id), "timeZone": "Asia/Kuala_Lumpur"})
+	assert.Equal(t, 400, r.Status, "%s", r.Body)
+	// A row split off inside the details (Enter pressed in it) is still not the recipient's salary.
+	split := fmt.Sprintf(`<div data-candidate-summary="true"><p data-candidate-id="%s">1. Other</p><p>Expected salary: <span data-field="candidate.expectedSalary">RM 11,000 per month</span></p></div>`, other.Id)
+	assert.Equal(t, 400, send(other, split).Status)
 	assert.Equal(t, 202, send(other, fmt.Sprintf(`<div data-candidate-summary="true"><p data-candidate-id="%s">Notice: 1 month</p></div>`, other.Id)).Status, "details without salary may go")
 	assert.Equal(t, 202, send(recipient, fmt.Sprintf(salaryBlock, recipient.Id)).Status, "their own salary may go to them")
 	// Their own salary in the message, next to another candidate's notice period, is fine too.

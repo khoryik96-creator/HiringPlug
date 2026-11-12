@@ -22,6 +22,8 @@ describe("dashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show recent imports" }));
     expect(await screen.findByText("No imports yet.")).toBeTruthy();
     expect(get).toHaveBeenCalledWith("/v1/cv-imports");
+    fireEvent.click(screen.getByRole("button", { name: "Hide recent imports" }));
+    expect(screen.queryByText("No imports yet.")).toBeNull();
     cleanup();
 
     renderWithClient(<Dashboard permissions={["pipeline:read"]} />);

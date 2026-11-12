@@ -118,18 +118,26 @@ describe("candidate list", () => {
     }) as never);
     renderWithClient(<CandidateList canCreate={false} canSeeSalary />);
     await screen.findByText("Siti Aisyah");
-    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "expected_salary_desc" } });
+    // Click a header to sort by it, like a spreadsheet; click again to flip.
+    fireEvent.click(screen.getByRole("button", { name: /^Expected salary/ }));
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_asc" } } }); });
+    fireEvent.click(screen.getByRole("button", { name: /^Expected salary/ }));
     await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc" } } }); });
+    expect(screen.getByRole("columnheader", { name: /Expected salary/ }).getAttribute("aria-sort")).toBe("descending");
     fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
     expect(await screen.findByText("Zara")).toBeTruthy();
     expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc", offset: 25 } } });
+    fireEvent.click(screen.getByRole("button", { name: /^Name/ }));
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "name" } } }); });
+    fireEvent.click(screen.getByRole("button", { name: "Back to newest first" }));
+    await waitFor(() => { expect(screen.getByRole("columnheader", { name: /^Name/ }).getAttribute("aria-sort")).toBe("none"); });
     cleanup();
 
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByText("Siti Aisyah");
-    const options = [...screen.getByLabelText<HTMLSelectElement>("Sort by").options].map((o) => o.textContent);
-    expect(options).toEqual(["Newest first", "Name (A–Z)", "Notice period (shortest first)"]); // no salary sorts without salary access
+    expect(screen.getByRole("button", { name: /^Name/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Expected salary/ })).toBeNull(); // no salary sorting without salary access
   });
 
   it("narrows by industry, then subindustry, from two dropdowns", async () => {
@@ -195,7 +203,7 @@ describe("candidate list", () => {
     }) as never);
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByRole("columnheader", { name: "Nationality" });
-    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""))).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
     const siti = screen.getByText("Siti Aisyah").closest("tr");
     expect(siti?.textContent).toContain("Singapore");
     expect(siti?.textContent).toContain("Malaysia");

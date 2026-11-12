@@ -170,10 +170,12 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
       {start.error && <p className="error">{start.error.message}</p>}
       {failures.map((f) => <p key={f} className="error">{f}</p>)}
 
-      {foldedHistory && !historyOpen && (
-        <button type="button" className="link small" onClick={() => { setHistoryOpen(true); }}>Show recent imports</button>
+      {foldedHistory && (
+        <button type="button" className="link small" aria-expanded={historyOpen} onClick={() => { setHistoryOpen(!historyOpen); }}>
+          {historyOpen ? "Hide recent imports" : "Show recent imports"}
+        </button>
       )}
-      {imports.data?.map((imp) => (
+      {historyOpen && imports.data?.map((imp) => (
         <div key={imp.id} aria-label={`Import of ${new Date(imp.createdAt).toLocaleString()}`}>
           <h4>
             {new Date(imp.createdAt).toLocaleString()} · {fs.label("candidate_source", imp.source)}:{" "}
@@ -185,7 +187,7 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
           </table>
         </div>
       ))}
-      {imports.data?.length === 0 && <p className="muted">No imports yet.</p>}
+      {historyOpen && imports.data?.length === 0 && <p className="muted">No imports yet.</p>}
     </section>
   );
 }

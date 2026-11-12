@@ -124,6 +124,16 @@ it("keeps the saved figure and its wording for a salary the calculation could no
   expect(screen.getByText(/expected salary could not be read, so its figure and wording stay as they were/)).toBeTruthy();
 });
 
+it("clears a salary whose wording was emptied", async () => {
+  vi.spyOn(api, "POST").mockResolvedValue(ok({ base:"15000",allowances:"0",bonus:"0",monthly:"15000",annualMonths:12,hasCurrent:true,reviewRequired:false,warnings:[],excluded:[] }));
+  renderWithClient(<Harness initial={{ ...formFromCompensation(null), expectedMin: "11000", expectedDescription: "11k" }} />);
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"), { target: { value: "rm15k" } });
+  fireEvent.change(screen.getByLabelText("Expected salary"), { target: { value: "" } }); // the recruiter removes it
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  fireEvent.click(await screen.findByRole("button",{name:"Use these figures"}));
+  expect(JSON.parse(screen.getByTestId("body").textContent) as { expectedSalary: unknown }).toMatchObject({ expectedSalary: null });
+});
+
 it("cannot use a calculation that read no figure at all", async () => {
   vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"0",allowances:"0",bonus:"0",monthly:"0",annualMonths:12,hasCurrent:false,reviewRequired:true,warnings:["Enter a basic salary."],excluded:[] }));
   renderWithClient(<Harness />);

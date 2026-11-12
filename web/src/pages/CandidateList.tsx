@@ -9,7 +9,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
-import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, SORTS, toBody } from "../components/search/candidateSearch";
+import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
@@ -31,8 +31,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
   const [sortBy, setSortBy] = useState<CandidateSort>(() => {
     const kept = readSort();
-    return SORTS.some((s) => s.value === kept && (!s.salary || canSeeSalary)) ? kept : "newest";
+    return Object.values(SORTABLE).some((s) => (s.asc === kept || s.desc === kept) && (!s.salary || canSeeSalary)) ? kept : "newest";
   });
+  const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
   const list = useInfiniteQuery({
     queryKey: [...candidatesKey, q, mine, sortBy],
     enabled: !advanced,
@@ -56,9 +57,11 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     getNextPageParam: nextPage,
   });
   const shownList = advanced ? found : list;
-  const hits: Hit[] = advanced
+  const allHits: Hit[] = advanced
     ? (found.data?.pages.flatMap((pg) => pg.items) ?? [])
     : (list.data?.pages.flatMap((pg) => pg.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null }))) ?? []);
+  // A sorted list pages by position: if a record moved between pages, it is shown once.
+  const hits = allHits.filter((h, i) => allHits.findIndex((x) => x.candidate.id === h.candidate.id) === i);
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
   const industries = useIndustries();
@@ -92,12 +95,6 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
           Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
         </button>
-        <label className="sort-by">
-          <span className="visually-hidden">Sort by</span>
-          <select aria-label="Sort by" value={sortBy} onChange={(e) => { const v = e.target.value as CandidateSort; setSortBy(v); keepSort(v); }}>
-            {SORTS.filter((s) => !s.salary || canSeeSalary).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </label>
         <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
@@ -118,6 +115,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           {shownList.data && (hits.length === 0 ? "No candidates match."
             : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
+          {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
         <WaLegend />
       </div>
@@ -132,8 +130,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
           <thead>
             <tr>
-              <th>Name</th>
-              {cols.columns.map((col) => <th key={col}>{COLUMNS[col].header}</th>)}
+              <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />
+              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />)}
             </tr>
           </thead>
           <tbody>
@@ -235,4 +233,20 @@ function readSort(): CandidateSort {
 }
 function keepSort(v: CandidateSort) {
   try { window.localStorage.setItem(SORT_KEY, v); } catch { /* only a convenience */ }
+}
+
+/** A column header; for sortable columns, a button that sorts (and flips) the list, like a spreadsheet. */
+function SortHeader({ column, label, sort, onSort, canSeeSalary }: {
+  column: string; label: string; sort: CandidateSort; onSort: (s: CandidateSort) => void; canSeeSalary: boolean;
+}) {
+  const sortable = SORTABLE[column];
+  if (!sortable || (sortable.salary && !canSeeSalary)) return <th>{label}</th>;
+  const way = sortOf(sort, column);
+  return (
+    <th aria-sort={way ?? "none"}>
+      <button type="button" className={`sort-header${way ? " on" : ""}`} onClick={() => { onSort(flipSort(sort, column)); }}>
+        {label}<span aria-hidden="true" className="sort-arrow">{way === "ascending" ? "▲" : way === "descending" ? "▼" : "↕"}</span>
+      </button>
+    </th>
+  );
 }

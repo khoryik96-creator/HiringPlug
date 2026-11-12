@@ -653,7 +653,9 @@ class CandidateSearchHit(BaseModel):
 class CandidateSort(StrEnum):
     newest = "newest"
     name = "name"
+    name_desc = "name_desc"
     notice = "notice"
+    notice_desc = "notice_desc"
     current_salary_asc = "current_salary_asc"
     current_salary_desc = "current_salary_desc"
     expected_salary_asc = "expected_salary_asc"

@@ -62,15 +62,16 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     const expectedRead = !!result.expectedMin;
     const unread = [!result.hasCurrent && current.trim() ? "current" : "", !expectedRead && expected.trim() ? "expected" : ""].filter(Boolean);
     patch({
-      currentAmount: result.hasCurrent ? result.monthly : form.currentAmount,
+      // Emptied wording clears that salary; wording that could not be read keeps what was saved.
+      currentAmount: result.hasCurrent ? result.monthly : current.trim() ? form.currentAmount : "",
       currentPeriod: result.hasCurrent ? "month" : form.currentPeriod,
       currentCurrency: result.currentCurrency ?? form.currentCurrency,
-      currentDescription: result.hasCurrent ? current : undefined,
-      expectedMin: expectedRead ? result.expectedMin ?? "" : form.expectedMin,
-      expectedMax: expectedRead ? result.expectedMax ?? "" : form.expectedMax,
+      currentDescription: result.hasCurrent ? current : current.trim() ? undefined : "",
+      expectedMin: expectedRead ? result.expectedMin ?? "" : expected.trim() ? form.expectedMin : "",
+      expectedMax: expectedRead ? result.expectedMax ?? "" : expected.trim() ? form.expectedMax : "",
       expectedPeriod: expectedRead ? "month" : form.expectedPeriod,
       expectedCurrency: result.expectedCurrency ?? form.expectedCurrency,
-      expectedDescription: expectedRead ? expected : undefined,
+      expectedDescription: expectedRead ? expected : expected.trim() ? undefined : "",
       calculationPending: false,
       currentNeedsReview: false,
       expectedNeedsReview: false,

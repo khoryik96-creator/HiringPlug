@@ -3609,10 +3609,10 @@ export interface components {
             cvSnippet: string | null;
         };
         /**
-         * @description newest (the default) pages with nextCursor; the others page with nextOffset. Unknown notice periods and salaries come last; salary sorts use monthly equivalents and only for roles that may see salaries.
+         * @description newest (the default) pages with nextCursor; the others page with nextOffset (up to 10,000 rows). name is A to Z (accents ignored), notice shortest first; unknown notice periods and salaries come last. Salary sorts use monthly equivalents, ringgit first and each other currency together, and only for roles that may see salaries.
          * @enum {string}
          */
-        CandidateSort: "newest" | "name" | "notice" | "current_salary_asc" | "current_salary_desc" | "expected_salary_asc" | "expected_salary_desc";
+        CandidateSort: "newest" | "name" | "name_desc" | "notice" | "notice_desc" | "current_salary_asc" | "current_salary_desc" | "expected_salary_asc" | "expected_salary_desc";
         CandidateSearchPage: {
             /** @description With a sort other than newest, pass as offset for the next page. */
             nextOffset?: number | null;

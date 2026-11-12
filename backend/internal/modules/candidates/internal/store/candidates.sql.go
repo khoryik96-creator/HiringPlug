@@ -603,15 +603,8 @@ WHERE ($1::text IS NULL OR c.id < $1::text)
   AND ($5::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($5::text)])
   AND ($6::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($6::text)])
   AND ($7::text IS NULL OR c.owner_id = $7::text)
-ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC,
-  CASE WHEN $8::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $8::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $8::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN $8::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  CASE WHEN $8::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN $8::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  c.id DESC
-LIMIT $10 OFFSET $9
+ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC, c.id DESC
+LIMIT $8
 `
 
 type ListCandidatesParams struct {
@@ -622,8 +615,6 @@ type ListCandidatesParams struct {
 	Tag          *string
 	Skill        *string
 	Owner        *string
-	Sort         string
-	RowOffset    int32
 	RowLimit     int32
 }
 
@@ -653,11 +644,129 @@ type ListCandidatesRow struct {
 // Newest first, keyset pagination on id (IDs sort by creation time).
 // @phones are the whole numbers a phone number typed as the query can be
 // (findquery.Numbers): never its last digits. With @similar, names like the query (typos) instead, the closest first.
-// @sort: see CandidateSort. Salaries come from the protected table: for roles
-// that may not see them, row-level security leaves them empty (newest order).
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listCandidates,
 		arg.Cursor,
+		arg.Query,
+		arg.SimilarNames,
+		arg.Phones,
+		arg.Tag,
+		arg.Skill,
+		arg.Owner,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCandidatesRow
+	for rows.Next() {
+		var i ListCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Phone,
+			&i.CurrentTitle,
+			&i.CurrentCompany,
+			&i.Location,
+			&i.WorkAuthorization,
+			&i.Tags,
+			&i.UpdatedAt,
+			&i.Availability,
+			&i.AvailabilitySince,
+			&i.NoticePeriodValue,
+			&i.NoticePeriodUnit,
+			&i.WorkAuthorizationBasis,
+			&i.Nationality,
+			&i.ResidenceCountry,
+			&i.Source,
+			&i.Industry,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCandidatesSorted = `-- name: ListCandidatesSorted :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry
+FROM candidate c
+LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+WHERE ($1::text IS NULL
+       OR CASE WHEN $2::boolean
+            THEN app_normalize_text($1::text) <% c.name_text
+            ELSE c.search_text LIKE ALL (app_search_patterns($1::text))
+              OR c.phone = ANY ($3::text[])
+          END)
+  AND ($4::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($4::text)])
+  AND ($5::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($5::text)])
+  AND ($6::text IS NULL OR c.owner_id = $6::text)
+ORDER BY
+  CASE WHEN $7::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $7::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $7::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $7::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
+  CASE WHEN $7::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN $7::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN $7::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $7::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $7::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $7::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  c.id DESC
+LIMIT $9 OFFSET $8
+`
+
+type ListCandidatesSortedParams struct {
+	Query        *string
+	SimilarNames bool
+	Phones       []string
+	Tag          *string
+	Skill        *string
+	Owner        *string
+	Sort         string
+	RowOffset    int32
+	RowLimit     int32
+}
+
+type ListCandidatesSortedRow struct {
+	ID                     string
+	FirstName              string
+	LastName               string
+	Email                  *string
+	Phone                  *string
+	CurrentTitle           *string
+	CurrentCompany         *string
+	Location               *string
+	WorkAuthorization      *string
+	Tags                   []string
+	UpdatedAt              time.Time
+	Availability           *string
+	AvailabilitySince      *time.Time
+	NoticePeriodValue      *int32
+	NoticePeriodUnit       *string
+	WorkAuthorizationBasis *string
+	Nationality            *string
+	ResidenceCountry       *string
+	Source                 *string
+	Industry               *string
+}
+
+// ListCandidates in another order (CandidateSort, not newest), paged by
+// offset. A separate query so the newest-first list keeps its index plan.
+// Keep its filters in step with ListCandidates.
+// Salaries only for roles that may see them (row-level security); for others the sort is newest first.
+func (q *Queries) ListCandidatesSorted(ctx context.Context, arg ListCandidatesSortedParams) ([]ListCandidatesSortedRow, error) {
+	rows, err := q.db.Query(ctx, listCandidatesSorted,
 		arg.Query,
 		arg.SimilarNames,
 		arg.Phones,
@@ -672,9 +781,9 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListCandidatesRow
+	var items []ListCandidatesSortedRow
 	for rows.Next() {
-		var i ListCandidatesRow
+		var i ListCandidatesSortedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.FirstName,
@@ -1122,15 +1231,8 @@ WHERE ($2::text IS NULL OR c.id < $2::text)
              <= ($19::text)::numeric))
   AND ($21::text IS NULL OR c.owner_id = $21::text)
   AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
-ORDER BY
-  CASE WHEN $23::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $23::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $23::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN $23::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  CASE WHEN $23::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
-  CASE WHEN $23::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
-  c.id DESC
-LIMIT $25 OFFSET $24
+ORDER BY c.id DESC
+LIMIT $23
 `
 
 type SearchCandidatesParams struct {
@@ -1156,8 +1258,6 @@ type SearchCandidatesParams struct {
 	SalaryCurrency       *string
 	Owner                *string
 	UpdatedWithinDays    *int32
-	Sort                 string
-	RowOffset            int32
 	RowLimit             int32
 }
 
@@ -1215,8 +1315,6 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.SalaryCurrency,
 		arg.Owner,
 		arg.UpdatedWithinDays,
-		arg.Sort,
-		arg.RowOffset,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -1226,6 +1324,185 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 	var items []SearchCandidatesRow
 	for rows.Next() {
 		var i SearchCandidatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Phone,
+			&i.CurrentTitle,
+			&i.CurrentCompany,
+			&i.Location,
+			&i.WorkAuthorization,
+			&i.Tags,
+			&i.UpdatedAt,
+			&i.Availability,
+			&i.AvailabilitySince,
+			&i.NoticePeriodValue,
+			&i.NoticePeriodUnit,
+			&i.WorkAuthorizationBasis,
+			&i.Nationality,
+			&i.ResidenceCountry,
+			&i.Source,
+			&i.Industry,
+			&i.ProfileHit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchCandidatesSorted = `-- name: SearchCandidatesSorted :many
+SELECT c.id, c.first_name, c.last_name, c.email, c.phone, c.current_title, c.current_company,
+       c.location, c.work_authorization, c.tags, c.updated_at,
+       c.availability, c.availability_since, c.notice_period_value, c.notice_period_unit, c.work_authorization_basis,
+       c.nationality, c.residence_country, c.source, c.industry,
+       ($1::text IS NOT NULL AND c.profile_terms @@ to_tsquery('english', $1::text))::boolean AS profile_hit
+FROM candidate c
+LEFT JOIN candidate_compensation cc ON cc.candidate_id = c.id
+WHERE ($2::text IS NULL
+       OR c.search_text LIKE ALL (app_search_patterns($2::text))
+       OR c.phone = ANY ($3::text[]))
+  AND ($1::text IS NULL
+       OR (c.profile_terms @@ to_tsquery('english', $1::text) AND NOT c.id = ANY ($4::text[]))
+       OR c.id = ANY ($5::text[]))
+  AND (cardinality($6::text[]) = 0 OR c.availability = ANY ($6::text[]))
+  AND (cardinality($7::text[]) = 0 OR (CASE
+         WHEN c.work_authorization = 'local' THEN 'local'
+         WHEN c.work_authorization = 'requires_visa' THEN 'needs_pass'
+         WHEN c.work_authorization = 'expat_eligible' AND c.work_authorization_basis = 'permanent_resident' THEN 'pr'
+         WHEN c.work_authorization = 'expat_eligible' THEN 'expat'
+         ELSE 'unknown' END) = ANY ($7::text[]))
+  AND (cardinality($8::text[]) = 0 OR c.nationality = ANY ($8::text[]))
+  AND (cardinality($9::text[]) = 0 OR c.residence_country = ANY ($9::text[]))
+  AND (cardinality($10::text[]) = 0 OR c.source = ANY ($10::text[]))
+  AND (cardinality($11::text[]) = 0 OR lower(c.industry) = ANY (app_lower_array($11::text[])) OR c.id = ANY($12::text[]))
+  AND (cardinality($13::text[]) = 0
+       OR ($14::boolean AND app_lower_array(c.skills) @> app_lower_array($13::text[]))
+       OR (NOT $14::boolean AND app_lower_array(c.skills) && app_lower_array($13::text[])))
+  AND (cardinality($15::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($15::text[]))
+  AND ($16::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($16::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($17::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $17::int))
+  -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
+  AND ($18::text IS NULL OR EXISTS (
+       SELECT 1 FROM candidate_compensation cc
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $19::text
+         AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
+             <= ($18::text)::numeric))
+  AND ($20::text IS NULL OR c.owner_id = $20::text)
+  AND ($21::int IS NULL OR c.updated_at >= now() - make_interval(days => $21::int))
+ORDER BY
+  CASE WHEN $22::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $22::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $22::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $22::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
+  CASE WHEN $22::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN $22::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN $22::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $22::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $22::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $22::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  c.id DESC
+LIMIT $24 OFFSET $23
+`
+
+type SearchCandidatesSortedParams struct {
+	Ts                   *string
+	Query                *string
+	Phones               []string
+	ExcludedIds          []string
+	CvIds                []string
+	Availability         []string
+	WaKinds              []string
+	Nationality          []string
+	Residence            []string
+	Sources              []string
+	Industries           []string
+	IndustryCandidateIds []string
+	Skills               []string
+	AllSkills            bool
+	Tags                 []string
+	Location             *string
+	NoticeMaxDays        *int32
+	SalaryMax            *string
+	SalaryCurrency       *string
+	Owner                *string
+	UpdatedWithinDays    *int32
+	Sort                 string
+	RowOffset            int32
+	RowLimit             int32
+}
+
+type SearchCandidatesSortedRow struct {
+	ID                     string
+	FirstName              string
+	LastName               string
+	Email                  *string
+	Phone                  *string
+	CurrentTitle           *string
+	CurrentCompany         *string
+	Location               *string
+	WorkAuthorization      *string
+	Tags                   []string
+	UpdatedAt              time.Time
+	Availability           *string
+	AvailabilitySince      *time.Time
+	NoticePeriodValue      *int32
+	NoticePeriodUnit       *string
+	WorkAuthorizationBasis *string
+	Nationality            *string
+	ResidenceCountry       *string
+	Source                 *string
+	Industry               *string
+	ProfileHit             bool
+}
+
+// SearchCandidates in another order (CandidateSort, not newest), paged by
+// offset. A separate query so the newest-first search keeps its index plan.
+// Keep its filters in step with SearchCandidates (a test runs both).
+// Salaries only for roles that may see them (row-level security); for others the sort is newest first.
+func (q *Queries) SearchCandidatesSorted(ctx context.Context, arg SearchCandidatesSortedParams) ([]SearchCandidatesSortedRow, error) {
+	rows, err := q.db.Query(ctx, searchCandidatesSorted,
+		arg.Ts,
+		arg.Query,
+		arg.Phones,
+		arg.ExcludedIds,
+		arg.CvIds,
+		arg.Availability,
+		arg.WaKinds,
+		arg.Nationality,
+		arg.Residence,
+		arg.Sources,
+		arg.Industries,
+		arg.IndustryCandidateIds,
+		arg.Skills,
+		arg.AllSkills,
+		arg.Tags,
+		arg.Location,
+		arg.NoticeMaxDays,
+		arg.SalaryMax,
+		arg.SalaryCurrency,
+		arg.Owner,
+		arg.UpdatedWithinDays,
+		arg.Sort,
+		arg.RowOffset,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchCandidatesSortedRow
+	for rows.Next() {
+		var i SearchCandidatesSortedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.FirstName,
