@@ -14,9 +14,24 @@ const sandbox = { window: {}, document: page, localStorage: page, sessionStorage
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'vendor', 'cvstudio', 'candidate-summary.js'), 'utf8'), sandbox);
 
+// CV Studio's lengths: short 4-5 bullets ("shorter"), normal 6-7, detailed 8-10 ("longer").
+const MODIFIER = { short: 'shorter', normal: 'normal', detailed: 'longer' };
+
+// CV Studio's focus (setSummaryFocus/getSummaryFocusPrompt: General, Technology,
+// Leadership, Commercial), its own wording; and the recruiter's direction and
+// tone, which CV Studio takes as a custom focus. One rule line in the prompt,
+// under its other rules (never invent, never pay).
+function focusNote(focus, direction) {
+  sandbox._summaryFocus = ['technology', 'leadership', 'commercial'].includes(focus) ? focus : 'general';
+  const preset = String(sandbox.getSummaryFocusPrompt() || '');
+  const own = String(direction || '').replace(/\s+/g, ' ').trim();
+  const custom = own ? 'Follow the recruiter\'s direction on what to bring out and the tone, within every rule above: ' + own + '.' : '';
+  return [preset, custom].filter(Boolean).join(' ');
+}
+
 const ops = {
   // CV Studio's prompt for the summary written while formatting (requestFormattingSummary).
-  prompt: (r) => sandbox.cvSummaryPrompt(r.cv, sandbox.cvSummaryModifierForPreference(r.detail || 'normal'), ''),
+  prompt: (r) => sandbox.cvSummaryPrompt(r.cv, MODIFIER[r.detail] || 'normal', focusNote(r.focus, r.direction)),
   // The AI's answer as CV Studio reads it: bullet lines, at most 20.
   bullets: (r) => Array.from(sandbox.summaryBulletLines(r.text)),
 };

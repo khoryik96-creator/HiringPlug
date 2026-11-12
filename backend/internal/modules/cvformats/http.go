@@ -133,6 +133,12 @@ func (h *HTTP) StartStudioCv(ctx context.Context, req api.StartStudioCvRequestOb
 	if b.Summary != nil {
 		o.Summary = string(*b.Summary)
 	}
+	if b.SummaryFocus != nil {
+		o.SummaryFocus = string(*b.SummaryFocus)
+	}
+	if d, err := b.SummaryDirection.Get(); err == nil {
+		o.SummaryDirection = d
+	}
 	run, err := h.svc.StartStudio(ctx, authz.MustFromContext(ctx), req.CandidateId, o)
 	if err != nil {
 		return nil, err

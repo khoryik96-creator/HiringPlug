@@ -41,9 +41,11 @@ def _call(op: str, **request: Any) -> Any:
     return answer.get("value")
 
 
-def prompt(cv_text: str, *, detailed: bool) -> str:
-    """CV Studio's prompt: 6-7 bullets, or 8-10 detailed ones."""
-    return str(_call("prompt", cv=cv_text, detail="detailed" if detailed else "normal"))
+def prompt(cv_text: str, *, length: str = "normal", focus: str = "general", direction: str = "") -> str:
+    """CV Studio's prompt: short (4-5 bullets), normal (6-7) or detailed
+    (8-10); bringing out its focus (general, technology, leadership or
+    commercial) and following the recruiter's direction and tone."""
+    return str(_call("prompt", cv=cv_text, detail=length, focus=focus, direction=direction))
 
 
 def bullets(answer: str) -> tuple[list[str], int]:

@@ -166,18 +166,21 @@ def _with_summary(
     Returns the lines stating pay removed from the summary."""
     if payload.summary.value == "none" or payload.blind:
         return int(str(checked.get("summary_pay_removed") or 0))
-    cv["summary_bullets"], pay = _summary(ask_text, cv_text, detailed=payload.summary.value == "detailed")
+    focus = payload.summaryFocus.value if payload.summaryFocus else "general"
+    cv["summary_bullets"], pay = _summary(
+        ask_text, cv_text, length=payload.summary.value, focus=focus, direction=payload.summaryDirection or ""
+    )
     return pay
 
 
 def _summary(
-    ask_text: Callable[[str, str, int], str], cv_text: str, *, detailed: bool
+    ask_text: Callable[[str, str, int], str], cv_text: str, *, length: str, focus: str, direction: str
 ) -> tuple[list[str], int]:
     """CV Studio's About Him / Her: its prompt sent alone, its reading of the
     answer, then lines stating the candidate's pay removed. An answer with no
     bullets fails the run (as CV Studio's does), unless pay was all it said."""
     try:
-        prompt = cvstudio_summary.prompt(cv_text, detailed=detailed)
+        prompt = cvstudio_summary.prompt(cv_text, length=length, focus=focus, direction=direction)
         answer = ask_text("", prompt, cvstudio_summary.MAX_TOKENS)
         bullets, pay = cvstudio_summary.bullets(answer)
     except cvstudio_summary.SummaryError as exc:

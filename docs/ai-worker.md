@@ -234,8 +234,12 @@ only code that touches it). In CV Studio's own order:
 
 **About Him / Her.** As CV Studio does while formatting (cv-format.js,
 `requestFormattingSummary`), the summary box is written by the AI from the
-CV unless the person chooses "Only the CV's own summary": normal (6-7
-points) or detailed (8-10), with CV Studio's own prompt and its reading of
+CV unless the person turns it off (the CV's own summary is then kept):
+short (4-5 points), normal (6-7) or detailed (8-10), bringing out CV
+Studio's focus (general, technology, leadership or commercial, its own
+`getSummaryFocusPrompt` wording) and the recruiter's direction and tone (one
+tidy line under CV Studio's rules, as its custom focus is; the API refuses one
+about pay), with CV Studio's own prompt and its reading of
 the answer, both run from its unchanged `candidate-summary.js` by Node
 (`engine/summary_cli.cjs`), sent alone, 1,000 tokens; lines stating pay are
 then removed. Never for a blind CV (it keeps the CV's own summary). Without

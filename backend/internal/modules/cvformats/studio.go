@@ -8,10 +8,12 @@ package cvformats
 import (
 	"context"
 	"encoding/base64"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/oapi-codegen/nullable"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats/internal/store"
@@ -41,8 +43,37 @@ type StudioOptions struct {
 	DocumentID                            string
 	Blind, NeutralGender, CorrectLanguage bool
 	Alignment                             string // left or justify
-	Summary                               string // the About Him / Her summary: none, normal or detailed
+	Summary                               string // the About Him / Her summary: none, short, normal or detailed
+	SummaryFocus                          string // general, technology, leadership or commercial
+	SummaryDirection                      string // the recruiter's direction and tone, in their words
 }
+
+// summaryOptions settles the summary's options: a blind CV keeps its own
+// summary; no summary, no focus or direction; a direction is one tidy line,
+// and never about pay (pay never goes to the AI, and the summary never says it).
+func summaryOptions(o StudioOptions) (StudioOptions, error) {
+	switch {
+	case o.Blind: // CV Studio keeps a blind CV's own summary, never writes one
+		o.Summary = "none"
+	case o.Summary != "none" && o.Summary != "short" && o.Summary != "detailed":
+		o.Summary = "normal"
+	}
+	if o.SummaryFocus != "technology" && o.SummaryFocus != "leadership" && o.SummaryFocus != "commercial" {
+		o.SummaryFocus = "general"
+	}
+	o.SummaryDirection = strings.Join(strings.Fields(strings.ReplaceAll(o.SummaryDirection, "---", " ")), " ")
+	if o.Summary == "none" {
+		o.SummaryFocus, o.SummaryDirection = "general", ""
+	}
+	if payWords.MatchString(o.SummaryDirection) {
+		return o, apperr.Validation(apperr.FieldErrors{{Field: "summaryDirection",
+			Message: "Leave pay out of the direction: the summary never mentions the candidate's pay, and pay is never sent to the AI."}})
+	}
+	return o, nil
+}
+
+// payWords spots a direction about the candidate's pay or naming an amount of money.
+var payWords = regexp.MustCompile(`(?i)\b(salary|salaries|remuneration|compensation|pay|paid|package|ctc|epf|kwsp|ringgit)\b|\b(rm|myr|sgd|usd|idr|php|thb|aud|eur|gbp)\s?\d|[$€£]\s?\d|\b\d+(\.\d+)?\s?k\b`)
 
 // StudioCV is a formatting run and, once done, its result.
 type StudioCV = store.StudioCv
@@ -55,14 +86,12 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 	if !o.Blind {
 		o.NeutralGender = false
 	}
-	switch {
-	case o.Blind: // CV Studio keeps a blind CV's own summary, never writes one
-		o.Summary = "none"
-	case o.Summary != "none" && o.Summary != "detailed":
-		o.Summary = "normal"
+	o, err := summaryOptions(o)
+	if err != nil {
+		return StudioCV{}, err
 	}
 	var out StudioCV
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if _, err := s.deps.Candidates.ForCV(ctx, tx, p, candidateID); err != nil {
 			return err // not found, or not theirs to see
 		}
@@ -81,6 +110,11 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 			return apperr.New(api.ErrorCodeSTUDIOCVOFF,
 				"CV Studio formatting needs the AI: set up an AI provider in Settings, or wait for next month's allowance.")
 		}
+		focus := api.StudioCvSummaryFocus(o.SummaryFocus)
+		var direction nullable.Nullable[string]
+		if o.SummaryDirection != "" {
+			direction.Set(o.SummaryDirection)
+		}
 		q := store.New(tx)
 		id, err := q.NewStudioCvID(ctx)
 		if err != nil {
@@ -96,11 +130,13 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 			StudioCvId: id, DownloadUrl: url, ContentType: src.ContentType, FileName: src.FileName, SizeBytes: src.SizeBytes,
 			Blind: o.Blind, NeutralGender: o.NeutralGender, CorrectLanguage: o.CorrectLanguage,
 			Alignment: api.StudioCvAlignment(o.Alignment), Summary: api.StudioCvSummary(o.Summary), Ai: access,
+			SummaryFocus: &focus, SummaryDirection: direction,
 		}); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "cv.studio_started", EntityType: "candidate", EntityID: candidateID, Changes: map[string]any{
 			"studioCvId": id, "sourceDocumentId": src.ID, "blind": o.Blind, "correctLanguage": o.CorrectLanguage, "summary": o.Summary,
+			"summaryFocus": o.SummaryFocus, "summaryDirection": o.SummaryDirection != "", // whether one was given, not its words
 		}})
 	})
 	return out, err

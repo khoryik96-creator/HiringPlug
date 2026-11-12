@@ -4660,12 +4660,20 @@ export interface components {
             correctLanguage?: boolean;
             alignment?: components["schemas"]["StudioCvAlignment"];
             summary?: components["schemas"]["StudioCvSummary"];
+            summaryFocus?: components["schemas"]["StudioCvSummaryFocus"];
+            /** @description The recruiter's own direction for the summary, in their words: what to bring out and the tone (e.g. confident and concise, lead with the S/4HANA migration). Never about pay: the summary never mentions it. */
+            summaryDirection?: string | null;
         };
         /**
-         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none, normal (6-7 bullets, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary.
+         * @description The About Him / Her summary, written by the AI from the CV as CV Studio does: none (only the CV's own), short (4-5 bullets), normal (6-7, the default) or detailed (8-10). Never for a blind CV: it keeps the CV's own summary.
          * @enum {string}
          */
-        StudioCvSummary: "none" | "normal" | "detailed";
+        StudioCvSummary: "none" | "short" | "normal" | "detailed";
+        /**
+         * @description What the summary brings out, CV Studio's choices: general (the default), technology (skills, tech stack, delivery), leadership (teams, stakeholders, strategy) or commercial (revenue, clients, growth).
+         * @enum {string}
+         */
+        StudioCvSummaryFocus: "general" | "technology" | "leadership" | "commercial";
         /** @enum {string} */
         StudioCvStatus: "queued" | "done" | "failed";
         StudioCv: {
@@ -4704,6 +4712,9 @@ export interface components {
             correctLanguage: boolean;
             alignment: components["schemas"]["StudioCvAlignment"];
             summary: components["schemas"]["StudioCvSummary"];
+            summaryFocus?: components["schemas"]["StudioCvSummaryFocus"];
+            /** @description The recruiter's direction and tone for the summary. */
+            summaryDirection?: string | null;
             /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
             ai?: components["schemas"]["AiAccess"];
         };

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateApplicationsKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
+import { fieldErrors } from "./forms";
 import { SaveError } from "./SaveError";
 
 export const cvTemplatesKey = ["cv-templates"] as const;
@@ -45,22 +46,51 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
   );
 }
 
+type SummaryLength = Exclude<Schemas["StudioCvSummary"], "none">;
+type SummaryFocus = Schemas["StudioCvSummaryFocus"];
+/** How the About Him / Her summary is written: remembered in this browser for the next CV. */
+export type SummaryChoice = { write: boolean; length: SummaryLength; focus: SummaryFocus; direction: string };
+
+const SUMMARY_KEY = "hiringplug.studio.summary";
+const SUMMARY_DEFAULT: SummaryChoice = { write: true, length: "normal", focus: "general", direction: "" };
+const LENGTHS: [SummaryLength, string][] = [["short", "Short (4-5 points)"], ["normal", "Normal (6-7)"], ["detailed", "Detailed (8-10)"]];
+const FOCUSES: [SummaryFocus, string][] = [["general", "General"], ["technology", "Technology"], ["leadership", "Leadership"], ["commercial", "Commercial"]];
+
+export function loadSummaryChoice(): SummaryChoice {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SUMMARY_KEY) ?? "{}") as Partial<SummaryChoice>;
+    return {
+      write: typeof saved.write === "boolean" ? saved.write : SUMMARY_DEFAULT.write,
+      length: LENGTHS.some(([k]) => k === saved.length) ? saved.length as SummaryLength : SUMMARY_DEFAULT.length,
+      focus: FOCUSES.some(([k]) => k === saved.focus) ? saved.focus as SummaryFocus : SUMMARY_DEFAULT.focus,
+      direction: typeof saved.direction === "string" ? saved.direction.slice(0, 500) : "",
+    };
+  } catch { return SUMMARY_DEFAULT; }
+}
+
+function saveSummaryChoice(choice: SummaryChoice) {
+  try { localStorage.setItem(SUMMARY_KEY, JSON.stringify(choice)); } catch { /* private window: not remembered */ }
+}
+
 function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Document[]; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     documentId: "", blind: false, neutralGender: false, correctLanguage: true, alignment: "left" as "left" | "justify",
-    summary: "normal" as Schemas["StudioCvSummary"],
   });
+  const [summary, setSummary] = useState(loadSummaryChoice);
   const documentId = form.documentId || cvs[0]?.id || "";
+  const writes = summary.write && !form.blind;
   const start = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/candidates/{candidateId}/studio-cvs", {
       params: { path: { candidateId } },
       body: {
         documentId, blind: form.blind, neutralGender: form.blind && form.neutralGender, correctLanguage: form.correctLanguage,
-        alignment: form.alignment, summary: form.blind ? "none" : form.summary,
+        alignment: form.alignment, summary: writes ? summary.length : "none",
+        ...(writes ? { summaryFocus: summary.focus, ...(summary.direction.trim() ? { summaryDirection: summary.direction.trim() } : {}) } : {}),
       },
     })),
     onSuccess: async () => {
+      if (!form.blind) saveSummaryChoice(summary);
       await queryClient.invalidateQueries({ queryKey: studioCvsKey(candidateId) });
       onDone();
     },
@@ -86,14 +116,10 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
           &ldquo;The candidate&rdquo; instead of he or she
         </label>
       )}
-      {!form.blind && (
-        <label className="field">About Him / Her
-          <select value={form.summary} onChange={(e) => { setForm({ ...form, summary: e.target.value as Schemas["StudioCvSummary"] }); }}>
-            <option value="normal">Written by the AI (6-7 points)</option>
-            <option value="detailed">Written by the AI, detailed (8-10 points)</option>
-            <option value="none">Only the CV&apos;s own summary</option>
-          </select>
-        </label>
+      {form.blind ? (
+        <p className="muted small full">A blind CV keeps the CV&apos;s own About Him / Her summary.</p>
+      ) : (
+        <SummaryOptions choice={summary} onChange={setSummary} error={fieldErrors(start.error).summaryDirection} />
       )}
       <label className="field">Paragraphs
         <select value={form.alignment} onChange={(e) => { setForm({ ...form, alignment: e.target.value === "justify" ? "justify" : "left" }); }}>
@@ -101,12 +127,51 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
           <option value="justify">Justified</option>
         </select>
       </label>
-      <ErrorMessage error={start.error} />
+      <ErrorMessage error={fieldErrors(start.error).summaryDirection ? null : start.error} />
       <div className="row full">
         <button type="submit" disabled={start.isPending || !documentId}>Format CV</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** The About Him / Her summary: whether the AI writes one, and how (CV Studio's lengths and focus, and your own direction and tone). */
+function SummaryOptions({ choice, onChange, error }: { choice: SummaryChoice; onChange: (c: SummaryChoice) => void; error?: string }) {
+  return (
+    <fieldset className="full summary-options">
+      <legend>About Him / Her summary</legend>
+      <label className="row">
+        <input type="checkbox" checked={choice.write} onChange={(e) => { onChange({ ...choice, write: e.target.checked }); }} />{" "}
+        Write a summary with the AI
+      </label>
+      {!choice.write && <p className="muted small">No summary is written: the CV&apos;s own summary is kept, if it has one.</p>}
+      {choice.write && (
+        <>
+          <div className="row" role="radiogroup" aria-label="Length">
+            <span className="small muted">Length</span>
+            {LENGTHS.map(([key, label]) => (
+              <button key={key} type="button" role="radio" aria-checked={choice.length === key} className="choice-pill"
+                onClick={() => { onChange({ ...choice, length: key }); }}>{label}</button>
+            ))}
+          </div>
+          <div className="row" role="radiogroup" aria-label="Focus">
+            <span className="small muted">Bring out</span>
+            {FOCUSES.map(([key, label]) => (
+              <button key={key} type="button" role="radio" aria-checked={choice.focus === key} className="choice-pill"
+                onClick={() => { onChange({ ...choice, focus: key }); }}>{label}</button>
+            ))}
+          </div>
+          <label className="field">Your direction and tone (optional)
+            <textarea rows={3} maxLength={500} value={choice.direction}
+              placeholder="e.g. Confident and concise. Lead with the S/4HANA migration and team leadership; written for a CFO."
+              onChange={(e) => { onChange({ ...choice, direction: e.target.value }); }} />
+          </label>
+          {error ? <small className="error">{error}</small>
+            : <p className="muted small">The summary sticks to what the CV says and never mentions pay. Your choices are remembered for the next CV.</p>}
+        </>
+      )}
+    </fieldset>
   );
 }
 

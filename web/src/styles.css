@@ -933,3 +933,10 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .backup-actions .link { margin-left: 0.6rem; }
 .backup-download { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; white-space: normal; }
 .backup-download progress { width: 9rem; }
+
+/* CV formatting: how the About Him / Her summary is written. */
+.summary-options { border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.9rem 0.8rem; display: grid; gap: 0.55rem; margin: 0; }
+.summary-options legend { font-weight: 600; padding: 0 0.3rem; }
+.summary-options .row { flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.choice-pill { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; min-height: 34px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
+.choice-pill[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }

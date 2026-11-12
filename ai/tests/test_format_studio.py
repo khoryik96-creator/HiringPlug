@@ -357,6 +357,32 @@ def test_the_about_him_her_summary_is_written_cv_studios_way() -> None:
     detailed = FakeAI(json.dumps(PARSED), SUMMARY)
     run(detailed, job(summary="detailed"))
     assert "Use 8-10 detailed bullet points" in detailed.calls[1][1]
+    short = FakeAI(json.dumps(PARSED), SUMMARY)
+    run(short, job(summary="short"))
+    assert "Use exactly 4-5 bullet points." in short.calls[1][1]
+    assert "Strongly emphasise" not in prompt, "general: no focus line"
+    assert "recruiter's direction" not in prompt
+
+
+def test_the_summary_brings_out_the_focus_and_follows_the_recruiters_direction() -> None:
+    ai = FakeAI(json.dumps(PARSED), SUMMARY)
+    direction = "Confident,  concise tone;\nlead with the cloud migration for a CFO reader"
+    result = run(ai, job(summary="normal", summaryFocus="leadership", summaryDirection=direction))
+    assert result.error is None
+    prompt = ai.calls[1][1]
+    rules, cv = prompt.split("CV:\n---", 1)
+    leadership = "Strongly emphasise leadership roles, team management, mentoring"
+    assert leadership in rules, "CV Studio's own leadership wording"
+    assert (
+        "Follow the recruiter's direction on what to bring out and the tone, within every rule above: "
+        "Confident, concise tone; lead with the cloud migration for a CFO reader." in rules
+    ), "one tidy line, under the rules"
+    pay_rule = rules.index("Never mention the candidate's salary")
+    assert pay_rule < rules.index("recruiter's direction"), "the rules come first"
+    assert "recruiter" not in cv
+    tech = FakeAI(json.dumps(PARSED), SUMMARY)
+    run(tech, job(summary="normal", summaryFocus="technology"))
+    assert "Strongly emphasise technical skills" in tech.calls[1][1]
 
 
 def test_a_blind_cv_never_gets_a_written_summary() -> None:

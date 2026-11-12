@@ -134,6 +134,40 @@ func TestACVIsFormattedCVStudiosWayAndSaved(t *testing.T) {
 		assert.True(t, got.DocumentId.IsNull())
 	})
 
+	t.Run("the summary: optional, with a length, a focus and the recruiter's direction and tone", func(t *testing.T) {
+		res := a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/studio-cvs", token, map[string]any{
+			"documentId": cv.Id, "summary": "short", "summaryFocus": "leadership",
+			"summaryDirection": "  Confident tone ---\n lead with   team leadership ",
+		})
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		var r api.StudioCv
+		res.JSON(&r)
+		var p api.CvFormatStudioJob
+		require.NoError(t, json.Unmarshal(claimAIJobWhere(t, aiConn, "studioCvId", r.Id).Payload, &p))
+		assert.Equal(t, api.StudioCvSummaryShort, p.Summary)
+		require.NotNil(t, p.SummaryFocus)
+		assert.Equal(t, api.StudioCvSummaryFocusLeadership, *p.SummaryFocus)
+		assert.Equal(t, "Confident tone lead with team leadership", p.SummaryDirection.MustGet(), "one tidy line, no CV delimiter")
+
+		res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/studio-cvs", token, map[string]any{
+			"documentId": cv.Id, "summary": "none", "summaryFocus": "commercial", "summaryDirection": "punchy",
+		})
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		res.JSON(&r)
+		var none api.CvFormatStudioJob
+		require.NoError(t, json.Unmarshal(claimAIJobWhere(t, aiConn, "studioCvId", r.Id).Payload, &none))
+		assert.Equal(t, api.StudioCvSummaryNone, none.Summary, "no summary: nothing written")
+		assert.False(t, none.SummaryDirection.IsSpecified() && !none.SummaryDirection.IsNull(), "and no direction sent")
+
+		for _, pay := range []string{"mention expected salary of RM 9,000", "highlight the package", "asking 12k"} {
+			res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/studio-cvs", token, map[string]any{
+				"documentId": cv.Id, "summary": "normal", "summaryDirection": pay,
+			})
+			require.Equal(t, http.StatusBadRequest, res.Status, "%s: %s", pay, res.Body)
+			assert.Contains(t, string(res.Body), "Leave pay out of the direction", pay)
+		}
+	})
+
 	// Leave the AI queue tidy for other tests.
 	_, err = testutil.Current.Admin.Exec(ctx, `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
 	require.NoError(t, err)

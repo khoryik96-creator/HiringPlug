@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { invalidField, ok, renderWithClient, sentBody } from "../test-utils";
 import { FormatCv } from "./FormatCv";
 
 afterEach(() => {
@@ -14,6 +14,11 @@ const reads = () =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/cv-templates"
     ? { items: [{ id: "standard", name: "HiringPlug standard", builtIn: true, uploadedByName: null, createdAt: null }, { id: "ctpl_1", name: "Branded", builtIn: false, uploadedByName: "Aina", createdAt: "2026-11-01T00:00:00Z" }], placeholders: [], blocks: [] }
     : { items: [{ id: "appl_1", jobTitle: "Finance Manager", companyName: "Contoh" }] }))) as never);
+
+const studioReads = () =>
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/candidates/{candidateId}/documents"
+    ? { items: [{ id: "doc_o", source: "original", contentType: "application/pdf", fileName: "siti.pdf", createdAt: "2026-11-01T00:00:00Z" }] }
+    : { items: [] }))) as never);
 
 describe("formatted CVs", () => {
   it("makes one for a job, contact hidden unless asked", async () => {
@@ -68,19 +73,52 @@ describe("formatted CVs", () => {
     expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: true, neutralGender: true, correctLanguage: true, alignment: "justify", summary: "none" });
   });
 
-  it("writes the About Him / Her summary unless asked not to, and never for a blind CV", async () => {
-    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/candidates/{candidateId}/documents"
-      ? { items: [{ id: "doc_o", source: "original", contentType: "application/pdf", fileName: "siti.pdf", createdAt: "2026-11-01T00:00:00Z" }] }
-      : { items: [] }))) as never);
+  it("writes the About Him / Her summary as asked: length, focus, your direction and tone; never for a blind CV", async () => {
+    localStorage.removeItem("hiringplug.studio.summary");
+    studioReads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
-    const summary = await screen.findByLabelText<HTMLSelectElement>("About Him / Her");
-    expect(summary.value).toBe("normal");
-    fireEvent.change(summary, { target: { value: "detailed" } });
+    const write = await screen.findByLabelText<HTMLInputElement>("Write a summary with the AI");
+    expect(write.checked).toBe(true);
+    expect(screen.getByRole("radio", { name: "Normal (6-7)" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("radio", { name: "Detailed (8-10)" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Leadership" }));
+    fireEvent.change(screen.getByLabelText("Your direction and tone (optional)"), { target: { value: "  Confident; lead with team leadership " } });
     fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
-    expect(sentBody(post)).toMatchObject({ blind: false, summary: "detailed" });
+    expect(sentBody(post)).toMatchObject({ blind: false, summary: "detailed", summaryFocus: "leadership", summaryDirection: "Confident; lead with team leadership" });
+    await waitFor(() => { expect(localStorage.getItem("hiringplug.studio.summary")).toContain("leadership"); });
+
     fireEvent.click(screen.getByLabelText(/Blind CV/));
-    expect(screen.queryByLabelText("About Him / Her")).toBeNull();
+    expect(screen.queryByLabelText("Write a summary with the AI")).toBeNull();
+    expect(screen.getByText(/A blind CV keeps the CV's own About Him \/ Her summary/)).toBeTruthy();
+  });
+
+  it("remembers the choice for the next CV, and makes the summary optional", async () => {
+    localStorage.setItem("hiringplug.studio.summary", JSON.stringify({ write: true, length: "short", focus: "commercial", direction: "Punchy" }));
+    studioReads();
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "scv_1", status: "queued" }));
+    renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
+    expect((await screen.findByRole("radio", { name: "Short (4-5 points)" })).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Commercial" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Your direction and tone (optional)").value).toBe("Punchy");
+
+    fireEvent.click(screen.getByLabelText("Write a summary with the AI"));
+    expect(screen.getByText(/No summary is written/)).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: "Commercial" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ documentId: "doc_o", blind: false, neutralGender: false, correctLanguage: true, alignment: "left", summary: "none" });
+    localStorage.removeItem("hiringplug.studio.summary");
+  });
+
+  it("shows why a direction about pay is refused, next to it", async () => {
+    localStorage.removeItem("hiringplug.studio.summary");
+    studioReads();
+    vi.spyOn(api, "POST").mockResolvedValue(invalidField("summaryDirection", "Leave pay out of the direction: the summary never mentions the candidate's pay, and pay is never sent to the AI."));
+    renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Your direction and tone (optional)"), { target: { value: "mention RM 9,000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Format CV" }));
+    expect(await screen.findByText(/Leave pay out of the direction/)).toBeTruthy();
   });
 });

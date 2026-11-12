@@ -1309,8 +1309,16 @@ class StudioCvAlignment(StrEnum):
 
 class StudioCvSummary(StrEnum):
     none = "none"
+    short = "short"
     normal = "normal"
     detailed = "detailed"
+
+
+class StudioCvSummaryFocus(StrEnum):
+    general = "general"
+    technology = "technology"
+    leadership = "leadership"
+    commercial = "commercial"
 
 
 class StudioCvStatus(StrEnum):
@@ -1333,6 +1341,10 @@ class CvFormatStudioJob(BaseModel):
     correctLanguage: bool
     alignment: StudioCvAlignment
     summary: StudioCvSummary
+    summaryFocus: StudioCvSummaryFocus | None = None
+    summaryDirection: Annotated[
+        str | None, Field(description="The recruiter's direction and tone for the summary.", max_length=500)
+    ] = None
     ai: Annotated[
         AiAccess | None,
         Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
@@ -4733,6 +4745,14 @@ class StudioCvInput(BaseModel):
     ] = None
     alignment: StudioCvAlignment | None = None
     summary: StudioCvSummary | None = None
+    summaryFocus: StudioCvSummaryFocus | None = None
+    summaryDirection: Annotated[
+        str | None,
+        Field(
+            description="The recruiter's own direction for the summary, in their words: what to bring out and the tone (e.g. confident and concise, lead with the S/4HANA migration). Never about pay: the summary never mentions it.",
+            max_length=500,
+        ),
+    ] = None
 
 
 class StudioCv(BaseModel):

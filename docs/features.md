@@ -203,7 +203,14 @@ stating the candidate's own salary are left out before the AI sees the CV. When
 CV Studio's check finds something the result may have lost or changed, the
 page says what, to compare before sending. It needs the AI (Settings > AI
 provider) and counts in the monthly AI allowance. Its summary box carries
-CV Studio's "ABOUT HIM / HER" heading. **From their profile** is
+CV Studio's "ABOUT HIM / HER" heading. The summary is optional ("Write a
+summary with the AI"; off keeps the CV's own): its length (short 4-5 points,
+normal 6-7, detailed 8-10), what it brings out (CV Studio's General,
+Technology, Leadership or Commercial) and your own direction and tone in a
+sentence or two ("confident and concise, lead with the S/4HANA migration"),
+remembered in the browser for the next CV. The summary still sticks to the
+CV and never mentions pay; a direction about pay or naming an amount is
+refused, since pay is never sent to the AI. **From their profile** is
 the template way below. Either way the file is named after the agency as CV
 Studio names it, "Hyppies CV - Siti Aisyah.docx": the agency's name is in
 Settings > General (Agency).
