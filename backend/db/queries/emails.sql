@@ -135,3 +135,19 @@ DELETE FROM email_mailbox_state WHERE state_hash = @state_hash AND consumed;
 SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':' || app_current_user(),0));
 -- name: MailboxForDelivery :one
 SELECT * FROM email_mailbox WHERE user_id = @user_id;
+
+-- The agency's own app details for a mail provider (Settings > Email connection).
+-- name: MailApps :many
+SELECT * FROM email_mail_app ORDER BY provider;
+
+-- name: MailApp :one
+SELECT * FROM email_mail_app WHERE provider = @provider;
+
+-- name: SaveMailApp :exec
+INSERT INTO email_mail_app (tenant_id, provider, client_id, sealed_secret, secret_ending, updated_by)
+VALUES (app_current_tenant(), @provider, @client_id, @sealed_secret, @secret_ending, app_current_user())
+ON CONFLICT (tenant_id, provider) DO UPDATE SET client_id = EXCLUDED.client_id, sealed_secret = EXCLUDED.sealed_secret,
+  secret_ending = EXCLUDED.secret_ending, updated_by = EXCLUDED.updated_by, updated_at = now();
+
+-- name: DeleteMailApp :exec
+DELETE FROM email_mail_app WHERE provider = @provider;

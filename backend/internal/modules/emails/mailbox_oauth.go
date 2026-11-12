@@ -26,25 +26,23 @@ import (
 // OAuthProvider endpoints are code-owned; browser input can choose only a provider name.
 type OAuthProvider struct{ AuthorizeURL, TokenURL, ProfileURL, SendURL, Scope string }
 
-func (s *Service) provider(name string) (OAuthProvider, OAuthApplication) {
+// endpoint is the provider's code-owned endpoints (overridden only by tests).
+func (s *Service) endpoint(name string) OAuthProvider {
 	if p, ok := s.connections.Providers[name]; ok {
-		if name == "google" {
-			return p, s.connections.Google
-		}
-		return p, s.connections.Microsoft
+		return p
 	}
 	if name == "google" {
 		return OAuthProvider{ //nolint:gosec // Official public OAuth endpoints/scopes, not credentials.
 			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth", TokenURL: "https://oauth2.googleapis.com/token",
 			ProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo", SendURL: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
 			Scope: "openid email https://www.googleapis.com/auth/gmail.send",
-		}, s.connections.Google
+		}
 	}
 	return OAuthProvider{ //nolint:gosec // Official public OAuth endpoints/scopes, not credentials.
 		AuthorizeURL: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
 		ProfileURL: "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName", SendURL: "https://graph.microsoft.com/v1.0/me/sendMail",
 		Scope: "openid offline_access User.Read Mail.Send Mail.ReadWrite",
-	}, s.connections.Microsoft
+	}
 }
 func (s *Service) callbackURL() string {
 	return strings.TrimRight(s.connections.PublicURL, "/") + "/v1/mailbox/callback"
@@ -98,9 +96,16 @@ func (s *Service) readMailboxState(state string) (oauthState, error) {
 	return claim, nil
 }
 func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provider string) (string, error) {
-	endpoint, app := s.provider(provider)
-	if len(s.connections.KeysSecret) < 32 || app.ClientID == "" || app.ClientSecret == "" {
-		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "the server's application registration is not configured for this provider"}})
+	endpoint := s.endpoint(provider)
+	if len(s.connections.KeysSecret) < 32 {
+		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "mailbox encryption is not configured on this server"}})
+	}
+	app, err := s.appIn(ctx, p, provider)
+	if err != nil {
+		return "", err
+	}
+	if app.ClientID == "" || app.ClientSecret == "" {
+		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "this provider's app is not set up: an owner or admin enters it in Settings > Email connection"}})
 	}
 	expires := time.Now().Add(10 * time.Minute)
 	state := s.signMailboxState(oauthState{Tenant: p.TenantID, User: p.UserID, Provider: provider, Nonce: randomMailboxToken(), Expires: expires.Unix()})
@@ -160,7 +165,11 @@ func (s *Service) completeMailbox(ctx context.Context, state, code, denied strin
 	if err = s.openMailbox(claim.Tenant, claim.User, "state:"+claim.Provider, saved.SealedVerifier, &verifier); err != nil {
 		return err
 	}
-	endpoint, app := s.provider(claim.Provider)
+	endpoint := s.endpoint(claim.Provider)
+	app, err := s.appIn(ctx, p, claim.Provider)
+	if err != nil {
+		return err
+	}
 	tokens, err := s.exchangeMailboxToken(ctx, endpoint, app, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {s.callbackURL()}, "code_verifier": {verifier}})
 	if err != nil {
 		return err

@@ -82,6 +82,15 @@ func (q *Queries) DeleteBanner(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const deleteMailApp = `-- name: DeleteMailApp :exec
+DELETE FROM email_mail_app WHERE provider = $1
+`
+
+func (q *Queries) DeleteMailApp(ctx context.Context, provider string) error {
+	_, err := q.db.Exec(ctx, deleteMailApp, provider)
+	return err
+}
+
 const deleteMailbox = `-- name: DeleteMailbox :exec
 DELETE FROM email_mailbox WHERE user_id=app_current_user()
 `
@@ -668,6 +677,58 @@ func (q *Queries) LockMailboxUser(ctx context.Context) error {
 	return err
 }
 
+const mailApp = `-- name: MailApp :one
+SELECT tenant_id, provider, client_id, sealed_secret, secret_ending, updated_by, updated_at FROM email_mail_app WHERE provider = $1
+`
+
+func (q *Queries) MailApp(ctx context.Context, provider string) (EmailMailApp, error) {
+	row := q.db.QueryRow(ctx, mailApp, provider)
+	var i EmailMailApp
+	err := row.Scan(
+		&i.TenantID,
+		&i.Provider,
+		&i.ClientID,
+		&i.SealedSecret,
+		&i.SecretEnding,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const mailApps = `-- name: MailApps :many
+SELECT tenant_id, provider, client_id, sealed_secret, secret_ending, updated_by, updated_at FROM email_mail_app ORDER BY provider
+`
+
+// The agency's own app details for a mail provider (Settings > Email connection).
+func (q *Queries) MailApps(ctx context.Context) ([]EmailMailApp, error) {
+	rows, err := q.db.Query(ctx, mailApps)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailMailApp
+	for rows.Next() {
+		var i EmailMailApp
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.Provider,
+			&i.ClientID,
+			&i.SealedSecret,
+			&i.SecretEnding,
+			&i.UpdatedBy,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const mailboxForDelivery = `-- name: MailboxForDelivery :one
 SELECT id, tenant_id, user_id, provider, address, host, port, tls, username, sealed_secret, version, updated_at FROM email_mailbox WHERE user_id = $1
 `
@@ -776,6 +837,30 @@ type RefreshMailboxSecretParams struct {
 
 func (q *Queries) RefreshMailboxSecret(ctx context.Context, arg RefreshMailboxSecretParams) error {
 	_, err := q.db.Exec(ctx, refreshMailboxSecret, arg.SealedSecret, arg.ID)
+	return err
+}
+
+const saveMailApp = `-- name: SaveMailApp :exec
+INSERT INTO email_mail_app (tenant_id, provider, client_id, sealed_secret, secret_ending, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+ON CONFLICT (tenant_id, provider) DO UPDATE SET client_id = EXCLUDED.client_id, sealed_secret = EXCLUDED.sealed_secret,
+  secret_ending = EXCLUDED.secret_ending, updated_by = EXCLUDED.updated_by, updated_at = now()
+`
+
+type SaveMailAppParams struct {
+	Provider     string
+	ClientID     string
+	SealedSecret string
+	SecretEnding string
+}
+
+func (q *Queries) SaveMailApp(ctx context.Context, arg SaveMailAppParams) error {
+	_, err := q.db.Exec(ctx, saveMailApp,
+		arg.Provider,
+		arg.ClientID,
+		arg.SealedSecret,
+		arg.SecretEnding,
+	)
 	return err
 }
 

@@ -529,6 +529,16 @@ type EmailCandidate struct {
 	Position      int16
 }
 
+type EmailMailApp struct {
+	TenantID     string
+	Provider     string
+	ClientID     string
+	SealedSecret string
+	SecretEnding string
+	UpdatedBy    string
+	UpdatedAt    time.Time
+}
+
 type EmailMailbox struct {
 	ID           string
 	TenantID     string

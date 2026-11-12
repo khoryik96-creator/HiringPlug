@@ -43,9 +43,13 @@ func (m *Module) ConnectMailboxesWith(settings ConnectionSettings) {
 
 func (s *Service) mailboxStatus(ctx context.Context, p authz.Principal) (api.MailboxStatus, error) {
 	out := api.MailboxStatus{StorageReady: len(s.connections.KeysSecret) >= 32, ServerMode: api.MailboxStatusServerMode(s.serverMode())}
-	out.GoogleReady = out.StorageReady && s.connections.Google.ClientID != "" && s.connections.Google.ClientSecret != ""
-	out.MicrosoftReady = out.StorageReady && s.connections.Microsoft.ClientID != "" && s.connections.Microsoft.ClientSecret != ""
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		apps, err := s.mailAppsIn(ctx, tx) // the agency's apps, or the server's
+		if err != nil {
+			return err
+		}
+		out.GoogleReady = out.StorageReady && apps.Google.Source != "none"
+		out.MicrosoftReady = out.StorageReady && apps.Microsoft.Source != "none"
 		row, err := store.New(tx).MailboxForDelivery(ctx, p.UserID)
 		if database.IsNoRows(err) {
 			return nil

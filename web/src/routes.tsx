@@ -132,7 +132,7 @@ export const ROUTES: Route[] = [
     render: () => <Integrations /> },
   { section: "cv-templates", path: /^#\/cv-templates/, permission: "cvformats:create", menu: { in: "settings", label: "CV templates", href: "#/cv-templates" },
     render: (c) => <CvTemplates canManage={can(c, "cvformats.templates:manage")} /> },
-  { section: "email-connection", path: /^#\/email-connection/, permission: "emails:send", menu: { in: "settings", label: "Email connection", href: "#/email-connection" }, render: () => <EmailConnection /> },
+  { section: "email-connection", path: /^#\/email-connection/, permission: "emails:send", menu: { in: "settings", label: "Email connection", href: "#/email-connection" }, render: (c) => <EmailConnection canManageApps={can(c, "emails.apps:manage")} /> },
   { section: "email-templates", path: /^#\/email-templates/, permission: "emails:send", menu: { in: "settings", label: "Email templates", href: "#/email-templates" },
     render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} canCreate={can(c, "emails.templates:create")} canPreview={can(c, "emails:send") && can(c, "candidates:read")} /> },
   { section: "automations", path: /^#\/automations/, permission: "automations:read", menu: { in: "settings", label: "Automations", href: "#/automations" },

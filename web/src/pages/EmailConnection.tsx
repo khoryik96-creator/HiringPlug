@@ -5,8 +5,9 @@ import { mailboxKey, useMailbox } from "../components/MailDeliveryNotice";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Field } from "../components/Field";
 import { fieldErrors } from "../components/forms";
+import { MailApps } from "../components/MailApps";
 
-export function EmailConnection(){
+export function EmailConnection({ canManageApps = false }: { canManageApps?: boolean }){
  const client=useQueryClient(),query=useMailbox();
  const [smtp,setSmtp]=useState(false);const [saved,setSaved]=useState(false);
  const connect=useMutation({onMutate:()=>{setOutcome(null);},mutationFn:async(provider:"microsoft"|"google")=>unwrap(await api.POST("/v1/mailbox/authorize",{body:{provider}})),onSuccess:(result)=>{window.location.assign(result.url);}});
@@ -31,10 +32,11 @@ export function EmailConnection(){
      <button type="button" disabled={!status.googleReady || connect.isPending} onClick={()=>{connect.mutate("google");}}>Connect Google</button>
      <button type="button" disabled={!status.storageReady || connect.isPending} onClick={()=>{setSmtp(true);}}>Other provider (SMTP)</button>
     </div>
-    {(!status.microsoftReady || !status.googleReady) && <p className="muted small">Microsoft and Google sign-in become available after the administrator configures the application registrations.</p>}
+    {(!status.microsoftReady || !status.googleReady) && <p className="muted small">{canManageApps ? "Set up the Microsoft and Google apps below to turn these on." : "Microsoft and Google sign-in become available once an owner or admin sets up their apps."}</p>}
     {saved && <p role="status">Connection saved.</p>}
     {(smtp || status.provider==="smtp") && <SmtpForm key={status.version} status={status} onSaved={()=>{setSaved(true);setOutcome(null);}} onEdited={()=>{setSaved(false);}}/>}
    </section>
+   {canManageApps && <MailApps/>}
   </>}
  </main>;
 }

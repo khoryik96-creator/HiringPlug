@@ -962,3 +962,8 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 @media (max-width: 760px) { .billing-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .billing-row > div:nth-child(3) { border-left: 0; } }
 .choice-pill { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; min-height: 34px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
 .choice-pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Settings > Email connection: the Microsoft and Google apps, one row each. */
+.mail-app { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto auto; gap: 0.5rem; align-items: center; padding: 0.5rem 0; border-top: 1px solid var(--line); }
+.mail-app .full { grid-column: 1 / -1; }
+@media (max-width: 760px) { .mail-app { grid-template-columns: 1fr; } }

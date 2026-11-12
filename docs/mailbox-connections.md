@@ -23,6 +23,17 @@ Changing this key makes existing connections unreadable: reconnect those
 mailboxes. Restart/recreate both API and Go worker after changing environment
 variables. Set `HP_PUBLIC_URL` to the browser-visible application origin.
 
+**The Microsoft and Google app details can be entered in Settings > Email
+connection** (owners and admins: `emails.apps:manage`) instead of the
+`HP_MAIL_MICROSOFT_*` and `HP_MAIL_GOOGLE_*` settings below: the client ID,
+and the client secret, which is stored sealed with `HP_MAIL_KEYS_SECRET` and
+never shown again (only its last four characters). Each agency's own app is
+used to connect and refresh its people's mailboxes; without one the server's
+settings are used. The page also shows the redirect URI to register. Changing
+or removing an app means mailboxes connected through the old one connect again.
+`HP_MAIL_KEYS_SECRET` itself stays a server setting: it is the key that locks
+these secrets, so it cannot be kept in the database beside them.
+
 The OAuth redirect registered with each provider must exactly equal:
 
 ```

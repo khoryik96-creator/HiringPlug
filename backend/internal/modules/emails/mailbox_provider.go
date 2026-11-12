@@ -114,7 +114,11 @@ func (s *Service) mailboxAccessIn(ctx context.Context, tx pgx.Tx, row store.Emai
 	if secret.RefreshToken == "" {
 		return "", fmt.Errorf("%w: mailbox authorization expired; reconnect the mailbox", mail.ErrPermanent)
 	}
-	endpoint, app := s.provider(row.Provider)
+	endpoint := s.endpoint(row.Provider)
+	app, err := s.appFor(ctx, tx, row.TenantID, row.Provider)
+	if err != nil {
+		return "", err
+	}
 	refreshed, err := s.exchangeMailboxToken(ctx, endpoint, app, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {secret.RefreshToken}})
 	if err != nil {
 		return "", err
@@ -147,7 +151,7 @@ func (s *Service) sendOAuthMailbox(ctx context.Context, row store.EmailMailbox, 
 	if len(msg.Bcc) > 0 {
 		raw = append([]byte("Bcc: "+strings.Join(msg.Bcc, ", ")+"\r\n"), raw...)
 	}
-	endpoint, _ := s.provider(row.Provider)
+	endpoint := s.endpoint(row.Provider)
 	if row.Provider == "google" {
 		body, _ := json.Marshal(map[string]string{"raw": base64.RawURLEncoding.EncodeToString(raw)})
 		_, err = s.providerRequest(ctx, "POST", endpoint.SendURL, "application/json", token, body)

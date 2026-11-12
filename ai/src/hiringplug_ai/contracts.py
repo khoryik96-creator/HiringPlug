@@ -43,6 +43,7 @@ class Permission(StrEnum):
     documents_create = "documents:create"
     documents_delete = "documents:delete"
     documents_read = "documents:read"
+    emails_apps_manage = "emails.apps:manage"
     emails_templates_create = "emails.templates:create"
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
@@ -1597,6 +1598,42 @@ class DocumentCvParsedJob(BaseModel):
     errorMessage: Annotated[str | None, Field(...)]
     aiTokens: Annotated[
         int | None, Field(description="Tokens the AI used (counted in the monthly allowance).", ge=0)
+    ] = None
+
+
+class MailAppProvider(StrEnum):
+    microsoft = "microsoft"
+    google = "google"
+
+
+class Source(StrEnum):
+    agency = "agency"
+    server = "server"
+    none = "none"
+
+
+class MailApp(BaseModel):
+    source: Annotated[
+        Source,
+        Field(
+            description="agency: entered here; server: the server's own settings file; none: not set up (people cannot connect this provider)."
+        ),
+    ]
+    clientId: Annotated[str | None, Field(description="The app's client ID (not a secret).")]
+    secretEnding: Annotated[
+        str | None,
+        Field(description="The secret's last four characters, to recognise it; the rest is never shown."),
+    ]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class MailAppInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    clientId: Annotated[str, Field(max_length=200, min_length=1)]
+    clientSecret: Annotated[
+        str | None, Field(description="Left out: keep the saved secret.", max_length=500, min_length=1)
     ] = None
 
 
@@ -4864,6 +4901,23 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class MailApps(BaseModel):
+    storageReady: Annotated[
+        bool,
+        Field(
+            description="The server can store secrets (HP_MAIL_KEYS_SECRET is set): without it nothing can be saved."
+        ),
+    ]
+    callbackUrl: Annotated[
+        str,
+        Field(
+            description="The redirect URI to register with Microsoft and Google, e.g. http://localhost:3000/v1/mailbox/callback."
+        ),
+    ]
+    microsoft: MailApp
+    google: MailApp
 
 
 class EmailBatch(BaseModel):

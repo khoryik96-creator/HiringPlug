@@ -24,6 +24,9 @@ x-module:
     emails.templates:manage:
       description: "Change and delete the company's email templates, and add banners (admins: give it to the people you trust)."
       roles: [owner, admin]
+    emails.apps:manage:
+      description: "Enter the agency's Microsoft and Google app details (client ID and secret) that let people connect their mailbox."
+      roles: [owner, admin]
   errorCodes:
     EMAIL_DO_NOT_CONTACT:
       status: 409
@@ -447,6 +450,63 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/DoNotContact' }
 
+  /v1/settings/email-apps:
+    get:
+      operationId: getMailApps
+      tags: [emails]
+      summary: The agency's Microsoft and Google app details for connecting mailboxes (secrets masked)
+      x-permission: emails.apps:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailApps' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/settings/email-apps/{provider}:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/MailAppProvider' }
+    put:
+      operationId: saveMailApp
+      tags: [emails]
+      summary: Save the agency's app details for one provider (the secret is kept when left out)
+      description: >
+        The secret is stored encrypted and never shown again, only its last four
+        characters. Mailboxes connected with other details must connect again.
+      x-permission: emails.apps:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MailAppInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailApps' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      operationId: deleteMailApp
+      tags: [emails]
+      summary: Remove the agency's app details for one provider (the server's are used again, if any)
+      x-permission: emails.apps:manage
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailApps' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 components:
   responses:
     DoNotContact:
@@ -462,6 +522,35 @@ components:
       schema: { $ref: '#/components/schemas/EmailTemplateId' }
 
   schemas:
+    MailAppProvider:
+      type: string
+      enum: [microsoft, google]
+    MailApps:
+      type: object
+      required: [storageReady, callbackUrl, microsoft, google]
+      properties:
+        storageReady: { type: boolean, description: "The server can store secrets (HP_MAIL_KEYS_SECRET is set): without it nothing can be saved." }
+        callbackUrl: { type: string, description: "The redirect URI to register with Microsoft and Google, e.g. http://localhost:3000/v1/mailbox/callback." }
+        microsoft: { $ref: '#/components/schemas/MailApp' }
+        google: { $ref: '#/components/schemas/MailApp' }
+    MailApp:
+      type: object
+      required: [source, clientId, secretEnding, updatedAt]
+      properties:
+        source:
+          type: string
+          enum: [agency, server, none]
+          description: "agency: entered here; server: the server's own settings file; none: not set up (people cannot connect this provider)."
+        clientId: { type: string, nullable: true, description: "The app's client ID (not a secret)." }
+        secretEnding: { type: string, nullable: true, description: "The secret's last four characters, to recognise it; the rest is never shown." }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    MailAppInput:
+      type: object
+      additionalProperties: false
+      required: [clientId]
+      properties:
+        clientId: { type: string, minLength: 1, maxLength: 200 }
+        clientSecret: { type: string, minLength: 1, maxLength: 500, description: "Left out: keep the saved secret." }
     MailboxProvider:
       type: string
       enum:
