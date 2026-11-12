@@ -6,7 +6,6 @@ package automations
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
@@ -73,7 +72,11 @@ func (s *Service) onEvent(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		}
 		about := DueAt(Rule{Trigger: r.Trigger}, anchor, s.deps.TimeZone)
 		when, ok := When(DueAt(r, anchor, s.deps.TimeZone), about, now)
-		if !ok {
+		if !ok { // too late now: a run waiting for the old date must not go then
+			late := "The date moved: it would come too late."
+			if _, err := q.SkipScheduledRun(ctx, store.SkipScheduledRunParams{AutomationID: row.ID, SubjectID: e.subjectID, Detail: &late}); err != nil {
+				return err
+			}
 			continue
 		}
 		run, err := q.ScheduleRun(ctx, store.ScheduleRunParams{
@@ -365,6 +368,11 @@ func (s *Service) decide(ctx context.Context, p authz.Principal, id string, d de
 		if err != nil {
 			return err
 		}
+		if visible, err := s.deps.Applications.Applications(ctx, tx, []string{run.ApplicationID}); err != nil {
+			return err
+		} else if _, ok := visible[run.ApplicationID]; !ok {
+			return apperr.NotFound("automation run") // about a candidate p does not see
+		}
 		if run.Status != ToApprove {
 			return apperr.New(api.ErrorCodeAUTOMATIONNOTALLOWED, "This is no longer waiting for approval.")
 		}
@@ -380,27 +388,24 @@ func (s *Service) decide(ctx context.Context, p authz.Principal, id string, d de
 		if err != nil {
 			return err
 		}
-		if _, err := q.FinishRun(ctx, store.FinishRunParams{ID: id, Status: status, Detail: &detail, FinishedBy: &p.UserID}); err != nil {
+		done, err := q.FinishRun(ctx, store.FinishRunParams{ID: id, Status: status, Detail: &detail, FinishedBy: &p.UserID})
+		if err != nil {
 			return err
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "automation.run_" + status, EntityType: "automation_run", EntityID: id,
 			Changes: map[string]any{"automationId": row.ID, "applicationId": run.ApplicationID}}); err != nil {
 			return err
 		}
-		rows, err := q.ListRuns(ctx, nil)
-		if err != nil {
+		views, err := s.runViews(ctx, tx, []store.ListRunsRow{{
+			ID: done.ID, TenantID: done.TenantID, AutomationID: done.AutomationID, SubjectType: done.SubjectType, SubjectID: done.SubjectID,
+			ApplicationID: done.ApplicationID, DueAt: done.DueAt, Status: done.Status, Detail: done.Detail, CreatedAt: done.CreatedAt,
+			FinishedAt: done.FinishedAt, FinishedBy: done.FinishedBy, AutomationName: row.Name, Actions: row.Actions,
+		}})
+		if err != nil || len(views) == 0 {
 			return err
 		}
-		for _, r := range rows {
-			if r.ID == id {
-				views, err := s.runViews(ctx, tx, []store.ListRunsRow{r})
-				if err == nil {
-					out = views[0]
-				}
-				return err
-			}
-		}
-		return errors.New("automation run not listed")
+		out = views[0]
+		return nil
 	})
 	return out, err
 }
@@ -414,16 +419,17 @@ func (s *Service) runViews(ctx context.Context, tx pgx.Tx, rows []store.ListRuns
 	if err != nil {
 		return nil, err
 	}
-	out := make([]RunView, len(rows))
-	for i, r := range rows {
+	out := make([]RunView, 0, len(rows))
+	for _, r := range rows {
+		a, ok := apps[r.ApplicationID]
+		if !ok {
+			continue // about a candidate the user does not see (or no longer there)
+		}
 		rule, err := ruleOf(store.Automation{Actions: r.Actions})
 		if err != nil {
 			return nil, err
 		}
-		out[i] = RunView{ListRunsRow: r, Actions: rule.Actions}
-		if a, ok := apps[r.ApplicationID]; ok {
-			out[i].App = &a
-		}
+		out = append(out, RunView{ListRunsRow: r, Actions: rule.Actions, App: &a})
 	}
 	return out, nil
 }

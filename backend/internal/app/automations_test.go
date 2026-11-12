@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -202,4 +203,56 @@ func TestAutomations(t *testing.T) {
 
 	other := testutil.Current.NewTenant(t, api.RoleOwner)
 	assert.Empty(t, a.automationRuns(other.Users[api.RoleOwner].Token, ""), "companies never see each other's")
+}
+
+// A run about a candidate the user does not see is not shown to them, nor
+// theirs to send or skip.
+func TestAutomationsOnlyTheirCandidates(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	a.switchOn(owner, preset(t, a.automations(owner), "application_received"), api.AutomationSendModeApprove)
+	a.setRole(owner, "recruiter", map[string]any{"version": 0, "permissions": authz.PermissionsForRole(api.RoleRecruiter), "candidateScope": "own", "jobCandidates": false}, http.StatusOK)
+	company := a.createCompany(owner, map[string]any{"name": "Maju Bhd"})
+	job := a.createJob(owner, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	a.addToJob(owner, job.Id, a.createCandidate(owner, map[string]any{"firstName": "Theirs", "email": "theirs." + tenant.ID + "@candidates.test"}).Id)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+
+	waiting := a.automationRuns(owner, "?status=to_approve")
+	require.Len(t, waiting, 1)
+	assert.Empty(t, a.automationRuns(recruiter, ""), "not their candidate")
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodPost, "/v1/automation-runs/"+waiting[0].Id+"/send", recruiter, nil).Status)
+	assert.Equal(t, http.StatusNotFound, a.request(http.MethodPost, "/v1/automation-runs/"+waiting[0].Id+"/skip", recruiter, nil).Status)
+	assert.Equal(t, api.AutomationRunStatusToApprove, a.automationRuns(owner, "?status=to_approve")[0].Status, "still waiting")
+}
+
+// An interview moved so its reminder would come too late: the reminder
+// waiting for the old time is skipped, not sent then.
+func TestAutomationsInterviewMovedTooLate(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, recruiter := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	a.switchOn(owner, preset(t, a.automations(owner), "interview_reminder"), api.AutomationSendModeSend)
+	company := a.createCompany(recruiter, map[string]any{"name": "Maju Bhd"})
+	job := a.createJob(recruiter, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	appl := a.addToJob(recruiter, job.Id, a.createCandidate(recruiter, map[string]any{"firstName": "Wei", "email": "wei." + tenant.ID + "@candidates.test"}).Id)
+	iv := a.interview(http.MethodPost, "/v1/applications/"+appl.Id+"/interviews", recruiter, map[string]any{
+		"title": "First interview", "startsAt": time.Now().Add(72 * time.Hour), "durationMinutes": 45, "mode": "video",
+		"interviewerIds": []string{tenant.Users[api.RoleRecruiter].ID},
+	}, http.StatusCreated)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	scheduled := a.automationRuns(owner, "?status=scheduled")
+	require.Len(t, scheduled, 1)
+	assert.WithinDuration(t, time.Now().Add(48*time.Hour), scheduled[0].DueAt, time.Minute, "the day before")
+
+	a.interview(http.MethodPatch, "/v1/interviews/"+iv.Id, recruiter, map[string]any{"version": iv.Version, "startsAt": time.Now().Add(-2 * time.Hour)}, http.StatusOK)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	skipped := a.automationRuns(owner, "?status=skipped")
+	require.Len(t, skipped, 1)
+	assert.Equal(t, "The date moved: it would come too late.", skipped[0].Detail.MustGet())
+	dueNow(t, tenant.ID)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Empty(t, mailServer.To("wei."+tenant.ID+"@candidates.test"), "no reminder for a past interview")
 }

@@ -548,6 +548,27 @@ func (q *Queries) SetTaskDone(ctx context.Context, arg SetTaskDoneParams) (Recru
 	return i, err
 }
 
+const skipScheduledRun = `-- name: SkipScheduledRun :execrows
+UPDATE automation_run SET status = 'skipped', detail = $1, finished_at = now()
+WHERE automation_id = $2 AND subject_id = $3 AND status = 'scheduled'
+`
+
+type SkipScheduledRunParams struct {
+	Detail       *string
+	AutomationID string
+	SubjectID    string
+}
+
+// A date moved so the run would come too late (an interview moved into the
+// past): the run waiting for it is skipped.
+func (q *Queries) SkipScheduledRun(ctx context.Context, arg SkipScheduledRunParams) (int64, error) {
+	result, err := q.db.Exec(ctx, skipScheduledRun, arg.Detail, arg.AutomationID, arg.SubjectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateAutomation = `-- name: UpdateAutomation :one
 UPDATE automation SET name = $1, enabled = $2, trigger = $3, stage = $4, offset_days = $5,
   company_id = $6, actions = $7, send_mode = $8, version = version + 1, updated_at = now()

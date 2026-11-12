@@ -86,3 +86,9 @@ LIMIT 200;
 UPDATE recruiter_task SET done_at = CASE WHEN @done::boolean THEN coalesce(done_at, now()) END
 WHERE id = @id AND user_id = @user_id
 RETURNING *;
+
+-- A date moved so the run would come too late (an interview moved into the
+-- past): the run waiting for it is skipped.
+-- name: SkipScheduledRun :execrows
+UPDATE automation_run SET status = 'skipped', detail = @detail, finished_at = now()
+WHERE automation_id = @automation_id AND subject_id = @subject_id AND status = 'scheduled';
