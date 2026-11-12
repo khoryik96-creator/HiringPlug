@@ -91,6 +91,14 @@ type placementApplications struct {
 	jobs     *jobs.Module
 }
 
+func (a placementApplications) OfCompany(ctx context.Context, tx pgx.Tx, companyID string) ([]string, error) {
+	jobIDs, err := a.jobs.IDsOfCompany(ctx, tx, companyID)
+	if err != nil {
+		return nil, err
+	}
+	return a.pipeline.IDsOnJobs(ctx, tx, jobIDs)
+}
+
 func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]placements.Application, error) {
 	briefs, err := a.pipeline.Briefs(ctx, tx, ids)
 	if err != nil {

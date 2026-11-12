@@ -999,6 +999,16 @@ class ContactId(RootModel[str]):
     ]
 
 
+class ContactRole(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="What the contact does in hiring: a key of the contact_role list in Settings (hiring_manager, hr, or one the agency added).",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ]
+
+
 class ContactStatus(StrEnum):
     active = "active"
     left = "left"
@@ -1030,6 +1040,10 @@ class ContactCreate(BaseModel):
     mobile: Annotated[str | None, Field(max_length=40)] = None
     linkedinUrl: Annotated[str | None, Field(max_length=300)] = None
     status: ContactStatus | None = None
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ] = None
     notes: Annotated[str | None, Field(max_length=4000)] = None
 
 
@@ -1047,6 +1061,10 @@ class ContactUpdate(BaseModel):
     mobile: Annotated[str | None, Field(max_length=40)] = None
     linkedinUrl: Annotated[str | None, Field(max_length=300)] = None
     status: ContactStatus | None = None
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ] = None
     notes: Annotated[str | None, Field(max_length=4000)] = None
 
 
@@ -1061,6 +1079,10 @@ class ContactSummary(BaseModel):
     phone: Annotated[str | None, Field(...)]
     mobile: Annotated[str | None, Field(...)]
     status: ContactStatus
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ]
     updatedAt: AwareDatetime
 
 
@@ -3987,6 +4009,7 @@ class FieldListName(StrEnum):
     company_benefits = "company_benefits"
     pre_offer_process = "pre_offer_process"
     company_category = "company_category"
+    contact_role = "contact_role"
 
 
 class FieldListKind(StrEnum):
@@ -5309,6 +5332,10 @@ class Contact(BaseModel):
     mobile: Annotated[str | None, Field(...)]
     linkedinUrl: Annotated[str | None, Field(...)]
     status: ContactStatus
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ]
     notes: Annotated[str | None, Field(...)]
     employment: Annotated[
         ContactEmployment | None,

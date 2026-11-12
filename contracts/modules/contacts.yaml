@@ -49,6 +49,18 @@ paths:
           in: query
           description: Only this company's contacts.
           schema: { $ref: '#/components/schemas/CompanyId' }
+        - name: role
+          in: query
+          description: Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager).
+          schema: { $ref: '#/components/schemas/ContactRole' }
+        - name: roleNotSet
+          in: query
+          description: Only contacts whose role is not set yet (ignored with role).
+          schema: { type: boolean, default: false }
+        - name: status
+          in: query
+          description: Only contacts who still work there (active) or have left.
+          schema: { $ref: '#/components/schemas/ContactStatus' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
@@ -194,6 +206,10 @@ components:
       type: string
       pattern: '^cont_[0-9a-hjkmnp-tv-z]{26}$'
       example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ContactRole:
+      type: string
+      pattern: '^[a-z0-9_]{1,40}$'
+      description: "What the contact does in hiring: a key of the contact_role list in Settings (hiring_manager, hr, or one the agency added)."
     ContactStatus:
       type: string
       description: active = works there; left = has left the company.
@@ -219,7 +235,7 @@ components:
 
     Contact:
       type: object
-      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, notes, employment, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         version: { type: integer }
@@ -238,6 +254,10 @@ components:
         mobile: { type: string, nullable: true }
         linkedinUrl: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/ContactStatus' }
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{ $ref: '#/components/schemas/ContactRole' }]
+          nullable: true
         notes: { type: string, nullable: true }
         employment:
           description: The latest employment check (from their LinkedIn profile); null before the first.
@@ -260,6 +280,10 @@ components:
         mobile: { type: string, maxLength: 40, nullable: true }
         linkedinUrl: { type: string, maxLength: 300, nullable: true }
         status: { $ref: '#/components/schemas/ContactStatus' }
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{ $ref: '#/components/schemas/ContactRole' }]
+          nullable: true
         notes: { type: string, maxLength: 4000, nullable: true }
 
     ContactUpdate:
@@ -277,11 +301,15 @@ components:
         mobile: { type: string, maxLength: 40, nullable: true }
         linkedinUrl: { type: string, maxLength: 300, nullable: true }
         status: { $ref: '#/components/schemas/ContactStatus' }
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{ $ref: '#/components/schemas/ContactRole' }]
+          nullable: true
         notes: { type: string, maxLength: 4000, nullable: true }
 
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, role, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         fullName: { type: string }
@@ -295,6 +323,10 @@ components:
         phone: { type: string, nullable: true }
         mobile: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/ContactStatus' }
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{ $ref: '#/components/schemas/ContactRole' }]
+          nullable: true
         updatedAt: { type: string, format: date-time }
     ContactPage:
       type: object

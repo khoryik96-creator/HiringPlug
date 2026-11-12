@@ -5,11 +5,11 @@
 INSERT INTO contact (
   tenant_id, company_id, first_name, last_name, title, email,
   email_check_status, email_check_reasons, email_checked_at,
-  phone, mobile, linkedin_url, status, notes, created_by
+  phone, mobile, linkedin_url, status, role, notes, created_by
 ) VALUES (
   app_current_tenant(), @company_id, @first_name, @last_name, sqlc.narg(title), sqlc.narg(email),
   sqlc.narg(email_check_status), @email_check_reasons, sqlc.narg(email_checked_at),
-  sqlc.narg(phone), sqlc.narg(mobile), sqlc.narg(linkedin_url), @status, sqlc.narg(notes), app_current_user()
+  sqlc.narg(phone), sqlc.narg(mobile), sqlc.narg(linkedin_url), @status, sqlc.narg(role), sqlc.narg(notes), app_current_user()
 )
 RETURNING *;
 
@@ -37,6 +37,7 @@ UPDATE contact SET
   mobile = sqlc.narg(mobile),
   linkedin_url = sqlc.narg(linkedin_url),
   status = @status,
+  role = sqlc.narg(role),
   notes = sqlc.narg(notes),
   version = version + 1,
   updated_at = now()
@@ -54,11 +55,14 @@ RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- With @similar, names like the query (typos) instead, the closest first.
+-- A role of '' means contacts whose role is not set.
 -- name: ListContacts :many
-SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, updated_at
+SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, role, updated_at
 FROM contact
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(role)::text IS NULL OR coalesce(role, '') = sqlc.narg(role)::text)
   AND (sqlc.narg(query)::text IS NULL
        OR CASE WHEN sqlc.arg(similar_names)::boolean
             THEN app_normalize_text(sqlc.narg(query)::text) <% name_text

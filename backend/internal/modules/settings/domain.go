@@ -126,6 +126,11 @@ var lists = []listDef{
 		{Key: "unknown", Label: "Unknown", Color: "#6b7280", BuiltIn: true},
 		{Key: "vip_client", Label: "VIP client", Color: "#b8860b", BuiltIn: true},
 	}},
+	// What a contact does in hiring, shown on their card in its colour.
+	{name: "contact_role", label: "Contact roles", colors: true, defaults: []Option{
+		{Key: "hiring_manager", Label: "Hiring manager", Color: "#2563eb", BuiltIn: true},
+		{Key: "hr", Label: "HR", Color: "#db2777", BuiltIn: true},
+	}},
 }
 
 // UnknownCategory is the category of a company without one.

@@ -36,11 +36,13 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
     payslips: "Payslips + bonus slips", identity: "NRIC/passport (expat)", education: "Highest education certificate", additional: "Additional process",
   },
   company_category: { signed_client: "Signed client", prospective_client: "Prospective client", unknown: "Unknown", vip_client: "VIP client" },
+  contact_role: { hiring_manager: "Hiring manager", hr: "HR" },
 };
 
-/** The built-in categories' colours, used until the company's load. */
+/** The built-in categories' and contact roles' colours, used until the company's load. */
 const BUILT_IN_COLOR: Record<string, string> = {
   signed_client: "#16a34a", prospective_client: "#2563eb", unknown: "#6b7280", vip_client: "#b8860b",
+  hiring_manager: "#2563eb", hr: "#db2777",
 };
 
 /** A notice period key (2_week) in words, for one no longer in the list. */

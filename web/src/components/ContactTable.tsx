@@ -1,7 +1,10 @@
 import type { ContactSummary } from "../api/client";
+import { chipStyle } from "./companyCategory";
+import { NO_ROLE_COLOR } from "./ContactBanner";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
+import { useFieldSettings } from "./useFieldSettings";
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
 export function ContactTable({ contacts, showCompany = false, empty, picked, onPick }: {
@@ -12,6 +15,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   picked?: Set<string>;
   onPick?: (contacts: ContactSummary[], on: boolean) => void;
 }) {
+  const fs = useFieldSettings();
   const all = contacts.length > 0 && contacts.every((c) => picked?.has(c.id));
   return (
     <>
@@ -23,6 +27,8 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
       <thead>
         <tr>
           <th>Name</th>
+          <th>Role</th>
+          <th>Status</th>
           <th>Job title</th>
           {showCompany && <th>Company</th>}
           <th>Email</th>
@@ -35,8 +41,13 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
             <td>
               <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
-              {c.status === "left" && <span className="muted"> (has left)</span>}
             </td>
+            <td>
+              <span className="category-chip" style={chipStyle(c.role ? fs.color("contact_role", c.role) : NO_ROLE_COLOR)}>
+                {c.role ? fs.label("contact_role", c.role) : "Not set"}
+              </span>
+            </td>
+            <td>{c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}</td>
             <td>{c.title}</td>
             {showCompany && <td><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></td>}
             <td>{c.email} <EmailCheckBadge check={c.emailCheckStatus} /></td>
@@ -44,7 +55,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
           </tr>
         ))}
         {contacts.length === 0 && (
-          <tr><td colSpan={showCompany ? 5 : 4} className="muted">{empty}</td></tr>
+          <tr><td colSpan={showCompany ? 7 : 6} className="muted">{empty}</td></tr>
         )}
       </tbody>
     </table>

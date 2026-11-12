@@ -3,9 +3,10 @@
 // category down its right edge, picked here and saved straight away.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { ApiError, api, type Schemas, unwrap } from "../api/client";
+import { ApiError, api, type Permission, type Schemas, unwrap } from "../api/client";
 import { companiesKey, companyKey, jobsKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, countryName } from "../labels";
+import { billingText, useCompanyBilling } from "./companyBilling";
 import { companyTermsKey } from "./CompanyTerms";
 import { tint, UNKNOWN_CATEGORY } from "./companyCategory";
 import { ErrorMessage } from "./ErrorMessage";
@@ -29,8 +30,10 @@ const range = (values: (number | null)[], words: (n: number) => string): string 
   return lo === hi ? words(lo) : `${words(lo)} – ${words(hi)}`;
 };
 
-export function CompanyBanner({ company: c, canEdit }: { company: Company; canEdit: boolean }) {
+export function CompanyBanner({ company: c, canEdit, permissions }: { company: Company; canEdit: boolean; permissions: Permission[] }) {
   const queryClient = useQueryClient();
+  const seesFees = permissions.includes("placements:read") && permissions.includes("placements.fees:read");
+  const billing = useCompanyBilling(c.id, seesFees);
   const fs = useFieldSettings();
   const terms = useQuery({
     queryKey: companyTermsKey(c.id),
@@ -60,7 +63,7 @@ export function CompanyBanner({ company: c, canEdit }: { company: Company; canEd
   const open = jobs.data?.filter((j) => j.status === "open").length;
 
   return (
-    <section className="banner company-banner" aria-label="Company" style={{ background: `linear-gradient(120deg, ${tint(color, 0.72)}, ${tint(color, 0.9)})` }}>
+    <section className="banner candidate-banner company-banner" aria-label="Company" style={{ background: `linear-gradient(120deg, ${tint(color, 0.72)}, ${tint(color, 0.9)})` }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">
@@ -92,7 +95,7 @@ export function CompanyBanner({ company: c, canEdit }: { company: Company; canEd
         )}
         <ErrorMessage error={save.error} />
 
-        <div className="banner-strip">
+        <div className={seesFees ? "banner-strip four" : "banner-strip"}>
           <div>
             <span className="label">Fee</span>
             <span className="figure">{feeText(tiers) ?? "—"}</span>
@@ -110,6 +113,13 @@ export function CompanyBanner({ company: c, canEdit }: { company: Company; canEd
             <span className="figure">{open ?? "—"}</span>
             {jobs.data && <span className="note">{jobs.data.length} in all</span>}
           </div>
+          {seesFees && (
+            <div>
+              <span className="label">Billing {billing.year}</span>
+              <span className="figure">{billing.loading ? "…" : billingText(billing.thisYear) ?? "—"}</span>
+              {!billing.loading && <span className="note">{billingText(billing.allTime) ?? "nothing yet"} all time</span>}
+            </div>
+          )}
         </div>
       </div>
       <div className="banner-column" style={{ background: color }}><span>{fs.label("company_category", category)}</span></div>

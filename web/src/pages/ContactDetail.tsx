@@ -3,18 +3,26 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { contactKey } from "../api/keys";
+import { ContactBanner } from "../components/ContactBanner";
 import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { type Section, SectionTabs } from "../components/SectionTabs";
 import { Timeline } from "../components/Timeline";
+import { useFieldSettings } from "../components/useFieldSettings";
 import { CONTACT_STATUS } from "../labels";
 
-/** One contact. Render it with key={id} so edit state never carries over. */
+type Tab = "details" | "employment" | "email" | "activity";
+
+/** One contact, laid out like a candidate: their card, a contact column and tabs. Render it with key={id}. */
 export function ContactDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const queryClient = useQueryClient();
+  const fs = useFieldSettings();
   const [editing, setEditing] = useState(false);
+  const [active, setActive] = useState<Tab>("details");
+  const [writing, setWriting] = useState(false);
   const contact = useQuery({
     queryKey: contactKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId: id } } })),
@@ -28,55 +36,74 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
   const c = contact.data;
   if (!c) return contact.error ? <ErrorMessage error={contact.error} /> : <p className="muted">Loading…</p>;
   const canEdit = permissions.includes("contacts:update");
+  const canEmail = permissions.includes("emails:read") && permissions.includes("emails:send");
+
+  const sections: Section<Tab>[] = [
+    { id: "details", label: "Details", content: editing ? (
+      <ContactForm contact={c} onDone={() => { setEditing(false); }} />
+    ) : (
+      <section className="panel candidate-profile" aria-label="Contact details">
+        <dl>
+          <dt>Job title</dt><dd>{c.title ?? "—"}</dd>
+          <dt>Company</dt><dd><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></dd>
+          <dt>Role</dt><dd>{c.role ? fs.label("contact_role", c.role) : "Not set"}</dd>
+          <dt>Status</dt><dd>{CONTACT_STATUS[c.status]}</dd>
+          <dt>Email</dt>
+          <dd>
+            {c.email ?? "—"} <EmailCheckBadge check={c.emailCheck} detailed />
+            {c.email && canEdit && (
+              <>
+                {" "}
+                <button type="button" className="link" disabled={recheck.isPending} onClick={() => { recheck.mutate(); }}>
+                  {recheck.isPending ? "Checking…" : "Check again"}
+                </button>
+              </>
+            )}
+          </dd>
+          <dt>Mobile</dt><dd>{c.mobile ?? "—"}</dd>
+          <dt>Office phone</dt><dd>{c.phone ?? "—"}</dd>
+          <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
+          <dt>Notes</dt><dd className="pre">{c.notes ?? "—"}</dd>
+        </dl>
+        <ErrorMessage error={recheck.error} />
+      </section>
+    ) },
+    { id: "employment", label: "Employment check", content: <EmploymentCheck contact={c} canCheck={canEdit} /> },
+    ...(permissions.includes("emails:read") ? [{ id: "email" as const, label: "Email", content:
+      <ContactEmails contactId={c.id} email={c.email} permissions={permissions} writing={writing} onWritingChange={setWriting} /> }] : []),
+    { id: "activity", label: "Activity", content: <Timeline compact subjectType="contact" subjectId={c.id} permissions={permissions} /> },
+  ];
 
   return (
-    <main>
+    <main className="roomy">
       <a href="#/contacts">← Contacts</a>
       {contact.error && (
         <ErrorMessage error={contact.error}>
           <p className="muted">Showing the version loaded earlier.</p>
         </ErrorMessage>
       )}
-      <div className="row spread">
-        <h2>{c.fullName}</h2>
-        {canEdit && !editing && <button type="button" onClick={() => { setEditing(true); }}>Edit contact</button>}
-      </div>
-      <p className="muted">
-        {c.title ? `${c.title} at ` : ""}<a href={`#/companies/${c.companyId}`}>{c.companyName}</a>
-        {c.status === "left" && ` · ${CONTACT_STATUS.left}`}
-      </p>
-      {editing ? (
-        <ContactForm contact={c} onDone={() => { setEditing(false); }} />
-      ) : (
-        <section className="panel" aria-label="Contact details">
-          <dl>
-            <dt>Email</dt>
-            <dd>
-              {c.email ?? "—"} <EmailCheckBadge check={c.emailCheck} detailed />
-              {c.email && canEdit && (
-                <>
-                  {" "}
-                  <button type="button" className="link" disabled={recheck.isPending} onClick={() => { recheck.mutate(); }}>
-                    {recheck.isPending ? "Checking…" : "Check again"}
-                  </button>
-                </>
-              )}
-            </dd>
-            <dt>Office phone</dt>
-            <dd>{c.phone ?? "—"}</dd>
-            <dt>Mobile</dt>
-            <dd>{c.mobile ?? "—"}</dd>
-            <dt>LinkedIn</dt>
-            <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl}</a> : "—"}</dd>
-            <dt>Notes</dt>
-            <dd className="pre">{c.notes ?? "—"}</dd>
-          </dl>
-          <ErrorMessage error={recheck.error} />
-        </section>
+      {!editing && (canEdit || canEmail) && (
+        <div className="row spread">
+          <span />
+          <span className="row">
+            {canEmail && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
+            {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit contact</button>}
+          </span>
+        </div>
       )}
-      {!editing && <EmploymentCheck contact={c} canCheck={canEdit} />}
-      {permissions.includes("emails:read") && <ContactEmails contactId={c.id} email={c.email} permissions={permissions} />}
-      <Timeline subjectType="contact" subjectId={c.id} permissions={permissions} />
+      <ContactBanner contact={c} canEdit={canEdit} />
+      <div className="candidate-workspace">
+        <aside className="candidate-contact panel" aria-label="Contact summary">
+          <h3>Contact</h3>
+          <dl>
+            <dt>Email</dt><dd>{c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : "—"}</dd>
+            <dt>Mobile</dt><dd>{c.mobile ? <a href={`tel:${c.mobile}`}>{c.mobile}</a> : "—"}</dd>
+            <dt>Office phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
+            <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn profile</a> : "—"}</dd>
+          </dl>
+        </aside>
+        <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
+      </div>
     </main>
   );
 }

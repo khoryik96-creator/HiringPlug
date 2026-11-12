@@ -278,16 +278,18 @@ WHERE ($1::text IS NULL OR application_id = $1)
   AND ($3::text IS NULL OR invoice_status = $3)
   AND ($4::date IS NULL OR start_date >= $4)
   AND ($5::date IS NULL OR start_date <= $5)
+  AND ($6::text[] IS NULL OR application_id = ANY($6::text[]))
 ORDER BY start_date DESC, id DESC
 LIMIT 500
 `
 
 type ListPlacementsParams struct {
-	ApplicationID *string
-	Status        *string
-	InvoiceStatus *string
-	StartFrom     *time.Time
-	StartTo       *time.Time
+	ApplicationID  *string
+	Status         *string
+	InvoiceStatus  *string
+	StartFrom      *time.Time
+	StartTo        *time.Time
+	ApplicationIds []string
 }
 
 func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) ([]Placement, error) {
@@ -297,6 +299,7 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 		arg.InvoiceStatus,
 		arg.StartFrom,
 		arg.StartTo,
+		arg.ApplicationIds,
 	)
 	if err != nil {
 		return nil, err

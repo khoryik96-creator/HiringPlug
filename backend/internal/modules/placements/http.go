@@ -20,7 +20,7 @@ func (h *HTTP) ListPlacements(ctx context.Context, req api.ListPlacementsRequest
 	q := req.Params
 	views, totals, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
 		ApplicationID: q.ApplicationId, Status: c.Convert[string](q.Status), InvoiceStatus: c.Convert[string](q.InvoiceStatus),
-		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo),
+		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo), CompanyID: q.CompanyId,
 	})
 	if err != nil {
 		return nil, err

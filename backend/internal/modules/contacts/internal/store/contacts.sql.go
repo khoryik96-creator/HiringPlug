@@ -89,7 +89,7 @@ func (q *Queries) FindContactIDByEmail(ctx context.Context, email *string) (stri
 }
 
 const getContact = `-- name: GetContact :one
-SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits FROM contact WHERE id = $1
+SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role FROM contact WHERE id = $1
 `
 
 func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
@@ -118,6 +118,7 @@ func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
 		&i.UpdatedAt,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.Role,
 	)
 	return i, err
 }
@@ -149,13 +150,13 @@ const insertContact = `-- name: InsertContact :one
 INSERT INTO contact (
   tenant_id, company_id, first_name, last_name, title, email,
   email_check_status, email_check_reasons, email_checked_at,
-  phone, mobile, linkedin_url, status, notes, created_by
+  phone, mobile, linkedin_url, status, role, notes, created_by
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5,
   $6, $7, $8,
-  $9, $10, $11, $12, $13, app_current_user()
+  $9, $10, $11, $12, $13, $14, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
 `
 
 type InsertContactParams struct {
@@ -171,6 +172,7 @@ type InsertContactParams struct {
 	Mobile            *string
 	LinkedinUrl       *string
 	Status            string
+	Role              *string
 	Notes             *string
 }
 
@@ -190,6 +192,7 @@ func (q *Queries) InsertContact(ctx context.Context, arg InsertContactParams) (C
 		arg.Mobile,
 		arg.LinkedinUrl,
 		arg.Status,
+		arg.Role,
 		arg.Notes,
 	)
 	var i Contact
@@ -216,6 +219,7 @@ func (q *Queries) InsertContact(ctx context.Context, arg InsertContactParams) (C
 		&i.UpdatedAt,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.Role,
 	)
 	return i, err
 }
@@ -279,23 +283,27 @@ func (q *Queries) LatestEmploymentCheck(ctx context.Context, contactID string) (
 }
 
 const listContacts = `-- name: ListContacts :many
-SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, updated_at
+SELECT id, company_id, first_name, last_name, title, email, email_check_status, phone, mobile, status, role, updated_at
 FROM contact
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR company_id = $2::text)
-  AND ($3::text IS NULL
-       OR CASE WHEN $4::boolean
-            THEN app_normalize_text($3::text) <% name_text
-            ELSE search_text LIKE ALL (app_search_patterns($3::text))
-              OR phone_digits LIKE '%' || app_phone_key($3::text) || '%'
+  AND ($3::text IS NULL OR status = $3::text)
+  AND ($4::text IS NULL OR coalesce(role, '') = $4::text)
+  AND ($5::text IS NULL
+       OR CASE WHEN $6::boolean
+            THEN app_normalize_text($5::text) <% name_text
+            ELSE search_text LIKE ALL (app_search_patterns($5::text))
+              OR phone_digits LIKE '%' || app_phone_key($5::text) || '%'
           END)
-ORDER BY CASE WHEN $4::boolean THEN word_similarity(app_normalize_text(coalesce($3::text, '')), name_text) END DESC, id DESC
-LIMIT $5
+ORDER BY CASE WHEN $6::boolean THEN word_similarity(app_normalize_text(coalesce($5::text, '')), name_text) END DESC, id DESC
+LIMIT $7
 `
 
 type ListContactsParams struct {
 	Cursor       *string
 	CompanyID    *string
+	Status       *string
+	Role         *string
 	Query        *string
 	SimilarNames bool
 	RowLimit     int32
@@ -312,15 +320,19 @@ type ListContactsRow struct {
 	Phone            *string
 	Mobile           *string
 	Status           string
+	Role             *string
 	UpdatedAt        time.Time
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
 // With @similar, names like the query (typos) instead, the closest first.
+// A role of ” means contacts whose role is not set.
 func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error) {
 	rows, err := q.db.Query(ctx, listContacts,
 		arg.Cursor,
 		arg.CompanyID,
+		arg.Status,
+		arg.Role,
 		arg.Query,
 		arg.SimilarNames,
 		arg.RowLimit,
@@ -343,6 +355,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 			&i.Phone,
 			&i.Mobile,
 			&i.Status,
+			&i.Role,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -398,7 +411,7 @@ UPDATE contact SET
   email_check_reasons = $2,
   email_checked_at = $3
 WHERE id = $4 AND email = $5
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
 `
 
 type SetEmailCheckParams struct {
@@ -442,6 +455,7 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 		&i.UpdatedAt,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.Role,
 	)
 	return i, err
 }
@@ -460,11 +474,12 @@ UPDATE contact SET
   mobile = $10,
   linkedin_url = $11,
   status = $12,
-  notes = $13,
+  role = $13,
+  notes = $14,
   version = version + 1,
   updated_at = now()
-WHERE id = $14 AND version = $15
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits
+WHERE id = $15 AND version = $16
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
 `
 
 type UpdateContactParams struct {
@@ -480,6 +495,7 @@ type UpdateContactParams struct {
 	Mobile            *string
 	LinkedinUrl       *string
 	Status            string
+	Role              *string
 	Notes             *string
 	ID                string
 	ExpectedVersion   int32
@@ -500,6 +516,7 @@ func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (C
 		arg.Mobile,
 		arg.LinkedinUrl,
 		arg.Status,
+		arg.Role,
 		arg.Notes,
 		arg.ID,
 		arg.ExpectedVersion,
@@ -528,6 +545,7 @@ func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (C
 		&i.UpdatedAt,
 		&i.NameText,
 		&i.PhoneDigits,
+		&i.Role,
 	)
 	return i, err
 }

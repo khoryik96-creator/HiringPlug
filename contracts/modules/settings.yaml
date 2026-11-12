@@ -261,8 +261,9 @@ components:
         pre_offer_process (the template for a client's benefits and its steps
         before an offer, on the company page; each item may carry a hint),
         company_category (a company's category, e.g. Signed client or VIP
-        client, each with its colour).
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category]
+        client, each with its colour), contact_role (what a contact does in
+        hiring, e.g. Hiring manager or HR, each with its colour).
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.

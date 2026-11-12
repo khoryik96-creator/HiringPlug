@@ -51,7 +51,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 		params := store.InsertContactParams{
 			CompanyID: d.CompanyID, FirstName: d.FirstName, LastName: d.LastName, Title: d.Title, Email: d.Email,
 			EmailCheckReasons: []string{}, Phone: d.Phone, Mobile: d.Mobile, LinkedinUrl: d.LinkedinURL,
-			Status: d.Status, Notes: d.Notes,
+			Status: d.Status, Role: d.Role, Notes: d.Notes,
 		}
 		if check != nil {
 			params.EmailCheckStatus, params.EmailCheckReasons, params.EmailCheckedAt = &check.Status, check.Reasons, &check.CheckedAt
@@ -135,7 +135,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
 			CompanyID: after.CompanyID, FirstName: after.FirstName, LastName: after.LastName, Title: after.Title,
 			Email: after.Email, EmailCheckReasons: []string{}, Phone: after.Phone, Mobile: after.Mobile,
-			LinkedinUrl: after.LinkedinURL, Status: after.Status, Notes: after.Notes,
+			LinkedinUrl: after.LinkedinURL, Status: after.Status, Role: after.Role, Notes: after.Notes,
 		}
 		if after.Email != nil && result != nil {
 			params.EmailCheckStatus, params.EmailCheckReasons, params.EmailCheckedAt = &result.Status, result.Reasons, &result.CheckedAt
@@ -190,17 +190,32 @@ type Page struct {
 	NextCursor *string
 }
 
-// List returns up to limit contacts, optionally matching query or one company.
-// With similar, names like query (typos) instead, the closest first, one page only.
-func (s *Service) List(ctx context.Context, p authz.Principal, query, companyID, cursor *string, similar bool, limit int) (Page, error) {
+// Filter narrows a list of contacts; every part given must hold.
+type Filter struct {
+	Query, CompanyID *string
+	Status           *string // active or left
+	Role             *string // a key of the contact_role list
+	RoleNotSet       bool    // only contacts without a role (ignored with Role)
+	// Similar: names like Query (typos), the closest first, one page only.
+	Similar bool
+}
+
+// List returns up to limit contacts matching f, newest first.
+func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
 	var page Page
-	similar = similar && query != nil
+	similar := f.Similar && f.Query != nil
 	if similar {
 		cursor = nil // ordered by likeness, not by id: one page
 	}
+	role := f.Role
+	if role == nil && f.RoleNotSet {
+		none := ""
+		role = &none // the query reads '' as "no role"
+	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: companyID, Query: query, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: role,
+			SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -226,7 +241,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, companyID,
 			page.Items[i] = Summary{
 				ID: r.ID, CompanyID: r.CompanyID, CompanyName: names[r.CompanyID], FirstName: r.FirstName, LastName: r.LastName,
 				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus,
-				Phone: r.Phone, Mobile: r.Mobile, UpdatedAt: r.UpdatedAt,
+				Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
 			}
 		}
 		return nil
@@ -377,7 +392,7 @@ func fromRow(r store.Contact) Contact {
 		ID: r.ID, Version: int(r.Version), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		Details: Details{
 			CompanyID: r.CompanyID, FirstName: r.FirstName, LastName: r.LastName, Title: r.Title, Email: r.Email,
-			Phone: r.Phone, Mobile: r.Mobile, LinkedinURL: r.LinkedinUrl, Status: r.Status, Notes: r.Notes,
+			Phone: r.Phone, Mobile: r.Mobile, LinkedinURL: r.LinkedinUrl, Status: r.Status, Role: r.Role, Notes: r.Notes,
 		},
 	}
 	if r.EmailCheckStatus != nil && r.EmailCheckedAt != nil {
@@ -391,6 +406,6 @@ func fields(d Details) map[string]any {
 	return map[string]any{
 		"companyId": d.CompanyID, "firstName": d.FirstName, "lastName": d.LastName, "title": d.Title,
 		"email": d.Email, "phone": d.Phone, "mobile": d.Mobile, "linkedinUrl": d.LinkedinURL,
-		"status": d.Status, "notes": d.Notes,
+		"status": d.Status, "role": d.Role, "notes": d.Notes,
 	}
 }

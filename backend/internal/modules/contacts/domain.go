@@ -21,7 +21,8 @@ type Details struct {
 	Phone       *string
 	Mobile      *string
 	LinkedinURL *string
-	Status      string // active or left
+	Status      string  // active or left
+	Role        *string // a key of the contact_role list (hiring_manager, hr…); nil: not set
 	Notes       *string
 }
 
@@ -47,7 +48,7 @@ type Contact struct {
 // Summary is a contact in a list.
 type Summary struct {
 	ID, CompanyID, CompanyName, FirstName, LastName, Status string
-	Title, Email, EmailCheckStatus, Phone, Mobile           *string
+	Title, Email, EmailCheckStatus, Phone, Mobile, Role     *string
 	UpdatedAt                                               time.Time
 }
 
@@ -62,6 +63,7 @@ type Patch struct {
 	Mobile      apiconv.Change[*string]
 	LinkedinURL apiconv.Change[*string]
 	Status      apiconv.Change[string]
+	Role        apiconv.Change[*string]
 	Notes       apiconv.Change[*string]
 }
 
@@ -76,6 +78,7 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.Mobile, p.Mobile)
 	apiconv.Apply(&d.LinkedinURL, p.LinkedinURL)
 	apiconv.Apply(&d.Status, p.Status)
+	apiconv.Apply(&d.Role, p.Role)
 	apiconv.Apply(&d.Notes, p.Notes)
 	return d
 }
@@ -97,7 +100,7 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 	if d.Status == "" {
 		d.Status = "active"
 	}
-	for _, f := range []**string{&d.Title, &d.Phone, &d.Mobile} {
+	for _, f := range []**string{&d.Title, &d.Phone, &d.Mobile, &d.Role} {
 		*f = squeezedOrNil(*f)
 	}
 	if n := d.Notes; n != nil {

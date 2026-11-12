@@ -1189,6 +1189,18 @@ paths:
           in: query
           description: Only this company's contacts.
           schema: {$ref: '#/components/schemas/CompanyId'}
+        - name: role
+          in: query
+          description: Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager).
+          schema: {$ref: '#/components/schemas/ContactRole'}
+        - name: roleNotSet
+          in: query
+          description: Only contacts whose role is not set yet (ignored with role).
+          schema: {type: boolean, default: false}
+        - name: status
+          in: query
+          description: Only contacts who still work there (active) or have left.
+          schema: {$ref: '#/components/schemas/ContactStatus'}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -4022,6 +4034,7 @@ paths:
         - {name: invoiceStatus, in: query, required: false, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
         - {name: startFrom, in: query, required: false, description: Started on or after this day., schema: {type: string, format: date}}
         - {name: startTo, in: query, required: false, description: Started on or before this day., schema: {type: string, format: date}}
+        - {name: companyId, in: query, required: false, description: "Only placements on this company's jobs (its billing).", schema: {$ref: '#/components/schemas/CompanyId'}}
       responses:
         '200':
           description: OK
@@ -6124,6 +6137,10 @@ components:
       type: string
       pattern: '^cont_[0-9a-hjkmnp-tv-z]{26}$'
       example: cont_01jbz6w0m0k8q9x2r3s4t5v6w7
+    ContactRole:
+      type: string
+      pattern: '^[a-z0-9_]{1,40}$'
+      description: "What the contact does in hiring: a key of the contact_role list in Settings (hiring_manager, hr, or one the agency added)."
     ContactStatus:
       type: string
       description: active = works there; left = has left the company.
@@ -6146,7 +6163,7 @@ components:
         checkedAt: {type: string, format: date-time}
     Contact:
       type: object
-      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, notes, employment, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactId'}
         version: {type: integer}
@@ -6165,6 +6182,10 @@ components:
         mobile: {type: string, nullable: true}
         linkedinUrl: {type: string, nullable: true}
         status: {$ref: '#/components/schemas/ContactStatus'}
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{$ref: '#/components/schemas/ContactRole'}]
+          nullable: true
         notes: {type: string, nullable: true}
         employment:
           description: The latest employment check (from their LinkedIn profile); null before the first.
@@ -6186,6 +6207,10 @@ components:
         mobile: {type: string, maxLength: 40, nullable: true}
         linkedinUrl: {type: string, maxLength: 300, nullable: true}
         status: {$ref: '#/components/schemas/ContactStatus'}
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{$ref: '#/components/schemas/ContactRole'}]
+          nullable: true
         notes: {type: string, maxLength: 4000, nullable: true}
     ContactUpdate:
       type: object
@@ -6202,10 +6227,14 @@ components:
         mobile: {type: string, maxLength: 40, nullable: true}
         linkedinUrl: {type: string, maxLength: 300, nullable: true}
         status: {$ref: '#/components/schemas/ContactStatus'}
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{$ref: '#/components/schemas/ContactRole'}]
+          nullable: true
         notes: {type: string, maxLength: 4000, nullable: true}
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, role, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactId'}
         fullName: {type: string}
@@ -6219,6 +6248,10 @@ components:
         phone: {type: string, nullable: true}
         mobile: {type: string, nullable: true}
         status: {$ref: '#/components/schemas/ContactStatus'}
+        role:
+          description: Hiring manager, HR… (a key of the contact_role list); null when not set.
+          allOf: [{$ref: '#/components/schemas/ContactRole'}]
+          nullable: true
         updatedAt: {type: string, format: date-time}
     ContactPage:
       type: object
@@ -9680,9 +9713,9 @@ components:
     FieldListName:
       type: string
       description: >
-        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour).
+        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour).
 
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category]
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.

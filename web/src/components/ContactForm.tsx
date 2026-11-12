@@ -7,6 +7,7 @@ import { CONTACT_STATUS, keysOf } from "../labels";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { CONTACT_PATHS, contactFields, type ContactFormState, contactProblems, formFromContact } from "./contactFormState";
 import { Field } from "./Field";
+import { useFieldSettings } from "./useFieldSettings";
 import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
 
@@ -23,6 +24,7 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
   onSaved?: (contact: Contact) => void;
 }) {
   const queryClient = useQueryClient();
+  const fs = useFieldSettings();
   const [opened] = useState(() => ({ id: contact?.id, version: contact?.version ?? 0, form: formFromContact(contact, company) }));
   const [form, setForm] = useState(opened.form);
   const save = useMutation({
@@ -75,6 +77,12 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       {text("phone", "Office phone")}
       {text("mobile", "Mobile")}
       {text("linkedinUrl", "LinkedIn", { placeholder: "linkedin.com/in/name" })}
+      <Field label="Role" error={errors[CONTACT_PATHS.role]}>
+        <select value={form.role} onChange={(e) => { set("role", e.target.value); }}>
+          <option value="">Not set</option>
+          {fs.options("contact_role", form.role || null).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </Field>
       <Field label="Status" error={errors[CONTACT_PATHS.status]}>
         <select value={form.status} onChange={(e) => { set("status", e.target.value as ContactFormState["status"]); }}>
           {keysOf(CONTACT_STATUS).map((s) => <option key={s} value={s}>{CONTACT_STATUS[s]}</option>)}

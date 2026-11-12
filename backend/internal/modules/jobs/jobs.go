@@ -111,6 +111,12 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 	return m.service.Briefs(ctx, tx, ids)
 }
 
+// IDsOfCompany returns a company's jobs, open or closed, in the caller's
+// transaction (e.g. to add up what the company was billed).
+func (m *Module) IDsOfCompany(ctx context.Context, tx pgx.Tx, companyID string) ([]string, error) {
+	return store.New(tx).JobOrderIDsOfCompany(ctx, companyID)
+}
+
 // OpenJob is an open job, for other modules (e.g. the dashboard).
 type OpenJob struct {
 	ID, Title, CompanyID string

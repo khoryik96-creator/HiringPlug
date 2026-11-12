@@ -4012,6 +4012,8 @@ export interface components {
         };
         /** @example cont_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactId: string;
+        /** @description What the contact does in hiring: a key of the contact_role list in Settings (hiring_manager, hr, or one the agency added). */
+        ContactRole: string;
         /**
          * @description active = works there; left = has left the company.
          * @enum {string}
@@ -4046,6 +4048,8 @@ export interface components {
             mobile: string | null;
             linkedinUrl: string | null;
             status: components["schemas"]["ContactStatus"];
+            /** @description Hiring manager, HR… (a key of the contact_role list); null when not set. */
+            role: components["schemas"]["ContactRole"] | null;
             notes: string | null;
             /** @description The latest employment check (from their LinkedIn profile); null before the first. */
             employment: components["schemas"]["ContactEmployment"] | null;
@@ -4064,6 +4068,8 @@ export interface components {
             mobile?: string | null;
             linkedinUrl?: string | null;
             status?: components["schemas"]["ContactStatus"];
+            /** @description Hiring manager, HR… (a key of the contact_role list); null when not set. */
+            role?: components["schemas"]["ContactRole"] | null;
             notes?: string | null;
         };
         ContactUpdate: {
@@ -4078,6 +4084,8 @@ export interface components {
             mobile?: string | null;
             linkedinUrl?: string | null;
             status?: components["schemas"]["ContactStatus"];
+            /** @description Hiring manager, HR… (a key of the contact_role list); null when not set. */
+            role?: components["schemas"]["ContactRole"] | null;
             notes?: string | null;
         };
         ContactSummary: {
@@ -4091,6 +4099,8 @@ export interface components {
             phone: string | null;
             mobile: string | null;
             status: components["schemas"]["ContactStatus"];
+            /** @description Hiring manager, HR… (a key of the contact_role list); null when not set. */
+            role: components["schemas"]["ContactRole"] | null;
             /** Format: date-time */
             updatedAt: string;
         };
@@ -6724,10 +6734,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour).
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category" | "contact_role";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}
@@ -8309,6 +8319,12 @@ export interface operations {
                 similar?: boolean;
                 /** @description Only this company's contacts. */
                 companyId?: components["schemas"]["CompanyId"];
+                /** @description Only contacts with this role (a key of the contact_role list, e.g. hr or hiring_manager). */
+                role?: components["schemas"]["ContactRole"];
+                /** @description Only contacts whose role is not set yet (ignored with role). */
+                roleNotSet?: boolean;
+                /** @description Only contacts who still work there (active) or have left. */
+                status?: components["schemas"]["ContactStatus"];
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["ContactId"];
@@ -12134,6 +12150,8 @@ export interface operations {
                 startFrom?: string;
                 /** @description Started on or before this day. */
                 startTo?: string;
+                /** @description Only placements on this company's jobs (its billing). */
+                companyId?: components["schemas"]["CompanyId"];
             };
             header?: never;
             path?: never;

@@ -87,3 +87,7 @@ FROM application_stage_change c JOIN application a ON a.tenant_id = c.tenant_id 
 WHERE (sqlc.narg(candidate_id)::text IS NULL OR a.candidate_id = sqlc.narg(candidate_id)::text)
 ORDER BY c.changed_at DESC, c.id DESC
 LIMIT @max_rows::integer;
+
+-- The applications on some jobs, at any stage (a company's billing).
+-- name: ApplicationIDsOnJobs :many
+SELECT id FROM application WHERE job_order_id = ANY(@job_order_ids::text[]);

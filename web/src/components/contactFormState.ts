@@ -13,13 +13,14 @@ export interface ContactFormState {
   mobile: string;
   linkedinUrl: string;
   status: Schemas["ContactStatus"];
+  role: string; // a key of the contact_role list; "" when not set
   notes: string;
 }
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
 export const CONTACT_PATHS: Record<keyof ContactFormState, string> = {
   company: "companyId", firstName: "firstName", lastName: "lastName", title: "title", email: "email",
-  phone: "phone", mobile: "mobile", linkedinUrl: "linkedinUrl", status: "status", notes: "notes",
+  phone: "phone", mobile: "mobile", linkedinUrl: "linkedinUrl", status: "status", role: "role", notes: "notes",
 };
 
 export function formFromContact(c: Contact | null, company: PickedCompany | null = null): ContactFormState {
@@ -33,6 +34,7 @@ export function formFromContact(c: Contact | null, company: PickedCompany | null
     mobile: c?.mobile ?? "",
     linkedinUrl: c?.linkedinUrl ?? "",
     status: c?.status ?? "active",
+    role: c?.role ?? "",
     notes: c?.notes ?? "",
   };
 }
@@ -57,6 +59,7 @@ export function contactFields(f: ContactFormState) {
     mobile: orNull(f.mobile),
     linkedinUrl: orNull(f.linkedinUrl),
     status: f.status,
+    role: orNull(f.role),
     notes: orNull(f.notes),
   };
 }

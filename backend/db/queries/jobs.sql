@@ -209,3 +209,7 @@ UPDATE job_ad SET
   updated_at = now()
 WHERE id = @id
 RETURNING *;
+
+-- A company's jobs, open or closed (its billing adds up their placements).
+-- name: JobOrderIDsOfCompany :many
+SELECT id FROM job_order WHERE company_id = @company_id;

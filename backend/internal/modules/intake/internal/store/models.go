@@ -335,6 +335,7 @@ type Contact struct {
 	UpdatedAt         time.Time
 	NameText          *string
 	PhoneDigits       *string
+	Role              *string
 }
 
 type ContactEmploymentCheck struct {

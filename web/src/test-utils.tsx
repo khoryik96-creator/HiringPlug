@@ -84,6 +84,9 @@ export function testFieldSettings(mandatory: { form: "candidate" | "job"; field:
       list("pre_offer_process", "Pre-offer process", "open", [
         ["reference_check", "Reference check", "How many, and which referees (superior/peers)"], ["health_screening", "Health screening"],
       ], true),
+      { ...list("contact_role", "Contact roles", "open", [["hiring_manager", "Hiring manager"], ["hr", "HR"], ["director", "Director"]]), colors: true,
+        options: [["hiring_manager", "Hiring manager", "#2563eb"], ["hr", "HR", "#db2777"], ["director", "Director", "#0d9488"]]
+          .map(([key, l, color]) => ({ key, label: l, hint: null, color, hidden: false, builtIn: key !== "director" })) },
     ],
     mandatory: mandatory.map((m) => ({ ...m, label: m.field, mandatory: true, alwaysRequired: false })),
   } as never;

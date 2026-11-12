@@ -66,3 +66,16 @@
 .candidate-tabs .email { margin-top: 12px; }
 @media (max-width: 1300px) { .candidate-profile dl { grid-template-columns: 120px minmax(0, 1fr); } }
 @media (max-width: 760px) { .candidate-profile dl { grid-template-columns: minmax(0, 1fr); } }
+
+/* A company's and a contact's card and page use the candidate's layout. */
+.company-banner .banner-strip.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.company-banner .banner-strip > div, .contact-banner .banner-strip > div { flex-direction: column; align-items: flex-start; gap: 2px; }
+.contact-banner .banner-job a, .contact-banner .banner-facts a, .contact-banner .banner-strip a { color: inherit; }
+.contact-banner .banner-strip .figure.small { font: 600 14px Inter, sans-serif; overflow-wrap: anywhere; }
+.contact-banner .contact-status { border-color: #15803d; color: #15803d; }
+.contact-banner.has-left .contact-status { border-color: #b91c1c; color: #b91c1c; background: #fff; }
+.contact-banner.has-left .banner-name { text-decoration: line-through; text-decoration-thickness: 2px; opacity: 0.75; }
+.contact-banner .banner-pill, .company-banner .banner-pill { min-height: 34px; font-size: 13px; padding: 4px 12px; }
+.status-chip { display: inline-block; font-size: 0.78rem; font-weight: 650; padding: 0.15rem 0.6rem; border-radius: 999px; border: 1.5px solid #15803d; color: #15803d; background: #f0fdf4; white-space: nowrap; }
+.status-chip.left { border-color: #b91c1c; color: #b91c1c; background: #fef2f2; }
+@media (max-width: 760px) { .company-banner .banner-strip.four { grid-template-columns: 1fr; } }

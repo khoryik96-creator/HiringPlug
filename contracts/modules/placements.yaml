@@ -49,6 +49,7 @@ paths:
         - { name: invoiceStatus, in: query, required: false, schema: { $ref: '#/components/schemas/InvoiceStatus' } }
         - { name: startFrom, in: query, required: false, description: Started on or after this day., schema: { type: string, format: date } }
         - { name: startTo, in: query, required: false, description: Started on or before this day., schema: { type: string, format: date } }
+        - { name: companyId, in: query, required: false, description: "Only placements on this company's jobs (its billing).", schema: { $ref: '#/components/schemas/CompanyId' } }
       responses:
         '200':
           description: OK

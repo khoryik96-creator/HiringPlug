@@ -15,6 +15,7 @@ WHERE (sqlc.narg(application_id)::text IS NULL OR application_id = sqlc.narg(app
   AND (sqlc.narg(invoice_status)::text IS NULL OR invoice_status = sqlc.narg(invoice_status))
   AND (sqlc.narg(start_from)::date IS NULL OR start_date >= sqlc.narg(start_from))
   AND (sqlc.narg(start_to)::date IS NULL OR start_date <= sqlc.narg(start_to))
+  AND (sqlc.narg(application_ids)::text[] IS NULL OR application_id = ANY(sqlc.narg(application_ids)::text[]))
 ORDER BY start_date DESC, id DESC
 LIMIT 500;
 

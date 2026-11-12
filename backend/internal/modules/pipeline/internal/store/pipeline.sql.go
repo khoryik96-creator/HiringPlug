@@ -62,6 +62,31 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 	return items, nil
 }
 
+const applicationIDsOnJobs = `-- name: ApplicationIDsOnJobs :many
+SELECT id FROM application WHERE job_order_id = ANY($1::text[])
+`
+
+// The applications on some jobs, at any stage (a company's billing).
+func (q *Queries) ApplicationIDsOnJobs(ctx context.Context, jobOrderIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, applicationIDsOnJobs, jobOrderIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const dropOverlappingApplications = `-- name: DropOverlappingApplications :execrows
 DELETE FROM application a
 WHERE a.candidate_id = $1

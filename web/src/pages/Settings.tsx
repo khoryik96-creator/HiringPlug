@@ -35,7 +35,13 @@ export function Settings() {
             The categories a company can be in (signed client, prospect, VIP…), each with its colour: the colour of its card on the
             company&apos;s page and its chip in the list. Rename them, add your own, choose the colours.
           </p>
-          {settings.data.lists.filter((l) => l.colors).map((l) => <ListEditor key={l.name} list={l} />)}
+          {settings.data.lists.filter((l) => l.name === "company_category").map((l) => <ListEditor key={l.name} list={l} />)}
+          <h3 id="contact-roles">Contact roles</h3>
+          <p className="muted">
+            What a contact does in hiring (hiring manager, HR…), each with its colour: the colour of their card and their chip in
+            the contact list, where you can filter by it. Rename them, add your own, choose the colours.
+          </p>
+          {settings.data.lists.filter((l) => l.name === "contact_role").map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="benefits-template">Company benefits template</h3>
           <p className="muted">
             What to record for each client on its page: its benefits, and the steps it takes before an offer. Rename, reorder,
@@ -225,7 +231,7 @@ function ListEditor({ list }: { list: List }) {
             </>
           ) : (
             <>
-              <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder={list.hints ? "New item" : list.colors ? "New category" : "New option"} value={adding.label}
+              <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder={list.hints ? "New item" : list.name === "contact_role" ? "New role" : list.colors ? "New category" : "New option"} value={adding.label}
                 onChange={(e) => { setAdding({ ...adding, label: e.target.value }); }} />
               {list.colors && (
                 <input type="color" className="color-input" aria-label="Colour of the new category" value={adding.color}

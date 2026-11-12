@@ -10,8 +10,14 @@ import { SentEmails } from "./CandidateEmails";
 import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 
-export function ContactEmails({ contactId, email, permissions }: { contactId: string; email: string | null; permissions: Permission[] }) {
-  const [writing, setWriting] = useState(false);
+export function ContactEmails({ contactId, email, permissions, writing: controlledWriting, onWritingChange }: {
+  contactId: string; email: string | null; permissions: Permission[];
+  /** With onWritingChange, the page opens the composer (its Email button). */
+  writing?: boolean; onWritingChange?: (writing: boolean) => void;
+}) {
+  const [ownWriting, setOwnWriting] = useState(false);
+  const writing = controlledWriting ?? ownWriting;
+  const setWriting = onWritingChange ?? setOwnWriting;
   const list = useQuery({
     queryKey: contactEmailsKey(contactId),
     queryFn: async () => unwrap(await api.GET("/v1/emails", { params: { query: { contactId } } })).items,

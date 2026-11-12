@@ -204,6 +204,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 type Filter struct {
 	ApplicationID, Status, InvoiceStatus *string
 	StartFrom, StartTo                   *time.Time
+	CompanyID                            *string // on this company's jobs
 }
 
 // List returns placements, newest start first, and (with placements.fees:read)
@@ -211,8 +212,17 @@ type Filter struct {
 func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) ([]View, []FeeTotal, error) {
 	var out []View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var ofCompany []string // nil: any company
+		if f.CompanyID != nil {
+			ids, err := s.applications.OfCompany(ctx, tx, *f.CompanyID)
+			if err != nil {
+				return err
+			}
+			ofCompany = append([]string{}, ids...) // never nil: no jobs, no placements
+		}
 		rows, err := store.New(tx).ListPlacements(ctx, store.ListPlacementsParams{
 			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
+			ApplicationIds: ofCompany,
 		})
 		if err != nil {
 			return err

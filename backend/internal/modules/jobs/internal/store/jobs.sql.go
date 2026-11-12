@@ -624,6 +624,31 @@ func (q *Queries) JobOrderExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const jobOrderIDsOfCompany = `-- name: JobOrderIDsOfCompany :many
+SELECT id FROM job_order WHERE company_id = $1
+`
+
+// A company's jobs, open or closed (its billing adds up their placements).
+func (q *Queries) JobOrderIDsOfCompany(ctx context.Context, companyID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, jobOrderIDsOfCompany, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const jobOrderTitles = `-- name: JobOrderTitles :many
 SELECT id, title, company_id, contact_id, created_at FROM job_order WHERE id = ANY($1::text[])
 `

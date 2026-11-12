@@ -397,7 +397,12 @@ for each of their jobs, with **Score fit** / **Score again**.
   its category's colour (like a candidate's): its name, category (also
   down its right edge), type and industry, where it is based, size and
   website; one click on a category changes it; and its fee (a range when
-  it depends on the salary), guarantee and payment terms and open jobs.
+  it depends on the salary), guarantee and payment terms and open jobs, and,
+  for those who may see fees, its **billing**: the fees of placements on all
+  its jobs that stood (not fallen through or cancelled), this year and all
+  time (`GET /v1/placements?companyId=`). Below the card the page is laid out
+  like a candidate's: a contact column (phone, website, LinkedIn, address)
+  and tabs: Details, Terms & benefits, Jobs, Contacts, Activity.
   The company list shows each one's category as a coloured chip and can be
   filtered by it.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
@@ -417,7 +422,16 @@ for each of their jobs, with **Score fit** / **Score again**.
   Places) and the business registry, as more sources of suggestions.
 - **Contacts** ✅: people at companies (hiring managers, HR) with job title,
   email, office phone, mobile, LinkedIn, status (works there / has left) and
-  notes; listed on their company's page. The **email check** runs whenever an
+  notes; listed on their company's page. Each has a **role** (Hiring manager,
+  HR to start with; Settings, General, Contact roles: rename them, add your
+  own and choose each one's colour). A contact's page opens with a card in
+  their role's colour (like a candidate's): name, whether they still work
+  there (one click to mark them as having left), job title and company, the
+  role down its right edge (one click on a role changes it), and email,
+  mobile and office phone; below it, a contact column and tabs (Details,
+  Employment check, Email, Activity). The contact list shows each one's role
+  and status as chips and filters by role (or "role not set") and status.
+  The **email check** runs whenever an
   email is added or changed: the format, whether the domain receives mail (its
   MX records, looked up with a 3-second limit outside any database
   transaction), and shared (`hr@`) or disposable addresses. The result is
