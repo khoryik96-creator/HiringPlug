@@ -1253,6 +1253,23 @@ func (q *Queries) SetCandidateOwner(ctx context.Context, arg SetCandidateOwnerPa
 	return changed, err
 }
 
+const setIndustrySummaries = `-- name: SetIndustrySummaries :exec
+UPDATE candidate r SET industry = v.industry, version = r.version + 1, updated_at = now()
+FROM (SELECT unnest($1::text[]) AS id, unnest($2::text[]) AS industry) v
+WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry
+`
+
+type SetIndustrySummariesParams struct {
+	Ids        []string
+	Industries []string
+}
+
+// Many at once, after an industry is renamed, moved or replaced.
+func (q *Queries) SetIndustrySummaries(ctx context.Context, arg SetIndustrySummariesParams) error {
+	_, err := q.db.Exec(ctx, setIndustrySummaries, arg.Ids, arg.Industries)
+	return err
+}
+
 const setIndustrySummary = `-- name: SetIndustrySummary :exec
 UPDATE candidate SET industry = $1, version = version + 1, updated_at = now()
 WHERE id = $2 AND industry IS DISTINCT FROM $1

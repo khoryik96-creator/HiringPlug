@@ -21,6 +21,20 @@ describe("the message box", () => {
     expect(box.textContent).toBe("Edited draft");
   });
 
+  it("puts candidate details below the paragraph the cursor is in, not after the sign-off", () => {
+    const props = { html: "<p>Hi Mei, please see the candidates:</p><p>Regards, Aisyah</p>", resetKey: 0, onChange: vi.fn(), fields, banners: [], bannerUrls: {} };
+    const { rerender } = render(<RichEditor {...props} />);
+    const box = screen.getByRole("textbox", { name: "Message" });
+    const range = document.createRange();
+    range.setStart(box.querySelector("p")?.firstChild as Text, 5);
+    range.collapse(true);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    fireEvent.mouseUp(box);
+    rerender(<RichEditor {...props} inserting={{ id: 1, managed: true, html: '<div data-candidate-summary="true"><p>1. Nurul Huda</p></div>' }} />);
+    expect([...box.children].map((c) => c.textContent)).toEqual(["Hi Mei, please see the candidates:", "1. Nurul Huda", "Regards, Aisyah"]);
+  });
+
   it("inserts a field where the cursor was, even after a toolbar dropdown took the focus", () => {
     const onChange = vi.fn();
     render(<RichEditor html="<p>She expects  per month.</p>" resetKey={0} onChange={onChange} fields={fields} banners={[]} bannerUrls={{}} />);

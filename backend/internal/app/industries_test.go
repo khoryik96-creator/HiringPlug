@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/oapi-codegen/nullable"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -190,4 +193,102 @@ func TestIndustriesAutomaticCVImportTracksCatalogueUsage(t *testing.T) {
 	c := industryCatalogue(t, a, token)
 	bank := industryNamed(t, c, "Financial Services")
 	assert.Equal(t, 1, bank.CandidateCount, "imported candidates must count before a category can be deleted")
+}
+
+// Saving one candidate must not wait for another candidate's save in the same
+// agency: the industry list is only read during a save, so saves share its
+// lock. (Each save used to take it exclusively, so every save in an agency
+// queued behind the others, and even loading suggestions waited.)
+func TestCandidateSavesDoNotQueueBehindEachOther(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	user := tenant.Users[api.RoleRecruiter]
+	c := a.createCandidate(user.Token, map[string]any{"firstName": "Synthetic Concurrent Save"})
+	p := authz.NewPrincipalWithAccess(tenant.ID, user.ID, "", "", api.RoleRecruiter, authz.PermissionsForRole(api.RoleRecruiter), authz.Scope{Users: []string{user.ID}})
+
+	held, release, done := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		done <- database.InTx(context.Background(), testutil.Current.App, p, func(tx pgx.Tx) error {
+			if err := a.modules.Industries.LockIn(context.Background(), tx); err != nil { // another save in progress
+				return err
+			}
+			close(held)
+			<-release
+			return nil
+		})
+	}()
+	<-held
+	defer func() { require.NoError(t, <-done) }()
+	defer close(release)
+
+	for name, call := range map[string]func() int{
+		"edit another candidate": func() int {
+			return a.request(http.MethodPatch, "/v1/candidates/"+c.Id, user.Token, map[string]any{"version": c.Version, "currentTitle": "Synthetic Analyst"}).Status
+		},
+		"load suggestions": func() int { return a.request(http.MethodGet, "/v1/candidates/used-values", user.Token, nil).Status },
+	} {
+		status := make(chan int, 1)
+		go func() { status <- call() }()
+		select {
+		case s := <-status:
+			assert.Equal(t, http.StatusOK, s, name)
+		case <-time.After(3 * time.Second):
+			t.Errorf("%s waited for another save to finish", name)
+			return
+		}
+	}
+}
+
+// Replacing a category a record already has next to the replacement leaves
+// one entry, the current one, and the summary follows it.
+func TestIndustryReplacementMergesIntoAnExistingTag(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
+	c := industryCatalogue(t, a, token)
+	bank, hardware := industryNamed(t, c, "FSI – Banking"), industryNamed(t, c, "Tech - Hardware")
+	r := a.request("POST", "/v1/candidates", token, map[string]any{"firstName": "Synthetic Merge Example", "industrySelections": map[string]any{"catalogueVersion": c.Version, "ids": []string{bank.Id, hardware.Id}, "primaryId": bank.Id}})
+	require.Equal(t, 201, r.Status, "%s", r.Body)
+	var candidate api.Candidate
+	r.JSON(&candidate)
+	r = a.request("POST", "/v1/industries/"+bank.Id+"/remove", token, map[string]any{"catalogueVersion": c.Version, "action": "delete", "replacementId": hardware.Id})
+	require.Equal(t, 200, r.Status, "%s", r.Body)
+	a.request("GET", "/v1/candidates/"+candidate.Id, token, nil).JSON(&candidate)
+	assert.Equal(t, []string{hardware.Id}, candidate.IndustrySelections.Ids)
+	require.NotNil(t, candidate.IndustrySelections.PrimaryId)
+	assert.Equal(t, hardware.Id, *candidate.IndustrySelections.PrimaryId)
+	assert.Equal(t, industryNamed(t, c, "Information Technology & Services").Label, candidate.Industry.MustGet())
+}
+
+// A CV whose jobs have no dates (common) still fills the current title and
+// company from the first job listed, as before the industry work; only the
+// industry stays unsuggested, since that needs a clearly identified employer.
+func TestCVImportFillsCurrentJobWithoutDates(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
+	r := a.request("POST", "/v1/cv-imports", token, map[string]any{"source": "linkedin"})
+	require.Equal(t, 201, r.Status)
+	var imp api.CvImport
+	r.JSON(&imp)
+	r = a.upload("/v1/cv-imports/"+imp.Id+"/files", token, "", "SyntheticUndated.pdf", minimalPDF)
+	require.Equal(t, 201, r.Status)
+	var item api.CvImportItem
+	r.JSON(&item)
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close(ctx) }()
+	text, profile := cvOf("Synthetic Undated Import", "undated-import@example.com", "")
+	text += "\nFinance Manager, Example Trading Sdn Bhd\nAccountant, Sample Holdings Berhad"
+	profile.Experience = []api.ParsedJob{
+		{Title: sourced("Finance Manager", "Finance Manager"), Company: sourced("Example Trading Sdn Bhd", "Example Trading Sdn Bhd")},
+		{Title: sourced("Accountant", "Accountant"), Company: sourced("Sample Holdings Berhad", "Sample Holdings Berhad")},
+	}
+	readImported(t, a, conn, item.Id, text, profile)
+	var candidate api.Candidate
+	a.request("GET", "/v1/candidates/"+item.CandidateId.MustGet(), token, nil).JSON(&candidate)
+	assert.Equal(t, "Finance Manager", candidate.CurrentTitle.MustGet())
+	assert.Equal(t, "Example Trading Sdn Bhd", candidate.CurrentCompany.MustGet())
 }

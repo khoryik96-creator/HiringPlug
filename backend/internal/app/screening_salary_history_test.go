@@ -34,9 +34,15 @@ func TestScreeningKeepsSalaryNotesAndEarlierCallFigures(t *testing.T) {
 	assert.False(t, earlier.SalaryApplied)
 	require.NotNil(t, earlier.Call.SalarySnapshot)
 	assert.Equal(t, "9000", earlier.Call.SalarySnapshot.CurrentSalary.MustGet().Amount)
+	// A call where salary was not discussed shows no salary as its own.
+	r := a.request("POST", "/v1/candidates/"+c.Id+"/screening-calls", owner, map[string]any{"version": c.Version, "calledOn": "2026-10-03", "notes": "Discussed notice period only."})
+	require.Equal(t, 200, r.Status, "%s", r.Body)
+	var noSalary api.ScreeningCallResult
+	r.JSON(&noSalary)
+	assert.Nil(t, noSalary.Call.SalarySnapshot, "no salary was recorded on this call")
 	var history api.ScreeningCallList
 	a.request("GET", "/v1/candidates/"+c.Id+"/screening-calls", owner, nil).JSON(&history)
-	require.Len(t, history.Items, 3)
+	require.Len(t, history.Items, 4)
 	byID := map[string]api.ScreeningCallSummary{}
 	for _, h := range history.Items {
 		byID[h.Id] = h
@@ -55,7 +61,7 @@ func TestScreeningKeepsSalaryNotesAndEarlierCallFigures(t *testing.T) {
 		return err
 	}))
 	// Older clients changing a figure do not erase the free salary notes.
-	r := a.request("PUT", "/v1/candidates/"+c.Id+"/compensation", owner, map[string]any{"expectedVersion": latest.Candidate.Compensation.MustGet().Version, "currentSalary": map[string]any{"amount": "13000", "currency": "MYR", "period": "month"}, "expectedSalary": nil})
+	r = a.request("PUT", "/v1/candidates/"+c.Id+"/compensation", owner, map[string]any{"expectedVersion": latest.Candidate.Compensation.MustGet().Version, "currentSalary": map[string]any{"amount": "13000", "currency": "MYR", "period": "month"}, "expectedSalary": nil})
 	require.Equal(t, 200, r.Status, "%s", r.Body)
 	var comp api.Compensation
 	r.JSON(&comp)

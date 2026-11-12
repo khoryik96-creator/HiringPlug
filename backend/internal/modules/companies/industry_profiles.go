@@ -51,6 +51,11 @@ func (m *Module) SetIndustrySummary(ctx context.Context, tx pgx.Tx, id string, l
 	return store.New(tx).SetIndustrySummary(ctx, store.SetIndustrySummaryParams{ID: id, Industry: label})
 }
 
+// SetIndustrySummaries sets many summaries in one statement (labels[i] is ids[i]'s).
+func (m *Module) SetIndustrySummaries(ctx context.Context, tx pgx.Tx, ids, labels []string) error {
+	return store.New(tx).SetIndustrySummaries(ctx, store.SetIndustrySummariesParams{Ids: ids, Industries: labels})
+}
+
 // IndustryEmployerID requires an exact, normalized company name, never a fuzzy first hit.
 func (m *Module) IndustryEmployerID(ctx context.Context, tx pgx.Tx, name string) (string, error) {
 	v, e := store.New(tx).IndustryEmployerID(ctx, name)

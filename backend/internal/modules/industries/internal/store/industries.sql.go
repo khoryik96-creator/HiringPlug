@@ -9,6 +9,37 @@ import (
 	"context"
 )
 
+const addReplacementIndustry = `-- name: AddReplacementIndustry :exec
+WITH moved AS (
+  SELECT unnest($2::text[]) AS candidate_id, unnest($3::text[]) AS company_id, unnest($4::boolean[]) AS was_primary
+), made_current AS (
+  UPDATE industry_assignment a SET is_primary = true FROM moved m
+  WHERE a.category_id = $1 AND m.was_primary
+    AND a.candidate_id IS NOT DISTINCT FROM nullif(m.candidate_id, '') AND a.company_id IS NOT DISTINCT FROM nullif(m.company_id, '')
+)
+INSERT INTO industry_assignment(category_id, candidate_id, company_id, is_primary)
+SELECT $1, nullif(m.candidate_id, ''), nullif(m.company_id, ''), m.was_primary FROM moved m
+WHERE NOT EXISTS (SELECT 1 FROM industry_assignment a WHERE a.category_id = $1
+  AND a.candidate_id IS NOT DISTINCT FROM nullif(m.candidate_id, '') AND a.company_id IS NOT DISTINCT FROM nullif(m.company_id, ''))
+`
+
+type AddReplacementIndustryParams struct {
+	CategoryID   string
+	CandidateIds []string
+	CompanyIds   []string
+	Primaries    []bool
+}
+
+func (q *Queries) AddReplacementIndustry(ctx context.Context, arg AddReplacementIndustryParams) error {
+	_, err := q.db.Exec(ctx, addReplacementIndustry,
+		arg.CategoryID,
+		arg.CandidateIds,
+		arg.CompanyIds,
+		arg.Primaries,
+	)
+	return err
+}
+
 const allIndustryAssignments = `-- name: AllIndustryAssignments :many
 SELECT tenant_id, category_id, candidate_id, company_id, is_primary FROM industry_assignment ORDER BY candidate_id, company_id
 `
@@ -127,6 +158,15 @@ func (q *Queries) DeleteIndustry(ctx context.Context, id string) error {
 	return err
 }
 
+const deleteIndustryAssignments = `-- name: DeleteIndustryAssignments :exec
+DELETE FROM industry_assignment WHERE category_id = ANY($1::text[])
+`
+
+func (q *Queries) DeleteIndustryAssignments(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, deleteIndustryAssignments, ids)
+	return err
+}
+
 const ensureCatalogue = `-- name: EnsureCatalogue :exec
 INSERT INTO industry_catalogue(tenant_id) VALUES (app_current_tenant()) ON CONFLICT DO NOTHING
 `
@@ -159,6 +199,35 @@ func (q *Queries) InsertIndustry(ctx context.Context, arg InsertIndustryParams) 
 		arg.Retired,
 		arg.SourceKey,
 	)
+	var i Industry
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ParentID,
+		&i.Label,
+		&i.LabelKey,
+		&i.Aliases,
+		&i.Retired,
+		&i.SourceKey,
+	)
+	return i, err
+}
+
+const insertLegacyIndustry = `-- name: InsertLegacyIndustry :one
+INSERT INTO industry(label, label_key, aliases, retired, source_key)
+VALUES ($1, $2, '{}', true, $3)
+ON CONFLICT (tenant_id, label_key) DO UPDATE SET label_key = excluded.label_key RETURNING id, tenant_id, parent_id, label, label_key, aliases, retired, source_key
+`
+
+type InsertLegacyIndustryParams struct {
+	Label     string
+	LabelKey  string
+	SourceKey *string
+}
+
+// A label an older client sends that the catalogue lacks; two saves may add it at once.
+func (q *Queries) InsertLegacyIndustry(ctx context.Context, arg InsertLegacyIndustryParams) (Industry, error) {
+	row := q.db.QueryRow(ctx, insertLegacyIndustry, arg.Label, arg.LabelKey, arg.SourceKey)
 	var i Industry
 	err := row.Scan(
 		&i.ID,
@@ -240,6 +309,36 @@ func (q *Queries) LockCatalogue(ctx context.Context) (int32, error) {
 	return version, err
 }
 
+const primaryIndustryAssignments = `-- name: PrimaryIndustryAssignments :many
+SELECT tenant_id, category_id, candidate_id, company_id, is_primary FROM industry_assignment WHERE is_primary
+`
+
+func (q *Queries) PrimaryIndustryAssignments(ctx context.Context) ([]IndustryAssignment, error) {
+	rows, err := q.db.Query(ctx, primaryIndustryAssignments)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IndustryAssignment
+	for rows.Next() {
+		var i IndustryAssignment
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.CategoryID,
+			&i.CandidateID,
+			&i.CompanyID,
+			&i.IsPrimary,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const retireIndustry = `-- name: RetireIndustry :exec
 UPDATE industry SET retired = true WHERE id = $1 OR parent_id = $1
 `
@@ -247,6 +346,19 @@ UPDATE industry SET retired = true WHERE id = $1 OR parent_id = $1
 func (q *Queries) RetireIndustry(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, retireIndustry, id)
 	return err
+}
+
+const shareCatalogue = `-- name: ShareCatalogue :one
+SELECT version FROM industry_catalogue WHERE tenant_id = app_current_tenant() FOR SHARE
+`
+
+// Record saves only read the catalogue: they share this lock, so they never
+// wait for each other, only for a catalogue edit (which takes it exclusively).
+func (q *Queries) ShareCatalogue(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, shareCatalogue)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
 }
 
 const subjectIndustries = `-- name: SubjectIndustries :many
@@ -274,6 +386,39 @@ func (q *Queries) SubjectIndustries(ctx context.Context, arg SubjectIndustriesPa
 			&i.CompanyID,
 			&i.IsPrimary,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const subjectsInIndustries = `-- name: SubjectsInIndustries :many
+SELECT candidate_id, company_id, bool_or(is_primary)::boolean AS was_primary FROM industry_assignment
+WHERE category_id = ANY($1::text[]) GROUP BY candidate_id, company_id
+`
+
+type SubjectsInIndustriesRow struct {
+	CandidateID *string
+	CompanyID   *string
+	WasPrimary  bool
+}
+
+// Replacing categories: who had them (and whether as their current one),
+// then those rows go, then the replacement is added or made current.
+func (q *Queries) SubjectsInIndustries(ctx context.Context, ids []string) ([]SubjectsInIndustriesRow, error) {
+	rows, err := q.db.Query(ctx, subjectsInIndustries, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SubjectsInIndustriesRow
+	for rows.Next() {
+		var i SubjectsInIndustriesRow
+		if err := rows.Scan(&i.CandidateID, &i.CompanyID, &i.WasPrimary); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

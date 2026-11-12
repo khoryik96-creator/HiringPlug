@@ -7,6 +7,7 @@ import { formatDay, keysOf, NOTE_KIND } from "../labels";
 import { describe } from "./activityText";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
+import { CallQA } from "./callLines";
 import { ScreeningCalls } from "./ScreeningCalls";
 import { fieldErrors } from "./forms";
 
@@ -35,13 +36,6 @@ const filterOf = (n: Note): Filter => (isCall(n) ? "calls" : n.kind === "referen
 /** A note longer than this is folded to its first lines. */
 const LONG = 220;
 
-/** A call's lines "RFL: wants regional scope" as label and answer; its "Call on … by …" line is in the header. */
-export function callLines(body: string): { label: string | null; text: string }[] {
-  return body.split("\n").filter((l) => l.trim() && !/^Call on .+ by .+$/.test(l.trim())).map((l) => {
-    const m = /^([^:\n]{1,40}):\s+(.+)$/.exec(l.trim());
-    return m ? { label: m[1] ?? null, text: m[2] ?? "" } : { label: null, text: l.trim() };
-  });
-}
 
 /**
  * Notes on a record and what changed on it: the latest call pinned on top,
@@ -80,6 +74,7 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
       return n ? { note: n, on: when(n.createdAt), by: n.authorName } : null;
     })();
   const callCount = allNotes.filter(isCall).length;
+  const hasCalls = (calls.data?.length ?? 0) > 0;
 
   const items = [
     ...allNotes.map((n) => ({ key: n.id, at: n.createdAt, note: n, text: null as string | null, who: n.authorName, kind: filterOf(n) })),
@@ -109,17 +104,14 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
       {notes.data && notes.data.hiddenSensitive > 0 && (
         <p className="muted">🔒 {String(notes.data.hiddenSensitive)} sensitive note{notes.data.hiddenSensitive === 1 ? " is" : "s are"} hidden for your role.</p>
       )}
-      {pinned && (
+      {/* A candidate's screening calls, the latest open with its salary; otherwise the latest call note. */}
+      {hasCalls ? <ScreeningCalls candidateId={subjectId} permissions={permissions} /> : pinned && (
         <div className="pinned-call" aria-label="Latest call">
           <span className="pinned-label">
             Latest {pinned.note.kind === "screening" ? "screening call" : "call"} · {pinned.on} · by {pinned.by}
             {pinned.note.sensitive && " · 🔒 sensitive"}
           </span>
-          <dl className="call-qa">
-            {callLines(pinned.note.body).map((l, i) => (
-              l.label ? <div key={i}><dt>{l.label}</dt><dd>{l.text}</dd></div> : <div key={i} className="plain"><dd>{l.text}</dd></div>
-            ))}
-          </dl>
+          <CallQA body={pinned.note.body} />
           {callCount > 1 && (
             <button type="button" className="link small" onClick={() => { setFilter("calls"); setSearch(""); }}>
               {callCount - 1} earlier call{callCount === 2 ? "" : "s"}
@@ -127,7 +119,6 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
           )}
         </div>
       )}
-      {permissions.includes("candidates.compensation:read") && calls.data?.some((c)=>c.salarySnapshot) && <details className="salary-history"><summary>Salary history</summary><ScreeningCalls candidateId={subjectId} permissions={permissions}/></details>}
       {items.length > 0 && (
         <div className="timeline-tools">
           <div className="chips" role="group" aria-label="Show">
@@ -141,7 +132,7 @@ export function Timeline({ subjectType, subjectId, permissions, compact = false 
             value={search} onChange={(e) => { setSearch(e.target.value); }} />
         </div>
       )}
-      <ul className="timeline">
+      <ul className="timeline" aria-label="Notes and changes">
         {shown.map((i) => {
           const long = (i.note?.body.length ?? 0) > LONG || (i.note?.body.split("\n").length ?? 0) > 4;
           const isOpen = open.has(i.key);

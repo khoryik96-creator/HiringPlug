@@ -1,6 +1,7 @@
 // Turns an audit entry into a sentence: "changed Current title from
 // Accountant to Senior Accountant". Salary changes never carry amounts.
 import type { ActivityEntry } from "../api/client";
+import { formatDay } from "../labels";
 
 /** "currentTitle" -> "current title"; a few fields get friendlier names. */
 export function fieldName(field: string): string {
@@ -29,6 +30,12 @@ function show(value: unknown): string {
 export function describe(entry: ActivityEntry): string | null {
   const [, verb] = entry.action.split(".");
   switch (entry.action) {
+    case "candidate.screened": {
+      const on = typeof entry.changes.calledOn === "string" ? ` on ${formatDay(entry.changes.calledOn)}` : "";
+      if (entry.changes.salary === true) return `logged a screening call${on} and updated the salary`;
+      if (entry.changes.salarySentButOlder === true) return `logged a screening call${on} (its salary was kept with the call; a later call's salary stays current)`;
+      return `logged a screening call${on}`;
+    }
     case "candidate.compensation_updated":
       return "changed the salary details";
     case "job.salary_updated":

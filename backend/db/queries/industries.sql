@@ -2,6 +2,15 @@
 INSERT INTO industry_catalogue(tenant_id) VALUES (app_current_tenant()) ON CONFLICT DO NOTHING;
 -- name: LockCatalogue :one
 SELECT version FROM industry_catalogue WHERE tenant_id = app_current_tenant() FOR UPDATE;
+-- Record saves only read the catalogue: they share this lock, so they never
+-- wait for each other, only for a catalogue edit (which takes it exclusively).
+-- name: ShareCatalogue :one
+SELECT version FROM industry_catalogue WHERE tenant_id = app_current_tenant() FOR SHARE;
+-- A label an older client sends that the catalogue lacks; two saves may add it at once.
+-- name: InsertLegacyIndustry :one
+INSERT INTO industry(label, label_key, aliases, retired, source_key)
+VALUES (@label, @label_key, '{}', true, @source_key)
+ON CONFLICT (tenant_id, label_key) DO UPDATE SET label_key = excluded.label_key RETURNING *;
 -- name: CatalogueVersion :one
 SELECT version FROM industry_catalogue WHERE tenant_id = app_current_tenant();
 -- name: BumpCatalogue :exec
@@ -31,6 +40,27 @@ SELECT * FROM industry_assignment WHERE candidate_id = sqlc.narg(candidate_id) O
 DELETE FROM industry_assignment WHERE candidate_id = sqlc.narg(candidate_id) OR company_id = sqlc.narg(company_id);
 -- name: AssignIndustry :exec
 INSERT INTO industry_assignment(category_id, candidate_id, company_id, is_primary) VALUES (@category_id, sqlc.narg(candidate_id), sqlc.narg(company_id), @is_primary);
+-- name: PrimaryIndustryAssignments :many
+SELECT * FROM industry_assignment WHERE is_primary;
+-- Replacing categories: who had them (and whether as their current one),
+-- then those rows go, then the replacement is added or made current.
+-- name: SubjectsInIndustries :many
+SELECT candidate_id, company_id, bool_or(is_primary)::boolean AS was_primary FROM industry_assignment
+WHERE category_id = ANY(@ids::text[]) GROUP BY candidate_id, company_id;
+-- name: DeleteIndustryAssignments :exec
+DELETE FROM industry_assignment WHERE category_id = ANY(@ids::text[]);
+-- name: AddReplacementIndustry :exec
+WITH moved AS (
+  SELECT unnest(@candidate_ids::text[]) AS candidate_id, unnest(@company_ids::text[]) AS company_id, unnest(@primaries::boolean[]) AS was_primary
+), made_current AS (
+  UPDATE industry_assignment a SET is_primary = true FROM moved m
+  WHERE a.category_id = @category_id AND m.was_primary
+    AND a.candidate_id IS NOT DISTINCT FROM nullif(m.candidate_id, '') AND a.company_id IS NOT DISTINCT FROM nullif(m.company_id, '')
+)
+INSERT INTO industry_assignment(category_id, candidate_id, company_id, is_primary)
+SELECT @category_id, nullif(m.candidate_id, ''), nullif(m.company_id, ''), m.was_primary FROM moved m
+WHERE NOT EXISTS (SELECT 1 FROM industry_assignment a WHERE a.category_id = @category_id
+  AND a.candidate_id IS NOT DISTINCT FROM nullif(m.candidate_id, '') AND a.company_id IS NOT DISTINCT FROM nullif(m.company_id, ''));
 -- name: AllIndustryAssignments :many
 SELECT * FROM industry_assignment ORDER BY candidate_id, company_id;
 -- name: CandidatesInIndustries :many

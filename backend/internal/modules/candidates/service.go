@@ -97,11 +97,6 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, error) {
 	var view View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if s.industries != nil {
-			if _, err := s.industries.ReadIn(ctx, tx, "candidate", ""); err != nil {
-				return err
-			}
-		}
 		q := store.New(tx)
 		row, err := q.GetCandidate(ctx, id)
 		if database.IsNoRows(err) {

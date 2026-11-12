@@ -13,11 +13,13 @@ import (
 
 // Salary snapshots are immutable and use compensation RLS, never general notes or audit payloads.
 func saveCallSalary(ctx context.Context, tx pgx.Tx, p authz.Principal, call *ScreeningCall, current *Compensation, in *SalaryInput) error {
-	if !p.Can(api.PermissionCandidatesCompensationRead) {
+	// Only a call where salary was given has a salary of its own: the stored
+	// figures when it was the latest call (they were applied), else what was given.
+	if !p.Can(api.PermissionCandidatesCompensationRead) || in == nil {
 		return nil
 	}
 	recorded := current
-	if in != nil && !call.SalaryRecorded {
+	if !call.SalaryRecorded {
 		recorded = &Compensation{Current: in.Current, Expected: in.Expected, SalaryNotes: in.SalaryNotes.Value}
 	}
 	if recorded == nil {

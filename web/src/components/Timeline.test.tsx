@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type ActivityEntry, type Note } from "../api/client";
@@ -78,26 +78,28 @@ describe("timeline", () => {
       { id: "scl_1", calledOn: "2026-10-21", calledBy: "usr_2", calledByName: "Hafiz", noteId: "note_old", salaryRecorded: false, createdAt: "2026-10-21T09:00:00Z" },
     ]);
     renderWithClient(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["notes:read", "notes.activity:read", "candidates:read"]} />);
+    // The latest screening call is the open card on top; earlier ones are folded under it.
     const pinned = await screen.findByLabelText("Latest call");
-    expect(pinned.textContent).toContain("Latest screening call · 8 Nov 2026 · by Aina"); // when it was, not when it was logged
+    expect(pinned.textContent).toContain("8 Nov 2026 · Aina"); // when it was, not when it was logged
+    expect(pinned.textContent).toContain("Salary updated");
     expect(pinned.textContent).toContain("RFLwants regional scope");
     expect(pinned.textContent).not.toContain("Call on 8 Nov 2026"); // in the header already
     expect(screen.queryAllByText(/wants regional scope/)).toHaveLength(1); // not twice
+    const list = screen.getByRole("list", { name: "Notes and changes" });
 
-    const folded = screen.getByText(/Client feedback/);
+    const folded = within(list).getByText(/Client feedback/);
     expect(folded.className).toContain("folded");
     fireEvent.click(screen.getByRole("button", { name: "Show more" }));
     expect(folded.className).not.toContain("folded");
 
-    fireEvent.click(screen.getByRole("button", { name: "1 earlier call" }));
-    expect(screen.getByRole("button", { name: /^Calls/ }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.queryByText(/Client feedback/)).toBeNull();
-    expect(screen.getByText(/restructuring/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Calls/ }));
+    expect(within(list).queryByText(/Client feedback/)).toBeNull();
+    expect(within(list).getByText(/restructuring/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /^All/ }));
     fireEvent.change(screen.getByLabelText("Search notes"), { target: { value: "second round" } });
-    expect(screen.getByText(/Client feedback/)).toBeTruthy();
-    expect(screen.queryByText(/restructuring/)).toBeNull();
+    expect(within(list).getByText(/Client feedback/)).toBeTruthy();
+    expect(within(list).queryByText(/restructuring/)).toBeNull();
     expect(screen.queryByText(/changed current title/)).toBeNull();
   });
 
@@ -139,8 +141,8 @@ describe("dashboard", () => {
 it("shows protected call history even when the call had no general note", async()=>{
  mockReads(0,[],[{id:"scl_salary",calledOn:"2026-11-08",calledBy:"usr_1",calledByName:"Aina",noteId:null,salaryRecorded:true,createdAt:"2026-11-08T10:00:00Z",salarySnapshot:{currentSalary:null,expectedSalary:null,salaryNotes:"Recorded salary discussion"}}]);
  const view=renderWithClient(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["candidates:read","candidates.compensation:read"]}/>);
- const summary=await screen.findByText("Salary history");fireEvent.click(summary);
+ // The call's card is on top of Notes and activity, open, with the salary given on it.
  expect(await screen.findByText("Recorded salary discussion")).toBeTruthy();
  view.rerender(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["candidates:read"]}/>);
- expect(screen.queryByText("Salary history")).toBeNull();expect(screen.queryByText("Recorded salary discussion")).toBeNull();
+ expect(screen.getByLabelText("Latest call")).toBeTruthy();expect(screen.queryByText("Recorded salary discussion")).toBeNull();
 });

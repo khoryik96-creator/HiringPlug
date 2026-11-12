@@ -109,9 +109,12 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
         nodes.forEach((n)=>{n.remove();});cursor.current=null;changed();return;
       }
       if (!inserting.html) return;
-      // Insert a standalone block. Browser insertHTML can merge its first row
-      // into the introduction, which would delete that writing with the candidate.
-      box.current.insertAdjacentHTML("beforeend", inserting.html);
+      // A standalone block below the paragraph the cursor is in (else at the
+      // end). Browser insertHTML can merge its first row into the
+      // introduction, which would delete that writing with the candidate.
+      const paragraph = blockAt(box.current, cursor.current);
+      if (paragraph) paragraph.insertAdjacentHTML("afterend", inserting.html);
+      else box.current.insertAdjacentHTML("beforeend", inserting.html);
       cursor.current=null;changed();return;
     }
     insert(inserting.html);
@@ -187,4 +190,11 @@ export function RichEditor({ compact = false, invalid = false, html, resetKey, o
         aria-label="Message" aria-invalid={invalid || undefined} tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />
     </div>
   );
+}
+
+/** The message's top-level element holding the cursor, if it is in the message. */
+function blockAt(box: HTMLElement, range: Range | null): Element | null {
+  let node: Node | null = range?.startContainer ?? null;
+  while (node && node.parentNode !== box) node = node.parentNode;
+  return node instanceof Element ? node : null;
 }

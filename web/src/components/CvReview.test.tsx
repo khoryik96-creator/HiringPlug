@@ -49,6 +49,16 @@ describe("suggestions from a CV", () => {
     expect(noticeFrom("soon")).toBeNull();
   });
 
+  it("offers the first job listed when none is marked current or dated (common in CVs)", () => {
+    const undated = { ...profile, experience: [
+      { title: s("Finance Manager"), company: s("Example Trading"), dates: null, startDate: null, endDate: null, current: false },
+      { title: s("Accountant"), company: s("Old Co"), dates: null, startDate: null, endDate: null, current: false },
+    ] };
+    const rows = suggestions(undated, testCandidate({ currentTitle: null, currentCompany: null }));
+    expect(rows.find((r) => r.key === "currentTitle")?.value).toBe("Finance Manager");
+    expect(rows.find((r) => r.key === "currentCompany")?.value).toBe("Example Trading");
+  });
+
   it("offers the CV's LinkedIn link, including one hidden behind a link in the file", () => {
     const withLink = { ...profile, linkedinUrl: s("https://www.linkedin.com/in/siti-aisyah", "linkedin.com/in/siti-aisyah") };
     const candidate = testCandidate({ linkedinUrl: null });

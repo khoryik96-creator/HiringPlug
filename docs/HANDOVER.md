@@ -152,6 +152,24 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   because large attachments go through a draft; "Payment Getaway" in the
   industry list is CV Studio's spelling, shared with its AI prompt, so change
   both together or neither.
+- **Second, full review (12 Nov).** Fixed: every candidate and company save
+  (and loading suggestions) took the agency's industry lock exclusively, so
+  saves queued behind each other; saves now share it and only Settings edits
+  to the industry list take it alone. Renaming, moving or deleting an
+  industry rewrote records one by one (2.3 s for 5,000 candidates, all saves
+  waiting); it is now a few bulk statements (0.3 s). CV imports and the CV
+  review again fill the current title and company when jobs are undated
+  (the job marked current, else the first listed); industries still need a
+  clearly identified employer. Calls without salary no longer show the
+  candidate's salary as if recorded on them (snapshots stored 10–12 Nov for
+  such calls were left in place). Candidate details go below the paragraph
+  the cursor is in, not after the sign-off. The salary calculator's review
+  points are highlighted but no longer block "Use these figures". The
+  screening-call cards replace the "Latest call" box and the separate
+  salary history in Notes and activity. Logged calls read as a sentence in
+  the timeline. Open for the owner to decide: the candidate-page composer
+  can send other candidates' details (salary included, if ticked) to a
+  candidate recipient.
 - Proposed before and still open: batch CV formatting; possible candidates
   by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
   PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft

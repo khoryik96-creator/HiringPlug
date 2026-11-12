@@ -84,11 +84,6 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (Company, error) {
 	var out Company
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if s.industries != nil {
-			if _, err := s.industries.ReadIn(ctx, tx, "companie", ""); err != nil {
-				return err
-			}
-		}
 		row, err := store.New(tx).GetCompany(ctx, id)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("company")

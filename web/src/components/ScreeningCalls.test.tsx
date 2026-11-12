@@ -21,7 +21,7 @@ describe("a candidate's screening calls", () => {
       ? { items: [note("note_2", "RFL: wants regional scope"), note("note_1", "RFL: restructuring")], hiddenSensitive: 0 }
       : { items: [call("scl_2", "2026-11-08", "Aina", "note_2", true), call("scl_1", "2026-10-21", "Hafiz", "note_1", false), call("scl_0", "2026-10-01", "Hafiz", null, false)] }))) as never);
     renderWithClient(<ScreeningCalls candidateId="cand_1" permissions={["candidates:read", "notes:read"]} />);
-    expect(await screen.findByText("RFL: wants regional scope")).toBeTruthy();
+    expect(await screen.findByText("wants regional scope")).toBeTruthy(); // as question and answer
     const items = screen.getAllByRole("listitem");
     expect(items).toHaveLength(3);
     expect(items[0]?.textContent).toContain("8 Nov 2026");

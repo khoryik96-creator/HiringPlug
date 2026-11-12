@@ -20,11 +20,6 @@ type UsedValues struct {
 func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, error) {
 	out := UsedValues{Tags: []string{}, Skills: []string{}, Industries: []string{}, Specializations: []string{}}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if s.industries != nil {
-			if err := s.industries.LockIn(ctx, tx); err != nil {
-				return err
-			}
-		}
 		rows, err := store.New(tx).UsedValues(ctx)
 		for _, r := range rows {
 			switch r.Kind {

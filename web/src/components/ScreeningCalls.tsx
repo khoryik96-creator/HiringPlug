@@ -1,9 +1,11 @@
-// A candidate's screening calls, latest first: when, by whom, whether it set
-// the salary, and what was said (the call's note), to read back easily.
+// A candidate's screening calls, latest first (open), the others folded: when,
+// by whom, what was said (the call's note, as questions and answers) and the
+// salary given on that call. Shown at the top of Notes and activity.
 import { useQuery } from "@tanstack/react-query";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { notesKey, screeningCallsKey } from "../api/keys";
+import { CallQA } from "./callLines";
 import { ScreeningSalarySnapshot } from "./ScreeningSalarySnapshot";
 import { formatDay } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
@@ -29,15 +31,16 @@ export function ScreeningCalls({ candidateId, permissions }: { candidateId: stri
         {list.map((c, i) => {
           const note = noteOf(c.noteId);
           return (
-            <li key={c.id} className={i === 0 ? "latest" : undefined}>
+            <li key={c.id} className={i === 0 ? "latest" : undefined} aria-label={i === 0 ? "Latest call" : undefined}>
               <details open={i === 0}>
                 <summary>
                   <strong>{formatDay(c.calledOn)}</strong>
                   <span className="muted"> · {c.calledByName ?? "someone no longer here"}</span>
                   {i === 0 && <span className="badge interview">Latest</span>}
                   {c.salaryRecorded && <span className="badge placed">Salary updated</span>}
+                  {note?.sensitive && <span className="muted small"> · 🔒 sensitive</span>}
                 </summary>
-                {note ? <p className="pre call-note">{note.body}</p>
+                {note ? <CallQA body={note.body} />
                   : <p className="muted small">{c.noteId ? "The note is hidden for your role." : "No notes were written on this call."}</p>}
                 {permissions.includes("candidates.compensation:read") && c.salarySnapshot && <ScreeningSalarySnapshot value={c.salarySnapshot} />}
               </details>

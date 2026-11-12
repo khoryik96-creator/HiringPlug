@@ -91,15 +91,31 @@ it("does not let an unrelated expected figure approve an unreviewed current sala
   expect(screen.getByTestId("problems").textContent).toContain("Calculate and review");
 });
 
-it("blocks a calculation the server marks as requiring review", async () => {
-  vi.spyOn(api,"GET").mockResolvedValue(ok({ allowances:true, bonus:true, bonusOnAllowances:false, cents:false }));
-  vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"400",allowances:"0",bonus:"0",monthly:"400",annualMonths:12,hasCurrent:true,reviewRequired:true,warnings:["A negative salary component needs review."],excluded:[] }));
+it("highlights what needs review but still lets the recruiter use the figures", async () => {
+  vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"15000",allowances:"500",bonus:"1875",monthly:"17375",annualMonths:13.5,hasCurrent:true,reviewRequired:true,
+    expectedMin:"19113",expectedMax:"20850",warnings:["Choose one fixed salary or guaranteed bonus figure, not a range."],excluded:["rsu"] }));
   renderWithClient(<Harness />);
-  fireEvent.change(screen.getByLabelText("Current salary breakdown"), { target: { value: "-16k + 400 allowance" } });
-  await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false); });
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"), { target: { value: "rm15k + 13.5th month + rsu + 500 allowance + 2-4 months bonus" } });
+  fireEvent.change(screen.getByLabelText("Expected salary"), { target: { value: "10-20%" } });
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  const button = await screen.findByRole<HTMLButtonElement>("button",{name:"Use these figures"});
+  expect(screen.getByText("Choose one fixed salary or guaranteed bonus figure, not a range.").className).toContain("warning");
+  expect(button.disabled).toBe(false);
+  fireEvent.click(button);
+  expect(screen.getByText("Figures applied. Save the call.")).toBeTruthy();
+  expect(screen.getByTestId("problems").textContent).toBe("{}");
+  expect(screen.getByTestId("body").textContent).toContain('"amount":"17375"');
+  expect(screen.getByTestId("body").textContent).toContain('"min":"19113"');
+});
+
+it("cannot use a calculation that read no figure at all", async () => {
+  vi.spyOn(api,"POST").mockResolvedValue(ok({ base:"0",allowances:"0",bonus:"0",monthly:"0",annualMonths:12,hasCurrent:false,reviewRequired:true,warnings:["Enter a basic salary."],excluded:[] }));
+  renderWithClient(<Harness />);
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"), { target: { value: "salary unknown" } });
   fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
   const button = await screen.findByRole<HTMLButtonElement>("button",{name:"Use these figures"});
   expect(button.disabled).toBe(true);
+  expect(screen.getByRole("button",{name:"Enter figures manually"})).toBeTruthy();
 });
 
 it("offers explicit manual review when the scanner cannot resolve a bonus", async () => {

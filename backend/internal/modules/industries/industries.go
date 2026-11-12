@@ -20,6 +20,7 @@ type LegacyIndustry struct{ Kind, ID, Label string }
 type Records interface {
 	LegacyIndustries(context.Context, pgx.Tx) ([]LegacyIndustry, error)
 	SetIndustrySummary(context.Context, pgx.Tx, string, string, *string) error
+	SetIndustrySummaries(ctx context.Context, tx pgx.Tx, kind string, ids, labels []string) error
 	EmployerEvidence(context.Context, pgx.Tx, string) (Evidence, error)
 	VerifiedEmployer(context.Context, pgx.Tx, string) (string, error)
 }
@@ -66,12 +67,14 @@ func (m *Module) CandidateIDsIn(ctx context.Context, tx pgx.Tx, values []string)
 	return m.service.candidateIDsIn(ctx, tx, values)
 }
 
-// LockIn takes the catalogue lock before a record is edited, avoiding lock inversion.
+// LockIn takes the catalogue lock, shared, before a record is edited: record
+// saves run side by side and wait only for a catalogue edit, which takes it
+// exclusively; taking it first avoids lock inversion.
 func (m *Module) LockIn(ctx context.Context, tx pgx.Tx) error {
 	if err := m.service.ensureIn(ctx, tx); err != nil {
 		return err
 	}
-	_, err := store.New(tx).LockCatalogue(ctx)
+	_, err := store.New(tx).ShareCatalogue(ctx)
 	return err
 }
 

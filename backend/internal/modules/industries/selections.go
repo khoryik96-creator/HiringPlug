@@ -51,7 +51,7 @@ func (s *Service) saveIn(ctx context.Context, tx pgx.Tx, kind, id string, in *ap
 	if err := s.ensureIn(ctx, tx); err != nil {
 		return api.IndustrySelections{}, err
 	}
-	if _, err := store.New(tx).LockCatalogue(ctx); err != nil {
+	if _, err := store.New(tx).ShareCatalogue(ctx); err != nil {
 		return api.IndustrySelections{}, err
 	}
 	before, err := s.readIn(ctx, tx, kind, id)
@@ -80,20 +80,18 @@ func (s *Service) saveIn(ctx context.Context, tx pgx.Tx, kind, id string, in *ap
 		if legacy != nil {
 			item := Match(c.Items, *legacy)
 			if item == nil {
+				// A retired entry, never offered as a choice, so the catalogue
+				// version (which open editors check) stays as it is: bumping it
+				// would need the exclusive lock that saves do not take.
 				source := "legacy-value:" + Key(*legacy)
-				row, e := store.New(tx).InsertIndustry(ctx, store.InsertIndustryParams{SourceKey: &source, Label: *legacy, LabelKey: Key(*legacy), Aliases: []string{}, Retired: true})
+				row, e := store.New(tx).InsertLegacyIndustry(ctx, store.InsertLegacyIndustryParams{SourceKey: &source, Label: *legacy, LabelKey: Key(*legacy)})
 				if e != nil {
 					return before, e
 				}
-				created := api.Industry{Id: row.ID, Label: row.Label, Aliases: []string{}, Retired: true}
+				created := api.Industry{Id: row.ID, Label: row.Label, Aliases: []string{}, Retired: row.Retired, SourceKey: row.SourceKey}
 				items[created.Id] = created
 				item = &created
 				legacyImported = created.Id
-				if e := store.New(tx).BumpCatalogue(ctx); e != nil {
-					return before, e
-				}
-				c.Version++
-				copy.CatalogueVersion = c.Version
 				if e := audit.Record(ctx, tx, audit.Entry{Action: "industry.legacy_imported", EntityType: "industry", EntityID: created.Id}); e != nil {
 					return before, e
 				}
@@ -161,50 +159,37 @@ func writeSelections(ctx context.Context, q *store.Queries, kind, id string, in 
 	}
 	return nil
 }
+
+// replaceIn moves every record tagged with an affected category to the
+// replacement (kept current where it was current), or just drops the tags.
+// A few statements for the whole agency, not one per record.
 func (s *Service) replaceIn(ctx context.Context, tx pgx.Tx, affected map[string]bool, replacement *api.Industry) error {
 	q := store.New(tx)
-	rows, err := q.AllIndustryAssignments(ctx)
+	ids := make([]string, 0, len(affected))
+	for id := range affected {
+		ids = append(ids, id)
+	}
+	moved, err := q.SubjectsInIndustries(ctx, ids)
 	if err != nil {
 		return err
 	}
-	type group struct {
-		kind, id string
-		in       api.IndustrySelections
+	if err := q.DeleteIndustryAssignments(ctx, ids); err != nil {
+		return err
 	}
-	groups := map[string]*group{}
-	for _, r := range rows {
-		kind, id := "candidate", r.CandidateID
-		if id == nil {
-			kind, id = "company", r.CompanyID
-		}
-		k := kind + ":" + *id
-		g := groups[k]
-		if g == nil {
-			g = &group{kind: kind, id: *id}
-			groups[k] = g
-		}
-		cat := r.CategoryID
-		if affected[cat] {
-			if replacement == nil {
-				continue
-			}
-			cat = replacement.Id
-		}
-		if !slices.Contains(g.in.Ids, cat) {
-			g.in.Ids = append(g.in.Ids, cat)
-		}
-		if r.IsPrimary {
-			copy := cat
-			g.in.PrimaryId = &copy
-		}
+	if replacement == nil || len(moved) == 0 {
+		return nil
 	}
-	for _, g := range groups {
-		if err := writeSelections(ctx, q, g.kind, g.id, g.in); err != nil {
-			return err
-		}
+	in := store.AddReplacementIndustryParams{CategoryID: replacement.Id}
+	for _, m := range moved {
+		in.CandidateIds = append(in.CandidateIds, deref(m.CandidateID))
+		in.CompanyIds = append(in.CompanyIds, deref(m.CompanyID))
+		in.Primaries = append(in.Primaries, m.WasPrimary)
 	}
-	return nil
+	return q.AddReplacementIndustry(ctx, in)
 }
+
+// refreshSummaries rewrites the broad-industry summaries after a rename, move
+// or replacement; only those that changed are written (and get a new version).
 func (s *Service) refreshSummaries(ctx context.Context, tx pgx.Tx) error {
 	if s.records == nil {
 		return nil
@@ -214,24 +199,32 @@ func (s *Service) refreshSummaries(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	items := catalogueMap(c.Items)
-	rows, err := store.New(tx).AllIndustryAssignments(ctx)
+	rows, err := store.New(tx).PrimaryIndustryAssignments(ctx)
 	if err != nil {
 		return err
 	}
+	ids, labels := map[string][]string{}, map[string][]string{}
 	for _, r := range rows {
-		if !r.IsPrimary {
-			continue
-		}
 		kind, id := "candidate", r.CandidateID
 		if id == nil {
 			kind, id = "company", r.CompanyID
 		}
-		label := root(items[r.CategoryID], items).Label
-		if err := s.records.SetIndustrySummary(ctx, tx, kind, *id, &label); err != nil {
+		ids[kind] = append(ids[kind], *id)
+		labels[kind] = append(labels[kind], root(items[r.CategoryID], items).Label)
+	}
+	for kind := range ids {
+		if err := s.records.SetIndustrySummaries(ctx, tx, kind, ids[kind], labels[kind]); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 func (s *Service) candidateIDsIn(ctx context.Context, tx pgx.Tx, values []string) ([]string, error) {
 	if err := s.ensureIn(ctx, tx); err != nil {

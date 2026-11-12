@@ -338,6 +338,11 @@ SELECT id, industry::text FROM candidate WHERE industry IS NOT NULL;
 -- name: SetIndustrySummary :exec
 UPDATE candidate SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
 WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);
+-- Many at once, after an industry is renamed, moved or replaced.
+-- name: SetIndustrySummaries :exec
+UPDATE candidate r SET industry = v.industry, version = r.version + 1, updated_at = now()
+FROM (SELECT unnest(@ids::text[]) AS id, unnest(@industries::text[]) AS industry) v
+WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry;
 
 -- name: InsertScreeningSalarySnapshot :exec
 INSERT INTO screening_call_salary(call_id,snapshot) VALUES (@call_id,@snapshot);

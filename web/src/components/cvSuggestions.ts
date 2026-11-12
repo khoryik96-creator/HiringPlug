@@ -28,11 +28,13 @@ export function noticeFrom(text: string): Notice | null {
   return m ? { value: Number(m[1]), unit: m[2] as Notice["unit"] } : null;
 }
 
-/** Use the employer selected by Go. Older parsed documents need an unambiguous current job. */
+/**
+ * The job the candidate has now: the employer the server identified, else the
+ * one marked current, else the first listed (CVs list the newest first).
+ */
 export function latestJob(p: Profile): Profile["experience"][number] | undefined {
   if (p.selectedEmployerIndex !== undefined) return p.experience[p.selectedEmployerIndex];
-  const current = p.experience.filter((j) => j.current);
-  return current.length === 1 ? current[0] : undefined;
+  return p.experience.find((j) => j.current) ?? p.experience[0];
 }
 
 const same = (a: string | null, b: string) => (a ?? "").trim().toLowerCase() === b.trim().toLowerCase();

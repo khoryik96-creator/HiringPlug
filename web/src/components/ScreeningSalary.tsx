@@ -37,9 +37,10 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   // A result counts only for the wording and currency it was calculated from.
   const fresh = result && asked && asked.current === current && asked.expected === expected
     && ((asked.currentCurrency ?? "") === selectedCurrency || result.currentCurrency === selectedCurrency);
-  const blocked = result && (result.reviewRequired
-    || (!result.hasCurrent && !result.expectedMin)
-    || (!!expected.trim() && !result.expectedMin));
+  // Points to check: shown highlighted, but the recruiter decides and may
+  // still use the figures. Only a result with no figure at all has nothing to use.
+  const needsReview = result && (result.reviewRequired || (!!expected.trim() && !result.expectedMin));
+  const nothingToUse = result && !result.hasCurrent && !result.expectedMin;
 
   const edit = (value: Partial<SalaryFormState>) => {
     setApplied(false);
@@ -54,15 +55,17 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   };
 
   const useFigures = () => {
-    if (!fresh || blocked) return;
+    if (!fresh || nothingToUse) return;
+    // A figure the calculation could not read keeps what the form had.
+    const expectedRead = !!result.expectedMin;
     patch({
-      currentAmount: result.hasCurrent ? result.monthly : "",
-      currentPeriod: "month",
+      currentAmount: result.hasCurrent ? result.monthly : form.currentAmount,
+      currentPeriod: result.hasCurrent ? "month" : form.currentPeriod,
       currentCurrency: result.currentCurrency ?? form.currentCurrency,
       currentDescription: current,
-      expectedMin: result.expectedMin ?? "",
-      expectedMax: result.expectedMax ?? "",
-      expectedPeriod: "month",
+      expectedMin: expectedRead ? result.expectedMin ?? "" : form.expectedMin,
+      expectedMax: expectedRead ? result.expectedMax ?? "" : form.expectedMax,
+      expectedPeriod: expectedRead ? "month" : form.expectedPeriod,
       expectedCurrency: result.expectedCurrency ?? form.expectedCurrency,
       expectedDescription: expected,
       calculationPending: false,
@@ -155,17 +158,17 @@ export function ScreeningSalary({ form, patch, set, errors }: {
             </p>
           )}
           {result.excluded.length > 0 && <p className="muted small">Excluded: {result.excluded.join(" · ")}</p>}
-          {result.warnings.map((w) => <p className="small" key={w}>{w}</p>)}
-          {blocked && (
-            <p className="small" id={blockedId} role="alert">
-              Resolve the calculation warnings, or enter reviewed figures manually.
+          {result.warnings.map((w) => <p className={needsReview ? "warning small" : "small"} key={w}>{w}</p>)}
+          {needsReview && (
+            <p className="warning small" id={blockedId} role="alert">
+              Check the points above. You can still use these figures, or enter reviewed figures manually.
             </p>
           )}
           <div className="row">
-            <button type="button" disabled={!!blocked} aria-describedby={blocked ? blockedId : undefined} onClick={useFigures}>
+            <button type="button" disabled={!!nothingToUse} aria-describedby={needsReview ? blockedId : undefined} onClick={useFigures}>
               Use these figures
             </button>
-            {blocked && <button type="button" onClick={openManual}>Enter figures manually</button>}
+            {(needsReview || nothingToUse) && <button type="button" onClick={openManual}>Enter figures manually</button>}
           </div>
         </div>
       )}

@@ -150,6 +150,11 @@ SELECT id, industry::text FROM company WHERE industry IS NOT NULL;
 -- name: SetIndustrySummary :exec
 UPDATE company SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
 WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);
+-- Many at once, after an industry is renamed, moved or replaced.
+-- name: SetIndustrySummaries :exec
+UPDATE company r SET industry = v.industry, version = r.version + 1, updated_at = now()
+FROM (SELECT unnest(@ids::text[]) AS id, unnest(@industries::text[]) AS industry) v
+WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry;
 -- name: IndustryEmployerID :one
 SELECT id FROM company WHERE name_key = app_normalize_text(@name::text);
 -- name: TouchCompany :one

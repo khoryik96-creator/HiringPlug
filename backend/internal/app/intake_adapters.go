@@ -88,6 +88,12 @@ func cvFromParsed(p api.ParsedProfile) candidates.FromCV {
 		jobs = append(jobs, industries.Employment{Name: plainString(job.Company), Title: plainString(job.Title), Start: plainString(job.StartDate), End: plainString(job.EndDate), Current: job.Current})
 	}
 	latest, _ := industries.SelectEmployer(jobs, time.Now())
+	if latest < 0 {
+		// No clearly identified employer (undated jobs are common): the current
+		// title and company still come from the job marked current, else the
+		// first listed, as the CV review shows them. The industry is not guessed.
+		latest = fallbackJob(cv.History.Work)
+	}
 	if latest >= 0 {
 		cv.Profile.CurrentTitle, cv.Profile.CurrentCompany = cv.History.Work[latest].Title, cv.History.Work[latest].Company
 	}
@@ -105,4 +111,18 @@ type documentCandidates struct{ *candidates.Module }
 
 func (a documentCandidates) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {
 	return intakeCandidates(a).Names(ctx, tx, ids)
+}
+
+// fallbackJob is the job marked current, else the first one listed (CVs list
+// the newest first); -1 when there is none.
+func fallbackJob(work []candidates.Job) int {
+	for i, j := range work {
+		if j.Current {
+			return i
+		}
+	}
+	if len(work) > 0 {
+		return 0
+	}
+	return -1
 }

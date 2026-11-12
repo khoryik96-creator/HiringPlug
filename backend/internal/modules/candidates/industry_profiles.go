@@ -42,3 +42,8 @@ func (m *Module) LegacyIndustries(ctx context.Context, tx pgx.Tx) (map[string]st
 func (m *Module) SetIndustrySummary(ctx context.Context, tx pgx.Tx, id string, label *string) error {
 	return store.New(tx).SetIndustrySummary(ctx, store.SetIndustrySummaryParams{ID: id, Industry: label})
 }
+
+// SetIndustrySummaries sets many summaries in one statement (labels[i] is ids[i]'s).
+func (m *Module) SetIndustrySummaries(ctx context.Context, tx pgx.Tx, ids, labels []string) error {
+	return store.New(tx).SetIndustrySummaries(ctx, store.SetIndustrySummariesParams{Ids: ids, Industries: labels})
+}
