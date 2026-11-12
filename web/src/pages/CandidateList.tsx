@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
@@ -13,7 +13,7 @@ import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, 
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
-import { StickyScrollbar } from "../components/StickyScrollbar";
+import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
@@ -35,7 +35,6 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     return Object.values(SORTABLE).some((s) => (s.asc === kept || s.desc === kept) && (!s.salary || canSeeSalary)) ? kept : "newest";
   });
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
-  const tableBox = useRef<HTMLDivElement>(null);
   const list = useInfiniteQuery({
     queryKey: [...candidatesKey, q, mine, sortBy],
     enabled: !advanced,
@@ -128,7 +127,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           {allShown ? "Unselect all shown" : "Select all shown"}
         </button>
       )}
-      <div className="table-scroll pinned-scroll" ref={tableBox}>
+      <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
           <thead>
             <tr>
@@ -162,8 +161,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             ))}
           </tbody>
         </table>
-      </div>
-      <StickyScrollbar target={tableBox} />
+      </PinnedScroll>
       {shownList.hasNextPage && (
         <button type="button" className="doc-btn" disabled={shownList.isFetchingNextPage} onClick={() => { void shownList.fetchNextPage(); }}>Show more</button>
       )}

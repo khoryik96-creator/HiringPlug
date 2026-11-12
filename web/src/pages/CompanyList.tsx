@@ -9,6 +9,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { COMPANY_TYPE, keysOf } from "../labels";
 import { hashParam } from "../hashQuery";
+import { PinnedScroll } from "../components/StickyScrollbar";
 
 type TypeFilter = "" | Schemas["CompanyType"];
 
@@ -55,6 +56,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
         />
       )}
       <ErrorMessage error={list.error} />
+      <PinnedScroll>
       <table>
         <thead>
           <tr>
@@ -88,6 +90,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
           )}
         </tbody>
       </table>
+      </PinnedScroll>
     </main>
   );
 }

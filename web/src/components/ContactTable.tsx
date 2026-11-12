@@ -1,6 +1,7 @@
 import type { ContactSummary } from "../api/client";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { pickRowProps } from "./pickRow";
+import { PinnedScroll } from "./StickyScrollbar";
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
 export function ContactTable({ contacts, showCompany = false, empty, picked, onPick }: {
@@ -17,6 +18,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
     {onPick && contacts.length > 0 && (
       <button type="button" className="link small" onClick={() => { onPick(contacts, !all); }}>{all ? "Unselect all shown" : "Select all shown"}</button>
     )}
+    <PinnedScroll>
     <table className={onPick ? "pick-table" : undefined}>
       <thead>
         <tr>
@@ -46,6 +48,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
         )}
       </tbody>
     </table>
+    </PinnedScroll>
     </>
   );
 }
