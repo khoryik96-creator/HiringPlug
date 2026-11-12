@@ -801,7 +801,9 @@ add up to is taken off the fee of the **first placement on the job** (not a
 cancelled one): that placement shows the retainer and the balance, its
 timeline shows the retainer stages, and its invoice is for the balance
 ("less the retainer of ..."); when the retainer covers the whole fee there is
-nothing left to invoice. A fee in another currency is left as it is. Like
+nothing left to invoice. A fee in another currency is left as it is. In the
+fee totals (the Placements page, a client's billing) each stage counts under
+its own invoice state, and only the balance under the placement's. Like
 salary and fees, retainers are hidden by the database from those without
 `placements.fees:read`, and the audit log never records their amounts.
 

@@ -5,6 +5,7 @@ package placements
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -165,6 +166,63 @@ func (s *Service) retainersOff(ctx context.Context, tx pgx.Tx, jobIDs []string) 
 		}
 	}
 	return out, nil
+}
+
+// retainerLines are what fee totals add for retainers: for each first
+// placement on a job with one that stands and that keep accepts, its retainer
+// share moves out of the placement's own invoice state, and each stage counts
+// under its own (paid, invoiced, not invoiced).
+func (s *Service) retainerLines(ctx context.Context, tx pgx.Tx, keep func(store.Placement) bool) ([]FeeLine, error) {
+	q := store.New(tx)
+	jobIDs, err := q.RetainerJobs(ctx)
+	if err != nil || len(jobIDs) == 0 {
+		return nil, err
+	}
+	rs, err := s.retainersOff(ctx, tx, jobIDs)
+	if err != nil {
+		return nil, err
+	}
+	var out []FeeLine
+	for id, rv := range rs {
+		row, err := q.GetPlacement(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if row.Status != Active || !keep(row) {
+			continue
+		}
+		money, err := q.PlacementMoney(ctx, []string{id})
+		if err != nil {
+			return nil, err
+		}
+		if len(money) == 0 {
+			continue
+		}
+		m, err := moneyOf(money[0])
+		if err != nil {
+			return nil, err
+		}
+		if m.FeeAmount == nil || m.FeeCurrency == nil {
+			continue
+		}
+		balance, ok := rv.Balance(*m.FeeAmount, *m.FeeCurrency)
+		if !ok {
+			continue
+		}
+		fee, _ := new(big.Rat).SetString(*m.FeeAmount)
+		left, _ := new(big.Rat).SetString(balance)
+		taken := fee.Sub(fee, left).Neg(fee)
+		out = append(out, FeeLine{Status: Active, InvoiceStatus: row.InvoiceStatus, Amount: taken.FloatString(2), Currency: rv.Currency})
+		for _, st := range rv.Stages {
+			out = append(out, FeeLine{Status: Active, InvoiceStatus: st.InvoiceStatus, Amount: st.Amount, Currency: rv.Currency})
+		}
+	}
+	return out, nil
+}
+
+// inPeriod reports whether a day is within from and to (nil: open).
+func inPeriod(day time.Time, from, to *time.Time) bool {
+	return (from == nil || !day.Before(*from)) && (to == nil || !day.After(*to))
 }
 
 func loadRetainers(ctx context.Context, q *store.Queries, jobIDs []string) (map[string]Retainer, error) {

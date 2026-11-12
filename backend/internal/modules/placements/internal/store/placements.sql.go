@@ -787,6 +787,32 @@ func (q *Queries) PutPlacementMoney(ctx context.Context, arg PutPlacementMoneyPa
 	return err
 }
 
+const retainerJobs = `-- name: RetainerJobs :many
+SELECT job_order_id FROM job_retainer
+`
+
+// Every job with a retainer (fees only): their stages move out of the first
+// placement's invoice state in the fee totals.
+func (q *Queries) RetainerJobs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, retainerJobs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var job_order_id string
+		if err := rows.Scan(&job_order_id); err != nil {
+			return nil, err
+		}
+		items = append(items, job_order_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const retainerStages = `-- name: RetainerStages :many
 SELECT job_order_id, position, label, amount::text AS amount, due_kind, due_on, due_days,
        invoice_status, invoice_number, invoiced_on, paid_on

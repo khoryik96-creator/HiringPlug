@@ -233,7 +233,14 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) ([]View
 		sums, err := q.PlacementFeeTotals(ctx, store.PlacementFeeTotalsParams{
 			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
 		})
-		totals = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total })
+		if err != nil {
+			return err
+		}
+		moved, err := s.retainerLines(ctx, tx, func(r store.Placement) bool {
+			return (f.ApplicationID == nil || r.ApplicationID == *f.ApplicationID) && (f.Status == nil || r.Status == *f.Status) &&
+				(f.InvoiceStatus == nil || r.InvoiceStatus == *f.InvoiceStatus) && inPeriod(r.StartDate, f.StartFrom, f.StartTo)
+		})
+		totals = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total }, moved...)
 		return err
 	})
 	return out, totals, err
@@ -265,7 +272,17 @@ func (s *Service) CompanyBilling(ctx context.Context, p authz.Principal, company
 			if err != nil {
 				return err
 			}
-			*period.into = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total })
+			onCompany := map[string]bool{}
+			for _, id := range ids {
+				onCompany[id] = true
+			}
+			moved, err := s.retainerLines(ctx, tx, func(r store.Placement) bool {
+				return onCompany[r.ApplicationID] && inPeriod(r.StartDate, period.from, period.to)
+			})
+			if err != nil {
+				return err
+			}
+			*period.into = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total }, moved...)
 		}
 		return nil
 	})
@@ -273,14 +290,14 @@ func (s *Service) CompanyBilling(ctx context.Context, p authz.Principal, company
 }
 
 // feeTotals turns the database's sums (currency, invoice status, total) into
-// totals per currency.
-func feeTotals(n int, row func(i int) (currency, invoiceStatus, total string)) []FeeTotal {
-	lines := make([]FeeLine, n)
+// totals per currency, with extra lines (a retainer's stages).
+func feeTotals(n int, row func(i int) (currency, invoiceStatus, total string), extra ...FeeLine) []FeeTotal {
+	lines := make([]FeeLine, n, n+len(extra))
 	for i := range lines {
 		currency, invoiceStatus, total := row(i)
 		lines[i] = FeeLine{Status: Active, InvoiceStatus: invoiceStatus, Amount: total, Currency: currency}
 	}
-	return Totals(lines)
+	return Totals(append(lines, extra...))
 }
 
 func (s *Service) checkRecruiter(ctx context.Context, tx pgx.Tx, id *string) error {

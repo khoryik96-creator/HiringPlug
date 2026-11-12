@@ -198,3 +198,8 @@ VALUES (app_current_tenant(), @job_order_id, @position, @label, sqlc.arg(amount)
 SELECT id, start_date FROM placement
 WHERE application_id = ANY(@application_ids::text[]) AND status <> 'cancelled'
 ORDER BY id LIMIT 1;
+
+-- Every job with a retainer (fees only): their stages move out of the first
+-- placement's invoice state in the fee totals.
+-- name: RetainerJobs :many
+SELECT job_order_id FROM job_retainer;

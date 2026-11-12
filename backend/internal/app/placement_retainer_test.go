@@ -109,8 +109,31 @@ func TestJobRetainer(t *testing.T) {
 		assert.NotContains(t, doc, "MYR 45,000.00")
 	})
 
+	t.Run("fee totals count each stage under its own invoice state", func(t *testing.T) {
+		// Two placements of MYR 45,000 on the job; the first has the retainer:
+		// 15,000 paid, 20,000 not invoiced, and its balance of 10,000 not invoiced.
+		want := []api.FeeTotal{{Currency: "MYR", Total: "90000.00", NotInvoiced: "75000.00", Invoiced: "0.00", Paid: "15000.00"}}
+		assert.Equal(t, want, *a.placements(recruiter, "").FeeTotals)
+		var billing api.CompanyBilling
+		a.request(http.MethodGet, "/v1/companies/"+company.Id+"/billing", recruiter, nil).JSON(&billing)
+		assert.Equal(t, want, billing.AllTime)
+		assert.Equal(t, []api.FeeTotal{{Currency: "MYR", Total: "45000.00", NotInvoiced: "30000.00", Invoiced: "0.00", Paid: "15000.00"}},
+			*a.placements(recruiter, "?applicationId="+p.ApplicationId).FeeTotals, "only the matching placement")
+	})
+
+	t.Run("a retainer covering the whole fee leaves nothing to invoice", func(t *testing.T) {
+		r = retainer(recruiter, map[string]any{"version": r.Version, "currency": "MYR", "stages": []any{
+			map[string]any{"label": "All of it", "amount": "50000", "dueKind": "on_date", "dueOn": "2026-12-01"},
+		}}, http.StatusOK)
+		off := a.placements(recruiter, "?applicationId="+p.ApplicationId).Items[0].Money.MustGet().Retainer.MustGet()
+		assert.Equal(t, "0.00", off.Balance.MustGet(), "never below nothing")
+		res := a.request(http.MethodGet, "/v1/placements/"+p.Id+"/invoice/file?format=pdf", recruiter, nil)
+		assert.Equal(t, http.StatusUnprocessableEntity, res.Status)
+		assert.Contains(t, string(res.Body), "nothing is left to invoice")
+	})
+
 	t.Run("cleared", func(t *testing.T) {
-		r = retainer(recruiter, map[string]any{"version": 1, "stages": []any{}}, http.StatusOK)
+		r = retainer(recruiter, map[string]any{"version": r.Version, "stages": []any{}}, http.StatusOK)
 		assert.Equal(t, 0, r.Version)
 		assert.True(t, a.placements(recruiter, "?applicationId="+p.ApplicationId).Items[0].Money.MustGet().Retainer.IsNull())
 	})

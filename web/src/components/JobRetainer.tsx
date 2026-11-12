@@ -7,6 +7,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey } from "../api/keys";
 import { INVOICE_STATUS, formatDay, formatMoney, keysOf } from "../labels";
 import { CURRENCIES, fieldErrors, FormInvalid } from "./forms";
+import { todayISO } from "./placementTimeline";
 import { blankStage, DUE_KIND, dueText, retainerBody, retainerForm, retainerProblems, type RetainerForm, type StageRow } from "./retainerFormState";
 import { SaveError } from "./SaveError";
 import { ErrorMessage } from "./ErrorMessage";
@@ -42,7 +43,7 @@ export function JobRetainer({ jobId, permissions }: { jobId: string; permissions
 function RetainerTable({ r }: { r: Retainer }) {
   if (r.version === 0) return <p className="muted">None. A retained search is paid in stages, taken off the placement fee.</p>;
   const cur = r.currency ?? "";
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = todayISO();
   return (
     <div className="table-wrap">
       <table className="retainer-table">
