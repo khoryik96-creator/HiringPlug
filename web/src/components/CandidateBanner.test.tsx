@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import { ok, renderWithClient, sentBody, testCandidate, testFieldSettings } from "../test-utils";
+import { WorkAuthorizationPicker } from "./WorkAuthorizationPicker";
 import { CandidateBanner, livesIn } from "./CandidateBanner";
 import { raiseText, sinceText, waColumnLabel, waFor, waKind } from "./candidateLook";
 
@@ -74,17 +75,18 @@ describe("candidate banner", () => {
     expect(screen.getAllByText("Restricted")).toHaveLength(2);
   });
 
-  it("saves a status at once with the version shown; picking it again clears it", async () => {
+  it("saves availability with the version shown and allows clearing it", async () => {
     settings();
     const c = testCandidate({ availability: "looking", version: 3 });
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...c, availability: "placed", version: 4 }));
     renderWithClient(<CandidateBanner canEdit candidate={c} />);
-    const status = screen.getByRole("group", { name: "Status" });
-    expect(within(status).getByRole("button", { name: "Looking out" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(within(status).getByRole("button", { name: "Placed" }));
+    const status = screen.getByRole("combobox", { name: "Availability" });
+    expect((status as HTMLSelectElement).value).toBe("looking");
+    fireEvent.change(status, { target: { value: "placed" } });
     await waitFor(() => { expect(patch).toHaveBeenCalled(); });
     expect(sentBody(patch)).toEqual({ version: 3, availability: "placed" });
-    fireEvent.click(within(status).getByRole("button", { name: "Looking out" }));
+    await waitFor(() => { expect((status as HTMLSelectElement).disabled).toBe(false); });
+    fireEvent.change(status, { target: { value: "" } });
     await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
     expect(sentBody(patch, 1)).toEqual({ version: 3, availability: null });
   });
@@ -93,7 +95,7 @@ describe("candidate banner", () => {
     settings();
     const c = testCandidate({ workAuthorization: { status: "local", note: "IC seen" } });
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(c));
-    renderWithClient(<CandidateBanner canEdit candidate={c} />);
+    renderWithClient(<WorkAuthorizationPicker canEdit candidate={c} />);
     const wa = screen.getByRole("group", { name: "Work authorization" });
     fireEvent.click(within(wa).getByRole("button", { name: "Spousal / RP-T" }));
     expect(patch).not.toHaveBeenCalled();
@@ -101,8 +103,20 @@ describe("candidate banner", () => {
     await waitFor(() => { expect(patch).toHaveBeenCalled(); });
     expect(sentBody(patch)).toMatchObject({ workAuthorization: { status: "expat_eligible", basis: "spouse_visa", note: "IC seen" } });
 
+    await waitFor(() => { expect(within(wa).getByRole<HTMLButtonElement>("button", { name: "Needs pass" }).disabled).toBe(false); });
     fireEvent.click(within(wa).getByRole("button", { name: "Needs pass" }));
     await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
     expect(sentBody(patch, 1)).toMatchObject({ workAuthorization: { status: "requires_visa", basis: null } });
   });
+  it("keeps work-rights editing out of the card and exposes every skill", () => {
+    settings();
+    renderWithClient(<CandidateBanner canEdit candidate={testCandidate({skills: ["Go", "React", "Python", "SQL", "Docker", "AWS", "Playwright", "Appium"]})} />);
+    expect(screen.queryByRole("group", { name: "Work authorization" })).toBeNull();
+    expect(screen.queryByText(/Appium/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", {name: "+2 skills"}));
+    expect(screen.getByText(/Playwright · Appium/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", {name: "Fewer skills"}));
+    expect(screen.queryByText(/Appium/)).toBeNull();
+  });
+
 });

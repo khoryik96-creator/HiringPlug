@@ -1,7 +1,7 @@
 // One CV shown in full: the PDF itself (or its text), with a version picker.
 // Used where a CV is read side by side with something else.
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, type Document, unwrap } from "../api/client";
 import { downloadDocument, fetchDocumentFile, fetchDocumentPdf } from "../api/files";
@@ -26,7 +26,9 @@ export function latestCv(docs: Document[]): Document | undefined {
   return [...(theirs.length > 0 ? theirs : docs)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
 
-export function CvPane({ docs, doc, selected, onSelect, title, highlight = "" }: {
+export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", unified = false, actions }: {
+  unified?: boolean;
+  actions?: ReactNode;
   docs: Document[];
   doc: Document | undefined;
   selected: string | undefined;
@@ -44,18 +46,20 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "" }:
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
       <div className="row">
         {title && <h3 className="cv-pane-title">{title}</h3>}
-        <select aria-label="CV version" value={selected ?? ""} onChange={(e) => { onSelect(e.target.value); }}>
+        {unified && doc && <strong className="cv-selected-name">{doc.fileName}</strong>}
+        {!unified && <select aria-label="CV version" value={selected ?? ""} onChange={(e) => { onSelect(e.target.value); }}>
           {docs.map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
-        </select>
+        </select>}
         {isPdf && (
           <button type="button" className="link" onClick={() => { setView(view === "original" ? "text" : "original"); }}>
             {view === "original" ? "Show text" : "Show original"}
           </button>
         )}
-        {doc && <button type="button" className="link" onClick={() => { void downloadDocument(doc); }}>Download</button>}
+        {!unified && doc && <button type="button" className="link" onClick={() => { void downloadDocument(doc); }}>Download</button>}
+        {actions}
       </div>
       {doc && marking && view === "text" && <Marked doc={doc} boolean={marking} onClear={() => { setMarking(""); }} />}
-      {!doc ? <p className="muted">Loading…</p> : isPdf && view === "original" ? <Original doc={doc} /> : marking ? null : (
+      {!doc ? <p className="muted">Loading…</p> : isPdf && view === "original" ? <Original key={doc.id} doc={doc} /> : marking ? null : (
         <>
           {doc.pdfStatus === "queued" && <p className="muted small" role="status">Making a preview of the Word file… its text meanwhile:</p>}
           <pre className="extracted">{doc.extractedText ?? doc.errorMessage ?? "No text has been read from this file yet."}</pre>

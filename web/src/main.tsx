@@ -8,6 +8,7 @@ import "@fontsource/barlow-condensed/latin-800.css";
 import { App } from "./App";
 import "./theme.css";
 import "./styles.css";
+import "./candidate-workspace.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root element");

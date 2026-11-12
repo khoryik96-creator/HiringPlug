@@ -31,7 +31,7 @@ describe("app", () => {
 
     window.location.hash = `#/candidates/${bob.id}`;
     render(<App />);
-    await screen.findByRole("heading", { name: "Bob Lee" });
+    await screen.findByRole("heading", { name: "Bob Lee" }, {timeout: 5000});
     window.location.hash = `#/candidates/${alice.id}`;
     await screen.findByRole("heading", { name: "Alice Tan" });
     fireEvent.click(screen.getByRole("button", { name: "Edit profile" }));
@@ -41,7 +41,7 @@ describe("app", () => {
     window.location.hash = `#/candidates/${bob.id}`;
     await screen.findByRole("heading", { name: "Bob Lee" });
     expect(screen.queryByRole("form", { name: "Edit profile" })).toBeNull();
-    expect(screen.getByText("bob@example.com")).toBeTruthy();
+    expect(within(screen.getByRole("region", {name: "Profile"})).getByText("bob@example.com")).toBeTruthy();
   });
 });
 

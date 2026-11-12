@@ -9,8 +9,10 @@ import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** Emails sent about a candidate, newest first, and writing a new one. */
-export function CandidateEmails({ candidateId, email, permissions }: { candidateId: string; email?:string|null;permissions: Permission[] }) {
-  const [writing, setWriting] = useState(false);
+export function CandidateEmails({ candidateId, email, permissions, writing: controlledWriting, onWritingChange }: { candidateId: string; email?:string|null;permissions: Permission[]; writing?: boolean; onWritingChange?: (writing: boolean) => void }) {
+  const [ownWriting, setOwnWriting] = useState(false);
+  const writing = controlledWriting ?? ownWriting;
+  const setWriting = onWritingChange ?? setOwnWriting;
   const canSend = permissions.includes("emails:send");
   const list = useQuery({
     queryKey: candidateEmailsKey(candidateId),

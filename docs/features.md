@@ -1,5 +1,26 @@
 # Features: your list, mapped to the design
 
+**Candidate workspace.** The FIFA card keeps its status colours and work-rights
+stripe, with an availability dropdown, expandable plain skills and a slim inline
+notice/salary ribbon. Work rights are edited in the existing Work authorization
+field under Details. Details opens first, followed by CV & files, Jobs, Activity,
+Salary and Email; document, pipeline and email tabs follow their permissions.
+Tabs load on first visit and keep forms and drafts mounted until the candidate
+changes. Search highlight links open CV & files directly.
+
+CV & files has one document library and one viewer: selecting a file changes its
+preview and action toolbar together. Upload, compare, formatting, formatting
+history, extracted-detail review, text/original view, Word/PDF download, reread
+and permission-gated formatted-file deletion remain available. Jobs uses the
+existing stage badge and separate Move to menu, including reason/cancel/reopen,
+interviews, offers, placements and stage history. Profile/history editing,
+duplicate merging, privacy tools, call history and salary notes remain in their
+respective tabs. The assistant remains available below the workspace and can
+still be docked. Email composers reveal candidate/CV controls and extra
+formatting on demand; CC/BCC, field insertion, attachments, templates, booking,
+preview and validation keep their existing behavior.
+
+
 Context from your answers: **agency and in-house**, **your own team and other
 companies (SaaS)**, **local first, cloud later**, and every version 1
 must-have (OCR/CV parsing, careers page, email, job boards, AI matching, data

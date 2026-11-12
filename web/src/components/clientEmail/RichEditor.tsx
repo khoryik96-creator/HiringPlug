@@ -1,7 +1,7 @@
 // The message box with its toolbar: bold, italic, underline, strike, lists,
 // indent, alignment, link, clear format, font, size, colour, insert a field
 // ([Expected salary]) or a banner. CV Studio's email client, with indent.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Schemas } from "../../api/client";
 import { exec, fillTypedFields, insertHtml, insertValue, restoreRange, saveRange, setFontSize, showBanners } from "./richText";
@@ -11,6 +11,7 @@ const FONTS = ["Calibri", "Arial", "Georgia", "Times New Roman", "Verdana", "Tah
 const SIZES = ["10", "11", "12", "14", "16", "18", "24"];
 
 type Props = {
+  compact?: boolean;
   invalid?: boolean;
   /** What the box starts with; changing `resetKey` puts it back in. */
   html: string;
@@ -37,7 +38,9 @@ type Props = {
   onFocus?: () => void;
 };
 
-export function RichEditor({ invalid = false, html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+export function RichEditor({ compact = false, invalid = false, html, resetKey, onChange, fields, banners, bannerUrls, onUploadBanner, values, inserting, insertElsewhere, onFocus }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const extras = !compact || expanded;
   const vals = values ?? NONE;
   const box = useRef<HTMLDivElement>(null);
   const cursor = useRef<Range | null>(null); // where it was before a toolbar dropdown took the focus
@@ -123,23 +126,24 @@ export function RichEditor({ invalid = false, html, resetKey, onChange, fields, 
 
   return (
     <div className="rich">
-      <div className="toolbar" role="toolbar" aria-label="Formatting">
+      <div className={compact ? "toolbar compact" : "toolbar"} role="toolbar" aria-label="Formatting">
         {button("Bold", "bold", "B")}
         {button("Italic", "italic", "I")}
         {button("Underline", "underline", "U")}
-        {button("Strike", "strikeThrough", "Strike")}
-        {button("Bullets", "insertUnorderedList")}
+        <span className="extra-formatting" hidden={!extras}>{button("Strike", "strikeThrough", "Strike")}
+        </span>{button("Bullets", "insertUnorderedList")}
+        <span className="extra-formatting" hidden={!extras}>
         {button("Numbered list", "insertOrderedList")}
         {button("Indent", "indent", "Indent →")}
         {button("Outdent", "outdent", "← Outdent")}
         {button("Left", "justifyLeft")}
         {button("Center", "justifyCenter")}
         {button("Right", "justifyRight")}
-        <button type="button" className="tool" onMouseDown={keep} onClick={() => {
+        </span><button type="button" className="tool" onMouseDown={keep} onClick={() => {
           const url = window.prompt("Link to (https://…)");
           if (url && /^(https?:\/\/|mailto:)/i.test(url)) run("createLink", url);
         }}>Link</button>
-        {button("Clear format", "removeFormat")}
+        <span className="extra-formatting" hidden={!extras}>{button("Clear format", "removeFormat")}
         <select aria-label="Font" defaultValue="Calibri" onChange={(e) => { run("fontName", e.target.value); }}>
           {FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
@@ -147,7 +151,7 @@ export function RichEditor({ invalid = false, html, resetKey, onChange, fields, 
           {SIZES.map((s) => <option key={s} value={s}>{s} pt</option>)}
         </select>
         <input type="color" aria-label="Text colour" defaultValue="#0b57a4" onChange={(e) => { run("foreColor", e.target.value); }} />
-        <select aria-label="Insert field" value="" onChange={(e) => {
+        </span><select aria-label="Insert field" value="" onChange={(e) => {
           const field = fields.find((f) => f.token === e.target.value);
           const value = field && vals[field.token];
           if (!field || !box.current) return;
@@ -160,7 +164,7 @@ export function RichEditor({ invalid = false, html, resetKey, onChange, fields, 
           <option value="">Insert field…</option>
           {fields.map((f) => <option key={f.key} value={f.token}>{f.label}{f.salary ? " (salary)" : ""}{values && !values[f.token] ? " — no value" : ""}</option>)}
         </select>
-        <select aria-label="Insert banner" value="" onChange={(e) => {
+        <span className="extra-formatting" hidden={!extras}><select aria-label="Insert banner" value="" onChange={(e) => {
           if (e.target.value) insert(`<img data-banner-id="${e.target.value}" alt="banner"><br>`);
         }}>
           <option value="">Insert banner…</option>
@@ -176,6 +180,8 @@ export function RichEditor({ invalid = false, html, resetKey, onChange, fields, 
             }} />
           </label>
         )}
+        </span>{compact && <button type="button" className="tool" aria-expanded={expanded} onMouseDown={keep}
+          onClick={() => { setExpanded(!expanded); }}>{expanded ? "Less formatting" : "More formatting"}</button>}
       </div>
       <div ref={box} className="rich-box" contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true"
         aria-label="Message" aria-invalid={invalid || undefined} tabIndex={0} onInput={typed} onBlur={changed} onKeyUp={remember} onMouseUp={remember} onFocus={onFocus} />

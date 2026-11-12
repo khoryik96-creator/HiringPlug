@@ -4,6 +4,16 @@ For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
 first (the rules, enforced by `task verify`), then `docs/README.md`;
 `docs/features.md` says what every screen does.
 
+## Candidate workspace
+
+- The approved compact candidate design is implemented: Details first, followed
+  by CV & files, Jobs, Activity, Salary and Email. Visited tabs retain drafts.
+- Work-rights choices live in Details' existing Work authorization field. The
+  FIFA card retains its stripe, uses an availability dropdown and plain
+  expandable skills, and has a slim notice/salary ribbon with natural height.
+- CV library selection drives a single viewer and toolbar. Existing document,
+  stage-move, salary-note and privacy behavior is retained; see `docs/features.md`.
+
 ## Where things stand
 
 - **main** has everything below, plus descriptive screening salaries and

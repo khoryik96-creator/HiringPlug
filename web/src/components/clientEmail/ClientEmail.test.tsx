@@ -101,6 +101,7 @@ describe("emailing the client", () => {
 
   it("saves templates as new or over the one picked, and deletes them; only for roles that manage templates", async () => {
     const { post, panel } = setup();
+    fireEvent.click(within(panel).getByText("Manage template"));
     fireEvent.change(within(panel).getByLabelText("Template name"), { target: { value: "Mine" } });
     fireEvent.change(within(panel).getByLabelText("Subject"), { target: { value: "Hello" } });
     fireEvent.click(within(panel).getByRole("button", { name: "Save as new" }));

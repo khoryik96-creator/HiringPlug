@@ -149,13 +149,13 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
         <button type="button" onClick={() => { void templates.refetch(); }}>Refresh templates</button>
       </div>
       {canManage && (
-        <div className="row">
+        <details><summary>Manage template</summary><div className="row">
           <label className="row grow">Template name <input value={name} onChange={(e) => { setName(e.target.value); }} /></label>
           <button type="button" disabled={!selected || !name.trim() || saveTemplate.isPending} onClick={() => { saveTemplate.mutate(false); }}>Save changes</button>
           <button type="button" disabled={!name.trim() || saveTemplate.isPending} onClick={() => { saveTemplate.mutate(true); }}>Save as new</button>
           <button type="button" disabled={!selected || deleteTemplate.isPending}
             onClick={() => { if (selected && window.confirm(`Delete the template "${selected.name}"?`)) deleteTemplate.mutate(selected.id); }}>Delete template</button>
-        </div>
+        </div></details>
       )}
       {!canManage && canCreate && <div className="row"><SaveAsTemplate subject={subject} html={html} values={values} /></div>}
       <ErrorMessage error={saveTemplate.error ?? deleteTemplate.error} />
@@ -169,13 +169,14 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       {!multi && permissions.includes("candidates:read") && <button type="button" className="link" onClick={()=>{packages.change([{candidateId,applicationId,name:values?.["[Full name]"] ?? "This candidate"}]);setMulti(true);}}>Select candidates and details</button>}
       {multi && (
         <>
+          <details className="email-candidates"><summary>Candidates and CVs ({people.length})</summary>
           <ShortlistPanel jobId={jobId} people={people} onPeople={packages.change} list={list} canSeeCvs={canSeeCvs} canSeeSalary={permissions.includes("candidates.compensation:read")} onRefresh={packages.clear}
-            onInsert={packages.insert} />
+            onInsert={packages.insert} /></details>
           {packages.notice && <p className="muted small" role="status">{packages.notice}</p>}
           <ErrorMessage error={list.error} />
         </>
       )}
-      <RichEditor invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+      <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
         values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
         insertElsewhere={(f, value) => {

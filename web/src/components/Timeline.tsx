@@ -48,7 +48,7 @@ export function callLines(body: string): { label: string | null; text: string }[
  * then everything newest first, filtered by kind and searchable, long notes
  * folded to their first lines.
  */
-export function Timeline({ subjectType, subjectId, permissions }: { subjectType: Subject; subjectId: string; permissions: Permission[] }) {
+export function Timeline({ subjectType, subjectId, permissions, compact = false }: { subjectType: Subject; subjectId: string; permissions: Permission[]; compact?: boolean }) {
   const canWrite = permissions.includes("notes:create");
   const canSensitive = permissions.includes("notes.sensitive:read");
   const [filter, setFilter] = useState<Filter>("all");
@@ -103,7 +103,8 @@ export function Timeline({ subjectType, subjectId, permissions }: { subjectType:
   return (
     <section className="panel" aria-label="Notes and activity">
       <h3>Notes and activity</h3>
-      {canWrite && <NoteForm subjectType={subjectType} subjectId={subjectId} canSensitive={canSensitive} />}
+      {canWrite && (compact ? <details><summary>Add a note</summary><NoteForm subjectType={subjectType} subjectId={subjectId} canSensitive={canSensitive} /></details>
+        : <NoteForm subjectType={subjectType} subjectId={subjectId} canSensitive={canSensitive} />)}
       <ErrorMessage error={notes.error ?? activity.error} />
       {notes.data && notes.data.hiddenSensitive > 0 && (
         <p className="muted">🔒 {String(notes.data.hiddenSensitive)} sensitive note{notes.data.hiddenSensitive === 1 ? " is" : "s are"} hidden for your role.</p>

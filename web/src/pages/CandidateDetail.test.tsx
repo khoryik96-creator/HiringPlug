@@ -37,6 +37,21 @@ describe("candidate page", () => {
     await show(c, RECRUITER);
     expect(screen.getByRole("status").textContent).toContain("A later call already set the salary");
   });
+  it("opens Details first and exposes only permitted workspaces", async () => {
+    await show(testCandidate(), ["candidates:read", "documents:read"]);
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["Details", "CV & files", "Activity", "Salary"]);
+    expect(screen.getByRole("tab", {name: "Details"}).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByRole("region", {name: "Documents"})).toBeNull();
+    fireEvent.click(screen.getByRole("tab", {name: "CV & files"}));
+    expect(await screen.findByRole("region", {name: "Documents"})).toBeTruthy();
+  });
+
+  it("opens the CV workspace for a search highlight link", async () => {
+    window.location.hash = `#/candidates/${testCandidate().id}?hl=Playwright`;
+    await show(testCandidate(), ["candidates:read", "documents:read"]);
+    expect(screen.getByRole("tab", {name: "CV & files"}).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("gives viewers no edit buttons", async () => {
     await show(testCandidate(), ["candidates:read", "candidates.compensation:read", "documents:read"]);
     expect(buttons()).not.toContain("Edit profile");
@@ -46,12 +61,14 @@ describe("candidate page", () => {
   it("lets recruiters edit the profile and the salary", async () => {
     await show(testCandidate(), RECRUITER);
     expect(buttons()).toContain("Edit profile");
+    fireEvent.click(screen.getByRole("tab", {name: "Salary"}));
     expect(buttons()).toContain("Add salary");
   });
 
   it("lets sourcers edit the profile, but not see or edit salary", async () => {
     await show(testCandidate({ restrictedFields: ["compensation"] }), ["candidates:read", "candidates:update", "documents:read"]);
     expect(buttons()).toContain("Edit profile");
+    fireEvent.click(screen.getByRole("tab", {name: "Salary"}));
     expect(screen.getByText(/restricted for your role/)).toBeTruthy();
     expect(buttons()).not.toContain("Add salary");
   });
@@ -80,7 +97,7 @@ describe("candidate page", () => {
     expect(within(banner).getByText("Malaysia")).toBeTruthy();
     expect(within(banner).getByText("Careers page")).toBeTruthy();
     expect(banner.textContent).toContain("Work authorization: RP-T"); // the column on the right
-    expect(screen.getByText("Expat, can work here: Residence Pass-Talent (RP-T)")).toBeTruthy(); // and in full in the profile
+    expect(within(screen.getByRole("region", {name: "Profile"})).getByRole("button", {name: "Spousal / RP-T"})).toBeTruthy();
   });
 });
 

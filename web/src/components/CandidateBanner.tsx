@@ -1,45 +1,23 @@
-// The candidate page's header: a banner coloured by the candidate's status,
-// with a column on its right coloured by their work authorization. Both are
-// picked here and saved straight away (with the version shown, so someone
-// else's newer change is never overwritten).
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+// Availability colours the card; work authorization is edited in Details.
 import { useState } from "react";
-
-import { ApiError, api, type Candidate, type Schemas, unwrap } from "../api/client";
-import { candidateKey, candidatesKey } from "../api/keys";
+import type { Candidate } from "../api/client";
+import { useCandidateUpdate } from "./useCandidateUpdate";
 import { formatNotice, regionName } from "../labels";
 import {
   AVAILABILITY, type Availability, jobLine, NO_STATUS_BG, raiseText, rangeText, salaryText, sinceText,
-  WA_KIND, waColumnLabel, waFor, waKind, type WaKind,
+  WA_KIND, waColumnLabel, waKind,
 } from "./candidateLook";
 import { ErrorMessage } from "./ErrorMessage";
 import { useFieldSettings } from "./useFieldSettings";
 
-const SHOWN_SKILLS = 8;
+const SHOWN_SKILLS = 6;
 
 export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidate; canEdit: boolean }) {
-  const queryClient = useQueryClient();
   const fs = useFieldSettings();
-  const [choosingPass, setChoosingPass] = useState(false);
-  const save = useMutation({
-    mutationFn: async (change: Pick<Schemas["CandidateUpdate"], "availability" | "workAuthorization">) =>
-      unwrap(await api.PATCH("/v1/candidates/{candidateId}", { params: { path: { candidateId: c.id } }, body: { version: c.version, ...change } })),
-    onSuccess: (updated) => {
-      setChoosingPass(false);
-      queryClient.setQueryData(candidateKey(c.id), updated);
-      void queryClient.invalidateQueries({ queryKey: candidatesKey });
-    },
-    onError: (e) => {
-      // Someone saved first: show their version, so the next click starts from it.
-      if (e instanceof ApiError && e.code === "CONFLICT_STALE_VERSION") void queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
-    },
-  });
+  const [expanded, setExpanded] = useState(false);
+  const save = useCandidateUpdate(c);
   const status = c.availability ? AVAILABILITY[c.availability] : null;
   const kind = waKind(c.workAuthorization);
-  const pickWa = (k: WaKind) => {
-    if (k === "expat") { setChoosingPass(true); return; }
-    save.mutate({ workAuthorization: waFor(k, c.workAuthorization) });
-  };
   const lives = livesIn(c.location, c.residenceCountry ? regionName(c.residenceCountry) ?? c.residenceCountry : null);
   const comp = c.compensation;
   const restricted = c.restrictedFields.includes("compensation");
@@ -47,13 +25,17 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
   const expected = comp?.expectedSalary ? rangeText(comp.expectedSalary) : null;
 
   return (
-    <section className="banner" aria-label="Candidate" style={{ background: status?.bg ?? NO_STATUS_BG }}>
+    <section className="banner candidate-banner" aria-label="Candidate" style={{ background: status?.bg ?? NO_STATUS_BG }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">
             <div className="row">
               <h2 className="banner-name">{c.fullName}</h2>
-              {status && <span className="banner-status">{status.label}</span>}
+              {canEdit ? <select className="banner-status" aria-label="Availability" value={c.availability ?? ""} disabled={save.isPending}
+                onChange={e => { save.mutate({ availability: (e.target.value || null) as Availability | null }); }}>
+                <option value="">Not set</option>
+                {(Object.keys(AVAILABILITY) as Availability[]).map(a => <option key={a} value={a}>{AVAILABILITY[a].label}</option>)}
+              </select> : status && <span className="banner-status">{status.label}</span>}
               {status && sinceText(c.availabilitySince) && <span className="banner-since">{sinceText(c.availabilitySince)}</span>}
             </div>
             {jobLine(c) && <p className="banner-job">{jobLine(c)}</p>}
@@ -65,22 +47,11 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
           </dl>
         </div>
 
-        {canEdit && (
-          <div className="row" role="group" aria-label="Status">
-            {(Object.keys(AVAILABILITY) as Availability[]).map((a) => (
-              <button key={a} type="button" className="banner-pill" aria-pressed={c.availability === a} disabled={save.isPending}
-                onClick={() => { save.mutate({ availability: c.availability === a ? null : a }); }}>
-                <span className="dot" style={{ background: AVAILABILITY[a].bg, borderColor: AVAILABILITY[a].edge }} />
-                {AVAILABILITY[a].label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {c.skills.length > 0 && (
-          <div className="row banner-skills">
-            {c.skills.slice(0, SHOWN_SKILLS).map((s) => <span key={s} className="banner-chip">{s}</span>)}
-            {c.skills.length > SHOWN_SKILLS && <span className="banner-chip">+{c.skills.length - SHOWN_SKILLS}</span>}
+          <div className="banner-skills">
+            <span>{(expanded ? c.skills : c.skills.slice(0, SHOWN_SKILLS)).join(" · ")}</span>
+            {c.skills.length > SHOWN_SKILLS && <button type="button" className="link" aria-expanded={expanded}
+              onClick={() => { setExpanded(!expanded); }}>{expanded ? "Fewer skills" : `+${c.skills.length - SHOWN_SKILLS} skills`}</button>}
           </div>
         )}
 
@@ -99,25 +70,6 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
           </div>
         </div>
 
-        {canEdit && (
-          <div className="row" role="group" aria-label="Work authorization">
-            {(Object.keys(WA_KIND) as WaKind[]).map((k) => (
-              <button key={k} type="button" className="banner-pill" aria-pressed={kind === k} disabled={save.isPending}
-                onClick={() => { pickWa(k); }}>
-                <span className="dot square" style={{ background: WA_KIND[k].color, borderColor: WA_KIND[k].color }} />
-                {WA_KIND[k].label}
-              </button>
-            ))}
-            {choosingPass && (
-              <span className="row" role="group" aria-label="Pass held">
-                <span>Which pass?</span>
-                <button type="button" onClick={() => { save.mutate({ workAuthorization: waFor("expat", c.workAuthorization, "rp_t") }); }}>RP-T</button>
-                <button type="button" onClick={() => { save.mutate({ workAuthorization: waFor("expat", c.workAuthorization, "spouse_visa") }); }}>Spouse visa</button>
-                <button type="button" className="link" onClick={() => { setChoosingPass(false); }}>Cancel</button>
-              </span>
-            )}
-          </div>
-        )}
         <ErrorMessage error={save.error} />
       </div>
       <div className="banner-column" style={{ background: WA_KIND[kind].color }}>

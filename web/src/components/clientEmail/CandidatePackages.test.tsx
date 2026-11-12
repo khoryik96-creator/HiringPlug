@@ -17,6 +17,7 @@ function setup(recipient:"contact"|"candidate"="contact"){
   return Promise.resolve(ok({id:"eml_sent"}));
  }) as never);
  renderWithClient(<EmailComposer {...(recipient==="contact"?{contactId:"contact_client"}:{candidateId:"cand_recipient"})} defaultTo="client@example.test" permissions={permissions} canManageTemplates={false} onDone={vi.fn()}/>);
+ fireEvent.click(screen.getByText("Candidates and CVs (0)"));
  return post;
 }
 async function add(){fireEvent.change(screen.getByLabelText("Add candidates"),{target:{value:"Person"}});fireEvent.click(await screen.findByRole("button",{name:"First Person · Analyst"}));fireEvent.change(screen.getByLabelText("Add candidates"),{target:{value:"Person"}});fireEvent.click(await screen.findByRole("button",{name:"Second Person · Engineer"}));await waitFor(()=>{expect(screen.getByRole<HTMLButtonElement>("button",{name:"Insert candidates into the message"}).disabled).toBe(false);});}

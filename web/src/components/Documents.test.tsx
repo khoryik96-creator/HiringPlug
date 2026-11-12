@@ -17,6 +17,25 @@ const doc = (over: Partial<Document>): Document => ({
 });
 
 describe("CVs and documents", () => {
+  it("shares one selected file between the library, preview and file actions", async () => {
+    const first = doc({id: "doc_first", fileName: "Original CV.txt", contentType: "text/plain", extractedText: "Original text"});
+    const formatted = doc({id: "doc_formatted", fileName: "Formatted CV.txt", source: "formatted", contentType: "text/plain", extractedText: "Formatted text"});
+    vi.spyOn(api, "GET").mockImplementation(((path: string, init: {params: {path: {documentId: string}}}) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? {items: [first, formatted]} : init.params.path.documentId === first.id ? first : formatted
+    ))) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read", "documents:delete"]}/>);
+    const library = await screen.findByRole("navigation", {name: "Candidate files"});
+    expect(await screen.findByText("Original text")).toBeTruthy();
+    expect(screen.queryByRole("combobox", {name: "CV version"})).toBeNull();
+    expect(screen.getAllByRole("button", {name: "Download"})).toHaveLength(1);
+    fireEvent.click(within(library).getByRole("button", {name: /Formatted CV.txt/}));
+    expect(await screen.findByText("Formatted text")).toBeTruthy();
+    expect(screen.queryByText("Original text")).toBeNull();
+    expect(screen.queryByRole("button", {name: "Review details"})).toBeNull();
+    fireEvent.click(screen.getByLabelText("More for Formatted CV.txt"));
+    expect(screen.getByRole("menuitem", {name: "Delete this formatted CV"})).toBeTruthy();
+  });
+
   it("lists their CVs before the formatted ones, each with its own actions", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
       doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "ready" }),

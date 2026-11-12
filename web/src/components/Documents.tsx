@@ -4,6 +4,9 @@ import { useState } from "react";
 import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadDocument, downloadFrom } from "../api/files";
 import { getToken } from "../auth";
+import { CandidateCv } from "./CandidateCv";
+import { latestCv } from "./CvPane";
+import { hashParam } from "../hashQuery";
 import { CvReview } from "./CvReview";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { findMatches, matchText } from "./duplicateCvs";
@@ -30,7 +33,8 @@ const kindOf = (d: Document) => fileKind(d.contentType);
  * or parses them), the text, and the details parsed from it for review. Their
  * own CVs first, then the ones HiringPlug made.
  */
-export function Documents({ candidate, canUpload, canEdit, permissions = [] }: { candidate: Candidate; canUpload: boolean; canEdit: boolean; permissions?: Permission[] }) {
+export function Documents({ candidate, canUpload, canEdit, permissions = [], workspace = false }: { workspace?: boolean; candidate: Candidate; canUpload: boolean; canEdit: boolean; permissions?: Permission[] }) {
+  const [picked, setPicked] = useState<string>();
   const [formatting, setFormatting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const candidateId = candidate.id;
@@ -106,33 +110,16 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
   });
 
   const all = docs.data ?? [];
+  const selected = all.find(d => d.id === picked) ?? latestCv(all);
   const groups = [
     { title: "From the candidate", items: all.filter((d) => d.source !== "formatted") },
     { title: "Formatted", items: all.filter((d) => d.source === "formatted") },
   ].filter((g) => g.items.length > 0);
 
-  const row = (d: Document) => {
-    const note = [
-      STATUS_NOTE[d.status],
-      d.parseStatus === "queued" ? "Reading the details…" : d.parseStatus === "failed" ? "Details could not be read" : null,
-      d.pdfStatus === "queued" ? "Making the PDF…" : null,
-    ].filter(Boolean).join(" · ");
-    // Formatted CVs are our own output: parsed for comparing, not for filling the profile.
+  const actions = (d: Document) => {
     const canReview = canEdit && d.parseStatus === "parsed" && d.source !== "formatted";
     const canReread = canUpload && d.status === "extracted" && d.parseStatus !== "queued";
-    return (
-      <li key={d.id} className="doc-card">
-        <div className="doc-line">
-          <span className={`doc-icon ${kindOf(d).toLowerCase()}`} aria-hidden="true">{kindOf(d)}</span>
-          <div className="doc-main">
-            <button type="button" className="doc-name" aria-expanded={open === d.id} title="Show the text read from it"
-              onClick={() => { setOpen(open === d.id ? null : d.id); }}>{d.fileName}</button>
-            <div className="doc-meta">
-              {SOURCE_LABEL[d.source]} · added {added(d.createdAt)}
-              {note && <span className={d.status === "queued" || d.parseStatus === "queued" ? "doc-busy" : "doc-problem"}> · {note}</span>}
-            </div>
-          </div>
-          <div className="doc-buttons">
+    return (          <div className="doc-buttons">
             {canReview && (
               <button type="button" className="doc-btn primary-soft" onClick={() => { setReviewing(reviewing === d.id ? null : d.id); }}>
                 Review details
@@ -143,9 +130,9 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
             <details className="doc-more">
               <summary aria-label={`More for ${d.fileName}`}>⋯</summary>
               <div className="doc-menu" role="menu">
-                <button type="button" role="menuitem" onClick={(e) => { setOpen(open === d.id ? null : d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
+                {!workspace && <button type="button" role="menuitem" onClick={(e) => { setOpen(open === d.id ? null : d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
                   {open === d.id ? "Hide the text" : "Show the text"}
-                </button>
+                </button>}
                 {canReread && (
                   <button type="button" role="menuitem" disabled={parse.isPending}
                     onClick={(e) => { parse.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
@@ -164,12 +151,32 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
                 )}
               </div>
             </details>
+          </div>);
+  };
+  const row = (d: Document) => {
+    const note = [
+      STATUS_NOTE[d.status],
+      d.parseStatus === "queued" ? "Reading the details…" : d.parseStatus === "failed" ? "Details could not be read" : null,
+      d.pdfStatus === "queued" ? "Making the PDF…" : null,
+    ].filter(Boolean).join(" · ");
+    return (
+      <li key={d.id} className="doc-card" hidden={workspace && selected?.id !== d.id}>
+        <div className="doc-line" hidden={workspace}>
+          <span className={`doc-icon ${kindOf(d).toLowerCase()}`} aria-hidden="true">{kindOf(d)}</span>
+          <div className="doc-main">
+            <button type="button" className="doc-name" aria-expanded={open === d.id} title="Show the text read from it"
+              onClick={() => { setOpen(open === d.id ? null : d.id); }}>{d.fileName}</button>
+            <div className="doc-meta">
+              {SOURCE_LABEL[d.source]} · added {added(d.createdAt)}
+              {note && <span className={d.status === "queued" || d.parseStatus === "queued" ? "doc-busy" : "doc-problem"}> · {note}</span>}
+            </div>
           </div>
+          {!workspace && actions(d)}
         </div>
         {d.extractionWarnings.map((w) => (
           <p key={w} className="warning small">{w}</p>
         ))}
-        {open === d.id && <DocumentText id={d.id} />}
+        {!workspace && open === d.id && <DocumentText id={d.id} />}
         {reviewing === d.id && <CvReview documentId={d.id} candidate={candidate} onDone={() => { setReviewing(null); }} />}
       </li>
     );
@@ -214,13 +221,22 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         </div>
       )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
-      {canFormat && <StudioCvRuns candidateId={candidateId} documentIds={docs.data ? new Set(all.map((d) => d.id)) : undefined} />}
+      {canFormat && <details className="formatting-history"><summary>Formatting history</summary>
+        <StudioCvRuns candidateId={candidateId} documentIds={docs.data ? new Set(all.map((d) => d.id)) : undefined} />
+      </details>}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error ?? remove.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
+      {workspace && selected && <div className="cv-workspace">
+        <nav className="cv-library" aria-label="Candidate files">{groups.map(group => <div key={group.title}>
+          <h4>{group.title}</h4>{group.items.map(d => <button key={d.id} type="button" aria-pressed={selected.id === d.id}
+            onClick={() => { setPicked(d.id); }}><strong>{d.fileName}</strong><span>{SOURCE_LABEL[d.source]} · {added(d.createdAt)} · {STATUS_NOTE[d.status] ?? "Text read"}{d.parseStatus === "failed" ? " · Details could not be read" : d.parseStatus === "queued" ? " · Reading details…" : d.parseStatus === "parsed" ? " · Details read" : ""}{d.pdfStatus === "queued" ? " · Making PDF…" : ""}</span></button>)}
+        </div>)}</nav>
+        <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")} />
+      </div>}
       {groups.map((g) => (
         <div key={g.title} className="doc-group">
-          {groups.length > 1 && <h4>{g.title}</h4>}
-          <ul className="doc-list">{g.items.map(row)}</ul>
+          {!workspace && groups.length > 1 && <h4>{g.title}</h4>}
+          <ul className="doc-list">{g.items.filter(d => !workspace || d.extractionWarnings.length > 0 || reviewing === d.id).map(row)}</ul>
         </div>
       ))}
     </section>

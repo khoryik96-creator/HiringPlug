@@ -1,0 +1,68 @@
+/* Candidate-only rules keep the company card and other shared banners intact. */
+.candidate-banner .banner-body { padding: 30px 32px; gap: 24px; }
+.candidate-banner .banner-job { font-size: 20px; }
+.candidate-banner .banner-facts { font-size: 12px; gap: 4px; }
+.candidate-banner .banner-since { font-size: 12px; font-weight: 400; }
+.candidate-banner .banner-status { width: auto; min-height: 30px; font-size: 14px; background: transparent; color: inherit; padding: 3px 8px; }
+.candidate-banner .banner-skills { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13px; }
+.candidate-banner .banner-skills button { font-size: 12px; color: inherit; padding: 0; }
+.candidate-banner .banner-strip { margin-top: 0; border-radius: 7px; box-shadow: none; background: #ffffffdb; grid-template-columns: .85fr 1fr 1.35fr; }
+.candidate-banner .banner-strip > div { padding: 8px 13px; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 5px; }
+.candidate-banner .banner-strip .label { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.candidate-banner .banner-strip .figure { font-size: 20px; }
+.candidate-banner .banner-strip .figure small, .candidate-banner .banner-strip .note { font: 10px Inter, sans-serif; }
+.candidate-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+.candidate-contact { margin-top: 0; padding: 18px; font-size: 12px; overflow-wrap: anywhere; }
+.candidate-contact h3 { font-size: 14px; margin-top: 0; }
+.candidate-contact dl { display: block; margin: 0; }
+.candidate-contact dt { margin-top: 14px; font-size: 11px; }
+.candidate-contact dd { margin: 4px 0 0; }
+.candidate-tabs { min-width: 0; }
+.candidate-tablist { display: flex; gap: 20px; overflow-x: auto; border-bottom: 1px solid var(--line, #e2dcf5); margin-bottom: 16px; }
+.candidate-tablist [role=tab] { flex-shrink: 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 10px 0; color: #6d657f; box-shadow: none; font-size: 12px; }
+.candidate-tablist [aria-selected=true] { border-bottom-color: #7653ed; color: #7653ed; }
+.candidate-tabs [role=tabpanel] > .panel:first-child { margin-top: 0; }
+.candidate-profile dl { display: grid; grid-template-columns: 100px minmax(0, 1fr) 100px minmax(0, 1fr); gap: 14px 16px; font-size: 13px; align-items: baseline; }
+.candidate-profile dd { margin: 0; overflow-wrap: anywhere; }
+.work-authorization-options { display: flex; flex-wrap: wrap; gap: 3px; }
+.work-authorization-options button { border: 0; border-radius: 4px; background: transparent; box-shadow: none; padding: 6px 8px; font-size: 11px; min-height: 30px; }
+.work-authorization-options [aria-pressed=true] { background: #7450e5; color: white; }
+.pass-choices { margin-top: 8px; font-size: 12px; }
+.candidate-assistant { margin-top: 16px; }
+.cv-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; }
+.cv-library { border-right: 1px solid #e2dcf5; padding-right: 12px; }
+.cv-library h4 { font-size: 11px; color: #736a86; margin: 10px 0; }
+.cv-library button { display: block; text-align: left; width: 100%; border: 1px solid transparent; background: transparent; box-shadow: none; padding: 10px; margin-bottom: 6px; }
+.cv-library button[aria-pressed=true] { background: #f0eafb; border-color: #d6c8fa; }
+.cv-library strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
+.cv-library span { display: block; font-size: 10px; color: #736a86; margin-top: 5px; }
+.cv-workspace .candidate-cv { min-width: 0; }
+.cv-workspace .candidate-cv > .panel { margin: 0; padding: 12px; }
+.cv-selected-name { font-size: 12px; overflow-wrap: anywhere; flex: 1; }
+.cv-workspace .doc-buttons { flex-wrap: wrap; }
+.formatting-history { margin: 12px 0; font-size: 12px; }
+.docs-panel .doc-card[hidden], [role=tabpanel][hidden] { display: none; }
+.toolbar .extra-formatting { display: contents; }
+.toolbar .extra-formatting[hidden] { display: none; }
+@media (max-width: 1100px) { .candidate-workspace { grid-template-columns: minmax(0, 1fr); } .candidate-contact { display: none; } }
+@media (max-width: 760px) {
+  .candidate-banner .banner-body { padding: 18px 16px; gap: 18px; }
+  .candidate-banner .banner-name { font-size: 36px; }
+  .candidate-banner .banner-job { font-size: 18px; }
+  .candidate-banner .banner-top { gap: 12px; }
+  .candidate-banner .banner-strip { grid-template-columns: 1fr; }
+  .candidate-banner .banner-strip > div { padding: 6px 10px; }
+  .candidate-tablist { gap: 18px; }
+  .candidate-profile dl { grid-template-columns: 1fr; gap: 8px; }
+  .candidate-profile dd { margin-bottom: 6px; }
+  .cv-workspace { grid-template-columns: minmax(0, 1fr); }
+  .cv-library { border: 0; max-height: 190px; overflow-y: auto; padding: 0; }
+}
+
+.docs-panel .doc-line[hidden] { display: none; }
+
+.email-candidates { grid-column: 1 / -1; font-size: 12px; margin: 4px 0; }
+.email-candidates > summary { cursor: pointer; color: #7450e5; padding: 6px 0; }
+.candidate-tabs .email { margin-top: 12px; }
+@media (max-width: 1300px) { .candidate-profile dl { grid-template-columns: 120px minmax(0, 1fr); } }
+@media (max-width: 760px) { .candidate-profile dl { grid-template-columns: minmax(0, 1fr); } }

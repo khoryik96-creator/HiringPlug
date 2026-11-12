@@ -45,6 +45,7 @@ function setup() {
     { candidateId: "cand_f", applicationId: "appl_f", name: "Farid Hassan", title: "Hub Supervisor", stage: "offer" },
     { candidateId: "cand_n", applicationId: "appl_n", name: "Nurul Huda", title: "Hub Supervisor", stage: "placed" },
   ]} />);
+  fireEvent.click(screen.getByText("Candidates and CVs (2)"));
   return { post, panel: screen.getByRole("region", { name: "Email client" }) };
 }
 

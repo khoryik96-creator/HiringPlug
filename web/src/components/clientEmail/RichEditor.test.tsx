@@ -8,6 +8,19 @@ afterEach(() => { cleanup(); });
 const fields = [{ token: "[Expected salary]", key: "candidate.expectedSalary", label: "Expected salary", salary: true }];
 
 describe("the message box", () => {
+  it("reveals all extra formatting without replacing the message", () => {
+    render(<RichEditor compact html="<p>Draft</p>" resetKey={0} onChange={vi.fn()} fields={fields} banners={[]} bannerUrls={{}} />);
+    expect(screen.queryByRole("button", {name: "Indent"})).toBeNull();
+    const box = screen.getByRole("textbox", {name: "Message"});
+    box.innerHTML = "<p>Edited draft</p>";
+    fireEvent.input(box);
+    fireEvent.click(screen.getByRole("button", {name: "More formatting"}));
+    expect(screen.getByRole("button", {name: "Indent"})).toBeTruthy();
+    expect(screen.getByRole("combobox", {name: "Insert banner"})).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", {name: "Less formatting"}));
+    expect(box.textContent).toBe("Edited draft");
+  });
+
   it("inserts a field where the cursor was, even after a toolbar dropdown took the focus", () => {
     const onChange = vi.fn();
     render(<RichEditor html="<p>She expects  per month.</p>" resetKey={0} onChange={onChange} fields={fields} banners={[]} bannerUrls={{}} />);

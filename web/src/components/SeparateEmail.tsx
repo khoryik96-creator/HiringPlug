@@ -98,7 +98,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
         }}>Use selected template</button>
       </div>
       <label className="field">Subject<input value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
-      <RichEditor html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
+      <RichEditor compact html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
       <Attachments candidateId="" canSeeCvs={false} cvs={[]} onCvs={() => undefined} uploads={uploads} onUploads={setUploads} />
 
       <div className="row separate-actions">

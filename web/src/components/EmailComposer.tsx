@@ -164,14 +164,15 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       <label className="field full">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
       {permissions.includes("candidates:read") && <div className="full">
-        <ShortlistPanel people={packages.people} onPeople={packages.change} list={list} canSeeCvs={permissions.includes("documents:read")} canSeeSalary={permissions.includes("candidates.compensation:read")} allowEmpty onRefresh={packages.clear} onInsert={packages.insert}/>
+        <details className="email-candidates"><summary>Candidates and CVs ({packages.people.length})</summary>
+        <ShortlistPanel people={packages.people} onPeople={packages.change} list={list} canSeeCvs={permissions.includes("documents:read")} canSeeSalary={permissions.includes("candidates.compensation:read")} allowEmpty onRefresh={packages.clear} onInsert={packages.insert}/></details>
         {candidateId && !packages.people.some((p)=>p.candidateId===candidateId) && packages.people.length<10 && <button type="button" className="link" onClick={()=>{packages.change([...packages.people,{candidateId,name:values?.["[Full name]"] ?? "This candidate",...(about?{applicationId:about}:{})}]);}}>Use this candidate’s details</button>}
         {packages.notice && <p role="status" className="muted small">{packages.notice}</p>}
         <ErrorMessage error={list.error}/>
       </div>}
       <div className="field full">
         <span>Message</span>
-        <RichEditor invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+        <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
           values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {
