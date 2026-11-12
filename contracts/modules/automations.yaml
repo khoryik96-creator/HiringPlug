@@ -1,0 +1,426 @@
+# Module contract: automations (When · If · Then rules that email candidates,
+# clients or the recruiter, or give the recruiter a task, when something
+# happens), the emails waiting for approval, the log of what ran, and the
+# recruiters' tasks. See contracts/README.md for the format.
+x-module:
+  name: automations
+  description: >
+    An automation is a rule: WHEN something happens (an application arrives,
+    a candidate moves to a stage, an interview is booked, a placement starts,
+    its guarantee ends, its invoice falls due), IF the job is at a given
+    client (optional), THEN after some days (or before, for dates) email the
+    candidate, the client's hiring contact or the recruiter, or give the
+    recruiter a task. Emails go from the recruiter's mailbox, on their own or
+    after a recruiter approves them (a choice per automation, with a default
+    in Settings). Every run is logged; what happened is checked again when it
+    is due, so a moved interview or a paid invoice sends nothing.
+  permissions:
+    automations:read:
+      description: See the automations, what they did and the emails waiting for approval.
+      roles: [owner, admin, recruiter]
+    automations:manage:
+      description: Add, change, switch on and off and remove automations, and their default.
+      roles: [owner, admin]
+    automations:approve:
+      description: Send or skip the emails waiting for approval (sent from your own mailbox).
+      roles: [owner, admin, recruiter]
+    automations.tasks:read:
+      description: See your tasks.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager]
+    automations.tasks:update:
+      description: Mark your tasks done.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager]
+  errorCodes:
+    AUTOMATION_NOT_ALLOWED:
+      status: 422
+      description: The automation run cannot be sent or skipped like this (it is no longer waiting, the candidate cannot be emailed, ...). The message says why.
+  jobs:
+    automation.event:
+      queue: core
+      payload: AutomationEventJob
+      priority: low
+      description: "Something happened that an automation may listen for (from the audit log): schedule the automations it starts (Go worker)."
+    automation.run:
+      queue: core
+      payload: AutomationRunJob
+      description: "An automation run is due: check it still applies, then email or add the task, or put the email up for approval (Go worker)."
+
+paths:
+  /v1/automations:
+    get:
+      operationId: listAutomations
+      tags: ["automations"]
+      summary: The automations, with the default for new ones
+      description: The first time, the ready-made automations are added (switched off).
+      x-permission: automations:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createAutomation
+      tags: ["automations"]
+      summary: Add an automation
+      x-permission: automations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutomationInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Automation' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/automations/{automationId}:
+    parameters:
+      - $ref: '#/components/parameters/AutomationIdPath'
+    put:
+      operationId: updateAutomation
+      tags: ["automations"]
+      summary: Change an automation (switch it on or off, ...)
+      description: version is the one read; a stale one is refused. Runs already scheduled follow the change when they are due.
+      x-permission: automations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutomationInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Automation' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: deleteAutomation
+      tags: ["automations"]
+      summary: Remove an automation (and what it has scheduled)
+      x-permission: automations:manage
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/automation-settings:
+    put:
+      operationId: putAutomationSettings
+      tags: ["automations"]
+      summary: The default for new automations (send on their own, or ask first)
+      x-permission: automations:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AutomationSettings' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationSettings' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/automation-runs:
+    get:
+      operationId: listAutomationRuns
+      tags: ["automations"]
+      summary: What automations did, will do, or wait to send (newest first, at most 200)
+      x-permission: automations:read
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AutomationRunStatus' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationRunList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/automation-runs/{runId}/send:
+    parameters:
+      - $ref: '#/components/parameters/AutomationRunIdPath'
+    post:
+      operationId: sendAutomationRun
+      tags: ["automations"]
+      summary: Send an email waiting for approval, from your mailbox
+      x-permission: automations:approve
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationRun' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/AutomationNotAllowed' }
+
+  /v1/automation-runs/{runId}/skip:
+    parameters:
+      - $ref: '#/components/parameters/AutomationRunIdPath'
+    post:
+      operationId: skipAutomationRun
+      tags: ["automations"]
+      summary: Do not send an email waiting for approval
+      x-permission: automations:approve
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AutomationRun' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/AutomationNotAllowed' }
+
+  /v1/tasks:
+    get:
+      operationId: listTasks
+      tags: ["automations"]
+      summary: Your tasks (open ones, and those done in the last 7 days)
+      x-permission: automations.tasks:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/TaskId' }
+    patch:
+      operationId: updateTask
+      tags: ["automations"]
+      summary: Mark one of your tasks done (or not done)
+      x-permission: automations.tasks:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  responses:
+    AutomationNotAllowed:
+      description: Not allowed (AUTOMATION_NOT_ALLOWED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  parameters:
+    AutomationIdPath:
+      name: automationId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/AutomationId' }
+    AutomationRunIdPath:
+      name: runId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/AutomationRunId' }
+
+  schemas:
+    AutomationId:
+      type: string
+      pattern: '^aut_[0-9a-hjkmnp-tv-z]{26}$'
+    AutomationRunId:
+      type: string
+      pattern: '^arn_[0-9a-hjkmnp-tv-z]{26}$'
+    TaskId:
+      type: string
+      pattern: '^tsk_[0-9a-hjkmnp-tv-z]{26}$'
+    AutomationTrigger:
+      type: string
+      description: >
+        application_received: a candidate applies or is added to a job;
+        stage_changed: a candidate moves to stage; interview_scheduled: an
+        interview is booked (days count from its day); placement_starts,
+        guarantee_ends, invoice_due: a placement's start, the end of its
+        guarantee, its invoice's due date (only while unpaid).
+      enum: [application_received, stage_changed, interview_scheduled, placement_starts, guarantee_ends, invoice_due]
+    AutomationActionKind:
+      type: string
+      description: "email_candidate, email_client (the job's hiring contact), email_recruiter, or task (for the recruiter)."
+      enum: [email_candidate, email_client, email_recruiter, task]
+    AutomationSendMode:
+      type: string
+      description: "send: emails go on their own; approve: they wait for a recruiter to send them."
+      enum: [send, approve]
+    AutomationAction:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: { $ref: '#/components/schemas/AutomationActionKind' }
+        subject: { type: string, maxLength: 300, description: "Emails: the subject, with fields like {{candidate.firstName}}." }
+        body: { type: string, maxLength: 10000, description: "Emails: the message, with fields." }
+        title: { type: string, maxLength: 200, description: "Tasks: what to do, with fields." }
+    Automation:
+      type: object
+      required: [id, version, name, enabled, trigger, stage, offsetDays, companyId, companyName, actions, sendMode, preset, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/AutomationId' }
+        version: { type: integer }
+        name: { type: string }
+        enabled: { type: boolean }
+        trigger: { $ref: '#/components/schemas/AutomationTrigger' }
+        stage:
+          description: stage_changed only.
+          allOf: [{ $ref: '#/components/schemas/Stage' }]
+          nullable: true
+        offsetDays: { type: integer, description: "Days after (negative: before) the event or its date." }
+        companyId:
+          description: "IF the job is at this client (null: any)."
+          allOf: [{ $ref: '#/components/schemas/CompanyId' }]
+          nullable: true
+        companyName: { type: string, nullable: true }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/AutomationAction' }
+        sendMode: { $ref: '#/components/schemas/AutomationSendMode' }
+        preset: { type: string, nullable: true, description: Which ready-made automation it started as. }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AutomationInput:
+      type: object
+      additionalProperties: false
+      required: [name, enabled, trigger, offsetDays, actions, sendMode]
+      properties:
+        version: { type: integer, minimum: 1, description: "Changing one: the version read." }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        enabled: { type: boolean }
+        trigger: { $ref: '#/components/schemas/AutomationTrigger' }
+        stage: { $ref: '#/components/schemas/Stage' }
+        offsetDays: { type: integer, minimum: -60, maximum: 365 }
+        companyId:
+          allOf: [{ $ref: '#/components/schemas/CompanyId' }]
+          nullable: true
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items: { $ref: '#/components/schemas/AutomationAction' }
+        sendMode: { $ref: '#/components/schemas/AutomationSendMode' }
+    AutomationSettings:
+      type: object
+      additionalProperties: false
+      required: [defaultSendMode]
+      properties:
+        defaultSendMode: { $ref: '#/components/schemas/AutomationSendMode' }
+    AutomationList:
+      type: object
+      required: [items, settings]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Automation' }
+        settings: { $ref: '#/components/schemas/AutomationSettings' }
+    AutomationRunStatus:
+      type: string
+      description: "scheduled (due later), to_approve (an email waiting), done (sent or task added), skipped (no longer applies, or a recruiter skipped it), failed."
+      enum: [scheduled, to_approve, done, skipped, failed]
+    AutomationRun:
+      type: object
+      required: [id, automationId, automationName, status, dueAt, applicationId, candidateId, candidateName, jobTitle, companyName, actions, detail, finishedAt]
+      properties:
+        id: { $ref: '#/components/schemas/AutomationRunId' }
+        automationId: { $ref: '#/components/schemas/AutomationId' }
+        automationName: { type: string }
+        status: { $ref: '#/components/schemas/AutomationRunStatus' }
+        dueAt: { type: string, format: date-time }
+        applicationId: { type: string, nullable: true }
+        candidateId: { type: string, nullable: true }
+        candidateName: { type: string, nullable: true }
+        jobTitle: { type: string, nullable: true }
+        companyName: { type: string, nullable: true }
+        actions:
+          type: array
+          description: The automation's actions (an approval sends its emails).
+          items: { $ref: '#/components/schemas/AutomationAction' }
+        detail: { type: string, nullable: true, description: "What it did, or why not." }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    AutomationRunList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AutomationRun' }
+    Task:
+      type: object
+      required: [id, title, dueOn, doneAt, applicationId, candidateId, candidateName, jobTitle, automationName, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/TaskId' }
+        title: { type: string }
+        dueOn: { type: string, format: date }
+        doneAt: { type: string, format: date-time, nullable: true }
+        applicationId: { type: string, nullable: true }
+        candidateId: { type: string, nullable: true }
+        candidateName: { type: string, nullable: true }
+        jobTitle: { type: string, nullable: true }
+        automationName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    TaskUpdate:
+      type: object
+      additionalProperties: false
+      required: [done]
+      properties:
+        done: { type: boolean }
+    TaskList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+    AutomationEventJob:
+      type: object
+      required: [action, entityType, entityId]
+      properties:
+        action: { type: string, description: "The audit action (application.moved, ...)." }
+        entityType: { type: string }
+        entityId: { type: string }
+        changes: { type: object, additionalProperties: true }
+    AutomationRunJob:
+      type: object
+      required: [runId, dueAt]
+      properties:
+        runId: { $ref: '#/components/schemas/AutomationRunId' }
+        dueAt: { type: string, format: date-time, description: When it was scheduled for (a run moved since then leaves this job behind). }

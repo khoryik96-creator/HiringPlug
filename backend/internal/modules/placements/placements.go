@@ -132,6 +132,33 @@ func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindPlacementInvoice: m.service.invoiceJob}
 }
 
+// Brief is a placement as automations see it: its dates, whether it stands
+// and whether its invoice is paid.
+type Brief struct {
+	ApplicationID, Status           string
+	StartDate, GuaranteeEnds, DueOn time.Time // DueOn: the invoice's due date
+	Paid                            bool
+	RecruiterID                     *string
+}
+
+// Brief returns a placement, in the caller's transaction; false when missing.
+func (m *Module) Brief(ctx context.Context, tx pgx.Tx, id string) (Brief, bool, error) {
+	row, err := store.New(tx).GetPlacement(ctx, id)
+	if database.IsNoRows(err) {
+		return Brief{}, false, nil
+	}
+	if err != nil {
+		return Brief{}, false, err
+	}
+	inv, err := m.service.invoicingViews(ctx, tx, row.TenantID, []store.Placement{row})
+	if err != nil {
+		return Brief{}, false, err
+	}
+	d := detailsOf(row)
+	return Brief{ApplicationID: row.ApplicationID, Status: row.Status, StartDate: row.StartDate, GuaranteeEnds: d.GuaranteeEnds(),
+		DueOn: inv[row.ID].DueOn, Paid: row.InvoiceStatus == Paid, RecruiterID: row.RecruiterID}, true, nil
+}
+
 // Fact is a placement as reports count it. FeeAmount is nil when none is
 // recorded or the user may not see fees (the database leaves them out).
 type Fact struct {

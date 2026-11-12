@@ -96,6 +96,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The automations, with the default for new ones
+         * @description The first time, the ready-made automations are added (switched off).
+         */
+        get: operations["listAutomations"];
+        put?: never;
+        /** Add an automation */
+        post: operations["createAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automations/{automationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automationId: components["parameters"]["AutomationIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change an automation (switch it on or off, ...)
+         * @description version is the one read; a stale one is refused. Runs already scheduled follow the change when they are due.
+         */
+        put: operations["updateAutomation"];
+        post?: never;
+        /** Remove an automation (and what it has scheduled) */
+        delete: operations["deleteAutomation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automation-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The default for new automations (send on their own, or ask first) */
+        put: operations["putAutomationSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automation-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What automations did, will do, or wait to send (newest first, at most 200) */
+        get: operations["listAutomationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automation-runs/{runId}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["AutomationRunIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send an email waiting for approval, from your mailbox */
+        post: operations["sendAutomationRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/automation-runs/{runId}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["AutomationRunIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Do not send an email waiting for approval */
+        post: operations["skipAutomationRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your tasks (open ones, and those done in the last 7 days) */
+        get: operations["listTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tasks/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark one of your tasks done (or not done) */
+        patch: operations["updateTask"];
+        trace?: never;
+    };
     "/v1/salary-calculations": {
         parameters: {
             query?: never;
@@ -3187,11 +3339,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "automation.event" | "automation.run" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -3370,6 +3522,139 @@ export interface components {
             model: string | null;
             inputTokens: number;
             outputTokens: number;
+        };
+        AutomationId: string;
+        AutomationRunId: string;
+        TaskId: string;
+        /**
+         * @description application_received: a candidate applies or is added to a job; stage_changed: a candidate moves to stage; interview_scheduled: an interview is booked (days count from its day); placement_starts, guarantee_ends, invoice_due: a placement's start, the end of its guarantee, its invoice's due date (only while unpaid).
+         * @enum {string}
+         */
+        AutomationTrigger: "application_received" | "stage_changed" | "interview_scheduled" | "placement_starts" | "guarantee_ends" | "invoice_due";
+        /**
+         * @description email_candidate, email_client (the job's hiring contact), email_recruiter, or task (for the recruiter).
+         * @enum {string}
+         */
+        AutomationActionKind: "email_candidate" | "email_client" | "email_recruiter" | "task";
+        /**
+         * @description send: emails go on their own; approve: they wait for a recruiter to send them.
+         * @enum {string}
+         */
+        AutomationSendMode: "send" | "approve";
+        AutomationAction: {
+            kind: components["schemas"]["AutomationActionKind"];
+            /** @description Emails: the subject, with fields like {{candidate.firstName}}. */
+            subject?: string;
+            /** @description Emails: the message, with fields. */
+            body?: string;
+            /** @description Tasks: what to do, with fields. */
+            title?: string;
+        };
+        Automation: {
+            id: components["schemas"]["AutomationId"];
+            version: number;
+            name: string;
+            enabled: boolean;
+            trigger: components["schemas"]["AutomationTrigger"];
+            /** @description stage_changed only. */
+            stage: components["schemas"]["Stage"] | null;
+            /** @description Days after (negative: before) the event or its date. */
+            offsetDays: number;
+            /** @description IF the job is at this client (null: any). */
+            companyId: components["schemas"]["CompanyId"] | null;
+            companyName: string | null;
+            actions: components["schemas"]["AutomationAction"][];
+            sendMode: components["schemas"]["AutomationSendMode"];
+            /** @description Which ready-made automation it started as. */
+            preset: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AutomationInput: {
+            /** @description Changing one: the version read. */
+            version?: number;
+            name: string;
+            enabled: boolean;
+            trigger: components["schemas"]["AutomationTrigger"];
+            stage?: components["schemas"]["Stage"];
+            offsetDays: number;
+            companyId?: components["schemas"]["CompanyId"] | null;
+            actions: components["schemas"]["AutomationAction"][];
+            sendMode: components["schemas"]["AutomationSendMode"];
+        };
+        AutomationSettings: {
+            defaultSendMode: components["schemas"]["AutomationSendMode"];
+        };
+        AutomationList: {
+            items: components["schemas"]["Automation"][];
+            settings: components["schemas"]["AutomationSettings"];
+        };
+        /**
+         * @description scheduled (due later), to_approve (an email waiting), done (sent or task added), skipped (no longer applies, or a recruiter skipped it), failed.
+         * @enum {string}
+         */
+        AutomationRunStatus: "scheduled" | "to_approve" | "done" | "skipped" | "failed";
+        AutomationRun: {
+            id: components["schemas"]["AutomationRunId"];
+            automationId: components["schemas"]["AutomationId"];
+            automationName: string;
+            status: components["schemas"]["AutomationRunStatus"];
+            /** Format: date-time */
+            dueAt: string;
+            applicationId: string | null;
+            candidateId: string | null;
+            candidateName: string | null;
+            jobTitle: string | null;
+            companyName: string | null;
+            /** @description The automation's actions (an approval sends its emails). */
+            actions: components["schemas"]["AutomationAction"][];
+            /** @description What it did, or why not. */
+            detail: string | null;
+            /** Format: date-time */
+            finishedAt: string | null;
+        };
+        AutomationRunList: {
+            items: components["schemas"]["AutomationRun"][];
+        };
+        Task: {
+            id: components["schemas"]["TaskId"];
+            title: string;
+            /** Format: date */
+            dueOn: string;
+            /** Format: date-time */
+            doneAt: string | null;
+            applicationId: string | null;
+            candidateId: string | null;
+            candidateName: string | null;
+            jobTitle: string | null;
+            automationName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        TaskUpdate: {
+            done: boolean;
+        };
+        TaskList: {
+            items: components["schemas"]["Task"][];
+        };
+        AutomationEventJob: {
+            /** @description The audit action (application.moved, ...). */
+            action: string;
+            entityType: string;
+            entityId: string;
+            changes?: {
+                [key: string]: unknown;
+            };
+        };
+        AutomationRunJob: {
+            runId: components["schemas"]["AutomationRunId"];
+            /**
+             * Format: date-time
+             * @description When it was scheduled for (a run moved since then leaves this job behind).
+             */
+            dueAt: string;
         };
         OwnerInput: {
             /** @description A user of the company, or null for nobody. */
@@ -7058,6 +7343,15 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description Not allowed (AUTOMATION_NOT_ALLOWED). */
+        AutomationNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description No AI for it (STUDIO_CV_OFF). */
         StudioCvOff: {
             headers: {
@@ -7223,6 +7517,8 @@ export interface components {
     };
     parameters: {
         AiProviderPath: components["schemas"]["AiProviderName"];
+        AutomationIdPath: components["schemas"]["AutomationId"];
+        AutomationRunIdPath: components["schemas"]["AutomationRunId"];
         CandidateIdPath: components["schemas"]["CandidateId"];
         CareersSlugPath: string;
         CompanyIdPath: components["schemas"]["CompanyId"];
@@ -7454,6 +7750,263 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["AssistantOff"];
             429: components["responses"]["AssistantLimitReached"];
+        };
+    };
+    listAutomations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Automation"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automationId: components["parameters"]["AutomationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Automation"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                automationId: components["parameters"]["AutomationIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putAutomationSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationSettings"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationSettings"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listAutomationRuns: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["AutomationRunStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRunList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    sendAutomationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["AutomationRunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRun"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["AutomationNotAllowed"];
+        };
+    };
+    skipAutomationRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: components["parameters"]["AutomationRunIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationRun"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["AutomationNotAllowed"];
+        };
+    };
+    listTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: components["schemas"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     calculateSalary: {

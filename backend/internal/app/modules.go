@@ -20,6 +20,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
@@ -76,6 +77,7 @@ type Modules struct {
 	AIProviders  *aiproviders.Module
 	Scheduling   *scheduling.Module
 	Industries   *industries.Module
+	Automations  *automations.Module
 	// scaffold:fields
 }
 
@@ -171,6 +173,11 @@ func NewModules(d Deps) *Modules {
 	m.Documents.UseIndustryRecognition(m.Industries.EnrichParsed)
 	m.Settings.UseIndustries(m.Industries)
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies})
+	m.Automations = automations.New(d.Pool, automations.Deps{
+		Applications: automationApplications{m.Pipeline, m.Jobs}, Interviews: automationInterviews{m.Interviews},
+		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
+		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
+	})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
@@ -216,6 +223,7 @@ type (
 	aiprovidersHTTP  = aiproviders.HTTP
 	schedulingHTTP   = scheduling.HTTP
 	industriesHTTP   = industries.HTTP
+	automationsHTTP  = automations.HTTP
 	// scaffold:aliases
 )
 
@@ -249,6 +257,7 @@ type Server struct {
 	*aiprovidersHTTP
 	*schedulingHTTP
 	*industriesHTTP
+	*automationsHTTP
 	// scaffold:embeds
 }
 
@@ -283,6 +292,7 @@ func (m *Modules) Server() *Server {
 		aiprovidersHTTP:  m.AIProviders.HTTP,
 		schedulingHTTP:   m.Scheduling.HTTP,
 		industriesHTTP:   m.Industries.HTTP,
+		automationsHTTP:  m.Automations.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -300,6 +310,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Leads.JobHandlers(),
 		m.Companies.JobHandlers(),
 		m.Placements.JobHandlers(),
+		m.Automations.JobHandlers(),
 		m.Contacts.JobHandlers(),
 		m.Assistant.JobHandlers(),
 		m.Matching.JobHandlers(),

@@ -103,6 +103,7 @@ type Brief struct {
 	CompanyID string
 	ContactID *string // the hiring contact
 	WorkType  *string // full_time, contract, ...
+	OwnerID   *string // the recruiter it belongs to
 	CreatedAt time.Time
 }
 

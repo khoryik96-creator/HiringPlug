@@ -115,6 +115,46 @@ type AuditLog struct {
 	CreatedAt  time.Time
 }
 
+type Automation struct {
+	ID         string
+	TenantID   string
+	Version    int32
+	Name       string
+	Enabled    bool
+	Trigger    string
+	Stage      *string
+	OffsetDays int32
+	CompanyID  *string
+	Actions    []byte
+	SendMode   string
+	Preset     *string
+	CreatedBy  string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type AutomationRun struct {
+	ID            string
+	TenantID      string
+	AutomationID  string
+	SubjectType   string
+	SubjectID     string
+	ApplicationID string
+	DueAt         time.Time
+	Status        string
+	Detail        *string
+	CreatedAt     time.Time
+	FinishedAt    *time.Time
+	FinishedBy    *string
+}
+
+type AutomationSetting struct {
+	TenantID        string
+	DefaultSendMode string
+	Seeded          bool
+	UpdatedAt       time.Time
+}
+
 type BackupRun struct {
 	ID         int64
 	Name       string
@@ -931,6 +971,19 @@ type PrivacyRequest struct {
 	CreatedBy   string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type RecruiterTask struct {
+	ID             string
+	TenantID       string
+	UserID         string
+	Title          string
+	DueOn          time.Time
+	ApplicationID  *string
+	RunID          *string
+	AutomationName *string
+	DoneAt         *time.Time
+	CreatedAt      time.Time
 }
 
 type RevokedSession struct {

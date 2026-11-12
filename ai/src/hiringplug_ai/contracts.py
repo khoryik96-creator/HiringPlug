@@ -20,6 +20,11 @@ class Role(StrEnum):
 class Permission(StrEnum):
     aiproviders_manage = "aiproviders:manage"
     assistant_use = "assistant:use"
+    automations_tasks_read = "automations.tasks:read"
+    automations_tasks_update = "automations.tasks:update"
+    automations_approve = "automations:approve"
+    automations_manage = "automations:manage"
+    automations_read = "automations:read"
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
     candidates_create = "candidates:create"
@@ -91,6 +96,7 @@ class ErrorCode(StrEnum):
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
     ASSISTANT_OFF = "ASSISTANT_OFF"
+    AUTOMATION_NOT_ALLOWED = "AUTOMATION_NOT_ALLOWED"
     BOOKING_CLOSED = "BOOKING_CLOSED"
     BOOKING_SLOT_TAKEN = "BOOKING_SLOT_TAKEN"
     BOOKING_TOO_MANY_TRIES = "BOOKING_TOO_MANY_TRIES"
@@ -142,6 +148,8 @@ class JobKind(StrEnum):
     aiprovider_checked = "aiprovider.checked"
     assistant_answered = "assistant.answered"
     assistant_ask = "assistant.ask"
+    automation_event = "automation.event"
+    automation_run = "automation.run"
     company_autofill = "company.autofill"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
@@ -407,6 +415,130 @@ class AssistantAnsweredJob(BaseModel):
     model: Annotated[str | None, Field(...)]
     inputTokens: Annotated[int, Field(ge=0)]
     outputTokens: Annotated[int, Field(ge=0)]
+
+
+class AutomationId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^aut_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class AutomationRunId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^arn_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class TaskId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^tsk_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class AutomationTrigger(StrEnum):
+    application_received = "application_received"
+    stage_changed = "stage_changed"
+    interview_scheduled = "interview_scheduled"
+    placement_starts = "placement_starts"
+    guarantee_ends = "guarantee_ends"
+    invoice_due = "invoice_due"
+
+
+class AutomationActionKind(StrEnum):
+    email_candidate = "email_candidate"
+    email_client = "email_client"
+    email_recruiter = "email_recruiter"
+    task = "task"
+
+
+class AutomationSendMode(StrEnum):
+    send = "send"
+    approve = "approve"
+
+
+class AutomationAction(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: AutomationActionKind
+    subject: Annotated[
+        str | None,
+        Field(description="Emails: the subject, with fields like {{candidate.firstName}}.", max_length=300),
+    ] = None
+    body: Annotated[str | None, Field(description="Emails: the message, with fields.", max_length=10000)] = (
+        None
+    )
+    title: Annotated[str | None, Field(description="Tasks: what to do, with fields.", max_length=200)] = None
+
+
+class AutomationSettings(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    defaultSendMode: AutomationSendMode
+
+
+class AutomationRunStatus(StrEnum):
+    scheduled = "scheduled"
+    to_approve = "to_approve"
+    done = "done"
+    skipped = "skipped"
+    failed = "failed"
+
+
+class AutomationRun(BaseModel):
+    id: AutomationRunId
+    automationId: AutomationId
+    automationName: str
+    status: AutomationRunStatus
+    dueAt: AwareDatetime
+    applicationId: Annotated[str | None, Field(...)]
+    candidateId: Annotated[str | None, Field(...)]
+    candidateName: Annotated[str | None, Field(...)]
+    jobTitle: Annotated[str | None, Field(...)]
+    companyName: Annotated[str | None, Field(...)]
+    actions: Annotated[
+        list[AutomationAction], Field(description="The automation's actions (an approval sends its emails).")
+    ]
+    detail: Annotated[str | None, Field(description="What it did, or why not.")]
+    finishedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class AutomationRunList(BaseModel):
+    items: list[AutomationRun]
+
+
+class Task(BaseModel):
+    id: TaskId
+    title: str
+    dueOn: date
+    doneAt: Annotated[AwareDatetime | None, Field(...)]
+    applicationId: Annotated[str | None, Field(...)]
+    candidateId: Annotated[str | None, Field(...)]
+    candidateName: Annotated[str | None, Field(...)]
+    jobTitle: Annotated[str | None, Field(...)]
+    automationName: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class TaskUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    done: bool
+
+
+class TaskList(BaseModel):
+    items: list[Task]
+
+
+class AutomationEventJob(BaseModel):
+    action: Annotated[str, Field(description="The audit action (application.moved, ...).")]
+    entityType: str
+    entityId: str
+    changes: dict[str, Any] | None = None
+
+
+class AutomationRunJob(BaseModel):
+    runId: AutomationRunId
+    dueAt: Annotated[
+        AwareDatetime,
+        Field(description="When it was scheduled for (a run moved since then leaves this job behind)."),
+    ]
 
 
 class OwnerInput(BaseModel):
@@ -4071,6 +4203,43 @@ class AiProviderEntry(BaseModel):
     ]
     updatedAt: Annotated[AwareDatetime | None, Field(...)]
     check: Annotated[AiProviderCheck | None, Field(...)]
+
+
+class Automation(BaseModel):
+    id: AutomationId
+    version: int
+    name: str
+    enabled: bool
+    trigger: AutomationTrigger
+    stage: Annotated[Stage | None, Field(description="stage_changed only.")]
+    offsetDays: Annotated[int, Field(description="Days after (negative: before) the event or its date.")]
+    companyId: Annotated[CompanyId | None, Field(description="IF the job is at this client (null: any).")]
+    companyName: Annotated[str | None, Field(...)]
+    actions: list[AutomationAction]
+    sendMode: AutomationSendMode
+    preset: Annotated[str | None, Field(description="Which ready-made automation it started as.")]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class AutomationInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int | None, Field(description="Changing one: the version read.", ge=1)] = None
+    name: Annotated[str, Field(max_length=120, min_length=1)]
+    enabled: bool
+    trigger: AutomationTrigger
+    stage: Stage | None = None
+    offsetDays: Annotated[int, Field(ge=-60, le=365)]
+    companyId: CompanyId | None = None
+    actions: Annotated[list[AutomationAction], Field(max_length=3, min_length=1)]
+    sendMode: AutomationSendMode
+
+
+class AutomationList(BaseModel):
+    items: list[Automation]
+    settings: AutomationSettings
 
 
 class Candidate(BaseModel):
