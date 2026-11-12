@@ -272,6 +272,9 @@ func (s *Service) Send(ctx context.Context, p authz.Principal, r SendRequest) (E
 		if err != nil {
 			return err
 		}
+		if err := salaryOnlyTheirOwn(r.RecipientCandidateID, r.Candidates, filled.salary); err != nil {
+			return err
+		}
 		q := store.New(tx)
 		if err := s.checkBanners(ctx, q, filled.BodyHTML); err != nil {
 			return err

@@ -69,3 +69,25 @@ func TestEmailCandidatePackagesUseRecipientGreetingAndCheckEverySource(t *testin
 	r = a.request("POST", "/v1/emails", token, body)
 	assert.Equal(t, 404, r.Status, "%s", r.Body)
 }
+
+// One candidate's salary never goes to another candidate: an email to a
+// candidate that shows salary may describe only that candidate.
+func TestCandidateRecipientNeverGetsOtherCandidatesSalary(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	token := testutil.Current.NewTenant(t, api.RoleOwner).Users[api.RoleOwner].Token
+	other := a.createCandidate(token, map[string]any{"firstName": "Synthetic Other"})
+	recipient := a.createCandidate(token, map[string]any{"firstName": "Synthetic Recipient", "email": "recipient@example.test"})
+	salaryBlock := `<div data-candidate-summary="true"><p data-candidate-id="%s">Expected salary: <span data-field="candidate.expectedSalary">RM 11,000 per month</span></p></div>`
+	send := func(about api.Candidate, html string) *response {
+		return a.request("POST", "/v1/emails", token, map[string]any{
+			"recipientCandidateId": recipient.Id, "candidates": []map[string]any{{"candidateId": about.Id}},
+			"to": []string{"recipient@example.test"}, "subject": "Details", "bodyHtml": html, "timeZone": "Asia/Kuala_Lumpur",
+		})
+	}
+	r := send(other, fmt.Sprintf(salaryBlock, other.Id))
+	assert.Equal(t, 400, r.Status, "%s", r.Body)
+	assert.Contains(t, string(r.Body), "salary")
+	assert.Equal(t, 202, send(other, fmt.Sprintf(`<div data-candidate-summary="true"><p data-candidate-id="%s">Notice: 1 month</p></div>`, other.Id)).Status, "details without salary may go")
+	assert.Equal(t, 202, send(recipient, fmt.Sprintf(salaryBlock, recipient.Id)).Status, "their own salary may go to them")
+}

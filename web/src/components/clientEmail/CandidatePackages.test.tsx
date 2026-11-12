@@ -39,3 +39,12 @@ it("updates one managed section and removes deselected candidate details without
  await waitFor(()=>{expect(editor.textContent).not.toContain("Second Person");});expect(editor.textContent).toContain("Keep my introduction.");expect(editor.textContent).toContain("Keep this personal comment.");
  fireEvent.click(screen.getByRole("button",{name:"Insert candidates into the message"}));await waitFor(()=>{expect(editor.textContent).toContain("First Person");});expect(editor.textContent).not.toContain("Second Person");
 });
+it("never offers other candidates' salary in an email to a candidate",async()=>{
+ setup("candidate");await add();
+ expect(screen.queryByRole("checkbox",{name:"Expected salary"})).toBeNull();
+ expect(screen.getByText(/Salary details are left out: this email goes to a candidate/)).toBeTruthy();
+ const editor=screen.getByRole("textbox",{name:"Message"});
+ fireEvent.click(screen.getByRole("button",{name:"Insert candidates into the message"}));
+ await waitFor(()=>{expect(editor.textContent).toContain("Second Person");});
+ expect(editor.textContent).not.toContain("RM 24,000");
+});

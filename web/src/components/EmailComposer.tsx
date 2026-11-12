@@ -65,6 +65,8 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
   const [reset, setReset] = useState(0); // puts html back into the editor (a template)
   const [missing, setMissing] = useState<string[]>([]);
   const packages=useCandidatePackages();
+  // To a candidate, other candidates' details may go, but never their salary (the server refuses it too).
+  const othersToCandidate = !contactId && !!candidateId && packages.people.some((p) => p.candidateId !== candidateId);
   const list=useShortlist(packages.people,permissions.includes("documents:read"));
   const [uploading,setUploading]=useState(false);
   const previewBox=useRef<HTMLDivElement>(null);
@@ -165,8 +167,9 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
         onFocus={() => { inSubject.current = true; }} /></label>
       {permissions.includes("candidates:read") && <div className="full">
         <details className="email-candidates"><summary>Candidates and CVs ({packages.people.length})</summary>
-        <ShortlistPanel people={packages.people} onPeople={packages.change} list={list} canSeeCvs={permissions.includes("documents:read")} canSeeSalary={permissions.includes("candidates.compensation:read")} allowEmpty onRefresh={packages.clear} onInsert={packages.insert}/></details>
+        <ShortlistPanel people={packages.people} onPeople={packages.change} list={list} canSeeCvs={permissions.includes("documents:read")} canSeeSalary={permissions.includes("candidates.compensation:read") && !othersToCandidate} allowEmpty onRefresh={packages.clear} onInsert={packages.insert}/></details>
         {candidateId && !packages.people.some((p)=>p.candidateId===candidateId) && packages.people.length<10 && <button type="button" className="link" onClick={()=>{packages.change([...packages.people,{candidateId,name:values?.["[Full name]"] ?? "This candidate",...(about?{applicationId:about}:{})}]);}}>Use this candidate’s details</button>}
+        {othersToCandidate && permissions.includes("candidates.compensation:read") && <p className="muted small">Salary details are left out: this email goes to a candidate, and other candidates’ salaries are never sent to a candidate.</p>}
         {packages.notice && <p role="status" className="muted small">{packages.notice}</p>}
         <ErrorMessage error={list.error}/>
       </div>}

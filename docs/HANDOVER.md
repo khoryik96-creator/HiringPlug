@@ -167,9 +167,9 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   points are highlighted but no longer block "Use these figures". The
   screening-call cards replace the "Latest call" box and the separate
   salary history in Notes and activity. Logged calls read as a sentence in
-  the timeline. Open for the owner to decide: the candidate-page composer
-  can send other candidates' details (salary included, if ticked) to a
-  candidate recipient.
+  the timeline. Owner's decision: an email to a candidate may describe other
+  candidates but never show their salary (the server refuses it; the
+  composer hides the salary options and says why); their own salary is fine.
 - Proposed before and still open: batch CV formatting; possible candidates
   by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
   PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft

@@ -28,3 +28,17 @@ func (s *Service) recipientValues(ctx context.Context, tx pgx.Tx, p authz.Princi
 	}
 	return nil
 }
+
+// salaryOnlyTheirOwn: an email to a candidate that shows salary may describe
+// only that candidate; another candidate's salary never goes to a candidate.
+func salaryOnlyTheirOwn(recipientID *string, list []Shortlisted, showsSalary bool) error {
+	if recipientID == nil || !showsSalary {
+		return nil
+	}
+	for _, c := range list {
+		if c.CandidateID != *recipientID {
+			return apperr.Validation(apperr.FieldErrors{{Field: "bodyHtml", Message: "another candidate's salary cannot be sent to a candidate; untick the salary details"}})
+		}
+	}
+	return nil
+}
