@@ -4062,6 +4062,50 @@ paths:
               schema: {$ref: '#/components/schemas/CompanyBilling'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/jobs/{jobId}/retainer:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: getJobRetainer
+      tags: [placements]
+      summary: A job's retainer
+      description: >
+        A retained search: the stages the client pays while the search runs. What they add up to is taken off the fee of the first placement on the job. Version 0 and no stages: the job has none.
+
+      x-permission: placements.fees:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobRetainer'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: putJobRetainer
+      tags: [placements]
+      summary: Set a job's retainer
+      description: >
+        Replaces the stages (no stages: no retainer). version is the one read (0 when there is none); a stale one is refused.
+
+      x-permission: placements.fees:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobRetainerInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobRetainer'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/applications/{applicationId}/placement:
     parameters:
       - $ref: '#/components/parameters/ApplicationIdPath'
@@ -9060,6 +9104,80 @@ components:
           items: {$ref: '#/components/schemas/Application'}
         placedLast30Days: {type: integer}
         movedLast7Days: {type: integer, description: Applications that changed stage in the last 7 days.}
+    RetainerDueKind:
+      type: string
+      description: "on_date: on dueOn; after_signing / after_start: dueDays after the retainer was signed / the placement starts."
+      enum: [on_date, after_signing, after_start]
+    RetainerStage:
+      type: object
+      required: [label, amount, dueKind, dueOn, dueDays, invoiceStatus, invoiceNumber, invoicedOn, paidOn]
+      properties:
+        label: {type: string}
+        amount: {$ref: '#/components/schemas/DecimalAmount'}
+        dueKind: {$ref: '#/components/schemas/RetainerDueKind'}
+        dueOn: {type: string, format: date, nullable: true, description: "The day it is due: given, or worked out (null while the signing or start day is not known)."}
+        dueDays: {type: integer, nullable: true}
+        invoiceStatus: {$ref: '#/components/schemas/InvoiceStatus'}
+        invoiceNumber: {type: string, nullable: true}
+        invoicedOn: {type: string, format: date, nullable: true}
+        paidOn: {type: string, format: date, nullable: true}
+    RetainerStageInput:
+      type: object
+      additionalProperties: false
+      required: [label, amount, dueKind]
+      properties:
+        label: {type: string, maxLength: 100}
+        amount: {$ref: '#/components/schemas/DecimalAmount'}
+        dueKind: {$ref: '#/components/schemas/RetainerDueKind'}
+        dueOn: {type: string, format: date, description: on_date only.}
+        dueDays: {type: integer, minimum: 0, maximum: 730, description: after_signing and after_start only.}
+        invoiceStatus: {$ref: '#/components/schemas/InvoiceStatus'}
+        invoiceNumber: {type: string, maxLength: 50}
+        invoicedOn: {type: string, format: date}
+        paidOn: {type: string, format: date}
+    JobRetainer:
+      type: object
+      required: [version, currency, signedOn, stages, total, placementId]
+      properties:
+        version: {type: integer, description: 0 when the job has no retainer.}
+        currency:
+          allOf: [{$ref: '#/components/schemas/CurrencyCode'}]
+          nullable: true
+        signedOn: {type: string, format: date, nullable: true}
+        stages:
+          type: array
+          items: {$ref: '#/components/schemas/RetainerStage'}
+        total: {$ref: '#/components/schemas/DecimalAmount'}
+        placementId:
+          description: The placement it is taken off (the first on the job), once there is one.
+          allOf: [{$ref: '#/components/schemas/PlacementId'}]
+          nullable: true
+    JobRetainerInput:
+      type: object
+      additionalProperties: false
+      required: [version, stages]
+      properties:
+        version: {type: integer, minimum: 0}
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        signedOn: {type: string, format: date, nullable: true}
+        stages:
+          type: array
+          maxItems: 12
+          items: {$ref: '#/components/schemas/RetainerStageInput'}
+    PlacementRetainer:
+      type: object
+      description: The job's retainer, taken off this placement's fee.
+      required: [currency, total, balance, stages]
+      properties:
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        total: {$ref: '#/components/schemas/DecimalAmount'}
+        balance:
+          description: The fee less the retainer (never below 0); null when the fee is in another currency (nothing is taken off).
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        stages:
+          type: array
+          items: {$ref: '#/components/schemas/RetainerStage'}
     PlacementInvoiceJob:
       type: object
       additionalProperties: false
@@ -9187,11 +9305,15 @@ components:
     PlacementMoney:
       type: object
       additionalProperties: false
-      required: [salary, feePercent, feeAmount, feeCurrency]
+      required: [salary, feePercent, feeAmount, feeCurrency, retainer]
       description: >
         The fee is either a percentage of the yearly salary (a monthly salary counts 12 times; feeAmount is then worked out) or a fixed amount (feePercent null).
 
       properties:
+        retainer:
+          description: The job's retainer when this is the first placement on a job with one.
+          allOf: [{$ref: '#/components/schemas/PlacementRetainer'}]
+          nullable: true
         salary:
           description: The agreed salary.
           allOf: [{$ref: '#/components/schemas/SalaryAmount'}]

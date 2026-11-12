@@ -792,6 +792,19 @@ recruiter and the rest. The invoice's preview, PDF and Word are in one Invoice
 menu beside Send now. The **Placements** page is a table (candidate, job, type,
 dates, fee, invoice) with each row's actions in a ⋯ menu.
 
+**Retainer (a retained search).** On the job page, those who may see fees
+see the job's **Retainer**: the stages the client pays while the search runs
+(Engagement, Shortlist, ...), each with an amount, when it is due (on a date,
+or a number of days after the retainer was signed or the placement starts) and
+its invoice (not invoiced, invoiced with its number, paid). What the stages
+add up to is taken off the fee of the **first placement on the job** (not a
+cancelled one): that placement shows the retainer and the balance, its
+timeline shows the retainer stages, and its invoice is for the balance
+("less the retainer of ..."); when the retainer covers the whole fee there is
+nothing left to invoice. A fee in another currency is left as it is. Like
+salary and fees, retainers are hidden by the database from those without
+`placements.fees:read`, and the audit log never records their amounts.
+
 The **Placements** page lists them all, filtered by what happened or the
 invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
 paid; fall-throughs and no-starts not counted; added up by the database over

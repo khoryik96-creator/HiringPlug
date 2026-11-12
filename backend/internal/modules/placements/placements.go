@@ -99,6 +99,10 @@ type Applications interface {
 	// PlacedOfCompany returns the applications on a company's jobs that are
 	// or were ever placed (only they can have a placement: its billing).
 	PlacedOfCompany(ctx context.Context, tx pgx.Tx, companyID string) ([]string, error)
+	// PlacedOnJob is the same for one job (the placement its retainer is taken off).
+	PlacedOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error)
+	// JobExists reports whether the job exists (for its retainer).
+	JobExists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error)
 	Place(ctx context.Context, tx pgx.Tx, id string) error
 }
 

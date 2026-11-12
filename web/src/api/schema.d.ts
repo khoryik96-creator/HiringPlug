@@ -2672,6 +2672,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/retainer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A job's retainer
+         * @description A retained search: the stages the client pays while the search runs. What they add up to is taken off the fee of the first placement on the job. Version 0 and no stages: the job has none.
+         */
+        get: operations["getJobRetainer"];
+        /**
+         * Set a job's retainer
+         * @description Replaces the stages (no stages: no retainer). version is the one read (0 when there is none); a stale one is refused.
+         */
+        put: operations["putJobRetainer"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/applications/{applicationId}/placement": {
         parameters: {
             query?: never;
@@ -6189,6 +6215,72 @@ export interface components {
             /** @description Applications that changed stage in the last 7 days. */
             movedLast7Days: number;
         };
+        /**
+         * @description on_date: on dueOn; after_signing / after_start: dueDays after the retainer was signed / the placement starts.
+         * @enum {string}
+         */
+        RetainerDueKind: "on_date" | "after_signing" | "after_start";
+        RetainerStage: {
+            label: string;
+            amount: components["schemas"]["DecimalAmount"];
+            dueKind: components["schemas"]["RetainerDueKind"];
+            /**
+             * Format: date
+             * @description The day it is due: given, or worked out (null while the signing or start day is not known).
+             */
+            dueOn: string | null;
+            dueDays: number | null;
+            invoiceStatus: components["schemas"]["InvoiceStatus"];
+            invoiceNumber: string | null;
+            /** Format: date */
+            invoicedOn: string | null;
+            /** Format: date */
+            paidOn: string | null;
+        };
+        RetainerStageInput: {
+            label: string;
+            amount: components["schemas"]["DecimalAmount"];
+            dueKind: components["schemas"]["RetainerDueKind"];
+            /**
+             * Format: date
+             * @description on_date only.
+             */
+            dueOn?: string;
+            /** @description after_signing and after_start only. */
+            dueDays?: number;
+            invoiceStatus?: components["schemas"]["InvoiceStatus"];
+            invoiceNumber?: string;
+            /** Format: date */
+            invoicedOn?: string;
+            /** Format: date */
+            paidOn?: string;
+        };
+        JobRetainer: {
+            /** @description 0 when the job has no retainer. */
+            version: number;
+            currency: components["schemas"]["CurrencyCode"] | null;
+            /** Format: date */
+            signedOn: string | null;
+            stages: components["schemas"]["RetainerStage"][];
+            total: components["schemas"]["DecimalAmount"];
+            /** @description The placement it is taken off (the first on the job), once there is one. */
+            placementId: components["schemas"]["PlacementId"] | null;
+        };
+        JobRetainerInput: {
+            version: number;
+            currency?: components["schemas"]["CurrencyCode"];
+            /** Format: date */
+            signedOn?: string | null;
+            stages: components["schemas"]["RetainerStageInput"][];
+        };
+        /** @description The job's retainer, taken off this placement's fee. */
+        PlacementRetainer: {
+            currency: components["schemas"]["CurrencyCode"];
+            total: components["schemas"]["DecimalAmount"];
+            /** @description The fee less the retainer (never below 0); null when the fee is in another currency (nothing is taken off). */
+            balance: components["schemas"]["DecimalAmount"] | null;
+            stages: components["schemas"]["RetainerStage"][];
+        };
         PlacementInvoiceJob: {
             placementId: components["schemas"]["PlacementId"];
             /**
@@ -6309,6 +6401,8 @@ export interface components {
         PlacementRestrictedField: "money";
         /** @description The fee is either a percentage of the yearly salary (a monthly salary counts 12 times; feeAmount is then worked out) or a fixed amount (feePercent null). */
         PlacementMoney: {
+            /** @description The job's retainer when this is the first placement on a job with one. */
+            retainer: components["schemas"]["PlacementRetainer"] | null;
             /** @description The agreed salary. */
             salary: components["schemas"]["SalaryAmount"] | null;
             /** @description e.g. "20" for 20% of the yearly salary. */
@@ -12252,6 +12346,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getJobRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRetainer"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putJobRetainer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobRetainerInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRetainer"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     createPlacement: {

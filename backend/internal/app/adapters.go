@@ -99,6 +99,16 @@ func (a placementApplications) PlacedOfCompany(ctx context.Context, tx pgx.Tx, c
 	return a.pipeline.PlacedOnJobs(ctx, tx, jobIDs)
 }
 
+func (a placementApplications) PlacedOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error) {
+	return a.pipeline.PlacedOnJobs(ctx, tx, []string{jobID})
+}
+
+func (a placementApplications) JobExists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error) {
+	briefs, err := a.jobs.Briefs(ctx, tx, []string{jobID})
+	_, ok := briefs[jobID]
+	return ok, err
+}
+
 func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]placements.Application, error) {
 	briefs, err := a.pipeline.Briefs(ctx, tx, ids)
 	if err != nil {

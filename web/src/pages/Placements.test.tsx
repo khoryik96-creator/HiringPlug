@@ -18,7 +18,7 @@ const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement
     dueOnSet: false, autoSend: true, sendsAt: null, sentAt: "2026-12-05T01:00:00Z", sendError: null }, recruiterId: "usr_1", recruiterName: "Aina",
   startDate: "2026-12-01", guaranteeDays: 90, guaranteeEndsOn: "2027-03-01", status: "active", leftOn: null, statusNote: null, replacement: "none",
   invoiceStatus: "invoiced", invoiceNumber: "INV-1", invoicedOn: "2026-12-05", paidOn: null,
-  money: { salary: { amount: "8500.00", currency: "MYR", period: "month" }, feePercent: "20.00", feeAmount: "20400.00", feeCurrency: "MYR" },
+  money: { salary: { amount: "8500.00", currency: "MYR", period: "month" }, feePercent: "20.00", feeAmount: "20400.00", feeCurrency: "MYR", retainer: null },
   restrictedFields: [], createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
   ...over,
 });

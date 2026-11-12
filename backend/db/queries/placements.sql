@@ -154,3 +154,47 @@ WHERE i.auto_send AND i.sent_at IS NULL AND p.status = 'active' AND p.invoice_st
 -- The job queued for the invoice email is running: nothing is queued now.
 -- name: ClearInvoiceSchedule :exec
 UPDATE placement_invoice SET scheduled_for = NULL WHERE placement_id = @placement_id;
+
+-- Retainers (a retained search on a job): visible only with
+-- placements.fees:read, writable only with placements.fees:update (row-level
+-- security). Amounts are read as exact decimal text.
+-- name: RetainersOfJobs :many
+SELECT job_order_id, version, currency, signed_on FROM job_retainer WHERE job_order_id = ANY(@job_ids::text[]);
+
+-- name: RetainerStages :many
+SELECT job_order_id, position, label, amount::text AS amount, due_kind, due_on, due_days,
+       invoice_status, invoice_number, invoiced_on, paid_on
+FROM job_retainer_stage WHERE job_order_id = ANY(@job_ids::text[])
+ORDER BY job_order_id, position;
+
+-- name: InsertRetainer :one
+INSERT INTO job_retainer (job_order_id, tenant_id, currency, signed_on, updated_by)
+VALUES (@job_order_id, app_current_tenant(), @currency, sqlc.narg(signed_on), app_current_user())
+ON CONFLICT (job_order_id) DO NOTHING
+RETURNING version;
+
+-- Optimistic concurrency: no row returned = stale version (or none).
+-- name: UpdateRetainer :one
+UPDATE job_retainer SET currency = @currency, signed_on = sqlc.narg(signed_on),
+  version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE job_order_id = @job_order_id AND version = @expected_version
+RETURNING version;
+
+-- name: DeleteRetainer :execrows
+DELETE FROM job_retainer WHERE job_order_id = @job_order_id AND version = @expected_version;
+
+-- name: DeleteRetainerStages :exec
+DELETE FROM job_retainer_stage WHERE job_order_id = @job_order_id;
+
+-- name: InsertRetainerStage :exec
+INSERT INTO job_retainer_stage (tenant_id, job_order_id, position, label, amount, due_kind, due_on, due_days,
+                                invoice_status, invoice_number, invoiced_on, paid_on)
+VALUES (app_current_tenant(), @job_order_id, @position, @label, sqlc.arg(amount)::text::numeric, @due_kind,
+        sqlc.narg(due_on), sqlc.narg(due_days), @invoice_status, sqlc.narg(invoice_number), sqlc.narg(invoiced_on), sqlc.narg(paid_on));
+
+-- The first placement among some applications (a job's): the one a retainer
+-- is taken off. A cancelled placement never started, so it does not count.
+-- name: FirstPlacementOf :one
+SELECT id, start_date FROM placement
+WHERE application_id = ANY(@application_ids::text[]) AND status <> 'cancelled'
+ORDER BY id LIMIT 1;

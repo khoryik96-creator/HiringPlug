@@ -125,7 +125,19 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 	if err != nil {
 		return invoice{}, err
 	}
-	totals, err := InvoiceAmounts(*money.FeeAmount, settings.TaxPercent)
+	// The first placement on a job with a retainer invoices what is left of the fee.
+	fee, less := *money.FeeAmount, ""
+	if rv, err := s.retainersOff(ctx, tx, []string{app.JobID}); err != nil {
+		return invoice{}, err
+	} else if r, ok := rv[row.ID]; ok {
+		if balance, ok := r.Balance(fee, *money.FeeCurrency); ok {
+			if balance == "0.00" {
+				return invoice{}, &notReady{"The retainer covers the whole fee: nothing is left to invoice."}
+			}
+			fee, less = balance, "less the retainer of "+MoneyText(r.Currency, r.Total())
+		}
+	}
+	totals, err := InvoiceAmounts(fee, settings.TaxPercent)
 	if err != nil {
 		return invoice{}, err
 	}
@@ -146,6 +158,9 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 		values["fee.percent"] = trimZeros(*money.FeePercent) + "%"
 		values["salary.annual"] = MoneyText(money.Salary.Currency, annual)
 		values["fee.basis"] = values["fee.percent"] + " of the annual salary of " + values["salary.annual"]
+	}
+	if less != "" {
+		values["fee.basis"] = strings.TrimPrefix(values["fee.basis"]+", "+less, ", ")
 	}
 	billTo := []string{app.CompanyName, contact.Name, *contact.Email}
 	doc := InvoiceDoc(settings, values, billTo, totals.Tax != "0.00")

@@ -776,6 +776,32 @@ type JobOrderSalary struct {
 	UpdatedAt  time.Time
 }
 
+type JobRetainer struct {
+	JobOrderID string
+	TenantID   string
+	Version    int32
+	Currency   string
+	SignedOn   pgtype.Date
+	UpdatedBy  string
+	UpdatedAt  time.Time
+}
+
+type JobRetainerStage struct {
+	ID            string
+	TenantID      string
+	JobOrderID    string
+	Position      int32
+	Label         string
+	Amount        pgtype.Numeric
+	DueKind       string
+	DueOn         pgtype.Date
+	DueDays       *int32
+	InvoiceStatus string
+	InvoiceNumber *string
+	InvoicedOn    pgtype.Date
+	PaidOn        pgtype.Date
+}
+
 type LeadSource struct {
 	ID            string
 	TenantID      string

@@ -153,12 +153,17 @@ func toAPI(v View) api.Placement {
 	switch {
 	case v.MoneyHidden:
 		out.RestrictedFields = append(out.RestrictedFields, api.PlacementRestrictedFieldMoney)
-	case v.Money == nil:
+	case v.Money == nil && v.Retainer == nil:
 		out.Money = nullable.NewNullNullable[api.PlacementMoney]()
 	default:
-		m := api.PlacementMoney{FeePercent: c.OrNull(v.Money.FeePercent), FeeAmount: c.OrNull(v.Money.FeeAmount), FeeCurrency: c.OrNull(v.Money.FeeCurrency)}
+		money := Money{}
+		if v.Money != nil {
+			money = *v.Money
+		}
+		m := api.PlacementMoney{FeePercent: c.OrNull(money.FeePercent), FeeAmount: c.OrNull(money.FeeAmount), FeeCurrency: c.OrNull(money.FeeCurrency)}
+		m.Retainer = placementRetainerToAPI(v.Retainer, money)
 		m.Salary = nullable.NewNullNullable[api.SalaryAmount]()
-		if s := v.Money.Salary; s != nil {
+		if s := money.Salary; s != nil {
 			m.Salary = nullable.NewNullableWithValue(api.SalaryAmount{Amount: s.Amount, Currency: s.Currency, Period: api.PayPeriod(s.Period)})
 		}
 		out.Money = nullable.NewNullableWithValue(m)

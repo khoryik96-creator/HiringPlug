@@ -10,6 +10,7 @@ import { JobAds } from "../components/JobAds";
 import { MarketMap } from "../components/MarketMap";
 import { JdFiles } from "../components/JdFiles";
 import { JobForm } from "../components/JobForm";
+import { JobRetainer } from "../components/JobRetainer";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
@@ -80,6 +81,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       <MarketMap jobId={j.id} permissions={permissions} />
       <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
+      <JobRetainer jobId={j.id} permissions={permissions} />
     </main>
   );
 }

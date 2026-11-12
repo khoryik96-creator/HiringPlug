@@ -75,6 +75,52 @@ func (q *Queries) DeletePlacementMoney(ctx context.Context, placementID string) 
 	return err
 }
 
+const deleteRetainer = `-- name: DeleteRetainer :execrows
+DELETE FROM job_retainer WHERE job_order_id = $1 AND version = $2
+`
+
+type DeleteRetainerParams struct {
+	JobOrderID      string
+	ExpectedVersion int32
+}
+
+func (q *Queries) DeleteRetainer(ctx context.Context, arg DeleteRetainerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRetainer, arg.JobOrderID, arg.ExpectedVersion)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteRetainerStages = `-- name: DeleteRetainerStages :exec
+DELETE FROM job_retainer_stage WHERE job_order_id = $1
+`
+
+func (q *Queries) DeleteRetainerStages(ctx context.Context, jobOrderID string) error {
+	_, err := q.db.Exec(ctx, deleteRetainerStages, jobOrderID)
+	return err
+}
+
+const firstPlacementOf = `-- name: FirstPlacementOf :one
+SELECT id, start_date FROM placement
+WHERE application_id = ANY($1::text[]) AND status <> 'cancelled'
+ORDER BY id LIMIT 1
+`
+
+type FirstPlacementOfRow struct {
+	ID        string
+	StartDate time.Time
+}
+
+// The first placement among some applications (a job's): the one a retainer
+// is taken off. A cancelled placement never started, so it does not count.
+func (q *Queries) FirstPlacementOf(ctx context.Context, applicationIds []string) (FirstPlacementOfRow, error) {
+	row := q.db.QueryRow(ctx, firstPlacementOf, applicationIds)
+	var i FirstPlacementOfRow
+	err := row.Scan(&i.ID, &i.StartDate)
+	return i, err
+}
+
 const getInvoiceSettings = `-- name: GetInvoiceSettings :one
 SELECT tenant_id, issuer, bank_details, number_prefix, next_number, tax_label, tax_percent::text AS tax_percent, line_text, footer,
        email_subject, email_body, send_hour, version
@@ -253,6 +299,64 @@ func (q *Queries) InsertPlacement(ctx context.Context, arg InsertPlacementParams
 		&i.EndDate,
 	)
 	return i, err
+}
+
+const insertRetainer = `-- name: InsertRetainer :one
+INSERT INTO job_retainer (job_order_id, tenant_id, currency, signed_on, updated_by)
+VALUES ($1, app_current_tenant(), $2, $3, app_current_user())
+ON CONFLICT (job_order_id) DO NOTHING
+RETURNING version
+`
+
+type InsertRetainerParams struct {
+	JobOrderID string
+	Currency   string
+	SignedOn   *time.Time
+}
+
+func (q *Queries) InsertRetainer(ctx context.Context, arg InsertRetainerParams) (int32, error) {
+	row := q.db.QueryRow(ctx, insertRetainer, arg.JobOrderID, arg.Currency, arg.SignedOn)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
+}
+
+const insertRetainerStage = `-- name: InsertRetainerStage :exec
+INSERT INTO job_retainer_stage (tenant_id, job_order_id, position, label, amount, due_kind, due_on, due_days,
+                                invoice_status, invoice_number, invoiced_on, paid_on)
+VALUES (app_current_tenant(), $1, $2, $3, $4::text::numeric, $5,
+        $6, $7, $8, $9, $10, $11)
+`
+
+type InsertRetainerStageParams struct {
+	JobOrderID    string
+	Position      int32
+	Label         string
+	Amount        string
+	DueKind       string
+	DueOn         *time.Time
+	DueDays       *int32
+	InvoiceStatus string
+	InvoiceNumber *string
+	InvoicedOn    *time.Time
+	PaidOn        *time.Time
+}
+
+func (q *Queries) InsertRetainerStage(ctx context.Context, arg InsertRetainerStageParams) error {
+	_, err := q.db.Exec(ctx, insertRetainerStage,
+		arg.JobOrderID,
+		arg.Position,
+		arg.Label,
+		arg.Amount,
+		arg.DueKind,
+		arg.DueOn,
+		arg.DueDays,
+		arg.InvoiceStatus,
+		arg.InvoiceNumber,
+		arg.InvoicedOn,
+		arg.PaidOn,
+	)
+	return err
 }
 
 const invoiceNumberUsed = `-- name: InvoiceNumberUsed :one
@@ -683,6 +787,98 @@ func (q *Queries) PutPlacementMoney(ctx context.Context, arg PutPlacementMoneyPa
 	return err
 }
 
+const retainerStages = `-- name: RetainerStages :many
+SELECT job_order_id, position, label, amount::text AS amount, due_kind, due_on, due_days,
+       invoice_status, invoice_number, invoiced_on, paid_on
+FROM job_retainer_stage WHERE job_order_id = ANY($1::text[])
+ORDER BY job_order_id, position
+`
+
+type RetainerStagesRow struct {
+	JobOrderID    string
+	Position      int32
+	Label         string
+	Amount        string
+	DueKind       string
+	DueOn         *time.Time
+	DueDays       *int32
+	InvoiceStatus string
+	InvoiceNumber *string
+	InvoicedOn    *time.Time
+	PaidOn        *time.Time
+}
+
+func (q *Queries) RetainerStages(ctx context.Context, jobIds []string) ([]RetainerStagesRow, error) {
+	rows, err := q.db.Query(ctx, retainerStages, jobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RetainerStagesRow
+	for rows.Next() {
+		var i RetainerStagesRow
+		if err := rows.Scan(
+			&i.JobOrderID,
+			&i.Position,
+			&i.Label,
+			&i.Amount,
+			&i.DueKind,
+			&i.DueOn,
+			&i.DueDays,
+			&i.InvoiceStatus,
+			&i.InvoiceNumber,
+			&i.InvoicedOn,
+			&i.PaidOn,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const retainersOfJobs = `-- name: RetainersOfJobs :many
+SELECT job_order_id, version, currency, signed_on FROM job_retainer WHERE job_order_id = ANY($1::text[])
+`
+
+type RetainersOfJobsRow struct {
+	JobOrderID string
+	Version    int32
+	Currency   string
+	SignedOn   *time.Time
+}
+
+// Retainers (a retained search on a job): visible only with
+// placements.fees:read, writable only with placements.fees:update (row-level
+// security). Amounts are read as exact decimal text.
+func (q *Queries) RetainersOfJobs(ctx context.Context, jobIds []string) ([]RetainersOfJobsRow, error) {
+	rows, err := q.db.Query(ctx, retainersOfJobs, jobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RetainersOfJobsRow
+	for rows.Next() {
+		var i RetainersOfJobsRow
+		if err := rows.Scan(
+			&i.JobOrderID,
+			&i.Version,
+			&i.Currency,
+			&i.SignedOn,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setInvoiceError = `-- name: SetInvoiceError :exec
 UPDATE placement_invoice SET send_error = $1 WHERE placement_id = $2
 `
@@ -843,4 +1039,31 @@ func (q *Queries) UpdatePlacement(ctx context.Context, arg UpdatePlacementParams
 		&i.EndDate,
 	)
 	return i, err
+}
+
+const updateRetainer = `-- name: UpdateRetainer :one
+UPDATE job_retainer SET currency = $1, signed_on = $2,
+  version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE job_order_id = $3 AND version = $4
+RETURNING version
+`
+
+type UpdateRetainerParams struct {
+	Currency        string
+	SignedOn        *time.Time
+	JobOrderID      string
+	ExpectedVersion int32
+}
+
+// Optimistic concurrency: no row returned = stale version (or none).
+func (q *Queries) UpdateRetainer(ctx context.Context, arg UpdateRetainerParams) (int32, error) {
+	row := q.db.QueryRow(ctx, updateRetainer,
+		arg.Currency,
+		arg.SignedOn,
+		arg.JobOrderID,
+		arg.ExpectedVersion,
+	)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Schemas } from "../api/client";
-import { billingTimeline, feeBasis, invoiceBadge, monthsLong, trimZeros } from "./placementTimeline";
+import { billingTimeline, feeBasis, feeNote, invoiceBadge, monthsLong, trimZeros } from "./placementTimeline";
 
 const base = {
   startDate: "2026-12-01", guaranteeEndsOn: "2027-03-01", status: "active", jobType: "contract", endDate: "2027-11-30",
@@ -30,6 +30,21 @@ describe("billingTimeline", () => {
     expect(billingTimeline(base, "2027-01-02").find((e) => e.label === "Payment due")?.state).toBe("overdue");
     const paid = billingTimeline({ ...base, invoicedOn: "2026-12-01", paidOn: "2026-12-20", endDate: null, jobType: "permanent" }, "2027-01-02");
     expect(paid.map((e) => e.label)).toEqual(["Starts", "Invoiced", "Paid", "Guarantee ends"]);
+  });
+});
+
+describe("with a retainer", () => {
+  it("shows the stages and the balance due", () => {
+    const stage = (label: string, dueOn: string | null, invoiceStatus: string, paidOn: string | null = null) =>
+      ({ label, dueOn, invoiceStatus, paidOn, amount: "15000.00", dueKind: "on_date", dueDays: null, invoiceNumber: null, invoicedOn: null });
+    const money = { ...base.money, retainer: { currency: "MYR", total: "30000.00", balance: "3600.00",
+      stages: [stage("Engagement", "2026-11-01", "paid", "2026-11-05"), stage("Shortlist", "2026-11-10", "invoiced"), stage("Later", null, "not_invoiced")] } };
+    const t = billingTimeline({ ...base, money } as unknown as Schemas["Placement"], "2026-11-12");
+    expect(t.map((e) => `${e.day} ${e.label} ${e.state}`)).toEqual([
+      "2026-11-05 Retainer · Engagement done", "2026-11-10 Retainer · Shortlist overdue",
+      "2026-12-01 Starts later", "2026-12-01 Invoice goes out later", "2026-12-31 Balance due due", "2027-03-01 Guarantee ends later", "2027-11-30 Contract ends later",
+    ]);
+    expect(feeNote(money as Schemas["PlacementMoney"])).toBe("Retainer MYR 30,000.00 · balance MYR 3,600.00");
   });
 });
 

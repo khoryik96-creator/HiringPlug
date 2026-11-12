@@ -14,8 +14,14 @@ export function billingTimeline(p: Placement, today: string): TimelineEntry[] {
   const out: TimelineEntry[] = [at(p.startDate, "Starts")];
   if (p.invoicedOn) out.push({ day: p.invoicedOn, label: "Invoiced", state: "done" });
   else if (inv.sendsAt) out.push(at(localDay(inv.sendsAt), "Invoice goes out"));
-  if (p.paidOn) out.push({ day: p.paidOn, label: "Paid", state: "done" });
-  else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
+  const retainer = p.money?.retainer;
+  if (p.paidOn) out.push({ day: p.paidOn, label: retainer ? "Balance paid" : "Paid", state: "done" });
+  else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: retainer ? "Balance due" : "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
+  for (const s of retainer?.stages ?? []) {
+    if (!s.dueOn) continue;
+    const state = s.invoiceStatus === "paid" ? "done" : s.dueOn < today ? "overdue" : s.invoiceStatus === "invoiced" ? "due" : "later";
+    out.push({ day: s.paidOn ?? s.dueOn, label: `Retainer · ${s.label}`, state });
+  }
   if (p.leftOn) out.push(at(p.leftOn, "Left"));
   out.push(at(p.guaranteeEndsOn, "Guarantee ends"));
   if (p.endDate) out.push(at(p.endDate, p.jobType === "contract" ? "Contract ends" : "Ends"));
@@ -34,6 +40,14 @@ export function invoiceBadge(p: Placement, today: string): InvoiceBadge {
     return { state: late ? "overdue" : "due", label: late ? "Overdue" : "Invoiced", note: [p.invoiceNumber, due].filter(Boolean).join(" · ") };
   }
   return { state: "none", label: "Not invoiced", note: due };
+}
+
+/** How the fee was worked out, or what is left once the job's retainer is taken off. */
+export function feeNote(m: Schemas["PlacementMoney"]): string {
+  const r = m.retainer;
+  if (!r) return feeBasis(m);
+  const total = `Retainer ${formatMoney(r.total, r.currency)}`;
+  return r.balance === null ? `${total} (another currency)` : `${total} · balance ${formatMoney(r.balance, r.currency)}`;
 }
 
 /** "20% of MYR 14,000.00 / month", or "Fixed fee". */

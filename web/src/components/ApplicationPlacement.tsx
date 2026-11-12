@@ -7,7 +7,7 @@ import { PAY_PERIOD, PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatDa
 import { ErrorMessage } from "./ErrorMessage";
 import { PlacementForm } from "./PlacementForm";
 import { PlacementInvoice } from "./PlacementInvoicing";
-import { billingTimeline, feeBasis, invoiceBadge, monthsLong, todayISO, trimZeros } from "./placementTimeline";
+import { billingTimeline, feeNote, invoiceBadge, monthsLong, todayISO, trimZeros } from "./placementTimeline";
 
 type Placement = Schemas["Placement"];
 
@@ -62,7 +62,7 @@ function PlacementCard({ p, permissions, onEdit }: { p: Placement; permissions: 
         {onEdit && <button type="button" className="link small" onClick={onEdit}>Edit</button>}
       </div>
       <div className="placement-figures">
-        {fee && money && figure("Fee", fee, feeBasis(money))}
+        {fee && money && figure("Fee", fee, feeNote(money))}
         {figure("Dates", p.endDate ? `${formatDay(p.startDate)} – ${formatDay(p.endDate)}` : `From ${formatDay(p.startDate)}`,
           p.endDate ? monthsLong(p.startDate, p.endDate) : undefined)}
         {figure("Guarantee", `to ${formatDay(p.guaranteeEndsOn)}`, `${String(p.guaranteeDays)} days`)}

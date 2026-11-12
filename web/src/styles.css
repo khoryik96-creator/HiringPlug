@@ -655,6 +655,18 @@ fieldset.invoicing .check { display: block; }
 .placements-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .placements-table td.actions { width: 1%; text-align: right; }
 .placements-table td[colspan] .panel { margin: 0; }
+.retainer-table { width: 100%; min-width: 34rem; font-variant-numeric: tabular-nums; }
+.retainer-table.edit { min-width: 44rem; }
+.retainer-table th.num { text-align: right; }
+.retainer-table td.num { white-space: nowrap; }
+.retainer-table td { vertical-align: top; }
+.retainer-table td.num, .retainer-table input.num { text-align: right; }
+.retainer-table tfoot td { border-top: 1px solid var(--line); }
+.retainer-table.edit input:not([type]) { width: 100%; min-width: 7rem; box-sizing: border-box; }
+.retainer-table.edit input.days { width: 4.5rem; }
+.retainer-table.edit input.inv-no { width: 8rem; min-width: 0; }
+.retainer-form { display: grid; gap: 0.75rem; }
+.row.tight { gap: 0.35rem; flex-wrap: wrap; }
 /* A small dropdown of actions. */
 .menu { position: relative; }
 .menu > summary { list-style: none; cursor: pointer; }

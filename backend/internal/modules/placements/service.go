@@ -35,6 +35,7 @@ type View struct {
 	RecruiterName *string
 	Money         *Money // nil: none recorded, or hidden (MoneyHidden)
 	MoneyHidden   bool
+	Retainer      *RetainerView // the job's retainer, when this is its first placement (fees only)
 	Invoicing     InvoicingView
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -384,6 +385,19 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 			money[r.PlacementID] = m
 		}
 	}
+	var retainers map[string]RetainerView
+	if seeMoney {
+		jobIDs, seen := []string{}, map[string]bool{}
+		for _, a := range apps {
+			if !seen[a.JobID] {
+				seen[a.JobID] = true
+				jobIDs = append(jobIDs, a.JobID)
+			}
+		}
+		if retainers, err = s.retainersOff(ctx, tx, jobIDs); err != nil {
+			return nil, err
+		}
+	}
 	invoicing, err := s.invoicingViews(ctx, tx, p.TenantID, rows)
 	if err != nil {
 		return nil, err
@@ -394,6 +408,9 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 		v := View{
 			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: OnSheet(apps[r.ApplicationID], d.Sheet), Details: d,
 			Money: money[r.ID], MoneyHidden: !seeMoney, Invoicing: invoicing[r.ID], CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		}
+		if rv, ok := retainers[r.ID]; ok {
+			v.Retainer = &rv
 		}
 		if r.RecruiterID != nil {
 			if n, ok := names[*r.RecruiterID]; ok {

@@ -110,7 +110,8 @@ function PlacementRow({ p, permissions, today, onEdit }: { p: Schemas["Placement
       <td><a href={`#/jobs/${p.jobId}`}>{p.jobTitle}</a><div className="muted small">{p.companyName}</div></td>
       <td>{PLACEMENT_JOB_TYPE[p.jobType]}{p.poNumber && <div className="muted small">{p.poNumber}</div>}</td>
       <td className="num">{formatDay(p.startDate)}{p.endDate && <div className="muted small">to {formatDay(p.endDate)}</div>}</td>
-      <td className="num">{fee ? <strong>{fee}</strong> : <span className="muted">—</span>}</td>
+      <td className="num">{fee ? <strong>{fee}</strong> : <span className="muted">—</span>}
+        {p.money?.retainer?.balance && <div className="muted small">balance {formatMoney(p.money.retainer.balance, p.money.retainer.currency)}</div>}</td>
       <td><span className={`pill ${badge.state}`}>{badge.label}</span>{badge.note && <div className="muted small">{badge.note}</div>}</td>
       <td className="actions"><PlacementInvoice p={p} permissions={permissions} variant="menu" extra={change} /></td>
     </tr>

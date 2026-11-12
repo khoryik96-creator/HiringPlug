@@ -3410,6 +3410,12 @@ class PipelineSummary(BaseModel):
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
 
 
+class RetainerDueKind(StrEnum):
+    on_date = "on_date"
+    after_signing = "after_signing"
+    after_start = "after_start"
+
+
 class InvoiceFormat(StrEnum):
     pdf = "pdf"
     docx = "docx"
@@ -3514,16 +3520,6 @@ class InvoiceStatus(StrEnum):
 
 class PlacementRestrictedField(StrEnum):
     money = "money"
-
-
-class PlacementMoney(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    salary: Annotated[SalaryAmount | None, Field(description="The agreed salary.")]
-    feePercent: Annotated[DecimalAmount | None, Field(description='e.g. "20" for 20% of the yearly salary.')]
-    feeAmount: Annotated[DecimalAmount | None, Field(...)]
-    feeCurrency: Annotated[CurrencyCode | None, Field(...)]
 
 
 class FeeTotal(BaseModel):
@@ -5123,6 +5119,74 @@ class OfferList(BaseModel):
     items: list[Offer]
 
 
+class RetainerStage(BaseModel):
+    label: str
+    amount: DecimalAmount
+    dueKind: RetainerDueKind
+    dueOn: Annotated[
+        date | None,
+        Field(
+            description="The day it is due: given, or worked out (null while the signing or start day is not known)."
+        ),
+    ]
+    dueDays: Annotated[int | None, Field(...)]
+    invoiceStatus: InvoiceStatus
+    invoiceNumber: Annotated[str | None, Field(...)]
+    invoicedOn: Annotated[date | None, Field(...)]
+    paidOn: Annotated[date | None, Field(...)]
+
+
+class RetainerStageInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    label: Annotated[str, Field(max_length=100)]
+    amount: DecimalAmount
+    dueKind: RetainerDueKind
+    dueOn: Annotated[date | None, Field(description="on_date only.")] = None
+    dueDays: Annotated[int | None, Field(description="after_signing and after_start only.", ge=0, le=730)] = (
+        None
+    )
+    invoiceStatus: InvoiceStatus | None = None
+    invoiceNumber: Annotated[str | None, Field(max_length=50)] = None
+    invoicedOn: date | None = None
+    paidOn: date | None = None
+
+
+class JobRetainer(BaseModel):
+    version: Annotated[int, Field(description="0 when the job has no retainer.")]
+    currency: Annotated[CurrencyCode | None, Field(...)]
+    signedOn: Annotated[date | None, Field(...)]
+    stages: list[RetainerStage]
+    total: DecimalAmount
+    placementId: Annotated[
+        PlacementId | None,
+        Field(description="The placement it is taken off (the first on the job), once there is one."),
+    ]
+
+
+class JobRetainerInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0)]
+    currency: CurrencyCode | None = None
+    signedOn: date | None = None
+    stages: Annotated[list[RetainerStageInput], Field(max_length=12)]
+
+
+class PlacementRetainer(BaseModel):
+    currency: CurrencyCode
+    total: DecimalAmount
+    balance: Annotated[
+        DecimalAmount | None,
+        Field(
+            description="The fee less the retainer (never below 0); null when the fee is in another currency (nothing is taken off)."
+        ),
+    ]
+    stages: list[RetainerStage]
+
+
 class PlacementInvoiceJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -5169,6 +5233,20 @@ class PlacementDefaults(BaseModel):
 class InvoiceSettings(InvoiceSettingsBase):
     version: Annotated[int, Field(description="0 while the defaults are in use.")]
     fields: Annotated[list[InvoiceField], Field(description="The {{fields}} the texts may use.")]
+
+
+class PlacementMoney(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    retainer: Annotated[
+        PlacementRetainer | None,
+        Field(description="The job's retainer when this is the first placement on a job with one."),
+    ]
+    salary: Annotated[SalaryAmount | None, Field(description="The agreed salary.")]
+    feePercent: Annotated[DecimalAmount | None, Field(description='e.g. "20" for 20% of the yearly salary.')]
+    feeAmount: Annotated[DecimalAmount | None, Field(...)]
+    feeCurrency: Annotated[CurrencyCode | None, Field(...)]
 
 
 class Placement(BaseModel):
