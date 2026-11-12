@@ -77,8 +77,17 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
-ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC, c.id DESC
-LIMIT @row_limit;
+-- @sort: see CandidateSort. Salaries come from the protected table: for roles
+-- that may not see them, row-level security leaves them empty (newest order).
+ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC,
+  CASE WHEN @sort::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  c.id DESC
+LIMIT @row_limit OFFSET @row_offset;
 
 -- Advanced search: every filter given must hold. With @ts (a boolean
 -- search as a text search query), a candidate is found when their profile
@@ -127,8 +136,15 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
              <= (sqlc.narg(salary_max)::text)::numeric))
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
-ORDER BY c.id DESC
-LIMIT @row_limit;
+ORDER BY
+  CASE WHEN @sort::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN @sort::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  c.id DESC
+LIMIT @row_limit OFFSET @row_offset;
 
 -- Amounts are numeric in the database; the Go code converts them to and
 -- from exact decimal strings, so no precision is ever lost.

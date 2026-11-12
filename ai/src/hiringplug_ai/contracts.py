@@ -650,7 +650,20 @@ class CandidateSearchHit(BaseModel):
     ]
 
 
+class CandidateSort(StrEnum):
+    newest = "newest"
+    name = "name"
+    notice = "notice"
+    current_salary_asc = "current_salary_asc"
+    current_salary_desc = "current_salary_desc"
+    expected_salary_asc = "expected_salary_asc"
+    expected_salary_desc = "expected_salary_desc"
+
+
 class CandidateSearchPage(BaseModel):
+    nextOffset: Annotated[
+        int | None, Field(description="With a sort other than newest, pass as offset for the next page.")
+    ] = None
     items: list[CandidateSearchHit]
     nextCursor: Annotated[CandidateId | None, Field(...)]
     terms: Annotated[
@@ -660,6 +673,9 @@ class CandidateSearchPage(BaseModel):
 
 
 class CandidatePage(BaseModel):
+    nextOffset: Annotated[
+        int | None, Field(description="With a sort other than newest, pass as offset for the next page.")
+    ] = None
     items: list[CandidateSummary]
     nextCursor: Annotated[
         CandidateId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
@@ -3282,6 +3298,9 @@ class Application(BaseModel):
     companyName: str
     candidateId: CandidateId
     candidateName: str
+    candidateFirstName: Annotated[
+        str | None, Field(description="The first name as recorded, for compact views such as the job board.")
+    ] = None
     candidateTitle: Annotated[str | None, Field(description="The candidate's current job title.")]
     stage: Stage
     reason: Annotated[CloseReason | None, Field(description="Set when rejected or withdrawn.")]
@@ -4291,6 +4310,13 @@ class CandidateSearch(BaseModel):
     updatedWithinDays: Annotated[int | None, Field(ge=1, le=3650)] = None
     limit: Annotated[int, Field(ge=1, le=100)] = 25
     cursor: CandidateId | None = None
+    sort: CandidateSort | None = None
+    offset: Annotated[
+        int | None,
+        Field(
+            description="With a sort other than newest, the nextOffset of the previous page.", ge=0, le=10000
+        ),
+    ] = None
 
 
 class ScreeningCallInput(BaseModel):

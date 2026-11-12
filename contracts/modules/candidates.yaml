@@ -86,6 +86,13 @@ paths:
           in: query
           description: The `nextCursor` of the previous page.
           schema: { $ref: '#/components/schemas/CandidateId' }
+        - name: sort
+          in: query
+          schema: { $ref: '#/components/schemas/CandidateSort' }
+        - name: offset
+          in: query
+          description: With a sort other than newest, the `nextOffset` of the previous page.
+          schema: { type: integer, minimum: 0, maximum: 10000, default: 0 }
       responses:
         '200':
           description: OK
@@ -850,6 +857,8 @@ components:
         updatedWithinDays: { type: integer, minimum: 1, maximum: 3650 }
         limit: { type: integer, minimum: 1, maximum: 100, default: 25 }
         cursor: { $ref: '#/components/schemas/CandidateId' }
+        sort: { $ref: '#/components/schemas/CandidateSort' }
+        offset: { type: integer, minimum: 0, maximum: 10000, description: "With a sort other than newest, the nextOffset of the previous page." }
     SalaryCap:
       type: object
       additionalProperties: false
@@ -874,10 +883,17 @@ components:
           type: string
           nullable: true
           description: "Where the CV matches, the words found between [[ and ]] (\"... led [[SAP]] [[BW]] upgrades ...\")."
+    CandidateSort:
+      type: string
+      enum: [newest, name, notice, current_salary_asc, current_salary_desc, expected_salary_asc, expected_salary_desc]
+      description: >-
+        newest (the default) pages with nextCursor; the others page with nextOffset. Unknown notice periods
+        and salaries come last; salary sorts use monthly equivalents and only for roles that may see salaries.
     CandidateSearchPage:
       type: object
       required: [items, nextCursor, terms]
       properties:
+        nextOffset: { type: integer, nullable: true, description: "With a sort other than newest, pass as offset for the next page." }
         items:
           type: array
           items: { $ref: '#/components/schemas/CandidateSearchHit' }
@@ -892,6 +908,7 @@ components:
       type: object
       required: [items, nextCursor]
       properties:
+        nextOffset: { type: integer, nullable: true, description: "With a sort other than newest, pass as offset for the next page." }
         items:
           type: array
           items: { $ref: '#/components/schemas/CandidateSummary' }

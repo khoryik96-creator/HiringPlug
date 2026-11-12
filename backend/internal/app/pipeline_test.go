@@ -101,6 +101,8 @@ func TestPipelineListsForJobAndCandidate(t *testing.T) {
 	require.Len(t, list.Items, 2)
 	assert.Equal(t, "Wei", list.Items[0].CandidateName, "in the order added")
 	assert.Equal(t, "Mei", list.Items[1].CandidateName)
+	require.NotNil(t, list.Items[0].CandidateFirstName)
+	assert.Equal(t, "Wei", *list.Items[0].CandidateFirstName, "the board shows first names")
 
 	a.request(http.MethodGet, "/v1/candidates/"+wei.Id+"/applications", token, nil).JSON(&list)
 	require.Len(t, list.Items, 2)

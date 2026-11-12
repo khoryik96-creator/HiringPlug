@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
@@ -9,7 +9,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
-import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
+import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, SORTS, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
@@ -29,26 +29,36 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const personOf = (c: Schemas["CandidateSummary"]) => ({ id: c.id, person: { candidateId: c.id, name: c.fullName, email: c.email } });
   const advanced = !isEmpty(adv);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
-  const list = useQuery({
-    queryKey: [...candidatesKey, q, mine],
+  const [sortBy, setSortBy] = useState<CandidateSort>(() => {
+    const kept = readSort();
+    return SORTS.some((s) => s.value === kept && (!s.salary || canSeeSalary)) ? kept : "newest";
+  });
+  const list = useInfiniteQuery({
+    queryKey: [...candidatesKey, q, mine, sortBy],
     enabled: !advanced,
-    queryFn: async () => {
-      const query: { q?: string; owner?: string } = {};
+    initialPageParam: undefined as PageAt | undefined,
+    queryFn: async ({ pageParam }) => {
+      const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number } = {};
       if (q.trim()) query.q = q.trim();
       if (mine) query.owner = "me";
+      if (sortBy !== "newest") query.sort = sortBy;
+      if (pageParam?.cursor) query.cursor = pageParam.cursor;
+      if (pageParam?.offset) query.offset = pageParam.offset;
       return unwrap(await api.GET("/v1/candidates", { params: { query } }));
     },
+    getNextPageParam: nextPage,
   });
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", q, mine, adv],
+    queryKey: [...candidatesKey, "search", q, mine, adv, sortBy],
     enabled: advanced,
-    initialPageParam: undefined as string | undefined,
-    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(adv, q, mine, pageParam) })),
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    initialPageParam: undefined as PageAt | undefined,
+    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(adv, q, mine, pageParam, sortBy) })),
+    getNextPageParam: nextPage,
   });
+  const shownList = advanced ? found : list;
   const hits: Hit[] = advanced
     ? (found.data?.pages.flatMap((pg) => pg.items) ?? [])
-    : (list.data?.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null })) ?? []);
+    : (list.data?.pages.flatMap((pg) => pg.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null }))) ?? []);
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
   const industries = useIndustries();
@@ -82,6 +92,12 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
           Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
         </button>
+        <label className="sort-by">
+          <span className="visually-hidden">Sort by</span>
+          <select aria-label="Sort by" value={sortBy} onChange={(e) => { const v = e.target.value as CandidateSort; setSortBy(v); keepSort(v); }}>
+            {SORTS.filter((s) => !s.salary || canSeeSalary).map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </label>
         <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
@@ -96,11 +112,11 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           <button type="button" className="link small" onClick={() => { apply(EMPTY); }}>Clear all</button>
         </div>
       )}
-      <ErrorMessage error={(advanced ? found.error : list.error) ?? cols.save.error} />
+      <ErrorMessage error={shownList.error ?? cols.save.error} />
       <div className="list-meta">
         <span role="status">
-          {(advanced ? found.data : list.data) && (hits.length === 0 ? "No candidates match."
-            : `${String(hits.length)}${(advanced ? found.hasNextPage : Boolean(list.data?.nextCursor)) ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
+          {shownList.data && (hits.length === 0 ? "No candidates match."
+            : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
         </span>
         <WaLegend />
@@ -147,8 +163,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           </tbody>
         </table>
       </div>
-      {advanced && found.hasNextPage && (
-        <button type="button" className="doc-btn" disabled={found.isFetchingNextPage} onClick={() => { void found.fetchNextPage(); }}>Show more</button>
+      {shownList.hasNextPage && (
+        <button type="button" className="doc-btn" disabled={shownList.isFetchingNextPage} onClick={() => { void shownList.fetchNextPage(); }}>Show more</button>
       )}
     </main>
   );
@@ -210,4 +226,13 @@ function AddCandidate({ onCancel }: { onCancel: () => void }) {
       <ErrorMessage error={create.error}><DuplicateEmail error={create.error} /></ErrorMessage>
     </form>
   );
+}
+
+// The chosen order is kept on this device (a convenience only).
+const SORT_KEY = "hiringplug.candidates.sort";
+function readSort(): CandidateSort {
+  try { return (window.localStorage.getItem(SORT_KEY) ?? "newest") as CandidateSort; } catch { return "newest"; }
+}
+function keepSort(v: CandidateSort) {
+  try { window.localStorage.setItem(SORT_KEY, v); } catch { /* only a convenience */ }
 }

@@ -108,6 +108,30 @@ describe("candidate list", () => {
     expect((sentBody(post, 1) as { availability?: string[] }).availability).toBeUndefined();
   });
 
+  it("sorts the whole list on the server and pages on in that order", async () => {
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: { offset?: number } } }) => {
+      if (path === "/v1/candidates") {
+        const more = !init?.params?.query?.offset;
+        return Promise.resolve(ok({ items: [{ ...summary, id: more ? summary.id : "cand_01jbz6w0m0k8q9x2r3s4t5v6w9", fullName: more ? "Siti Aisyah" : "Zara" }], nextCursor: null, nextOffset: more ? 25 : null }));
+      }
+      return (answer([summary]) as (p: string) => unknown)(path);
+    }) as never);
+    renderWithClient(<CandidateList canCreate={false} canSeeSalary />);
+    await screen.findByText("Siti Aisyah");
+    fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "expected_salary_desc" } });
+    await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc" } } }); });
+    fireEvent.click(await screen.findByRole("button", { name: "Show more" }));
+    expect(await screen.findByText("Zara")).toBeTruthy();
+    expect(get).toHaveBeenCalledWith("/v1/candidates", { params: { query: { sort: "expected_salary_desc", offset: 25 } } });
+    cleanup();
+
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate={false} />);
+    await screen.findByText("Siti Aisyah");
+    const options = [...screen.getByLabelText<HTMLSelectElement>("Sort by").options].map((o) => o.textContent);
+    expect(options).toEqual(["Newest first", "Name (A–Z)", "Notice period (shortest first)"]); // no salary sorts without salary access
+  });
+
   it("narrows by industry, then subindustry, from two dropdowns", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary])); // the test catalogue: Financial Services > FSI – Banking, IT > ERP
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [], nextCursor: null, terms: [] }));

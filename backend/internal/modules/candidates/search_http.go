@@ -19,11 +19,14 @@ func (h *HTTP) SearchCandidates(ctx context.Context, req api.SearchCandidatesReq
 		limit = *b.Limit
 	}
 	f := FilterOf(*b, p)
+	if b.Sort != nil {
+		f.Order.Sort = string(*b.Sort)
+	}
 	page, err := h.svc.Search(ctx, p, f, b.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
-	out := api.SearchCandidates200JSONResponse{Items: make([]api.CandidateSearchHit, len(page.Items)), NextCursor: orNull(page.NextCursor), Terms: page.Terms}
+	out := api.SearchCandidates200JSONResponse{Items: make([]api.CandidateSearchHit, len(page.Items)), NextCursor: orNull(page.NextCursor), NextOffset: orNull(page.NextOffset), Terms: page.Terms}
 	if out.Terms == nil {
 		out.Terms = []string{}
 	}
@@ -70,7 +73,7 @@ func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
 		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
 		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
 		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
-		Owner: blankNil(b.Owner),
+		Owner: blankNil(b.Owner), Order: Order{Offset: deref(b.Offset)},
 	}
 	if f.Owner != nil && *f.Owner == "me" {
 		f.Owner = &p.UserID

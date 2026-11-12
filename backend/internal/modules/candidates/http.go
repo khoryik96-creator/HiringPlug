@@ -31,11 +31,15 @@ func (h *HTTP) ListCandidates(ctx context.Context, req api.ListCandidatesRequest
 	if owner != nil && *owner == "me" {
 		owner = &p.UserID
 	}
-	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner, Similar: req.Params.Similar != nil && *req.Params.Similar}, req.Params.Cursor, limit)
+	order := Order{Offset: deref(req.Params.Offset)}
+	if req.Params.Sort != nil {
+		order.Sort = string(*req.Params.Sort)
+	}
+	page, err := h.svc.List(ctx, p, Filter{Query: req.Params.Q, Tag: req.Params.Tag, Skill: req.Params.Skill, Owner: owner, Similar: req.Params.Similar != nil && *req.Params.Similar, Order: order}, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
-	out := api.ListCandidates200JSONResponse{Items: make([]api.CandidateSummary, len(page.Items)), NextCursor: orNull(page.NextCursor)}
+	out := api.ListCandidates200JSONResponse{Items: make([]api.CandidateSummary, len(page.Items)), NextCursor: orNull(page.NextCursor), NextOffset: orNull(page.NextOffset)}
 	for i, s := range page.Items {
 		out.Items[i] = summaryToAPI(s)
 	}

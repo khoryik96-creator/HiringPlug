@@ -46,8 +46,25 @@ export function isEmpty(s: SearchState): boolean {
   return JSON.stringify({ ...s, skillsMatch: "all" }) === JSON.stringify(EMPTY);
 }
 
+export type CandidateSort = Schemas["CandidateSort"];
+/** Where a page starts: an id cursor (newest first) or an offset (other sorts). */
+export type PageAt = { cursor?: string; offset?: number };
+/** The next page of a list or search, from the server's answer. */
+export const nextPage = (last: { nextCursor?: string | null; nextOffset?: number | null }): PageAt | undefined =>
+  last.nextCursor ? { cursor: last.nextCursor } : last.nextOffset != null ? { offset: last.nextOffset } : undefined;
+
+export const SORTS: { value: CandidateSort; label: string; salary?: boolean }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "name", label: "Name (A–Z)" },
+  { value: "notice", label: "Notice period (shortest first)" },
+  { value: "current_salary_asc", label: "Current salary (lowest first)", salary: true },
+  { value: "current_salary_desc", label: "Current salary (highest first)", salary: true },
+  { value: "expected_salary_asc", label: "Expected salary (lowest first)", salary: true },
+  { value: "expected_salary_desc", label: "Expected salary (highest first)", salary: true },
+];
+
 /** The request for a page of the search (q and "mine" come from the page's own boxes). */
-export function toBody(s: SearchState, q: string, mine: boolean, cursor?: string): Schemas["CandidateSearch"] {
+export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, sort: CandidateSort = "newest"): Schemas["CandidateSearch"] {
   const body: Schemas["CandidateSearch"] = { limit: 25, skillsMatch: s.skillsMatch };
   const list = <T extends string>(v: T[]) => (v.length > 0 ? v : undefined);
   if (q.trim()) body.q = q.trim();
@@ -66,7 +83,9 @@ export function toBody(s: SearchState, q: string, mine: boolean, cursor?: string
   if (salary) body.expectedSalaryMax = { amount: salary, currency: "MYR" };
   if (s.updatedWithinDays !== null) body.updatedWithinDays = s.updatedWithinDays;
   if (mine) body.owner = "me";
-  if (cursor) body.cursor = cursor;
+  if (page?.cursor) body.cursor = page.cursor;
+  if (page?.offset) body.offset = page.offset;
+  if (sort !== "newest") body.sort = sort;
   return JSON.parse(JSON.stringify(body)) as Schemas["CandidateSearch"]; // without the undefined ones
 }
 

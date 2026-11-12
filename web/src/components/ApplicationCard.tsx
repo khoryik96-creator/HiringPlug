@@ -61,10 +61,14 @@ export function timeInStage(app: Application, now = Date.now()): string {
   return days === 1 ? "1 day" : `${String(days)} days`;
 }
 
+/** The name a board card shows: the first name as recorded (the full name on hover). */
+export const cardName = (app: Application) => app.candidateFirstName ?? app.candidateName.split(" ")[0] ?? app.candidateName;
+
 /**
- * A candidate's card on a job's board: name, title, time in the stage and
- * fit. Clicking the card ticks it (for emailing or moving the chosen ones
- * from the bar above the board); drag it to another column to move it.
+ * A candidate's card on a job's board: first name, time in the stage and
+ * fit. Clicking the card chooses it (for emailing or moving the chosen ones
+ * from the bar above the board), as does Space on its name; drag it to
+ * another column to move it.
  */
 export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove, onDragStart }: {
   app: Application;
@@ -88,13 +92,12 @@ export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove
       }}
     >
       <span className="card-name">
-        {onPick && (
-          <input type="checkbox" aria-label={`Choose ${app.candidateName}`} checked={picked ?? false}
-            onChange={(e) => { onPick(app, e.target.checked); }} />
-        )}
-        <a href={`#/candidates/${app.candidateId}`}>{app.candidateName}</a>
+        <a href={`#/candidates/${app.candidateId}`} title={app.candidateName}
+          onKeyDown={(e) => { if (onPick && e.key === " ") { e.preventDefault(); onPick(app, !picked); } }}>
+          {cardName(app)}
+        </a>
+        {picked && <span className="visually-hidden"> (chosen)</span>}
       </span>
-      {app.candidateTitle && <div className="muted">{app.candidateTitle}</div>}
       <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}{app.channel ? ` · via ${CHANNEL[app.channel]}` : ""}</div>
       {match && (
         <button type="button" className="link" aria-label={`Fit of ${app.candidateName}: why?`} onClick={() => onShowFit?.(app)}>

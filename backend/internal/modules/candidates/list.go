@@ -5,6 +5,7 @@ package candidates
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -42,6 +43,40 @@ type Summary struct {
 type Page struct {
 	Items      []Summary
 	NextCursor *string
+	NextOffset *int // with a sort other than newest
+}
+
+// Order is how a list is sorted (see the contract's CandidateSort) and, for
+// a sort other than newest, where the page starts.
+type Order struct {
+	Sort   string
+	Offset int
+}
+
+// paging: the sort to run (a salary sort needs salary access; without it
+// salaries are hidden, so the list is simply newest first), the id cursor
+// (newest only) and the offset (other sorts only).
+func (o Order) paging(p authz.Principal, cursor *string) (string, *string, int32) {
+	sort := o.Sort
+	if strings.Contains(sort, "salary") && !canSeeSalary(p) {
+		sort = ""
+	}
+	if sort == "" || sort == "newest" {
+		return "newest", cursor, 0
+	}
+	return sort, nil, int32(o.Offset) //nolint:gosec // 0..10000 per the contract
+}
+
+// nextPage records where the next page starts, when there are more rows.
+func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*string, *int) {
+	if !more {
+		return nil, nil
+	}
+	if sort == "newest" {
+		return &lastID, nil
+	}
+	next := o.Offset + limit
+	return nil, &next
 }
 
 // Filter narrows a list: text, tag and skill (each optional).
@@ -50,6 +85,7 @@ type Filter struct {
 	Owner             *string // a user id
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
+	Order   Order
 }
 
 // List returns up to limit candidates matching f, starting after cursor (the
@@ -58,11 +94,13 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		similar := f.Similar && f.Query != nil
+		sort, cur, offset := f.Order.paging(p, cursor)
 		if similar {
-			cursor = nil // ordered by likeness, not by id: one page
+			cur, sort, offset = nil, "newest", 0 // ordered by likeness: one page
 		}
 		rows, err := store.New(tx).ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar,
+			Sort: sort, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -72,8 +110,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		}
 		if len(rows) > limit {
 			rows = rows[:limit]
-			last := rows[len(rows)-1].ID
-			page.NextCursor = &last
+			page.NextCursor, page.NextOffset = f.Order.nextPage(sort, true, rows[len(rows)-1].ID, limit)
 		}
 		page.Items = make([]Summary, len(rows))
 		for i, r := range rows {

@@ -39,6 +39,7 @@ type SearchFilter struct {
 	NoticeMaxDays, UpdatedWithinDays                *int
 	SalaryMax, SalaryCurrency                       *string // per month
 	Owner                                           *string // a user id
+	Order                                           Order
 }
 
 // SearchHit is a candidate found, with where the boolean matched.
@@ -52,6 +53,7 @@ type SearchHit struct {
 type SearchPage struct {
 	Items      []SearchHit
 	NextCursor *string
+	NextOffset *int // with a sort other than newest
 	Terms      []string
 }
 
@@ -115,8 +117,9 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		}
 	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
+	sort, cur, offset := f.Order.paging(p, cursor)
 	rows, err := store.New(tx).SearchCandidates(ctx, store.SearchCandidatesParams{
-		IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
+		Sort: sort, RowOffset: offset, IndustryCandidateIds: industryIDs, Ts: ts, Cursor: cur, Query: f.Query, Phones: s.queryPhones(f.Query), CvIds: orEmpty(cvIDs), ExcludedIds: orEmpty(excludedIDs),
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
@@ -128,8 +131,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	}
 	if len(rows) > limit {
 		rows = rows[:limit]
-		last := rows[len(rows)-1].ID
-		page.NextCursor = &last
+		page.NextCursor, page.NextOffset = f.Order.nextPage(sort, true, rows[len(rows)-1].ID, limit)
 	}
 	summaries := make([]Summary, len(rows))
 	var matched []string

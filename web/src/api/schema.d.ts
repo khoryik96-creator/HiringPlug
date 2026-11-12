@@ -3587,6 +3587,9 @@ export interface components {
             /** @default 25 */
             limit: number;
             cursor?: components["schemas"]["CandidateId"];
+            sort?: components["schemas"]["CandidateSort"];
+            /** @description With a sort other than newest, the nextOffset of the previous page. */
+            offset?: number;
         };
         SalaryCap: {
             /** @example 12000 */
@@ -3605,13 +3608,22 @@ export interface components {
             /** @description Where the CV matches, the words found between [[ and ]] ("... led [[SAP]] [[BW]] upgrades ..."). */
             cvSnippet: string | null;
         };
+        /**
+         * @description newest (the default) pages with nextCursor; the others page with nextOffset. Unknown notice periods and salaries come last; salary sorts use monthly equivalents and only for roles that may see salaries.
+         * @enum {string}
+         */
+        CandidateSort: "newest" | "name" | "notice" | "current_salary_asc" | "current_salary_desc" | "expected_salary_asc" | "expected_salary_desc";
         CandidateSearchPage: {
+            /** @description With a sort other than newest, pass as offset for the next page. */
+            nextOffset?: number | null;
             items: components["schemas"]["CandidateSearchHit"][];
             nextCursor: components["schemas"]["CandidateId"] | null;
             /** @description The boolean's words and phrases to highlight (not those left out with NOT). */
             terms: string[];
         };
         CandidatePage: {
+            /** @description With a sort other than newest, pass as offset for the next page. */
+            nextOffset?: number | null;
             items: components["schemas"]["CandidateSummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["CandidateId"] | null;
@@ -6065,6 +6077,8 @@ export interface components {
             companyName: string;
             candidateId: components["schemas"]["CandidateId"];
             candidateName: string;
+            /** @description The first name as recorded, for compact views such as the job board. */
+            candidateFirstName?: string;
             /** @description The candidate's current job title. */
             candidateTitle: string | null;
             stage: components["schemas"]["Stage"];
@@ -7324,6 +7338,9 @@ export interface operations {
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CandidateId"];
+                sort?: components["schemas"]["CandidateSort"];
+                /** @description With a sort other than newest, the `nextOffset` of the previous page. */
+                offset?: number;
             };
             header?: never;
             path?: never;

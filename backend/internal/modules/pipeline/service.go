@@ -223,7 +223,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, rows []store.Application
 		candidate := candidates[r.CandidateID]
 		out[i] = View{
 			Application: fromRow(r), JobTitle: job.Title, CompanyID: job.CompanyID, CompanyName: companies[job.CompanyID],
-			CandidateName: candidate.Name, CandidateTitle: candidate.Title,
+			CandidateName: candidate.Name, CandidateFirstName: candidate.FirstName, CandidateTitle: candidate.Title,
 		}
 	}
 	return out, nil

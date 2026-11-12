@@ -603,8 +603,15 @@ WHERE ($1::text IS NULL OR c.id < $1::text)
   AND ($5::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($5::text)])
   AND ($6::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($6::text)])
   AND ($7::text IS NULL OR c.owner_id = $7::text)
-ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC, c.id DESC
-LIMIT $8
+ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC,
+  CASE WHEN $8::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $8::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $8::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN $8::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  CASE WHEN $8::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN $8::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  c.id DESC
+LIMIT $10 OFFSET $9
 `
 
 type ListCandidatesParams struct {
@@ -615,6 +622,8 @@ type ListCandidatesParams struct {
 	Tag          *string
 	Skill        *string
 	Owner        *string
+	Sort         string
+	RowOffset    int32
 	RowLimit     int32
 }
 
@@ -644,6 +653,8 @@ type ListCandidatesRow struct {
 // Newest first, keyset pagination on id (IDs sort by creation time).
 // @phones are the whole numbers a phone number typed as the query can be
 // (findquery.Numbers): never its last digits. With @similar, names like the query (typos) instead, the closest first.
+// @sort: see CandidateSort. Salaries come from the protected table: for roles
+// that may not see them, row-level security leaves them empty (newest order).
 func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) ([]ListCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listCandidates,
 		arg.Cursor,
@@ -653,6 +664,8 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 		arg.Tag,
 		arg.Skill,
 		arg.Owner,
+		arg.Sort,
+		arg.RowOffset,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -1109,8 +1122,15 @@ WHERE ($2::text IS NULL OR c.id < $2::text)
              <= ($19::text)::numeric))
   AND ($21::text IS NULL OR c.owner_id = $21::text)
   AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
-ORDER BY c.id DESC
-LIMIT $23
+ORDER BY
+  CASE WHEN $23::text = 'name' THEN lower(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $23::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $23::text = 'current_salary_asc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN $23::text = 'current_salary_desc' THEN (SELECT cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  CASE WHEN $23::text = 'expected_salary_asc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END ASC NULLS LAST,
+  CASE WHEN $23::text = 'expected_salary_desc' THEN (SELECT cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END FROM candidate_compensation cc WHERE cc.candidate_id = c.id) END DESC NULLS LAST,
+  c.id DESC
+LIMIT $25 OFFSET $24
 `
 
 type SearchCandidatesParams struct {
@@ -1136,6 +1156,8 @@ type SearchCandidatesParams struct {
 	SalaryCurrency       *string
 	Owner                *string
 	UpdatedWithinDays    *int32
+	Sort                 string
+	RowOffset            int32
 	RowLimit             int32
 }
 
@@ -1193,6 +1215,8 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.SalaryCurrency,
 		arg.Owner,
 		arg.UpdatedWithinDays,
+		arg.Sort,
+		arg.RowOffset,
 		arg.RowLimit,
 	)
 	if err != nil {

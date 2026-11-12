@@ -337,7 +337,7 @@ func (a pipelineCandidates) Info(ctx context.Context, tx pgx.Tx, ids []string) (
 	briefs, err := a.Briefs(ctx, tx, ids)
 	out := make(map[string]pipeline.CandidateInfo, len(briefs))
 	for id, b := range briefs {
-		out[id] = pipeline.CandidateInfo{Name: b.Name, Title: b.CurrentTitle}
+		out[id] = pipeline.CandidateInfo{Name: b.Name, FirstName: b.FirstName, Title: b.CurrentTitle}
 	}
 	return out, err
 }
