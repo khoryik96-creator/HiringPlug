@@ -8909,7 +8909,6 @@ components:
         companyName: {type: string}
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         candidateName: {type: string}
-        candidateFirstName: {type: string, description: "The first name as recorded, for compact views such as the job board."}
         candidateTitle: {type: string, nullable: true, description: "The candidate's current job title."}
         stage: {$ref: '#/components/schemas/Stage'}
         reason:

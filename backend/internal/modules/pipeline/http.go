@@ -65,7 +65,7 @@ func toAPIList(views []View) []api.Application {
 func toAPI(v View) api.Application {
 	return api.Application{
 		Id: v.ID, Version: v.Version, JobId: v.JobID, JobTitle: v.JobTitle, CompanyId: v.CompanyID, CompanyName: v.CompanyName,
-		CandidateId: v.CandidateID, CandidateName: v.CandidateName, CandidateFirstName: &v.CandidateFirstName, CandidateTitle: c.OrNull(v.CandidateTitle),
+		CandidateId: v.CandidateID, CandidateName: v.CandidateName, CandidateTitle: c.OrNull(v.CandidateTitle),
 		Stage: api.Stage(v.Stage), Reason: c.OrNull(c.Convert[api.CloseReason](v.Reason)), ReasonNote: c.OrNull(v.ReasonNote),
 		Channel:        c.OrNull(c.Convert[api.ApplicationChannel](v.Channel)),
 		StageChangedAt: v.StageChangedAt, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,

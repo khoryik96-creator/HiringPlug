@@ -61,11 +61,8 @@ export function timeInStage(app: Application, now = Date.now()): string {
   return days === 1 ? "1 day" : `${String(days)} days`;
 }
 
-/** The name a board card shows: the first name as recorded (the full name on hover). */
-export const cardName = (app: Application) => app.candidateFirstName ?? app.candidateName.split(" ")[0] ?? app.candidateName;
-
 /**
- * A candidate's card on a job's board: first name, time in the stage and
+ * A candidate's card on a job's board: name, time in the stage and
  * fit. Clicking the card chooses it (for emailing or moving the chosen ones
  * from the bar above the board), as does Space on its name; drag it to
  * another column to move it.
@@ -92,9 +89,9 @@ export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove
       }}
     >
       <span className="card-name">
-        <a href={`#/candidates/${app.candidateId}`} title={app.candidateName}
+        <a href={`#/candidates/${app.candidateId}`}
           onKeyDown={(e) => { if (onPick && e.key === " ") { e.preventDefault(); onPick(app, !picked); } }}>
-          {cardName(app)}
+          {app.candidateName}
         </a>
         {picked && <span className="visually-hidden"> (chosen)</span>}
       </span>

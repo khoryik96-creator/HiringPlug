@@ -46,12 +46,11 @@ type Application struct {
 // View adds what is shown with an application: job, company and candidate.
 type View struct {
 	Application
-	JobTitle           string
-	CompanyID          string
-	CompanyName        string
-	CandidateName      string
-	CandidateFirstName string
-	CandidateTitle     *string
+	JobTitle       string
+	CompanyID      string
+	CompanyName    string
+	CandidateName  string
+	CandidateTitle *string
 }
 
 // Move is a request to change an application's stage.

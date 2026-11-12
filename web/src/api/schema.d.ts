@@ -6077,8 +6077,6 @@ export interface components {
             companyName: string;
             candidateId: components["schemas"]["CandidateId"];
             candidateName: string;
-            /** @description The first name as recorded, for compact views such as the job board. */
-            candidateFirstName?: string;
             /** @description The candidate's current job title. */
             candidateTitle: string | null;
             stage: components["schemas"]["Stage"];

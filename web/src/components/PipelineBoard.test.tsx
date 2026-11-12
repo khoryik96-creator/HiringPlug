@@ -19,21 +19,21 @@ const siti: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w1", cand
 const wei: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w2", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w2", candidateName: "Wei Tan", stage: "rejected", reason: "salary_mismatch", reasonNote: "Wants 15k" };
 
 /** Clicking a card (not its name) ticks it. */
-/** A card by the candidate's full name (shown on hover; the card shows the first name). */
-const cardOf = (name: string) => { const card = screen.getByTitle(name).closest(".card"); if (!card) throw new Error("no card"); return card; };
+/** A candidate's card on the board, by their name. */
+const cardOf = (name: string) => { const card = screen.getByRole("link", { name }).closest(".card"); if (!card) throw new Error("no card"); return card; };
 const choose = (name: string) => { fireEvent.click(cardOf(name)); };
 const moveChosen = (stage: string) => { fireEvent.change(screen.getByRole("combobox", { name: "Move the chosen candidates" }), { target: { value: stage } }); };
 
 async function showBoard(canUpdate = true) {
   vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
   renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate={canUpdate} />);
-  await screen.findByTitle("Siti Aisyah");
+  await screen.findByRole("link", { name: "Siti Aisyah" });
 }
 
 describe("pipeline board", () => {
   it("shows each candidate in their stage, and closed ones with the reason", async () => {
     await showBoard();
-    expect(within(screen.getByRole("list", { name: "Screening" })).getByTitle("Siti Aisyah")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Screening" })).getByRole("link", { name: "Siti Aisyah" })).toBeTruthy();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3 days in screening")).toBeTruthy();
     expect(screen.getByText("Rejected or withdrawn").closest("summary")?.textContent).toBe("Rejected or withdrawn 1");
     expect(screen.getByText(/Salary does not match: Wants 15k/)).toBeTruthy();
@@ -91,7 +91,7 @@ describe("pipeline board", () => {
     const post = vi.spyOn(api, "POST").mockImplementation(((_: string, init: { params: { path: { applicationId: string } } }) =>
       Promise.resolve(ok({ ...siti, id: init.params.path.applicationId, stage: "rejected", version: 4 }))) as never);
     renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate />);
-    await screen.findByTitle("Aina Yusof");
+    await screen.findByRole("link", { name: "Aina Yusof" });
     choose("Siti Aisyah");
     moveChosen("rejected");
     fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "not_qualified" } });
@@ -117,18 +117,16 @@ describe("pipeline board", () => {
     vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} }));
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, wei] }));
     renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
-    await screen.findByTitle("Siti Aisyah");
+    await screen.findByRole("link", { name: "Siti Aisyah" });
     choose("Siti Aisyah");
     fireEvent.click(screen.getByRole("button", { name: "Email client about 1 candidate" }));
     const email = await screen.findByRole("region", { name: "Email client" });
     expect(within(email).getByRole("heading", { name: "Email client" })).toBeTruthy(); // about this application, not a list
   });
 
-  it("shows only the first name (full name on hover), no tick box and no title; Space on the name chooses the card", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [{ ...siti, candidateFirstName: "Siti" }, wei] }));
-    renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate />);
-    const name = await screen.findByTitle("Siti Aisyah");
-    expect(name.textContent).toBe("Siti");
+  it("shows the name with no tick box and no title; Space on the name chooses the card", async () => {
+    await showBoard();
+    const name = screen.getByRole("link", { name: "Siti Aisyah" });
     const card = cardOf("Siti Aisyah");
     expect(card.textContent).not.toContain("Accountant");
     expect(card.querySelector("input")).toBeNull();
@@ -148,7 +146,7 @@ describe("pipeline board", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [aina, siti, wei] }));
     vi.spyOn(api, "POST").mockResolvedValue(ok({ subject: "", bodyHtml: "", missing: [], salary: false, clientEmail: null, fieldValues: {} }));
     renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
-    await screen.findByTitle("Aina Yusof");
+    await screen.findByRole("link", { name: "Aina Yusof" });
     choose("Aina Yusof");
     choose("Siti Aisyah"); // clicking the card ticks it too
     expect(screen.getByText("2 chosen")).toBeTruthy();
@@ -167,7 +165,7 @@ describe("pipeline board", () => {
 
   it("does not tick the card when its name is clicked to open the candidate", async () => {
     await showBoard();
-    fireEvent.click(screen.getByTitle("Siti Aisyah")); // the name link
+    fireEvent.click(screen.getByRole("link", { name: "Siti Aisyah" })); // the name link
     expect(screen.queryByText("1 chosen")).toBeNull();
   });
 });

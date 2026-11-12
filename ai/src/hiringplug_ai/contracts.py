@@ -3298,9 +3298,6 @@ class Application(BaseModel):
     companyName: str
     candidateId: CandidateId
     candidateName: str
-    candidateFirstName: Annotated[
-        str | None, Field(description="The first name as recorded, for compact views such as the job board.")
-    ] = None
     candidateTitle: Annotated[str | None, Field(description="The candidate's current job title.")]
     stage: Stage
     reason: Annotated[CloseReason | None, Field(description="Set when rejected or withdrawn.")]

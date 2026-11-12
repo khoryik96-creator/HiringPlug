@@ -812,3 +812,4 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .pick-table .pick-row.chosen td:first-child { box-shadow: inset 3px 0 0 var(--accent), inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
 .card.picked { position: relative; }
 .card.picked::after { content: "✓"; position: absolute; top: 0.45rem; right: 0.55rem; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.8rem; font-weight: 700; display: grid; place-items: center; }
+.card.picked .card-name { padding-right: 1.6rem; } /* long names stay clear of the check mark */
