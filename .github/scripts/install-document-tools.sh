@@ -19,13 +19,13 @@ if ! download; then
   switched=false
   for sources in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
     /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-    if [[ -f "$sources" ]] && grep -Eq 'https?://([[:alnum:]-]+[.])+archive[.]ubuntu[.]com/ubuntu' "$sources"; then
-      sed -E -i 's|https?://([[:alnum:]-]+[.])+archive[.]ubuntu[.]com/ubuntu|http://archive.ubuntu.com/ubuntu|g' "$sources"
+    if [[ -f "$sources" ]] && grep -Eq '(http://([[:alnum:]-]+[.])*archive[.]ubuntu[.]com/ubuntu|https://([[:alnum:]-]+[.])+archive[.]ubuntu[.]com/ubuntu|http://security[.]ubuntu[.]com/ubuntu)' "$sources"; then
+      sed -E -i 's|https?://([[:alnum:]-]+[.])*archive[.]ubuntu[.]com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security[.]ubuntu[.]com/ubuntu|https://security.ubuntu.com/ubuntu|g' "$sources"
       switched=true
     fi
   done
   if "$switched"; then
-    echo 'Retrying with archive.ubuntu.com.'
+    echo 'Retrying with Ubuntu archives over HTTPS.'
   else
     echo '::warning::No supported Ubuntu mirror URL was changed; retrying the configured sources once.'
   fi

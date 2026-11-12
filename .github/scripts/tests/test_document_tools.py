@@ -141,10 +141,10 @@ esac
                 result, _ = self.run_installer(root, env)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 content = (root / "apt" / source_file).read_text()
-                self.assertIn("http://archive.ubuntu.com/ubuntu\n", content)
+                self.assertIn("https://archive.ubuntu.com/ubuntu\n", content)
                 self.assertNotIn("azure.archive.ubuntu.com", content)
                 if source_file == "apt-mirrors.txt":
-                    self.assertIn("http://security.ubuntu.com/ubuntu\n", content)
+                    self.assertIn("https://security.ubuntu.com/ubuntu\n", content)
                     reference = (root / "apt/sources.list.d/ubuntu.sources").read_text()
                     self.assertIn("mirror+file:", reference)
 
@@ -152,16 +152,25 @@ esac
         root, env = self.fixture(1, mirror="https://renamed-runner.archive.ubuntu.com/ubuntu")
         result, _ = self.run_installer(root, env)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("http://archive.ubuntu.com/ubuntu\n", (root / "apt/apt-mirrors.txt").read_text())
+        self.assertIn("https://archive.ubuntu.com/ubuntu\n", (root / "apt/apt-mirrors.txt").read_text())
+
+    def test_retry_upgrades_http_main_archive_and_security(self) -> None:
+        root, env = self.fixture(1, mirror="http://archive.ubuntu.com/ubuntu")
+        result, _ = self.run_installer(root, env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        content = (root / "apt/apt-mirrors.txt").read_text()
+        self.assertIn("https://archive.ubuntu.com/ubuntu", content)
+        self.assertIn("https://security.ubuntu.com/ubuntu", content)
+        self.assertNotIn("http://", content)
 
     def test_unknown_or_already_main_mirror_warns_when_unchanged(self) -> None:
-        for mirror in ("https://mirror.example.org/ubuntu", "http://archive.ubuntu.com/ubuntu"):
+        for mirror in ("https://mirror.example.org/ubuntu", "https://archive.ubuntu.com/ubuntu"):
             with self.subTest(mirror=mirror):
-                root, env = self.fixture(1, mirror=mirror)
+                root, env = self.fixture(1, source_file="sources.list.d/ubuntu.sources", mirror=mirror)
                 result, _ = self.run_installer(root, env)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("::warning::No supported Ubuntu mirror URL was changed", result.stdout)
-                self.assertIn(mirror, (root / "apt/apt-mirrors.txt").read_text())
+                self.assertIn(mirror, (root / "apt/sources.list.d/ubuntu.sources").read_text())
 
     def test_second_install_reuses_and_retains_downloaded_packages(self) -> None:
         root, env = self.fixture()
