@@ -20,7 +20,7 @@ func (h *HTTP) GetPlacementDefaults(ctx context.Context, req api.GetPlacementDef
 		return nil, err
 	}
 	out := api.GetPlacementDefaults200JSONResponse{
-		CompanyId: d.CompanyID, CompanyName: d.CompanyName, TermsSet: d.Terms.Set,
+		CompanyId: d.CompanyID, CompanyName: d.CompanyName, JobTitle: d.JobTitle, JobType: api.PlacementJobType(d.JobType), TermsSet: d.Terms.Set,
 		FeePercent: nullable.NewNullNullable[api.DecimalAmount](), PaymentTermsDays: d.PaymentTermsDays, GuaranteeDays: d.GuaranteeDays,
 		ContactId: c.OrNull(d.ContactID), SalaryCurrency: d.Terms.SalaryCurrency, Tiers: make([]api.CompanyTermsTier, len(d.Terms.Tiers)),
 	}

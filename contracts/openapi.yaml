@@ -9075,10 +9075,12 @@ components:
       enum: [pdf, docx]
     PlacementDefaults:
       type: object
-      required: [companyId, companyName, feePercent, paymentTermsDays, guaranteeDays, contactId, termsSet, tiers, salaryCurrency]
+      required: [companyId, companyName, jobTitle, jobType, feePercent, paymentTermsDays, guaranteeDays, contactId, termsSet, tiers, salaryCurrency]
       properties:
         companyId: {$ref: '#/components/schemas/CompanyId'}
         companyName: {type: string}
+        jobTitle: {type: string}
+        jobType: {$ref: '#/components/schemas/PlacementJobType'}
         termsSet: {type: boolean, description: The client has terms of business recorded.}
         tiers:
           type: array
@@ -9206,7 +9208,7 @@ components:
           nullable: true
     Placement:
       type: object
-      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyId, companyName, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn, invoicing, restrictedFields, createdAt, updatedAt]
+      required: [id, version, applicationId, candidateId, candidateName, jobId, jobTitle, companyId, companyName, jobType, poNumber, endDate, recruiterId, recruiterName, startDate, guaranteeDays, guaranteeEndsOn, status, leftOn, statusNote, replacement, invoiceStatus, invoiceNumber, invoicedOn, paidOn, invoicing, restrictedFields, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/PlacementId'}
         version: {type: integer}
@@ -9214,9 +9216,12 @@ components:
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         candidateName: {type: string}
         jobId: {$ref: '#/components/schemas/JobOrderId'}
-        jobTitle: {type: string}
+        jobTitle: {type: string, description: "As on the placement sheet: the job's title unless changed."}
         companyId: {$ref: '#/components/schemas/CompanyId'}
-        companyName: {type: string}
+        companyName: {type: string, description: "As on the placement sheet: the client's name unless changed."}
+        jobType: {$ref: '#/components/schemas/PlacementJobType'}
+        poNumber: {type: string, nullable: true, description: "The client's purchase order number."}
+        endDate: {type: string, format: date, nullable: true, description: "When the placement ends (a contract's end), if known."}
         invoicing: {$ref: '#/components/schemas/PlacementInvoicing'}
         recruiterId:
           description: The recruiter credited with the placement.
@@ -9292,12 +9297,21 @@ components:
         feeCurrency:
           allOf: [{$ref: '#/components/schemas/CurrencyCode'}]
           nullable: true
+    PlacementJobType:
+      type: string
+      description: "permanent or contract; from the job's work type unless changed (contract and temporary jobs are contract)."
+      enum: [permanent, contract]
     PlacementInput:
       type: object
       additionalProperties: false
       required: [startDate]
       properties:
         startDate: {type: string, format: date}
+        jobTitle: {type: string, maxLength: 300, description: "Defaults to the job's title."}
+        companyName: {type: string, maxLength: 300, description: "Defaults to the client's name."}
+        jobType: {$ref: '#/components/schemas/PlacementJobType'}
+        poNumber: {type: string, maxLength: 100}
+        endDate: {type: string, format: date}
         guaranteeDays: {type: integer, minimum: 0, maximum: 365, description: Defaults to 90.}
         recruiterId:
           description: Defaults to you.
@@ -9310,6 +9324,11 @@ components:
       properties:
         version: {type: integer, minimum: 1}
         startDate: {type: string, format: date}
+        jobTitle: {type: string, maxLength: 300}
+        companyName: {type: string, maxLength: 300}
+        jobType: {$ref: '#/components/schemas/PlacementJobType'}
+        poNumber: {type: string, maxLength: 100, nullable: true}
+        endDate: {type: string, format: date, nullable: true}
         guaranteeDays: {type: integer, minimum: 0, maximum: 365}
         recruiterId:
           allOf: [{$ref: '#/components/schemas/UserId'}]

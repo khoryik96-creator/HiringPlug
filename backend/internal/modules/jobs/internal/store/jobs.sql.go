@@ -650,7 +650,7 @@ func (q *Queries) JobOrderIDsOfCompany(ctx context.Context, companyID string) ([
 }
 
 const jobOrderTitles = `-- name: JobOrderTitles :many
-SELECT id, title, company_id, contact_id, created_at FROM job_order WHERE id = ANY($1::text[])
+SELECT id, title, company_id, contact_id, work_type, created_at FROM job_order WHERE id = ANY($1::text[])
 `
 
 type JobOrderTitlesRow struct {
@@ -658,6 +658,7 @@ type JobOrderTitlesRow struct {
 	Title     string
 	CompanyID string
 	ContactID *string
+	WorkType  *string
 	CreatedAt time.Time
 }
 
@@ -675,6 +676,7 @@ func (q *Queries) JobOrderTitles(ctx context.Context, ids []string) ([]JobOrderT
 			&i.Title,
 			&i.CompanyID,
 			&i.ContactID,
+			&i.WorkType,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -117,7 +117,7 @@ func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []stri
 		j := jobBriefs[b.JobID]
 		out[id] = placements.Application{
 			Stage: b.Stage, CandidateID: b.CandidateID, CandidateName: b.CandidateName, JobID: b.JobID, JobTitle: b.JobTitle,
-			CompanyID: j.CompanyID, CompanyName: b.CompanyName, ContactID: j.ContactID,
+			CompanyID: j.CompanyID, CompanyName: b.CompanyName, ContactID: j.ContactID, WorkType: j.WorkType,
 		}
 	}
 	return out, nil

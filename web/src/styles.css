@@ -623,6 +623,17 @@ fieldset.invoicing .check { display: block; }
 .placement-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.4rem 0.9rem; }
 .placement-fact { display: flex; flex-direction: column; font-size: 0.9rem; }
 .placement-fact-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 650; }
+.placement-sheet { display: grid; grid-template-columns: 1.4fr 1fr; gap: 0.75rem 1.25rem; align-items: start; }
+.placement-sheet .placement-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .placement-sheet { grid-template-columns: 1fr; } }
+.placement-timeline { list-style: none; margin: 0; padding: 0 0 0 0.9rem; border-left: 2px solid var(--line); display: grid; gap: 0.55rem; font-size: 0.88rem; }
+.placement-timeline li { position: relative; }
+.placement-timeline li::before { content: ""; position: absolute; left: -1.27rem; top: 0.3rem; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--line); }
+.placement-timeline li.paid::before, .placement-timeline li.done::before { background: var(--accent); }
+.placement-timeline li.overdue::before { background: #b42318; }
+.placement-timeline .pill { margin-left: 0.4rem; font-size: 0.7rem; font-weight: 650; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--soft); border: 1px solid var(--line); }
+.placement-timeline .pill.paid { color: #067647; border-color: currentColor; }
+.placement-timeline .pill.overdue { color: #b42318; border-color: currentColor; }
 .placement-box .placement-invoice { border-top: 1px dashed var(--line); padding-top: 0.45rem; margin-top: 0; }
 .small-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 

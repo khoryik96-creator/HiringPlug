@@ -92,7 +92,7 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 	if err != nil {
 		return invoice{}, err
 	}
-	app := apps[row.ApplicationID]
+	app := OnSheet(apps[row.ApplicationID], detailsOf(row).Sheet)
 	if inv.ContactID == nil {
 		return invoice{}, &notReady{"Choose who receives the invoice (one of the client's contacts)."}
 	}
@@ -135,7 +135,8 @@ func (s *Service) makeInvoice(ctx context.Context, tx pgx.Tx, tenantID string, r
 	values := map[string]string{
 		"agency.name": agency, "client.name": app.CompanyName, "contact.name": contact.Name, "contact.firstName": first,
 		"candidate.name": app.CandidateName, "job.title": app.JobTitle, "placement.startDate": LongDate(row.StartDate),
-		"invoice.number": number, "invoice.date": LongDate(date), "invoice.dueDate": LongDate(due),
+		"placement.poNumber": deref(row.PoNumber),
+		"invoice.number":     number, "invoice.date": LongDate(date), "invoice.dueDate": LongDate(due),
 		"invoice.terms": strconv.Itoa(int(inv.PaymentTermsDays)), "invoice.subtotal": MoneyText(cur, totals.Subtotal),
 		"invoice.tax": MoneyText(cur, totals.Tax), "invoice.total": MoneyText(cur, totals.Total),
 		"fee.percent": "", "fee.basis": "", "salary.annual": "",

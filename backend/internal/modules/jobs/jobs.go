@@ -102,6 +102,7 @@ type Brief struct {
 	Title     string
 	CompanyID string
 	ContactID *string // the hiring contact
+	WorkType  *string // full_time, contract, ...
 	CreatedAt time.Time
 }
 

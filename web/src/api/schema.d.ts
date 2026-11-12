@@ -6202,6 +6202,8 @@ export interface components {
         PlacementDefaults: {
             companyId: components["schemas"]["CompanyId"];
             companyName: string;
+            jobTitle: string;
+            jobType: components["schemas"]["PlacementJobType"];
             /** @description The client has terms of business recorded. */
             termsSet: boolean;
             /** @description The client's rates by annual salary: the form picks the one for the salary typed in. */
@@ -6321,9 +6323,19 @@ export interface components {
             candidateId: components["schemas"]["CandidateId"];
             candidateName: string;
             jobId: components["schemas"]["JobOrderId"];
+            /** @description As on the placement sheet: the job's title unless changed. */
             jobTitle: string;
             companyId: components["schemas"]["CompanyId"];
+            /** @description As on the placement sheet: the client's name unless changed. */
             companyName: string;
+            jobType: components["schemas"]["PlacementJobType"];
+            /** @description The client's purchase order number. */
+            poNumber: string | null;
+            /**
+             * Format: date
+             * @description When the placement ends (a contract's end), if known.
+             */
+            endDate: string | null;
             invoicing: components["schemas"]["PlacementInvoicing"];
             /** @description The recruiter credited with the placement. */
             recruiterId: components["schemas"]["UserId"] | null;
@@ -6383,9 +6395,22 @@ export interface components {
             feeAmount?: components["schemas"]["DecimalAmount"] | null;
             feeCurrency?: components["schemas"]["CurrencyCode"] | null;
         };
+        /**
+         * @description permanent or contract; from the job's work type unless changed (contract and temporary jobs are contract).
+         * @enum {string}
+         */
+        PlacementJobType: "permanent" | "contract";
         PlacementInput: {
             /** Format: date */
             startDate: string;
+            /** @description Defaults to the job's title. */
+            jobTitle?: string;
+            /** @description Defaults to the client's name. */
+            companyName?: string;
+            jobType?: components["schemas"]["PlacementJobType"];
+            poNumber?: string;
+            /** Format: date */
+            endDate?: string;
             /** @description Defaults to 90. */
             guaranteeDays?: number;
             /** @description Defaults to you. */
@@ -6396,6 +6421,12 @@ export interface components {
             version: number;
             /** Format: date */
             startDate?: string;
+            jobTitle?: string;
+            companyName?: string;
+            jobType?: components["schemas"]["PlacementJobType"];
+            poNumber?: string | null;
+            /** Format: date */
+            endDate?: string | null;
             guaranteeDays?: number;
             recruiterId?: components["schemas"]["UserId"] | null;
             status?: components["schemas"]["PlacementStatus"];

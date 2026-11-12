@@ -856,6 +856,11 @@ type Placement struct {
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	Replacement   string
+	JobTitle      *string
+	CompanyName   *string
+	JobType       string
+	PoNumber      *string
+	EndDate       *time.Time
 }
 
 type PlacementInvoice struct {

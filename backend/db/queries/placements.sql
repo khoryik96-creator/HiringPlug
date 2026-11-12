@@ -1,8 +1,9 @@
 -- Queries owned by the placements module. Run inside a tenant-scoped transaction.
 
 -- name: InsertPlacement :one
-INSERT INTO placement (tenant_id, application_id, recruiter_id, start_date, guarantee_days, created_by)
-VALUES (app_current_tenant(), @application_id, sqlc.narg(recruiter_id), @start_date, @guarantee_days, app_current_user())
+INSERT INTO placement (tenant_id, application_id, recruiter_id, start_date, guarantee_days, job_title, company_name, job_type, po_number, end_date, created_by)
+VALUES (app_current_tenant(), @application_id, sqlc.narg(recruiter_id), @start_date, @guarantee_days,
+  sqlc.narg(job_title), sqlc.narg(company_name), @job_type, sqlc.narg(po_number), sqlc.narg(end_date), app_current_user())
 RETURNING *;
 
 -- name: GetPlacement :one
@@ -49,6 +50,8 @@ UPDATE placement SET recruiter_id = sqlc.narg(recruiter_id), start_date = @start
   status = @status, left_on = sqlc.narg(left_on), status_note = sqlc.narg(status_note), replacement = @replacement,
   invoice_status = @invoice_status, invoice_number = sqlc.narg(invoice_number),
   invoiced_on = sqlc.narg(invoiced_on), paid_on = sqlc.narg(paid_on),
+  job_title = sqlc.narg(job_title), company_name = sqlc.narg(company_name), job_type = @job_type,
+  po_number = sqlc.narg(po_number), end_date = sqlc.narg(end_date),
   version = version + 1, updated_at = now()
 WHERE id = @id AND version = @expected_version
 RETURNING *;

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { placementsKey, usersKey } from "../api/keys";
-import { INVOICE_STATUS, keysOf, PAY_PERIOD, PLACEMENT_STATUS, REPLACEMENT, formatMoney } from "../labels";
+import { INVOICE_STATUS, keysOf, PAY_PERIOD, PLACEMENT_JOB_TYPE, PLACEMENT_STATUS, REPLACEMENT, formatMoney } from "../labels";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors } from "./forms";
 import { createBody, feePreview, formFromPlacement, invoicingBody, type PlacementFormState, updateBody, withDefaults } from "./placementFormState";
@@ -15,7 +15,8 @@ type Placement = Schemas["Placement"];
 
 /**
  * Record a placement for an application (it moves to placed), or change one:
- * start, guarantee, recruiter credited, what happened, the invoice, and (for
+ * the sheet (title, client and job type from the job; PO number; start and
+ * end), guarantee, recruiter credited, what happened, the invoice, and (for
  * those allowed) the salary and fee.
  */
 export function PlacementForm({ applicationId, placement, permissions, onDone, onCancel }: {
@@ -87,13 +88,30 @@ export function PlacementForm({ applicationId, placement, permissions, onDone, o
     setForm((f) => ({ ...f, [key]: e.target.value }));
   };
   const preview = feePreview(form);
-  const shown = ["startDate", "guaranteeDays", "recruiterId", "leftOn", "paidOn", "money.feePercent", "money.feeAmount", "contactId", "paymentTermsDays", "dueOn"];
+  const shown = ["jobTitle", "companyName", "jobType", "poNumber", "endDate", "startDate", "guaranteeDays", "recruiterId", "leftOn", "paidOn", "money.feePercent", "money.feeAmount", "contactId", "paymentTermsDays", "dueOn"];
 
   return (
     <form className="panel form-grid" aria-label={placement ? "Change placement" : "Record placement"}
       onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+      <Field label="Job title" error={errors.jobTitle}>
+        <input value={form.jobTitle} maxLength={300} onChange={set("jobTitle")} />
+      </Field>
+      <Field label="Company" error={errors.companyName}>
+        <input value={form.companyName} maxLength={300} onChange={set("companyName")} />
+      </Field>
+      <Field label="Job type" error={errors.jobType}>
+        <select value={form.jobType} onChange={set("jobType")}>
+          {keysOf(PLACEMENT_JOB_TYPE).map((t) => <option key={t} value={t}>{PLACEMENT_JOB_TYPE[t]}</option>)}
+        </select>
+      </Field>
+      <Field label="PO number" error={errors.poNumber}>
+        <input value={form.poNumber} maxLength={100} onChange={set("poNumber")} />
+      </Field>
       <Field label="Start date" error={errors.startDate}>
         <input type="date" value={form.startDate} onChange={set("startDate")} />
+      </Field>
+      <Field label="End date" error={errors.endDate}>
+        <input type="date" value={form.endDate} min={form.startDate || undefined} onChange={set("endDate")} />
       </Field>
       <Field label="Guarantee (days)" error={errors.guaranteeDays}>
         <input type="number" min={0} max={365} value={form.guaranteeDays} onChange={set("guaranteeDays")} />

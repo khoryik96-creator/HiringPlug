@@ -13,7 +13,7 @@ afterEach(() => {
 
 const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement"] => ({
   id: "plc_1", version: 1, applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "jo_1",
-  jobTitle: "Accountant", companyId: "comp_1", companyName: "Contoh Berhad",
+  jobTitle: "Accountant", companyId: "comp_1", companyName: "Contoh Berhad", jobType: "permanent", poNumber: null, endDate: null,
   invoicing: { contactId: "cont_1", contactName: "Mei Tan", contactEmail: "mei@contoh.test", paymentTermsDays: 30, dueOn: "2027-01-04",
     dueOnSet: false, autoSend: true, sendsAt: null, sentAt: "2026-12-05T01:00:00Z", sendError: null }, recruiterId: "usr_1", recruiterName: "Aina",
   startDate: "2026-12-01", guaranteeDays: 90, guaranteeEndsOn: "2027-03-01", status: "active", leftOn: null, statusNote: null, replacement: "none",
@@ -23,7 +23,7 @@ const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement
   ...over,
 });
 const noTerms: Schemas["PlacementDefaults"] = {
-  companyId: "comp_1", companyName: "Maju Foods", termsSet: false, tiers: [], salaryCurrency: "MYR", feePercent: null,
+  companyId: "comp_1", companyName: "Maju Foods", jobTitle: "Finance Manager", jobType: "permanent", termsSet: false, tiers: [], salaryCurrency: "MYR", feePercent: null,
   paymentTermsDays: 30, guaranteeDays: 90, contactId: null,
 };
 const reads = (list: Schemas["PlacementList"]) =>
@@ -55,7 +55,7 @@ describe("placements", () => {
     fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({
-      startDate: "2026-12-01", guaranteeDays: 90,
+      startDate: "2026-12-01", guaranteeDays: 90, jobType: "permanent",
       money: { salary: { amount: "8500", currency: "MYR", period: "month" }, feePercent: "20", feeAmount: null, feeCurrency: null },
     });
   });

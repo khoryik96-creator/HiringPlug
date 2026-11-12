@@ -120,7 +120,7 @@ func (q *Queries) GetInvoiceSettings(ctx context.Context) (GetInvoiceSettingsRow
 }
 
 const getPlacement = `-- name: GetPlacement :one
-SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement FROM placement WHERE id = $1
+SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date FROM placement WHERE id = $1
 `
 
 func (q *Queries) GetPlacement(ctx context.Context, id string) (Placement, error) {
@@ -145,6 +145,11 @@ func (q *Queries) GetPlacement(ctx context.Context, id string) (Placement, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Replacement,
+		&i.JobTitle,
+		&i.CompanyName,
+		&i.JobType,
+		&i.PoNumber,
+		&i.EndDate,
 	)
 	return i, err
 }
@@ -190,9 +195,10 @@ func (q *Queries) InsertInvoiceSettings(ctx context.Context, arg InsertInvoiceSe
 
 const insertPlacement = `-- name: InsertPlacement :one
 
-INSERT INTO placement (tenant_id, application_id, recruiter_id, start_date, guarantee_days, created_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
-RETURNING id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement
+INSERT INTO placement (tenant_id, application_id, recruiter_id, start_date, guarantee_days, job_title, company_name, job_type, po_number, end_date, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4,
+  $5, $6, $7, $8, $9, app_current_user())
+RETURNING id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date
 `
 
 type InsertPlacementParams struct {
@@ -200,6 +206,11 @@ type InsertPlacementParams struct {
 	RecruiterID   *string
 	StartDate     time.Time
 	GuaranteeDays int32
+	JobTitle      *string
+	CompanyName   *string
+	JobType       string
+	PoNumber      *string
+	EndDate       *time.Time
 }
 
 // Queries owned by the placements module. Run inside a tenant-scoped transaction.
@@ -209,6 +220,11 @@ func (q *Queries) InsertPlacement(ctx context.Context, arg InsertPlacementParams
 		arg.RecruiterID,
 		arg.StartDate,
 		arg.GuaranteeDays,
+		arg.JobTitle,
+		arg.CompanyName,
+		arg.JobType,
+		arg.PoNumber,
+		arg.EndDate,
 	)
 	var i Placement
 	err := row.Scan(
@@ -230,6 +246,11 @@ func (q *Queries) InsertPlacement(ctx context.Context, arg InsertPlacementParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Replacement,
+		&i.JobTitle,
+		&i.CompanyName,
+		&i.JobType,
+		&i.PoNumber,
+		&i.EndDate,
 	)
 	return i, err
 }
@@ -316,7 +337,7 @@ func (q *Queries) ListPlacementInvoicing(ctx context.Context, placementIds []str
 }
 
 const listPlacements = `-- name: ListPlacements :many
-SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement FROM placement
+SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date FROM placement
 WHERE ($1::text IS NULL OR application_id = $1)
   AND ($2::text IS NULL OR status = $2)
   AND ($3::text IS NULL OR invoice_status = $3)
@@ -368,6 +389,11 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Replacement,
+			&i.JobTitle,
+			&i.CompanyName,
+			&i.JobType,
+			&i.PoNumber,
+			&i.EndDate,
 		); err != nil {
 			return nil, err
 		}
@@ -740,9 +766,11 @@ UPDATE placement SET recruiter_id = $1, start_date = $2, guarantee_days = $3,
   status = $4, left_on = $5, status_note = $6, replacement = $7,
   invoice_status = $8, invoice_number = $9,
   invoiced_on = $10, paid_on = $11,
+  job_title = $12, company_name = $13, job_type = $14,
+  po_number = $15, end_date = $16,
   version = version + 1, updated_at = now()
-WHERE id = $12 AND version = $13
-RETURNING id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement
+WHERE id = $17 AND version = $18
+RETURNING id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date
 `
 
 type UpdatePlacementParams struct {
@@ -757,6 +785,11 @@ type UpdatePlacementParams struct {
 	InvoiceNumber   *string
 	InvoicedOn      *time.Time
 	PaidOn          *time.Time
+	JobTitle        *string
+	CompanyName     *string
+	JobType         string
+	PoNumber        *string
+	EndDate         *time.Time
 	ID              string
 	ExpectedVersion int32
 }
@@ -775,6 +808,11 @@ func (q *Queries) UpdatePlacement(ctx context.Context, arg UpdatePlacementParams
 		arg.InvoiceNumber,
 		arg.InvoicedOn,
 		arg.PaidOn,
+		arg.JobTitle,
+		arg.CompanyName,
+		arg.JobType,
+		arg.PoNumber,
+		arg.EndDate,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -798,6 +836,11 @@ func (q *Queries) UpdatePlacement(ctx context.Context, arg UpdatePlacementParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Replacement,
+		&i.JobTitle,
+		&i.CompanyName,
+		&i.JobType,
+		&i.PoNumber,
+		&i.EndDate,
 	)
 	return i, err
 }

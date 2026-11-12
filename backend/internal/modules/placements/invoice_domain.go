@@ -58,6 +58,7 @@ var InvoiceFields = []InvoiceField{
 	{"candidate.name", "Candidate", "Siti Nur Aisyah"},
 	{"job.title", "Job", "Finance Manager"},
 	{"placement.startDate", "Start date", "1 December 2026"},
+	{"placement.poNumber", "PO number", "PO-88123"},
 	{"invoice.number", "Invoice number", "INV-0042"},
 	{"invoice.date", "Invoice date", "1 December 2026"},
 	{"invoice.dueDate", "Due date", "31 December 2026"},

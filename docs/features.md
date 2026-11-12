@@ -777,6 +777,17 @@ or change them (`placements.fees:read` / `:update`), the database hides them
 from everyone else, and the audit log records only that they changed. The fee
 is a percentage of the yearly salary (a monthly salary counts 12 times; worked
 out to the cent on the server, with a preview in the form) or a fixed amount.
+**The placement sheet.** The job title, company and job type (permanent or
+contract: contract and temporary jobs are contracts) are filled in from the job
+and can be changed on the placement; clearing the title or company goes back to
+the job's. The client's **PO number** and the **end date** (a contract's end,
+or whenever the placement ends) are optional; the end cannot be before the
+start. The invoice uses the sheet's title and company, and its template can
+show the PO number (`{{placement.poNumber}}`). On the candidate's job, the
+placement shows the sheet on the left (with salary, fee %, fee and guarantee)
+and a **billing timeline** on the right: start, invoice, payment due (overdue
+once past) or paid, guarantee end and contract end.
+
 The **Placements** page lists them all, filtered by what happened or the
 invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
 paid; fall-throughs and no-starts not counted; added up by the database over

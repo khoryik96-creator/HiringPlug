@@ -71,9 +71,8 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 		d.RecruiterID = &p.UserID
 	}
 	d.Status, d.InvoiceStatus = Active, NotInvoiced
-	d, errs, _ := Normalize(d, s.today())
 	m, moneyErrs := normalizeMoney(money)
-	if err := append(errs, moneyErrs...).Err(); err != nil {
+	if err := moneyErrs.Err(); err != nil {
 		return View{}, err
 	}
 	var out View
@@ -89,12 +88,18 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 		if app.Stage == "rejected" || app.Stage == "withdrawn" {
 			return notAllowed("Reopen the application (move it to an open stage) before recording a placement.")
 		}
+		d.Sheet = d.WithJob(app) // the sheet starts from the job
+		var errs apperr.FieldErrors
+		if d, errs, _ = Normalize(d, s.today()); errs.Err() != nil {
+			return errs.Err()
+		}
 		if err := s.checkRecruiter(ctx, tx, d.RecruiterID); err != nil {
 			return err
 		}
 		q := store.New(tx)
 		row, err := q.InsertPlacement(ctx, store.InsertPlacementParams{
 			ApplicationID: appID, RecruiterID: d.RecruiterID, StartDate: d.StartDate, GuaranteeDays: int32(d.GuaranteeDays), //nolint:gosec // 0..365
+			JobTitle: d.JobTitle, CompanyName: d.CompanyName, JobType: d.JobType, PoNumber: d.PONumber, EndDate: d.EndDate,
 		})
 		if database.IsUniqueViolation(err, onePerApplication) {
 			return notAllowed("This application already has a placement: change that one.")
@@ -112,10 +117,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 		if m != nil {
 			salary = m.Salary
 		}
-		if err := s.startInvoicing(ctx, tx, row.ID, app, salary); err != nil {
+		if err := s.startInvoicing(ctx, tx, row.ID, OnSheet(app, d.Sheet), salary); err != nil {
 			return err
 		}
-		changes := map[string]any{"applicationId": appID, "startDate": d.StartDate.Format(time.DateOnly), "guaranteeDays": d.GuaranteeDays, "recruiterId": d.RecruiterID}
+		changes := sheetAudit(d.Sheet)
+		changes["applicationId"], changes["startDate"], changes["guaranteeDays"], changes["recruiterId"] = appID, d.StartDate.Format(time.DateOnly), d.GuaranteeDays, d.RecruiterID
 		if m != nil {
 			changes["money"] = audit.Redacted
 		}
@@ -172,6 +178,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 			RecruiterID: after.RecruiterID, StartDate: after.StartDate, GuaranteeDays: int32(after.GuaranteeDays), //nolint:gosec // 0..365
 			Status: after.Status, LeftOn: after.LeftOn, StatusNote: after.StatusNote, Replacement: after.Replacement,
 			InvoiceStatus: after.InvoiceStatus, InvoiceNumber: after.InvoiceNumber, InvoicedOn: after.InvoicedOn, PaidOn: after.PaidOn,
+			JobTitle: after.JobTitle, CompanyName: after.CompanyName, JobType: after.JobType, PoNumber: after.PONumber, EndDate: after.EndDate,
 		})
 		if database.IsNoRows(err) {
 			return apperr.StaleVersion("placement")
@@ -314,6 +321,7 @@ func detailsOf(r store.Placement) Details {
 		RecruiterID: r.RecruiterID, StartDate: r.StartDate, GuaranteeDays: int(r.GuaranteeDays),
 		Status: r.Status, LeftOn: r.LeftOn, StatusNote: r.StatusNote, Replacement: r.Replacement,
 		InvoiceStatus: r.InvoiceStatus, InvoiceNumber: r.InvoiceNumber, InvoicedOn: r.InvoicedOn, PaidOn: r.PaidOn,
+		Sheet: Sheet{JobTitle: r.JobTitle, CompanyName: r.CompanyName, JobType: r.JobType, PONumber: r.PoNumber, EndDate: r.EndDate},
 	}
 }
 
@@ -324,11 +332,15 @@ func auditFields(d Details) map[string]any {
 		}
 		return t.Format(time.DateOnly)
 	}
-	return map[string]any{
+	out := sheetAudit(d.Sheet)
+	for k, v := range map[string]any{
 		"recruiterId": d.RecruiterID, "startDate": d.StartDate.Format(time.DateOnly), "guaranteeDays": d.GuaranteeDays,
 		"status": d.Status, "leftOn": day(d.LeftOn), "statusNote": d.StatusNote, "replacement": d.Replacement,
 		"invoiceStatus": d.InvoiceStatus, "invoiceNumber": d.InvoiceNumber, "invoicedOn": day(d.InvoicedOn), "paidOn": day(d.PaidOn),
+	} {
+		out[k] = v
 	}
+	return out
 }
 
 func (s *Service) one(ctx context.Context, tx pgx.Tx, p authz.Principal, row store.Placement) (View, error) {
@@ -379,7 +391,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 	out := make([]View, len(rows))
 	for i, r := range rows {
 		v := View{
-			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: apps[r.ApplicationID], Details: detailsOf(r),
+			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: OnSheet(apps[r.ApplicationID], detailsOf(r).Sheet), Details: detailsOf(r),
 			Money: money[r.ID], MoneyHidden: !seeMoney, Invoicing: invoicing[r.ID], CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		}
 		if r.RecruiterID != nil {

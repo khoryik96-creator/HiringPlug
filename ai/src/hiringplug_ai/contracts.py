@@ -3415,34 +3415,6 @@ class InvoiceFormat(StrEnum):
     docx = "docx"
 
 
-class PlacementDefaults(BaseModel):
-    companyId: CompanyId
-    companyName: str
-    termsSet: Annotated[bool, Field(description="The client has terms of business recorded.")]
-    tiers: Annotated[
-        list[CompanyTermsTier],
-        Field(
-            description="The client's rates by annual salary: the form picks the one for the salary typed in."
-        ),
-    ]
-    salaryCurrency: Annotated[str, Field(description="The currency of the tiers' salary limits.")]
-    feePercent: Annotated[
-        DecimalAmount | None,
-        Field(
-            description="From the client's terms (the rate for any salary; null when it depends on the salary)."
-        ),
-    ]
-    paymentTermsDays: Annotated[
-        int, Field(description="From the client's terms (30 when not set or when it depends on the salary).")
-    ]
-    guaranteeDays: Annotated[
-        int, Field(description="From the client's terms (90 when not set or when it depends on the salary).")
-    ]
-    contactId: Annotated[
-        ContactId | None, Field(description="The job's hiring contact, when they have an email address.")
-    ]
-
-
 class PlacementInvoicing(BaseModel):
     contactId: Annotated[
         ContactId | None, Field(description="Who receives the invoice (one of the client's contacts).")
@@ -3554,59 +3526,12 @@ class PlacementMoney(BaseModel):
     feeCurrency: Annotated[CurrencyCode | None, Field(...)]
 
 
-class Placement(BaseModel):
-    id: PlacementId
-    version: int
-    applicationId: ApplicationId
-    candidateId: CandidateId
-    candidateName: str
-    jobId: JobOrderId
-    jobTitle: str
-    companyId: CompanyId
-    companyName: str
-    invoicing: PlacementInvoicing
-    recruiterId: Annotated[UserId | None, Field(description="The recruiter credited with the placement.")]
-    recruiterName: Annotated[str | None, Field(...)]
-    startDate: date
-    guaranteeDays: Annotated[
-        int,
-        Field(
-            description="How long after the start the candidate is guaranteed: if they leave within it, the placement fell through."
-        ),
-    ]
-    guaranteeEndsOn: date
-    status: PlacementStatus
-    leftOn: Annotated[date | None, Field(description="When the candidate left (fell_through only).")]
-    statusNote: Annotated[str | None, Field(...)]
-    replacement: ReplacementStatus
-    invoiceStatus: InvoiceStatus
-    invoiceNumber: Annotated[str | None, Field(...)]
-    invoicedOn: Annotated[date | None, Field(...)]
-    paidOn: Annotated[date | None, Field(...)]
-    money: Annotated[
-        PlacementMoney | None,
-        Field(
-            description="Left out (and listed in restrictedFields) without placements.fees:read. null means none recorded."
-        ),
-    ] = None
-    restrictedFields: list[PlacementRestrictedField]
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
 class FeeTotal(BaseModel):
     currency: CurrencyCode
     total: DecimalAmount
     notInvoiced: DecimalAmount
     invoiced: Annotated[DecimalAmount, Field(description="Invoiced and not yet paid.")]
     paid: DecimalAmount
-
-
-class PlacementList(BaseModel):
-    items: list[Placement]
-    feeTotals: Annotated[
-        list[FeeTotal] | None, Field(description="Left out without placements.fees:read.")
-    ] = None
 
 
 class PlacementMoneyInput(BaseModel):
@@ -3619,11 +3544,23 @@ class PlacementMoneyInput(BaseModel):
     feeCurrency: CurrencyCode | None = None
 
 
+class PlacementJobType(StrEnum):
+    permanent = "permanent"
+    contract = "contract"
+
+
 class PlacementInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     startDate: date
+    jobTitle: Annotated[str | None, Field(description="Defaults to the job's title.", max_length=300)] = None
+    companyName: Annotated[
+        str | None, Field(description="Defaults to the client's name.", max_length=300)
+    ] = None
+    jobType: PlacementJobType | None = None
+    poNumber: Annotated[str | None, Field(max_length=100)] = None
+    endDate: date | None = None
     guaranteeDays: Annotated[int | None, Field(description="Defaults to 90.", ge=0, le=365)] = None
     recruiterId: Annotated[UserId | None, Field(description="Defaults to you.")] = None
     money: PlacementMoneyInput | None = None
@@ -3635,6 +3572,11 @@ class PlacementUpdate(BaseModel):
     )
     version: Annotated[int, Field(ge=1)]
     startDate: date | None = None
+    jobTitle: Annotated[str | None, Field(max_length=300)] = None
+    companyName: Annotated[str | None, Field(max_length=300)] = None
+    jobType: PlacementJobType | None = None
+    poNumber: Annotated[str | None, Field(max_length=100)] = None
+    endDate: date | None = None
     guaranteeDays: Annotated[int | None, Field(ge=0, le=365)] = None
     recruiterId: UserId | None = None
     status: PlacementStatus | None = None
@@ -5194,15 +5136,99 @@ class PlacementInvoiceJob(BaseModel):
     ] = None
 
 
+class PlacementDefaults(BaseModel):
+    companyId: CompanyId
+    companyName: str
+    jobTitle: str
+    jobType: PlacementJobType
+    termsSet: Annotated[bool, Field(description="The client has terms of business recorded.")]
+    tiers: Annotated[
+        list[CompanyTermsTier],
+        Field(
+            description="The client's rates by annual salary: the form picks the one for the salary typed in."
+        ),
+    ]
+    salaryCurrency: Annotated[str, Field(description="The currency of the tiers' salary limits.")]
+    feePercent: Annotated[
+        DecimalAmount | None,
+        Field(
+            description="From the client's terms (the rate for any salary; null when it depends on the salary)."
+        ),
+    ]
+    paymentTermsDays: Annotated[
+        int, Field(description="From the client's terms (30 when not set or when it depends on the salary).")
+    ]
+    guaranteeDays: Annotated[
+        int, Field(description="From the client's terms (90 when not set or when it depends on the salary).")
+    ]
+    contactId: Annotated[
+        ContactId | None, Field(description="The job's hiring contact, when they have an email address.")
+    ]
+
+
 class InvoiceSettings(InvoiceSettingsBase):
     version: Annotated[int, Field(description="0 while the defaults are in use.")]
     fields: Annotated[list[InvoiceField], Field(description="The {{fields}} the texts may use.")]
+
+
+class Placement(BaseModel):
+    id: PlacementId
+    version: int
+    applicationId: ApplicationId
+    candidateId: CandidateId
+    candidateName: str
+    jobId: JobOrderId
+    jobTitle: Annotated[str, Field(description="As on the placement sheet: the job's title unless changed.")]
+    companyId: CompanyId
+    companyName: Annotated[
+        str, Field(description="As on the placement sheet: the client's name unless changed.")
+    ]
+    jobType: PlacementJobType
+    poNumber: Annotated[str | None, Field(description="The client's purchase order number.")]
+    endDate: Annotated[
+        date | None, Field(description="When the placement ends (a contract's end), if known.")
+    ]
+    invoicing: PlacementInvoicing
+    recruiterId: Annotated[UserId | None, Field(description="The recruiter credited with the placement.")]
+    recruiterName: Annotated[str | None, Field(...)]
+    startDate: date
+    guaranteeDays: Annotated[
+        int,
+        Field(
+            description="How long after the start the candidate is guaranteed: if they leave within it, the placement fell through."
+        ),
+    ]
+    guaranteeEndsOn: date
+    status: PlacementStatus
+    leftOn: Annotated[date | None, Field(description="When the candidate left (fell_through only).")]
+    statusNote: Annotated[str | None, Field(...)]
+    replacement: ReplacementStatus
+    invoiceStatus: InvoiceStatus
+    invoiceNumber: Annotated[str | None, Field(...)]
+    invoicedOn: Annotated[date | None, Field(...)]
+    paidOn: Annotated[date | None, Field(...)]
+    money: Annotated[
+        PlacementMoney | None,
+        Field(
+            description="Left out (and listed in restrictedFields) without placements.fees:read. null means none recorded."
+        ),
+    ] = None
+    restrictedFields: list[PlacementRestrictedField]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
 
 
 class CompanyBilling(BaseModel):
     year: Annotated[int, Field(description="The current year in the agency's time zone.")]
     thisYear: list[FeeTotal]
     allTime: list[FeeTotal]
+
+
+class PlacementList(BaseModel):
+    items: list[Placement]
+    feeTotals: Annotated[
+        list[FeeTotal] | None, Field(description="Left out without placements.fees:read.")
+    ] = None
 
 
 class RecruiterRow(BaseModel):

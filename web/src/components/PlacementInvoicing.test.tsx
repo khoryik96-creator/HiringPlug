@@ -21,12 +21,12 @@ const contacts = [
 const rate = (salaryFrom: string | null, salaryBelow: string | null, feePercent: string, guaranteeDays: number, paymentTermsDays: number, remarks: string | null = null) =>
   ({ salaryFrom, salaryBelow, feePercent, guaranteeDays, paymentTermsDays, remarks });
 const defaults: Schemas["PlacementDefaults"] = {
-  companyId: "comp_1", companyName: "Maju Foods", termsSet: true, feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, contactId: "cont_aisyah",
+  companyId: "comp_1", companyName: "Maju Foods", jobTitle: "Finance Manager", jobType: "contract", termsSet: true, feePercent: "18", paymentTermsDays: 30, guaranteeDays: 60, contactId: "cont_aisyah",
   tiers: [rate(null, null, "18", 60, 30)], salaryCurrency: "MYR",
 };
 const placement = (over: Partial<Schemas["Placement"]> = {}): Schemas["Placement"] => ({
   id: "plc_1", version: 1, applicationId: "appl_1", candidateId: "cand_1", candidateName: "Siti Aisyah", jobId: "jo_1", jobTitle: "Finance Manager",
-  companyId: "comp_1", companyName: "Maju Foods", recruiterId: null, recruiterName: null, startDate: "2026-12-01", guaranteeDays: 60,
+  companyId: "comp_1", companyName: "Maju Foods", jobType: "permanent", poNumber: null, endDate: null, recruiterId: null, recruiterName: null, startDate: "2026-12-01", guaranteeDays: 60,
   guaranteeEndsOn: "2027-01-30", status: "active", leftOn: null, statusNote: null, replacement: "none", invoiceStatus: "not_invoiced",
   invoiceNumber: null, invoicedOn: null, paidOn: null, money: null, restrictedFields: [], createdAt: "2026-11-09T00:00:00Z", updatedAt: "2026-11-09T00:00:00Z",
   invoicing: { contactId: "cont_ken", contactName: "Ken Lim", contactEmail: "ken@maju.test", paymentTermsDays: 30, dueOn: "2026-12-31",

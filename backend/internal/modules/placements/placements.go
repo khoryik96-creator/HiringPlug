@@ -39,6 +39,7 @@ type Application struct {
 	JobID, JobTitle            string
 	CompanyID, CompanyName     string
 	ContactID                  *string // the job's hiring contact
+	WorkType                   *string // the job's work type (full_time, contract, ...)
 }
 
 // ClientTerms are a client's terms of business (companies module): their

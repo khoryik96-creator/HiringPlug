@@ -42,6 +42,7 @@ type Details struct {
 	InvoiceNumber *string
 	InvoicedOn    *time.Time
 	PaidOn        *time.Time
+	Sheet
 }
 
 // GuaranteeEnds is the last day of the guarantee period.
@@ -60,6 +61,7 @@ type Patch struct {
 	InvoiceNumber apiconv.Change[*string]
 	InvoicedOn    apiconv.Change[*time.Time]
 	PaidOn        apiconv.Change[*time.Time]
+	Sheet         SheetPatch
 }
 
 // Apply returns d with the patch's changes.
@@ -75,6 +77,7 @@ func (p Patch) Apply(d Details) Details {
 	apiconv.Apply(&d.InvoiceNumber, p.InvoiceNumber)
 	apiconv.Apply(&d.InvoicedOn, p.InvoicedOn)
 	apiconv.Apply(&d.PaidOn, p.PaidOn)
+	d.Sheet = p.Sheet.Apply(d.Sheet)
 	return d
 }
 
@@ -98,6 +101,7 @@ func Normalize(d Details, today time.Time) (Details, apperr.FieldErrors, string)
 	if d.GuaranteeDays < 0 || d.GuaranteeDays > 365 {
 		errs.Add("guaranteeDays", "must be between 0 and 365 days")
 	}
+	d.Sheet = d.normalize(d.StartDate, &errs)
 	problem := ""
 	if d.Status != FellThrough {
 		d.LeftOn, d.Replacement = nil, NoReplacement

@@ -4,6 +4,12 @@ import type { Schemas } from "../api/client";
 type Placement = Schemas["Placement"];
 
 export type PlacementFormState = {
+  // The sheet: title, client and job type start from the job.
+  jobTitle: string;
+  companyName: string;
+  jobType: Schemas["PlacementJobType"];
+  poNumber: string;
+  endDate: string;
   startDate: string;
   guaranteeDays: string;
   recruiterId: string;
@@ -33,6 +39,11 @@ export type PlacementFormState = {
 export function formFromPlacement(p: Placement | undefined, recruiterId: string): PlacementFormState {
   const money = p?.money ?? null;
   return {
+    jobTitle: p?.jobTitle ?? "",
+    companyName: p?.companyName ?? "",
+    jobType: p?.jobType ?? "permanent",
+    poNumber: p?.poNumber ?? "",
+    endDate: p?.endDate ?? "",
     startDate: p?.startDate ?? "",
     guaranteeDays: String(p?.guaranteeDays ?? 90),
     recruiterId: p ? (p.recruiterId ?? "") : recruiterId,
@@ -62,6 +73,9 @@ export function formFromPlacement(p: Placement | undefined, recruiterId: string)
 export function withDefaults(f: PlacementFormState, d: Schemas["PlacementDefaults"], withMoney: boolean): PlacementFormState {
   return {
     ...f,
+    jobTitle: f.jobTitle || d.jobTitle,
+    companyName: f.companyName || d.companyName,
+    jobType: d.jobType,
     guaranteeDays: String(d.guaranteeDays),
     paymentTermsDays: String(d.paymentTermsDays),
     contactId: f.contactId || (d.contactId ?? ""),
@@ -116,6 +130,11 @@ export function createBody(f: PlacementFormState, withMoney: boolean): Schemas["
   return {
     startDate: f.startDate,
     guaranteeDays: Number(f.guaranteeDays),
+    jobType: f.jobType,
+    ...(f.jobTitle.trim() ? { jobTitle: f.jobTitle.trim() } : {}),
+    ...(f.companyName.trim() ? { companyName: f.companyName.trim() } : {}),
+    ...(f.poNumber.trim() ? { poNumber: f.poNumber.trim() } : {}),
+    ...(f.endDate ? { endDate: f.endDate } : {}),
     ...(f.recruiterId ? { recruiterId: f.recruiterId } : {}),
     ...(money ? { money } : {}),
   };
@@ -124,6 +143,12 @@ export function createBody(f: PlacementFormState, withMoney: boolean): Schemas["
 export function updateBody(f: PlacementFormState, version: number, withMoney: boolean): Schemas["PlacementUpdate"] {
   return {
     version,
+    // A cleared title or client name goes back to the job's.
+    jobTitle: f.jobTitle.trim(),
+    companyName: f.companyName.trim(),
+    jobType: f.jobType,
+    poNumber: orNull(f.poNumber),
+    endDate: orNull(f.endDate),
     startDate: f.startDate,
     guaranteeDays: Number(f.guaranteeDays),
     recruiterId: orNull(f.recruiterId),

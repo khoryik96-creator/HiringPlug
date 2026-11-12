@@ -52,7 +52,7 @@ ORDER BY id DESC
 LIMIT @row_limit;
 
 -- name: JobOrderTitles :many
-SELECT id, title, company_id, contact_id, created_at FROM job_order WHERE id = ANY(@ids::text[]);
+SELECT id, title, company_id, contact_id, work_type, created_at FROM job_order WHERE id = ANY(@ids::text[]);
 
 -- Amounts are read as exact decimal text (numeric -> text), never floats;
 -- an empty max_amount means a single figure.

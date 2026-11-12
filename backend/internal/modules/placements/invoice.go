@@ -25,6 +25,7 @@ import (
 // Defaults are what a new placement starts with.
 type Defaults struct {
 	CompanyID, CompanyName          string
+	JobTitle, JobType               string // the job's title and what its work type means
 	Terms                           ClientTerms
 	FeePercent                      *string // the rate for any salary; nil when it depends on the salary
 	PaymentTermsDays, GuaranteeDays int
@@ -65,7 +66,7 @@ func (s *Service) Defaults(ctx context.Context, p authz.Principal, appID string)
 		if err != nil {
 			return err
 		}
-		out = Defaults{CompanyID: app.CompanyID, CompanyName: app.CompanyName, Terms: terms,
+		out = Defaults{CompanyID: app.CompanyID, CompanyName: app.CompanyName, JobTitle: app.JobTitle, JobType: JobTypeOf(app.WorkType), Terms: terms,
 			PaymentTermsDays: DefaultPaymentTermsDays, GuaranteeDays: DefaultGuaranteeDays}
 		if rate, ok := terms.For(nil); ok {
 			out.FeePercent = rate.FeePercent

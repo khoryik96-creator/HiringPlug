@@ -129,6 +129,11 @@ export const WORK_TYPE: Record<Schemas["WorkType"], string> = {
   internship: "Internship",
 };
 
+export const PLACEMENT_JOB_TYPE: Record<Schemas["PlacementJobType"], string> = {
+  permanent: "Permanent",
+  contract: "Contract",
+};
+
 export const WORK_ARRANGEMENT: Record<Schemas["WorkArrangement"], string> = {
   onsite: "On site",
   hybrid: "Hybrid",

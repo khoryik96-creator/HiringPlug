@@ -56,7 +56,9 @@ func feeTotalsToAPI(totals []FeeTotal) []api.FeeTotal {
 // CreatePlacement handles POST /v1/applications/{applicationId}/placement.
 func (h *HTTP) CreatePlacement(ctx context.Context, req api.CreatePlacementRequestObject) (api.CreatePlacementResponseObject, error) {
 	b := req.Body
-	d := Details{StartDate: b.StartDate.Time, GuaranteeDays: DefaultGuaranteeDays, RecruiterID: b.RecruiterId}
+	d := Details{StartDate: b.StartDate.Time, GuaranteeDays: DefaultGuaranteeDays, RecruiterID: b.RecruiterId, Sheet: Sheet{
+		JobTitle: b.JobTitle, CompanyName: b.CompanyName, JobType: deref(c.Convert[string](b.JobType)), PONumber: b.PoNumber, EndDate: dayPtr(b.EndDate),
+	}}
 	if b.GuaranteeDays != nil {
 		d.GuaranteeDays = *b.GuaranteeDays
 	}
@@ -86,6 +88,10 @@ func (h *HTTP) UpdatePlacement(ctx context.Context, req api.UpdatePlacementReque
 		InvoiceNumber: c.Optional(b.InvoiceNumber, c.Same[string]),
 		InvoicedOn:    c.Optional(b.InvoicedOn, dayOf),
 		PaidOn:        c.Optional(b.PaidOn, dayOf),
+		Sheet: SheetPatch{
+			JobTitle: given(b.JobTitle), CompanyName: given(b.CompanyName), JobType: c.Required(c.Convert[string](b.JobType)),
+			PONumber: c.Optional(b.PoNumber, c.Same[string]), EndDate: c.Optional(b.EndDate, dayOf),
+		},
 	}
 	var money c.Change[*Money]
 	if b.Money.IsSpecified() {
@@ -102,6 +108,9 @@ func (h *HTTP) UpdatePlacement(ctx context.Context, req api.UpdatePlacementReque
 }
 
 func dayOf(d openapi_types.Date) time.Time { return d.Time }
+
+// given is a change to an optional text when it was sent ("" clears it).
+func given(s *string) c.Change[*string] { return c.Change[*string]{Set: s != nil, Value: s} }
 
 func dayPtr(d *openapi_types.Date) *time.Time {
 	if d == nil {
@@ -131,6 +140,7 @@ func toAPI(v View) api.Placement {
 	out := api.Placement{
 		Id: v.ID, Version: v.Version, ApplicationId: v.ApplicationID,
 		CandidateId: v.App.CandidateID, CandidateName: v.App.CandidateName, JobId: v.App.JobID, JobTitle: v.App.JobTitle, CompanyId: v.App.CompanyID, CompanyName: v.App.CompanyName,
+		JobType: api.PlacementJobType(d.JobType), PoNumber: c.OrNull(d.PONumber), EndDate: dateOf(d.EndDate),
 		RecruiterId: c.OrNull(d.RecruiterID), RecruiterName: c.OrNull(v.RecruiterName),
 		StartDate: openapi_types.Date{Time: d.StartDate}, GuaranteeDays: d.GuaranteeDays, GuaranteeEndsOn: openapi_types.Date{Time: d.GuaranteeEnds()},
 		Status: api.PlacementStatus(d.Status), LeftOn: dateOf(d.LeftOn), StatusNote: c.OrNull(d.StatusNote),
