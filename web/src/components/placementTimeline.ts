@@ -13,7 +13,7 @@ export function billingTimeline(p: Placement, today: string): TimelineEntry[] {
   const inv = p.invoicing;
   const out: TimelineEntry[] = [at(p.startDate, "Starts")];
   if (p.invoicedOn) out.push({ day: p.invoicedOn, label: "Invoiced", state: "done" });
-  else if (inv.sendsAt) out.push(at(inv.sendsAt.slice(0, 10), "Invoice goes out"));
+  else if (inv.sendsAt) out.push(at(localDay(inv.sendsAt), "Invoice goes out"));
   if (p.paidOn) out.push({ day: p.paidOn, label: "Paid", state: "done" });
   else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
   if (p.leftOn) out.push(at(p.leftOn, "Left"));
@@ -55,5 +55,10 @@ export function monthsLong(start: string, end: string): string {
 /** "20.00" -> "20", "17.50" -> "17.5". */
 export const trimZeros = (n: string) => (n.includes(".") ? n.replace(/0+$/, "").replace(/\.$/, "") : n);
 
-/** Today in the user's time zone (YYYY-MM-DD). */
-export const todayISO = () => new Date().toLocaleDateString("en-CA");
+/** The day (YYYY-MM-DD) of a moment, in the user's time zone: today by default. */
+export function localDay(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${String(d.getFullYear())}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+export const todayISO = () => localDay();

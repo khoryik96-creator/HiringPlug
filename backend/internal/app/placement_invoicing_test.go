@@ -99,6 +99,7 @@ func TestPlacementInvoicing(t *testing.T) {
 		s.BankDetails = "Maybank 5140 1234 5678 (Hyppies Sdn Bhd)"
 		s.EmailSubject = "Invoice {{invoice.number}} for {{candidate.name}}"
 		s.SendHour = 0 // at midnight on the start date: due whatever the time of the test
+		s.LineText += "\nPO {{placement.poNumber}}"
 		body := map[string]any{"version": s.Version, "issuer": s.Issuer, "bankDetails": s.BankDetails, "numberPrefix": s.NumberPrefix,
 			"nextNumber": s.NextNumber, "taxLabel": s.TaxLabel, "taxPercent": s.TaxPercent, "lineText": s.LineText, "footer": s.Footer,
 			"emailSubject": s.EmailSubject, "emailBody": s.EmailBody, "sendHour": s.SendHour}
@@ -112,11 +113,15 @@ func TestPlacementInvoicing(t *testing.T) {
 	})
 
 	t.Run("a preview before it is sent", func(t *testing.T) {
+		// The invoice names the job as the placement sheet does, with its PO number.
+		p = a.placement(http.MethodPatch, "/v1/placements/"+p.Id, recruiter, map[string]any{
+			"version": p.Version, "jobTitle": "Finance Manager (Regional)", "poNumber": "PO-88213",
+		}, http.StatusOK)
 		res := a.request(http.MethodGet, "/v1/placements/"+p.Id+"/invoice/file?format=docx", recruiter, nil)
 		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 		doc := docxText(t, res.Body)
 		for _, want := range []string{"INVOICE", "Hyppies Sdn Bhd", "(numbered when sent)", "Maju Foods Berhad", "Ken Lim",
-			"Recruitment fee: Siti Aisyah, Finance Manager", "18% of the annual salary of MYR 120,000.00",
+			"Recruitment fee: Siti Aisyah, Finance Manager (Regional)", "PO PO-88213", "18% of the annual salary of MYR 120,000.00",
 			"MYR 21,600.00", "SST 8%", "MYR 1,728.00", "MYR 23,328.00", "Maybank 5140 1234 5678", "within 45 days"} {
 			assert.Contains(t, doc, want)
 		}

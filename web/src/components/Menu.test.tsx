@@ -18,4 +18,16 @@ describe("Menu", () => {
     expect(chosen).toHaveBeenCalled();
     expect(details.open).toBe(false);
   });
+
+  it("closes on a click outside it", () => {
+    const { container } = render(<><Menu label="Invoice">{() => <button type="button">PDF</button>}</Menu><p>elsewhere</p></>);
+    const details = container.querySelector("details");
+    if (!details) throw new Error("no menu");
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "PDF" }));
+    expect(details.open, "a click inside keeps it open").toBe(true);
+    fireEvent.pointerDown(screen.getByText("elsewhere"));
+    expect(details.open).toBe(false);
+  });
 });

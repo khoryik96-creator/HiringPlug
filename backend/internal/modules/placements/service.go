@@ -390,8 +390,9 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 	}
 	out := make([]View, len(rows))
 	for i, r := range rows {
+		d := detailsOf(r)
 		v := View{
-			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: OnSheet(apps[r.ApplicationID], detailsOf(r).Sheet), Details: detailsOf(r),
+			ID: r.ID, Version: int(r.Version), ApplicationID: r.ApplicationID, App: OnSheet(apps[r.ApplicationID], d.Sheet), Details: d,
 			Money: money[r.ID], MoneyHidden: !seeMoney, Invoicing: invoicing[r.ID], CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		}
 		if r.RecruiterID != nil {

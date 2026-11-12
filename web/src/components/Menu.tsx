@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * A small dropdown of actions. The list is placed against the window, so a
@@ -10,21 +10,29 @@ export function Menu({ label, ariaLabel, className, children }: {
   children: (close: () => void) => React.ReactNode;
 }) {
   const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const root = useRef<HTMLDetailsElement>(null);
   const close = () => { setAt(null); };
   const open = at !== null;
   useEffect(() => { // placed against the window: scrolling would leave it behind
     if (!open) return;
     const shut = () => { setAt(null); };
+    const outside = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) shut(); };
     window.addEventListener("scroll", shut, { capture: true, passive: true });
     window.addEventListener("resize", shut);
-    return () => { window.removeEventListener("scroll", shut, { capture: true }); window.removeEventListener("resize", shut); };
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      window.removeEventListener("scroll", shut, { capture: true });
+      window.removeEventListener("resize", shut);
+      document.removeEventListener("pointerdown", outside);
+    };
   }, [open]);
   return (
-    <details className="menu" open={open} onToggle={(e) => {
+    <details className="menu" ref={root} open={open} onToggle={(e) => {
       const d = e.currentTarget;
       if (!d.open) { setAt(null); return; }
       const r = d.getBoundingClientRect();
-      setAt({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+      // clientWidth: the viewport a fixed element is placed in (without the scrollbar)
+      setAt({ top: r.bottom + 4, right: Math.max(8, document.documentElement.clientWidth - r.right) });
     }}>
       <summary className={className} aria-label={ariaLabel}>{label}</summary>
       <div className="menu-list" style={at ? { position: "fixed", top: at.top, right: at.right } : undefined}

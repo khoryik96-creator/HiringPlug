@@ -69,7 +69,7 @@ describe("placements", () => {
     fireEvent.click(screen.getByRole("button", { name: "Record placement" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({
-      startDate: "2026-12-01", guaranteeDays: 90, jobType: "permanent",
+      startDate: "2026-12-01", guaranteeDays: 90,
       money: { salary: { amount: "8500", currency: "MYR", period: "month" }, feePercent: "20", feeAmount: null, feeCurrency: null },
     });
   });

@@ -101,6 +101,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone, o
       </Field>
       <Field label="Job type" error={errors.jobType}>
         <select value={form.jobType} onChange={set("jobType")}>
+          {form.jobType === "" && <option value="">As the job</option>}
           {keysOf(PLACEMENT_JOB_TYPE).map((t) => <option key={t} value={t}>{PLACEMENT_JOB_TYPE[t]}</option>)}
         </select>
       </Field>

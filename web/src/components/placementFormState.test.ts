@@ -9,11 +9,11 @@ describe("placement form", () => {
   it("sends a percentage fee with the salary, thousands separators removed", () => {
     const f = { ...blank, startDate: "2026-12-01", salaryAmount: "8,500", salaryCurrency: "myr", feePercent: "20" };
     expect(createBody(f, true)).toEqual({
-      startDate: "2026-12-01", guaranteeDays: 90, jobType: "permanent",
+      startDate: "2026-12-01", guaranteeDays: 90,
       money: { salary: { amount: "8500", currency: "MYR", period: "month" }, feePercent: "20", feeAmount: null, feeCurrency: null },
     });
     expect(feePreview(f)).toBe("20400.00");
-    expect(createBody(f, false)).toEqual({ startDate: "2026-12-01", guaranteeDays: 90, jobType: "permanent" }); // no money without permission
+    expect(createBody(f, false)).toEqual({ startDate: "2026-12-01", guaranteeDays: 90 }); // no money; job type from the job without permission
   });
 
   it("sends a fixed fee, or nothing when no money is entered", () => {
@@ -37,6 +37,17 @@ describe("placement form", () => {
     expect(createBody({ ...f, startDate: "2026-12-01", poNumber: " PO-1 ", endDate: "2027-11-30" }, false)).toMatchObject({
       jobTitle: "Finance Manager", companyName: "Maju Foods", jobType: "contract", poNumber: "PO-1", endDate: "2027-11-30",
     });
-    expect(updateBody({ ...f, jobTitle: " ", poNumber: "" }, 2, false)).toMatchObject({ jobTitle: "", poNumber: null, endDate: null });
+    expect(updateBody({ ...f, loadedNames: { jobTitle: "Finance Manager", companyName: "Maju Foods" }, jobTitle: " ", poNumber: "" }, 2, false)).toMatchObject({ jobTitle: "", poNumber: null, endDate: null });
+    expect(withDefaults({ ...blank, jobType: "permanent" }, d, false).jobType, "what the user chose stays").toBe("permanent");
+  });
+
+  it("sends the title and client only when changed, so a cleared one keeps following the job", () => {
+    const f = formFromPlacement({ jobTitle: "Finance Manager", companyName: "Maju Foods", jobType: "contract", money: null,
+      invoicing: { paymentTermsDays: 30 } } as unknown as Schemas["Placement"], "");
+    const body = updateBody({ ...f, poNumber: "PO-2" }, 4, false);
+    expect(body).not.toHaveProperty("jobTitle");
+    expect(body).not.toHaveProperty("companyName");
+    expect(body).toMatchObject({ jobType: "contract", poNumber: "PO-2" });
+    expect(updateBody({ ...f, jobTitle: "Finance Lead" }, 4, false)).toMatchObject({ jobTitle: "Finance Lead" });
   });
 });

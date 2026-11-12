@@ -4,10 +4,13 @@ import type { Schemas } from "../api/client";
 type Placement = Schemas["Placement"];
 
 export type PlacementFormState = {
-  // The sheet: title, client and job type start from the job.
+  // The sheet: title, client and job type start from the job ("" job type:
+  // not known yet, so the server takes it from the job).
   jobTitle: string;
   companyName: string;
-  jobType: Schemas["PlacementJobType"];
+  jobType: Schemas["PlacementJobType"] | "";
+  /** The title and client as the form opened with them: unchanged, they are not sent (a cleared one keeps following the job). */
+  loadedNames: { jobTitle: string; companyName: string };
   poNumber: string;
   endDate: string;
   startDate: string;
@@ -41,7 +44,8 @@ export function formFromPlacement(p: Placement | undefined, recruiterId: string)
   return {
     jobTitle: p?.jobTitle ?? "",
     companyName: p?.companyName ?? "",
-    jobType: p?.jobType ?? "permanent",
+    jobType: p?.jobType ?? "",
+    loadedNames: { jobTitle: p?.jobTitle ?? "", companyName: p?.companyName ?? "" },
     poNumber: p?.poNumber ?? "",
     endDate: p?.endDate ?? "",
     startDate: p?.startDate ?? "",
@@ -75,7 +79,7 @@ export function withDefaults(f: PlacementFormState, d: Schemas["PlacementDefault
     ...f,
     jobTitle: f.jobTitle || d.jobTitle,
     companyName: f.companyName || d.companyName,
-    jobType: d.jobType,
+    jobType: f.jobType || d.jobType,
     guaranteeDays: String(d.guaranteeDays),
     paymentTermsDays: String(d.paymentTermsDays),
     contactId: f.contactId || (d.contactId ?? ""),
@@ -130,7 +134,7 @@ export function createBody(f: PlacementFormState, withMoney: boolean): Schemas["
   return {
     startDate: f.startDate,
     guaranteeDays: Number(f.guaranteeDays),
-    jobType: f.jobType,
+    ...(f.jobType ? { jobType: f.jobType } : {}),
     ...(f.jobTitle.trim() ? { jobTitle: f.jobTitle.trim() } : {}),
     ...(f.companyName.trim() ? { companyName: f.companyName.trim() } : {}),
     ...(f.poNumber.trim() ? { poNumber: f.poNumber.trim() } : {}),
@@ -143,10 +147,10 @@ export function createBody(f: PlacementFormState, withMoney: boolean): Schemas["
 export function updateBody(f: PlacementFormState, version: number, withMoney: boolean): Schemas["PlacementUpdate"] {
   return {
     version,
-    // A cleared title or client name goes back to the job's.
-    jobTitle: f.jobTitle.trim(),
-    companyName: f.companyName.trim(),
-    jobType: f.jobType,
+    // Only what was changed: a cleared title or client name goes back to the job's.
+    ...(f.jobTitle.trim() !== f.loadedNames.jobTitle ? { jobTitle: f.jobTitle.trim() } : {}),
+    ...(f.companyName.trim() !== f.loadedNames.companyName ? { companyName: f.companyName.trim() } : {}),
+    ...(f.jobType ? { jobType: f.jobType } : {}),
     poNumber: orNull(f.poNumber),
     endDate: orNull(f.endDate),
     startDate: f.startDate,

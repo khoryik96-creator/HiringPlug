@@ -16,6 +16,16 @@ describe("billingTimeline", () => {
     expect(t.map((e) => e.label)).toEqual(["Starts", "Invoice goes out", "Payment due", "Guarantee ends", "Contract ends"]);
     expect(t.map((e) => e.state)).toEqual(["done", "done", "due", "later", "later"]);
   });
+  it("puts the invoice on the day it goes out where the user is", () => {
+    const tz = process.env.TZ;
+    process.env.TZ = "Asia/Kuala_Lumpur";
+    try {
+      const t = billingTimeline({ ...base, invoicing: { ...base.invoicing, sendsAt: "2026-11-30T16:30:00Z" } }, "2026-11-12");
+      expect(t.find((e) => e.label === "Invoice goes out")?.day).toBe("2026-12-01"); // 00:30 on 1 Dec in Kuala Lumpur
+    } finally {
+      process.env.TZ = tz;
+    }
+  });
   it("shows a payment as overdue, then paid", () => {
     expect(billingTimeline(base, "2027-01-02").find((e) => e.label === "Payment due")?.state).toBe("overdue");
     const paid = billingTimeline({ ...base, invoicedOn: "2026-12-01", paidOn: "2026-12-20", endDate: null, jobType: "permanent" }, "2027-01-02");
