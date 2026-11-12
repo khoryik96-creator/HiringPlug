@@ -185,8 +185,10 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 - Inspect installed tools and database health first. If the local PostgreSQL
   service is stopped, start it with `service postgresql start`. If Docker
   already provides PostgreSQL, reuse it instead of starting another server.
-- `export PATH=$PATH:/root/go/bin` makes installed Go tools available in the
-  service-based cloud environment. Keep existing dependency caches.
+- Go, golangci-lint and the other tools are already on PATH (there is no
+  `/root/go/bin`); sqlc runs through `go tool`. Install ShellCheck if
+  `task lint:shell` cannot find it (`apt-get install -y shellcheck`). Keep
+  existing dependency caches.
 - Run `task setup` only for missing dependencies or changed lockfiles (Go,
   Python with `uv`, web with `pnpm`, and `npm ci` for CV Studio's renderer).
   Run targeted checks during edits, then `task verify` before pushing.
