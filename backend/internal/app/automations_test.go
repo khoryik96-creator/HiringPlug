@@ -80,6 +80,12 @@ func TestAutomations(t *testing.T) {
 		assert.Equal(t, api.AutomationSendModeApprove, au.SendMode, "asking first, the default")
 	}
 	assert.Len(t, a.automations(owner).Items, 7, "added once")
+	names := make([]string, len(list.Items))
+	for i, au := range list.Items {
+		names[i] = au.Name
+	}
+	assert.Equal(t, []string{"Application received", "Interview reminder, the day before", "Not progressing, 2 days after",
+		"Placement check-in, 30 days", "Placement check-in, 90 days", "Guarantee ending, a week before", "Invoice overdue"}, names, "in their own order")
 	assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, "/v1/automations", viewer, nil).Status)
 	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/automations", recruiter, map[string]any{}).Status, "only owners and admins change them")
 

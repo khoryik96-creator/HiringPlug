@@ -6,6 +6,7 @@ import { timeInStage } from "../components/ApplicationCard";
 import { CvImports } from "../components/CvImports";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
+import { MyTasks } from "../components/MyTasks";
 import { OffersToApprove } from "../components/Offers";
 import { QuickSearch } from "../components/QuickSearch";
 import { OPEN_STAGES, STAGE } from "../labels";
@@ -35,6 +36,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
       </div>
 
       {permissions.includes("intake:create") && <CvImports foldedHistory />}
+      {permissions.includes("automations.tasks:read") && <MyTasks approvals={permissions.includes("automations:approve")} />}
       {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
       {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
 

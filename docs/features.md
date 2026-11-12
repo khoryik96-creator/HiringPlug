@@ -843,6 +843,36 @@ is sent). An invoice is never sent twice; one that cannot be sent on its own
 is shown only to roles that may see salaries, and the audit log records the
 number and recipient, never the amounts.
 
+## Automations ✅
+
+Settings › **Automations** has rules that read as **When · If · Then**: WHEN
+something happens (a candidate applies or is added to a job, moves to a stage,
+an interview is booked, a placement starts, its guarantee ends, its invoice
+falls due unpaid), IF the job is at a given client (optional), THEN after some
+days (or before, for the dates) email the candidate, the client's hiring
+contact or the recruiter, and/or give the recruiter a task; up to three things
+each. Emails use fields like `{{candidate.firstName}}` and `{{job.title}}`;
+automated emails never show salaries.
+
+Seven ready-made ones are added, switched off, the first time the page is
+opened: application received, interview reminder the day before, not
+progressing (2 days after rejected), placement check-ins at 30 and 90 days
+(email and a task), guarantee ending a week before (task) and invoice overdue
+(task). Each can be changed or removed, and new ones added.
+
+Each automation either **sends on its own** or **asks first**: its emails then
+wait under **To approve** until a recruiter sends or skips them (sent from the
+approver's mailbox). New automations start from the company's default, set on
+the same page. Emails go out from the recruiter's mailbox (the job's owner, or
+the placement's recruiter); tasks go to them too and show on their
+**Dashboard** under **Your tasks**, ticked off there.
+
+An automation runs at most once per application, interview or placement. When
+it is due it checks again that it still applies: a candidate no longer at that
+stage, a cancelled interview, a placement that fell through, a paid invoice or
+a switched-off automation skip it. A moved interview or start date moves it.
+The **Log** shows what each did, or why not.
+
 ## 5. Notes and activity
 
 ✅ Notes (general, screening, interview, call) on candidates, jobs, companies

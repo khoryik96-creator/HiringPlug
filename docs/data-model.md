@@ -59,6 +59,11 @@ tenant ─┬─ app_user (role)
 | `document` (PDF) | for formatted CVs made by the app: PDF status (queued/ready/failed), stored PDF, error |
 | `placement` | application (one each; moved to placed when recorded), recruiter credited, start date, guarantee days, status (active/fell through/cancelled) with the day they left (only a fall-through, within the guarantee), note, replacement (none, or owed/provided/refunded after a fall-through), invoice status (not invoiced/invoiced/paid) with number and dates, `version` |
 | `placement_money` | placement, agreed salary (amount/currency/period), fee percent, fee amount and currency; row-level security: only with `placements.fees:read` (write: `:update`) |
+| `job_retainer`, `job_retainer_stage` | a job's retainer (currency, signed on) and its stages (label, amount, due on a date or days after signing or the start, invoice status, number and dates); row-level security like `placement_money` |
+| `automation` | a When · If · Then rule: name, on/off, trigger (and stage), days after or before, client (optional), 1-3 actions (email the candidate, client or recruiter: subject and message with fields; or a task), send on its own or ask first, the ready-made one it started as, `version` |
+| `automation_run` | one per automation and record (application, interview or placement): when it is due, status (scheduled, to approve, done, skipped, failed), what happened, who approved; queued by a trigger on `audit_log` (`automation.event`) |
+| `recruiter_task` | a task for a user from an automation: title, due day, application, done when |
+| `automation_settings` | the company's default for new automations (send or ask first), and that the ready-made ones were added |
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `cv_import` | an import of CVs or LinkedIn PDFs: source given to the new candidates, who started it (only they see it) |
 | `cv_import_item` | one file of an import: file name, status (reading/created/added/unread/failed), candidate, document, error |

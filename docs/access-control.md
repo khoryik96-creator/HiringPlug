@@ -86,6 +86,9 @@ details get their own permissions.
 | `placements:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `placements:manage` (record and change) | ✓ | ✓ | ✓ | | | |
 | `placements.fees:read`, `placements.fees:update` (salary and fee) | ✓ | ✓ | ✓ | | | |
+| `automations:read`, `automations:approve` (send or skip emails waiting for approval) | ✓ | ✓ | ✓ | | | |
+| `automations:manage` (add, change, switch on and off) | ✓ | ✓ | | | | |
+| `automations.tasks:read`, `automations.tasks:update` (your own tasks) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | `offers:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `offers:manage` (make, change, ask for approval, send, record the answer) | ✓ | ✓ | ✓ | | | |
 | `offers:approve` (approve others' requests; send without asking) | ✓ | ✓ | | | ✓ | |

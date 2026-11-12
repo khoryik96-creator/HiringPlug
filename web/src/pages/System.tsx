@@ -15,6 +15,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "aiprovider.checked": "Saving an AI key check",
   "assistant.ask": "AI assistant questions",
   "assistant.answered": "Saving AI assistant answers",
+  "automation.event": "Starting automations",
+  "automation.run": "Running automations (emails and tasks)",
   "company.autofill": "Filling in companies from their websites",
   "contact.read_linkedin": "Reading contacts' LinkedIn profiles",
   "contact.linkedin_read": "Saving contacts' LinkedIn profiles",

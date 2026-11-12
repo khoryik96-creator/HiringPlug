@@ -5,6 +5,7 @@ package automations
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -57,6 +58,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal) ([]View, string, 
 		if err != nil {
 			return err
 		}
+		sortPresetsFirst(rows)
 		out, err = s.views(ctx, tx, rows)
 		return err
 	})
@@ -160,6 +162,24 @@ func (s *Service) SetDefault(ctx context.Context, p authz.Principal, mode string
 			Changes: map[string]any{"defaultSendMode": mode}})
 	})
 	return mode, err
+}
+
+// sortPresetsFirst lists the ready-made automations in their own order (they
+// are added at the same moment), then the company's own, oldest first.
+func sortPresetsFirst(rows []store.Automation) {
+	order := map[string]int{}
+	for i, p := range Presets(AskFirst) {
+		order[p.Key] = i
+	}
+	rank := func(r store.Automation) int {
+		if r.Preset != nil {
+			if i, ok := order[*r.Preset]; ok {
+				return i
+			}
+		}
+		return len(order)
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rank(rows[i]) < rank(rows[j]) })
 }
 
 func insert(ctx context.Context, q *store.Queries, r Rule, preset *string) (store.Automation, error) {

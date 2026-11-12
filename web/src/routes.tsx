@@ -31,6 +31,7 @@ const CompareCvs = page(() => import("./pages/CompareCvs"), "CompareCvs");
 const ContactDetail = page(() => import("./pages/ContactDetail"), "ContactDetail");
 const ContactList = page(() => import("./pages/ContactList"), "ContactList");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
+const Automations = page(() => import("./pages/Automations"), "Automations");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
 const Invoicing = page(() => import("./pages/Invoicing"), "Invoicing");
@@ -133,6 +134,8 @@ export const ROUTES: Route[] = [
   { section: "email-connection", path: /^#\/email-connection/, permission: "emails:send", menu: { in: "settings", label: "Email connection", href: "#/email-connection" }, render: () => <EmailConnection /> },
   { section: "email-templates", path: /^#\/email-templates/, permission: "emails:send", menu: { in: "settings", label: "Email templates", href: "#/email-templates" },
     render: (c) => <EmailTemplates canManage={can(c, "emails.templates:manage")} canCreate={can(c, "emails.templates:create")} canPreview={can(c, "emails:send") && can(c, "candidates:read")} /> },
+  { section: "automations", path: /^#\/automations/, permission: "automations:read", menu: { in: "settings", label: "Automations", href: "#/automations" },
+    render: (c) => <Automations permissions={c.permissions} /> },
   { section: "invoicing", path: /^#\/invoicing/, permission: "placements:read", menu: { in: "settings", label: "Invoicing", href: "#/invoicing" },
     render: (c) => <Invoicing canManage={can(c, "settings:manage")} /> },
   { section: "system", path: /^#\/system/, permission: "settings:manage", menu: { in: "settings", label: "System", href: "#/system" },

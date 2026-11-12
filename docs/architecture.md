@@ -94,6 +94,12 @@ candidate, their CV and their application **in one transaction**: the
 caller's transaction, and `internal/app` adapts them (`adapters.go`).
 Nothing is half-done if one step fails, and no module imports another.
 
+Reacting to what happened elsewhere goes through the **audit log**: every
+change writes an entry in its own transaction, and database triggers on
+`audit_log` queue work for those listening, in that same transaction.
+Webhooks (`webhook.deliver`) and automations (`automation.event`) work this
+way, so a module never has to call them when something changes.
+
 **Adding a module** is one command (`task new:module`): it creates the contract
 file, a migration with row-level security, the SQL, the Go code in this layout,
 unit and integration tests, and the wiring. See
