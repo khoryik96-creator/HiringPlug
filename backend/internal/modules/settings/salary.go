@@ -19,18 +19,31 @@ func defaultSalaryRules() api.SalaryCalculationRules {
 }
 
 func (s *Service) salaryRules(ctx context.Context, p authz.Principal) (api.SalaryCalculationRules, error) {
-	out := defaultSalaryRules()
+	var out api.SalaryCalculationRules
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		v, err := store.New(tx).GetPolicy(ctx, "salary_calculation")
-		if database.IsNoRows(err) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal([]byte(v), &out)
+		var err error
+		out, err = salaryRulesIn(ctx, tx)
+		return err
 	})
 	return out, err
+}
+
+// SalaryCalculationRules are the company's saved rules, read in the caller's
+// transaction (the candidates module's salary calculator uses them).
+func (m *Module) SalaryCalculationRules(ctx context.Context, tx pgx.Tx) (api.SalaryCalculationRules, error) {
+	return salaryRulesIn(ctx, tx)
+}
+
+func salaryRulesIn(ctx context.Context, tx pgx.Tx) (api.SalaryCalculationRules, error) {
+	out := defaultSalaryRules()
+	v, err := store.New(tx).GetPolicy(ctx, "salary_calculation")
+	if database.IsNoRows(err) {
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	return out, json.Unmarshal([]byte(v), &out)
 }
 
 func (s *Service) setSalaryRules(ctx context.Context, p authz.Principal, rules api.SalaryCalculationRules) error {
@@ -50,11 +63,6 @@ func (s *Service) setSalaryRules(ctx context.Context, p authz.Principal, rules a
 func (h *HTTP) GetSalaryCalculationRules(ctx context.Context, _ api.GetSalaryCalculationRulesRequestObject) (api.GetSalaryCalculationRulesResponseObject, error) {
 	rules, err := h.svc.salaryRules(ctx, authz.MustFromContext(ctx))
 	return api.GetSalaryCalculationRules200JSONResponse(rules), err
-}
-
-func (h *HTTP) GetScreeningSalaryCalculationRules(ctx context.Context, _ api.GetScreeningSalaryCalculationRulesRequestObject) (api.GetScreeningSalaryCalculationRulesResponseObject, error) {
-	rules, err := h.svc.salaryRules(ctx, authz.MustFromContext(ctx))
-	return api.GetScreeningSalaryCalculationRules200JSONResponse(rules), err
 }
 
 func (h *HTTP) PutSalaryCalculationRules(ctx context.Context, req api.PutSalaryCalculationRulesRequestObject) (api.PutSalaryCalculationRulesResponseObject, error) {

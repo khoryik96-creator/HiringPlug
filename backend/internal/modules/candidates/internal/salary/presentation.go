@@ -1,9 +1,8 @@
-package salarycalc
+package salary
 
 import (
-	"math"
+	"math/big"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -53,17 +52,16 @@ func displayComponent(raw, currency string, base bool) string {
 	if !variableRE.MatchString(normalized) && !conditionalRE.MatchString(normalized) {
 		months, isBonus, known := bonusMonths(normalized)
 		if match := totalMonths.FindStringSubmatch(normalized); match != nil {
-			months, _ = strconv.ParseFloat(match[1], 64)
-			isBonus, known = true, true
+			months, _ = decimal(match[1])
+			isBonus, known = months != nil, months != nil
 		}
-		if isBonus && known && months >= 13 && months <= 18 {
+		if isBonus && known && months.Cmp(big.NewRat(13, 1)) >= 0 && months.Cmp(big.NewRat(18, 1)) <= 0 {
 			if count := displayMonths.FindStringSubmatch(text); count != nil {
-				extra, _ := strconv.ParseFloat(count[1], 64)
-				if extra < 12 {
+				if extra, ok := decimal(count[1]); ok && extra.Cmp(twelve) < 0 {
 					return count[1] + " months fixed/contractual bonus"
 				}
 			}
-			return strconv.FormatFloat(months, 'f', -1, 64) + "th month fixed/contractual bonus"
+			return plain(months) + "th month fixed/contractual bonus"
 		}
 	}
 	for _, group := range groupedRE.FindAllString(text, -1) {
@@ -80,12 +78,15 @@ func displayComponent(raw, currency string, base bool) string {
 	if strings.HasPrefix(tail, "%") || displayMonths.MatchString(text) || strings.Contains(tail, "(unit not specified)") || strings.HasPrefix(tail, "-") || strings.HasPrefix(tail, "–") {
 		return text
 	}
-	n, err := strconv.ParseFloat(strings.ReplaceAll(match[2], ",", ""), 64)
-	n *= magnitude(strings.ToLower(match[3]))
-	if err != nil || math.IsInf(n, 0) || n > 999999999999 {
+	n, ok := decimal(strings.ReplaceAll(match[2], ",", ""))
+	if !ok {
 		return text
 	}
-	if match[1] == "" && match[3] == "" && n < 100 && ((!base && tail == "") || bonusRE.MatchString(normalized)) {
+	n = mul(n, magnitude(strings.ToLower(match[3])))
+	if n.Cmp(maxMoney) > 0 {
+		return text
+	}
+	if match[1] == "" && match[3] == "" && n.Cmp(hundred) < 0 && ((!base && tail == "") || bonusRE.MatchString(normalized)) {
 		return text + " (component needs review)"
 	}
 	code := Currency(text)
@@ -107,9 +108,8 @@ func displayComponent(raw, currency string, base bool) string {
 	return strings.TrimSpace(code + " " + groupDisplayAmount(n) + " " + tail)
 }
 
-func groupDisplayAmount(n float64) string {
-	value := strconv.FormatFloat(n, 'f', -1, 64)
-	parts := strings.SplitN(value, ".", 2)
+func groupDisplayAmount(n *big.Rat) string {
+	parts := strings.SplitN(plain(n), ".", 2)
 	whole := parts[0]
 	for at := len(whole) - 3; at > 0; at -= 3 {
 		whole = whole[:at] + "," + whole[at:]

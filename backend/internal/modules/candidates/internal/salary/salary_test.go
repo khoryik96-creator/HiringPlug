@@ -1,4 +1,4 @@
-package salarycalc
+package salary
 
 import (
 	"testing"
@@ -36,7 +36,7 @@ func TestRecruiterDescriptions(t *testing.T) {
 		{"5.000,50 + 400 allowance", 5401},
 		{"14.4 lakhs per annum", 120000},
 	} {
-		t.Run(tc.raw, func(t *testing.T) { assert.Equal(t, tc.want, Calculate(tc.raw, "", DefaultRules()).Monthly) })
+		t.Run(tc.raw, func(t *testing.T) { assert.Equal(t, tc.want, Calculate(tc.raw, "", DefaultRules()).Monthly.Float64()) })
 	}
 }
 
@@ -53,12 +53,12 @@ func TestExpectedSalary(t *testing.T) {
 		t.Run(tc.raw, func(t *testing.T) {
 			r := Calculate("16k + 400 allowance + 13.5th bonus", tc.raw, DefaultRules())
 			require.NotNil(t, r.ExpectedMin)
-			assert.Equal(t, tc.lo, *r.ExpectedMin)
+			assert.Equal(t, tc.lo, r.ExpectedMin.Float64())
 			if tc.hi == 0 {
 				assert.Nil(t, r.ExpectedMax)
 			} else {
 				require.NotNil(t, r.ExpectedMax)
-				assert.Equal(t, tc.hi, *r.ExpectedMax)
+				assert.Equal(t, tc.hi, r.ExpectedMax.Float64())
 			}
 		})
 	}
@@ -73,21 +73,21 @@ func TestCompanyFormulaAndReview(t *testing.T) {
 	text := "16k + 400 allowance + 13.5th month bonus"
 	rules := DefaultRules()
 	rules.Bonus = false
-	assert.Equal(t, 16400.0, Calculate(text, "", rules).Monthly)
+	assert.Equal(t, 16400.0, Calculate(text, "", rules).Monthly.Float64())
 	rules = DefaultRules()
 	rules.Allowances = false
-	assert.Equal(t, 18000.0, Calculate(text, "", rules).Monthly)
+	assert.Equal(t, 18000.0, Calculate(text, "", rules).Monthly.Float64())
 	rules = DefaultRules()
 	rules.BonusOnAllowances = true
-	assert.Equal(t, 18450.0, Calculate(text, "", rules).Monthly)
+	assert.Equal(t, 18450.0, Calculate(text, "", rules).Monthly.Float64())
 	rules = DefaultRules()
 	rules.Cents = true
-	assert.Equal(t, 17333.33, Calculate("16k + AWS", "", rules).Monthly)
+	assert.Equal(t, 17333.33, Calculate("16k + AWS", "", rules).Monthly.Float64())
 	for _, raw := range []string{"16k + fixed bonus", "16k + 13th bonus + 15th bonus", "daily rate 1.6k", "salary unknown"} {
 		assert.NotEmpty(t, Calculate(raw, "", DefaultRules()).Warnings, raw)
 	}
 	r := Calculate("16k + 1.5 onus", "", DefaultRules())
-	assert.Equal(t, 16000.0, r.Monthly)
+	assert.Equal(t, 16000.0, r.Monthly.Float64())
 	assert.NotEmpty(t, r.Warnings, "unrecognised bonus wording must not turn into a fixed allowance")
 }
 
@@ -95,14 +95,14 @@ func TestUnconfirmedBonusDoesNotBlockFixedFigures(t *testing.T) {
 	current := "rm 9.6k + 2k allowance + 13percen epf + 13.5 month bonus + 3 months bonus + 200 allowance +"
 	r := Calculate(current, "14-18%", DefaultRules(), "MYR")
 	assert.False(t, r.ReviewRequired)
-	assert.Equal(t, 13000.0, r.Monthly)
-	assert.Equal(t, 1200.0, r.Bonus)
+	assert.Equal(t, 13000.0, r.Monthly.Float64())
+	assert.Equal(t, 1200.0, r.Bonus.Float64())
 	assert.Contains(t, r.Excluded, "3 months bonus")
 	assert.NotEmpty(t, r.Warnings, "the excluded unconfirmed bonus stays visible for review")
 	require.NotNil(t, r.ExpectedMin)
 	require.NotNil(t, r.ExpectedMax)
-	assert.Equal(t, 14820.0, *r.ExpectedMin)
-	assert.Equal(t, 15340.0, *r.ExpectedMax)
+	assert.Equal(t, 14820.0, r.ExpectedMin.Float64())
+	assert.Equal(t, 15340.0, r.ExpectedMax.Float64())
 	for _, bonus := range []string{"fixed bonus", "contractual bonus", "guaranteed bonus", "13th bonus + 15th bonus"} {
 		assert.True(t, Calculate("9.6k + "+bonus, "", DefaultRules()).ReviewRequired, bonus)
 	}
@@ -116,5 +116,5 @@ func TestCurrencyOnlyFromExplicitSalaryText(t *testing.T) {
 	} {
 		assert.Equal(t, want, Currency(raw), raw)
 	}
-	assert.Equal(t, 16000000.0, Calculate("Basic IDR 15.5mil nett, 16mil gross, THR bonus", "", DefaultRules()).Monthly)
+	assert.Equal(t, 16000000.0, Calculate("Basic IDR 15.5mil nett, 16mil gross, THR bonus", "", DefaultRules()).Monthly.Float64())
 }

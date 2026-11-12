@@ -24,7 +24,6 @@ const CALLER: Permission[] = [...RECRUITER, "notes:create", "notes.sensitive:rea
 function reads(c: Candidate) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { path?: { documentId?: string } } }) => {
     if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
-    if (path === "/v1/salary-calculation-rules") return Promise.resolve(ok({allowances:true,bonus:true,bonusOnAllowances:false,cents:false}));
     if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(c));
     if (path === "/v1/candidates/{candidateId}/documents") return Promise.resolve(ok({ items: docs }));
     if (path === "/v1/documents/{documentId}") return Promise.resolve(ok(docs.find((d) => d.id === init?.params?.path?.documentId)));

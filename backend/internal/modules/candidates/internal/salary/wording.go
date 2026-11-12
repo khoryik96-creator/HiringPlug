@@ -1,4 +1,4 @@
-package salarycalc
+package salary
 
 import (
 	"regexp"

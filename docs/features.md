@@ -844,14 +844,15 @@ Named allowances cannot become basic pay, even when entered first or when the
 basic pay is missing or invalid. A fixed bonus expressed as a percentage needs
 its basis clarified before applying the figures.
 An expected salary can be recorded without a current salary. Changing the
-currency or calculation rules invalidates an unapplied preview.
+wording or currency invalidates an unapplied preview.
 Space-grouped amounts, em-dash ranges, `pct`/`per cent` and `plus` separators
 are accepted. A blocked preview explains the need for correction and opens
 **Enter figures manually**. **Use entered figures** confirms reviewed manual
 amounts, including unchanged prefilled figures; invalid/missing amounts,
 currencies and reversed ranges are still refused. Manual entry also works
-when calculation rules cannot load. Salary updaters can read their company's
-formula without needing access to other Settings.
+when the calculation fails. The server always calculates with the company's
+saved rules (the browser cannot choose a formula), so salary updaters need no
+access to Settings; money is counted exactly, never with floating point.
 
 **Settings → General → Salary calculation** chooses fixed allowances, guaranteed
 bonus, the bonus basis and rounding for the company. Defaults spread guaranteed

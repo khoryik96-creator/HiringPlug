@@ -1,4 +1,4 @@
-package salarycalc
+package salary
 
 import (
 	"math"
@@ -18,19 +18,17 @@ func FuzzSalaryCalculation(f *testing.F) {
 			t.Skip()
 		}
 		r := Calculate(current, expected, DefaultRules(), "MYR")
-		for _, n := range []float64{r.Base, r.Allowances, r.Bonus, r.Monthly, r.AnnualMonths} {
-			if math.IsInf(n, 0) || math.IsNaN(n) {
-				t.Fatal("calculator returned a non-finite value")
-			}
+		if math.IsInf(r.AnnualMonths, 0) || math.IsNaN(r.AnnualMonths) {
+			t.Fatal("calculator returned non-finite months")
 		}
 		if !r.ReviewRequired {
-			if !validMoney(r.Monthly) {
+			if !validMoney(r.Monthly.rat()) {
 				t.Fatal("unreviewed fixed salary outside the supported range")
 			}
-			if r.ExpectedMin != nil && !validMoney(*r.ExpectedMin) {
+			if r.ExpectedMin != nil && !validMoney(r.ExpectedMin.rat()) {
 				t.Fatal("invalid expected salary")
 			}
-			if r.ExpectedMax != nil && (r.ExpectedMin == nil || *r.ExpectedMax < *r.ExpectedMin || !validMoney(*r.ExpectedMax)) {
+			if r.ExpectedMax != nil && (r.ExpectedMin == nil || r.ExpectedMax.rat().Cmp(r.ExpectedMin.rat()) < 0 || !validMoney(r.ExpectedMax.rat())) {
 				t.Fatal("invalid expected range")
 			}
 		}

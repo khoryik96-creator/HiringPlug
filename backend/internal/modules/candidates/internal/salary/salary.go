@@ -1,11 +1,10 @@
-// Package salarycalc ports Kano's deterministic salary rules to Go.
+// Package salary ports Kano's deterministic salary rules to Go.
 // It never calls a model or writes candidate data. Uncertain inputs need review.
-package salarycalc
+package salary
 
 import (
-	"math"
+	"math/big"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -22,9 +21,10 @@ func DefaultRules() Rules { return Rules{Allowances: true, Bonus: true} }
 
 // Result contains reviewed figures and their interpretation, never raw AI output.
 type Result struct {
-	Base, Allowances, Bonus, Monthly             float64
-	ExpectedMin, ExpectedMax                     *float64
-	AnnualMonths                                 float64
+	Base, Allowances, Bonus, Monthly             Money
+	ExpectedMin, ExpectedMax                     *Money
+	AnnualMonths                                 float64 // for display; months is exact
+	months                                       *big.Rat
 	Excluded, Warnings                           []string
 	HasCurrent, ReviewRequired, relativeExpected bool
 	bonusCurrency                                string
@@ -56,54 +56,51 @@ var (
 
 func clean(raw string) string {
 	raw = strings.NewReplacer("−", "-", "—", "–", "％", "%").Replace(raw)
-	raw = regexp.MustCompile(`(^|[^0-9])\.(\d)`).ReplaceAllString(raw, "${1}0.${2}")
+	raw = bareDecimalRE.ReplaceAllString(raw, "${1}0.${2}")
 	raw = percentWords(raw)
 	raw = componentPlus(raw)
-	raw = regexp.MustCompile(`([A-Za-z])(\d)`).ReplaceAllString(raw, "$1 $2")
-	raw = regexp.MustCompile(`(?i)\b(lpa|lakhs?|lacs?|crores?|cr)\s+(\d+(?:\.\d+)?)`).ReplaceAllString(raw, "$2 $1")
-	raw = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR)\b`).ReplaceAllString(raw, "$1 $2")
-	raw = regexp.MustCompile(`(?i)\bbonu\b`).ReplaceAllString(raw, "bonus")
+	raw = letterDigitRE.ReplaceAllString(raw, "$1 $2")
+	raw = indianWordFirstRE.ReplaceAllString(raw, "$2 $1")
+	raw = gluedCodeRE.ReplaceAllString(raw, "$1 $2")
+	raw = bonuRE.ReplaceAllString(raw, "bonus")
 	t := groupedNumbers(raw)
 	//nolint:misspell // Deliberate recruiter input misspellings.
 	return strings.NewReplacer("fixedbonus", "fixed bonus", "contractualbonus", "contractual bonus", "bouns", "bonus", "bnous", "bonus", "bonous", "bonus", "bonsu", "bonus", "contracutal", "contractual", "contracual", "contractual", "contractul", "contractual", "guarenteed", "guaranteed", "guarnateed", "guaranteed", "garanteed", "guaranteed", "fixd", "fixed", "mths", "months", "mth", "month", "mnths", "months", "mnth", "month", "monhts", "months", "annual wage supplement", "aws").Replace(strings.ToLower(t))
 }
 
-func magnitude(s string) float64 {
+func magnitude(s string) *big.Rat {
 	switch s {
 	case "k":
-		return 1000
+		return big.NewRat(1000, 1)
 	case "m", "mil", "million":
-		return 1000000
+		return big.NewRat(1000000, 1)
 	case "l", "lpa", "lakh", "lakhs", "lac", "lacs":
-		return 100000
+		return big.NewRat(100000, 1)
 	case "cr", "crore", "crores":
-		return 10000000
+		return big.NewRat(10000000, 1)
 	default:
-		return 1
+		return big.NewRat(1, 1)
 	}
 }
 
-func amount(s string) (float64, bool) {
+// amount is the first number in s, times its k/m/lakh word, read exactly.
+func amount(s string) (*big.Rat, bool) {
 	m := numberRE.FindStringSubmatch(s)
 	if m == nil {
-		return 0, false
+		return nil, false
 	}
-	n, err := strconv.ParseFloat(m[1], 64)
-	n *= magnitude(m[2])
-	return n, err == nil && !math.IsInf(n, 0) && n >= 0 && n <= 999999999999
-}
-
-func rounded(n float64, cents bool) float64 {
-	if cents {
-		return math.Round((n+1e-9)*100) / 100
+	n, ok := decimal(m[1])
+	if !ok {
+		return nil, false
 	}
-	return math.Round(n)
+	n = mul(n, magnitude(m[2]))
+	return n, n.Sign() >= 0 && n.Cmp(big.NewRat(999999999999, 1)) <= 0
 }
 
 // Calculate computes fixed monthly cash from a complete description. Unlike Kano's
 // regex fallback it does not truncate the current line to 80 characters.
 func Calculate(current, expected string, rules Rules, currency ...string) (out Result) {
-	out = Result{AnnualMonths: 12, Excluded: []string{}, Warnings: []string{}}
+	out = Result{AnnualMonths: 12, months: big.NewRat(12, 1), Excluded: []string{}, Warnings: []string{}}
 	defer func() { finish(&out) }()
 	fallback := ""
 	if len(currency) > 0 {
@@ -129,7 +126,7 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 			out.Excluded = append(out.Excluded, part)
 			continue
 		}
-		if conditionalRE.MatchString(part) && (!strings.Contains(part, "fixed") && !strings.Contains(part, "guaranteed") || regexp.MustCompile(`not\s+fixed|non[- ]fixed|not\s+guaranteed`).MatchString(part)) {
+		if conditionalRE.MatchString(part) && (!strings.Contains(part, "fixed") && !strings.Contains(part, "guaranteed") || notFixedRE.MatchString(part)) {
 			out.Excluded = append(out.Excluded, part)
 			inform(&out, "Conditional allowances excluded unless confirmed fixed.")
 			continue
@@ -155,10 +152,10 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 					}
 					out.bonusCurrency = c
 				}
-				if out.AnnualMonths != 12 && out.AnnualMonths != months {
+				if out.months.Cmp(twelve) != 0 && out.months.Cmp(months) != 0 {
 					review(&out, "Conflicting guaranteed bonus totals.")
 				}
-				out.AnnualMonths = months
+				out.setMonths(months)
 			} else {
 				review(&out, "Enter the guaranteed bonus as extra months or total annual months.")
 			}
@@ -190,9 +187,9 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 				return out
 			}
 			if annualRE.MatchString(part) {
-				n /= 12
+				n = quo(n, twelve)
 			}
-			out.Base, baseFound, out.HasCurrent = n, true, true
+			out.Base, baseFound, out.HasCurrent = moneyOf(n), true, true
 			out.CurrentCurrency = Currency(part)
 			if rawCurrency == "" || out.CurrentCurrency == "" {
 				out.CurrentCurrency = fallback
@@ -207,16 +204,16 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 				continue
 			}
 			if annualRE.MatchString(part) {
-				n /= 12
+				n = quo(n, twelve)
 			}
 			// An unfamiliar misspelled bonus must not silently become an allowance.
 			remaining := numberRE.ReplaceAllString(part, "")
-			knownAllowance := regexp.MustCompile(`(?i)allowance|fixed|guaranteed|transport|housing|meal|phone|mobile|internet|parking|petrol|fuel|travel|living`).MatchString(part)
-			if regexp.MustCompile(`[a-z]`).MatchString(remaining) && !knownAllowance && Currency(part) == "" {
+			knownAllowance := knownAllowanceRE.MatchString(part)
+			if letterRE.MatchString(remaining) && !knownAllowance && Currency(part) == "" {
 				review(&out, "A salary component could not be read. Mark fixed allowances or variable bonuses explicitly.")
 				continue
 			}
-			out.Allowances += n
+			out.Allowances = moneyOf(add(out.Allowances.rat(), n))
 		}
 	}
 	if !baseFound {
@@ -228,49 +225,57 @@ func Calculate(current, expected string, rules Rules, currency ...string) (out R
 	}
 	// IDR gross already includes THR in Kano's input convention.
 	if strings.Contains(clean(current), "gross") && out.CurrentCurrency == "IDR" {
-		out.AnnualMonths = 12
+		out.setMonths(twelve)
 	}
+	bonus := new(big.Rat)
 	if rules.Bonus {
-		basis := out.Base
+		basis := out.Base.rat()
 		if rules.BonusOnAllowances {
-			basis += out.Allowances
+			basis = add(basis, out.Allowances.rat())
 		}
-		out.Bonus = basis * (out.AnnualMonths - 12) / 12
+		bonus = quo(mul(basis, new(big.Rat).Sub(out.months, twelve)), twelve)
 	}
-	out.Monthly = rounded(out.Base+out.Allowances+out.Bonus, rules.Cents)
-	out.Bonus = rounded(out.Bonus, rules.Cents)
+	out.Monthly = moneyOf(rounded(add(add(out.Base.rat(), out.Allowances.rat()), bonus), rules.Cents))
+	out.Bonus = moneyOf(rounded(bonus, rules.Cents))
 	calculateExpected(&out, expected, rules)
 	return out
 }
 
-func bonusMonths(s string) (float64, bool, bool) {
+// bonusMonths: the months paid in a year (13.5 for "13.5th month bonus"),
+// whether s is a guaranteed bonus, and whether its months are known.
+func bonusMonths(s string) (*big.Rat, bool, bool) {
 	for _, re := range []*regexp.Regexp{ordinalRE, monthBonusRE} {
 		if m := re.FindStringSubmatch(s); m != nil {
-			n, _ := strconv.ParseFloat(m[1], 64)
+			n, _ := decimal(m[1])
 			return n, true, true
 		}
 	}
 	if !guaranteedRE.MatchString(s) {
-		return 0, false, false
+		return nil, false, false
 	}
 	if n, ok := amount(s); ok {
-		if n >= 12 && n <= 18 {
+		if n.Cmp(twelve) >= 0 && n.Cmp(big.NewRat(18, 1)) <= 0 {
 			return n, true, true
 		}
-		if n >= 0 && n <= 6 {
-			return 12 + n, true, true
+		if n.Sign() >= 0 && n.Cmp(big.NewRat(6, 1)) <= 0 {
+			return add(twelve, n), true, true
 		}
-		return 0, true, false
+		return nil, true, false
 	}
 	if strings.Contains(s, "aws") || strings.Contains(s, "thr") || strings.Contains(s, "festive") || strings.Contains(s, "hari raya") {
-		return 13, true, true
+		return big.NewRat(13, 1), true, true
 	}
-	return 0, true, false
+	return nil, true, false
+}
+
+func (out *Result) setMonths(n *big.Rat) {
+	out.months = new(big.Rat).Set(n)
+	out.AnnualMonths, _ = n.Float64()
 }
 
 func groupedNumbers(raw string) string {
 	raw = strings.NewReplacer("\u00a0", " ", "\u202f", " ").Replace(raw)
-	raw = regexp.MustCompile(`\b\d{1,3}(?: \d{3})+(?:\.\d+)?\b`).ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(s, " ", "") })
+	raw = spaceGroupRE.ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(s, " ", "") })
 	t := decimalGroupRE.ReplaceAllStringFunc(raw, func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, ".", ""), ",", ".") })
 	t = multipleDotRE.ReplaceAllStringFunc(t, func(s string) string { return strings.ReplaceAll(s, ".", "") })
 	t = groupedRE.ReplaceAllStringFunc(t, func(token string) string {
@@ -283,11 +288,25 @@ func groupedNumbers(raw string) string {
 }
 
 func componentPlus(raw string) string {
-	return regexp.MustCompile(`(?i)\bplus\b`).ReplaceAllString(raw, "+")
+	return plusRE.ReplaceAllString(raw, "+")
 }
 
 // Preserve glued currency-code boundaries while accepting common percentage wording.
 func percentWords(raw string) string {
 	//nolint:misspell // Common truncated percent word in recruiter input.
-	return regexp.MustCompile(`(?i)(\d)\s*(?:percent(?:age)?|per\s+cent|pct|percen)\b`).ReplaceAllString(correctSpelling(raw), "$1%")
+	return percentWordRE.ReplaceAllString(correctSpelling(raw), "$1%")
 }
+
+var (
+	bareDecimalRE     = regexp.MustCompile(`(^|[^0-9])\.(\d)`)
+	letterDigitRE     = regexp.MustCompile(`([A-Za-z])(\d)`)
+	indianWordFirstRE = regexp.MustCompile(`(?i)\b(lpa|lakhs?|lacs?|crores?|cr)\s+(\d+(?:\.\d+)?)`)
+	gluedCodeRE       = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR)\b`)
+	bonuRE            = regexp.MustCompile(`(?i)\bbonu\b`)
+	notFixedRE        = regexp.MustCompile(`not\s+fixed|non[- ]fixed|not\s+guaranteed`)
+	knownAllowanceRE  = regexp.MustCompile(`(?i)allowance|fixed|guaranteed|transport|housing|meal|phone|mobile|internet|parking|petrol|fuel|travel|living`)
+	letterRE          = regexp.MustCompile(`[a-z]`)
+	spaceGroupRE      = regexp.MustCompile(`\b\d{1,3}(?: \d{3})+(?:\.\d+)?\b`)
+	plusRE            = regexp.MustCompile(`(?i)\bplus\b`)
+	percentWordRE     = regexp.MustCompile(`(?i)(\d)\s*(?:percent(?:age)?|per\s+cent|pct|percen)\b`)
+)

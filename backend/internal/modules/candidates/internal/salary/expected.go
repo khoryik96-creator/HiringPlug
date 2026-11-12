@@ -1,8 +1,8 @@
-package salarycalc
+package salary
 
 import (
+	"math/big"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -33,15 +33,17 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		review(out, "Expected rate needs working-time information before monthly conversion.")
 		return
 	}
-	set := func(lo, hi float64) {
+	set := func(lo, hi *big.Rat) {
 		lo, hi = rounded(lo, rules.Cents), rounded(hi, rules.Cents)
-		if !validMoney(lo) || !validMoney(hi) || lo > hi {
+		if !validMoney(lo) || !validMoney(hi) || lo.Cmp(hi) > 0 {
 			review(out, "Expected salary is outside the supported range.")
 			return
 		}
-		out.ExpectedMin = &lo
-		if hi != lo {
-			out.ExpectedMax = &hi
+		low := moneyOf(lo)
+		out.ExpectedMin = &low
+		if hi.Cmp(lo) != 0 {
+			high := moneyOf(hi)
+			out.ExpectedMax = &high
 		}
 	}
 	// Removing percentages first prevents 1000% from being read as salary 1000.
@@ -56,14 +58,15 @@ func calculateExpected(out *Result, text string, rules Rules) {
 				review(out, "Enter one expected range without additional alternative amounts.")
 				return
 			}
-			a, errA := strconv.ParseFloat(m[1], 64)
-			b, errB := strconv.ParseFloat(m[3], 64)
-			if errA != nil || errB != nil {
+			a, okA := decimal(m[1])
+			b, okB := decimal(m[3])
+			if !okA || !okB {
 				review(out, "Expected salary is outside the supported range.")
 				return
 			}
 			left, right := m[2], m[4]
-			if a < 1000 && b < 1000 {
+			thousand := big.NewRat(1000, 1)
+			if a.Cmp(thousand) < 0 && b.Cmp(thousand) < 0 {
 				if left == "" {
 					left = right
 				}
@@ -71,13 +74,11 @@ func calculateExpected(out *Result, text string, rules Rules) {
 					right = left
 				}
 			}
-			a *= magnitude(left)
-			b *= magnitude(right)
+			a, b = mul(a, magnitude(left)), mul(b, magnitude(right))
 			if annualRE.MatchString(s) {
-				a /= 12
-				b /= 12
+				a, b = quo(a, twelve), quo(b, twelve)
 			}
-			if a > b {
+			if a.Cmp(b) > 0 {
 				review(out, "Expected salary range runs backwards.")
 				return
 			}
@@ -90,7 +91,7 @@ func calculateExpected(out *Result, text string, rules Rules) {
 		}
 		if n, ok := amount(literal); ok {
 			if annualRE.MatchString(s) {
-				n /= 12
+				n = quo(n, twelve)
 			}
 			set(n, n)
 			return
@@ -105,33 +106,40 @@ func calculateExpected(out *Result, text string, rules Rules) {
 			return
 		}
 		m := matches[0]
-		lo, hi := 0.0, 0.0
+		var lo, hi *big.Rat
 		if m[3] != "" {
-			lo, _ = strconv.ParseFloat(m[3], 64)
+			lo, _ = decimal(m[3])
 			hi = lo
 		} else {
-			lo, _ = strconv.ParseFloat(m[1], 64)
-			hi, _ = strconv.ParseFloat(m[2], 64)
+			lo, _ = decimal(m[1])
+			hi, _ = decimal(m[2])
 		}
-		if lo <= -100 || hi > 500 || lo > hi || lo > 500 || hi <= -100 {
+		minus100, plus500 := big.NewRat(-100, 1), big.NewRat(500, 1)
+		if lo == nil || hi == nil || lo.Cmp(minus100) <= 0 || hi.Cmp(plus500) > 0 || lo.Cmp(hi) > 0 || hi.Cmp(minus100) <= 0 {
 			review(out, "Expected increase must be above -100% and at most 500%.")
 			return
 		}
-		if (lo > 0 || hi > 0) && regexp.MustCompile(`\b(decrease|decrement|reduction|reduce|less|lower|cut)\b`).MatchString(s) {
+		if (lo.Sign() > 0 || hi.Sign() > 0) && decreaseRE.MatchString(s) {
 			review(out, "Use a negative percentage for an expected salary decrease.")
 			return
 		}
 		out.relativeExpected = true
-		set(out.Monthly*(1+lo/100), out.Monthly*(1+hi/100))
+		raise := func(p *big.Rat) *big.Rat { return mul(out.Monthly.rat(), add(big.NewRat(1, 1), quo(p, hundred))) }
+		set(raise(lo), raise(hi))
 		return
 	}
 	if sameRE.MatchString(s) {
 		out.relativeExpected = true
-		set(out.Monthly, out.Monthly)
+		set(out.Monthly.rat(), out.Monthly.rat())
 		return
 	}
 	// Unknown words must not be turned into a guessed numeric salary.
-	if regexp.MustCompile(`\S`).MatchString(s) {
+	if anyTextRE.MatchString(s) {
 		review(out, "Expected salary needs review.")
 	}
 }
+
+var (
+	decreaseRE = regexp.MustCompile(`\b(decrease|decrement|reduction|reduce|less|lower|cut)\b`)
+	anyTextRE  = regexp.MustCompile(`\S`)
+)

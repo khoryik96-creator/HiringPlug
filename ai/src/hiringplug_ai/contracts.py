@@ -707,6 +707,15 @@ class UsedValues(BaseModel):
     specializations: list[str]
 
 
+class SalaryCalculationInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    current: Annotated[str, Field(max_length=2000)]
+    currentCurrency: CurrencyCode | None = None
+    expected: Annotated[str, Field(max_length=2000)]
+
+
 class SalaryCalculation(BaseModel):
     hasCurrent: bool
     reviewRequired: bool
@@ -4342,16 +4351,6 @@ class CandidateFound(BaseModel):
         Field(description="With a company searched for: where they work or worked there."),
     ]
     score: Annotated[float | None, Field(description="For names alike, how alike (0 to 1).")]
-
-
-class SalaryCalculationInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    current: Annotated[str, Field(max_length=2000)]
-    currentCurrency: CurrencyCode | None = None
-    expected: Annotated[str, Field(max_length=2000)]
-    rules: SalaryCalculationRules
 
 
 class PublicJobAd(BaseModel):

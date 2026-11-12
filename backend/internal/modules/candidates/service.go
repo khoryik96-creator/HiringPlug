@@ -27,6 +27,7 @@ type Service struct {
 	phoneRegion string
 	users       Users
 	rules       FieldRules // the company's mandatory fields and sources
+	salaryRules SalaryRules
 	movers      []RecordMover
 	notes       Notes // screening calls' notes
 	cvs         CVs   // CV text, for advanced search

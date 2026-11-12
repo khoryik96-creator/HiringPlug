@@ -23,7 +23,6 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/salarycalc"
 )
 
 type emailCandidates struct {
@@ -59,7 +58,7 @@ func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Princi
 		d.SalaryNotes = cleanSalaryWording(c.SalaryNotes)
 		if c.Current != nil {
 			if c.Current.Description != nil {
-				value := salarycalc.FormatBreakdown(*c.Current.Description, c.Current.Currency, c.Current.Period)
+				value := candidates.FormatSalaryBreakdown(*c.Current.Description, c.Current.Currency, c.Current.Period)
 				d.CurrentBreakdown = &value
 			}
 		}
@@ -257,6 +256,6 @@ func cleanSalaryWording(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	clean := salarycalc.CleanWording(*value)
+	clean := candidates.CleanSalaryWording(*value)
 	return &clean
 }

@@ -1048,12 +1048,12 @@ components:
     SalaryCalculationInput:
       type: object
       additionalProperties: false
-      required: [current, expected, rules]
+      description: The company's saved salary calculation rules apply; the browser does not choose them.
+      required: [current, expected]
       properties:
         current: { type: string, maxLength: 2000 }
         currentCurrency: { $ref: '#/components/schemas/CurrencyCode' }
         expected: { type: string, maxLength: 2000 }
-        rules: { $ref: '#/components/schemas/SalaryCalculationRules' }
     SalaryCalculation:
       type: object
       required: [base, allowances, bonus, monthly, annualMonths, warnings, excluded, hasCurrent, reviewRequired]

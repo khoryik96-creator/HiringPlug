@@ -1,17 +1,10 @@
-package salarycalc
+package salary
 
 import (
-	"math"
 	"regexp"
 	"slices"
 	"strings"
 )
-
-const maxMoney = 999999999999.99
-
-func validMoney(n float64) bool {
-	return !math.IsNaN(n) && !math.IsInf(n, 0) && n >= 0 && n <= maxMoney
-}
 
 func negativeMoney(text string) bool {
 	first := numberRE.FindStringIndex(text)
@@ -19,7 +12,7 @@ func negativeMoney(text string) bool {
 		return false
 	}
 	prefix := strings.TrimSpace(text[:first[0]])
-	return strings.HasSuffix(prefix, "-") || regexp.MustCompile(`(?i)(^|\s)-\s*(?:[a-z]{1,3}\$|[a-z]{2,3}|[€£₹$])\s*$`).MatchString(prefix)
+	return strings.HasSuffix(prefix, "-") || minusCurrencyRE.MatchString(prefix)
 }
 
 func review(out *Result, message string) {
@@ -48,8 +41,8 @@ func finish(out *Result) {
 			out.ExpectedCurrency = out.CurrentCurrency
 		}
 	}
-	for _, n := range []float64{out.Base, out.Allowances, out.Bonus, out.Monthly} {
-		if !validMoney(n) {
+	for _, n := range []Money{out.Base, out.Allowances, out.Bonus, out.Monthly} {
+		if !validMoney(n.rat()) {
 			review(out, "The calculated salary is outside the supported range.")
 		}
 	}
@@ -58,10 +51,9 @@ func finish(out *Result) {
 
 // Keep gross/nett alternatives separate from additive package components.
 func preferGross(parts []string) []string {
-	million := regexp.MustCompile(`(?i)\d\s*(mil|million|m)\b`)
 	alternative := func(s string) bool {
 		s = clean(s)
-		return million.MatchString(s) && !bonusRE.MatchString(s) && !variableRE.MatchString(s)
+		return millionRE.MatchString(s) && !bonusRE.MatchString(s) && !variableRE.MatchString(s)
 	}
 	first, pick := -1, -1
 	for i, part := range parts {
@@ -101,7 +93,6 @@ func preferGross(parts []string) []string {
 // Named allowances cannot supply the basic-pay figure used for bonus accrual.
 // Prefer an explicitly named base; otherwise retain the first eligible amount.
 func preferBase(parts []string) []string {
-	baseRE := regexp.MustCompile(`(?i)\b(?:basic|base)\b`)
 	best := -1
 	for i, part := range parts {
 		if allowanceRE.MatchString(part) || bonusRE.MatchString(part) || guaranteedRE.MatchString(part) ||
@@ -126,3 +117,9 @@ func preferBase(parts []string) []string {
 	out = append(out, parts[:best]...)
 	return append(out, parts[best+1:]...)
 }
+
+var (
+	minusCurrencyRE = regexp.MustCompile(`(?i)(^|\s)-\s*(?:[a-z]{1,3}\$|[a-z]{2,3}|[€£₹$])\s*$`)
+	millionRE       = regexp.MustCompile(`(?i)\d\s*(mil|million|m)\b`)
+	baseRE          = regexp.MustCompile(`(?i)\b(?:basic|base)\b`)
+)

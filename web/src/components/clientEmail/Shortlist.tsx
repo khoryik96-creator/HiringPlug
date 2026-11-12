@@ -11,7 +11,17 @@ import { STAGE } from "../../labels";
 import { blocksHtml, choiceKey, type CvChoice, DEFAULT_DETAILS, DETAILS, type Layout, missingDetails, type Person, type Profile, profilesOf, tableHtml } from "./shortlistHtml";
 
 /** A candidate on the email; profile undefined: their newest profile (none if they have none). */
-export type Shortlisted = { candidateId: string; applicationId?: string; name: string; title?: string | null; stage?: Schemas["Stage"]; profile?: CvChoice | null; candidateVersion?: number; compensationVersion?: number };
+export type Shortlisted = {
+  candidateId: string;
+  applicationId?: string;
+  name: string;
+  title?: string | null;
+  stage?: Schemas["Stage"];
+  profile?: CvChoice | null;
+  // The versions the details were read at: sending fails if they changed since.
+  candidateVersion?: number;
+  compensationVersion?: number;
+};
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -39,14 +49,29 @@ export function useShortlist(people: Shortlisted[], canSeeCvs: boolean) {
     return chosen === undefined ? profiles[i]?.[0]?.choice ?? null : chosen;
   };
   const cvs = people.map((_, i) => profileOf(i)).filter((c): c is CvChoice => c !== null);
-  const personAt = (i: number): Person => ({ id:people[i]?.candidateId, name: values[i]?.data?.fieldValues["[Full name]"] ?? people[i]?.name ?? "", values: values[i]?.data?.fieldValues ?? {} });
-  const loading = values.some((v) => v.isPending) || (canSeeCvs && docs.some((d,i)=>people[i]?.profile!==null && d.isPending));
-  const snapshot = (includeSalary:boolean):Shortlisted[]=>people.map((p,i)=>({ ...p,
-   ...(values[i]?.data?.candidateVersion !== undefined ? {candidateVersion:values[i].data.candidateVersion}:{}),
-   ...(includeSalary && values[i]?.data?.compensationVersion !== undefined ? {compensationVersion:values[i].data.compensationVersion}:{compensationVersion:undefined})
-  }));
-  const refresh = () => Promise.all([...values.map((q)=>q.refetch()),...(canSeeCvs?docs.map((q)=>q.refetch()):[])]);
-  return { profiles, profileOf, cvs, personAt, loading, snapshot, refresh, error: values.find((v) => v.error)?.error ?? docs.find((d,i) => people[i]?.profile!==null && d.error)?.error };
+  const personAt = (i: number): Person => ({
+    id: people[i]?.candidateId,
+    name: values[i]?.data?.fieldValues["[Full name]"] ?? people[i]?.name ?? "",
+    values: values[i]?.data?.fieldValues ?? {},
+  });
+  // A candidate sent with "No attachment" needs no documents.
+  const wantsDocs = (i: number) => people[i]?.profile !== null;
+  const loading = values.some((v) => v.isPending) || (canSeeCvs && docs.some((d, i) => wantsDocs(i) && d.isPending));
+  /** The people with the versions their details were read at (salary's only when shown). */
+  const snapshot = (includeSalary: boolean): Shortlisted[] => people.map((p, i) => {
+    const read = values[i]?.data;
+    return {
+      ...p,
+      ...(read?.candidateVersion !== undefined ? { candidateVersion: read.candidateVersion } : {}),
+      compensationVersion: includeSalary ? read?.compensationVersion : undefined,
+    };
+  });
+  const refresh = () => Promise.all([
+    ...values.map((q) => q.refetch()),
+    ...(canSeeCvs ? docs.map((q) => q.refetch()) : []),
+  ]);
+  const error = values.find((v) => v.error)?.error ?? docs.find((d, i) => wantsDocs(i) && d.error)?.error;
+  return { profiles, profileOf, cvs, personAt, loading, snapshot, refresh, error };
 }
 
 const read = <T,>(key: string, fallback: T): T => {
@@ -67,8 +92,10 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   onPeople: (people: Shortlisted[]) => void;
   list: ReturnType<typeof useShortlist>;
   canSeeCvs: boolean;
-  canSeeSalary?: boolean;allowEmpty?:boolean;onRefresh?:()=>void;
-  onInsert: (html: string,snapshot:Shortlisted[]) => void;
+  canSeeSalary?: boolean;
+  allowEmpty?: boolean;
+  onRefresh?: () => void;
+  onInsert: (html: string, snapshot: Shortlisted[]) => void;
 }) {
   const [layout, setLayout] = useState<Layout>(() => read("hiringplug.shortlist.layout", "blocks"));
   const [details, setDetails] = useState<string[]>(() => read("hiringplug.shortlist.details", DEFAULT_DETAILS));
@@ -78,7 +105,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/applications", { params: { path: { jobId: jobId ?? "" } } })),
   });
   const more = (onJob.data?.items ?? []).filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn" && !people.some((p) => p.candidateId === a.candidateId));
-  const available=DETAILS.filter((d)=>!d.salary || canSeeSalary);
+  const available = DETAILS.filter((d) => !d.salary || canSeeSalary);
   const chosen = available.filter((d) => details.includes(d.id));
   const shown = people.map((_, i) => list.personAt(i));
   const gaps = list.loading ? [] : missingDetails(shown, chosen);
@@ -92,7 +119,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
   return (
     <fieldset className="shortlist" aria-label="Candidates">
       <legend>Selected candidates ({people.length}/10)</legend>
-      <EmailCandidateSearch people={people} onAdd={(p)=>{onPeople([...people,p]);}} />
+      <EmailCandidateSearch people={people} onAdd={(p) => { onPeople([...people, p]); }} />
       <ol className="shortlist-rows">
         {people.map((p, i) => (
           <li key={p.candidateId} className="shortlist-row">
@@ -134,7 +161,7 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
         <div className="segmented" role="group" aria-label="Write them as">
           {(["blocks", "table"] as const).map((l) => (
             <button key={l} type="button" aria-pressed={layout === l} className={layout === l ? "on" : undefined}
-              onClick={() => { onRefresh?.();setLayout(l); keep("hiringplug.shortlist.layout", l); }}>
+              onClick={() => { onRefresh?.(); setLayout(l); keep("hiringplug.shortlist.layout", l); }}>
               {l === "blocks" ? "A block each" : "One table"}
             </button>
           ))}
@@ -144,17 +171,29 @@ export function ShortlistPanel({ jobId, people, onPeople, list, canSeeCvs, canSe
             <label key={d.id} className="small">
               <input type="checkbox" checked={details.includes(d.id)} onChange={(e) => {
                 const next = e.target.checked ? DETAILS.filter((x) => details.includes(x.id) || x.id === d.id).map((x) => x.id) : details.filter((x) => x !== d.id);
-                onRefresh?.();setDetails(next);
+                onRefresh?.();
+                setDetails(next);
                 keep("hiringplug.shortlist.details", next);
               }} /> {d.label}
             </label>
           ))}
         </span>
-        <button type="button" disabled={list.loading || !!list.error || people.length===0} onClick={() => { onInsert(layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen),list.snapshot(chosen.some((d)=>d.salary))); }}>
+        <button
+          type="button"
+          disabled={list.loading || !!list.error || people.length === 0}
+          onClick={() => {
+            const html = layout === "blocks" ? blocksHtml(shown, chosen) : tableHtml(shown, chosen);
+            onInsert(html, list.snapshot(chosen.some((d) => d.salary)));
+          }}
+        >
           Insert candidates into the message
         </button>
       </div>
-      {people.length>0 && <button type="button" className="link" onClick={()=>{onRefresh?.();void list.refresh();}}>Refresh candidate details and CVs</button>}
+      {people.length > 0 && (
+        <button type="button" className="link" onClick={() => { onRefresh?.(); void list.refresh(); }}>
+          Refresh candidate details and CVs
+        </button>
+      )}
       {gaps.length > 0 && <p className="warning small">Not on record (shown as —): {gaps.join("; ")}.</p>}
     </fieldset>
   );

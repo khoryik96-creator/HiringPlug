@@ -18,6 +18,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/salary"
+
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
@@ -33,10 +35,28 @@ type Module struct {
 
 // New wires the module. phoneRegion is the country assumed for local phone
 // numbers, e.g. "MY".
-func New(pool *pgxpool.Pool, phoneRegion string, users Users, rules FieldRules) *Module {
-	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users, rules: rules}
+func New(pool *pgxpool.Pool, phoneRegion string, users Users, settings Settings) *Module {
+	svc := &Service{pool: pool, phoneRegion: phoneRegion, users: users, rules: settings, salaryRules: settings}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
+
+// Settings is what this module needs from the settings module: the
+// company's mandatory fields and lists, and its salary calculation rules.
+type Settings interface {
+	FieldRules
+	SalaryRules
+}
+
+// FormatSalaryBreakdown writes a stored salary breakdown for an email
+// ("12k + AWS" -> "RM 12,000 + 13th month fixed/contractual bonus per month").
+// The stored wording is not changed.
+func FormatSalaryBreakdown(raw, currency, period string) string {
+	return salary.FormatBreakdown(raw, currency, period)
+}
+
+// CleanSalaryWording tidies salary words for an email ("perf bonus" ->
+// "performance bonus") without touching any amount.
+func CleanSalaryWording(text string) string { return salary.CleanWording(text) }
 
 // Users is what this module needs from the identity module: owners' names,
 // and whether someone is an active user (to own candidates).

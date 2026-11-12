@@ -4,7 +4,6 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
 import { ScreeningSalary } from "./ScreeningSalary";
-import { salaryRulesKey } from "./SalaryCalculationSettings";
 import { formFromCompensation, salaryProblems, type SalaryFormState, toCompensationBody } from "./salaryFormState";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -27,6 +26,7 @@ it("requires review, preserves the wording, and only applies the calculated mont
   await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false); });
   fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
   await screen.findByRole("button",{name:"Use these figures"});
+  expect(sentBody(post)).not.toHaveProperty("rules"); // the server uses the company's saved rules
   expect(screen.getByTestId("body").textContent).not.toContain("18400");
   fireEvent.click(screen.getByRole("button",{name:"Use these figures"}));
   expect(screen.getByTestId("body").textContent).toContain('"amount":"18400.00"');
@@ -62,10 +62,10 @@ it.each([{current:"",expected:"22k",hasCurrent:false,expectedMin:"22000.00"},{cu
   if(expectedMin) expect(screen.getByTestId("body").textContent).toContain(expectedMin);
 });
 
-it("discards a preview after the currency or company rules change", async () => {
+it("discards a preview after the figures or currency change", async () => {
   vi.spyOn(api,"GET").mockResolvedValue(ok({allowances:true,bonus:true,bonusOnAllowances:false,cents:false}));
   vi.spyOn(api,"POST").mockResolvedValue(ok({base:"16000",allowances:"0",bonus:"0",monthly:"16000",annualMonths:12,hasCurrent:true,reviewRequired:false,currentCurrency:"MYR",warnings:[],excluded:[]}));
-  const {client}=renderWithClient(<Harness />);
+  renderWithClient(<Harness />);
   fireEvent.change(screen.getByLabelText("Current salary breakdown"),{target:{value:"16k"}});
   await waitFor(() => {expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false);});
   fireEvent.click(screen.getByRole("button",{name:"Calculate"}));await screen.findByRole("button",{name:"Use these figures"});
@@ -80,8 +80,6 @@ it("discards a preview after the currency or company rules change", async () => 
   fireEvent.change(currentCurrency,{target:{value:"MYR"}});
   fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
   await screen.findByRole("button",{name:"Use these figures"});
-  client.setQueryData(salaryRulesKey,{allowances:true,bonus:false,bonusOnAllowances:false,cents:false});
-  await waitFor(() => {expect(screen.queryByRole("button",{name:"Use these figures"})).toBeNull();});
 });
 
 
@@ -148,9 +146,10 @@ it.each(["+10%", "10pct", "10 per cent", "10% plus bonus"])("rechecks expected p
   expect(screen.getByTestId("problems").textContent).toContain("Calculate and review");
 });
 
-it("keeps reviewed manual entry available when calculation rules cannot load", async () => {
-  vi.spyOn(api,"GET").mockResolvedValue(failure("SERVICE_UNAVAILABLE","Could not load calculation rules.",undefined,503));
+it("keeps reviewed manual entry available when the calculation fails", async () => {
+  vi.spyOn(api,"POST").mockResolvedValue(failure("SERVICE_UNAVAILABLE","Could not calculate.",undefined,503));
   renderWithClient(<Harness initial={{...formFromCompensation(null),currentAmount:"9000",expectedMin:"11000"}} />);
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
   fireEvent.click(await screen.findByRole("button",{name:"Enter figures manually"}));
   fireEvent.click(screen.getByRole("button",{name:"Use entered figures"}));
   expect(screen.getByTestId("problems").textContent).toBe("{}");

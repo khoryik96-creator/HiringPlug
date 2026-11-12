@@ -30,7 +30,15 @@ func TestSalaryCalculationRulesAndProtectedDescriptions(t *testing.T) {
 	a.request(http.MethodGet, path, other, nil).JSON(&isolated)
 	assert.True(t, isolated.Bonus, "settings are scoped to their company")
 	current := "16k monthly + 400 allowance + 13.5th month bonus + 3 months performance + 16% EPF"
-	body := map[string]any{"current": current, "expected": "10% lateral", "rules": rules}
+	body := map[string]any{"current": current, "expected": "10% lateral"}
+	// The company's saved rules apply (bonus switched off above); the browser
+	// cannot send its own.
+	withRules := map[string]any{"current": current, "expected": "", "rules": rules}
+	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodPost, "/v1/salary-calculations", recruiter, withRules).Status)
+	var withoutBonus api.SalaryCalculation
+	a.request(http.MethodPost, "/v1/salary-calculations", recruiter, body).JSON(&withoutBonus)
+	assert.Equal(t, "16400.00", withoutBonus.Monthly)
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, path, admin, rules).Status) // bonus counted again
 	res := a.request(http.MethodPost, "/v1/salary-calculations", recruiter, body)
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	var calculation api.SalaryCalculation
@@ -87,7 +95,7 @@ func TestSalaryCalculationReviewFlagsAndCurrencies(t *testing.T) {
 		{"", "22k", "22000.00", false, false, ""},
 		{"0", "lateral", "0.00", false, true, "MYR"},
 	} {
-		res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{"current": tc.current, "expected": tc.expected, "currentCurrency": "MYR", "rules": api.SalaryCalculationRules{Allowances: true, Bonus: true}})
+		res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{"current": tc.current, "expected": tc.expected, "currentCurrency": "MYR"})
 		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 		var out api.SalaryCalculation
 		res.JSON(&out)
@@ -113,7 +121,6 @@ func TestScreeningCallSavesFixedFiguresWithUnconfirmedBonus(t *testing.T) {
 	current := "9.6k + 2k allowance + 13.5 month bonus + 3 months bonus + 200 allowance + 13% EPF"
 	res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{
 		"current": current, "expected": "14-18%", "currentCurrency": "MYR",
-		"rules": api.SalaryCalculationRules{Allowances: true, Bonus: true},
 	})
 	require.Equal(t, http.StatusOK, res.Status)
 	var calculation api.SalaryCalculation
@@ -148,16 +155,18 @@ func TestScreeningRulesDoNotRequireSettingsAccess(t *testing.T) {
 	rules := api.SalaryCalculationRules{Allowances: true, Bonus: false, Cents: true}
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/settings/salary-calculation", owner, rules).Status)
 	require.Equal(t, http.StatusForbidden, a.request(http.MethodGet, "/v1/settings/salary-calculation", recruiter, nil).Status)
-	res := a.request(http.MethodGet, "/v1/salary-calculation-rules", recruiter, nil)
-	require.Equal(t, http.StatusOK, res.Status)
-	var got api.SalaryCalculationRules
-	res.JSON(&got)
-	assert.Equal(t, rules, got)
-	assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, "/v1/salary-calculation-rules", tenant.Users[api.RoleSourcer].Token, nil).Status)
+	// The calculator applies the saved rules for someone who cannot open Settings.
+	calc := func(token string) api.SalaryCalculation {
+		res := a.request(http.MethodPost, "/v1/salary-calculations", token, map[string]any{"current": "16k + AWS", "expected": ""})
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var out api.SalaryCalculation
+		res.JSON(&out)
+		return out
+	}
+	assert.Equal(t, "16000.00", calc(recruiter).Monthly, "no bonus, in cents, as the company saved")
+	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/salary-calculations", tenant.Users[api.RoleSourcer].Token, map[string]any{"current": "16k", "expected": ""}).Status)
 	other := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
-	var isolated api.SalaryCalculationRules
-	a.request(http.MethodGet, "/v1/salary-calculation-rules", other, nil).JSON(&isolated)
-	assert.True(t, isolated.Bonus)
+	assert.Equal(t, "17333.00", calc(other).Monthly, "another company keeps its own (default) rules")
 }
 
 // A breakdown explains the figure it was saved with. Changing the figure on a
