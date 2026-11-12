@@ -702,7 +702,10 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 
 /* Choosing candidates on the board for one email to the client. */
 .card-name { display: flex; align-items: center; gap: 0.4rem; }
-.card-name input { margin: 0; flex: none; }
+.card-name input { margin: 0; flex: none; width: 20px; height: 20px; cursor: pointer; accent-color: var(--accent); }
+.card.pickable { cursor: pointer; }
+.card.pickable:hover { border-color: var(--accent); }
+.pick-bar select { width: auto; min-height: 34px; }
 .card.picked { border-color: var(--accent); background: var(--accent-soft); }
 .pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
 
@@ -802,3 +805,10 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 [aria-invalid="true"] { outline: 2px solid #dc2626 !important; outline-offset: 1px; }
 .rich-box [data-missing-detail] { outline: 2px solid #dc2626; outline-offset: 2px; }
 .rich-box td:has([data-missing-detail]) { outline: 2px solid #dc2626; outline-offset: -2px; }
+
+/* Lists where clicking a row chooses it (candidates, contacts). */
+.pick-table .pick-row { cursor: pointer; }
+.pick-table .pick-row:hover td { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.pick-table .pick-row.chosen td { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); box-shadow: inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
+.pick-table .pick-row.chosen td:first-child { box-shadow: inset 3px 0 0 var(--accent), inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent); }
+.pick-table .pick-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

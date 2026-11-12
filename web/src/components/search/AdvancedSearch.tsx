@@ -9,7 +9,7 @@ import { AVAILABILITY } from "../candidateLook";
 import { useFieldSettings } from "../useFieldSettings";
 import { useUsedValues } from "../useUsedValues";
 import { booleanTokens, EMPTY, NOTICE_CHOICES, type SearchState, UPDATED_CHOICES, WORK_KINDS } from "./candidateSearch";
-import { categoryLabel, useIndustries } from "../IndustryPicker";
+import { type Category, categoryLabel, useIndustries } from "../IndustryPicker";
 import { MultiSelect } from "./MultiSelect";
 
 const COUNTRY_CHOICES = COUNTRIES.map((c) => ({ value: c, label: countryName(c) }));
@@ -88,7 +88,8 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       <MultiSelect label="Lives in" choices={COUNTRY_CHOICES} value={draft.residence} onChange={set("residence")} />
       <MultiSelect label="Source" choices={fs.options("candidate_source").map((o) => ({ value: o.key, label: o.label }))}
         value={draft.source} onChange={set("source")} />
-      <MultiSelect label="Industry" align="end" choices={industries.data ? industries.data.items.map((i) => ({ value: i.id, label: categoryLabel(i, industries.data.items) + (i.retired ? " · Retired" : "") })) : withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />
+      {industries.data ? <IndustryFilters items={industries.data.items} value={draft.industry} onChange={set("industry")} />
+        : <MultiSelect label="Industry" align="end" choices={withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />}
       <div className="adv-skills">
         <MultiSelect label="Skills" choices={withChosen(used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} />
         {draft.skills.length > 1 && (
@@ -120,5 +121,32 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
         </select>
       </label>
     </div>
+  );
+}
+
+/**
+ * Industry, then subindustry: two dropdowns writing one filter. An industry
+ * alone matches its subindustries too (the server includes them); the
+ * subindustry list narrows to the industries chosen. Retired entries are
+ * offered only while chosen.
+ */
+function IndustryFilters({ items, value, onChange }: { items: Category[]; value: string[]; onChange: (v: string[]) => void }) {
+  const offered = (i: Category) => !i.retired || value.includes(i.id);
+  const label = (i: Category, text: string) => text + (i.retired ? " · Retired" : "");
+  const roots = items.filter((i) => !i.parentId && offered(i));
+  const rootIds = new Set(items.filter((i) => !i.parentId).map((i) => i.id));
+  const chosenRoots = value.filter((v) => rootIds.has(v));
+  // Sorted as read, whatever dash a label uses ("FSI – Banking" with "FSI - Insurance").
+  const byLabel = (a: Category, b: Category) => categoryLabel(a, items).replace(/[‐-―−]/g, "-").localeCompare(categoryLabel(b, items).replace(/[‐-―−]/g, "-"));
+  const subs = items.filter((i) => i.parentId && offered(i) && (chosenRoots.length === 0 || chosenRoots.includes(i.parentId) || value.includes(i.id))).sort(byLabel);
+  const chosenSubs = value.filter((v) => !rootIds.has(v));
+  return (
+    <>
+      <MultiSelect label="Industry" choices={roots.map((i) => ({ value: i.id, label: label(i, i.label) }))}
+        value={chosenRoots} onChange={(v) => { onChange([...v, ...chosenSubs]); }} />
+      <MultiSelect label="Subindustry" align="end"
+        choices={subs.map((i) => ({ value: i.id, label: label(i, chosenRoots.length === 1 ? i.label : categoryLabel(i, items)) }))}
+        value={chosenSubs} onChange={(v) => { onChange([...chosenRoots, ...v]); }} />
+    </>
   );
 }

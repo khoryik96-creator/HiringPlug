@@ -29,13 +29,20 @@ function answer(items: unknown[], columns: string[] | null | (() => string[] | n
 }
 
 describe("candidate list", () => {
-  it("ticks candidates (one, or all shown) to email each separately", async () => {
+  it("chooses candidates by clicking their rows (one, or all shown) to email each separately", async () => {
     const wei = { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Wei Tan", email: "wei@example.com" };
     vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
     renderWithClient(<CandidateList canCreate={false} canEmail />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Choose Wei Tan" }));
+    expect(screen.queryByRole("checkbox", { name: /Choose/ })).toBeNull(); // no tick boxes
+    const row = await screen.findByRole("row", { name: "Wei Tan" });
+    fireEvent.click(row.querySelector("td:last-child") as Element);
     expect(screen.getByText("1 chosen")).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Choose all shown" }));
+    expect(screen.getByRole("row", { name: "Wei Tan (chosen)" }).className).toContain("chosen");
+    fireEvent.click(screen.getByRole("link", { name: "Siti Aisyah" })); // the name opens the candidate, not chooses
+    expect(screen.getByText("1 chosen")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("row", { name: "Wei Tan (chosen)" }), { key: " " }); // Space unchooses
+    expect(screen.queryByText("1 chosen")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
     expect(screen.getByText("2 chosen")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Email each separately" }));
     const panel = await screen.findByRole("region", { name: "Email each separately" });
@@ -43,11 +50,12 @@ describe("candidate list", () => {
     expect(panel.textContent).toContain("Siti Aisyah · no email");
   });
 
-  it("offers no ticks to those who may not send email", async () => {
+  it("does not choose rows for those who may not send email", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByText("Siti Aisyah");
-    expect(screen.queryByRole("checkbox", { name: /Choose/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull();
+    expect(screen.queryByRole("row", { name: "Siti Aisyah" })).toBeNull();
   });
 
   it("shows tags by the name", async () => {
@@ -87,6 +95,23 @@ describe("candidate list", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove Status: Looking out" }));
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
     expect((sentBody(post, 1) as { availability?: string[] }).availability).toBeUndefined();
+  });
+
+  it("narrows by industry, then subindustry, from two dropdowns", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary])); // the test catalogue: Financial Services > FSI – Banking, IT > ERP
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [], nextCursor: null, terms: [] }));
+    renderWithClient(<CandidateList canCreate canSeeSalary />);
+    await screen.findByText("Siti Aisyah");
+    fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Industry/ }));
+    expect(screen.queryByRole("checkbox", { name: "FSI – Banking" })).toBeNull(); // main industries only
+    fireEvent.click(screen.getByRole("checkbox", { name: "Financial Services" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Subindustry/ }));
+    expect(screen.queryByRole("checkbox", { name: /ERP/ })).toBeNull(); // narrowed to Financial Services
+    fireEvent.click(screen.getByRole("checkbox", { name: "FSI – Banking" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect((sentBody(post) as { industry?: string[] }).industry).toEqual(["industry_bank", "industry_banking"]);
   });
 
   it("shows each candidate's status and since when, notice period and salaries, or that salary is restricted", async () => {

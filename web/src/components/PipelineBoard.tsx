@@ -4,14 +4,14 @@ import { type ReactNode, useState } from "react";
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
-import { ApplicationCard, MoveMenu } from "./ApplicationCard";
+import { ApplicationCard, MoveChosen, MoveMenu } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
 import { type Person, SeparateEmail } from "./SeparateEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
-import { useMoveApplication } from "./useMoveApplication";
+import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
 
 /**
  * A job's pipeline: a column per stage, closed applications listed below.
@@ -38,17 +38,26 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
   const [bestFirst, setBestFirst] = useState(false);
   const [fitShown, setFitShown] = useState<Application | null>(null);
-  const [emailing, setEmailing] = useState<Application | null>(null);
   // Candidates chosen for one email to the client, in the board's order.
   const [picked, setPicked] = useState<string[]>([]);
   const [shortlist, setShortlist] = useState<Shortlisted[] | null>(null);
   const [separately, setSeparately] = useState<Person[] | null>(null);
   const canEmail = permissions.includes("emails:send");
+  const canPick = canEmail || canUpdate;
+  const chosenApps = apps.filter((a) => picked.includes(a.id));
+  // Each chosen card moves on its own (a stale one reports itself); those that moved are unticked.
+  const moveChosen = async (to: Omit<MoveRequest, "app">) => {
+    for (const app of chosenApps.filter((a) => a.stage !== to.stage)) {
+      try {
+        await move.mutateAsync({ app, ...to });
+        setPicked((cur) => cur.filter((id) => id !== app.id));
+      } catch { return; } // the error is shown above the board
+    }
+  };
   const pick = (a: Application, on: boolean) => { setPicked((cur) => (on ? [...cur, a.id] : cur.filter((id) => id !== a.id))); };
   const startShortlist = () => {
     const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)));
     setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
-    setEmailing(null);
   };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
   const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
@@ -68,27 +77,25 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         </label>
       )}
       {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}
-      {canEmail && picked.length > 0 && !shortlist && !separately && (
+      {canPick && picked.length > 0 && !shortlist && !separately && (
         <div className="pick-bar" role="status">
           <span>{picked.length} chosen</span>
-          <button type="button" className="primary" disabled={picked.length > 10} onClick={startShortlist}>
-            Email client about {picked.length} candidate{picked.length === 1 ? "" : "s"}
-          </button>
-          <button type="button" onClick={() => {
-            setSeparately(apps.filter((a) => picked.includes(a.id)).map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
-            setEmailing(null);
-          }}>Email each candidate separately</button>
+          {canEmail && <>
+            <button type="button" className="primary" disabled={picked.length > 10} onClick={startShortlist}>
+              Email client about {picked.length} candidate{picked.length === 1 ? "" : "s"}
+            </button>
+            <button type="button" onClick={() => {
+              setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
+            }}>Email each candidate separately</button>
+          </>}
+          {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending} onMove={(to) => { void moveChosen(to); }} />}
           <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
-          {picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
+          {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
       )}
       {shortlist && (
         <ClientEmail key={shortlist.map((p) => p.candidateId).join()} shortlist={shortlist} jobId={jobId} permissions={permissions}
           onClose={() => { setShortlist(null); setPicked([]); }} />
-      )}
-      {emailing && (
-        <ClientEmail key={emailing.id} candidateId={emailing.candidateId} applicationId={emailing.id} permissions={permissions}
-          onClose={() => { setEmailing(null); }} />
       )}
       {fitShown && shownMatch && (
         <section className="fit-panel" aria-label={`Fit of ${fitShown.candidateName}`}>
@@ -126,15 +133,14 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               }}
             >
               <h4>{STAGE[stage]} ({String(cards.length)})</h4>
-              {canEmail && (stage==="applied" || stage==="screening") && cards.length>0 && <div className="row">
+              {canPick && cards.length>0 && <div className="row">
                 <button type="button" className="link small" aria-label={`Select all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>[...new Set([...ids,...cards.map((a)=>a.id)])]);}}>Select all</button>
                 <button type="button" className="link small" aria-label={`Unselect all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>ids.filter((id)=>!cards.some((a)=>a.id===id)));}}>Unselect all</button>
               </div>}
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
                   <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}
-                    onEmailClient={canEmail ? (x) => { setShortlist(null); setEmailing(x); } : undefined}
-                    picked={picked.includes(a.id)} onPick={canEmail ? pick : undefined} canMove={canUpdate} busy={move.isPending} onMove={(m) => { move.mutate(m); }} onDragStart={setDragging} />
+                    picked={picked.includes(a.id)} onPick={canPick ? pick : undefined} canMove={canUpdate} onDragStart={setDragging} />
                 </div>
               ))}
             </div>

@@ -109,7 +109,7 @@ export function CvImports() {
 
   return (
     <section className="panel" aria-label="CV import">
-      <h3>CVs and LinkedIn PDFs</h3>
+      <h3>Import profiles <span className="muted small">CVs and LinkedIn PDFs</span></h3>
       <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
       <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
         hint="PDF, Word, text or a photo of each CV"

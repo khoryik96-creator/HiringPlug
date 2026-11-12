@@ -2,7 +2,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import type { Permission } from "../api/client";
-import { CvImports } from "../components/CvImports";
 import { parseCsv, toCsv } from "../import/csv";
 import { autoMap, FIELDS, type ImportKind, mappingProblems } from "../import/mapping";
 import { type RowResult, runImport } from "../import/runImport";
@@ -15,13 +14,13 @@ const KINDS: { kind: ImportKind; label: string; permission: Permission }[] = [
 
 const STATUS: Record<RowResult["status"], string> = { added: "Added", exists: "Already there", fix: "To fix", failed: "Failed" };
 
-/** Import CVs and LinkedIn PDFs, or candidates, companies or contacts from a CSV file, with a report. */
+/** Candidates, companies or contacts from a CSV file, with a report. CVs and LinkedIn PDFs are imported on the dashboard. */
 export function ImportPage({ permissions }: { permissions: Permission[] }) {
   const cvs = permissions.includes("intake:create");
   return (
     <main>
       <h2>Import</h2>
-      {cvs && <CvImports />}
+      {cvs && <p className="muted small">CVs and LinkedIn PDFs are imported on the <a href="#/">dashboard</a>.</p>}
       <CsvImport permissions={permissions} cvs={cvs} />
     </main>
   );

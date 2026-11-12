@@ -11,6 +11,7 @@ import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { activeChips, EMPTY, isEmpty, loadSearch, saveSearch, type SearchState, snippetParts, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
+import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
@@ -52,8 +53,15 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
-  const width = cols.columns.length + (canEmail ? 2 : 1);
+  const width = cols.columns.length + 1;
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
+  // With email, clicking a row chooses the candidate (the name still opens them).
+  const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
+    if (!canEmail) return { className: snippet ? "has-snippet" : undefined };
+    const chosen = pick.ids.has(c.id);
+    const row = pickRowProps(chosen, () => { pick.pick([personOf(c)], !chosen); }, c.fullName);
+    return { ...row, className: `${row.className}${snippet ? " has-snippet" : ""}` };
+  };
 
   return (
     <main className="candidates-page wide">
@@ -99,16 +107,15 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
+      {canEmail && hits.length > 0 && !emailing && (
+        <button type="button" className="link small" onClick={() => { pick.pick(hits.map((h) => personOf(h.candidate)), !allShown); }}>
+          {allShown ? "Unselect all shown" : "Select all shown"}
+        </button>
+      )}
       <div className="table-scroll">
-        <table className="candidates-table">
+        <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
           <thead>
             <tr>
-              {canEmail && (
-                <th className="pick-col">
-                  <input type="checkbox" aria-label="Choose all shown" checked={allShown}
-                    onChange={(e) => { pick.pick(hits.map((h) => personOf(h.candidate)), e.target.checked); }} />
-                </th>
-              )}
               <th>Name</th>
               {cols.columns.map((col) => <th key={col}>{COLUMNS[col].header}</th>)}
             </tr>
@@ -116,13 +123,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           <tbody>
             {hits.map(({ candidate: c, matchedIn, cvSnippet }) => (
               <Fragment key={c.id}>
-                <tr className={cvSnippet ? "has-snippet" : undefined}>
-                  {canEmail && (
-                    <td className="pick-col">
-                      <input type="checkbox" aria-label={`Choose ${c.fullName}`} checked={pick.ids.has(c.id)}
-                        onChange={(e) => { pick.pick([personOf(c)], e.target.checked); }} />
-                    </td>
-                  )}
+                <tr {...rowProps(c, cvSnippet)}>
                   <td className="name-cell">
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}

@@ -61,46 +61,74 @@ export function timeInStage(app: Application, now = Date.now()): string {
   return days === 1 ? "1 day" : `${String(days)} days`;
 }
 
-/** A candidate's card on a job's board: drag it to another column, or use the menu. Its fit badge opens the reasons. */
-export function ApplicationCard({ app, match, onShowFit, onEmailClient, picked, onPick, canMove, onMove, busy, onDragStart }: {
+/**
+ * A candidate's card on a job's board: name, title, time in the stage and
+ * fit. Clicking the card ticks it (for emailing or moving the chosen ones
+ * from the bar above the board); drag it to another column to move it.
+ */
+export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove, onDragStart }: {
   app: Application;
-  /** Chosen for an email to the client about several candidates. */
+  /** Chosen, for the bar above the board. */
   picked?: boolean;
   onPick?: (app: Application, on: boolean) => void;
   match?: Match;
   onShowFit?: (app: Application) => void;
-  /** Opens an email to the client about this candidate. */
-  onEmailClient?: (app: Application) => void;
   canMove: boolean;
-  onMove: (m: MoveRequest) => void;
-  busy: boolean;
   onDragStart: (app: Application) => void;
 }) {
   return (
     <div
-      className={picked ? "card picked" : "card"}
+      className={`card${picked ? " picked" : ""}${onPick ? " pickable" : ""}`}
       draggable={canMove}
       onDragStart={(e) => { e.dataTransfer.setData("text/plain", app.id); onDragStart(app); }}
+      onClick={(e) => {
+        // The name opens the candidate and the fit opens its reasons; anywhere else ticks the card.
+        if (!onPick || (e.target as HTMLElement).closest("a, button, input, select, label")) return;
+        onPick(app, !picked);
+      }}
     >
       <span className="card-name">
         {onPick && (
-          <input type="checkbox" aria-label={`Choose ${app.candidateName} for an email to the client`} checked={picked ?? false}
+          <input type="checkbox" aria-label={`Choose ${app.candidateName}`} checked={picked ?? false}
             onChange={(e) => { onPick(app, e.target.checked); }} />
         )}
         <a href={`#/candidates/${app.candidateId}`}>{app.candidateName}</a>
       </span>
       {app.candidateTitle && <div className="muted">{app.candidateTitle}</div>}
-      <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}</div>
-      {app.channel && <div className="muted">Applied via {CHANNEL[app.channel]}</div>}
+      <div className="muted">{timeInStage(app)} in {STAGE[app.stage].toLowerCase()}{app.channel ? ` · via ${CHANNEL[app.channel]}` : ""}</div>
       {match && (
         <button type="button" className="link" aria-label={`Fit of ${app.candidateName}: why?`} onClick={() => onShowFit?.(app)}>
           <FitBadge match={match} />
         </button>
       )}
-      {canMove && <MoveMenu app={app} onMove={onMove} busy={busy} />}
-      {onEmailClient && (
-        <button type="button" className="link" aria-label={`Email client about ${app.candidateName}`} onClick={() => { onEmailClient(app); }}>Email client</button>
-      )}
     </div>
+  );
+}
+
+/** "Move to…" for the chosen cards, asking the reason once when closing them. */
+export function MoveChosen({ apps, onMove, busy }: { apps: Application[]; onMove: (m: Omit<MoveRequest, "app">) => void; busy: boolean }) {
+  const [closing, setClosing] = useState<Stage | null>(null);
+  const [reason, setReason] = useState<"" | Schemas["CloseReason"]>("");
+  const [note, setNote] = useState("");
+  if (closing) {
+    return (
+      <form className="close-form row" aria-label={`${STAGE[closing]}: why?`}
+        onSubmit={(e) => { e.preventDefault(); if (reason) { onMove({ stage: closing, reason, reasonNote: note }); setClosing(null); } }}>
+        <select aria-label="Reason" value={reason} onChange={(e) => { setReason(e.target.value as typeof reason); }}>
+          <option value="">Why {closing}?</option>
+          {keysOf(CLOSE_REASON).map((r) => <option key={r} value={r}>{CLOSE_REASON[r]}</option>)}
+        </select>
+        <input aria-label="Note (optional)" placeholder="Note (optional)" value={note} onChange={(e) => { setNote(e.target.value); }} />
+        <button type="submit" disabled={!reason || busy}>{STAGE[closing]} {apps.length}</button>
+        <button type="button" className="link" onClick={() => { setClosing(null); }}>Cancel</button>
+      </form>
+    );
+  }
+  return (
+    <select aria-label="Move the chosen candidates" value="" disabled={busy}
+      onChange={(e) => { const to = e.target.value as Stage; if (isClosed(to)) setClosing(to); else onMove({ stage: to }); }}>
+      <option value="">Move to…</option>
+      {([...OPEN_STAGES, "rejected", "withdrawn"] as Stage[]).map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
+    </select>
   );
 }

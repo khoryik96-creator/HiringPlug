@@ -3,18 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
 import { timeInStage } from "../components/ApplicationCard";
+import { CvImports } from "../components/CvImports";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
 import { OffersToApprove } from "../components/Offers";
 import { QuickSearch } from "../components/QuickSearch";
-import { StageMoves } from "../components/StageMoves";
 import { OPEN_STAGES, STAGE } from "../labels";
 
 type Counts = Schemas["StageCounts"];
 
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
 
-/** The home page: open jobs and their pipelines, who is stuck, recent results. */
+/** The home page: importing CVs, open jobs and their pipelines, who is stuck. */
 export function Dashboard({ permissions }: { permissions: Permission[] }) {
   const summary = useQuery({
     queryKey: summaryKey,
@@ -34,6 +34,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
         <div className="stat"><strong>{s.placedLast30Days}</strong><span>placed in 30 days</span></div>
       </div>
 
+      {permissions.includes("intake:create") && <CvImports />}
       {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
       {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
 
@@ -61,8 +62,6 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
           </tbody>
         </table>
       </section>
-
-      <StageMoves />
 
       <section className="panel" aria-label="Waiting too long">
         <h3>Waiting too long</h3>

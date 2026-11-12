@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { ok, renderWithClient, testFieldSettings } from "../test-utils";
+import { CvImports } from "../components/CvImports";
+import { Dashboard } from "./Dashboard";
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
@@ -25,18 +27,29 @@ const reads = (imports: Schemas["CvImport"][]) =>
     Promise.resolve(ok(path === "/v1/settings/fields" ? testFieldSettings() : { items: imports }))) as never);
 
 describe("importing CVs and LinkedIn PDFs", () => {
-  it("is offered only with the permission; the spreadsheet import keeps its own", () => {
-    reads([]);
-    renderWithClient(<ImportPage permissions={["intake:create"]} />);
-    expect(screen.getByRole("region", { name: "CV import" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "CSV import" })).toBeNull();
-    expect(screen.queryByText("Your role cannot add records.")).toBeNull();
+  it("is on the dashboard, only with the permission; the Import page keeps the spreadsheet import", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary"
+      ? { openJobs: 0, stageCounts: { applied: 0, screening: 0, submitted: 0, interview: 0, offer: 0, placed: 0 }, placedLast30Days: 0, movedLast7Days: 0, jobs: [], stuck: [] }
+      : { items: [] }))) as never);
+    renderWithClient(<Dashboard permissions={["intake:create", "pipeline:read"]} />);
+    expect(await screen.findByRole("region", { name: "CV import" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Recent moves" })).toBeNull();
+    cleanup();
+
+    renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
+    await screen.findByRole("region", { name: "Open jobs" });
+    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
     cleanup();
     vi.restoreAllMocks();
 
+    reads([]);
+    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
+    expect(screen.getByRole("link", { name: "dashboard" })).toBeTruthy();
+    cleanup();
+
     const get = reads([]);
     renderWithClient(<ImportPage permissions={["companies:create"]} />);
-    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
     expect(screen.getByRole("region", { name: "CSV import" })).toBeTruthy();
     expect(get).not.toHaveBeenCalledWith("/v1/cv-imports");
     cleanup();
@@ -54,7 +67,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
         error: { code: "PAYLOAD_TOO_LARGE", message: "The file is too large.", requestId: "req_1" },
       }), { status: 413 }));
     vi.stubGlobal("fetch", send);
-    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    renderWithClient(<CvImports />);
 
     const picker = screen.getByRole("group", { name: "Source of these candidates" });
     expect((await within(picker).findByRole("button", { name: /LinkedIn/ })).getAttribute("aria-pressed")).toBe("true");
@@ -78,7 +91,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
 
   it("takes CVs dropped on it, in several drops, skipping other files and the same file twice", async () => {
     reads([]);
-    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    renderWithClient(<CvImports />);
     const zone = (await screen.findByText("Drop CVs here")).closest(".drop-zone");
     if (!zone) throw new Error("no drop zone");
     const siti = new File(["%PDF"], "Siti.pdf");
@@ -99,7 +112,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
       item({ id: "cvf_4", fileName: "photo.png", status: "failed", candidateId: null, candidateName: null, error: "not a PDF, .docx or .doc file" }),
       item({ id: "cvf_5", fileName: "new.pdf", status: "reading", candidateName: "new", candidateId: "cand_5" }),
     ])]);
-    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    renderWithClient(<CvImports />);
     expect(await screen.findByText(/1 reading · 1 new · 1 added to existing · 1 to fill in · 1 failed/)).toBeTruthy();
     const row = (file: string) => screen.getByText(file).closest("tr") as HTMLElement;
     expect(within(row("Siti Aisyah.pdf")).getByRole("link", { name: "Siti Aisyah" }).getAttribute("href"))
@@ -123,7 +136,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
       : anImport([])))) as never);
     const send = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(item({ status: "reading" })), { status: 201 })));
     vi.stubGlobal("fetch", send);
-    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    renderWithClient(<CvImports />);
     await within(screen.getByRole("group", { name: "Source of these candidates" })).findByRole("button", { name: /LinkedIn/ });
     fireEvent.change(screen.getByLabelText("Drop CVs here"), {
       target: { files: [new File(["one"], "same.pdf"), new File(["two"], "Nurul CV.pdf"), new File(["three"], "new.pdf")] },
