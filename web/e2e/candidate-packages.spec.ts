@@ -54,9 +54,9 @@ test("selects several candidates in contact, candidate and job emails, preservin
  await page.getByRole("button",{name:"Save the call",exact:true}).click();await expect(page).toHaveURL(new RegExp(`#/candidates/${first.id}$`));
  await page.getByRole("tab",{name:"Salary",exact:true}).click();await page.getByRole("region",{name:"Salary",exact:true}).scrollIntoViewIfNeeded();await shot("candidate-salary");
  await page.getByRole("button",{name:"Edit salary",exact:true}).click();await expect(page.getByLabel("Salary notes",{exact:true})).toHaveValue("Updated discussion: prefers fixed pay");await shot("edit-salary");await page.getByRole("button",{name:"Cancel",exact:true}).click();
- await page.getByRole("tab",{name:"Activity",exact:true}).click();await page.getByText("Salary history",{exact:true}).click();
+ await page.getByRole("tab",{name:"Activity",exact:true}).click();
  const calls=page.getByRole("region",{name:"Screening calls",exact:true});await calls.locator("details").last().locator("summary").click();await expect(calls).toContainText("Original salary discussion — retained");await calls.scrollIntoViewIfNeeded();await shot("salary-call-history");
- await page.goto(`/#/contacts/${contact.id}`);await page.getByRole("button",{name:"Write email",exact:true}).click();
+ await page.goto(`/#/contacts/${contact.id}`);await page.getByRole("button",{name:"Email",exact:true}).click();
  await page.getByText("Candidates and CVs (0)",{exact:true}).click();
  const editor=page.getByRole("textbox",{name:"Message",exact:true});await editor.fill("Dear Aisha, please review these candidates.");
  for(const c of [first,second]){await page.getByLabel("Add candidates",{exact:true}).fill(c.fullName);await page.getByRole("button",{name:`${c.fullName} · ${c.currentTitle}`,exact:true}).click();}

@@ -1,6 +1,6 @@
 // A dropdown of choices to tick: "Status · Any", or "Status · 2" once some
 // are chosen. Long lists get a box to narrow them.
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 export type Choice = { value: string; label: string };
 
@@ -15,7 +15,17 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const box = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [side, setSide] = useState(align);
   const id = useId();
+  // Opened on its preferred side, unless that runs off the window: then the other.
+  useLayoutEffect(() => {
+    if (!open || !menu.current) return;
+    const r = menu.current.getBoundingClientRect();
+    const width = document.documentElement.clientWidth;
+    if (align === "end" && r.left < 0) setSide("start");
+    else if (align === "start" && r.right > width) setSide("end");
+  }, [open, align]);
   // A click elsewhere closes it.
   useEffect(() => {
     if (!open) return;
@@ -31,11 +41,11 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
     <div className="multi" ref={box}>
       <span className="multi-label" id={id}>{label}</span>
       <button type="button" className={`multi-button${value.length > 0 ? " set" : ""}`} aria-haspopup="listbox" aria-expanded={open}
-        aria-labelledby={id} aria-describedby={`${id}-v`} onClick={() => { setOpen(!open); }}>
+        aria-labelledby={id} aria-describedby={`${id}-v`} onClick={() => { setSide(align); setOpen(!open); }}>
         <span id={`${id}-v`}>{summary}</span><span aria-hidden="true" className="multi-caret">▾</span>
       </button>
       {open && (
-        <div className={`multi-menu${align === "end" ? " align-end" : ""}`} role="listbox" aria-multiselectable="true" aria-label={label}>
+        <div ref={menu} className={`multi-menu${side === "end" ? " align-end" : ""}`} role="listbox" aria-multiselectable="true" aria-label={label}>
           {searchable && (
             <input className="multi-filter" placeholder="Type to narrow" aria-label={`Narrow ${label}`} value={filter} autoFocus
               onChange={(e) => { setFilter(e.target.value); }} />

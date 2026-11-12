@@ -110,15 +110,19 @@ test("industry search stays inside the viewport and shows names in applied filte
   await opens(page, "#/candidates", "Candidates");
   await page.getByRole("button", { name: /Advanced search/ }).click();
   const form = page.getByRole("form", { name: "Advanced search" });
+  // Main industries in one dropdown, their subindustries in the next.
   await form.getByRole("button", { name: "Industry", exact: true }).click();
-  const menu = form.getByRole("listbox", { name: "Industry", exact: true });
-  await menu.getByLabel("Financial Services / FSI – Banking", { exact: true }).waitFor();
+  await form.getByRole("listbox", { name: "Industry", exact: true }).getByLabel("Financial Services", { exact: true }).check();
+  await form.getByRole("button", { name: "Industry", exact: true }).click();
+  await form.getByRole("button", { name: "Subindustry", exact: true }).click();
+  const menu = form.getByRole("listbox", { name: "Subindustry", exact: true });
+  await menu.getByLabel("FSI – Banking", { exact: true }).waitFor();
   const box = await menu.boundingBox();
   expect(box).not.toBeNull();
   expect(box?.x).toBeGreaterThanOrEqual(0);
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1440);
-  await menu.getByLabel("Financial Services / FSI – Banking", { exact: true }).check();
-  await form.getByRole("button", { name: "Industry", exact: true }).click();
+  await menu.getByLabel("FSI – Banking", { exact: true }).check();
+  await form.getByRole("button", { name: "Subindustry", exact: true }).click();
   await form.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByLabel("Search filters")).toContainText("FSI – Banking");
   await expect(page.getByLabel("Search filters")).not.toContainText("industry_");
