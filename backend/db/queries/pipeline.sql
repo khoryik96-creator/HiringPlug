@@ -88,6 +88,11 @@ WHERE (sqlc.narg(candidate_id)::text IS NULL OR a.candidate_id = sqlc.narg(candi
 ORDER BY c.changed_at DESC, c.id DESC
 LIMIT @max_rows::integer;
 
--- The applications on some jobs, at any stage (a company's billing).
--- name: ApplicationIDsOnJobs :many
-SELECT id FROM application WHERE job_order_id = ANY(@job_order_ids::text[]);
+-- The applications on some jobs that are or were ever placed (a company's
+-- billing: only they can have a placement).
+-- name: PlacedApplicationIDsOnJobs :many
+SELECT a.id FROM application a
+WHERE a.job_order_id = ANY(@job_order_ids::text[])
+  AND (a.stage = 'placed' OR EXISTS (
+    SELECT 1 FROM application_stage_change c
+    WHERE c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'));

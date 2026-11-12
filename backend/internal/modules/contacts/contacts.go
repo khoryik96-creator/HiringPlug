@@ -30,6 +30,11 @@ type Companies interface {
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
 }
 
+// Roles checks a role against Settings' contact roles (settings module).
+type Roles interface {
+	HasOption(ctx context.Context, tx pgx.Tx, list, key string) (bool, error)
+}
+
 // MailServers looks up where a domain receives mail. *net.Resolver does;
 // tests pass a fake.
 type MailServers interface {
@@ -44,8 +49,8 @@ type Module struct {
 }
 
 // New wires the module. files keeps LinkedIn PDFs until they are read.
-func New(pool *pgxpool.Pool, companies Companies, mail MailServers, files *blob.Store, maxUploadBytes int64) *Module {
-	svc := &Service{pool: pool, companies: companies, mail: mail, files: files}
+func New(pool *pgxpool.Pool, companies Companies, roles Roles, mail MailServers, files *blob.Store, maxUploadBytes int64) *Module {
+	svc := &Service{pool: pool, companies: companies, roles: roles, mail: mail, files: files}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 
@@ -70,4 +75,10 @@ type Brief struct {
 // left out), for other modules (e.g. a job's hiring contact).
 func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Brief, error) {
 	return m.service.Briefs(ctx, tx, ids)
+}
+
+// CountWithRole returns how many contacts have a role (e.g. before Settings
+// removes it), in the caller's transaction.
+func (m *Module) CountWithRole(ctx context.Context, tx pgx.Tx, role string) (int, error) {
+	return m.service.CountWithRole(ctx, tx, role)
 }

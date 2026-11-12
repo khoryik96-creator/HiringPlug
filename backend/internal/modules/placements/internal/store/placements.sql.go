@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const applicationsFeeTotals = `-- name: ApplicationsFeeTotals :many
+SELECT m.fee_currency::text AS currency, p.invoice_status, sum(m.fee_amount)::text AS total
+FROM placement p JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND m.fee_amount IS NOT NULL
+  AND p.application_id = ANY($1::text[])
+  AND ($2::date IS NULL OR p.start_date >= $2)
+  AND ($3::date IS NULL OR p.start_date <= $3)
+GROUP BY m.fee_currency, p.invoice_status
+`
+
+type ApplicationsFeeTotalsParams struct {
+	ApplicationIds []string
+	StartFrom      *time.Time
+	StartTo        *time.Time
+}
+
+type ApplicationsFeeTotalsRow struct {
+	Currency      string
+	InvoiceStatus string
+	Total         string
+}
+
+// A client's billing: the fees of the placements on some applications (its
+// jobs') that stood, per currency and invoice status, from a day on (or all).
+func (q *Queries) ApplicationsFeeTotals(ctx context.Context, arg ApplicationsFeeTotalsParams) ([]ApplicationsFeeTotalsRow, error) {
+	rows, err := q.db.Query(ctx, applicationsFeeTotals, arg.ApplicationIds, arg.StartFrom, arg.StartTo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApplicationsFeeTotalsRow
+	for rows.Next() {
+		var i ApplicationsFeeTotalsRow
+		if err := rows.Scan(&i.Currency, &i.InvoiceStatus, &i.Total); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearInvoiceSchedule = `-- name: ClearInvoiceSchedule :exec
 UPDATE placement_invoice SET scheduled_for = NULL WHERE placement_id = $1
 `
@@ -278,18 +322,16 @@ WHERE ($1::text IS NULL OR application_id = $1)
   AND ($3::text IS NULL OR invoice_status = $3)
   AND ($4::date IS NULL OR start_date >= $4)
   AND ($5::date IS NULL OR start_date <= $5)
-  AND ($6::text[] IS NULL OR application_id = ANY($6::text[]))
 ORDER BY start_date DESC, id DESC
 LIMIT 500
 `
 
 type ListPlacementsParams struct {
-	ApplicationID  *string
-	Status         *string
-	InvoiceStatus  *string
-	StartFrom      *time.Time
-	StartTo        *time.Time
-	ApplicationIds []string
+	ApplicationID *string
+	Status        *string
+	InvoiceStatus *string
+	StartFrom     *time.Time
+	StartTo       *time.Time
 }
 
 func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) ([]Placement, error) {
@@ -299,7 +341,6 @@ func (q *Queries) ListPlacements(ctx context.Context, arg ListPlacementsParams) 
 		arg.InvoiceStatus,
 		arg.StartFrom,
 		arg.StartTo,
-		arg.ApplicationIds,
 	)
 	if err != nil {
 		return nil, err
@@ -453,6 +494,61 @@ func (q *Queries) PlacementFacts(ctx context.Context, arg PlacementFactsParams) 
 			&i.FeeAmount,
 			&i.FeeCurrency,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const placementFeeTotals = `-- name: PlacementFeeTotals :many
+SELECT m.fee_currency::text AS currency, p.invoice_status, sum(m.fee_amount)::text AS total
+FROM placement p JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND m.fee_amount IS NOT NULL
+  AND ($1::text IS NULL OR p.application_id = $1)
+  AND ($2::text IS NULL OR p.invoice_status = $2)
+  AND ($3::text IS NULL OR p.status = $3)
+  AND ($4::date IS NULL OR p.start_date >= $4)
+  AND ($5::date IS NULL OR p.start_date <= $5)
+GROUP BY m.fee_currency, p.invoice_status
+`
+
+type PlacementFeeTotalsParams struct {
+	ApplicationID *string
+	InvoiceStatus *string
+	Status        *string
+	StartFrom     *time.Time
+	StartTo       *time.Time
+}
+
+type PlacementFeeTotalsRow struct {
+	Currency      string
+	InvoiceStatus string
+	Total         string
+}
+
+// The fees of every placement the list's filters match (not only the 500
+// listed) that stood, per currency and invoice status. Visible only with
+// placements.fees:read (row-level security on placement_money).
+func (q *Queries) PlacementFeeTotals(ctx context.Context, arg PlacementFeeTotalsParams) ([]PlacementFeeTotalsRow, error) {
+	rows, err := q.db.Query(ctx, placementFeeTotals,
+		arg.ApplicationID,
+		arg.InvoiceStatus,
+		arg.Status,
+		arg.StartFrom,
+		arg.StartTo,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlacementFeeTotalsRow
+	for rows.Next() {
+		var i PlacementFeeTotalsRow
+		if err := rows.Scan(&i.Currency, &i.InvoiceStatus, &i.Total); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

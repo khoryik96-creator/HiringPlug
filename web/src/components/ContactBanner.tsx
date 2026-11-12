@@ -8,15 +8,14 @@ import { ApiError, api, type Contact, type Schemas, unwrap } from "../api/client
 import { contactKey, contactsKey } from "../api/keys";
 import { CONTACT_STATUS, keysOf } from "../labels";
 import { tint } from "./companyCategory";
+import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { ErrorMessage } from "./ErrorMessage";
 import { useFieldSettings } from "./useFieldSettings";
 
-/** The grey of a contact whose role is not set. */
-export const NO_ROLE_COLOR = "#6b7280";
-
 type Change = { role?: string | null; status?: Schemas["ContactStatus"] };
 
+/** canEdit: the role and status can be changed here (not while the contact's edit form is open: it would then save a stale version). */
 export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEdit: boolean }) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
@@ -32,8 +31,7 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
     },
   });
 
-  const color = c.role ? fs.color("contact_role", c.role) : NO_ROLE_COLOR;
-  const roleLabel = c.role ? fs.label("contact_role", c.role) : "Role not set";
+  const color = roleColor(fs, c.role);
   const left = c.status === "left";
 
   return (
@@ -85,7 +83,7 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
         </div>
       </div>
       <div className="banner-column" style={{ background: color }}>
-        <span><span className="visually-hidden">Role: </span>{roleLabel}</span>
+        <span><span className="visually-hidden">Role: </span>{roleLabel(fs, c.role, "Role not set")}</span>
       </div>
     </section>
   );

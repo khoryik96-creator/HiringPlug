@@ -49,6 +49,13 @@ func (m *Module) Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool,
 	return m.service.Exists(ctx, tx, companyID)
 }
 
+// CountInCategory returns how many companies are in a category (e.g. before
+// Settings removes it), in the caller's transaction.
+func (m *Module) CountInCategory(ctx context.Context, tx pgx.Tx, category string) (int, error) {
+	n, err := store.New(tx).CountCompaniesInCategory(ctx, &category)
+	return int(n), err
+}
+
 // Names returns the names of the given companies (missing ones are left out),
 // for other modules that show a company next to their records.
 func (m *Module) Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error) {

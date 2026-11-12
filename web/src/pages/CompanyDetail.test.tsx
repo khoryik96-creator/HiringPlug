@@ -55,23 +55,16 @@ describe("company pages", () => {
   });
 
   it("lays its sections out as tabs, like a candidate's, and shows its billing to those who see fees", async () => {
-    const asked: Record<string, unknown>[] = [];
-    vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: Record<string, unknown> } }) => {
-      if (path !== "/v1/placements") return Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }));
-      const query = init?.params?.query ?? {};
-      asked.push(query);
-      const total = query.startFrom ? "20000.00" : "30000.00";
-      return Promise.resolve(ok({ items: [], feeTotals: [{ currency: "MYR", total, notInvoiced: total, invoiced: "0.00", paid: "0.00" }] }));
-    }) as never);
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies/{companyId}/billing"
+      ? { year: 2026, thisYear: [{ currency: "MYR", total: "20000.00", notInvoiced: "20000.00", invoiced: "0.00", paid: "0.00" }],
+        allTime: [{ currency: "MYR", total: "30000.00", notInvoiced: "30000.00", invoiced: "0.00", paid: "0.00" }] }
+      : answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("placements:read", "placements.fees:read")} />);
     await screen.findByRole("heading", { name: "Grab" });
     const card = screen.getByRole("region", { name: "Company" });
-    const year = String(new Date().getFullYear());
-    expect(within(card).getByText(`Billing ${year}`)).toBeTruthy();
     expect(await within(card).findByText("RM 20,000")).toBeTruthy();
+    expect(within(card).getByText("Billing 2026"), "the agency's year, from the server").toBeTruthy();
     expect(within(card).getByText("RM 30,000 all time")).toBeTruthy();
-    expect(asked).toContainEqual({ companyId: company.id, startFrom: `${year}-01-01`, startTo: `${year}-12-31` });
-    expect(asked).toContainEqual({ companyId: company.id });
 
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Details", "Terms & benefits", "Jobs", "Contacts", "Activity"]);
     expect(screen.queryByRole("region", { name: "Contacts" }), "a tab loads when opened").toBeNull();
@@ -79,12 +72,20 @@ describe("company pages", () => {
     expect(await screen.findByRole("region", { name: "Contacts" })).toBeTruthy();
   });
 
+  it("keeps the card read-only while the edit form is open", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
+    renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER.concat("companies:update")} />);
+    await screen.findByRole("group", { name: "Category" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit company" }));
+    expect(screen.queryByRole("group", { name: "Category" }), "a category click would make the form's save stale").toBeNull();
+  });
+
   it("leaves the billing out for those who may not see fees", async () => {
     const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER} />);
     await screen.findByRole("heading", { name: "Grab" });
     expect(screen.queryByText(/^Billing/)).toBeNull();
-    expect(get.mock.calls.some((call) => (call as unknown[])[0] === "/v1/placements")).toBe(false);
+    expect(get.mock.calls.some((call) => (call as unknown[])[0] === "/v1/companies/{companyId}/billing")).toBe(false);
   });
 
   it("gives viewers no edit or add buttons", async () => {

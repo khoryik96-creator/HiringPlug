@@ -43,3 +43,24 @@ it("shows each contact's role and whether they still work there, and filters by 
   fireEvent.change(screen.getByLabelText("Role"), { target: { value: "-" } });
   await waitFor(() => { expect(asked.at(-1)).toEqual({ limit: 100, roleNotSet: true, status: "left" }); });
 });
+
+it("pages through more than one page of contacts and says when there are more", async () => {
+  const cursors: unknown[] = [];
+  vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: Record<string, unknown> } }) => {
+    if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+    const cursor = init?.params?.query?.cursor;
+    cursors.push(cursor);
+    return Promise.resolve(ok(cursor
+      ? { nextCursor: null, items: [contact({ id: "cont_01jbz6w0m0k8q9x2r3s4t5v6w9", fullName: "Older Contact" })] }
+      : { nextCursor: "cont_01jbz6w0m0k8q9x2r3s4t5v6w7", items: [contact({})] }));
+  }) as never);
+  renderWithClient(<ContactList canCreate={false} />);
+  await screen.findByRole("link", { name: "Mei Tan" });
+  expect(screen.getByText("1+ contact, more below")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+  expect(await screen.findByRole("link", { name: "Older Contact" })).toBeTruthy();
+  expect(cursors).toEqual([undefined, "cont_01jbz6w0m0k8q9x2r3s4t5v6w7"]);
+  expect(screen.getByRole("link", { name: "Mei Tan" }), "the first page stays").toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+  expect(screen.getByText("2 contacts")).toBeTruthy();
+});

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
@@ -23,15 +23,19 @@ export function ContactList({ canCreate, canEmail = false }: { canCreate: boolea
   const [adding, setAdding] = useState(false);
   const pick = usePicked();
   const [emailing, setEmailing] = useState(false);
-  const list = useQuery({
+  const list = useInfiniteQuery({
     queryKey: [...contactsKey, q, role, status],
-    queryFn: async () => unwrap(await api.GET("/v1/contacts", { params: { query: {
+    queryFn: async ({ pageParam }) => unwrap(await api.GET("/v1/contacts", { params: { query: {
       limit: 100,
       ...(q.trim() ? { q: q.trim() } : {}),
       ...(role === NOT_SET ? { roleNotSet: true } : role ? { role } : {}),
       ...(status ? { status } : {}),
+      ...(pageParam ? { cursor: pageParam } : {}),
     } } })),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
   });
+  const contacts = list.data?.pages.flatMap((page) => page.items);
   const filtered = !!(q || role || status);
 
   return (
@@ -63,9 +67,17 @@ export function ContactList({ canCreate, canEmail = false }: { canCreate: boolea
       <ErrorMessage error={list.error} />
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
-      {list.data && (
-        <ContactTable contacts={list.data.items} showCompany empty={filtered ? "No contacts match." : "No contacts yet."}
-          picked={pick.ids} onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
+      {contacts && (
+        <>
+          <p className="muted small" role="status">
+            {contacts.length}{list.hasNextPage ? "+" : ""} contact{contacts.length === 1 ? "" : "s"}{list.hasNextPage ? ", more below" : ""}
+          </p>
+          <ContactTable contacts={contacts} showCompany empty={filtered ? "No contacts match." : "No contacts yet."}
+            picked={pick.ids} onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
+          {list.hasNextPage && (
+            <button type="button" className="doc-btn" disabled={list.isFetchingNextPage} onClick={() => { void list.fetchNextPage(); }}>Show more</button>
+          )}
+        </>
       )}
     </main>
   );

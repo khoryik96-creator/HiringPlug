@@ -15,9 +15,33 @@ WHERE (sqlc.narg(application_id)::text IS NULL OR application_id = sqlc.narg(app
   AND (sqlc.narg(invoice_status)::text IS NULL OR invoice_status = sqlc.narg(invoice_status))
   AND (sqlc.narg(start_from)::date IS NULL OR start_date >= sqlc.narg(start_from))
   AND (sqlc.narg(start_to)::date IS NULL OR start_date <= sqlc.narg(start_to))
-  AND (sqlc.narg(application_ids)::text[] IS NULL OR application_id = ANY(sqlc.narg(application_ids)::text[]))
 ORDER BY start_date DESC, id DESC
 LIMIT 500;
+
+-- The fees of every placement the list's filters match (not only the 500
+-- listed) that stood, per currency and invoice status. Visible only with
+-- placements.fees:read (row-level security on placement_money).
+-- name: PlacementFeeTotals :many
+SELECT m.fee_currency::text AS currency, p.invoice_status, sum(m.fee_amount)::text AS total
+FROM placement p JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND m.fee_amount IS NOT NULL
+  AND (sqlc.narg(application_id)::text IS NULL OR p.application_id = sqlc.narg(application_id))
+  AND (sqlc.narg(invoice_status)::text IS NULL OR p.invoice_status = sqlc.narg(invoice_status))
+  AND (sqlc.narg(status)::text IS NULL OR p.status = sqlc.narg(status))
+  AND (sqlc.narg(start_from)::date IS NULL OR p.start_date >= sqlc.narg(start_from))
+  AND (sqlc.narg(start_to)::date IS NULL OR p.start_date <= sqlc.narg(start_to))
+GROUP BY m.fee_currency, p.invoice_status;
+
+-- A client's billing: the fees of the placements on some applications (its
+-- jobs') that stood, per currency and invoice status, from a day on (or all).
+-- name: ApplicationsFeeTotals :many
+SELECT m.fee_currency::text AS currency, p.invoice_status, sum(m.fee_amount)::text AS total
+FROM placement p JOIN placement_money m ON m.tenant_id = p.tenant_id AND m.placement_id = p.id
+WHERE p.status = 'active' AND m.fee_amount IS NOT NULL
+  AND p.application_id = ANY(@application_ids::text[])
+  AND (sqlc.narg(start_from)::date IS NULL OR p.start_date >= sqlc.narg(start_from))
+  AND (sqlc.narg(start_to)::date IS NULL OR p.start_date <= sqlc.narg(start_to))
+GROUP BY m.fee_currency, p.invoice_status;
 
 -- Optimistic concurrency: no row returned = stale version (or not found).
 -- name: UpdatePlacement :one

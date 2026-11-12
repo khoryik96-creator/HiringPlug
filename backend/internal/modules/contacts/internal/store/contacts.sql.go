@@ -59,6 +59,18 @@ func (q *Queries) ContactExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const countContactsWithRole = `-- name: CountContactsWithRole :one
+SELECT count(*) FROM contact WHERE role = $1
+`
+
+// How many contacts have a role (Settings refuses to remove one in use).
+func (q *Queries) CountContactsWithRole(ctx context.Context, role *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countContactsWithRole, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const fillLinkedinURL = `-- name: FillLinkedinURL :execrows
 UPDATE contact SET linkedin_url = $1, version = version + 1, updated_at = now()
 WHERE id = $2 AND linkedin_url IS NULL
@@ -288,15 +300,16 @@ FROM contact
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR company_id = $2::text)
   AND ($3::text IS NULL OR status = $3::text)
-  AND ($4::text IS NULL OR coalesce(role, '') = $4::text)
-  AND ($5::text IS NULL
-       OR CASE WHEN $6::boolean
-            THEN app_normalize_text($5::text) <% name_text
-            ELSE search_text LIKE ALL (app_search_patterns($5::text))
-              OR phone_digits LIKE '%' || app_phone_key($5::text) || '%'
+  AND ($4::text IS NULL OR role = $4::text)
+  AND (NOT $5::boolean OR role IS NULL)
+  AND ($6::text IS NULL
+       OR CASE WHEN $7::boolean
+            THEN app_normalize_text($6::text) <% name_text
+            ELSE search_text LIKE ALL (app_search_patterns($6::text))
+              OR phone_digits LIKE '%' || app_phone_key($6::text) || '%'
           END)
-ORDER BY CASE WHEN $6::boolean THEN word_similarity(app_normalize_text(coalesce($5::text, '')), name_text) END DESC, id DESC
-LIMIT $7
+ORDER BY CASE WHEN $7::boolean THEN word_similarity(app_normalize_text(coalesce($6::text, '')), name_text) END DESC, id DESC
+LIMIT $8
 `
 
 type ListContactsParams struct {
@@ -304,6 +317,7 @@ type ListContactsParams struct {
 	CompanyID    *string
 	Status       *string
 	Role         *string
+	RoleNotSet   bool
 	Query        *string
 	SimilarNames bool
 	RowLimit     int32
@@ -326,13 +340,14 @@ type ListContactsRow struct {
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
 // With @similar, names like the query (typos) instead, the closest first.
-// A role of ” means contacts whose role is not set.
+// With @role_not_set, only contacts without a role.
 func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]ListContactsRow, error) {
 	rows, err := q.db.Query(ctx, listContacts,
 		arg.Cursor,
 		arg.CompanyID,
 		arg.Status,
 		arg.Role,
+		arg.RoleNotSet,
 		arg.Query,
 		arg.SimilarNames,
 		arg.RowLimit,

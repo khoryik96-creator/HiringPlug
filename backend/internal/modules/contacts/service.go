@@ -27,6 +27,7 @@ const (
 type Service struct {
 	pool      *pgxpool.Pool
 	companies Companies
+	roles     Roles
 	mail      MailServers
 	files     *blob.Store
 }
@@ -46,6 +47,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 			return err
 		}
 		if err := checkEmailFree(ctx, q, d.Email, ""); err != nil {
+			return err
+		}
+		if err := s.checkRole(ctx, tx, d.Role, nil); err != nil {
 			return err
 		}
 		params := store.InsertContactParams{
@@ -125,6 +129,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			}
 		}
 		if err := checkEmailFree(ctx, q, after.Email, id); err != nil {
+			return err
+		}
+		if err := s.checkRole(ctx, tx, after.Role, current.Details.Role); err != nil {
 			return err
 		}
 		result := current.EmailCheck // same email: keep its result
@@ -207,14 +214,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 	if similar {
 		cursor = nil // ordered by likeness, not by id: one page
 	}
-	role := f.Role
-	if role == nil && f.RoleNotSet {
-		none := ""
-		role = &none // the query reads '' as "no role"
-	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: role,
+			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet,
 			SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
@@ -320,6 +322,25 @@ func (s *Service) dnsWorks(ctx context.Context) bool {
 func notFound(err error) bool {
 	var dnsErr *net.DNSError
 	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
+}
+
+// checkRole refuses a role that is not in Settings' contact roles (hidden
+// ones count). A contact keeping the role they had is left alone.
+func (s *Service) checkRole(ctx context.Context, tx pgx.Tx, role, had *string) error {
+	if role == nil || sameString(role, had) {
+		return nil
+	}
+	ok, err := s.roles.HasOption(ctx, tx, "contact_role", *role)
+	if err != nil || ok {
+		return err
+	}
+	return apperr.Validation(apperr.FieldErrors{{Field: "role", Message: "is not one of the contact roles in Settings"}})
+}
+
+// CountWithRole returns how many contacts have a role.
+func (s *Service) CountWithRole(ctx context.Context, tx pgx.Tx, role string) (int, error) {
+	n, err := store.New(tx).CountContactsWithRole(ctx, &role)
+	return int(n), err
 }
 
 func (s *Service) checkCompany(ctx context.Context, tx pgx.Tx, companyID string) error {

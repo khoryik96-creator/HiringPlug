@@ -204,42 +204,75 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 type Filter struct {
 	ApplicationID, Status, InvoiceStatus *string
 	StartFrom, StartTo                   *time.Time
-	CompanyID                            *string // on this company's jobs
 }
 
-// List returns placements, newest start first, and (with placements.fees:read)
-// the fee totals of those that stand.
+// List returns placements, newest start first (at most 500), and (with
+// placements.fees:read) the fee totals of every matching one that stands.
 func (s *Service) List(ctx context.Context, p authz.Principal, f Filter) ([]View, []FeeTotal, error) {
 	var out []View
+	var totals []FeeTotal
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		var ofCompany []string // nil: any company
-		if f.CompanyID != nil {
-			ids, err := s.applications.OfCompany(ctx, tx, *f.CompanyID)
-			if err != nil {
-				return err
-			}
-			ofCompany = append([]string{}, ids...) // never nil: no jobs, no placements
-		}
-		rows, err := store.New(tx).ListPlacements(ctx, store.ListPlacementsParams{
+		q := store.New(tx)
+		rows, err := q.ListPlacements(ctx, store.ListPlacementsParams{
 			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
-			ApplicationIds: ofCompany,
 		})
 		if err != nil {
 			return err
 		}
-		out, err = s.views(ctx, tx, p, rows)
+		if out, err = s.views(ctx, tx, p, rows); err != nil || !p.Can(api.PermissionPlacementsFeesRead) {
+			return err
+		}
+		sums, err := q.PlacementFeeTotals(ctx, store.PlacementFeeTotalsParams{
+			ApplicationID: f.ApplicationID, Status: f.Status, InvoiceStatus: f.InvoiceStatus, StartFrom: f.StartFrom, StartTo: f.StartTo,
+		})
+		totals = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total })
 		return err
 	})
-	if err != nil || !p.Can(api.PermissionPlacementsFeesRead) {
-		return out, nil, err
-	}
-	var lines []FeeLine
-	for _, v := range out {
-		if v.Money != nil && v.Money.FeeAmount != nil {
-			lines = append(lines, FeeLine{Status: v.Details.Status, InvoiceStatus: v.Details.InvoiceStatus, Amount: *v.Money.FeeAmount, Currency: *v.Money.FeeCurrency})
+	return out, totals, err
+}
+
+// Billing is what a client was billed: this year (in the agency's time
+// zone) and all time, per currency.
+type Billing struct {
+	Year              int
+	ThisYear, AllTime []FeeTotal
+}
+
+// CompanyBilling adds up the fees of the placements on a company's jobs.
+func (s *Service) CompanyBilling(ctx context.Context, p authz.Principal, companyID string, now time.Time) (Billing, error) {
+	year := now.In(s.inv.TimeZone).Year()
+	out := Billing{Year: year, ThisYear: []FeeTotal{}, AllTime: []FeeTotal{}}
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		ids, err := s.applications.PlacedOfCompany(ctx, tx, companyID)
+		if err != nil || len(ids) == 0 {
+			return err
 		}
+		q := store.New(tx)
+		from, to := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+		for _, period := range []struct {
+			into     *[]FeeTotal
+			from, to *time.Time
+		}{{&out.ThisYear, &from, &to}, {&out.AllTime, nil, nil}} {
+			sums, err := q.ApplicationsFeeTotals(ctx, store.ApplicationsFeeTotalsParams{ApplicationIds: ids, StartFrom: period.from, StartTo: period.to})
+			if err != nil {
+				return err
+			}
+			*period.into = feeTotals(len(sums), func(i int) (string, string, string) { return sums[i].Currency, sums[i].InvoiceStatus, sums[i].Total })
+		}
+		return nil
+	})
+	return out, err
+}
+
+// feeTotals turns the database's sums (currency, invoice status, total) into
+// totals per currency.
+func feeTotals(n int, row func(i int) (currency, invoiceStatus, total string)) []FeeTotal {
+	lines := make([]FeeLine, n)
+	for i := range lines {
+		currency, invoiceStatus, total := row(i)
+		lines[i] = FeeLine{Status: Active, InvoiceStatus: invoiceStatus, Amount: total, Currency: currency}
 	}
-	return out, Totals(lines), nil
+	return Totals(lines)
 }
 
 func (s *Service) checkRecruiter(ctx context.Context, tx pgx.Tx, id *string) error {

@@ -125,6 +125,18 @@ func (q *Queries) CompanyWordHits(ctx context.Context, query string) ([]string, 
 	return items, nil
 }
 
+const countCompaniesInCategory = `-- name: CountCompaniesInCategory :one
+SELECT count(*) FROM company WHERE category = $1
+`
+
+// How many companies are in a category (Settings refuses to remove one in use).
+func (q *Queries) CountCompaniesInCategory(ctx context.Context, category *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countCompaniesInCategory, category)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const decideSuggestion = `-- name: DecideSuggestion :exec
 UPDATE company_suggestion SET status = $1 WHERE id = $2
 `

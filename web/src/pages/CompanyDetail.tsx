@@ -14,13 +14,13 @@ import { CompanyJobs } from "../components/CompanyJobs";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { Timeline } from "../components/Timeline";
-import { COMPANY_SIZE } from "../labels";
 
 type Tab = "details" | "terms" | "jobs" | "contacts" | "activity";
 
 /**
- * One company, laid out like a candidate: its card, a contact column and its
- * sections as tabs. Render it with key={id} so edit state never carries over.
+ * One company, laid out like a candidate: its card (where it is based, size,
+ * website, LinkedIn, fee, billing) and tabs for the rest, each fact shown once.
+ * Render it with key={id} so edit state never carries over.
  */
 export function CompanyDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
@@ -41,10 +41,9 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
         <section className="panel candidate-profile" aria-label="Company details">
           <dl>
             <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
-            <dt>Size</dt><dd>{c.size ? COMPANY_SIZE[c.size] : "—"}</dd>
-            <dt>Registration no.</dt><dd>{c.registrationNumber ?? "—"}</dd>
-            <dt>Website</dt><dd>{c.website ? <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</dd>
+            <dt>Phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
             <dt>Address</dt><dd className="pre">{c.address ?? "—"}</dd>
+            <dt>Registration no.</dt><dd>{c.registrationNumber ?? "—"}</dd>
             <dt>About</dt><dd className="pre">{c.about ?? "—"}</dd>
           </dl>
         </section>
@@ -72,19 +71,9 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       {canEdit && !editing && (
         <div className="row spread"><span /><button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit company</button></div>
       )}
-      <CompanyBanner company={c} canEdit={canEdit} permissions={permissions} />
-      <div className="candidate-workspace">
-        <aside className="candidate-contact panel" aria-label="Company contact">
-          <h3>Contact</h3>
-          <dl>
-            <dt>Phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
-            <dt>Website</dt><dd>{c.website ? <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</dd>
-            <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn page</a> : "—"}</dd>
-            <dt>Address</dt><dd className="pre">{c.address ?? "—"}</dd>
-          </dl>
-        </aside>
-        <SectionTabs name="company" label="Company sections" sections={sections} active={active} onChange={setActive} />
-      </div>
+      {/* While the edit form is open the card is read-only: a change there would make the form's save stale. */}
+      <CompanyBanner company={c} canEdit={canEdit && !editing} permissions={permissions} />
+      <SectionTabs name="company" label="Company sections" sections={sections} active={active} onChange={setActive} />
     </main>
   );
 }

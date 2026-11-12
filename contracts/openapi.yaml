@@ -4025,7 +4025,7 @@ paths:
       tags: [placements]
       summary: Placements, newest start date first, with fee totals
       description: >
-        `money` is only included with placements.fees:read, and so are the fee totals.
+        `money` is only included with placements.fees:read, and so are the fee totals. The list stops at 500 placements; the totals count every placement that matches.
 
       x-permission: placements:read
       parameters:
@@ -4034,7 +4034,6 @@ paths:
         - {name: invoiceStatus, in: query, required: false, schema: {$ref: '#/components/schemas/InvoiceStatus'}}
         - {name: startFrom, in: query, required: false, description: Started on or after this day., schema: {type: string, format: date}}
         - {name: startTo, in: query, required: false, description: Started on or before this day., schema: {type: string, format: date}}
-        - {name: companyId, in: query, required: false, description: "Only placements on this company's jobs (its billing).", schema: {$ref: '#/components/schemas/CompanyId'}}
       responses:
         '200':
           description: OK
@@ -4042,6 +4041,25 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/PlacementList'}
         '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/companies/{companyId}/billing:
+    parameters:
+      - $ref: '#/components/parameters/CompanyIdPath'
+    get:
+      operationId: getCompanyBilling
+      tags: [placements]
+      summary: What a client was billed, this year and all time
+      description: >
+        The fees of placements on any of the company's jobs that stood (not fallen through or cancelled), per currency: those starting this year (in the agency's time zone) and all of them.
+
+      x-permission: placements.fees:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CompanyBilling'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
   /v1/applications/{applicationId}/placement:
@@ -9225,10 +9243,21 @@ components:
           items: {$ref: '#/components/schemas/PlacementRestrictedField'}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
+    CompanyBilling:
+      type: object
+      required: [year, thisYear, allTime]
+      properties:
+        year: {type: integer, description: The current year in the agency's time zone.}
+        thisYear:
+          type: array
+          items: {$ref: '#/components/schemas/FeeTotal'}
+        allTime:
+          type: array
+          items: {$ref: '#/components/schemas/FeeTotal'}
     FeeTotal:
       type: object
       required: [currency, total, notInvoiced, invoiced, paid]
-      description: Fees of the listed placements that did not fall through or get cancelled, in one currency.
+      description: Fees of the matching placements that did not fall through or get cancelled, in one currency.
       properties:
         currency: {$ref: '#/components/schemas/CurrencyCode'}
         total: {$ref: '#/components/schemas/DecimalAmount'}

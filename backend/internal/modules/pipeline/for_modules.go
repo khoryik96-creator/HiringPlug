@@ -91,13 +91,13 @@ func (m *Module) CandidatesOnJob(ctx context.Context, tx pgx.Tx, jobID string) (
 	return out, err
 }
 
-// IDsOnJobs returns the applications on some jobs, at any stage, in the
-// caller's transaction (e.g. to add up what a company was billed).
-func (m *Module) IDsOnJobs(ctx context.Context, tx pgx.Tx, jobIDs []string) ([]string, error) {
+// PlacedOnJobs returns the applications on some jobs that are or were ever
+// placed, in the caller's transaction (e.g. to add up what a company was billed).
+func (m *Module) PlacedOnJobs(ctx context.Context, tx pgx.Tx, jobIDs []string) ([]string, error) {
 	if len(jobIDs) == 0 {
-		return []string{}, nil
+		return nil, nil
 	}
-	return store.New(tx).ApplicationIDsOnJobs(ctx, jobIDs)
+	return store.New(tx).PlacedApplicationIDsOnJobs(ctx, jobIDs)
 }
 
 // OnJobOf is an application of a candidate, with its job.

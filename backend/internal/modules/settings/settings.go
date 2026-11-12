@@ -20,6 +20,16 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings/internal/store"
 )
 
+// Uses counts the records that hold an option of a list (a contact's role, a
+// company's category), so one still in use is hidden rather than removed.
+type Uses interface {
+	OptionUses(ctx context.Context, tx pgx.Tx, list, key string) (int, error)
+}
+
+// CountUsesWith gives settings the modules that hold options (wired after
+// they exist).
+func (m *Module) CountUsesWith(u Uses) { m.service.uses = u }
+
 // Module is the settings module.
 type Module struct {
 	service *Service

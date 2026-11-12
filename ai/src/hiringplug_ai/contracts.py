@@ -5199,6 +5199,12 @@ class InvoiceSettings(InvoiceSettingsBase):
     fields: Annotated[list[InvoiceField], Field(description="The {{fields}} the texts may use.")]
 
 
+class CompanyBilling(BaseModel):
+    year: Annotated[int, Field(description="The current year in the agency's time zone.")]
+    thisYear: list[FeeTotal]
+    allTime: list[FeeTotal]
+
+
 class RecruiterRow(BaseModel):
     recruiterId: Annotated[UserId | None, Field(...)]
     recruiterName: Annotated[str | None, Field(description="null when no recruiter is credited.")]

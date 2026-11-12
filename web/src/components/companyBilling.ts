@@ -14,15 +14,11 @@ export function billingText(totals: Schemas["FeeTotal"][] | undefined): string |
   return parts.length ? parts.join(" + ") : null;
 }
 
-/** This year's billing and all of it, for those who may see fees. */
-export function useCompanyBilling(companyId: string, enabled: boolean, today = new Date()) {
-  const year = today.getFullYear();
-  const totals = (query: Record<string, string>) => ({
-    queryKey: [...placementsKey, "billing", companyId, query],
-    queryFn: async () => unwrap(await api.GET("/v1/placements", { params: { query: { companyId, ...query } } })).feeTotals,
+/** This year's billing (the year in the agency's time zone) and all of it, for those who may see fees. */
+export function useCompanyBilling(companyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...placementsKey, "billing", companyId],
+    queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}/billing", { params: { path: { companyId } } })),
     enabled,
   });
-  const thisYear = useQuery(totals({ startFrom: `${String(year)}-01-01`, startTo: `${String(year)}-12-31` }));
-  const allTime = useQuery(totals({}));
-  return { year, thisYear: thisYear.data, allTime: allTime.data, loading: thisYear.isPending || allTime.isPending };
 }

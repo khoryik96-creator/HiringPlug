@@ -159,3 +159,7 @@ WHERE r.id = v.id AND r.industry IS DISTINCT FROM v.industry;
 SELECT id FROM company WHERE name_key = app_normalize_text(@name::text);
 -- name: TouchCompany :one
 UPDATE company SET version = version + 1, updated_at = now() WHERE id = @id AND version = @expected_version RETURNING *;
+
+-- How many companies are in a category (Settings refuses to remove one in use).
+-- name: CountCompaniesInCategory :one
+SELECT count(*) FROM company WHERE category = @category;

@@ -2639,9 +2639,31 @@ export interface paths {
         };
         /**
          * Placements, newest start date first, with fee totals
-         * @description `money` is only included with placements.fees:read, and so are the fee totals.
+         * @description `money` is only included with placements.fees:read, and so are the fee totals. The list stops at 500 placements; the totals count every placement that matches.
          */
         get: operations["listPlacements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What a client was billed, this year and all time
+         * @description The fees of placements on any of the company's jobs that stood (not fallen through or cancelled), per currency: those starting this year (in the agency's time zone) and all of them.
+         */
+        get: operations["getCompanyBilling"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6334,7 +6356,13 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        /** @description Fees of the listed placements that did not fall through or get cancelled, in one currency. */
+        CompanyBilling: {
+            /** @description The current year in the agency's time zone. */
+            year: number;
+            thisYear: components["schemas"]["FeeTotal"][];
+            allTime: components["schemas"]["FeeTotal"][];
+        };
+        /** @description Fees of the matching placements that did not fall through or get cancelled, in one currency. */
         FeeTotal: {
             currency: components["schemas"]["CurrencyCode"];
             total: components["schemas"]["DecimalAmount"];
@@ -12150,8 +12178,6 @@ export interface operations {
                 startFrom?: string;
                 /** @description Started on or before this day. */
                 startTo?: string;
-                /** @description Only placements on this company's jobs (its billing). */
-                companyId?: components["schemas"]["CompanyId"];
             };
             header?: never;
             path?: never;
@@ -12169,6 +12195,30 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getCompanyBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyBilling"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

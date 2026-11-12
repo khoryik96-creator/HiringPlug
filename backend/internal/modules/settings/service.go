@@ -2,11 +2,14 @@ package settings
 
 import (
 	"context"
+	"fmt"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
@@ -16,6 +19,7 @@ import (
 type Service struct {
 	pool       *pgxpool.Pool
 	industries IndustryCatalogue
+	uses       Uses
 }
 
 // Settings is every dropdown and every field's mandatory choice.
@@ -87,6 +91,9 @@ func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, i
 	var out List
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
+		if err := s.checkRemovedUnused(ctx, tx, q, name, options); err != nil {
+			return err
+		}
 		if err := q.DeleteOptions(ctx, name); err != nil {
 			return err
 		}
@@ -112,6 +119,51 @@ func (s *Service) PutList(ctx context.Context, p authz.Principal, name string, i
 		return err
 	})
 	return out, err
+}
+
+// checkRemovedUnused refuses to remove an option records still hold (a
+// contact's role, a company's category): they would show a bare key. Hiding
+// it keeps it for them and out of new choices.
+func (s *Service) checkRemovedUnused(ctx context.Context, tx pgx.Tx, q *store.Queries, name string, options []Option) error {
+	if s.uses == nil {
+		return nil
+	}
+	lists, err := listsIn(ctx, q)
+	if err != nil {
+		return err
+	}
+	for _, l := range lists {
+		if l.Name != name {
+			continue
+		}
+		for _, old := range l.Options {
+			if slices.ContainsFunc(options, func(o Option) bool { return o.Key == old.Key }) {
+				continue
+			}
+			n, err := s.uses.OptionUses(ctx, tx, name, old.Key)
+			if err != nil {
+				return err
+			}
+			if n > 0 {
+				return apperr.Validation(apperr.FieldErrors{{Field: "options", Message: fmt.Sprintf("%q is still used by %d %s: hide it instead of removing it", old.Label, n, usedBy(name, n))}})
+			}
+		}
+	}
+	return nil
+}
+
+func usedBy(list string, n int) string {
+	what := map[string]string{"contact_role": "contact", "company_category": "company"}[list]
+	if what == "" {
+		what = "record"
+	}
+	if n == 1 {
+		return what
+	}
+	if what == "company" {
+		return "companies"
+	}
+	return what + "s"
 }
 
 // PutRules sets which fields are mandatory.

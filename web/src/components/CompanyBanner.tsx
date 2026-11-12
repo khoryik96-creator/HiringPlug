@@ -32,7 +32,7 @@ const range = (values: (number | null)[], words: (n: number) => string): string 
 
 export function CompanyBanner({ company: c, canEdit, permissions }: { company: Company; canEdit: boolean; permissions: Permission[] }) {
   const queryClient = useQueryClient();
-  const seesFees = permissions.includes("placements:read") && permissions.includes("placements.fees:read");
+  const seesFees = permissions.includes("placements.fees:read");
   const billing = useCompanyBilling(c.id, seesFees);
   const fs = useFieldSettings();
   const terms = useQuery({
@@ -115,9 +115,9 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
           </div>
           {seesFees && (
             <div>
-              <span className="label">Billing {billing.year}</span>
-              <span className="figure">{billing.loading ? "…" : billingText(billing.thisYear) ?? "—"}</span>
-              {!billing.loading && <span className="note">{billingText(billing.allTime) ?? "nothing yet"} all time</span>}
+              <span className="label">Billing {billing.data?.year ?? new Date().getFullYear()}</span>
+              <span className="figure">{billing.data ? billingText(billing.data.thisYear) ?? "—" : "…"}</span>
+              {billing.data && <span className="note">{billingText(billing.data.allTime) ?? "nothing yet"} all time</span>}
             </div>
           )}
         </div>

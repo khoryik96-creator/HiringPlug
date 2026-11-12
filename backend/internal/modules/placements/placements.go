@@ -95,8 +95,9 @@ type Invoicing struct {
 // Applications reads applications and moves them to placed (pipeline module).
 type Applications interface {
 	Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Application, error)
-	// OfCompany returns the applications on a company's jobs (its billing).
-	OfCompany(ctx context.Context, tx pgx.Tx, companyID string) ([]string, error)
+	// PlacedOfCompany returns the applications on a company's jobs that are
+	// or were ever placed (only they can have a placement: its billing).
+	PlacedOfCompany(ctx context.Context, tx pgx.Tx, companyID string) ([]string, error)
 	Place(ctx context.Context, tx pgx.Tx, id string) error
 }
 

@@ -216,6 +216,11 @@ func TestContactsRoleAndStatusFilters(t *testing.T) {
 
 	res = a.request(http.MethodPatch, "/v1/contacts/"+hm.Id, token, map[string]any{"version": hm.Version, "role": "Hiring Manager"})
 	assert.Equal(t, http.StatusBadRequest, res.Status, "a role is a list key")
+	res = a.request(http.MethodPatch, "/v1/contacts/"+hm.Id, token, map[string]any{"version": hm.Version, "role": "ceo"})
+	require.Equal(t, http.StatusBadRequest, res.Status, "a role not in Settings is refused")
+	assert.Contains(t, string(res.Body), "is not one of the contact roles in Settings")
+	res = a.request(http.MethodPost, "/v1/contacts", token, map[string]any{"companyId": company.Id, "firstName": "Zed", "role": "ceo"})
+	assert.Equal(t, http.StatusBadRequest, res.Status)
 }
 
 // The roles are the agency's own list in Settings, each with a colour.
@@ -246,4 +251,31 @@ func TestContactRolesAreAnAgencyList(t *testing.T) {
 	company := a.createCompany(owner, map[string]any{"name": "Petronas"})
 	c := a.createContact(owner, map[string]any{"companyId": company.Id, "firstName": "Dina", "role": "director"})
 	assert.Equal(t, "director", c.Role.MustGet())
+
+	// A role a contact still has can be hidden, not removed; then it can go.
+	res = a.request(http.MethodPut, "/v1/settings/fields/lists/contact_role", owner, map[string]any{"options": options[:2]})
+	require.Equal(t, http.StatusBadRequest, res.Status, "%s", res.Body)
+	assert.Contains(t, string(res.Body), `\"Director\" is still used by 1 contact: hide it instead of removing it`)
+	options[2]["hidden"] = true
+	res = a.request(http.MethodPut, "/v1/settings/fields/lists/contact_role", owner, map[string]any{"options": options})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPatch, "/v1/contacts/"+c.Id, owner, map[string]any{"version": c.Version, "title": "Director of People"})
+	require.Equal(t, http.StatusOK, res.Status, "a hidden role stays valid: %s", res.Body)
+	var kept api.Contact
+	res.JSON(&kept)
+	res = a.request(http.MethodPatch, "/v1/contacts/"+c.Id, owner, map[string]any{"version": kept.Version, "role": nil})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPut, "/v1/settings/fields/lists/contact_role", owner, map[string]any{"options": options[:2]})
+	assert.Equal(t, http.StatusOK, res.Status, "no contact has it now: %s", res.Body)
+
+	// The same for company categories.
+	cats := []map[string]any{
+		{"key": "signed_client", "label": "Signed client"}, {"key": "prospective_client", "label": "Prospective client"},
+		{"key": "unknown", "label": "Unknown"}, {"key": "vip_client", "label": "VIP client"}, {"key": "dormant", "label": "Dormant"},
+	}
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/settings/fields/lists/company_category", owner, map[string]any{"options": cats}).Status)
+	a.createCompany(owner, map[string]any{"name": "Sleepy Sdn Bhd", "category": "dormant"})
+	res = a.request(http.MethodPut, "/v1/settings/fields/lists/company_category", owner, map[string]any{"options": cats[:4]})
+	assert.Equal(t, http.StatusBadRequest, res.Status, "%s", res.Body)
+	assert.Contains(t, string(res.Body), `\"Dormant\" is still used by 1 company`)
 }

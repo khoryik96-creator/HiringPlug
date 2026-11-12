@@ -20,7 +20,7 @@ func (h *HTTP) ListPlacements(ctx context.Context, req api.ListPlacementsRequest
 	q := req.Params
 	views, totals, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
 		ApplicationID: q.ApplicationId, Status: c.Convert[string](q.Status), InvoiceStatus: c.Convert[string](q.InvoiceStatus),
-		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo), CompanyID: q.CompanyId,
+		StartFrom: dayPtr(q.StartFrom), StartTo: dayPtr(q.StartTo),
 	})
 	if err != nil {
 		return nil, err
@@ -30,13 +30,27 @@ func (h *HTTP) ListPlacements(ctx context.Context, req api.ListPlacementsRequest
 		out.Items[i] = toAPI(v)
 	}
 	if authz.MustFromContext(ctx).Can(api.PermissionPlacementsFeesRead) {
-		list := make([]api.FeeTotal, len(totals))
-		for i, t := range totals {
-			list[i] = api.FeeTotal{Currency: t.Currency, Total: t.Total, NotInvoiced: t.NotInvoiced, Invoiced: t.Invoiced, Paid: t.Paid}
-		}
+		list := feeTotalsToAPI(totals)
 		out.FeeTotals = &list
 	}
 	return out, nil
+}
+
+// GetCompanyBilling handles GET /v1/companies/{companyId}/billing.
+func (h *HTTP) GetCompanyBilling(ctx context.Context, req api.GetCompanyBillingRequestObject) (api.GetCompanyBillingResponseObject, error) {
+	b, err := h.svc.CompanyBilling(ctx, authz.MustFromContext(ctx), req.CompanyId, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	return api.GetCompanyBilling200JSONResponse{Year: b.Year, ThisYear: feeTotalsToAPI(b.ThisYear), AllTime: feeTotalsToAPI(b.AllTime)}, nil
+}
+
+func feeTotalsToAPI(totals []FeeTotal) []api.FeeTotal {
+	list := make([]api.FeeTotal, len(totals))
+	for i, t := range totals {
+		list[i] = api.FeeTotal{Currency: t.Currency, Total: t.Total, NotInvoiced: t.NotInvoiced, Invoiced: t.Invoiced, Paid: t.Paid}
+	}
+	return list
 }
 
 // CreatePlacement handles POST /v1/applications/{applicationId}/placement.

@@ -1,6 +1,6 @@
 import type { ContactSummary } from "../api/client";
 import { chipStyle } from "./companyCategory";
-import { NO_ROLE_COLOR } from "./ContactBanner";
+import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
@@ -43,9 +43,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
             </td>
             <td>
-              <span className="category-chip" style={chipStyle(c.role ? fs.color("contact_role", c.role) : NO_ROLE_COLOR)}>
-                {c.role ? fs.label("contact_role", c.role) : "Not set"}
-              </span>
+              <span className="category-chip" style={chipStyle(roleColor(fs, c.role))}>{roleLabel(fs, c.role)}</span>
             </td>
             <td>{c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}</td>
             <td>{c.title}</td>

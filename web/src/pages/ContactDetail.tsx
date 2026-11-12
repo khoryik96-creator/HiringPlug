@@ -10,13 +10,17 @@ import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { type Section, SectionTabs } from "../components/SectionTabs";
+import { roleLabel } from "../components/contactRole";
 import { Timeline } from "../components/Timeline";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { CONTACT_STATUS } from "../labels";
 
 type Tab = "details" | "employment" | "email" | "activity";
 
-/** One contact, laid out like a candidate: their card, a contact column and tabs. Render it with key={id}. */
+/**
+ * One contact, laid out like a candidate: their card (email and phones on it)
+ * and tabs for the rest, each fact shown once. Render it with key={id}.
+ */
 export function ContactDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
@@ -46,11 +50,11 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
         <dl>
           <dt>Job title</dt><dd>{c.title ?? "—"}</dd>
           <dt>Company</dt><dd><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></dd>
-          <dt>Role</dt><dd>{c.role ? fs.label("contact_role", c.role) : "Not set"}</dd>
+          <dt>Role</dt><dd>{roleLabel(fs, c.role)}</dd>
           <dt>Status</dt><dd>{CONTACT_STATUS[c.status]}</dd>
-          <dt>Email</dt>
+          <dt>Email check</dt>
           <dd>
-            {c.email ?? "—"} <EmailCheckBadge check={c.emailCheck} detailed />
+            {c.email ? <EmailCheckBadge check={c.emailCheck} detailed /> : "No email"}
             {c.email && canEdit && (
               <>
                 {" "}
@@ -60,15 +64,12 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
               </>
             )}
           </dd>
-          <dt>Mobile</dt><dd>{c.mobile ?? "—"}</dd>
-          <dt>Office phone</dt><dd>{c.phone ?? "—"}</dd>
-          <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
           <dt>Notes</dt><dd className="pre">{c.notes ?? "—"}</dd>
         </dl>
         <ErrorMessage error={recheck.error} />
       </section>
     ) },
-    { id: "employment", label: "Employment check", content: <EmploymentCheck contact={c} canCheck={canEdit} /> },
+    { id: "employment", label: "Employment check", content: <EmploymentCheck contact={c} canCheck={canEdit && !editing} /> },
     ...(permissions.includes("emails:read") ? [{ id: "email" as const, label: "Email", content:
       <ContactEmails contactId={c.id} email={c.email} permissions={permissions} writing={writing} onWritingChange={setWriting} /> }] : []),
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="contact" subjectId={c.id} permissions={permissions} /> },
@@ -91,19 +92,8 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
           </span>
         </div>
       )}
-      <ContactBanner contact={c} canEdit={canEdit} />
-      <div className="candidate-workspace">
-        <aside className="candidate-contact panel" aria-label="Contact summary">
-          <h3>Contact</h3>
-          <dl>
-            <dt>Email</dt><dd>{c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : "—"}</dd>
-            <dt>Mobile</dt><dd>{c.mobile ? <a href={`tel:${c.mobile}`}>{c.mobile}</a> : "—"}</dd>
-            <dt>Office phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
-            <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn profile</a> : "—"}</dd>
-          </dl>
-        </aside>
-        <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
-      </div>
+      <ContactBanner contact={c} canEdit={canEdit && !editing} />
+      <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
     </main>
   );
 }

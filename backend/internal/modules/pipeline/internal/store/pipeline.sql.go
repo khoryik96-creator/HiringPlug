@@ -62,31 +62,6 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 	return items, nil
 }
 
-const applicationIDsOnJobs = `-- name: ApplicationIDsOnJobs :many
-SELECT id FROM application WHERE job_order_id = ANY($1::text[])
-`
-
-// The applications on some jobs, at any stage (a company's billing).
-func (q *Queries) ApplicationIDsOnJobs(ctx context.Context, jobOrderIds []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, applicationIDsOnJobs, jobOrderIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const dropOverlappingApplications = `-- name: DropOverlappingApplications :execrows
 DELETE FROM application a
 WHERE a.candidate_id = $1
@@ -378,6 +353,36 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const placedApplicationIDsOnJobs = `-- name: PlacedApplicationIDsOnJobs :many
+SELECT a.id FROM application a
+WHERE a.job_order_id = ANY($1::text[])
+  AND (a.stage = 'placed' OR EXISTS (
+    SELECT 1 FROM application_stage_change c
+    WHERE c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'))
+`
+
+// The applications on some jobs that are or were ever placed (a company's
+// billing: only they can have a placement).
+func (q *Queries) PlacedApplicationIDsOnJobs(ctx context.Context, jobOrderIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, placedApplicationIDsOnJobs, jobOrderIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const recentResults = `-- name: RecentResults :one

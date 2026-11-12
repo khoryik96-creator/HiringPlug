@@ -400,9 +400,11 @@ for each of their jobs, with **Score fit** / **Score again**.
   it depends on the salary), guarantee and payment terms and open jobs, and,
   for those who may see fees, its **billing**: the fees of placements on all
   its jobs that stood (not fallen through or cancelled), this year and all
-  time (`GET /v1/placements?companyId=`). Below the card the page is laid out
-  like a candidate's: a contact column (phone, website, LinkedIn, address)
-  and tabs: Details, Terms & benefits, Jobs, Contacts, Activity.
+  time in the agency's time zone (`GET /v1/companies/{id}/billing`; only the
+  applications ever placed on its jobs are looked at). Below the card, tabs
+  as on a candidate's page: Details, Terms & benefits, Jobs, Contacts,
+  Activity; each fact is shown once. While the edit form is open the card is
+  read-only, so a click there never makes the form's save stale.
   The company list shows each one's category as a coloured chip and can be
   filtered by it.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
@@ -428,9 +430,11 @@ for each of their jobs, with **Score fit** / **Score again**.
   their role's colour (like a candidate's): name, whether they still work
   there (one click to mark them as having left), job title and company, the
   role down its right edge (one click on a role changes it), and email,
-  mobile and office phone; below it, a contact column and tabs (Details,
-  Employment check, Email, Activity). The contact list shows each one's role
-  and status as chips and filters by role (or "role not set") and status.
+  mobile and office phone; below it, tabs (Details, Employment check, Email,
+  Activity). The contact list shows each one's role and status as chips,
+  filters by role (or "role not set") and status, and pages with "Show
+  more". A role must be one of the list's (hidden ones count); a role or a
+  company category still in use can be hidden but not removed in Settings.
   The **email check** runs whenever an
   email is added or changed: the format, whether the domain receives mail (its
   MX records, looked up with a 3-second limit outside any database
@@ -775,7 +779,8 @@ is a percentage of the yearly salary (a monthly salary counts 12 times; worked
 out to the cent on the server, with a preview in the form) or a fixed amount.
 The **Placements** page lists them all, filtered by what happened or the
 invoice, with fee totals per currency (not invoiced / invoiced and unpaid /
-paid; fall-throughs and no-starts not counted) and the placements whose
+paid; fall-throughs and no-starts not counted; added up by the database over
+every matching placement, though the list stops at 500) and the placements whose
 guarantee ends within two weeks. A fall-through means the client is owed a
 **replacement**: the placement shows "Replacement owed" (listed at the top of
 the Placements page) until it is marked provided or refunded.
