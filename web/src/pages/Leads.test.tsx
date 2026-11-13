@@ -32,6 +32,14 @@ describe("leads", () => {
     expect(screen.getByText("Last check: the site answered HTTP 503")).toBeTruthy();
   });
 
+  it("never makes a link of an address that is not a web address", async () => {
+    // eslint-disable-next-line no-script-url -- what an old or hostile record may hold
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok({ items: path === "/v1/lead-sources" ? [source] : [{ ...lead, url: "javascript:alert(1)" }] }))) as never);
+    renderWithClient(<Leads permissions={[...manage]} />);
+    expect(await screen.findByText("Account Executive")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Account Executive" })).toBeNull();
+  });
+
   it("changes a lead's status", async () => {
     reads();
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...lead, status: "contacted" }));

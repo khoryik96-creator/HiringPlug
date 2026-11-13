@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -91,7 +90,8 @@ func TestMailAppsEnteredInSettings(t *testing.T) {
 	assert.Equal(t, "agency-client-id", target.Query().Get("client_id"))
 	callback := "/v1/mailbox/callback?" + url.Values{"state": {target.Query().Get("state")}, "code": {"synthetic-code"}}.Encode()
 	r = a.request(http.MethodGet, callback, "", nil)
-	assert.True(t, strings.Contains(r.Header.Get("Location"), "mailbox=connected"), "%s", r.Header.Get("Location"))
+	r = a.request(http.MethodPost, "/v1/mailbox/complete", recruiter, map[string]any{"ticket": mailboxTicket(t, r.Header.Get("Location"))})
+	require.Equal(t, http.StatusOK, r.Status, "%s", r.Body)
 	assert.EqualValues(t, 1, exchanges.Load(), "the code was exchanged with the agency's app")
 
 	// Another agency does not get this one's app.

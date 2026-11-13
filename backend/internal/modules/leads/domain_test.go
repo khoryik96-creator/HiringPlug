@@ -86,3 +86,40 @@ func TestCareersPageMarkup(t *testing.T) {
 	assert.Equal(t, "HR Executive & Admin", got[1].Title)
 	assert.Equal(t, "https://contoh.com.my/careers/hr", got[1].ExternalID)
 }
+
+// Links read from other people's pages become links people click: only web
+// addresses are kept.
+func TestWebLink(t *testing.T) {
+	s := func(v string) *string { return &v }
+	for _, tc := range []struct{ raw, base, want string }{
+		{"https://example.com/jobs/1", "", "https://example.com/jobs/1"},
+		{"http://example.com/jobs/1", "", "http://example.com/jobs/1"},
+		{"/jobs/1", "https://example.com/careers", "https://example.com/jobs/1"},
+		{"javascript:alert(document.cookie)", "https://example.com/careers", ""},
+		{"JaVaScRiPt:alert(1)", "", ""},
+		{"data:text/html,<script>alert(1)</script>", "", ""},
+		{"https://user:pw@example.com/", "", ""},
+		{"/jobs/1", "", ""},
+		{"not a link", "", ""},
+	} {
+		got := WebLink(s(tc.raw), tc.base)
+		if tc.want == "" {
+			if got != nil {
+				t.Errorf("WebLink(%q, %q) = %q, want none", tc.raw, tc.base, *got)
+			}
+			continue
+		}
+		if got == nil || *got != tc.want {
+			t.Errorf("WebLink(%q, %q) = %v, want %q", tc.raw, tc.base, got, tc.want)
+		}
+	}
+	if WebLink(nil, "https://example.com") != nil {
+		t.Error("no link stays no link")
+	}
+
+	page := `<script type="application/ld+json">{"@type":"JobPosting","title":"Analyst","url":"javascript:alert(1)","hiringOrganization":{"name":"Acme"}}</script>`
+	postings := ParseJobPostings([]byte(page), "https://acme.example/careers")
+	if len(postings) != 1 || postings[0].URL == nil || *postings[0].URL != "https://acme.example/careers" {
+		t.Errorf("an unsafe posting link falls back to the careers page: %+v", postings)
+	}
+}

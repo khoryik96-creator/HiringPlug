@@ -7,11 +7,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// WebLink is a link read from someone else's page or job board as it may be
+// stored and shown: an http(s) address (one relative to base is completed),
+// or nil. Anything else (javascript:, data:, a bare word) is dropped: these
+// become links people click.
+func WebLink(raw *string, base string) *string {
+	if raw == nil {
+		return nil
+	}
+	u, err := url.Parse(strings.TrimSpace(*raw))
+	if err != nil {
+		return nil
+	}
+	if b, err := url.Parse(base); err == nil && base != "" {
+		u = b.ResolveReference(u)
+	}
+	if (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
+		return nil
+	}
+	out := u.String()
+	return &out
+}
 
 func str(s string) *string {
 	s = strings.TrimSpace(s)
@@ -210,7 +233,7 @@ func jobPosting(o map[string]any, pageURL string) (Posting, bool) {
 	if p.Title == "" {
 		return p, false
 	}
-	p.URL = str(text(o["url"]))
+	p.URL = WebLink(str(text(o["url"])), pageURL)
 	if p.URL == nil {
 		p.URL = str(pageURL)
 	}

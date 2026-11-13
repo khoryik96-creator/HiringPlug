@@ -121,9 +121,16 @@ DELETE FROM email_mailbox WHERE user_id=app_current_user();
 UPDATE email_mailbox SET sealed_secret = @sealed_secret,updated_at=now() WHERE id = @id;
 -- name: SaveMailboxState :exec
 INSERT INTO email_mailbox_state(state_hash,provider,sealed_verifier,expires_at) VALUES (@state_hash,@provider,@sealed_verifier,@expires_at)
-ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false;
--- name: ConsumeMailboxState :one
-UPDATE email_mailbox_state SET consumed=true WHERE state_hash = @state_hash AND expires_at>now() AND NOT consumed RETURNING *;
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false,sealed_code=NULL,ticket_hash=NULL;
+-- The provider's redirect: the sign-in code is parked (sealed) on the state,
+-- once, with the hash of the ticket handed to that browser.
+-- name: ParkMailboxCode :execrows
+UPDATE email_mailbox_state SET consumed=true,sealed_code=sqlc.narg(sealed_code),ticket_hash=sqlc.narg(ticket_hash)
+WHERE state_hash = @state_hash AND expires_at>now() AND NOT consumed;
+-- The signed-in person's own parked sign-in for a ticket (row-level security
+-- shows only their own: someone else's ticket finds nothing).
+-- name: ParkedMailbox :one
+SELECT * FROM email_mailbox_state WHERE ticket_hash = @ticket_hash AND consumed AND sealed_code IS NOT NULL AND expires_at>now();
 -- name: ClearMailboxStates :exec
 DELETE FROM email_mailbox_state WHERE user_id=app_current_user();
 -- name: BindEmailDelivery :exec

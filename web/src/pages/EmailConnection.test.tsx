@@ -32,3 +32,22 @@ it("warns in the composer when mail is captured locally",async()=>{
  vi.spyOn(api,"GET").mockResolvedValue(ok(initial));renderWithClient(<MailDeliveryNotice/>);
  expect(await screen.findByText(/These emails will not reach real mailboxes/)).toBeTruthy();
 });
+it("back from the provider, finishes the connection with the ticket and takes it out of the address",async()=>{
+ window.location.hash="#/email-connection?mailbox=confirm&ticket=one-time-ticket-0123456789";
+ const connected:Schemas["MailboxStatus"]={...initial,connected:true,provider:"microsoft",address:"me@agency.test",version:1,deliveryMode:"live"};
+ vi.spyOn(api,"GET").mockResolvedValue(ok(initial));
+ const post=vi.spyOn(api,"POST").mockResolvedValue(ok(connected));
+ renderWithClient(<EmailConnection/>);
+ expect(await screen.findByText("Mailbox connected.")).toBeTruthy();
+ expect(post.mock.calls[0]?.[0]).toBe("/v1/mailbox/complete");
+ expect(sentBody(post)).toEqual({ticket:"one-time-ticket-0123456789"});
+ expect(window.location.hash).toBe("#/email-connection");
+ expect(await screen.findByText("me@agency.test")).toBeTruthy();
+});
+it("says so when the connection cannot be finished (someone else's sign-in, or expired)",async()=>{
+ window.location.hash="#/email-connection?mailbox=confirm&ticket=not-mine-0123456789-0123456789";
+ vi.spyOn(api,"GET").mockResolvedValue(ok(initial));
+ vi.spyOn(api,"POST").mockRejectedValue(new Error("not completed"));
+ renderWithClient(<EmailConnection/>);
+ expect(await screen.findByText(/Sign-in could not be completed/)).toBeTruthy();
+});

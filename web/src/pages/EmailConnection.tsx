@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { mailboxKey, useMailbox } from "../components/MailDeliveryNotice";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -14,8 +14,26 @@ export function EmailConnection({ canManageApps = false }: { canManageApps?: boo
  const disconnect=useMutation({mutationFn:async()=>{const result=await api.DELETE("/v1/mailbox");if(!result.response.ok)unwrap(result);},onSuccess:async()=>{setSmtp(false);setOutcome(null);await client.invalidateQueries({queryKey:mailboxKey});}});
  const status=query.data;
  const [outcome,setOutcome]=useState(()=>new URLSearchParams(window.location.hash.split("?")[1]).get("mailbox"));
+ // Back from Microsoft or Google: the sign-in is only parked. This person,
+ // signed in here, finishes it with the one-time ticket in the address (so a
+ // sign-in link passed to someone else connects nothing to this account).
+ const finish=useMutation({
+  mutationFn:async(ticket:string)=>unwrap(await api.POST("/v1/mailbox/complete",{body:{ticket}})),
+  onSuccess:(result)=>{client.setQueryData(mailboxKey,result);setOutcome("connected");},
+  onError:()=>{setOutcome("failed");},
+ });
+ const started=useRef(false);
+ useEffect(()=>{
+  const ticket=new URLSearchParams(window.location.hash.split("?")[1]).get("ticket");
+  if(started.current||outcome!=="confirm"||!ticket)return;
+  started.current=true;
+  window.history.replaceState(null,"","#/email-connection"); // the ticket does not stay in the address or the history
+  finish.mutate(ticket);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
  return <main><h2>Email connection</h2>
   <ErrorMessage error={query.error ?? connect.error ?? disconnect.error}/>
+  {outcome==="confirm" && <p role="status" className="muted">Finishing the mailbox connection…</p>}
   {outcome==="connected" && <p role="status">Mailbox connected.</p>}
   {outcome==="failed" && <p role="alert" className="error">Sign-in could not be completed. Connect again; your existing connection was kept.</p>}
   {status && <>

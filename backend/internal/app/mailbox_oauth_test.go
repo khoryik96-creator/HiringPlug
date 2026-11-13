@@ -27,8 +27,8 @@ func TestMailboxOAuthProvidersAndRefreshSurviveSendRetry(t *testing.T) {
 		t.Run(provider, func(t *testing.T) {
 			t.Parallel()
 			a := newTestApp(t)
-			tenant := testutil.Current.NewTenant(t, api.RoleOwner)
-			token := tenant.Users[api.RoleOwner].Token
+			tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+			token, colleague := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
 			var refreshes, sends atomic.Int32
 			var challenge string
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,14 +94,27 @@ func TestMailboxOAuthProvidersAndRefreshSurviveSendRetry(t *testing.T) {
 			callback := "/v1/mailbox/callback?" + url.Values{"state": {state}, "code": {"synthetic-code"}}.Encode()
 			r = a.request("GET", callback, "", nil)
 			require.Equal(t, 303, r.Status)
-			assert.Contains(t, r.Header.Get("Location"), "mailbox=connected")
 			assert.Equal(t, "no-store", r.Header.Get("Cache-Control"))
 			assert.Equal(t, "no-referrer", r.Header.Get("Referrer-Policy"))
-			// The same state cannot overwrite the connection twice, and errors are never reflected.
+			// The redirect connects nothing: it hands this browser a ticket,
+			// and the person who started it finishes, signed in.
+			ticket := mailboxTicket(t, r.Header.Get("Location"))
+			var status api.MailboxStatus
+			a.request("GET", "/v1/mailbox", token, nil).JSON(&status)
+			require.False(t, status.Connected, "not before the person who started it finishes")
+			// Someone else who ends up with the ticket (they were sent the
+			// sign-in link and signed in to their own mailbox) connects nothing.
+			assert.Equal(t, 400, a.request("POST", "/v1/mailbox/complete", colleague, map[string]any{"ticket": ticket}).Status)
+			assert.Equal(t, 401, a.request("POST", "/v1/mailbox/complete", "", map[string]any{"ticket": ticket}).Status)
+			a.request("GET", "/v1/mailbox", colleague, nil).JSON(&status)
+			require.False(t, status.Connected, "not to the colleague's account")
+			// The same state cannot be parked twice, and errors are never reflected.
 			replay := a.request("GET", callback, "", nil)
 			assert.Contains(t, replay.Header.Get("Location"), "mailbox=failed")
 			assert.NotContains(t, string(replay.Body), "synthetic")
-			var status api.MailboxStatus
+			r = a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": ticket})
+			require.Equal(t, 200, r.Status, "%s", r.Body)
+			assert.Equal(t, 400, a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": ticket}).Status, "a ticket works once")
 			r = a.request("GET", "/v1/mailbox", token, nil)
 			r.JSON(&status)
 			require.True(t, status.Connected)

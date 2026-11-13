@@ -63,7 +63,7 @@ function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
   return (
     <tr>
       <td>{l.companyId ? <a href={`#/companies/${l.companyId}`}>{l.companyName}</a> : l.companyName}</td>
-      <td>{l.url ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
+      <td>{l.url && /^https?:\/\//i.test(l.url) ? <a href={l.url} target="_blank" rel="noreferrer noopener">{l.title}</a> : l.title}{l.notes && <div className="muted">{l.notes}</div>}</td>
       <td>{l.location}</td>
       <td className="muted">{formatDay((l.postedAt ?? l.firstSeenAt).slice(0, 10))}{l.closedAt && <> · closed</>}</td>
       <td>

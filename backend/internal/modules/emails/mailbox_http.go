@@ -52,13 +52,28 @@ func (h *HTTP) AuthorizeMailbox(ctx context.Context, r api.AuthorizeMailboxReque
 }
 func (h *HTTP) CompleteMailboxAuthorization(ctx context.Context, r api.CompleteMailboxAuthorizationRequestObject) (api.CompleteMailboxAuthorizationResponseObject, error) {
 	// Never reflect provider errors, codes, state or tokens into the browser or logs.
-	outcome := "connected"
-	if h.svc.completeMailbox(ctx, deref(r.Params.State), deref(r.Params.Code), deref(r.Params.Error)) != nil {
-		outcome = "failed"
+	// Nothing is connected here: the sign-in is parked, and this browser is
+	// sent back to the app with a one-time ticket to finish it, signed in.
+	outcome := "failed"
+	if ticket, err := h.svc.parkMailbox(ctx, deref(r.Params.State), deref(r.Params.Code), deref(r.Params.Error)); err == nil {
+		outcome = "confirm&ticket=" + ticket
 	}
 	cache, policy := "no-store", "no-referrer"
 	target := h.svc.connections.PublicURL + "/#/email-connection?mailbox=" + outcome
 	return api.CompleteMailboxAuthorization303Response{Headers: api.CompleteMailboxAuthorization303ResponseHeaders{Location: &target, CacheControl: &cache, ReferrerPolicy: &policy}}, nil
+}
+
+// FinishMailboxAuthorization handles POST /v1/mailbox/complete.
+func (h *HTTP) FinishMailboxAuthorization(ctx context.Context, r api.FinishMailboxAuthorizationRequestObject) (api.FinishMailboxAuthorizationResponseObject, error) {
+	p, err := mailboxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.finishMailbox(ctx, p, r.Body.Ticket); err != nil {
+		return nil, err
+	}
+	out, err := h.svc.mailboxStatus(ctx, p)
+	return api.FinishMailboxAuthorization200JSONResponse(out), err
 }
 
 func mailboxUser(ctx context.Context) (authz.Principal, error) {

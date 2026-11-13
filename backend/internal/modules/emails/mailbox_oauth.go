@@ -142,43 +142,84 @@ func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provi
 	target.RawQuery = q.Encode()
 	return target.String(), nil
 }
-func (s *Service) completeMailbox(ctx context.Context, state, code, denied string) error {
+
+// parkMailbox handles the provider's redirect: it checks the signed state
+// and parks the sign-in code (sealed) on it, once. It returns a one-time
+// ticket for the browser that was redirected. Nothing is connected yet: the
+// person who started it finishes, signed in, with the ticket (finishMailbox),
+// so a sign-in link passed to someone else connects nothing.
+func (s *Service) parkMailbox(ctx context.Context, state, code, denied string) (string, error) {
 	claim, err := s.readMailboxState(state)
 	if err != nil {
-		return err
+		return "", err
 	}
 	p := authz.NewPrincipalWithAccess(claim.Tenant, claim.User, "", "", api.RoleSourcer, []api.Permission{api.PermissionEmailsSend}, authz.Scope{Users: []string{}})
-	var saved store.EmailMailboxState
-	// Claim once; replacement or disconnect invalidates this lease even in flight.
+	var sealedCode, ticketHash *string
+	ticket := ""
+	if denied == "" && code != "" {
+		sealed, err := s.sealMailbox(claim.Tenant, claim.User, "code:"+claim.Provider, code)
+		if err != nil {
+			return "", err
+		}
+		ticket = randomMailboxToken()
+		hash := stateHash(ticket)
+		sealedCode, ticketHash = &sealed, &hash
+	}
+	var parked int64
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		var err error
-		saved, err = store.New(tx).ConsumeMailboxState(ctx, stateHash(state))
+		parked, err = store.New(tx).ParkMailboxCode(ctx, store.ParkMailboxCodeParams{StateHash: stateHash(state), SealedCode: sealedCode, TicketHash: ticketHash})
 		return err
 	})
+	if err != nil || parked != 1 {
+		return "", errors.New("mailbox authorization expired; connect again")
+	}
+	if ticket == "" {
+		return "", errors.New("mailbox authorization was not completed")
+	}
+	return ticket, nil
+}
+
+// finishMailbox connects the mailbox whose sign-in was parked for ticket. Only
+// the person who started the connection finds it (row-level security shows
+// each person their own state), so the mailbox of whoever signed in at the
+// provider is connected to nobody else's account.
+func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket string) error {
+	notCompleted := apperr.Validation(apperr.FieldErrors{{Field: "ticket", Message: "the mailbox sign-in was not completed or has expired: connect again"}})
+	var saved store.EmailMailboxState
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		var err error
+		hash := stateHash(ticket)
+		saved, err = store.New(tx).ParkedMailbox(ctx, &hash)
+		return err
+	})
+	if database.IsNoRows(err) || (err == nil && saved.SealedCode == nil) {
+		return notCompleted
+	}
 	if err != nil {
-		return errors.New("mailbox authorization expired; connect again")
-	}
-	if denied != "" || code == "" || saved.Provider != claim.Provider {
-		return errors.New("mailbox authorization was not completed")
-	}
-	var verifier string
-	if err = s.openMailbox(claim.Tenant, claim.User, "state:"+claim.Provider, saved.SealedVerifier, &verifier); err != nil {
 		return err
 	}
-	endpoint := s.endpoint(claim.Provider)
-	app, err := s.appIn(ctx, p, claim.Provider)
+	var verifier, code string
+	if err = s.openMailbox(p.TenantID, p.UserID, "state:"+saved.Provider, saved.SealedVerifier, &verifier); err != nil {
+		return err
+	}
+	if err = s.openMailbox(p.TenantID, p.UserID, "code:"+saved.Provider, *saved.SealedCode, &code); err != nil {
+		return err
+	}
+	endpoint := s.endpoint(saved.Provider)
+	app, err := s.appIn(ctx, p, saved.Provider)
 	if err != nil {
 		return err
 	}
 	tokens, err := s.exchangeMailboxToken(ctx, endpoint, app, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {s.callbackURL()}, "code_verifier": {verifier}})
 	if err != nil {
-		return err
+		return notCompleted
 	}
-	address, err := s.mailboxProfile(ctx, claim.Provider, endpoint, tokens.AccessToken)
+	address, err := s.mailboxProfile(ctx, saved.Provider, endpoint, tokens.AccessToken)
 	if err != nil {
-		return err
+		return notCompleted
 	}
-	sealed, err := s.sealMailbox(claim.Tenant, claim.User, claim.Provider, tokens)
+	sealed, err := s.sealMailbox(p.TenantID, p.UserID, saved.Provider, tokens)
 	if err != nil {
 		return err
 	}
@@ -186,21 +227,20 @@ func (s *Service) completeMailbox(ctx context.Context, state, code, denied strin
 		if err := store.New(tx).LockMailboxUser(ctx); err != nil {
 			return err
 		}
-		claimed, err := store.New(tx).FinishMailboxState(ctx, stateHash(state))
+		claimed, err := store.New(tx).FinishMailboxState(ctx, saved.StateHash)
 		if err != nil {
 			return err
 		}
 		if claimed != 1 {
-			return errors.New("mailbox authorization was cancelled or replaced")
+			return notCompleted // cancelled or replaced meanwhile
 		}
-		// Lock before replacement, including when another connection already exists.
-		if _, err := store.New(tx).MailboxForUser(ctx, claim.User); err != nil && !database.IsNoRows(err) {
+		if _, err := store.New(tx).MailboxForUser(ctx, p.UserID); err != nil && !database.IsNoRows(err) {
 			return err
 		}
-		_, err = store.New(tx).SaveMailbox(ctx, store.SaveMailboxParams{Provider: claim.Provider, Address: address, SealedSecret: sealed})
+		_, err = store.New(tx).SaveMailbox(ctx, store.SaveMailboxParams{Provider: saved.Provider, Address: address, SealedSecret: sealed})
 		if err != nil {
 			return err
 		}
-		return audit.Record(ctx, tx, audit.Entry{Action: "mailbox.connected", EntityType: "user", EntityID: claim.User, Changes: map[string]any{"provider": claim.Provider}})
+		return audit.Record(ctx, tx, audit.Entry{Action: "mailbox.connected", EntityType: "user", EntityID: p.UserID, Changes: map[string]any{"provider": saved.Provider}})
 	})
 }

@@ -126,6 +126,35 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/MailboxAuthorizeInput'
+  /v1/mailbox/complete:
+    post:
+      operationId: finishMailboxAuthorization
+      tags: [emails]
+      summary: Finish connecting a mailbox (the person who started it, signed in, with the ticket from the redirect)
+      description: >
+        The provider's redirect only parks the sign-in and hands the browser a one-time ticket. The person who
+        started the connection finishes it here, so a sign-in link passed to someone else cannot connect their
+        mailbox to another account.
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [ticket]
+              properties:
+                ticket: { type: string, minLength: 20, maxLength: 200 }
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailboxStatus' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/mailbox/callback:
     get:
       operationId: completeMailboxAuthorization

@@ -115,13 +115,13 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, src store.LeadSou
 		externalID := p.ExternalID
 		if _, err := q.InsertLead(ctx, store.InsertLeadParams{
 			SourceID: &src.ID, SourceKind: &src.Kind, ExternalID: &externalID, CompanyName: company(p), CompanyID: src.CompanyID,
-			Title: p.Title, Location: p.Location, Url: p.URL, PostedAt: p.PostedAt,
+			Title: p.Title, Location: p.Location, Url: WebLink(p.URL, ""), PostedAt: p.PostedAt,
 		}); err != nil {
 			return Sync{}, err
 		}
 	}
 	for id, p := range sync.Seen {
-		if err := q.SeenLead(ctx, store.SeenLeadParams{ID: id, Title: p.Title, Location: p.Location, Url: p.URL, CompanyName: company(p)}); err != nil {
+		if err := q.SeenLead(ctx, store.SeenLeadParams{ID: id, Title: p.Title, Location: p.Location, Url: WebLink(p.URL, ""), CompanyName: company(p)}); err != nil {
 			return Sync{}, err
 		}
 	}

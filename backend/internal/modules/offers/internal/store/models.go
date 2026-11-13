@@ -577,6 +577,8 @@ type EmailMailboxState struct {
 	SealedVerifier string
 	Consumed       bool
 	ExpiresAt      time.Time
+	SealedCode     *string
+	TicketHash     *string
 }
 
 type EmailTemplate struct {

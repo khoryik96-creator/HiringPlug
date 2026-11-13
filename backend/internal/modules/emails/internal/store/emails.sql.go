@@ -51,25 +51,6 @@ func (q *Queries) ClearMailboxStates(ctx context.Context) error {
 	return err
 }
 
-const consumeMailboxState = `-- name: ConsumeMailboxState :one
-UPDATE email_mailbox_state SET consumed=true WHERE state_hash = $1 AND expires_at>now() AND NOT consumed RETURNING tenant_id, user_id, state_hash, provider, sealed_verifier, consumed, expires_at
-`
-
-func (q *Queries) ConsumeMailboxState(ctx context.Context, stateHash string) (EmailMailboxState, error) {
-	row := q.db.QueryRow(ctx, consumeMailboxState, stateHash)
-	var i EmailMailboxState
-	err := row.Scan(
-		&i.TenantID,
-		&i.UserID,
-		&i.StateHash,
-		&i.Provider,
-		&i.SealedVerifier,
-		&i.Consumed,
-		&i.ExpiresAt,
-	)
-	return i, err
-}
-
 const deleteBanner = `-- name: DeleteBanner :execrows
 UPDATE email_banner SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL
 `
@@ -826,6 +807,50 @@ func (q *Queries) MoveShortlistsToCandidate(ctx context.Context, arg MoveShortli
 	return err
 }
 
+const parkMailboxCode = `-- name: ParkMailboxCode :execrows
+UPDATE email_mailbox_state SET consumed=true,sealed_code=$1,ticket_hash=$2
+WHERE state_hash = $3 AND expires_at>now() AND NOT consumed
+`
+
+type ParkMailboxCodeParams struct {
+	SealedCode *string
+	TicketHash *string
+	StateHash  string
+}
+
+// The provider's redirect: the sign-in code is parked (sealed) on the state,
+// once, with the hash of the ticket handed to that browser.
+func (q *Queries) ParkMailboxCode(ctx context.Context, arg ParkMailboxCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, parkMailboxCode, arg.SealedCode, arg.TicketHash, arg.StateHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const parkedMailbox = `-- name: ParkedMailbox :one
+SELECT tenant_id, user_id, state_hash, provider, sealed_verifier, consumed, expires_at, sealed_code, ticket_hash FROM email_mailbox_state WHERE ticket_hash = $1 AND consumed AND sealed_code IS NOT NULL AND expires_at>now()
+`
+
+// The signed-in person's own parked sign-in for a ticket (row-level security
+// shows only their own: someone else's ticket finds nothing).
+func (q *Queries) ParkedMailbox(ctx context.Context, ticketHash *string) (EmailMailboxState, error) {
+	row := q.db.QueryRow(ctx, parkedMailbox, ticketHash)
+	var i EmailMailboxState
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.StateHash,
+		&i.Provider,
+		&i.SealedVerifier,
+		&i.Consumed,
+		&i.ExpiresAt,
+		&i.SealedCode,
+		&i.TicketHash,
+	)
+	return i, err
+}
+
 const refreshMailboxSecret = `-- name: RefreshMailboxSecret :exec
 UPDATE email_mailbox SET sealed_secret = $1,updated_at=now() WHERE id = $2
 `
@@ -912,7 +937,7 @@ func (q *Queries) SaveMailbox(ctx context.Context, arg SaveMailboxParams) (Email
 
 const saveMailboxState = `-- name: SaveMailboxState :exec
 INSERT INTO email_mailbox_state(state_hash,provider,sealed_verifier,expires_at) VALUES ($1,$2,$3,$4)
-ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false
+ON CONFLICT(tenant_id,user_id) DO UPDATE SET state_hash=excluded.state_hash,provider=excluded.provider,sealed_verifier=excluded.sealed_verifier,expires_at=excluded.expires_at,consumed=false,sealed_code=NULL,ticket_hash=NULL
 `
 
 type SaveMailboxStateParams struct {

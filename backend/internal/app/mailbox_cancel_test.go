@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,8 +40,17 @@ func TestMailboxDisconnectCancelsOAuthAlreadyExchangingItsCode(t *testing.T) {
 	callback := "/v1/mailbox/callback?" + url.Values{"state": {target.Query().Get("state")}, "code": {"synthetic-code"}}.Encode()
 	r = a.request("GET", callback, "", nil)
 	require.Equal(t, 303, r.Status)
-	assert.Contains(t, r.Header.Get("Location"), "mailbox=failed")
+	r = a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": mailboxTicket(t, r.Header.Get("Location"))})
+	assert.Equal(t, 400, r.Status, "disconnected while the code was being exchanged: %s", r.Body)
 	var status api.MailboxStatus
 	a.request("GET", "/v1/mailbox", token, nil).JSON(&status)
 	assert.False(t, status.Connected)
+}
+
+// mailboxTicket is the one-time ticket in the address the provider's
+// redirect sends the browser back to.
+func mailboxTicket(t *testing.T, location string) string {
+	t.Helper()
+	require.Contains(t, location, "mailbox=confirm&ticket=", "the redirect parks the sign-in and hands over a ticket")
+	return location[strings.Index(location, "ticket=")+len("ticket="):]
 }

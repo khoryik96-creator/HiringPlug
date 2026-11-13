@@ -1195,6 +1195,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/mailbox/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish connecting a mailbox (the person who started it, signed in, with the ticket from the redirect)
+         * @description The provider's redirect only parks the sign-in and hands the browser a one-time ticket. The person who started the connection finishes it here, so a sign-in link passed to someone else cannot connect their mailbox to another account.
+         */
+        post: operations["finishMailboxAuthorization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/mailbox/callback": {
         parameters: {
             query?: never;
@@ -10097,6 +10117,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailboxAuthorization"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    finishMailboxAuthorization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ticket: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxStatus"];
                 };
             };
             400: components["responses"]["ValidationFailed"];
