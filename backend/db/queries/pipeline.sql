@@ -52,12 +52,18 @@ SELECT
   count(*) FILTER (WHERE version > 1 AND stage_changed_at > now() - interval '7 days')::integer AS moved_last_7_days
 FROM application;
 
--- Merging candidates: drop the duplicate's applications to jobs the kept
--- candidate is already on, then move the rest.
--- name: DropOverlappingApplications :execrows
-DELETE FROM application a
+-- Merging candidates: the jobs both are on, with each one's application
+-- there (one of the two has to go: a candidate is on a job once).
+-- name: OverlappingApplications :many
+SELECT a.id AS from_id, k.id AS to_id, a.job_order_id, a.stage_changed_at AS from_changed_at, k.stage_changed_at AS to_changed_at
+FROM application a
+JOIN application k ON k.job_order_id = a.job_order_id AND k.candidate_id = @to_id
 WHERE a.candidate_id = @from_id
-  AND EXISTS (SELECT 1 FROM application k WHERE k.candidate_id = @to_id AND k.job_order_id = a.job_order_id);
+ORDER BY a.id;
+
+-- Merging candidates: the applications that carry nothing (see merge.go).
+-- name: DeleteApplications :execrows
+DELETE FROM application WHERE id = ANY(@ids::text[]);
 
 -- name: MoveApplicationsToCandidate :execrows
 UPDATE application SET candidate_id = @to_id, updated_at = now() WHERE candidate_id = @from_id;

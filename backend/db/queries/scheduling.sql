@@ -79,3 +79,8 @@ WHERE id = @id RETURNING *;
 -- The public page knows only the token: its company, outside any tenant scope.
 -- name: BookingTenant :one
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_booking_tenant(@token_hash::text);
+
+-- Merging candidates: the duplicate's booking links follow it, so a link
+-- already sent still works.
+-- name: MoveBookingLinks :exec
+UPDATE booking_link SET candidate_id = @to_id WHERE candidate_id = @from_id;

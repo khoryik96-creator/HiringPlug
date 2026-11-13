@@ -127,6 +127,7 @@ func NewModules(d Deps) *Modules {
 		Terms: placementTerms{m.Companies}, Contacts: placementContacts{m.Contacts}, Mailer: placementMailer{m.Emails},
 		Tenants: m.Identity, TimeZone: d.Config.TimeZone,
 	})
+	m.Pipeline.WhenUnplaced(m.Placements.BackOut) // pulled out of placed: the sheet stays, backed out
 	m.Reports = reports.New(d.Pool, reports.Deps{
 		Applications: reportApplications{m.Pipeline}, Sources: reportSources{m.Candidates}, Jobs: reportJobs{m.Jobs},
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
@@ -181,7 +182,8 @@ func NewModules(d Deps) *Modules {
 	})
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
-	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy)
+	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake)
+	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{

@@ -16,7 +16,7 @@ export function billingTimeline(p: Placement, today: string): TimelineEntry[] {
   else if (inv.sendsAt) out.push(at(localDay(inv.sendsAt), "Invoice goes out"));
   const retainer = p.money?.retainer;
   if (p.paidOn) out.push({ day: p.paidOn, label: retainer ? "Balance paid" : "Paid", state: "done" });
-  else if (p.status !== "cancelled") out.push({ day: inv.dueOn, label: retainer ? "Balance due" : "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
+  else if (p.status !== "cancelled" && p.status !== "backed_out") out.push({ day: inv.dueOn, label: retainer ? "Balance due" : "Payment due", state: inv.dueOn < today ? "overdue" : "due" });
   for (const s of retainer?.stages ?? []) {
     if (!s.dueOn) continue;
     const state = s.invoiceStatus === "paid" ? "done" : s.dueOn < today ? "overdue" : s.invoiceStatus === "invoiced" ? "due" : "later";
@@ -33,7 +33,7 @@ export type InvoiceBadge = { state: "paid" | "due" | "overdue" | "none"; label: 
 /** Where the invoice stands, as a pill and a line under it. */
 export function invoiceBadge(p: Placement, today: string): InvoiceBadge {
   const due = `due ${formatDay(p.invoicing.dueOn)}`;
-  if (p.status === "cancelled" && p.invoiceStatus === "not_invoiced") return { state: "none", label: "No invoice", note: "" };
+  if ((p.status === "cancelled" || p.status === "backed_out") && p.invoiceStatus === "not_invoiced") return { state: "none", label: "No invoice", note: "" };
   if (p.invoiceStatus === "paid") return { state: "paid", label: "Paid", note: p.paidOn ? formatDay(p.paidOn) : "" };
   if (p.invoiceStatus === "invoiced") {
     const late = p.invoicing.dueOn < today;

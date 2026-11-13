@@ -40,6 +40,11 @@ x-error-codes:
     module: aiproviders
     status: 409
     description: That provider has no API key yet; save one first.
+  APPLICATIONS_OVERLAP:
+    module: pipeline
+    status: 409
+    description: |
+      Two candidates being merged are on the same job, and both applications there carry interviews, offers or a placement: nothing is deleted. Remove one of the two applications by hand, then merge. `details.jobId` names the job.
   APPLICATION_EXISTS:
     module: pipeline
     status: 409
@@ -4292,7 +4297,7 @@ paths:
       tags: [placements]
       summary: What a client was billed, this year and all time
       description: >
-        The fees of placements on any of the company's jobs that stood (not fallen through or cancelled), per currency: those starting this year (in the agency's time zone) and all of them.
+        The fees of placements on any of the company's jobs that stood (not fallen through, cancelled or backed out), per currency: those starting this year (in the agency's time zone) and all of them.
 
       x-permission: placements.fees:read
       responses:
@@ -5319,6 +5324,7 @@ components:
       enum:
         - AI_KEYS_NOT_SET_UP
         - AI_PROVIDER_NO_KEY
+        - APPLICATIONS_OVERLAP
         - APPLICATION_EXISTS
         - ASSISTANT_LIMIT_REACHED
         - ASSISTANT_OFF
@@ -9869,8 +9875,10 @@ components:
       example: plc_01jbz6w0m0k8q9x2r3s4t5v6w7
     PlacementStatus:
       type: string
-      description: active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start.
-      enum: [active, fell_through, cancelled]
+      description: >
+        active = started (or starting); fell_through = left within the guarantee period; cancelled = did not start; backed_out = the candidate or the client pulled out after it was recorded (the sheet stays, its fee no longer counts). Moving a placed application back to offer or to withdrawn backs its placement out; recording the placement again makes it active.
+
+      enum: [active, fell_through, cancelled, backed_out]
     ReplacementStatus:
       type: string
       description: "After a fall-through: owed = the client is owed a replacement candidate (or a refund); provided; refunded. none otherwise."
@@ -9964,7 +9972,7 @@ components:
     FeeTotal:
       type: object
       required: [currency, total, notInvoiced, invoiced, paid]
-      description: Fees of the matching placements that did not fall through or get cancelled, in one currency.
+      description: Fees of the matching placements that stand (not fallen through, cancelled or backed out), in one currency.
       properties:
         currency: {$ref: '#/components/schemas/CurrencyCode'}
         total: {$ref: '#/components/schemas/DecimalAmount'}

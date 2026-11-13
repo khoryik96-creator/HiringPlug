@@ -1,5 +1,9 @@
 -- Queries owned by the offers module. Run inside a tenant-scoped transaction.
 
+-- Which of these applications have an offer (merging candidates keeps them).
+-- name: ApplicationsWithOffers :many
+SELECT DISTINCT application_id FROM offer WHERE application_id = ANY(@ids::text[]);
+
 -- name: InsertOffer :one
 INSERT INTO offer (tenant_id, application_id, start_date, expires_on, terms, created_by)
 VALUES (app_current_tenant(), sqlc.arg(application_id), sqlc.narg(start_date), sqlc.narg(expires_on), sqlc.narg(offer_terms), app_current_user())

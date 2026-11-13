@@ -43,3 +43,7 @@ INSERT INTO studio_cv_ai_use (tenant_id, studio_cv_id, tokens) VALUES (app_curre
 
 -- name: StudioCvTokensSince :one
 SELECT coalesce(sum(tokens), 0)::bigint FROM studio_cv_ai_use WHERE created_at >= @since;
+
+-- Merging candidates: the duplicate's formatting runs follow it.
+-- name: MoveStudioCvs :exec
+UPDATE studio_cv SET candidate_id = @to_id WHERE candidate_id = @from_id;

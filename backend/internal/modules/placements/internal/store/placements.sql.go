@@ -56,6 +56,70 @@ func (q *Queries) ApplicationsFeeTotals(ctx context.Context, arg ApplicationsFee
 	return items, nil
 }
 
+const applicationsWithPlacements = `-- name: ApplicationsWithPlacements :many
+SELECT application_id FROM placement WHERE application_id = ANY($1::text[])
+`
+
+// Which of these applications have a placement (merging candidates keeps them).
+func (q *Queries) ApplicationsWithPlacements(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, applicationsWithPlacements, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var application_id string
+		if err := rows.Scan(&application_id); err != nil {
+			return nil, err
+		}
+		items = append(items, application_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const backOutPlacement = `-- name: BackOutPlacement :one
+UPDATE placement SET status = 'backed_out', version = version + 1, updated_at = now()
+WHERE application_id = $1 AND status = 'active'
+RETURNING id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date
+`
+
+// The candidate was moved out of placed: an active placement is backed out
+// (its sheet stays, its fee no longer counts). No row: none stood.
+func (q *Queries) BackOutPlacement(ctx context.Context, applicationID string) (Placement, error) {
+	row := q.db.QueryRow(ctx, backOutPlacement, applicationID)
+	var i Placement
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.ApplicationID,
+		&i.RecruiterID,
+		&i.StartDate,
+		&i.GuaranteeDays,
+		&i.Status,
+		&i.LeftOn,
+		&i.StatusNote,
+		&i.InvoiceStatus,
+		&i.InvoiceNumber,
+		&i.InvoicedOn,
+		&i.PaidOn,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Replacement,
+		&i.JobTitle,
+		&i.CompanyName,
+		&i.JobType,
+		&i.PoNumber,
+		&i.EndDate,
+	)
+	return i, err
+}
+
 const clearInvoiceSchedule = `-- name: ClearInvoiceSchedule :exec
 UPDATE placement_invoice SET scheduled_for = NULL WHERE placement_id = $1
 `
@@ -134,7 +198,7 @@ func (q *Queries) DeleteRetainerStages(ctx context.Context, jobOrderID string) e
 
 const firstPlacementOf = `-- name: FirstPlacementOf :one
 SELECT id, start_date FROM placement
-WHERE application_id = ANY($1::text[]) AND status <> 'cancelled'
+WHERE application_id = ANY($1::text[]) AND status NOT IN ('cancelled', 'backed_out')
 ORDER BY id LIMIT 1
 `
 
@@ -144,7 +208,7 @@ type FirstPlacementOfRow struct {
 }
 
 // The first placement among some applications (a job's): the one a retainer
-// is taken off. A cancelled placement never started, so it does not count.
+// is taken off. One that did not start or was backed out of does not count.
 func (q *Queries) FirstPlacementOf(ctx context.Context, applicationIds []string) (FirstPlacementOfRow, error) {
 	row := q.db.QueryRow(ctx, firstPlacementOf, applicationIds)
 	var i FirstPlacementOfRow
@@ -754,6 +818,42 @@ func (q *Queries) PlacementMoney(ctx context.Context, ids []string) ([]Placement
 		return nil, err
 	}
 	return items, nil
+}
+
+const placementOfApplication = `-- name: PlacementOfApplication :one
+SELECT id, tenant_id, version, application_id, recruiter_id, start_date, guarantee_days, status, left_on, status_note, invoice_status, invoice_number, invoiced_on, paid_on, created_by, created_at, updated_at, replacement, job_title, company_name, job_type, po_number, end_date FROM placement WHERE application_id = $1
+`
+
+// An application's placement (there is at most one).
+func (q *Queries) PlacementOfApplication(ctx context.Context, applicationID string) (Placement, error) {
+	row := q.db.QueryRow(ctx, placementOfApplication, applicationID)
+	var i Placement
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.ApplicationID,
+		&i.RecruiterID,
+		&i.StartDate,
+		&i.GuaranteeDays,
+		&i.Status,
+		&i.LeftOn,
+		&i.StatusNote,
+		&i.InvoiceStatus,
+		&i.InvoiceNumber,
+		&i.InvoicedOn,
+		&i.PaidOn,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Replacement,
+		&i.JobTitle,
+		&i.CompanyName,
+		&i.JobType,
+		&i.PoNumber,
+		&i.EndDate,
+	)
+	return i, err
 }
 
 const putPlacementInvoicing = `-- name: PutPlacementInvoicing :exec

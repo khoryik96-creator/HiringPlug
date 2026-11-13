@@ -7,6 +7,7 @@ textarea { width: 100%; box-sizing: border-box; }
 .badge.queued { background: #fef3c7; }
 .badge.sent { background: #dcfce7; }
 .badge.fell_through { background: #fee2e2; }
+.badge.backed_out { background: #eceef1; }
 .email-body { white-space: pre-wrap; }
 pre.extracted { white-space: pre-wrap; background: #f1f5f9; padding: 0.75rem; max-height: 24rem; overflow: auto; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem 1rem; align-items: start; }
@@ -959,6 +960,9 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .pill.guarantee-ending_soon { background: #fdf1dc; border-color: transparent; color: #9a5b00; }
 .pill.guarantee-not_started { background: #e8f0fe; border-color: transparent; color: #1d4ed8; }
 .pill.guarantee-fell_through { background: #fde7e4; border-color: transparent; color: #b42318; }
+.pill.guarantee-backed_out, .pill.guarantee-cancelled { background: #eceef1; border-color: transparent; color: #4b5563; }
+/* A fee that no longer counts (backed out, did not start, fell through): shown, crossed out. */
+.fee-void { text-decoration: line-through; color: var(--muted, #6b7280); font-weight: 400; }
 @media (max-width: 760px) { .billing-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .billing-row > div:nth-child(3) { border-left: 0; } }
 .choice-pill { font: inherit; font-size: 0.85rem; padding: 0.3rem 0.8rem; min-height: 34px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--text); cursor: pointer; }
 .choice-pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }

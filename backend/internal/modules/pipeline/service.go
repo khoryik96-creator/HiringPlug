@@ -22,7 +22,10 @@ type Service struct {
 	jobs       Jobs
 	companies  Companies
 	whenAdded  []AddedHook
-	users      Users // names on the timeline of stage moves
+	attached   []Attached // which applications carry interviews, offers, a placement
+	// whenUnplaced runs when an application is moved out of placed.
+	whenUnplaced []UnplacedHook
+	users        Users // names on the timeline of stage moves
 }
 
 // AddedHook runs when a candidate is put on a job, in the same transaction
@@ -134,6 +137,13 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 				),
 			}); err != nil {
 				return err
+			}
+			if current.Stage == Placed && move.To != Placed { // pulled out: the placement is backed out, its sheet kept
+				for _, hook := range s.whenUnplaced {
+					if err := hook(ctx, tx, id); err != nil {
+						return err
+					}
+				}
 			}
 		}
 		views, err := s.views(ctx, tx, []store.Application{row})

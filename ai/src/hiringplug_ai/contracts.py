@@ -95,6 +95,7 @@ class Permission(StrEnum):
 class ErrorCode(StrEnum):
     AI_KEYS_NOT_SET_UP = "AI_KEYS_NOT_SET_UP"
     AI_PROVIDER_NO_KEY = "AI_PROVIDER_NO_KEY"
+    APPLICATIONS_OVERLAP = "APPLICATIONS_OVERLAP"
     APPLICATION_EXISTS = "APPLICATION_EXISTS"
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
     ASSISTANT_OFF = "ASSISTANT_OFF"
@@ -3685,6 +3686,7 @@ class PlacementStatus(StrEnum):
     active = "active"
     fell_through = "fell_through"
     cancelled = "cancelled"
+    backed_out = "backed_out"
 
 
 class ReplacementStatus(StrEnum):

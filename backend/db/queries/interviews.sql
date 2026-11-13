@@ -1,6 +1,10 @@
 -- Queries owned by the interviews module. Run inside a tenant-scoped
 -- transaction: row-level security limits every query to the current tenant.
 
+-- Which of these applications have an interview (merging candidates keeps them).
+-- name: ApplicationsWithInterviews :many
+SELECT DISTINCT application_id FROM interview WHERE application_id = ANY(@ids::text[]);
+
 -- name: InsertInterview :one
 INSERT INTO interview (tenant_id, application_id, title, starts_at, duration_minutes, ends_at, mode, location,
                        instructions, interviewer_ids, created_by)

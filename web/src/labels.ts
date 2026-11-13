@@ -222,7 +222,7 @@ export function countryName(code: string): string {
 export const EMAIL_STATUS: Record<Schemas["EmailStatus"], string> = { queued: "Sending", sent: "Sent", failed: "Not sent" };
 
 export const PLACEMENT_STATUS: Record<Schemas["PlacementStatus"], string> = {
-  active: "Placed", fell_through: "Fell through", cancelled: "Did not start",
+  active: "Placed", fell_through: "Fell through", cancelled: "Did not start", backed_out: "Backed out",
 };
 export const INVOICE_STATUS: Record<Schemas["InvoiceStatus"], string> = { not_invoiced: "Not invoiced", invoiced: "Invoiced", paid: "Paid" };
 

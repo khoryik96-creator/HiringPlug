@@ -20,16 +20,17 @@ export function addDays(day: string, n: number): string {
 /** A guarantee ending this many days from today or fewer is "ending soon". */
 export const ENDING_SOON_DAYS = 30;
 
-export type GuaranteeState = "not_started" | "in_guarantee" | "ending_soon" | "ended" | "fell_through" | "cancelled";
+export type GuaranteeState = "not_started" | "in_guarantee" | "ending_soon" | "ended" | "fell_through" | "cancelled" | "backed_out";
 export const GUARANTEE_LABEL: Record<GuaranteeState, string> = {
   not_started: "Not started", in_guarantee: "In guarantee", ending_soon: "Ending soon",
-  ended: "Guarantee over", fell_through: "Fell through", cancelled: "Did not start",
+  ended: "Guarantee over", fell_through: "Fell through", cancelled: "Did not start", backed_out: "Backed out",
 };
 
 /** Where a placement's guarantee stands today, and a short line for the table. */
 export function guarantee(p: Placement, today: string): { state: GuaranteeState; note: string } {
   if (p.status === "fell_through") return { state: "fell_through", note: p.leftOn ? `left ${formatDay(p.leftOn)}` : "" };
   if (p.status === "cancelled") return { state: "cancelled", note: "" };
+  if (p.status === "backed_out") return { state: "backed_out", note: "sheet kept, fee not counted" };
   const toStart = daysBetween(today, p.startDate);
   if (toStart > 0) return { state: "not_started", note: toStart === 1 ? "starts tomorrow" : `starts in ${String(toStart)} days` };
   const left = daysBetween(today, p.guaranteeEndsOn);
@@ -37,6 +38,9 @@ export function guarantee(p: Placement, today: string): { state: GuaranteeState;
   const note = left === 0 ? "ends today" : left === 1 ? "1 day left" : `${String(left)} days left`;
   return { state: left <= ENDING_SOON_DAYS ? "ending_soon" : "in_guarantee", note };
 }
+
+/** The placement happened (or is about to): not one that did not start or was backed out of. */
+export const stood = (p: Placement) => p.status !== "cancelled" && p.status !== "backed_out";
 
 /** The invoice was sent and its due day has passed without payment. */
 export const overdue = (p: Placement, today: string) => p.invoiceStatus === "invoiced" && p.invoicing.dueOn < today;
@@ -59,7 +63,7 @@ export function onCard(p: Placement, kpi: Kpi, today: string): boolean {
     case "starting": return guarantee(p, today).state === "not_started";
     case "in_guarantee": { const s = guarantee(p, today).state; return s === "in_guarantee" || s === "ending_soon"; }
     case "ending_soon": return guarantee(p, today).state === "ending_soon";
-    case "not_invoiced": return p.status !== "cancelled" && p.invoiceStatus === "not_invoiced";
+    case "not_invoiced": return stood(p) && p.invoiceStatus === "not_invoiced";
     case "overdue": return overdue(p, today);
     case "replacement": return p.replacement === "owed";
   }

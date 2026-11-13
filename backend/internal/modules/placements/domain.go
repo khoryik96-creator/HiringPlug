@@ -17,6 +17,9 @@ const (
 	Active      = "active"
 	FellThrough = "fell_through"
 	Cancelled   = "cancelled"
+	// BackedOut: the candidate or the client pulled out after the placement
+	// was recorded. The sheet stays; its fee no longer counts.
+	BackedOut = "backed_out"
 
 	NoReplacement   = "none"
 	ReplacementOwed = "owed"
@@ -153,6 +156,10 @@ func trimmed(s *string) *string {
 }
 
 // Salary is an agreed salary.
+// Stood reports whether a placement with this status happened (it started,
+// or is about to): not one that did not start or was backed out of.
+func Stood(status string) bool { return status != Cancelled && status != BackedOut }
+
 type Salary struct{ Amount, Currency, Period string }
 
 // Money is a placement's salary and fee. The fee is a percentage of the

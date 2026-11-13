@@ -9,6 +9,21 @@ RETURNING *;
 -- name: GetPlacement :one
 SELECT * FROM placement WHERE id = @id;
 
+-- Which of these applications have a placement (merging candidates keeps them).
+-- name: ApplicationsWithPlacements :many
+SELECT application_id FROM placement WHERE application_id = ANY(@ids::text[]);
+
+-- An application's placement (there is at most one).
+-- name: PlacementOfApplication :one
+SELECT * FROM placement WHERE application_id = @application_id;
+
+-- The candidate was moved out of placed: an active placement is backed out
+-- (its sheet stays, its fee no longer counts). No row: none stood.
+-- name: BackOutPlacement :one
+UPDATE placement SET status = 'backed_out', version = version + 1, updated_at = now()
+WHERE application_id = @application_id AND status = 'active'
+RETURNING *;
+
 -- name: ListPlacements :many
 SELECT * FROM placement
 WHERE (sqlc.narg(application_id)::text IS NULL OR application_id = sqlc.narg(application_id))
@@ -202,10 +217,10 @@ VALUES (app_current_tenant(), @job_order_id, @position, @label, sqlc.arg(amount)
         sqlc.narg(due_on), sqlc.narg(due_days), @invoice_status, sqlc.narg(invoice_number), sqlc.narg(invoiced_on), sqlc.narg(paid_on));
 
 -- The first placement among some applications (a job's): the one a retainer
--- is taken off. A cancelled placement never started, so it does not count.
+-- is taken off. One that did not start or was backed out of does not count.
 -- name: FirstPlacementOf :one
 SELECT id, start_date FROM placement
-WHERE application_id = ANY(@application_ids::text[]) AND status <> 'cancelled'
+WHERE application_id = ANY(@application_ids::text[]) AND status NOT IN ('cancelled', 'backed_out')
 ORDER BY id LIMIT 1;
 
 -- Every job with a retainer (fees only): their stages move out of the first

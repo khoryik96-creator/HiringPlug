@@ -14,6 +14,12 @@ x-module:
     APPLICATION_EXISTS:
       status: 409
       description: The candidate is already on this job. `details.existingApplicationId` points to it.
+    APPLICATIONS_OVERLAP:
+      status: 409
+      description: >
+        Two candidates being merged are on the same job, and both applications there carry interviews, offers or a
+        placement: nothing is deleted. Remove one of the two applications by hand, then merge. `details.jobId`
+        names the job.
     STAGE_MOVE_NOT_ALLOWED:
       status: 422
       description: The move breaks a pipeline rule (the message says which), e.g. rejecting without a reason.

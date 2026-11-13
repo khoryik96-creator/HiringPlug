@@ -51,7 +51,23 @@ func FillFrom(keep, dup Profile) (Profile, []string) {
 	if keep.NoticePeriod == nil && dup.NoticePeriod != nil {
 		keep.NoticePeriod, filled = dup.NoticePeriod, append(filled, "noticePeriod")
 	}
+	// Tags and skills are joined, the kept candidate's first (up to what a
+	// profile may hold): the duplicate's are not lost.
+	if joined := joinLabels(keep.Tags, dup.Tags, maxTags); len(joined) > len(CleanLabels(keep.Tags)) {
+		keep.Tags, filled = joined, append(filled, "tags")
+	}
+	if joined := joinLabels(keep.Skills, dup.Skills, maxSkills); len(joined) > len(CleanLabels(keep.Skills)) {
+		keep.Skills, filled = joined, append(filled, "skills")
+	}
 	return keep, filled
+}
+
+func joinLabels(keep, dup []string, limit int) []string {
+	out := CleanLabels(append(append([]string{}, keep...), dup...))
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }
 
 // Merge moves duplicate dupID into keepID (its CVs, jobs, notes, salary if

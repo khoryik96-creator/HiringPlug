@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Application, type Schemas, unwrap } from "../api/client";
-import { applicationsKey } from "../api/keys";
+import { applicationsKey, placementsKey } from "../api/keys";
 
 export interface MoveRequest {
   app: Application;
@@ -33,6 +33,7 @@ export function useMoveApplication() {
       queryClient.setQueriesData<{ items: Application[] }>({ queryKey: applicationsKey }, (list) =>
         list ? { items: list.items.map((a) => (a.id === moved.id ? moved : a)) } : list);
       void queryClient.invalidateQueries({ queryKey: applicationsKey });
+      void queryClient.invalidateQueries({ queryKey: placementsKey }); // out of placed: its placement is backed out
     },
   });
 }
@@ -51,6 +52,9 @@ export function useMoveApplications(onMoved: (ids: string[]) => void) {
       const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
       if (failed) throw failed.reason;
     },
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: applicationsKey }); },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: applicationsKey });
+      void queryClient.invalidateQueries({ queryKey: placementsKey });
+    },
   });
 }

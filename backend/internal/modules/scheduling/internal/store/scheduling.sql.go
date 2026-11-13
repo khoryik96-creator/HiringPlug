@@ -449,6 +449,22 @@ func (q *Queries) LockSchedule(ctx context.Context, userID string) (Schedule, er
 	return i, err
 }
 
+const moveBookingLinks = `-- name: MoveBookingLinks :exec
+UPDATE booking_link SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveBookingLinksParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging candidates: the duplicate's booking links follow it, so a link
+// already sent still works.
+func (q *Queries) MoveBookingLinks(ctx context.Context, arg MoveBookingLinksParams) error {
+	_, err := q.db.Exec(ctx, moveBookingLinks, arg.ToID, arg.FromID)
+	return err
+}
+
 const putSchedule = `-- name: PutSchedule :one
 INSERT INTO schedule (tenant_id, user_id, time_zone, hours, buffer_minutes, min_notice_hours, max_days_ahead)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6)

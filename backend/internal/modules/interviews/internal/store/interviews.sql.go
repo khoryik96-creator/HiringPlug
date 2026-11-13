@@ -10,6 +10,34 @@ import (
 	"time"
 )
 
+const applicationsWithInterviews = `-- name: ApplicationsWithInterviews :many
+
+SELECT DISTINCT application_id FROM interview WHERE application_id = ANY($1::text[])
+`
+
+// Queries owned by the interviews module. Run inside a tenant-scoped
+// transaction: row-level security limits every query to the current tenant.
+// Which of these applications have an interview (merging candidates keeps them).
+func (q *Queries) ApplicationsWithInterviews(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, applicationsWithInterviews, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var application_id string
+		if err := rows.Scan(&application_id); err != nil {
+			return nil, err
+		}
+		items = append(items, application_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const busyFor = `-- name: BusyFor :many
 SELECT starts_at, ends_at FROM interview
 WHERE status = 'scheduled' AND $1::text = ANY (interviewer_ids) AND ends_at > $2::timestamptz AND starts_at < $3::timestamptz
@@ -177,7 +205,6 @@ func (q *Queries) GetInterview(ctx context.Context, id string) (Interview, error
 }
 
 const insertInterview = `-- name: InsertInterview :one
-
 INSERT INTO interview (tenant_id, application_id, title, starts_at, duration_minutes, ends_at, mode, location,
                        instructions, interviewer_ids, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7,
@@ -197,8 +224,6 @@ type InsertInterviewParams struct {
 	InterviewerIds  []string
 }
 
-// Queries owned by the interviews module. Run inside a tenant-scoped
-// transaction: row-level security limits every query to the current tenant.
 func (q *Queries) InsertInterview(ctx context.Context, arg InsertInterviewParams) (Interview, error) {
 	row := q.db.QueryRow(ctx, insertInterview,
 		arg.ApplicationID,

@@ -62,21 +62,13 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 	return items, nil
 }
 
-const dropOverlappingApplications = `-- name: DropOverlappingApplications :execrows
-DELETE FROM application a
-WHERE a.candidate_id = $1
-  AND EXISTS (SELECT 1 FROM application k WHERE k.candidate_id = $2 AND k.job_order_id = a.job_order_id)
+const deleteApplications = `-- name: DeleteApplications :execrows
+DELETE FROM application WHERE id = ANY($1::text[])
 `
 
-type DropOverlappingApplicationsParams struct {
-	FromID string
-	ToID   string
-}
-
-// Merging candidates: drop the duplicate's applications to jobs the kept
-// candidate is already on, then move the rest.
-func (q *Queries) DropOverlappingApplications(ctx context.Context, arg DropOverlappingApplicationsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, dropOverlappingApplications, arg.FromID, arg.ToID)
+// Merging candidates: the applications that carry nothing (see merge.go).
+func (q *Queries) DeleteApplications(ctx context.Context, ids []string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteApplications, ids)
 	if err != nil {
 		return 0, err
 	}
@@ -353,6 +345,55 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const overlappingApplications = `-- name: OverlappingApplications :many
+SELECT a.id AS from_id, k.id AS to_id, a.job_order_id, a.stage_changed_at AS from_changed_at, k.stage_changed_at AS to_changed_at
+FROM application a
+JOIN application k ON k.job_order_id = a.job_order_id AND k.candidate_id = $1
+WHERE a.candidate_id = $2
+ORDER BY a.id
+`
+
+type OverlappingApplicationsParams struct {
+	ToID   string
+	FromID string
+}
+
+type OverlappingApplicationsRow struct {
+	FromID        string
+	ToID          string
+	JobOrderID    string
+	FromChangedAt time.Time
+	ToChangedAt   time.Time
+}
+
+// Merging candidates: the jobs both are on, with each one's application
+// there (one of the two has to go: a candidate is on a job once).
+func (q *Queries) OverlappingApplications(ctx context.Context, arg OverlappingApplicationsParams) ([]OverlappingApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, overlappingApplications, arg.ToID, arg.FromID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OverlappingApplicationsRow
+	for rows.Next() {
+		var i OverlappingApplicationsRow
+		if err := rows.Scan(
+			&i.FromID,
+			&i.ToID,
+			&i.JobOrderID,
+			&i.FromChangedAt,
+			&i.ToChangedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const placedApplicationIDsOnJobs = `-- name: PlacedApplicationIDsOnJobs :many

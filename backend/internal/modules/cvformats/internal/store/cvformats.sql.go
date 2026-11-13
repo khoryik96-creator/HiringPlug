@@ -269,6 +269,21 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]CvTemplate, error) {
 	return items, nil
 }
 
+const moveStudioCvs = `-- name: MoveStudioCvs :exec
+UPDATE studio_cv SET candidate_id = $1 WHERE candidate_id = $2
+`
+
+type MoveStudioCvsParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging candidates: the duplicate's formatting runs follow it.
+func (q *Queries) MoveStudioCvs(ctx context.Context, arg MoveStudioCvsParams) error {
+	_, err := q.db.Exec(ctx, moveStudioCvs, arg.ToID, arg.FromID)
+	return err
+}
+
 const newStudioCvID = `-- name: NewStudioCvID :one
 SELECT new_id('scv')::text
 `

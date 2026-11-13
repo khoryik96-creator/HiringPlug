@@ -26,3 +26,7 @@ SELECT * FROM cv_import_item WHERE document_id = @document_id AND status = 'read
 -- name: FinishItem :exec
 UPDATE cv_import_item SET status = @status, candidate_id = sqlc.narg(candidate_id), error = sqlc.narg(error), updated_at = now()
 WHERE id = @id;
+
+-- Merging candidates: import files that made the duplicate point to the one kept.
+-- name: MoveImportItems :exec
+UPDATE cv_import_item SET candidate_id = sqlc.arg(to_id)::text WHERE candidate_id = sqlc.arg(from_id)::text;

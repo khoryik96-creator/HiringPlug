@@ -253,10 +253,10 @@ func checkLengths(p Profile, errs *apperr.FieldErrors) {
 	long("currentTitle", p.CurrentTitle, 200)
 	long("currentCompany", p.CurrentCompany, 200)
 	long("location", p.Location, 200)
-	if len(p.Skills) > 100 {
+	if len(p.Skills) > maxSkills {
 		errs.Add("skills", "must be at most 100")
 	}
-	if len(p.Tags) > 50 {
+	if len(p.Tags) > maxTags {
 		errs.Add("tags", "must be at most 50")
 	}
 	for i, s := range p.Skills {
@@ -362,6 +362,12 @@ func trimmedOrNil(s *string) *string {
 	}
 	return &t
 }
+
+// How many skills and tags a profile may hold.
+const (
+	maxSkills = 100
+	maxTags   = 50
+)
 
 // CleanLabels tidies tags or skills: spaces squeezed, empty ones dropped, and
 // duplicates ignoring case removed (the first spelling is kept). Never nil.

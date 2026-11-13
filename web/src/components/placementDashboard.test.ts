@@ -22,6 +22,7 @@ it("tells where a guarantee stands, at its edges", () => {
   expect(guarantee(p({ startDate: today, guaranteeEndsOn: addDays(today, 90) }), today).state, "starting today: in guarantee").toBe("in_guarantee");
   expect(guarantee(p({ status: "fell_through", leftOn: "2026-11-02" }), today)).toEqual({ state: "fell_through", note: "left 2 Nov 2026" });
   expect(guarantee(p({ status: "cancelled" }), today).state).toBe("cancelled");
+  expect(guarantee(p({ status: "backed_out" }), today).state, "pulled out: the sheet stays, labelled").toBe("backed_out");
 });
 
 it("counts each card as its label says", () => {
@@ -29,6 +30,7 @@ it("counts each card as its label says", () => {
   expect(onCard(p({ invoiceStatus: "invoiced", invoicing: { ...p().invoicing, dueOn: today } }), "overdue", today), "due today is not overdue").toBe(false);
   expect(onCard(p({ invoiceStatus: "paid", invoicing: { ...p().invoicing, dueOn: "2026-01-01" } }), "overdue", today)).toBe(false);
   expect(onCard(p({ status: "cancelled" }), "not_invoiced", today), "a no-start owes no invoice").toBe(false);
+  expect(onCard(p({ status: "backed_out" }), "not_invoiced", today), "nor does one backed out of").toBe(false);
   expect(onCard(p(), "not_invoiced", today)).toBe(true);
   expect(onCard(p({ status: "fell_through", replacement: "owed" }), "replacement", today)).toBe(true);
   expect(onCard(p({ status: "fell_through" }), "in_guarantee", today)).toBe(false);

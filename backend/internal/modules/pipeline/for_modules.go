@@ -80,6 +80,14 @@ func (m *Module) OpenOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]OnJo
 // internal/app once every module exists).
 func (m *Module) WhenAdded(hooks ...AddedHook) { m.service.whenAdded = hooks }
 
+// UnplacedHook runs, in the move's transaction, when an application is moved
+// out of placed (back to offer, or withdrawn): the placements module backs
+// its placement out.
+type UnplacedHook func(ctx context.Context, tx pgx.Tx, applicationID string) error
+
+// WhenUnplaced registers what runs when an application leaves placed.
+func (m *Module) WhenUnplaced(hooks ...UnplacedHook) { m.service.whenUnplaced = hooks }
+
 // CandidatesOnJob returns the candidates on a job, at any stage, in the
 // caller's transaction.
 func (m *Module) CandidatesOnJob(ctx context.Context, tx pgx.Tx, jobID string) ([]string, error) {

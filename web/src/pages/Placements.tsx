@@ -199,7 +199,7 @@ function PlacementRow({ p, permissions, today, seesFees, onEdit }: {
         <span className={`pill guarantee-${g.state}`}>{p.status === "active" ? GUARANTEE_LABEL[g.state] : PLACEMENT_STATUS[p.status]}</span>
         <div className="muted small">{[g.note, p.status === "active" ? `ends ${formatDay(p.guaranteeEndsOn)}` : ""].filter(Boolean).join(" · ")}</div>
       </td>
-      {seesFees && <td className="num">{fee ? <strong>{fee}</strong> : <span className="muted">—</span>}
+      {seesFees && <td className="num">{fee ? <strong className={p.status === "active" ? undefined : "fee-void"} title={p.status === "active" ? undefined : "Not counted in the fees"}>{fee}</strong> : <span className="muted">—</span>}
         {p.money?.retainer?.balance && <div className="muted small">balance {formatMoney(p.money.retainer.balance, p.money.retainer.currency)}</div>}</td>}
       <td><span className={`pill ${badge.state}`}>{badge.label}</span>{badge.note && <div className="muted small">{badge.note}</div>}</td>
       <td className="small">{p.recruiterName ?? <span className="muted">—</span>}</td>

@@ -98,30 +98,34 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, appID string, d
 			return err
 		}
 		q := store.New(tx)
-		row, err := q.InsertPlacement(ctx, store.InsertPlacementParams{
-			ApplicationID: appID, RecruiterID: d.RecruiterID, StartDate: d.StartDate, GuaranteeDays: int32(d.GuaranteeDays), //nolint:gosec // 0..365
-			JobTitle: d.JobTitle, CompanyName: d.CompanyName, JobType: d.JobType, PoNumber: d.PONumber, EndDate: d.EndDate,
-		})
-		if database.IsUniqueViolation(err, onePerApplication) {
-			return notAllowed("This application already has a placement: change that one.")
-		}
+		row, again, err := s.insertOrRevive(ctx, q, appID, d)
 		if err != nil {
 			return err
 		}
 		if err := s.applications.Place(ctx, tx, appID); err != nil {
 			return err
 		}
-		if err := putMoney(ctx, q, row.ID, m); err != nil {
-			return err
-		}
 		var salary *Salary
 		if m != nil {
 			salary = m.Salary
 		}
-		if err := s.startInvoicing(ctx, tx, row.ID, OnSheet(app, d.Sheet), salary); err != nil {
+		if again { // recorded again after backing out: its money and invoicing stay unless given now
+			if m != nil {
+				err = putMoney(ctx, q, row.ID, m)
+			}
+			if err == nil {
+				err = s.reschedule(ctx, tx, p.TenantID, row)
+			}
+		} else if err = putMoney(ctx, q, row.ID, m); err == nil {
+			err = s.startInvoicing(ctx, tx, row.ID, OnSheet(app, d.Sheet), salary)
+		}
+		if err != nil {
 			return err
 		}
 		changes := sheetAudit(d.Sheet)
+		if again {
+			changes["again"] = true
+		}
 		changes["applicationId"], changes["startDate"], changes["guaranteeDays"], changes["recruiterId"] = appID, d.StartDate.Format(time.DateOnly), d.GuaranteeDays, d.RecruiterID
 		if m != nil {
 			changes["money"] = audit.Redacted

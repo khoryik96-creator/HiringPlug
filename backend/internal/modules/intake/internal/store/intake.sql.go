@@ -174,6 +174,21 @@ func (q *Queries) ListItems(ctx context.Context, importIds []string) ([]CvImport
 	return items, nil
 }
 
+const moveImportItems = `-- name: MoveImportItems :exec
+UPDATE cv_import_item SET candidate_id = $1::text WHERE candidate_id = $2::text
+`
+
+type MoveImportItemsParams struct {
+	ToID   string
+	FromID string
+}
+
+// Merging candidates: import files that made the duplicate point to the one kept.
+func (q *Queries) MoveImportItems(ctx context.Context, arg MoveImportItemsParams) error {
+	_, err := q.db.Exec(ctx, moveImportItems, arg.ToID, arg.FromID)
+	return err
+}
+
 const readingItemByDocument = `-- name: ReadingItemByDocument :one
 SELECT id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at FROM cv_import_item WHERE document_id = $1 AND status = 'reading'
 `

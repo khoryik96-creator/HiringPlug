@@ -48,6 +48,8 @@ func (s *Service) SendNow(ctx context.Context, p authz.Principal, id string) (Vi
 			return notAllowed("This placement is already invoiced.")
 		case row.Status == Cancelled:
 			return notAllowed("This placement was cancelled: there is nothing to invoice.")
+		case row.Status == BackedOut:
+			return notAllowed("This placement was backed out of: there is nothing to invoice.")
 		}
 		if err := s.send(ctx, tx, p.TenantID, row, inv, false); err != nil {
 			var reason *notReady

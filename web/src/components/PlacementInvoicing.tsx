@@ -125,7 +125,7 @@ export function PlacementInvoice({ p, permissions, variant = "full", extra }: {
   else if (p.invoiceStatus !== "not_invoiced") status = `Invoiced${p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}`;
   else if (inv.sendsAt) status = `Emails to ${to ?? "the client"} on ${dayOf(inv.sendsAt)}`;
   else status = to ? `To ${to} · not emailed automatically` : "No invoice recipient yet";
-  const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled";
+  const canSend = permissions.includes("placements:manage") && seeFees && p.invoiceStatus === "not_invoiced" && !inv.sentAt && p.status !== "cancelled" && p.status !== "backed_out";
   const sendNow = () => {
     if (window.confirm(`Email the invoice to ${to ?? "the client"}${inv.contactEmail ? ` (${inv.contactEmail})` : ""} now?`)) { send.mutate(); setViewing(false); }
   };

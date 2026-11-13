@@ -10,6 +10,33 @@ import (
 	"time"
 )
 
+const applicationsWithOffers = `-- name: ApplicationsWithOffers :many
+
+SELECT DISTINCT application_id FROM offer WHERE application_id = ANY($1::text[])
+`
+
+// Queries owned by the offers module. Run inside a tenant-scoped transaction.
+// Which of these applications have an offer (merging candidates keeps them).
+func (q *Queries) ApplicationsWithOffers(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, applicationsWithOffers, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var application_id string
+		if err := rows.Scan(&application_id); err != nil {
+			return nil, err
+		}
+		items = append(items, application_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteOfferSalary = `-- name: DeleteOfferSalary :exec
 DELETE FROM offer_salary WHERE offer_id = $1
 `
@@ -49,7 +76,6 @@ func (q *Queries) GetOffer(ctx context.Context, id string) (Offer, error) {
 }
 
 const insertOffer = `-- name: InsertOffer :one
-
 INSERT INTO offer (tenant_id, application_id, start_date, expires_on, terms, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
 RETURNING id, tenant_id, version, application_id, status, start_date, expires_on, terms, requested_by, decided_by, decided_at, decision_note, sent_at, answered_at, created_by, created_at, updated_at
@@ -62,7 +88,6 @@ type InsertOfferParams struct {
 	OfferTerms    *string
 }
 
-// Queries owned by the offers module. Run inside a tenant-scoped transaction.
 func (q *Queries) InsertOffer(ctx context.Context, arg InsertOfferParams) (Offer, error) {
 	row := q.db.QueryRow(ctx, insertOffer,
 		arg.ApplicationID,
