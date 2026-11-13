@@ -47,5 +47,5 @@ func (m *Module) Access(ctx context.Context, tx pgx.Tx) (access *api.AiAccess, o
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindAiproviderChecked: m.service.checked}
+	return jobqueue.Handlers{api.JobKindAiproviderChecked: m.service.checked, api.JobKindAiproviderReported: m.service.reported}
 }

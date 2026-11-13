@@ -149,6 +149,7 @@ class ErrorCode(StrEnum):
 class JobKind(StrEnum):
     aiprovider_check = "aiprovider.check"
     aiprovider_checked = "aiprovider.checked"
+    aiprovider_reported = "aiprovider.reported"
     assistant_answered = "assistant.answered"
     assistant_ask = "assistant.ask"
     automation_event = "automation.event"
@@ -305,6 +306,31 @@ class AiProviderCheckJob(BaseModel):
     )
     provider: AiProviderName
     access: AiAccess
+
+
+class AiStatus(BaseModel):
+    down: Annotated[bool, Field(description="The latest call to the provider failed, within the last hour.")]
+    provider: Annotated[
+        str | None, Field(description="Its name as shown: DeepSeek, Claude, ChatGPT, or the server's AI.")
+    ]
+    message: Annotated[str | None, Field(description="Why, in words safe to show (never a key).")]
+    since: Annotated[AwareDatetime | None, Field(description="When the failures began.")]
+    failedAt: Annotated[AwareDatetime | None, Field(description="The latest failure.")]
+
+
+class AiProviderReportedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: Annotated[
+        str,
+        Field(
+            description="deepseek, claude, openai, or server (the server's own).", max_length=40, min_length=1
+        ),
+    ]
+    ok: bool
+    error: Annotated[str | None, Field(description="Why it failed, in words safe to show.", max_length=500)]
+    at: AwareDatetime
 
 
 class AiProviderCheckedJob(BaseModel):

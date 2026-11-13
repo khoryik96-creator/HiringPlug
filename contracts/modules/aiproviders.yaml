@@ -32,6 +32,11 @@ x-module:
       payload: AiProviderCheckedJob
       priority: high
       description: Save whether the check worked (Go worker).
+    aiprovider.reported:
+      queue: core
+      payload: AiProviderReportedJob
+      priority: high
+      description: Save whether the provider answered an AI job's last call, for the notice shown when it is down (Go worker).
 
 paths:
   /v1/ai-providers:
@@ -124,6 +129,24 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/AiProviderConflict' }
 
+  /v1/ai-status:
+    get:
+      operationId: getAiStatus
+      tags: [aiproviders]
+      summary: Whether the AI the company uses is answering
+      description: >
+        For the notice shown to everyone when AI features are not working:
+        `down` is true while the provider's latest call failed (within the
+        last hour), with why and since when. No key or prompt is ever in it.
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiStatus' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
 components:
   responses:
     AiProviderConflict:
@@ -214,6 +237,24 @@ components:
       properties:
         provider: { $ref: '#/components/schemas/AiProviderName' }
         access: { $ref: '#/components/schemas/AiAccess' }
+    AiStatus:
+      type: object
+      required: [down, provider, message, since, failedAt]
+      properties:
+        down: { type: boolean, description: "The latest call to the provider failed, within the last hour." }
+        provider: { type: string, nullable: true, description: "Its name as shown: DeepSeek, Claude, ChatGPT, or the server's AI." }
+        message: { type: string, nullable: true, description: "Why, in words safe to show (never a key)." }
+        since: { type: string, format: date-time, nullable: true, description: When the failures began. }
+        failedAt: { type: string, format: date-time, nullable: true, description: The latest failure. }
+    AiProviderReportedJob:
+      type: object
+      additionalProperties: false
+      required: [provider, ok, error, at]
+      properties:
+        provider: { type: string, minLength: 1, maxLength: 40, description: "deepseek, claude, openai, or server (the server's own)." }
+        ok: { type: boolean }
+        error: { type: string, nullable: true, maxLength: 500, description: "Why it failed, in words safe to show." }
+        at: { type: string, format: date-time }
     AiProviderCheckedJob:
       type: object
       additionalProperties: false

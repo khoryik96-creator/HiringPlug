@@ -30,6 +30,15 @@ type AiProviderChoice struct {
 	UpdatedAt time.Time
 }
 
+type AiProviderStatus struct {
+	TenantID     string
+	Provider     string
+	LastOkAt     *time.Time
+	FailedAt     *time.Time
+	FailingSince *time.Time
+	Error        *string
+}
+
 type ApiKey struct {
 	ID         string
 	TenantID   string

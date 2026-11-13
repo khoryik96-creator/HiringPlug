@@ -25,7 +25,7 @@ from .config import Config, ConfigError, load_config
 from .contracts import JobKind
 from .download import download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
-from .jobs import HANDLERS, Deps
+from .jobs import HANDLERS, Deps, ProviderLog
 from .providers import OpenAICompatible, connect
 from .queue import ClaimedJob, LeaseLostError, Queue
 
@@ -41,18 +41,29 @@ def process(queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None
         attempt=job.attempts,
     ):
         started = time.monotonic()
+        calls = ProviderLog()  # what the AI provider did, told to the app with the result
         try:
             handler = HANDLERS[JobKind(job.kind)]
             payload = handler.payload_model.model_validate(job.payload)
+            deps = dataclasses.replace(deps, log=calls)
             if lease_seconds:
                 deps = dataclasses.replace(deps, keep_alive=lambda: queue.extend(job, lease_seconds))
-            queue.complete(job, handler.run(payload, deps))
+            follow_ups = handler.run(payload, deps)
+            report = calls.report()
+            queue.complete(job, [*follow_ups, report] if report else follow_ups)
             log.info("job done", extra={"duration_ms": int((time.monotonic() - started) * 1000)})
         except LeaseLostError:
             log.warning("job outlived its lease; its results were discarded and another worker owns it")
         except Exception as exc:  # every failure must be recorded on the job
             status = queue.fail(job, f"{type(exc).__name__}: {exc}")
             log.exception("job failed", extra={"new_status": status, "max_attempts": job.max_attempts})
+            report = calls.report()
+            # The provider is why: say so now, not after the retries.
+            if report is not None and calls.ok is False:
+                try:
+                    queue.enqueue(job, report)
+                except psycopg.Error:  # telling is best effort; the failure itself is recorded
+                    log.warning("could not report the AI provider's failure")
 
 
 def main() -> None:

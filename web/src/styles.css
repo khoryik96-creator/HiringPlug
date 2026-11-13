@@ -54,6 +54,11 @@ tr.total td { font-weight: 600; }
 .timeline li.note { border-left-color: var(--accent); }
 .timeline li p { margin: 0.25rem 0; }
 .warning-panel { background: #fffbeb; border-color: #fcd34d; }
+/* The AI the company uses is not answering: a line across the app, under the top bar. */
+.ai-notice { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; padding: 0.55rem 1.25rem;
+  background: #fffbeb; border-bottom: 1px solid #fcd34d; color: #78350f; font-size: 0.9rem; }
+.ai-notice a { color: inherit; text-decoration: underline; }
+.ai-notice button { flex: none; color: inherit; }
 .warning-panel ul { margin: 0.25rem 0 0; }
 .chips { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.25rem; }
 .chip { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--accent-soft); color: #1e3a8a; border-radius: 999px; padding: 0.15rem 0.65rem; font-size: 0.82rem; font-weight: 550; }

@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 
 import { api, ApiError, unwrap } from "./api/client";
 import { authLinkRoute, clearToken, getToken } from "./auth";
+import { AiNotice } from "./components/AiNotice";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
@@ -74,6 +75,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           </button>
         </div>
       </header>
+      <AiNotice permissions={permissions} />
       {/* key: a new location starts with a fresh boundary */}
       <PageErrorBoundary key={hash}>
         <Suspense fallback={<p className="muted page-loading">Loading…</p>}>

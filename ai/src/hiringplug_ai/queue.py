@@ -45,6 +45,20 @@ class LeaseLostError(RuntimeError):
     """Another worker took this job after our lease expired; our results were discarded."""
 
 
+_ENQUEUE = "SELECT job_enqueue(%s, %s, %s, %s::jsonb, %s, p_priority => %s::smallint)"
+
+
+def _enqueue_args(job: ClaimedJob, f: FollowUp) -> tuple[Any, ...]:
+    return (
+        job.tenant_id,
+        f.queue,
+        f.kind.value,
+        json.dumps(f.payload.model_dump(mode="json")),
+        job.request_id,
+        job.priority,  # a result is as urgent as the job that made it
+    )
+
+
 class Queue:
     def __init__(self, conninfo: str, worker_id: str) -> None:
         self._conninfo = conninfo
@@ -76,22 +90,17 @@ class Queue:
             return None
         return ClaimedJob(*row)
 
+    def enqueue(self, job: ClaimedJob, f: FollowUp) -> None:
+        """Queue one job for the same company as `job`, on its own (not tied to
+        the job completing): a word to the app that must not wait for retries."""
+        self._connection().execute(_ENQUEUE, _enqueue_args(job, f))
+
     def complete(self, job: ClaimedJob, follow_ups: list[FollowUp]) -> None:
         """Queue the follow-up jobs and mark this job done, atomically."""
         conn = self._connection()
         with conn.transaction():
             for f in follow_ups:
-                conn.execute(
-                    "SELECT job_enqueue(%s, %s, %s, %s::jsonb, %s, p_priority => %s::smallint)",
-                    (
-                        job.tenant_id,
-                        f.queue,
-                        f.kind.value,
-                        json.dumps(f.payload.model_dump(mode="json")),
-                        job.request_id,
-                        job.priority,  # a result is as urgent as the job that made it
-                    ),
-                )
+                conn.execute(_ENQUEUE, _enqueue_args(job, f))
             row = conn.execute("SELECT job_complete(%s, %s)", (job.id, self.worker_id)).fetchone()
             if row is None or not row[0]:
                 raise LeaseLostError(job.id)  # rolls back the follow-ups

@@ -122,6 +122,65 @@ func (q *Queries) MarkChecking(ctx context.Context, provider string) error {
 	return err
 }
 
+const providerStatus = `-- name: ProviderStatus :one
+SELECT provider, last_ok_at, failed_at, failing_since, error FROM ai_provider_status
+`
+
+type ProviderStatusRow struct {
+	Provider     string
+	LastOkAt     *time.Time
+	FailedAt     *time.Time
+	FailingSince *time.Time
+	Error        *string
+}
+
+func (q *Queries) ProviderStatus(ctx context.Context) (ProviderStatusRow, error) {
+	row := q.db.QueryRow(ctx, providerStatus)
+	var i ProviderStatusRow
+	err := row.Scan(
+		&i.Provider,
+		&i.LastOkAt,
+		&i.FailedAt,
+		&i.FailingSince,
+		&i.Error,
+	)
+	return i, err
+}
+
+const reportProvider = `-- name: ReportProvider :exec
+INSERT INTO ai_provider_status (tenant_id, provider, last_ok_at, failed_at, failing_since, error)
+VALUES (app_current_tenant(), $1,
+        CASE WHEN $2::boolean THEN $3::timestamptz END,
+        CASE WHEN NOT $2::boolean THEN $3::timestamptz END,
+        CASE WHEN NOT $2::boolean THEN $3::timestamptz END, $4)
+ON CONFLICT (tenant_id) DO UPDATE SET
+  provider = excluded.provider,
+  last_ok_at = coalesce(excluded.last_ok_at, ai_provider_status.last_ok_at),
+  failed_at = coalesce(excluded.failed_at, ai_provider_status.failed_at),
+  failing_since = CASE WHEN $2::boolean THEN NULL ELSE coalesce(ai_provider_status.failing_since, excluded.failing_since) END,
+  error = CASE WHEN $2::boolean THEN NULL ELSE excluded.error END
+WHERE $3::timestamptz >= greatest(coalesce(ai_provider_status.last_ok_at, '-infinity'), coalesce(ai_provider_status.failed_at, '-infinity'))
+`
+
+type ReportProviderParams struct {
+	Provider string
+	Ok       bool
+	At       time.Time
+	Error    *string
+}
+
+// The AI worker's word on the provider: it answered, or why it did not.
+// failing_since is when the failures began (cleared by an answer).
+func (q *Queries) ReportProvider(ctx context.Context, arg ReportProviderParams) error {
+	_, err := q.db.Exec(ctx, reportProvider,
+		arg.Provider,
+		arg.Ok,
+		arg.At,
+		arg.Error,
+	)
+	return err
+}
+
 const saveCheck = `-- name: SaveCheck :execrows
 UPDATE ai_provider SET check_status = $1, check_message = $2, checked_at = now()
 WHERE provider = $3 AND sealed_key = $4

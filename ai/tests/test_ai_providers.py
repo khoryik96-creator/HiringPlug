@@ -15,15 +15,19 @@ from hiringplug_ai.contracts import (
     AiAccess,
     AiProviderCheckedJob,
     AiProviderCheckJob,
+    AiProviderReportedJob,
     AssistantAskJob,
     JobKind,
 )
 from hiringplug_ai.extraction import DEFAULT_LIMITS
-from hiringplug_ai.jobs import Deps, ai_check, assistant_ask
+from hiringplug_ai.jobs import HANDLERS, Deps, ProviderLog, ai_check, assistant_ask
+from hiringplug_ai.jobs import Handler as JobHandler
 from hiringplug_ai.keys import SealedKeyError, open_key
 from hiringplug_ai.providers import Completion, ProviderError, connect
 from hiringplug_ai.providers.messages import Messages
 from hiringplug_ai.providers.responses import Responses
+from hiringplug_ai.queue import ClaimedJob, FollowUp
+from hiringplug_ai.worker import process
 
 # The same vector as the Go side's TestSealMatchesTheWorkersVector: Go seals,
 # this worker opens, and neither can drift.
@@ -339,3 +343,92 @@ def test_each_request_closes_its_connections() -> None:
     _, client = recording([message("fine")])
     Messages("claude", KEY, "claude-opus-5-5", http_client=client).complete("s", "u", max_tokens=10)
     assert client.is_closed, "a worker must not keep a connection pool open per call"
+
+
+# The worker tells the app whether the provider answered each job's last
+# call, so people see a notice when the AI is down.
+
+
+class RecordingQueue:
+    def __init__(self) -> None:
+        self.completed: list[list[FollowUp]] = []
+        self.failed: list[str] = []
+        self.enqueued: list[FollowUp] = []
+
+    def complete(self, job: ClaimedJob, follow_ups: list[FollowUp]) -> None:
+        self.completed.append(follow_ups)
+
+    def fail(self, job: ClaimedJob, error: str) -> str:
+        self.failed.append(error)
+        return "pending"
+
+    def enqueue(self, job: ClaimedJob, follow_up: FollowUp) -> None:
+        self.enqueued.append(follow_up)
+
+
+def check_job() -> ClaimedJob:
+    access = {"provider": "deepseek", "model": "deepseek-chat", "sealedKey": "v1.sealed"}
+    return ClaimedJob(
+        id="job_01jbz6w0m0k8q9x2r3s4t5v6w7",
+        tenant_id="tnt_01jbz6w0m0k8q9x2r3s4t5v6w7",
+        kind="aiprovider.check",
+        payload={"provider": "deepseek", "access": access},
+        attempts=1,
+        max_attempts=5,
+        request_id="req_test",
+    )
+
+
+def reported(f: FollowUp) -> AiProviderReportedJob:
+    assert (f.queue, f.kind) == ("core", JobKind.aiprovider_reported)
+    return AiProviderReportedJob.model_validate(f.payload.model_dump(mode="json"))
+
+
+def test_a_job_whose_provider_fails_tells_the_app_why() -> None:
+    queue = RecordingQueue()
+    down = ProviderError("the AI provider could not be reached")
+    process(queue, check_job(), deps(company=Fake(down)))  # type: ignore[arg-type]
+    assert queue.failed == []
+    [_result, report] = queue.completed[0]
+    r = reported(report)
+    assert (r.provider, r.ok, r.error) == ("deepseek", False, "the AI provider could not be reached")
+
+
+def test_a_job_whose_provider_answers_says_so_and_clears_the_notice() -> None:
+    queue = RecordingQueue()
+    process(queue, check_job(), deps(company=Fake(OK)))  # type: ignore[arg-type]
+    r = reported(queue.completed[0][-1])
+    assert (r.provider, r.ok, r.error) == ("deepseek", True, None)
+
+
+def test_a_job_that_calls_no_provider_reports_nothing() -> None:
+    log = ProviderLog()
+    assert log.report() is None
+
+
+def test_a_key_that_cannot_be_opened_is_reported_too() -> None:
+    queue = RecordingQueue()
+    process(queue, check_job(), deps())  # type: ignore[arg-type]  # no HP_AI_KEYS_SECRET: connect is None
+    r = reported(queue.completed[0][-1])
+    assert r.ok is False
+    assert "HP_AI_KEYS_SECRET" in (r.error or "")
+
+
+def test_a_job_that_dies_on_the_provider_still_tells_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A handler that lets the provider's error out fails the job (it is
+    retried); the app is told at once, not after the last retry."""
+
+    def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
+        ai = deps.provider(payload.access)
+        assert ai is not None
+        ai.complete("s", "u", max_tokens=1)
+        return []
+
+    monkeypatch.setitem(HANDLERS, JobKind.aiprovider_check, JobHandler(AiProviderCheckJob, run))
+    queue = RecordingQueue()
+    down = ProviderError("the AI provider did not answer in time")
+    process(queue, check_job(), deps(company=Fake(down)))  # type: ignore[arg-type]
+    assert queue.completed == []
+    assert len(queue.failed) == 1
+    [report] = queue.enqueued
+    assert reported(report).error == "the AI provider did not answer in time"

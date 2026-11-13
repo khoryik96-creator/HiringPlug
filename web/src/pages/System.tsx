@@ -13,6 +13,7 @@ const systemKey = ["settings", "system"] as const;
 export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "aiprovider.check": "Checking an AI key",
   "aiprovider.checked": "Saving an AI key check",
+  "aiprovider.reported": "Noting whether the AI answered",
   "assistant.ask": "AI assistant questions",
   "assistant.answered": "Saving AI assistant answers",
   "automation.event": "Starting automations",

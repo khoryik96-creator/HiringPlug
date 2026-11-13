@@ -35,3 +35,22 @@ SELECT provider FROM ai_provider_choice;
 INSERT INTO ai_provider_choice (tenant_id, provider, updated_by)
 VALUES (app_current_tenant(), @provider, app_current_user())
 ON CONFLICT (tenant_id) DO UPDATE SET provider = excluded.provider, updated_by = excluded.updated_by, updated_at = now();
+
+-- The AI worker's word on the provider: it answered, or why it did not.
+-- failing_since is when the failures began (cleared by an answer).
+-- name: ReportProvider :exec
+INSERT INTO ai_provider_status (tenant_id, provider, last_ok_at, failed_at, failing_since, error)
+VALUES (app_current_tenant(), @provider,
+        CASE WHEN @ok::boolean THEN @at::timestamptz END,
+        CASE WHEN NOT @ok::boolean THEN @at::timestamptz END,
+        CASE WHEN NOT @ok::boolean THEN @at::timestamptz END, sqlc.narg(error))
+ON CONFLICT (tenant_id) DO UPDATE SET
+  provider = excluded.provider,
+  last_ok_at = coalesce(excluded.last_ok_at, ai_provider_status.last_ok_at),
+  failed_at = coalesce(excluded.failed_at, ai_provider_status.failed_at),
+  failing_since = CASE WHEN @ok::boolean THEN NULL ELSE coalesce(ai_provider_status.failing_since, excluded.failing_since) END,
+  error = CASE WHEN @ok::boolean THEN NULL ELSE excluded.error END
+WHERE @at::timestamptz >= greatest(coalesce(ai_provider_status.last_ok_at, '-infinity'), coalesce(ai_provider_status.failed_at, '-infinity'));
+
+-- name: ProviderStatus :one
+SELECT provider, last_ok_at, failed_at, failing_since, error FROM ai_provider_status;
