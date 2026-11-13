@@ -72,8 +72,13 @@ func summaryOptions(o StudioOptions) (StudioOptions, error) {
 	return o, nil
 }
 
-// payWords spots a direction about the candidate's pay or naming an amount of money.
-var payWords = regexp.MustCompile(`(?i)\b(salary|salaries|remuneration|compensation|pay|paid|package|ctc|epf|kwsp|ringgit)\b|\b(rm|myr|sgd|usd|idr|php|thb|aud|eur|gbp)\s?\d|[$€£]\s?\d|\b\d+(\.\d+)?\s?k\b`)
+// payWords spots a direction about the candidate's own pay. Words that are
+// also ordinary work ("compensation and benefits", "SAP package", "paid
+// media") and amounts on their own ("RM 2 million savings", "50k users") are
+// left alone: they describe the work, not the pay.
+var payWords = regexp.MustCompile(`(?i)\b(salary|salaries|remuneration|ctc|last[- ]drawn|take[- ]home pay|` +
+	`(current|expected|asking|basic|monthly|annual|his|her|their) (pay|package|compensation)|` +
+	`(pay|compensation|remuneration) package|pay (rise|cut|expectations?))\b`)
 
 // StudioCV is a formatting run and, once done, its result.
 type StudioCV = store.StudioCv

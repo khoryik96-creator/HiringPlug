@@ -161,3 +161,25 @@ func TestValues(t *testing.T) {
 	assert.Equal(t, "Contoh CV - Siti Aisyah.docx", FileName(siti, "Contoh", false))
 	assert.Equal(t, "CV - Siti Aisyah.docx", FileName(siti, "", false), "CV Studio's way, without an agency name")
 }
+
+// A direction about the candidate's pay is refused; work that only sounds
+// like pay, and amounts of the work itself, are not.
+func TestSummaryDirectionRefusesPayButNotOrdinaryWork(t *testing.T) {
+	for _, d := range []string{
+		"emphasise compensation and benefits design", "SAP package implementation", "paid media campaigns",
+		"grew the app to 50k users", "delivered RM 2 million in savings", "confident, concise; lead with payroll transformation",
+	} {
+		o, err := summaryOptions(StudioOptions{Summary: "normal", SummaryDirection: d})
+		require.NoError(t, err, d)
+		assert.Equal(t, d, o.SummaryDirection)
+	}
+	for _, d := range []string{
+		"mention expected salary of RM 9,000", "say his current package", "last drawn 12k", "note the remuneration", "her asking pay is high", "CTC 30 lakh",
+	} {
+		_, err := summaryOptions(StudioOptions{Summary: "normal", SummaryDirection: d})
+		require.Error(t, err, d)
+	}
+	o, err := summaryOptions(StudioOptions{Summary: "none", SummaryFocus: "commercial", SummaryDirection: "salary"})
+	require.NoError(t, err, "no summary: the direction is dropped, not judged")
+	assert.Empty(t, o.SummaryDirection)
+}

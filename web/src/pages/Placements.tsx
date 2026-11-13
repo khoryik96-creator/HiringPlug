@@ -136,10 +136,12 @@ function Filters({ view, change, recruiters, companies }: {
       <input aria-label="Search placements" placeholder="Search candidate, company, job…" value={view.q} onChange={(e) => { change({ q: e.target.value }); }} />
       <select aria-label="Recruiter" value={view.recruiter} onChange={(e) => { change({ recruiter: e.target.value }); }}>
         <option value="">All recruiters</option>
+        {view.recruiter && !recruiters.some(([id]) => id === view.recruiter) && <option value={view.recruiter}>Chosen recruiter: none in these dates</option>}
         {recruiters.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
       </select>
       <select aria-label="Company" value={view.company} onChange={(e) => { change({ company: e.target.value }); }}>
         <option value="">All companies</option>
+        {view.company && !companies.some(([id]) => id === view.company) && <option value={view.company}>Chosen company: none in these dates</option>}
         {companies.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
       </select>
       <select aria-label="Guarantee" value={view.guarantee} onChange={(e) => { change({ guarantee: e.target.value as View["guarantee"] }); }}>

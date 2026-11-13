@@ -159,7 +159,7 @@ func TestACVIsFormattedCVStudiosWayAndSaved(t *testing.T) {
 		assert.Equal(t, api.StudioCvSummaryNone, none.Summary, "no summary: nothing written")
 		assert.False(t, none.SummaryDirection.IsSpecified() && !none.SummaryDirection.IsNull(), "and no direction sent")
 
-		for _, pay := range []string{"mention expected salary of RM 9,000", "highlight the package", "asking 12k"} {
+		for _, pay := range []string{"mention expected salary of RM 9,000", "highlight his expected package", "last drawn 12k"} {
 			res = a.request(http.MethodPost, "/v1/candidates/"+c.Id+"/studio-cvs", token, map[string]any{
 				"documentId": cv.Id, "summary": "normal", "summaryDirection": pay,
 			})

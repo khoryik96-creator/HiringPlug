@@ -112,6 +112,9 @@ services:
       <<: *backend-env
       HP_BACKUP_DIR: /backups
       HP_BACKUP_KEEP: ${HP_BACKUP_KEEP:-14}
+      # The API runs as this user (not root): it is given the backups, so
+      # Settings > Backups can list, download and delete them.
+      HP_BACKUP_OWNER: "65532:65532"
     volumes: [files:/data/files, ../backups:/backups]
     depends_on:
       bootstrap: { condition: service_completed_successfully }

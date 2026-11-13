@@ -60,8 +60,8 @@ func (h *HTTP) CreateBackupDownloadLink(ctx context.Context, req api.CreateBacku
 
 // DownloadBackup handles GET /v1/backup-downloads/{backupName}: the backup as
 // one .tar, sent as it is read (a backup can be many gigabytes).
-func (h *HTTP) DownloadBackup(_ context.Context, req api.DownloadBackupRequestObject) (api.DownloadBackupResponseObject, error) {
-	size, err := h.svc.OpenDownload(req.BackupName, req.Params.Exp, req.Params.Sig)
+func (h *HTTP) DownloadBackup(ctx context.Context, req api.DownloadBackupRequestObject) (api.DownloadBackupResponseObject, error) {
+	size, err := h.svc.OpenDownload(ctx, req.BackupName, req.Params.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (t tarDownload) VisitDownloadBackupResponse(w http.ResponseWriter) error {
 }
 
 func backupsToAPI(b Backups) api.Backups {
-	out := api.Backups{Available: b.Available, Auto: b.Control.Auto, Backups: []api.BackupFile{}, TotalBytes: b.Total,
+	out := api.Backups{Available: b.Available, Auto: b.Control.Auto, ServiceRunning: b.Control.ServiceRunning, Backups: []api.BackupFile{}, TotalBytes: b.Total,
 		ServiceSeenAt: c.OrNull(b.Control.ServiceSeenAt), RequestedAt: c.OrNull(b.Control.RequestedAt)}
 	out.Last.SetNull()
 	if l := b.Last; l != nil {

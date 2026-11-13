@@ -75,11 +75,11 @@ export const SORTS: [Sort, string][] = [
 /** What the dashboard shows: the dates, the card, the search, the filters and the order. */
 export type View = {
   range: Range; from: string; to: string; kpi: Kpi; q: string;
-  recruiter: string; company: string; outcome: Schemas["PlacementStatus"] | ""; invoice: "" | "not_invoiced" | "invoiced" | "overdue" | "paid";
+  recruiter: string; company: string; invoice: "" | "not_invoiced" | "invoiced" | "overdue" | "paid";
   guarantee: GuaranteeState | ""; sort: Sort;
 };
 export const DEFAULT_VIEW: View = {
-  range: "this_year", from: "", to: "", kpi: "all", q: "", recruiter: "", company: "", outcome: "", invoice: "", guarantee: "", sort: "start_desc",
+  range: "this_year", from: "", to: "", kpi: "all", q: "", recruiter: "", company: "", invoice: "", guarantee: "", sort: "start_desc",
 };
 
 /** The start dates to ask the server for (inclusive); empty for all time. */
@@ -99,7 +99,6 @@ export function filtered(items: Placement[], v: View, today: string): Placement[
   const out = items.filter((p) => {
     if (v.recruiter && p.recruiterId !== v.recruiter) return false; // the placement's own recruiter, never the job's owner
     if (v.company && p.companyId !== v.company) return false;
-    if (v.outcome && p.status !== v.outcome) return false;
     if (v.invoice === "overdue" ? !overdue(p, today) : v.invoice === "invoiced" ? p.invoiceStatus !== "invoiced" || overdue(p, today) : v.invoice && p.invoiceStatus !== v.invoice) return false;
     if (v.guarantee && guarantee(p, today).state !== v.guarantee) return false;
     if (words.length) {
@@ -119,7 +118,7 @@ export function filtered(items: Placement[], v: View, today: string): Placement[
   return out.sort((a, b) => by[v.sort](a, b) || b.startDate.localeCompare(a.startDate));
 }
 
-/** The guarantee view: those ending soonest first, within the card's filter. */
+/** The placements a card counts. */
 export const forCard = (items: Placement[], kpi: Kpi, today: string) => items.filter((p) => onCard(p, kpi, today));
 
 const VIEW_KEY = "hiringplug.placements.view";

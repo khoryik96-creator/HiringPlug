@@ -207,10 +207,12 @@ CV Studio's "ABOUT HIM / HER" heading. The summary is optional (one line:
 "AI summary" on or off, off keeps the CV's own): its length (short 4-5 points,
 normal 6-7, detailed 8-10), what it brings out (CV Studio's General,
 Technology, Leadership or Commercial) and your own direction and tone in a
-sentence or two ("confident and concise, lead with the S/4HANA migration"),
-remembered in the browser for the next CV. The summary still sticks to the
-CV and never mentions pay; a direction about pay or naming an amount is
-refused, since pay is never sent to the AI. **From their profile** is
+sentence or two ("confident and concise, lead with the S/4HANA migration").
+Whether, the length and the focus are remembered in the browser for the next
+CV; the direction is about one candidate, so it starts empty each time. The summary still sticks to the
+CV and never mentions pay; a direction about the candidate's pay ("expected
+salary", "current package") is refused, since pay is never sent to the AI
+(work that only sounds like pay, "compensation and benefits design", is fine). **From their profile** is
 the template way below. Either way the file is named after the agency as CV
 Studio names it, "Hyppies CV - Siti Aisyah.docx": the agency's name is in
 Settings > General (Agency).
@@ -1116,7 +1118,9 @@ when it failed or is more than two days old.
 minute, and the page says when that service is not running), and lists the
 backups on the server with when each was made, how many files it holds and
 its size, with the total. **Download** saves one as a single .tar file (the
-backup's folder, ready to restore) through a link that works for 10 minutes;
+backup's folder, ready to restore; any size) through a link that works for
+10 minutes: a random token the server keeps until then, so a link cannot be
+forged from a secret key;
 Chrome and Edge ask which folder to save it in and stream it there with
 progress, other browsers save it to their downloads folder. **Delete** removes
 one after asking. Another agency on the same server sees none of it: a backup

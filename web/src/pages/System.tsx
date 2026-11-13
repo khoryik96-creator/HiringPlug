@@ -63,7 +63,7 @@ export function System() {
       <ErrorMessage error={status.error ?? retry.error} />
       {st && (
         <>
-          <Backup backup={st.backup} />
+          <Backup backup={st.backup} auto={st.backupAuto} />
           <section className="panel" aria-label="Background jobs">
             <h3>Background jobs</h3>
             {st.jobs.length === 0 ? <p className="muted">Nothing waiting, nothing failed.</p> : (
@@ -105,13 +105,15 @@ export function System() {
   );
 }
 
-function Backup({ backup }: { backup: Schemas["SystemStatus"]["backup"] }) {
+function Backup({ backup, auto }: { backup: Schemas["SystemStatus"]["backup"]; auto: boolean }) {
   const [now] = useState(Date.now); // when the page was opened
-  const stale = backup?.status === "done" && now - new Date(backup.startedAt).getTime() > 2 * 24 * 3600 * 1000;
+  // Old only matters while a backup is expected every night.
+  const stale = auto && backup?.status === "done" && now - new Date(backup.startedAt).getTime() > 2 * 24 * 3600 * 1000;
   return (
     <section className="panel" aria-label="Backups">
       <h3>Backups</h3>
-      {!backup && <p className="warning">No backup has been made yet. With Docker one is made every night; see the guide to run them.</p>}
+      {!auto && <p className="muted">The nightly backup is turned off (Settings &gt; Backups): backups are made only when asked for.</p>}
+      {!backup && auto && <p className="warning">No backup has been made yet. With Docker one is made every night; see the guide to run them.</p>}
       {backup?.status === "done" && (
         <p className={stale ? "warning" : undefined}>
           Last backup {formatWhen(backup.startedAt)}{backup.sizeBytes !== null && ` (${megabytes(backup.sizeBytes)})`}: {backup.name}.

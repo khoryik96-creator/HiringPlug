@@ -20,12 +20,8 @@ export function fileSize(n: number): string {
   return `${(n / 1024 ** 3).toFixed(2)} GB`;
 }
 
-/** The backup service checks in every 30 seconds; two minutes without means it is not running. */
-const serviceRunning = (b: Backups, now: number) => !!b.serviceSeenAt && now - new Date(b.serviceSeenAt).getTime() < 2 * 60_000;
-
 export function BackupsPage() {
   const queryClient = useQueryClient();
-  const [now] = useState(Date.now);
   const backups = useQuery({
     queryKey: backupsKey,
     queryFn: async () => unwrap(await api.GET("/v1/settings/backups")),
@@ -71,7 +67,7 @@ export function BackupsPage() {
                 onChange={(e) => { setAuto.mutate(e.target.checked); }} />
               <span><strong>Make a backup every night</strong> {b.auto ? "On" : "Off: none are made unless you press Back up now."}</span>
             </label>
-            <ServiceLine backups={b} now={now} />
+            <ServiceLine backups={b} />
             <div className="row">
               <button type="button" disabled={backUpNow.isPending || !!b.requestedAt || b.last?.status === "running"} onClick={() => { backUpNow.mutate(); }}>
                 Back up now
@@ -88,8 +84,9 @@ export function BackupsPage() {
   );
 }
 
-function ServiceLine({ backups: b, now }: { backups: Backups; now: number }) {
-  if (serviceRunning(b, now)) return <p className="small">The backup service is running (it checked in {formatWhen(b.serviceSeenAt ?? "")}).</p>;
+/** Whether the backup service is running: the server's word (its own clock), never this computer's. */
+function ServiceLine({ backups: b }: { backups: Backups }) {
+  if (b.serviceRunning) return <p className="small">The backup service is running.</p>;
   return (
     <p className="warning small">
       The backup service is not running, so no backup can be made{b.serviceSeenAt ? ` (last seen ${formatWhen(b.serviceSeenAt)})` : ""}.
@@ -162,8 +159,13 @@ function DownloadButton({ backup }: { backup: Backup }) {
       const res = await fetch(link.url);
       if (!res.ok || !res.body) throw new Error(`The download failed (${String(res.status)}). Try again.`);
       let saved = 0;
+      let shown = 0; // the progress shown, at most four times a second
       const count = new TransformStream<Uint8Array, Uint8Array>({
-        transform(chunk, out) { saved += chunk.byteLength; setState({ saved }); out.enqueue(chunk); },
+        transform(chunk, out) {
+          saved += chunk.byteLength;
+          if (Date.now() - shown > 250) { shown = Date.now(); setState({ saved }); }
+          out.enqueue(chunk);
+        },
       });
       await res.body.pipeThrough(count).pipeTo(await target.createWritable());
       setState({ saved, done: "Saved to the folder you chose." });

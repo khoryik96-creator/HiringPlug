@@ -163,6 +163,12 @@ type BackupControl struct {
 	UpdatedAt     time.Time
 }
 
+type BackupDownload struct {
+	TokenHash string
+	Name      string
+	ExpiresAt time.Time
+}
+
 type BackupRun struct {
 	ID         int64
 	Name       string

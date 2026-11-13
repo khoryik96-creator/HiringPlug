@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -134,4 +135,50 @@ func TestABackupAskedForIsAnsweredByTheNextOne(t *testing.T) {
 	c, err = backup.ReadControl(ctx, admin)
 	require.NoError(t, err)
 	assert.Nil(t, c.RequestedAt, "made: no longer asked for")
+}
+
+// A backup's files archive passes 8 GiB with many CVs: its header must still
+// be one 512-byte block (the download's size is worked out from that).
+func TestAVeryLargeBackupFileStillFitsOneHeader(t *testing.T) {
+	const size = 100 << 30 // 100 GiB
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	require.NoError(t, tw.WriteHeader(backup.FileHeader("hiringplug-20261101-020000", "files.tar.gz", size, time.Unix(1_800_000_000, 0))))
+	assert.Equal(t, 512, buf.Len())
+	hdr, err := tar.NewReader(bytes.NewReader(buf.Bytes())).Next()
+	require.NoError(t, err)
+	assert.EqualValues(t, size, hdr.Size)
+	assert.Equal(t, "hiringplug-20261101-020000/files.tar.gz", hdr.Name)
+}
+
+// The backups are handed to the API's user, still private to that user.
+func TestBackupsAreHandedToTheirOwner(t *testing.T) {
+	dir := t.TempDir()
+	fakeBackup(t, dir, "hiringplug-20261101-020000", 10, 10, "{}")
+	require.NoError(t, backup.Own(dir, os.Getuid(), os.Getgid()))
+	if os.Getuid() == 0 { // only root may give files away (the backup service in Docker)
+		require.NoError(t, backup.Own(dir, 65532, 65532))
+		for _, p := range []string{dir, filepath.Join(dir, "hiringplug-20261101-020000"), filepath.Join(dir, "hiringplug-20261101-020000", "database.dump")} {
+			info, err := os.Stat(p)
+			require.NoError(t, err)
+			assert.EqualValues(t, 65532, info.Sys().(*syscall.Stat_t).Uid, p)
+		}
+	}
+	info, err := os.Stat(filepath.Join(dir, "hiringplug-20261101-020000", "database.dump"))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "still only its owner may read it")
+}
+
+// A backup the service was stopped in the middle of is not waited for forever.
+func TestAnInterruptedBackupIsMarkedFailed(t *testing.T) {
+	ctx := context.Background()
+	admin := testutil.Current.Admin
+	var id int64
+	require.NoError(t, admin.QueryRow(ctx, `INSERT INTO backup_run (name, started_at, status) VALUES ('hiringplug-20260101-000000', now() - interval '3 hours', 'running') RETURNING id`).Scan(&id))
+	t.Cleanup(func() { _, _ = admin.Exec(ctx, `DELETE FROM backup_run WHERE id = $1`, id) })
+	require.NoError(t, backup.FailInterrupted(ctx, admin))
+	var status, why string
+	require.NoError(t, admin.QueryRow(ctx, `SELECT status, error FROM backup_run WHERE id = $1`, id).Scan(&status, &why))
+	assert.Equal(t, "failed", status)
+	assert.Contains(t, why, "stopped before this backup was finished")
 }

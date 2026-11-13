@@ -17,7 +17,7 @@ const lastBackup: NonNullable<Schemas["SystemStatus"]["backup"]> = {
 const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemStatus"] => ({
   jobs: [{ kind: "email.send", waiting: 2, running: 1, retrying: 0, failed: 1, oldestWaitingSince: "2026-11-07T06:00:00Z" }],
   failed: [{ id: "job_1", kind: "email.send", attempts: 5, error: "smtp: 550 mailbox unavailable", failedAt: "2026-11-07T05:00:00Z" }],
-  backup: lastBackup,
+  backup: lastBackup, backupAuto: true,
   ...over,
 });
 
@@ -43,6 +43,15 @@ describe("System", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(status({ backup: { ...lastBackup, startedAt: old } })));
     renderWithClient(<System />);
     expect(await screen.findByText(/more than two days ago/)).toBeTruthy();
+  });
+
+  it("does not warn about an old backup once the nightly backup is turned off", async () => {
+    const old = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    vi.spyOn(api, "GET").mockResolvedValue(ok(status({ backupAuto: false, backup: { ...lastBackup, startedAt: old } })));
+    renderWithClient(<System />);
+    expect(await screen.findByText(/The nightly backup is turned off/)).toBeTruthy();
+    expect(screen.getByText(/Last backup/)).toBeTruthy();
+    expect(screen.queryByText(/more than two days ago/)).toBeNull();
   });
 
   it("says when the last backup failed", async () => {

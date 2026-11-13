@@ -84,7 +84,10 @@ the nightly backup off or on, makes one now, shows each backup's size, and
 downloads one as a single .tar file to a folder you choose (Chrome and Edge
 ask where; other browsers save to their downloads folder). Only that agency
 sees them, because a backup holds every agency's data: set `HP_BACKUP_TENANT`
-to its id once the server holds more than one agency. Copy backups to another
+to its id once the server holds more than one agency. In Docker the backup
+service runs as root and the API as another user, so the backup service hands
+the backups to the API's user (`HP_BACKUP_OWNER`, set in the compose file);
+they stay readable by that user only. Copy backups to another
 disk or cloud storage too: a backup on the same disk does not survive the
 disk. To make one now from the command line:
 

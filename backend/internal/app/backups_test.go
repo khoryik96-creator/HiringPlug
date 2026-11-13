@@ -3,16 +3,14 @@ package app_test
 import (
 	"archive/tar"
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,15 +117,31 @@ func TestBackupsInSettings(t *testing.T) {
 		}
 		assert.Equal(t, []string{backupName + "/", backupName + "/database.dump", backupName + "/files.tar.gz", backupName + "/manifest.json"}, names)
 
-		tampered := a.request(http.MethodGet, "/v1/backup-downloads/"+backupName+"?exp=9999999999&sig="+hex.EncodeToString(make([]byte, 32)), "", nil)
-		assert.Equal(t, http.StatusForbidden, tampered.Status, "a made-up signature")
-		past := strconv.FormatInt(time.Now().Add(-time.Minute).Unix(), 10)
-		m := hmac.New(sha256.New, []byte("files-secret-for-tests-0123456789abcdef"))
-		_, _ = fmt.Fprintf(m, "backup-download\n%s\n%s", backupName, past)
-		expired := a.request(http.MethodGet, "/v1/backup-downloads/"+backupName+"?exp="+past+"&sig="+hex.EncodeToString(m.Sum(nil)), "", nil)
-		assert.Equal(t, http.StatusForbidden, expired.Status, "an expired link")
-		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/backup-downloads/..%2Fsecrets?exp=1&sig=x", "", nil).Status, "only backups")
-		assert.Equal(t, http.StatusBadRequest, a.request(http.MethodGet, "/v1/backup-downloads/secrets?exp=1&sig=x", "", nil).Status, "only backups")
+		madeUp := a.request(http.MethodGet, "/v1/backup-downloads/"+backupName+"?token="+strings.Repeat("A", 43), "", nil)
+		assert.Equal(t, http.StatusForbidden, madeUp.Status, "a made-up token: the server keeps the real ones")
+		otherBackup := a.request(http.MethodGet, strings.Replace(link.Url, backupName, "hiringplug-20261102-020000", 1), "", nil)
+		assert.Equal(t, http.StatusForbidden, otherBackup.Status, "a token is for one backup")
+		_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE backup_download SET expires_at = now() - interval '1 minute'`)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusForbidden, a.request(http.MethodGet, link.Url, "", nil).Status, "an expired link")
+		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/backup-downloads/..%2Fsecrets?token=x", "", nil).Status, "only backups")
+	})
+
+	t.Run("the page is told whether the backup service is running, by the server's clock", func(t *testing.T) {
+		ctx := context.Background()
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE backup_control SET service_seen_at = now() - interval '10 minutes'`)
+		require.NoError(t, err)
+		a.request(http.MethodGet, "/v1/settings/backups", owner, nil).JSON(&b)
+		assert.False(t, b.ServiceRunning)
+		_, err = testutil.Current.Admin.Exec(ctx, `UPDATE backup_control SET service_seen_at = now()`)
+		require.NoError(t, err)
+		a.request(http.MethodGet, "/v1/settings/backups", owner, nil).JSON(&b)
+		assert.True(t, b.ServiceRunning)
+
+		var system api.SystemStatus
+		a.request(http.MethodPut, "/v1/settings/backups/auto", owner, map[string]any{"auto": false})
+		a.request(http.MethodGet, "/v1/settings/system", owner, nil).JSON(&system)
+		assert.False(t, system.BackupAuto, "System knows the nightly backup is off, so it does not warn about an old one")
 	})
 
 	t.Run("delete one", func(t *testing.T) {

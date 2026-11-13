@@ -26,14 +26,45 @@ type Control struct {
 	Auto          bool
 	RequestedAt   *time.Time
 	ServiceSeenAt *time.Time
+	// ServiceRunning: it checked in within the last two minutes, by the
+	// database's clock (never a browser's).
+	ServiceRunning bool
 }
 
 // ReadControl returns the switch and request.
 func ReadControl(ctx context.Context, q db) (Control, error) {
 	var c Control
-	err := q.QueryRow(ctx, `SELECT auto, requested_at, service_seen_at FROM backup_control`).
-		Scan(&c.Auto, &c.RequestedAt, &c.ServiceSeenAt)
+	err := q.QueryRow(ctx, `SELECT auto, requested_at, service_seen_at,
+		coalesce(service_seen_at > now() - interval '2 minutes', false) FROM backup_control`).
+		Scan(&c.Auto, &c.RequestedAt, &c.ServiceSeenAt, &c.ServiceRunning)
 	return c, err
+}
+
+// FailInterrupted marks backups still "running" as failed: the backup service
+// calls it when it starts, when none can be running (it was stopped
+// mid-backup), so Settings does not wait for them forever.
+func FailInterrupted(ctx context.Context, q db) error {
+	_, err := q.Exec(ctx, `UPDATE backup_run SET status = 'failed', finished_at = now(),
+		error = 'The backup service stopped before this backup was finished.' WHERE status = 'running'`)
+	return err
+}
+
+// SaveDownload keeps a download token (hashed) for one backup until expires,
+// and forgets the expired ones.
+func SaveDownload(ctx context.Context, q db, tokenHash, name string, expires time.Time) error {
+	if _, err := q.Exec(ctx, `DELETE FROM backup_download WHERE expires_at < now()`); err != nil {
+		return err
+	}
+	_, err := q.Exec(ctx, `INSERT INTO backup_download (token_hash, name, expires_at) VALUES ($1, $2, $3)`, tokenHash, name, expires)
+	return err
+}
+
+// DownloadAllowed reports whether a token (hashed) is a live one for this backup.
+func DownloadAllowed(ctx context.Context, q db, tokenHash, name string) (bool, error) {
+	var ok bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM backup_download WHERE token_hash = $1 AND name = $2 AND expires_at > now())`,
+		tokenHash, name).Scan(&ok)
+	return ok, err
 }
 
 // SetAuto turns the nightly backup on or off.

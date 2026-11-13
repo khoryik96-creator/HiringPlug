@@ -88,6 +88,7 @@ describe("formatted CVs", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toMatchObject({ blind: false, summary: "detailed", summaryFocus: "leadership", summaryDirection: "Confident; lead with team leadership" });
     await waitFor(() => { expect(localStorage.getItem("hiringplug.studio.summary")).toContain("leadership"); });
+    expect(localStorage.getItem("hiringplug.studio.summary"), "the direction is about this candidate only").not.toContain("Confident");
 
     fireEvent.click(screen.getByLabelText(/Blind CV/));
     expect(screen.queryByLabelText("AI summary"), "a blind CV keeps its own summary").toBeNull();
@@ -100,7 +101,7 @@ describe("formatted CVs", () => {
     renderWithClient(<FormatCv candidateId="cand_1" permissions={["cvformats:create"]} onDone={vi.fn()} />);
     expect((await screen.findByLabelText<HTMLSelectElement>("Summary length")).value).toBe("short");
     expect(screen.getByLabelText<HTMLSelectElement>("Summary focus").value).toBe("commercial");
-    expect(screen.getByLabelText<HTMLInputElement>("Direction and tone").value).toBe("Punchy");
+    expect(screen.getByLabelText<HTMLInputElement>("Direction and tone").value, "a direction saved by an older version is not reused").toBe("");
 
     fireEvent.click(screen.getByLabelText("AI summary"));
     expect(screen.queryByLabelText("Summary focus"), "no summary: no options").toBeNull();

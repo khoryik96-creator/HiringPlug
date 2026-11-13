@@ -88,7 +88,7 @@ func NewModules(d Deps) *Modules {
 	m := &Modules{}
 	m.Identity = identity.New(d.Pool, d.Verifier, identityMailer{m}, d.Config.PublicURL)
 	m.Settings = settings.New(d.Pool)
-	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant, Secret: d.Config.FilesURLSecret})
+	m.Settings.UseBackups(settings.BackupSetup{Dir: d.Config.BackupDir, OperatorTenant: d.Config.BackupTenant})
 	m.Industries = industries.New(d.Pool)
 	m.AIProviders = aiproviders.New(d.Pool, aiproviders.Settings{ServerOn: d.Config.AI.Enabled, KeysSecret: d.Config.AI.KeysSecret})
 	m.Candidates = candidates.New(d.Pool, d.Config.DefaultPhoneArea, m.Identity, m.Settings)

@@ -25,6 +25,8 @@ type SystemStatus struct {
 	Jobs   []jobqueue.KindStatus
 	Failed []jobqueue.DeadJob
 	Backup *backup.Last
+	// BackupAuto: the nightly backup is on (off, an old last backup is expected).
+	BackupAuto bool
 }
 
 // System returns the company's background jobs and the last backup.
@@ -48,9 +50,14 @@ func systemStatus(ctx context.Context, tx pgx.Tx, tenantID string) (SystemStatus
 		return out, err
 	}
 	last, ok, err := backup.LastRun(ctx, tx)
+	if err != nil {
+		return out, err
+	}
 	if ok {
 		out.Backup = &last
 	}
+	control, err := backup.ReadControl(ctx, tx)
+	out.BackupAuto = control.Auto
 	return out, err
 }
 
@@ -93,7 +100,7 @@ func (h *HTTP) RetryBackgroundJob(ctx context.Context, req api.RetryBackgroundJo
 }
 
 func systemToAPI(st SystemStatus) api.SystemStatus {
-	out := api.SystemStatus{Jobs: []api.JobKindStatus{}, Failed: []api.FailedJob{}}
+	out := api.SystemStatus{Jobs: []api.JobKindStatus{}, Failed: []api.FailedJob{}, BackupAuto: st.BackupAuto}
 	for _, k := range st.Jobs {
 		out.Jobs = append(out.Jobs, api.JobKindStatus{Kind: k.Kind, Waiting: k.Waiting, Running: k.Running, Retrying: k.Retrying,
 			Failed: k.Dead, OldestWaitingSince: c.OrNull(k.OldestWaiting)})

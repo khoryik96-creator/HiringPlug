@@ -5059,13 +5059,12 @@ paths:
       tags: [settings]
       summary: One backup as a single .tar file (from a link made by createBackupDownloadLink)
       description: >
-        The backup's folder (database.dump, files.tar.gz, manifest.json) in one .tar file; unpack it to get the folder back. Needs the link's `exp` and `sig`, not a sign-in.
+        The backup's folder (database.dump, files.tar.gz, manifest.json) in one .tar file; unpack it to get the folder back. Needs the link's `token` (random, kept by the server until it expires), not a sign-in.
 
       x-permission: public
       security: []
       parameters:
-        - {name: exp, in: query, required: true, schema: {type: integer, format: int64}}
-        - {name: sig, in: query, required: true, schema: {type: string, pattern: '^[0-9a-f]{64}$'}}
+        - {name: token, in: query, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{43}$'}}
       responses:
         '200':
           description: The backup
@@ -10412,8 +10411,9 @@ components:
         userId: {type: string}
     SystemStatus:
       type: object
-      required: [jobs, failed, backup]
+      required: [jobs, failed, backup, backupAuto]
       properties:
+        backupAuto: {type: boolean, description: "The nightly backup is on (Settings > Backups): off, an old last backup is expected."}
         jobs:
           type: array
           description: The company's background jobs by kind, kinds with none left out.
@@ -10457,8 +10457,9 @@ components:
         error: {type: string, nullable: true}
     Backups:
       type: object
-      required: [available, auto, serviceSeenAt, requestedAt, last, backups, totalBytes]
+      required: [available, auto, serviceRunning, serviceSeenAt, requestedAt, last, backups, totalBytes]
       properties:
+        serviceRunning: {type: boolean, description: "The backup service checked in within the last two minutes, by the server's clock (it does every 30 seconds, also while making a backup)."}
         available: {type: boolean, description: "False for an agency that does not run the server, or when this server keeps no backups (HP_BACKUP_DIR unset)."}
         auto: {type: boolean, description: The nightly backup is on.}
         serviceSeenAt: {type: string, format: date-time, nullable: true, description: When the backup service last checked in (it does every 30 seconds while running).}
@@ -10484,7 +10485,7 @@ components:
       type: object
       required: [url, fileName, sizeBytes, expiresAt]
       properties:
-        url: {type: string, description: "A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?exp=…&sig=…"}
+        url: {type: string, description: "A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?token=…"}
         fileName: {type: string, description: "e.g. hiringplug-20261107-020000.tar"}
         sizeBytes: {type: integer, format: int64}
         expiresAt: {type: string, format: date-time}

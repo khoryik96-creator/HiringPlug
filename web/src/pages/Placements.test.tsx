@@ -121,6 +121,20 @@ describe("placements", () => {
     await waitFor(() => { expect(lastQuery()).toEqual({ params: { query: {} } }); });
   });
 
+  it("keeps showing a chosen company that has no placements in the dates, so an empty table explains itself", async () => {
+    localStorage.setItem("hiringplug.placements.view", JSON.stringify({ company: "comp_gone", recruiter: "usr_gone" }));
+    reads({ items: [placement()], total: 1, today: "2026-12-10" });
+    renderWithClient(<Placements permissions={["placements:read"]} />);
+    const company = await screen.findByLabelText<HTMLSelectElement>("Company");
+    expect(company.value).toBe("comp_gone");
+    expect(company.selectedOptions[0]?.textContent).toBe("Chosen company: none in these dates");
+    expect(screen.getByLabelText<HTMLSelectElement>("Recruiter").selectedOptions[0]?.textContent).toBe("Chosen recruiter: none in these dates");
+    expect(screen.getByText("None match.")).toBeTruthy();
+    fireEvent.change(company, { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Recruiter"), { target: { value: "" } });
+    expect(await screen.findByRole("row", { name: /Siti Aisyah/ })).toBeTruthy();
+  });
+
   it("says when the list stopped short, instead of passing it off as all of them", async () => {
     reads({ items: [placement()], total: 730, today: "2026-12-10" });
     renderWithClient(<Placements permissions={["placements:read"]} />);

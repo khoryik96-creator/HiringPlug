@@ -48,7 +48,7 @@ export function FormatCv({ candidateId, permissions, onDone }: { candidateId: st
 
 type SummaryLength = Exclude<Schemas["StudioCvSummary"], "none">;
 type SummaryFocus = Schemas["StudioCvSummaryFocus"];
-/** How the About Him / Her summary is written: remembered in this browser for the next CV. */
+/** How the About Him / Her summary is written. Whether, its length and its focus are remembered in this browser for the next CV; the direction is about one candidate, so it starts empty each time. */
 export type SummaryChoice = { write: boolean; length: SummaryLength; focus: SummaryFocus; direction: string };
 
 const SUMMARY_KEY = "hiringplug.studio.summary";
@@ -63,13 +63,14 @@ export function loadSummaryChoice(): SummaryChoice {
       write: typeof saved.write === "boolean" ? saved.write : SUMMARY_DEFAULT.write,
       length: LENGTHS.some(([k]) => k === saved.length) ? saved.length as SummaryLength : SUMMARY_DEFAULT.length,
       focus: FOCUSES.some(([k]) => k === saved.focus) ? saved.focus as SummaryFocus : SUMMARY_DEFAULT.focus,
-      direction: typeof saved.direction === "string" ? saved.direction.slice(0, 500) : "",
+      direction: "",
     };
   } catch { return SUMMARY_DEFAULT; }
 }
 
 function saveSummaryChoice(choice: SummaryChoice) {
-  try { localStorage.setItem(SUMMARY_KEY, JSON.stringify(choice)); } catch { /* private window: not remembered */ }
+  const { write, length, focus } = choice;
+  try { localStorage.setItem(SUMMARY_KEY, JSON.stringify({ write, length, focus })); } catch { /* private window: not remembered */ }
 }
 
 function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Document[]; onDone: () => void }) {

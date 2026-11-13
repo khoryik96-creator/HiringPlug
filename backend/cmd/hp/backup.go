@@ -36,6 +36,20 @@ func backupOptions() (backup.Options, error) {
 	return o, nil
 }
 
+// backupOwner reads HP_BACKUP_OWNER ("uid:gid"): who the backups are handed
+// to, so the API (another user than the backup service, in Docker) can list,
+// send and delete them. Unset: they stay the backup service's own.
+func backupOwner() (uid, gid int, set bool, err error) {
+	v := os.Getenv("HP_BACKUP_OWNER")
+	if v == "" {
+		return 0, 0, false, nil
+	}
+	if _, scanErr := fmt.Sscanf(v, "%d:%d", &uid, &gid); scanErr != nil || uid < 0 || gid < 0 {
+		return 0, 0, false, fmt.Errorf("HP_BACKUP_OWNER must be a user and group id like 65532:65532, got %q", v)
+	}
+	return uid, gid, true, nil
+}
+
 func runBackup(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
 	every := fs.Duration("every", 0, "keep running: a backup every this long while the nightly backup is on (Settings), and whenever one is asked for; 0 = one now")
@@ -59,10 +73,27 @@ func runBackup(ctx context.Context, args []string) error {
 		return err
 	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "backup")
+	uid, gid, owned, err := backupOwner()
+	if err != nil {
+		return err
+	}
+	if err := backup.FailInterrupted(ctx, pool); err != nil {
+		return err
+	}
+	own := func() { // also backups made before this setting, or by hand as root
+		if !owned {
+			return
+		}
+		if err := backup.Own(o.Dir, uid, gid); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warn("could not hand the backups to HP_BACKUP_OWNER", "error", err)
+		}
+	}
+	own()
 	for {
 		if err := backupTurn(ctx, pool, o, *every, log); err != nil {
 			log.Error("backup failed", "error", err)
 		}
+		own() // straight after a backup is made, so the API can read it at once
 		select {
 		case <-ctx.Done():
 			return nil
@@ -82,7 +113,20 @@ func backupTurn(ctx context.Context, pool *pgxpool.Pool, o backup.Options, every
 	if err != nil || !backup.Due(time.Now(), c, last, every) {
 		return err
 	}
+	// A long backup keeps checking in, so Settings does not take the service for stopped.
+	beat, stop := context.WithCancel(ctx)
+	go func() {
+		for {
+			select {
+			case <-beat.Done():
+				return
+			case <-time.After(backup.PollEvery):
+				_, _ = backup.CheckIn(beat, pool)
+			}
+		}
+	}()
 	dir, runErr := backup.Run(ctx, pool, o)
+	stop()
 	if err := backup.Answered(ctx, pool); err != nil {
 		return errors.Join(runErr, err)
 	}

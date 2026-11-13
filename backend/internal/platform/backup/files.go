@@ -153,13 +153,12 @@ func WriteTar(w io.Writer, dir, name string) error {
 		return err
 	}
 	tw := tar.NewWriter(w)
-	folder := &tar.Header{Name: name + "/", Mode: 0o700, Typeflag: tar.TypeDir, Format: tar.FormatUSTAR, ModTime: time.Now().Truncate(time.Second)}
+	folder := &tar.Header{Name: name + "/", Mode: 0o700, Typeflag: tar.TypeDir, Format: tar.FormatGNU, ModTime: time.Now().Truncate(time.Second)}
 	if err := tw.WriteHeader(folder); err != nil {
 		return err
 	}
 	for _, p := range files {
-		hdr := &tar.Header{Name: name + "/" + p.name, Mode: 0o600, Size: p.size, ModTime: p.mod.Truncate(time.Second), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
-		if err := tw.WriteHeader(hdr); err != nil {
+		if err := tw.WriteHeader(FileHeader(name, p.name, p.size, p.mod)); err != nil {
 			return err
 		}
 		f, err := os.Open(filepath.Join(path, p.name)) //nolint:gosec // a file of a backup named by nameRe
@@ -176,6 +175,43 @@ func WriteTar(w io.Writer, dir, name string) error {
 		}
 	}
 	return tw.Close()
+}
+
+// FileHeader is the .tar header of one of a backup's files: GNU format, one
+// 512-byte block whatever the size (USTAR stops at 8 GiB; a backup's files
+// archive is far larger with many CVs).
+func FileHeader(backupName, file string, size int64, mod time.Time) *tar.Header {
+	return &tar.Header{Name: backupName + "/" + file, Mode: 0o600, Size: size, ModTime: mod.Truncate(time.Second), Typeflag: tar.TypeReg, Format: tar.FormatGNU}
+}
+
+// Own gives the backups folder, every backup in it and their files to a
+// user and group (HP_BACKUP_OWNER), keeping them private to that user. The
+// backup service runs as root in Docker and the API as another user: without
+// this the API could not list, send or delete them.
+func Own(dir string, uid, gid int) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	errs := []error{os.Chown(dir, uid, gid)}
+	for _, e := range entries {
+		if !e.IsDir() || !nameRe.MatchString(e.Name()) {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		errs = append(errs, os.Chown(path, uid, gid))
+		files, err := os.ReadDir(path)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, f := range files {
+			if f.Type().IsRegular() {
+				errs = append(errs, os.Chown(filepath.Join(path, f.Name()), uid, gid))
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Delete removes one backup from dir.

@@ -9,13 +9,12 @@ package settings
 
 import (
 	"context"
-	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -32,7 +31,6 @@ import (
 type BackupSetup struct {
 	Dir            string // HP_BACKUP_DIR; empty: this server keeps none
 	OperatorTenant string // HP_BACKUP_TENANT; empty: the only agency, if there is one
-	Secret         []byte // signs download links
 	Now            func() time.Time
 }
 
@@ -170,7 +168,9 @@ func notFoundBackup(err error) error {
 	return err
 }
 
-// DownloadLink returns a link that downloads one backup for LinkLife.
+// DownloadLink returns a link that downloads one backup for LinkLife: a
+// random token the server keeps (hashed) until then, so a link cannot be
+// made from a secret key alone.
 func (s *Service) DownloadLink(ctx context.Context, p authz.Principal, name string) (DownloadLink, error) {
 	var out DownloadLink
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -185,10 +185,17 @@ func (s *Service) DownloadLink(ctx context.Context, p authz.Principal, name stri
 		if err != nil {
 			return notFoundBackup(err)
 		}
+		raw := make([]byte, 32)
+		if _, err := rand.Read(raw); err != nil {
+			return err
+		}
+		token := base64.RawURLEncoding.EncodeToString(raw)
 		exp := s.backups.Now().Add(LinkLife).Truncate(time.Second)
-		expText := strconv.FormatInt(exp.Unix(), 10)
+		if err := backup.SaveDownload(ctx, tx, tokenHash(token), name, exp); err != nil {
+			return err
+		}
 		out = DownloadLink{
-			URL:      "/v1/backup-downloads/" + name + "?" + url.Values{"exp": {expText}, "sig": {s.signBackup(name, expText)}}.Encode(),
+			URL:      "/v1/backup-downloads/" + name + "?" + url.Values{"token": {token}}.Encode(),
 			FileName: name + ".tar", Size: info.SizeBytes, ExpiresAt: exp,
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "settings.backup_downloaded", EntityType: "backup", EntityID: "server", Changes: map[string]any{"backup": name}})
@@ -196,19 +203,28 @@ func (s *Service) DownloadLink(ctx context.Context, p authz.Principal, name stri
 	return out, err
 }
 
-// OpenDownload checks a download link and returns the backup's size; the
-// link needs no sign-in, so its signature is the only check.
-func (s *Service) OpenDownload(name string, exp int64, sig string) (int64, error) {
-	expText := strconv.FormatInt(exp, 10)
-	if s.backups.Dir == "" || s.backups.Now().Unix() > exp || !hmac.Equal([]byte(sig), []byte(s.signBackup(name, expText))) {
-		return 0, apperr.New(api.ErrorCodeFORBIDDEN, "This download link has expired or is not valid: make a new one in Settings › Backups.")
+// OpenDownload checks a download link's token and returns the backup's size;
+// the link needs no sign-in, so the token is the only check.
+func (s *Service) OpenDownload(ctx context.Context, name, token string) (int64, error) {
+	if s.backups.Dir == "" {
+		return 0, expiredLink()
+	}
+	ok, err := backup.DownloadAllowed(ctx, s.pool, tokenHash(token), name)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, expiredLink()
 	}
 	size, err := backup.Size(s.backups.Dir, name)
 	return size, notFoundBackup(err)
 }
 
-func (s *Service) signBackup(name, exp string) string {
-	m := hmac.New(sha256.New, s.backups.Secret)
-	_, _ = fmt.Fprintf(m, "backup-download\n%s\n%s", name, exp)
-	return hex.EncodeToString(m.Sum(nil))
+func expiredLink() error {
+	return apperr.New(api.ErrorCodeFORBIDDEN, "This download link has expired or is not valid: make a new one in Settings › Backups.")
+}
+
+func tokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }

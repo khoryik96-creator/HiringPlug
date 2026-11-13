@@ -4119,7 +4119,7 @@ class BackupDownloadLink(BaseModel):
     url: Annotated[
         str,
         Field(
-            description="A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?exp=…&sig=…"
+            description="A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?token=…"
         ),
     ]
     fileName: Annotated[str, Field(description="e.g. hiringplug-20261107-020000.tar")]
@@ -5639,6 +5639,12 @@ class BookingLink(BaseModel):
 
 
 class SystemStatus(BaseModel):
+    backupAuto: Annotated[
+        bool,
+        Field(
+            description="The nightly backup is on (Settings > Backups): off, an old last backup is expected."
+        ),
+    ]
     jobs: Annotated[
         list[JobKindStatus],
         Field(description="The company's background jobs by kind, kinds with none left out."),
@@ -5653,6 +5659,12 @@ class SystemStatus(BaseModel):
 
 
 class Backups(BaseModel):
+    serviceRunning: Annotated[
+        bool,
+        Field(
+            description="The backup service checked in within the last two minutes, by the server's clock (it does every 30 seconds, also while making a backup)."
+        ),
+    ]
     available: Annotated[
         bool,
         Field(

@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 const backups = (over: Partial<Schemas["Backups"]> = {}): Schemas["Backups"] => ({
-  available: true, auto: true, serviceSeenAt: new Date().toISOString(), requestedAt: null,
+  available: true, auto: true, serviceRunning: true, serviceSeenAt: "2026-11-12T02:01:30Z", requestedAt: null,
   last: { name: "hiringplug-20261112-020000", startedAt: "2026-11-12T02:00:00Z", finishedAt: "2026-11-12T02:01:00Z", status: "done", sizeBytes: 3_565_158, error: null },
   backups: [
     { name: "hiringplug-20261112-020000", createdAt: "2026-11-12T02:00:00Z", sizeBytes: 3_565_158, files: 120 },
@@ -23,7 +23,7 @@ const backups = (over: Partial<Schemas["Backups"]> = {}): Schemas["Backups"] => 
   ...over,
 });
 
-const link = { url: "/v1/backup-downloads/hiringplug-20261112-020000?exp=1&sig=ab", fileName: "hiringplug-20261112-020000.tar", sizeBytes: 3_565_158, expiresAt: "2026-11-12T10:10:00Z" };
+const link = { url: "/v1/backup-downloads/hiringplug-20261112-020000?token=abc", fileName: "hiringplug-20261112-020000.tar", sizeBytes: 3_565_158, expiresAt: "2026-11-12T10:10:00Z" };
 
 describe("Settings › Backups", () => {
   it("writes sizes as a person reads them", () => {
@@ -50,8 +50,8 @@ describe("Settings › Backups", () => {
   });
 
   it("asks for a backup now, and says when the backup service is not running", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok(backups({ serviceSeenAt: "2026-11-01T00:00:00Z" })));
-    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(backups({ serviceSeenAt: "2026-11-01T00:00:00Z", requestedAt: new Date().toISOString() })));
+    vi.spyOn(api, "GET").mockResolvedValue(ok(backups({ serviceRunning: false, serviceSeenAt: "2026-11-01T00:00:00Z" })));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(backups({ serviceRunning: false, serviceSeenAt: "2026-11-01T00:00:00Z", requestedAt: new Date().toISOString() })));
     renderWithClient(<BackupsPage />);
     expect(await screen.findByText(/The backup service is not running/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Back up now" }));
@@ -91,6 +91,14 @@ describe("Settings › Backups", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Download" }));
     expect(await within(row).findByText(/saving it to its downloads folder/)).toBeTruthy();
     expect(clicked).toEqual([link.url]);
+  });
+
+  it("takes the server's word for whether the backup service runs, whatever this computer's clock says", async () => {
+    // Checked in "a year ago" by this computer's clock, yet the server says it is running.
+    vi.spyOn(api, "GET").mockResolvedValue(ok(backups({ serviceRunning: true, serviceSeenAt: "2025-01-01T00:00:00Z" })));
+    renderWithClient(<BackupsPage />);
+    expect(await screen.findByText("The backup service is running.")).toBeTruthy();
+    expect(screen.queryByText(/not running/)).toBeNull();
   });
 
   it("deletes one after asking", async () => {

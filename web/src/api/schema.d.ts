@@ -3478,7 +3478,7 @@ export interface paths {
         };
         /**
          * One backup as a single .tar file (from a link made by createBackupDownloadLink)
-         * @description The backup's folder (database.dump, files.tar.gz, manifest.json) in one .tar file; unpack it to get the folder back. Needs the link's `exp` and `sig`, not a sign-in.
+         * @description The backup's folder (database.dump, files.tar.gz, manifest.json) in one .tar file; unpack it to get the folder back. Needs the link's `token` (random, kept by the server until it expires), not a sign-in.
          */
         get: operations["downloadBackup"];
         put?: never;
@@ -7322,6 +7322,8 @@ export interface components {
             userId: string;
         };
         SystemStatus: {
+            /** @description The nightly backup is on (Settings > Backups): off, an old last backup is expected. */
+            backupAuto: boolean;
             /** @description The company's background jobs by kind, kinds with none left out. */
             jobs: components["schemas"]["JobKindStatus"][];
             /** @description Jobs that failed for good in the last 30 days, newest first (at most 50). */
@@ -7368,6 +7370,8 @@ export interface components {
             error: string | null;
         };
         Backups: {
+            /** @description The backup service checked in within the last two minutes, by the server's clock (it does every 30 seconds, also while making a backup). */
+            serviceRunning: boolean;
             /** @description False for an agency that does not run the server, or when this server keeps no backups (HP_BACKUP_DIR unset). */
             available: boolean;
             /** @description The nightly backup is on. */
@@ -7406,7 +7410,7 @@ export interface components {
             files: number;
         };
         BackupDownloadLink: {
-            /** @description A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?exp=…&sig=… */
+            /** @description A path on this server, e.g. /v1/backup-downloads/hiringplug-20261107-020000?token=… */
             url: string;
             /** @description e.g. hiringplug-20261107-020000.tar */
             fileName: string;
@@ -14240,8 +14244,7 @@ export interface operations {
     downloadBackup: {
         parameters: {
             query: {
-                exp: number;
-                sig: string;
+                token: string;
             };
             header?: never;
             path: {
