@@ -113,6 +113,9 @@ func TestWebhooks(t *testing.T) {
 	res.JSON(&created)
 	hook := created.Webhook
 	assert.NotContains(t, string(a.request(http.MethodGet, "/v1/webhooks", owner, nil).Body), created.Secret, "the secret is shown once")
+	var stored string
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT secret FROM webhook WHERE id = $1`, hook.Id).Scan(&stored))
+	assert.NotContains(t, stored, created.Secret, "sealed where it is stored: a backup does not give it away")
 
 	cand := a.createCandidate(owner, map[string]any{"firstName": "Siti"})
 	a.createCompany(owner, map[string]any{"name": "Not listened for"})
@@ -164,4 +167,33 @@ func TestWebhooks(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodDelete, "/v1/webhooks/"+hook.Id, stranger, nil).Status)
 		assert.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, "/v1/webhooks/"+hook.Id, owner, nil).Status)
 	})
+}
+
+// A webhook saved before secrets were sealed keeps signing with its secret,
+// which is sealed the first time it is used.
+func TestWebhookSecretsSavedBeforeSealingStillWork(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	rec, srv := newReceiver(t)
+	res := a.request(http.MethodPost, "/v1/webhooks", owner, map[string]any{"url": srv.URL + "/hooks", "events": []string{"candidate.created"}})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	var created api.WebhookCreated
+	res.JSON(&created)
+	ctx := context.Background()
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE webhook SET secret = 'whsec_saved_in_the_clear' WHERE id = $1`, created.Webhook.Id)
+	require.NoError(t, err)
+
+	a.createCandidate(owner, map[string]any{"firstName": "Siti"})
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	require.Equal(t, 1, rec.count())
+	sig := rec.requests[0].Header.Get("X-HiringPlug-Signature")
+	ts, _, _ := strings.Cut(strings.TrimPrefix(sig, "t="), ",")
+	unix, err := strconv.ParseInt(ts, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, integrations.Signature("whsec_saved_in_the_clear", time.Unix(unix, 0), rec.bodies[0]), sig)
+	var stored string
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT secret FROM webhook WHERE id = $1`, created.Webhook.Id).Scan(&stored))
+	assert.NotContains(t, stored, "whsec_saved_in_the_clear", "sealed now")
 }

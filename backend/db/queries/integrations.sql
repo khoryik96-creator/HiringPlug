@@ -58,3 +58,7 @@ UPDATE webhook_delivery SET status = @status, attempts = attempts + 1, response_
   last_error = sqlc.narg(last_error), next_attempt_at = sqlc.narg(next_attempt_at),
   delivered_at = CASE WHEN @status = 'delivered' THEN now() END
 WHERE id = @id;
+
+-- A secret saved before secrets were sealed is sealed the next time it is used.
+-- name: SealWebhookSecret :exec
+UPDATE webhook SET secret = @sealed WHERE secret = @plain;

@@ -25,6 +25,7 @@ type Service struct {
 	pool         *pgxpool.Pool
 	users        Users
 	allowPrivate bool
+	sealer       Sealer
 }
 
 func randomHex(n int) string {
@@ -118,7 +119,11 @@ func (s *Service) CreateWebhook(ctx context.Context, p authz.Principal, h Hook) 
 	secret := "whsec_" + randomHex(24)
 	var out store.Webhook
 	err := s.inTx(ctx, p, func(tx pgx.Tx, q *store.Queries) error {
-		row, err := q.InsertWebhook(ctx, store.InsertWebhookParams{Url: h.URL, Events: h.Events, Secret: secret, Description: h.Description})
+		sealed, err := s.sealer.Seal(p.TenantID, secret)
+		if err != nil {
+			return err
+		}
+		row, err := q.InsertWebhook(ctx, store.InsertWebhookParams{Url: h.URL, Events: h.Events, Secret: sealed, Description: h.Description})
 		if err != nil {
 			return err
 		}

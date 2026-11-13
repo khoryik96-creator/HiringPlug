@@ -133,7 +133,7 @@ func NewModules(d Deps) *Modules {
 		Placements: reportPlacements{m.Placements}, Users: m.Identity,
 	}, d.Config.TimeZone)
 	m.Offers = offers.New(d.Pool, offerApplications{m.Pipeline}, m.Identity)
-	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks)
+	m.Integrations = integrations.New(d.Pool, m.Identity, d.Config.AllowPrivateNetworks, d.Config.AuthJWTSecret)
 	m.Leads = leads.New(d.Pool, m.Companies, d.Config.AllowPrivateNetworks)
 	m.Cvformats = cvformats.New(d.Pool, cvformats.Deps{
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,

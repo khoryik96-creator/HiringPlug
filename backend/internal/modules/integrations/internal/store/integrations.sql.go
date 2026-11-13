@@ -373,6 +373,21 @@ func (q *Queries) RevokeApiKey(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const sealWebhookSecret = `-- name: SealWebhookSecret :exec
+UPDATE webhook SET secret = $1 WHERE secret = $2
+`
+
+type SealWebhookSecretParams struct {
+	Sealed string
+	Plain  string
+}
+
+// A secret saved before secrets were sealed is sealed the next time it is used.
+func (q *Queries) SealWebhookSecret(ctx context.Context, arg SealWebhookSecretParams) error {
+	_, err := q.db.Exec(ctx, sealWebhookSecret, arg.Sealed, arg.Plain)
+	return err
+}
+
 const updateWebhook = `-- name: UpdateWebhook :one
 UPDATE webhook SET url = $1, events = $2::text[], active = $3, description = $4,
   version = version + 1, updated_at = now()

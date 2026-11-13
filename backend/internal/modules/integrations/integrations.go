@@ -50,8 +50,9 @@ type Module struct {
 
 // New wires the module. allowPrivate lets webhooks reach private networks and
 // plain HTTP addresses (local testing only).
-func New(pool *pgxpool.Pool, users Users, allowPrivate bool) *Module {
-	svc := &Service{pool: pool, users: users, allowPrivate: allowPrivate}
+// serverSecret seals the webhook signing secrets it stores.
+func New(pool *pgxpool.Pool, users Users, allowPrivate bool, serverSecret []byte) *Module {
+	svc := &Service{pool: pool, users: users, allowPrivate: allowPrivate, sealer: NewSealer(serverSecret)}
 	return &Module{pool: pool, service: svc, HTTP: &HTTP{svc: svc}}
 }
 

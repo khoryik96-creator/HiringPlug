@@ -3,6 +3,7 @@ package identity
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,4 +57,21 @@ func TestTeamRules(t *testing.T) {
 	assert.Contains(t, ChangeProblem(recruiter, admin, "admin", false, 1), "Only an admin or owner")
 	assert.Empty(t, ChangeProblem(recruiter, sourcer, "viewer", true, 1))
 	assert.Empty(t, ChangeProblem(recruiter, admin, "admin", true, 1), "nothing changes (e.g. only their team)")
+}
+
+// Someone guessing a person's password is cut off, but cannot lock that
+// person out: the count is per address and email.
+func TestSignInLimitsDoNotLockOutTheVictim(t *testing.T) {
+	now := time.Unix(0, 0)
+	l := newLimits(func() time.Time { return now })
+	for i := range 10 {
+		assert.True(t, l.signIn("203.0.113.9", "siti@contoh.my"), "guess %d", i+1)
+	}
+	assert.False(t, l.signIn("203.0.113.9", "siti@contoh.my"), "the guesser is cut off")
+	assert.True(t, l.signIn("198.51.100.4", "siti@contoh.my"), "Siti still signs in from her own address")
+	assert.True(t, l.signIn("203.0.113.9", "aina@contoh.my"), "per email: a shared office address is not blocked for everyone")
+	for range 19 {
+		l.signIn("203.0.113.9", "aina@contoh.my")
+	}
+	assert.False(t, l.signIn("203.0.113.9", "other@contoh.my"), "an address trying many accounts is cut off as a whole")
 }

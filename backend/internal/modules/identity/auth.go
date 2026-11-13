@@ -30,7 +30,16 @@ const (
 
 // limits slow down guessing: per client address, and per email or user.
 type limits struct {
-	signInAddr, signInEmail, resetAddr, resetEmail, links, change *ratelimit.Limiter
+	signInAddr, signInPair, signInEmail, resetAddr, resetEmail, links, change *ratelimit.Limiter
+}
+
+// signIn reports whether another sign-in attempt for email from addr is
+// allowed. Guesses are counted per address and per address-and-email, so
+// someone guessing a colleague's password locks out only themselves, not
+// the colleague signing in from elsewhere. A much higher limit per email
+// (from every address together) still bounds guessing from many addresses.
+func (l limits) signIn(addr, email string) bool {
+	return l.signInAddr.Allow(addr) && l.signInPair.Allow(addr+"|"+email) && l.signInEmail.Allow(email)
 }
 
 func newLimits(now func() time.Time) limits {
@@ -38,7 +47,7 @@ func newLimits(now func() time.Time) limits {
 		return ratelimit.New(now, ratelimit.Limit{Window: window, Max: max}, ratelimit.Limit{Window: 24 * time.Hour, Max: dayMax})
 	}
 	return limits{
-		signInAddr: l(30, 15*time.Minute, 300), signInEmail: l(10, 15*time.Minute, 50),
+		signInAddr: l(30, 15*time.Minute, 300), signInPair: l(10, 15*time.Minute, 50), signInEmail: l(200, 15*time.Minute, 2000),
 		resetAddr: l(10, 15*time.Minute, 50), resetEmail: l(3, time.Hour, 10),
 		links: l(30, 15*time.Minute, 200), change: l(10, 15*time.Minute, 50),
 	}
@@ -71,7 +80,7 @@ func normEmail(email string) string { return strings.ToLower(strings.TrimSpace(e
 // companies, company (the careers page slug) chooses one.
 func (m *Module) SignIn(ctx context.Context, clientAddr, email, password, company string) (Session, error) {
 	email = normEmail(email)
-	if !m.limits.signInAddr.Allow(clientAddr) || !m.limits.signInEmail.Allow(email) {
+	if !m.limits.signIn(clientAddr, email) {
 		return Session{}, tooMany()
 	}
 	accounts, err := store.New(m.pool).AccountsByEmail(ctx, email)
