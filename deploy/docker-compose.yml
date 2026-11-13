@@ -6,17 +6,28 @@
 # after pulling new code.
 # For development you usually start only PostgreSQL and Mailpit: `task db:up`.
 #
-# Before running this anywhere but your own laptop, replace every *_dev
-# password and secret below (see .env.example).
+# The passwords and secrets below are published defaults for a laptop. Before
+# running this anywhere others can reach (an office server, the cloud), put
+# your own in deploy/.env, next to this file (never commit it):
+#   HP_ENV=production            refuses to start with a published secret
+#   HP_AUTH_JWT_SECRET=...       32+ random characters (signs sign-ins)
+#   HP_FILES_URL_SECRET=...      32+ random characters (signs file links)
+#   HP_MAIL_KEYS_SECRET=...      32+ random characters (seals mailbox sign-ins)
+#   HP_AI_KEYS_SECRET=...        32+ random characters (seals AI keys)
+#   HP_DB_ADMIN_PASSWORD=...     letters and digits; set before the first start
+#   HP_DB_API_PASSWORD=...  HP_DB_AI_PASSWORD=...
+# The database, the API port and the mail catcher listen on this machine only
+# (127.0.0.1); only the web app (port 3000) is reachable from other computers.
+# See docs/playbooks/run-locally.md.
 name: hiringplug
 
 x-backend-env: &backend-env
-  HP_ENV: development
-  HP_DATABASE_URL: postgres://hp_api:hp_api_dev@postgres:5432/hiringplug?sslmode=disable
-  HP_DATABASE_ADMIN_URL: postgres://postgres:postgres@postgres:5432/hiringplug?sslmode=disable
-  HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
-  HP_AUTH_JWT_SECRET: dev-only-secret-change-me-0123456789abcdef
-  HP_FILES_URL_SECRET: dev-only-secret-change-me-0123456789abcdef
+  HP_ENV: ${HP_ENV:-development}
+  HP_DATABASE_URL: postgres://hp_api:${HP_DB_API_PASSWORD:-hp_api_dev}@postgres:5432/hiringplug?sslmode=disable
+  HP_DATABASE_ADMIN_URL: postgres://postgres:${HP_DB_ADMIN_PASSWORD:-postgres}@postgres:5432/hiringplug?sslmode=disable
+  HP_AI_DATABASE_URL: postgres://hp_ai:${HP_DB_AI_PASSWORD:-hp_ai_dev}@postgres:5432/hiringplug?sslmode=disable
+  HP_AUTH_JWT_SECRET: ${HP_AUTH_JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+  HP_FILES_URL_SECRET: ${HP_FILES_URL_SECRET:-dev-only-secret-change-me-0123456789abcdef}
   HP_FILES_DIR: /data/files
   HP_INTERNAL_BASE_URL: http://api:8080
   HP_CLIENT_IP_HEADER: X-Real-IP # set by nginx (deploy/nginx.conf)
@@ -46,9 +57,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${HP_DB_ADMIN_PASSWORD:-postgres}
       POSTGRES_DB: hiringplug
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5432:5432"] # this machine only: never the network
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -70,7 +81,7 @@ services:
     environment:
       <<: *backend-env
       HP_BACKUP_DIR: /backups # Settings > Backups: list, download, delete
-    ports: ["8080:8080"]
+    ports: ["127.0.0.1:8080:8080"] # this machine only: people use the web app, which reaches the API itself
     volumes: [files:/data/files, ../backups:/backups]
     depends_on:
       bootstrap: { condition: service_completed_successfully }
@@ -88,7 +99,7 @@ services:
     build: { context: .., dockerfile: deploy/ai.Dockerfile }
     restart: unless-stopped
     environment:
-      HP_AI_DATABASE_URL: postgres://hp_ai:hp_ai_dev@postgres:5432/hiringplug?sslmode=disable
+      HP_AI_DATABASE_URL: postgres://hp_ai:${HP_DB_AI_PASSWORD:-hp_ai_dev}@postgres:5432/hiringplug?sslmode=disable
       HP_AI_OCR_LANGUAGES: eng
       HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
       HP_AI_PROVIDER_URL: ${HP_AI_PROVIDER_URL:-}
@@ -123,7 +134,7 @@ services:
   mailpit:
     image: axllent/mailpit:v1.21
     restart: unless-stopped
-    ports: ["1025:1025", "8025:8025"]
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
 
   web:
     build: { context: .., dockerfile: deploy/web.Dockerfile }

@@ -123,12 +123,14 @@ func (q *Queries) GetRequest(ctx context.Context, id string) (PrivacyRequest, er
 	return i, err
 }
 
-const giveConsent = `-- name: GiveConsent :exec
+const giveConsent = `-- name: GiveConsent :one
 INSERT INTO candidate_consent (candidate_id, tenant_id, status, method, day, recorded_by)
 VALUES ($1, app_current_tenant(), 'given', $2, $3, app_current_user())
 ON CONFLICT (candidate_id) DO UPDATE
 SET status = 'given', method = EXCLUDED.method, day = EXCLUDED.day, note = NULL,
     recorded_by = EXCLUDED.recorded_by, version = candidate_consent.version + 1, updated_at = now()
+WHERE candidate_consent.status <> 'withdrawn'
+RETURNING candidate_id
 `
 
 type GiveConsentParams struct {
@@ -138,9 +140,13 @@ type GiveConsentParams struct {
 }
 
 // Consent given on a form overrides what was recorded: applying is a new consent.
-func (q *Queries) GiveConsent(ctx context.Context, arg GiveConsentParams) error {
-	_, err := q.db.Exec(ctx, giveConsent, arg.CandidateID, arg.Method, arg.Day)
-	return err
+// A withdrawal stands: the public form cannot prove who filled it in, so it
+// never turns "withdrawn" back into "given" (no row returned then).
+func (q *Queries) GiveConsent(ctx context.Context, arg GiveConsentParams) (string, error) {
+	row := q.db.QueryRow(ctx, giveConsent, arg.CandidateID, arg.Method, arg.Day)
+	var candidate_id string
+	err := row.Scan(&candidate_id)
+	return candidate_id, err
 }
 
 const insertConsent = `-- name: InsertConsent :one

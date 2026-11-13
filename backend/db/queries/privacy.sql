@@ -18,12 +18,16 @@ WHERE candidate_id = @candidate_id AND version = @version
 RETURNING *;
 
 -- Consent given on a form overrides what was recorded: applying is a new consent.
--- name: GiveConsent :exec
+-- A withdrawal stands: the public form cannot prove who filled it in, so it
+-- never turns "withdrawn" back into "given" (no row returned then).
+-- name: GiveConsent :one
 INSERT INTO candidate_consent (candidate_id, tenant_id, status, method, day, recorded_by)
 VALUES (@candidate_id, app_current_tenant(), 'given', @method, @day, app_current_user())
 ON CONFLICT (candidate_id) DO UPDATE
 SET status = 'given', method = EXCLUDED.method, day = EXCLUDED.day, note = NULL,
-    recorded_by = EXCLUDED.recorded_by, version = candidate_consent.version + 1, updated_at = now();
+    recorded_by = EXCLUDED.recorded_by, version = candidate_consent.version + 1, updated_at = now()
+WHERE candidate_consent.status <> 'withdrawn'
+RETURNING candidate_id;
 
 -- name: ConsentCounts :one
 SELECT count(*) FILTER (WHERE status = 'given')::integer AS given,

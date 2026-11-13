@@ -45,4 +45,15 @@ func TestTeamRules(t *testing.T) {
 
 	assert.Contains(t, InviteProblem("admin", "owner"), "Only an owner")
 	assert.Empty(t, InviteProblem("owner", "owner"))
+
+	// Nobody gives or takes a role above their own, even when their role was
+	// let to manage the team.
+	assert.Contains(t, InviteProblem("recruiter", "admin"), "Only an admin or owner")
+	assert.Empty(t, InviteProblem("recruiter", "sourcer"))
+	assert.Empty(t, InviteProblem("admin", "admin"))
+	sourcer := Member{ID: "usr_s", Role: "sourcer", Active: true}
+	assert.Contains(t, ChangeProblem(recruiter, sourcer, "admin", true, 1), "Only an admin or owner")
+	assert.Contains(t, ChangeProblem(recruiter, admin, "admin", false, 1), "Only an admin or owner")
+	assert.Empty(t, ChangeProblem(recruiter, sourcer, "viewer", true, 1))
+	assert.Empty(t, ChangeProblem(recruiter, admin, "admin", true, 1), "nothing changes (e.g. only their team)")
 }

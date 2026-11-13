@@ -33,7 +33,9 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
   );
 }
 
-const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => r !== "owner" || myRole === "owner");
+/** Owners above admins above everyone else: nobody gives or changes a role above their own. */
+const rank = (r: Schemas["Role"]) => (r === "owner" ? 3 : r === "admin" ? 2 : 1);
+const roles = (myRole: Schemas["Role"]) => keysOf(ROLE).filter((r) => rank(r) <= rank(myRole));
 
 function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: Schemas["Role"]; me: boolean; groups: Group[] }) {
   const queryClient = useQueryClient();
@@ -50,7 +52,11 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
     mutationFn: async () => unwrap(await api.POST("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })),
     onSuccess: (inv) => { setLink(inv.link); },
   });
-  const locked = me || (m.role === "owner" && myRole !== "owner");
+  const cancel = useMutation({
+    mutationFn: async () => { unwrap(await api.DELETE("/v1/team/{userId}/invite", { params: { path: { userId: m.id } } })); },
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: teamKey }); },
+  });
+  const locked = me || rank(m.role) > rank(myRole);
   return (
     <tr>
       <td>{m.name}{me && <span className="muted"> (you)</span>}</td>
@@ -78,8 +84,13 @@ function MemberRow({ member: m, myRole, me, groups }: { member: Member; myRole: 
         )}
         {!locked && m.status === "deactivated" && <button type="button" className="link" onClick={() => { update.mutate({ active: true }); }}>Reactivate</button>}
         {m.status === "invited" && <button type="button" className="link" disabled={resend.isPending} onClick={() => { resend.mutate(); }}>Send new invitation</button>}
+        {m.status === "invited" && !locked && (
+          <button type="button" className="link danger" disabled={cancel.isPending} onClick={() => {
+            if (window.confirm(`Cancel the invitation of ${m.name} (${m.email})? Their link stops working now; you can invite them again later.`)) cancel.mutate();
+          }}>Cancel invitation</button>
+        )}
         {link && <div className="secret">{link}</div>}
-        <ErrorMessage error={update.error ?? resend.error} />
+        <ErrorMessage error={update.error ?? resend.error ?? cancel.error} />
       </td>
     </tr>
   );

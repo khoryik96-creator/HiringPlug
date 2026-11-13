@@ -65,6 +65,8 @@ export function describe(entry: ActivityEntry): string | null {
       return `deleted the job description ${show(entry.changes.fileName)}`;
     case "job.jd_kept":
       return "kept the job description the job was added from";
+    case "consent.kept_withdrawn":
+      return "applied through the careers page; their consent stays withdrawn until someone confirms it with them";
     case "contact.employment_check_started":
       return `checked their LinkedIn profile (${show(entry.changes.fileName)})`;
     case "contact.employment_checked":

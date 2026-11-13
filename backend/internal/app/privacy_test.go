@@ -85,7 +85,7 @@ func TestConsentIsRecordedAndWithdrawnMeansDoNotContact(t *testing.T) {
 	a.setConsent(other, c.Id, map[string]any{"expectedVersion": 0, "status": "given", "method": "phone", "day": klDay(t, 0)}, http.StatusNotFound)
 }
 
-func TestApplyingOnTheCareersPageIsConsent(t *testing.T) {
+func TestApplyingOnTheCareersPageIsConsentButKeepsAWithdrawal(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
@@ -112,8 +112,17 @@ func TestApplyingOnTheCareersPageIsConsent(t *testing.T) {
 	assert.Equal(t, klDay(t, 0), c.Day.String())
 
 	a.setConsent(token, id, map[string]any{"expectedVersion": c.Version, "status": "withdrawn", "method": "email", "day": klDay(t, 0)}, http.StatusOK)
+	// Anyone can type an email into the public form: it never undoes a
+	// withdrawal. The application still arrives, and the history says so,
+	// for someone in the team to confirm with the candidate.
 	apply()
-	assert.Equal(t, api.ConsentStatusGiven, a.privacyOf(token, id).Consent.MustGet().Status, "applying again is a new consent")
+	after := a.privacyOf(token, id).Consent.MustGet()
+	assert.Equal(t, api.ConsentStatusWithdrawn, after.Status, "a withdrawal stands")
+	assert.Equal(t, api.ConsentMethodEmail, after.Method)
+	history := a.request(http.MethodGet, "/v1/activity?entityType=candidate&entityId="+id, token, nil)
+	require.Equal(t, http.StatusOK, history.Status, "%s", history.Body)
+	assert.Contains(t, string(history.Body), "consent.kept_withdrawn")
+	a.setConsent(token, id, map[string]any{"expectedVersion": after.Version, "status": "given", "method": "phone", "day": klDay(t, 0)}, http.StatusOK)
 }
 
 func TestPrivacyRequestsAreDecidedOnTheDashboard(t *testing.T) {

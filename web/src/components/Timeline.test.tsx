@@ -41,6 +41,8 @@ describe("activity sentences", () => {
   it("never break on entries of another shape (a merge's empty list broke candidate pages)", () => {
     expect(sentence({ ...change, action: "candidate.merged", changes: { filled: null, duplicateId: "cand_2", duplicateName: "Mohd Faizal" } }))
       .toBe("merged in a duplicate record (Mohd Faizal)");
+    expect(sentence({ ...change, action: "consent.kept_withdrawn", changes: { method: "careers_form" } }))
+      .toContain("their consent stays withdrawn until someone confirms it with them");
     expect(sentence({ ...change, action: "candidate.merged", changes: { filled: ["email", "currentTitle"], duplicateName: "A" } }))
       .toBe("merged in a duplicate record (A), taking email, current title from it");
     expect(sentence({ ...change, action: "candidate.filled_from_cv", changes: { email: { from: null, to: "a@b.c" }, phone: { from: null, to: "1" } } }))

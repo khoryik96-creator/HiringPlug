@@ -90,6 +90,14 @@ func (h *HTTP) ResendInvite(ctx context.Context, req api.ResendInviteRequestObje
 	return api.ResendInvite201JSONResponse(invitationToAPI(inv)), nil
 }
 
+// CancelInvite handles DELETE /v1/team/{userId}/invite.
+func (h *HTTP) CancelInvite(ctx context.Context, req api.CancelInviteRequestObject) (api.CancelInviteResponseObject, error) {
+	if err := h.m.CancelInvite(ctx, authz.MustFromContext(ctx), req.UserId); err != nil {
+		return nil, err
+	}
+	return api.CancelInvite204Response{}, nil
+}
+
 // UpdateTeamMember handles PATCH /v1/team/{userId}.
 func (h *HTTP) UpdateTeamMember(ctx context.Context, req api.UpdateTeamMemberRequestObject) (api.UpdateTeamMemberResponseObject, error) {
 	b := req.Body

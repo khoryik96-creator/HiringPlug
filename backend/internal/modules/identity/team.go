@@ -92,6 +92,38 @@ func (m *Module) ResendInvite(ctx context.Context, p authz.Principal, userID str
 	return out, err
 }
 
+// CancelInvite withdraws the invitation of someone who has not joined: their
+// link stops working at once and they leave the team list (they can be
+// invited again). For an invitation sent to the wrong address.
+func (m *Module) CancelInvite(ctx context.Context, p authz.Principal, userID string) error {
+	return database.InTx(ctx, m.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		row, err := q.TeamMember(ctx, userID)
+		if database.IsNoRows(err) {
+			return apperr.NotFound("user")
+		}
+		if err != nil {
+			return err
+		}
+		if !row.Invited {
+			return teamProblem("They have already joined: deactivate them instead.")
+		}
+		if problem := InviteProblem(string(p.Role), row.Role); problem != "" {
+			return teamProblem(problem)
+		}
+		if err := q.EndLinks(ctx, store.EndLinksParams{UserID: userID, Kind: "invite"}); err != nil {
+			return err
+		}
+		if n, err := q.DeleteInvited(ctx, userID); err != nil {
+			return err
+		} else if n == 0 {
+			return teamProblem("They have already joined: deactivate them instead.")
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "user.invite_cancelled", EntityType: "user", EntityID: userID,
+			Changes: map[string]any{"email": row.Email, "role": row.Role}})
+	})
+}
+
 func (m *Module) sendInvite(ctx context.Context, tx pgx.Tx, q *store.Queries, p authz.Principal, member TeamMember) (Invitation, error) {
 	link, expires, err := m.link(ctx, q, member.ID, "invite", InviteValid)
 	if err != nil {

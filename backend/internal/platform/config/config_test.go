@@ -39,6 +39,24 @@ func TestProductionRefusesDevelopmentSecrets(t *testing.T) {
 	_, err := Load(env(map[string]string{"HP_ENV": "production", "HP_DATABASE_URL": "postgres://u:p@db:5432/hp"}))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "HP_AUTH_JWT_SECRET must be set to a real secret")
+
+	// Every published default is refused, the mail keys and the database
+	// password among them (the Docker file ships with them).
+	real := "a-real-secret-0123456789-0123456789-xyz"
+	_, err = Load(env(map[string]string{
+		"HP_ENV": "production", "HP_DATABASE_URL": "postgres://hp_api:hp_api_dev@db:5432/hp",
+		"HP_AUTH_JWT_SECRET": real, "HP_FILES_URL_SECRET": real, "HP_MAIL_KEYS_SECRET": devSecret,
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HP_MAIL_KEYS_SECRET must be a real secret")
+	assert.Contains(t, err.Error(), "HP_DATABASE_URL must not use the published development password")
+	assert.NotContains(t, err.Error(), "hp_api_dev")
+
+	_, err = Load(env(map[string]string{
+		"HP_ENV": "production", "HP_DATABASE_URL": "postgres://hp_api:s3cretpw@db:5432/hp",
+		"HP_AUTH_JWT_SECRET": real, "HP_FILES_URL_SECRET": real, "HP_MAIL_KEYS_SECRET": real,
+	}))
+	require.NoError(t, err)
 }
 
 func TestPasswordsNeverAppearInErrors(t *testing.T) {

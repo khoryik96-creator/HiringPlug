@@ -27,7 +27,10 @@ func TestHealthAndDocs(t *testing.T) {
 	a := newTestApp(t)
 	assert.Equal(t, http.StatusNoContent, a.request(http.MethodGet, "/health/live", "", nil).Status)
 	assert.Equal(t, http.StatusNoContent, a.request(http.MethodGet, "/health/ready", "", nil).Status)
-	assert.Equal(t, http.StatusOK, a.request(http.MethodGet, "/docs", "", nil).Status)
+	docs := a.request(http.MethodGet, "/docs", "", nil)
+	assert.Equal(t, http.StatusOK, docs.Status)
+	assert.Regexp(t, `<script src="https://cdn\.jsdelivr\.net/npm/@scalar/api-reference@\d+\.\d+\.\d+/[^"]+" integrity="sha384-[A-Za-z0-9+/=]{64}" crossorigin="anonymous">`,
+		string(docs.Body), "the outside script is one fixed version with its fingerprint")
 	spec := a.request(http.MethodGet, "/openapi.json", "", nil).Map()
 	assert.Contains(t, spec["paths"], "/v1/candidates")
 }

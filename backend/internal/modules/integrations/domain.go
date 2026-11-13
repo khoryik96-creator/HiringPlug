@@ -32,6 +32,13 @@ func HashKey(key string) string {
 // the key's id).
 func IsKeyPrincipal(userID string) bool { return strings.HasPrefix(userID, "akey_") }
 
+// MayGiveKeyRole reports whether someone with actorRole may make a key that
+// acts as keyRole: an admin key only by an admin or owner, whoever else was
+// let to manage integrations (a key is never an owner).
+func MayGiveKeyRole(actorRole, keyRole string) bool {
+	return keyRole != "admin" || actorRole == "admin" || actorRole == "owner"
+}
+
 // Events are those a webhook may listen for (audit actions; the contract's
 // WebhookEvent lists the same, which a test checks). Salary changes are not
 // among them.

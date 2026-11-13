@@ -32,6 +32,27 @@ describe("team", () => {
     expect(screen.getByRole("button", { name: "Send new invitation" })).toBeTruthy();
   });
 
+  it("cancels an invitation sent to the wrong person, after asking", async () => {
+    reads();
+    const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderWithClient(<Team myRole="admin" myId="usr_me" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel invitation" }));
+    expect(confirm.mock.calls[0]?.[0]).toContain("Their link stops working now");
+    await waitFor(() => { expect(del).toHaveBeenCalled(); });
+    expect(del.mock.calls[0]?.[0]).toBe("/v1/team/{userId}/invite");
+    expect(del.mock.calls[0]?.[1]).toEqual({ params: { path: { userId: "usr_n" } } });
+  });
+
+  it("offers nobody a role above their own, and leaves admins to admins", async () => {
+    reads();
+    renderWithClient(<Team myRole="recruiter" myId="usr_r" />);
+    const nur = await screen.findByLabelText("Role of Nur");
+    expect(within(nur).queryByText("Admin"), "a recruiter let to manage the team does not make admins").toBeNull();
+    expect(within(nur).getByText("Sourcer")).toBeTruthy();
+    expect(screen.queryByLabelText("Role of Aina"), "nor change one").toBeNull();
+  });
+
   it("invites someone and shows the link to pass on", async () => {
     reads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({

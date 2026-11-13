@@ -75,6 +75,11 @@ UPDATE app_user SET role = @role, active = @active, team_id = sqlc.narg(team_id)
 WHERE id = @id
 RETURNING id, email, name, role, team_id, active, invited, last_sign_in_at, created_at;
 
+-- Cancelling an invitation: only someone who never joined is removed (their
+-- links go with them).
+-- name: DeleteInvited :execrows
+DELETE FROM app_user WHERE id = @id AND invited;
+
 -- name: ActiveOwners :one
 SELECT count(*) FROM app_user WHERE role = 'owner' AND active;
 

@@ -1676,7 +1676,11 @@ export interface paths {
         put?: never;
         /** Send someone who has not joined yet a new invitation (the old link stops working) */
         post: operations["resendInvite"];
-        delete?: never;
+        /**
+         * Cancel the invitation of someone who has not joined yet (their link stops working at once)
+         * @description For an invitation sent to the wrong address or person. They are removed from the team list and can be invited again later. Someone who has joined is deactivated instead (PATCH).
+         */
+        delete: operations["cancelInvite"];
         options?: never;
         head?: never;
         patch?: never;
@@ -10943,6 +10947,30 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Invitation"];
                 };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["TeamChangeNotAllowed"];
+        };
+    };
+    cancelInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];

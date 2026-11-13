@@ -27,7 +27,7 @@ machine first and is built to move to the cloud later.
   candidate.
 - **Users and roles** (owner, admin, recruiter, sourcer, hiring manager,
   viewer) with view / create / update permissions per area.
-- **API documentation** generated from the contract, at `/docs`.
+- **API documentation** generated from the contract, at `/docs` on the API's own port (http://localhost:8080/docs).
 - **A web app** to search and add candidates, edit their profile and salary
   (each needs its own permission), see the "restricted" notice where salary is
   hidden, and upload CVs and read their text.

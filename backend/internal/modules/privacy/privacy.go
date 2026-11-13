@@ -65,12 +65,23 @@ func New(pool *pgxpool.Pool, deps Deps, loc *time.Location) *Module {
 }
 
 // RecordFormConsent records that a candidate consented on the careers form
-// today, in the caller's transaction. Applying is a new consent, so it
-// replaces an earlier withdrawal.
+// today, in the caller's transaction. A consent they withdrew before stays
+// withdrawn (the form cannot prove who filled it in): the history notes that
+// they applied, for someone in the team to confirm with them.
 func (m *Module) RecordFormConsent(ctx context.Context, tx pgx.Tx, candidateID string) error {
-	if err := store.New(tx).GiveConsent(ctx, store.GiveConsentParams{
+	_, err := store.New(tx).GiveConsent(ctx, store.GiveConsentParams{
 		CandidateID: candidateID, Method: MethodCareersForm, Day: toDate(m.service.today()),
-	}); err != nil {
+	})
+	if database.IsNoRows(err) {
+		// They withdrew consent before. Anyone can type an email into the
+		// public form, so the withdrawal stands until a person in the team
+		// confirms with them and records it.
+		return audit.Record(ctx, tx, audit.Entry{
+			Action: "consent.kept_withdrawn", EntityType: "candidate", EntityID: candidateID,
+			Changes: map[string]any{"method": MethodCareersForm, "note": "applied through the careers form while consent is withdrawn"},
+		})
+	}
+	if err != nil {
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{

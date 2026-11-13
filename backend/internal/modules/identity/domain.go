@@ -102,7 +102,24 @@ func InviteProblem(actorRole, role string) string {
 	if role == "owner" && actorRole != "owner" {
 		return "Only an owner can make someone an owner."
 	}
+	if RoleRank(role) > RoleRank(actorRole) {
+		return "Only an admin or owner can make someone an admin."
+	}
 	return ""
+}
+
+// RoleRank orders roles by what they may hand out: owners above admins
+// above everyone else. Nobody gives (or takes away) a role above their own,
+// whatever their role was allowed to manage: being let to invite teammates
+// is not being let to make an admin.
+func RoleRank(role string) int {
+	switch role {
+	case "owner":
+		return 3
+	case "admin":
+		return 2
+	}
+	return 1
 }
 
 // ChangeProblem says why actor may not change target to (role, active), or
@@ -116,6 +133,8 @@ func ChangeProblem(actor, target Member, role string, active bool, activeOwners 
 		return "You cannot change your own role or deactivate yourself: ask another admin or owner."
 	case (target.Role == "owner" || role == "owner") && actor.Role != "owner" && (role != target.Role || active != target.Active):
 		return "Only an owner can make, change or deactivate an owner."
+	case (RoleRank(target.Role) > RoleRank(actor.Role) || RoleRank(role) > RoleRank(actor.Role)) && (role != target.Role || active != target.Active):
+		return "Only an admin or owner can make, change or deactivate an admin."
 	case target.Role == "owner" && target.Active && (role != "owner" || !active) && activeOwners <= 1:
 		return "The company needs at least one active owner: make someone else an owner first."
 	}

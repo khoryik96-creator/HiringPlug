@@ -203,6 +203,12 @@ func Load(getenv func(string) string) (Config, error) {
 		if strings.HasPrefix(string(c.AI.KeysSecret), "dev-only-") {
 			r.fail("HP_AI_KEYS_SECRET must be a real secret in production (or empty)")
 		}
+		if strings.HasPrefix(string(c.MailConnections.KeysSecret), "dev-only-") {
+			r.fail("HP_MAIL_KEYS_SECRET must be a real secret in production (or empty: no mailboxes can be connected)")
+		}
+		if strings.Contains(c.DatabaseURL, ":hp_api_dev@") {
+			r.fail("HP_DATABASE_URL must not use the published development password in production")
+		}
 	}
 	if len(r.problems) > 0 {
 		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(r.problems, "\n  - "))

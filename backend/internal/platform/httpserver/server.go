@@ -99,14 +99,25 @@ func serveContract(w http.ResponseWriter, r *http.Request) {
 
 // serveDocs renders the contract as browsable API documentation (Scalar).
 // It loads Scalar's script from a CDN, so it needs internet access.
+// The API reference's script: one fixed version, with its fingerprint, so
+// the browser refuses anything else the CDN might serve under that address.
+// To move to a newer version, change both (the hash is the sha384 of the
+// file in the npm package: dist/browser/standalone.js).
+const (
+	docsScript     = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.0/dist/browser/standalone.js"
+	docsScriptHash = "sha384-oH1C0RwqcwbVXkC+r8A+4qRoyEUQdtxAzOwumkxZtQBBcsy61FOoPt7B50OVJYYQ"
+)
+
 func serveDocs(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	_, _ = w.Write([]byte(`<!doctype html>
 <html>
   <head><title>HiringPlug API</title><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
   <body>
     <script id="api-reference" data-url="/openapi.json"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script src="` + docsScript + `" integrity="` + docsScriptHash + `" crossorigin="anonymous"></script>
   </body>
 </html>
 `))

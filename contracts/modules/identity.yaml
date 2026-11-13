@@ -302,6 +302,20 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
+    delete:
+      operationId: cancelInvite
+      tags: [identity]
+      summary: Cancel the invitation of someone who has not joined yet (their link stops working at once)
+      description: >
+        For an invitation sent to the wrong address or person. They are removed from the team list and can be
+        invited again later. Someone who has joined is deactivated instead (PATCH).
+      x-permission: identity.team:manage
+      responses:
+        '204': { description: Cancelled }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/TeamChangeNotAllowed' }
 
   /v1/access:
     get:

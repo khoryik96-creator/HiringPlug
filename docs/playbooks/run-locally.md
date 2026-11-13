@@ -44,9 +44,26 @@ For development, `task db:setup` (`hp dev-setup`) creates demo users who sign
 in with their email (e.g. `owner@demo.hiringplug.local`) and the password
 `demo-password-2026`.
 
-**Before anything beyond your own laptop:** change every `*_dev` password and
-the two secrets in `deploy/docker-compose.yml` (or move them to a `.env` file),
-and put HTTPS in front (e.g. Caddy).
+**Before anything beyond your own laptop** (an office server, the cloud): the
+passwords and secrets in `deploy/docker-compose.yml` are published defaults.
+Put your own in `deploy/.env` (next to `docker-compose.yml`; never commit it):
+
+```
+HP_ENV=production
+HP_AUTH_JWT_SECRET=<32+ random characters>
+HP_FILES_URL_SECRET=<32+ random characters>
+HP_MAIL_KEYS_SECRET=<32+ random characters>
+HP_AI_KEYS_SECRET=<32+ random characters>
+HP_DB_ADMIN_PASSWORD=<letters and digits>
+HP_DB_API_PASSWORD=<letters and digits>
+HP_DB_AI_PASSWORD=<letters and digits>
+```
+
+With `HP_ENV=production` HiringPlug refuses to start while any of them is
+still a published default. Set the database passwords before the first start
+(the admin password is fixed when the database is first created). The
+database, the API port and the mail catcher listen on the machine itself only;
+other computers reach the web app (port 3000). Put HTTPS in front (e.g. Caddy).
 
 ## Turning on the AI assistant and matching
 

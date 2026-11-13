@@ -144,6 +144,20 @@ func (q *Queries) CareersTenant(ctx context.Context, slug string) (CareersTenant
 	return i, err
 }
 
+const deleteInvited = `-- name: DeleteInvited :execrows
+DELETE FROM app_user WHERE id = $1 AND invited
+`
+
+// Cancelling an invitation: only someone who never joined is removed (their
+// links go with them).
+func (q *Queries) DeleteInvited(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInvited, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteRoleSetting = `-- name: DeleteRoleSetting :exec
 DELETE FROM role_setting WHERE role = $1
 `

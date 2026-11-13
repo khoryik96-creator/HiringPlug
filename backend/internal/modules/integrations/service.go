@@ -68,6 +68,9 @@ func (s *Service) CreateAPIKey(ctx context.Context, p authz.Principal, name, rol
 	if name == "" {
 		return store.ApiKey{}, "", apperr.Validation(apperr.FieldErrors{{Field: "name", Message: "is required"}})
 	}
+	if !MayGiveKeyRole(string(p.Role), role) {
+		return store.ApiKey{}, "", apperr.New(api.ErrorCodeFORBIDDEN, "Only an admin or owner can make a key that acts as an admin.")
+	}
 	key := KeyPrefix + randomHex(32)
 	var out store.ApiKey
 	err := s.inTx(ctx, p, func(tx pgx.Tx, q *store.Queries) error {
