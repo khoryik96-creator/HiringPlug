@@ -109,7 +109,8 @@ services:
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 
-  # A backup of the database and the uploaded files every night, the newest
+  # A backup of the database and the uploaded files every night (only files
+  # new since the night before are copied; unchanged ones are shared), the newest
   # 14 kept, in the backups folder next to this repository (copy them to
   # another disk or the cloud too). Settings > Backups turns the nightly
   # backup off or on, makes one now, and downloads one. Restore one with:

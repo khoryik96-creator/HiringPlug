@@ -29,3 +29,9 @@ func FindTool(name string, major int, onPath, pathVersion string, debianMajors .
 	}
 	return f.tool(name, major)
 }
+
+// LinkFiles and PreviousFiles are linkFiles and previousFiles, for tests.
+var (
+	LinkFiles     = linkFiles
+	PreviousFiles = previousFiles
+)

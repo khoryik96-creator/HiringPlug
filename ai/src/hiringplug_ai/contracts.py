@@ -5714,7 +5714,12 @@ class Backups(BaseModel):
         Field(description="The latest backup run (it may have failed); null before the first."),
     ]
     backups: Annotated[list[BackupFile], Field(description="The backups on the server, newest first.")]
-    totalBytes: Annotated[int, Field(description="The space all of them take.")]
+    totalBytes: Annotated[
+        int,
+        Field(
+            description="The disk space all of them take (a file unchanged between backups is counted once)."
+        ),
+    ]
 
 
 class AiProviders(BaseModel):

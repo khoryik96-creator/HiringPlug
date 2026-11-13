@@ -110,7 +110,7 @@ func (s *Service) backupsIn(ctx context.Context, tx pgx.Tx) (Backups, error) {
 		return out, err
 	}
 	for _, b := range out.List {
-		out.Total += b.SizeBytes
+		out.Total += b.DiskBytes // what they take on the disk: unchanged files are shared between backups
 	}
 	return out, nil
 }

@@ -21,7 +21,18 @@ func Restore(ctx context.Context, o Options, name string) error {
 		return fmt.Errorf("%q is not a backup name (hiringplug-YYYYMMDD-HHMMSS)", name)
 	}
 	dir := filepath.Join(o.Dir, name)
-	for _, f := range []string{"database.dump", "files.tar.gz", "manifest.json"} {
+	// The uploaded files are a folder; a backup made before that holds them
+	// as files.tar.gz, and still restores.
+	files, packed := filepath.Join(dir, filesFolder), filepath.Join(dir, "files.tar.gz")
+	inFolder := false
+	if info, err := os.Stat(files); err == nil && info.IsDir() {
+		inFolder = true
+	}
+	need := []string{"database.dump", "manifest.json"}
+	if !inFolder {
+		need = append(need, "files.tar.gz")
+	}
+	for _, f := range need {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			return fmt.Errorf("backup %s is incomplete: %w", name, err)
 		}
@@ -42,7 +53,10 @@ func Restore(ctx context.Context, o Options, name string) error {
 	if err := emptyDir(o.FilesDir); err != nil {
 		return fmt.Errorf("emptying the files folder: %w", err)
 	}
-	return untar(filepath.Join(dir, "files.tar.gz"), o.FilesDir)
+	if inFolder {
+		return copyTree(files, o.FilesDir)
+	}
+	return untar(packed, o.FilesDir)
 }
 
 func emptyDir(dir string) error {

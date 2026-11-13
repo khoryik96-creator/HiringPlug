@@ -12,13 +12,10 @@
 package backup
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -138,7 +135,9 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 	if err := os.Chmod(dump, 0o600); err != nil { // it holds every company's data
 		return "", 0, err
 	}
-	files, err := tarFiles(o.FilesDir, filepath.Join(tmp, "files.tar.gz"))
+	// Only files new since the previous backup are copied; the rest are
+	// shared with it (incremental.go).
+	files, copied, filesTar, err := linkFiles(o.FilesDir, previousFiles(o.Dir), filepath.Join(tmp, filesFolder), name+"/"+filesFolder)
 	if err != nil {
 		return "", 0, fmt.Errorf("copying the files: %w", err)
 	}
@@ -148,6 +147,7 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 	}
 	manifest, _ := json.MarshalIndent(map[string]any{
 		"name": name, "createdAt": o.Now().UTC(), "files": files, "sizeBytes": size,
+		"newFileBytes": copied, "filesTarBytes": filesTar,
 		"restore": "hp restore " + name + " --yes (stop the API and workers first)",
 	}, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmp, "manifest.json"), manifest, 0o600); err != nil {
@@ -158,60 +158,6 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 	}
 	ok = true
 	return final, size, nil
-}
-
-// tarFiles writes every regular file under dir into a gzipped tar at path. It
-// returns how many there were.
-func tarFiles(dir, path string) (int, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) //nolint:gosec // a new file in the backup being written
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = f.Close() }()
-	gz := gzip.NewWriter(f)
-	tw := tar.NewWriter(gz)
-	n := 0
-	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) && p == dir {
-				return filepath.SkipDir // no files yet
-			}
-			return err
-		}
-		if !d.Type().IsRegular() { // folders are implied; links are never followed
-			return nil
-		}
-		rel, err := filepath.Rel(dir, p)
-		if err != nil {
-			return err
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		hdr := &tar.Header{Name: filepath.ToSlash(rel), Mode: 0o600, Size: info.Size(), ModTime: info.ModTime(), Typeflag: tar.TypeReg}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-		src, err := os.Open(p) //nolint:gosec // a file under our own files folder
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(tw, src)
-		_ = src.Close()
-		n++
-		return err
-	})
-	if err != nil {
-		return 0, err
-	}
-	if err := tw.Close(); err != nil {
-		return 0, err
-	}
-	if err := gz.Close(); err != nil {
-		return 0, err
-	}
-	return n, f.Close()
 }
 
 // prune deletes the oldest backups beyond keep, and partial ones left by a crash.

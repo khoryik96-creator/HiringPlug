@@ -7463,7 +7463,7 @@ export interface components {
             backups: components["schemas"]["BackupFile"][];
             /**
              * Format: int64
-             * @description The space all of them take.
+             * @description The disk space all of them take (a file unchanged between backups is counted once).
              */
             totalBytes: number;
         };

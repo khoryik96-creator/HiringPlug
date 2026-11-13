@@ -56,7 +56,7 @@ func TestBackupsInSettings(t *testing.T) {
 	// content in 512-byte blocks, then two empty blocks.
 	wantSize := int64(512 + (512 + 2048) + (512 + 1024) + (512 + 512) + 1024)
 	assert.Equal(t, wantSize, b.Backups[0].SizeBytes)
-	assert.Equal(t, wantSize, b.TotalBytes)
+	assert.EqualValues(t, 2000+700+46, b.TotalBytes, "in all: what they take on the disk")
 
 	t.Run("only the owner of the agency that runs the server", func(t *testing.T) {
 		res := a.request(http.MethodGet, "/v1/settings/backups", operator.Users[api.RoleAdmin].Token, nil)

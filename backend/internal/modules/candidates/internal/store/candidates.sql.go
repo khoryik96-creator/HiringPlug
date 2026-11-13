@@ -1589,12 +1589,15 @@ func (q *Queries) SetIndustrySummary(ctx context.Context, arg SetIndustrySummary
 const similarCandidates = `-- name: SimilarCandidates :many
 SELECT id, first_name, last_name, email, phone, current_title, current_company, location, work_authorization, updated_at,
        (phone IS NOT NULL AND phone = $1::text)::boolean AS same_phone,
-       (similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) >= 0.6)::boolean AS similar_name
+       (similarity(name_text, app_normalize_text($2::text)) >= 0.6)::boolean AS similar_name
 FROM candidate
 WHERE id <> $3
+  -- name_text % ... is what the name index answers (it finds names at least
+  -- 30% alike); the 60% rule is then checked on those few, not on everyone.
   AND ((phone IS NOT NULL AND phone = $1::text)
-       OR similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) >= 0.6)
-ORDER BY similarity(app_normalize_text(first_name || ' ' || last_name), app_normalize_text($2::text)) DESC, id DESC
+       OR (name_text % app_normalize_text($2::text)
+           AND similarity(name_text, app_normalize_text($2::text)) >= 0.6))
+ORDER BY similarity(name_text, app_normalize_text($2::text)) DESC, id DESC
 LIMIT 10
 `
 

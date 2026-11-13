@@ -60,7 +60,8 @@ export function BackupsPage() {
             <p className="muted">
               A backup is a copy of everything in HiringPlug: candidates, notes and screening calls, salaries, companies, contacts,
               jobs, placements, settings, and every uploaded CV and file. It is kept on the computer HiringPlug runs on (your own
-              computer, if HiringPlug runs there); the newest 14 are kept.
+              computer, if HiringPlug runs there); the newest 14 are kept. Each night only new files are copied: a file that has
+              not changed is shared between backups, so they take far less disk than their sizes added up.
             </p>
             <label className="switch-row">
               <input type="checkbox" role="switch" checked={b.auto} disabled={setAuto.isPending}
@@ -101,7 +102,7 @@ function BackupList({ backups: b, onDelete, deleting }: { backups: Backups; onDe
       <h3>On this server</h3>
       {b.backups.length === 0 ? <p className="muted">No backups on this server.</p> : (
         <>
-          <p className="small" role="status">{b.backups.length} backup{b.backups.length === 1 ? "" : "s"} · {fileSize(b.totalBytes)} in all</p>
+          <p className="small" role="status">{b.backups.length} backup{b.backups.length === 1 ? "" : "s"} · {fileSize(b.totalBytes)} on the disk in all</p>
           <div className="table-scroll">
           <table>
             <thead><tr><th>Made</th><th>Files</th><th>Size</th><th /></tr></thead>

@@ -54,11 +54,28 @@ func TestABackupHoldsTheDatabaseAndFilesAndRestoresBoth(t *testing.T) {
 		kept = append(kept, e.Name())
 	}
 	assert.Equal(t, made[1:], kept, "only the newest two are kept")
-	for _, f := range []string{"database.dump", "files.tar.gz", "manifest.json"} {
+	for _, f := range []string{"database.dump", "manifest.json", filepath.Join("files", tenant.ID, "doc_1")} {
 		info, err := os.Stat(filepath.Join(dir, made[2], f))
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "%s: only the server's own user may read it", f)
 	}
+	// The file did not change between the two nights: both backups hold it,
+	// once on the disk.
+	older, err := os.Stat(filepath.Join(dir, made[1], "files", tenant.ID, "doc_1"))
+	require.NoError(t, err)
+	newer, err := os.Stat(filepath.Join(dir, made[2], "files", tenant.ID, "doc_1"))
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(older, newer), "an unchanged file is shared with the backup before, not copied again")
+	// What Settings shows is the download's size to the byte, files included.
+	size, err := backup.Size(dir, made[2])
+	require.NoError(t, err)
+	var sent countingWriter
+	require.NoError(t, backup.WriteTar(&sent, dir, made[2]))
+	assert.Equal(t, size, sent.n)
+	info, err := backup.Stat(dir, made[2])
+	require.NoError(t, err)
+	assert.Equal(t, 1, info.Files)
+	assert.Less(t, info.DiskBytes, info.SizeBytes, "it added less to the disk than its download: its file is shared")
 
 	last, ok, err := backup.LastRun(ctx, testutil.Current.App)
 	require.NoError(t, err)
@@ -158,3 +175,7 @@ func TestTheToolsMatchTheDatabasesVersion(t *testing.T) {
 	_, err = backup.FindTool("pg_dump", 16, "", "")
 	assert.ErrorContains(t, err, "not installed")
 }
+
+type countingWriter struct{ n int64 }
+
+func (c *countingWriter) Write(p []byte) (int, error) { c.n += int64(len(p)); return len(p), nil }

@@ -25,6 +25,9 @@ type Info struct {
 	CreatedAt time.Time
 	SizeBytes int64 // the .tar download's size
 	Files     int   // uploaded files it holds
+	// DiskBytes is what it added to the disk: files unchanged since the
+	// backup before it are shared with that one and not counted again.
+	DiskBytes int64
 }
 
 // ValidName reports whether name is a backup's folder name (no paths).
@@ -76,19 +79,39 @@ func Stat(dir, name string) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	out := Info{Name: name, SizeBytes: tarSize(parts)}
+	out := Info{Name: name, SizeBytes: tarSize(name, parts)}
+	for _, p := range parts {
+		out.DiskBytes += p.size
+	}
 	out.CreatedAt, _ = time.Parse("20060102-150405", name[len("hiringplug-"):])
+	var m struct {
+		CreatedAt     time.Time `json:"createdAt"`
+		Files         int       `json:"files"`
+		NewFileBytes  *int64    `json:"newFileBytes"`
+		FilesTarBytes *int64    `json:"filesTarBytes"`
+	}
 	if raw, err := os.ReadFile(filepath.Join(path, "manifest.json")); err == nil { //nolint:gosec // a file of a backup named by nameRe
-		var m struct {
-			CreatedAt time.Time `json:"createdAt"`
-			Files     int       `json:"files"`
-		}
 		if json.Unmarshal(raw, &m) == nil {
 			if !m.CreatedAt.IsZero() {
 				out.CreatedAt = m.CreatedAt
 			}
 			out.Files = m.Files
 		}
+	}
+	// The uploaded files (the files folder): the manifest says what they
+	// take, so listing backups does not read hundreds of thousands of files.
+	if m.FilesTarBytes != nil && m.NewFileBytes != nil {
+		out.SizeBytes += *m.FilesTarBytes
+		out.DiskBytes += *m.NewFileBytes
+		return out, nil
+	}
+	files, err := fileParts(path)
+	if err != nil {
+		return Info{}, err
+	}
+	for _, f := range files {
+		out.SizeBytes += entrySize(name+"/"+f.name, f.size)
+		out.DiskBytes += f.size
 	}
 	return out, nil
 }
@@ -127,10 +150,10 @@ func parts(path string) ([]part, error) {
 // tarSize is the exact size of the .tar WriteTar writes: a 512-byte header
 // and the content padded to 512 bytes for each file (names are short, so no
 // extra headers), the folder's own header, and two empty blocks at the end.
-func tarSize(parts []part) int64 {
+func tarSize(name string, parts []part) int64 {
 	size := int64(512) // the folder
 	for _, p := range parts {
-		size += 512 + (p.size+511)/512*512
+		size += entrySize(name+"/"+p.name, p.size)
 	}
 	return size + 1024
 }
@@ -152,6 +175,11 @@ func WriteTar(w io.Writer, dir, name string) error {
 	if err != nil {
 		return err
 	}
+	uploaded, err := fileParts(path)
+	if err != nil {
+		return err
+	}
+	files = append(files, uploaded...)
 	tw := tar.NewWriter(w)
 	folder := &tar.Header{Name: name + "/", Mode: 0o700, Typeflag: tar.TypeDir, Format: tar.FormatGNU, ModTime: time.Now().Truncate(time.Second)}
 	if err := tw.WriteHeader(folder); err != nil {
@@ -161,7 +189,7 @@ func WriteTar(w io.Writer, dir, name string) error {
 		if err := tw.WriteHeader(FileHeader(name, p.name, p.size, p.mod)); err != nil {
 			return err
 		}
-		f, err := os.Open(filepath.Join(path, p.name)) //nolint:gosec // a file of a backup named by nameRe
+		f, err := os.Open(filepath.Join(path, filepath.FromSlash(p.name))) //nolint:gosec // a file of a backup named by nameRe
 		if err != nil {
 			return err
 		}
@@ -198,18 +226,15 @@ func Own(dir string, uid, gid int) error {
 		if !e.IsDir() || !nameRe.MatchString(e.Name()) {
 			continue
 		}
-		path := filepath.Join(dir, e.Name())
-		errs = append(errs, os.Chown(path, uid, gid))
-		files, err := os.ReadDir(path)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		for _, f := range files {
-			if f.Type().IsRegular() {
-				errs = append(errs, os.Chown(filepath.Join(path, f.Name()), uid, gid))
+		errs = append(errs, filepath.WalkDir(filepath.Join(dir, e.Name()), func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
-		}
+			if d.IsDir() || d.Type().IsRegular() { // its folders and files; links are left alone
+				return os.Chown(p, uid, gid)
+			}
+			return nil
+		}))
 	}
 	return errors.Join(errs...)
 }

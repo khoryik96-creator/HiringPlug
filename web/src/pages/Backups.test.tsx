@@ -37,7 +37,7 @@ describe("Settings › Backups", () => {
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(backups({ auto: false })));
     renderWithClient(<BackupsPage />);
     const list = await screen.findByRole("region", { name: "Backups on this server" });
-    expect(within(list).getByText("2 backups · 1.20 GB in all")).toBeTruthy();
+    expect(within(list).getByText("2 backups · 1.20 GB on the disk in all")).toBeTruthy();
     expect(within(list).getByText("3.4 MB")).toBeTruthy();
     expect(within(list).getByText("1.20 GB")).toBeTruthy();
     expect(screen.getByText(/The backup service is running/)).toBeTruthy();

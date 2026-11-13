@@ -31,6 +31,7 @@ type Service struct {
 	movers      []RecordMover
 	notes       Notes // screening calls' notes
 	cvs         CVs   // CV text, for advanced search
+	used        usedCache // the suggestions of values already used
 }
 
 // Create adds a candidate.
@@ -90,6 +91,9 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Profile) (Vi
 		view.OwnerName, err = ownerName(ctx, tx, s.users, view.OwnerID)
 		return err
 	})
+	if err == nil {
+		s.used.learn(p.TenantID, view.Profile)
+	}
 	return view, err
 }
 
@@ -125,6 +129,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		view, err = s.updateIn(ctx, tx, p, id, expectedVersion, patch.Apply, false)
 		return err
 	})
+	if err == nil {
+		s.used.learn(p.TenantID, view.Profile)
+	}
 	return view, err
 }
 
