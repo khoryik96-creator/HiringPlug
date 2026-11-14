@@ -2,6 +2,7 @@ import type { ContactSummary } from "../api/client";
 import { chipStyle } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
+import { MailboxBadge } from "./MailboxBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
 import { useFieldSettings } from "./useFieldSettings";
@@ -36,8 +37,11 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
         </tr>
       </thead>
       <tbody>
-        {contacts.map((c) => (
-          <tr key={c.id} {...(onPick ? pickRowProps(picked?.has(c.id) ?? false, () => { onPick([c], !(picked?.has(c.id) ?? false)); }) : {})}>
+        {contacts.map((c) => {
+          const pickProps = onPick ? pickRowProps(picked?.has(c.id) ?? false, () => { onPick([c], !(picked?.has(c.id) ?? false)); }) : undefined;
+          const bounces = c.mailboxStatus === "invalid";
+          return (
+          <tr key={c.id} {...pickProps} className={[pickProps?.className, bounces ? "bounces" : ""].filter(Boolean).join(" ") || undefined}>
             <td>
               <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
@@ -48,10 +52,15 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
             <td>{c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}</td>
             <td>{c.title}</td>
             {showCompany && <td><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></td>}
-            <td>{c.email} <EmailCheckBadge check={c.emailCheckStatus} /></td>
+            <td>
+              {c.email}{" "}
+              {/* A mailbox answer says more than the quick check of the address. */}
+              {c.mailboxStatus ? <MailboxBadge check={c.mailboxStatus} /> : <EmailCheckBadge check={c.emailCheckStatus} />}
+            </td>
             <td>{c.mobile ?? c.phone}</td>
           </tr>
-        ))}
+          );
+        })}
         {contacts.length === 0 && (
           <tr><td colSpan={showCompany ? 7 : 6} className="muted">{empty}</td></tr>
         )}

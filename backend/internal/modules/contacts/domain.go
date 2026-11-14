@@ -41,6 +41,7 @@ type Contact struct {
 	Details     Details
 	EmailCheck  *EmailCheckResult // nil without an email
 	Employment  *EmploymentCheck  // the latest LinkedIn check; nil before the first
+	Mailbox     *MailboxCheck     // the latest mailbox check of Details.Email; nil before the first
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -48,7 +49,7 @@ type Contact struct {
 // Summary is a contact in a list.
 type Summary struct {
 	ID, CompanyID, CompanyName, FirstName, LastName, Status string
-	Title, Email, EmailCheckStatus, Phone, Mobile, Role     *string
+	Title, Email, EmailCheckStatus, MailboxStatus, Phone, Mobile, Role *string
 	UpdatedAt                                               time.Time
 }
 

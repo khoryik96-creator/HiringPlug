@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -25,6 +26,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/app"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/config"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mailcheck"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -92,6 +94,7 @@ func newTestApp(t *testing.T, overrides ...map[string]string) *testApp {
 	require.NoError(t, err)
 	t.Cleanup(closeDeps)
 	deps.MailServers = fakeMailServers{}
+	deps.Mailboxes = &fakeMailboxes{}
 	deps.Mail = mail.NewSMTP(mail.Config{Addr: mailServer.Addr, From: "no-reply@agency.test", TLS: "none"})
 	modules := app.NewModules(deps)
 	handler, err := app.NewHTTPHandler(deps, modules)
@@ -266,4 +269,41 @@ func (fakeMailServers) LookupMX(_ context.Context, name string) ([]*net.MX, erro
 
 func (fakeMailServers) LookupHost(_ context.Context, host string) ([]string, error) {
 	return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+}
+
+// fakeMailboxes answers mailbox checks without the network, by the address's
+// local part: gone@ does not exist, busy@ is inconclusive (worth a recheck),
+// any other is accepted. It keeps what it was asked.
+type fakeMailboxes struct {
+	mu    sync.Mutex
+	calls []fakeMailboxCall
+}
+
+type fakeMailboxCall struct{ Email, Mode, ControlID string }
+
+func (f *fakeMailboxes) Check(_ context.Context, email, mode, controlID string) (mailcheck.Result, error) {
+	f.mu.Lock()
+	f.calls = append(f.calls, fakeMailboxCall{email, mode, controlID})
+	f.mu.Unlock()
+	r := mailcheck.Result{Status: mailcheck.Accepted, Reason: "The server accepted this mailbox and rejected a made-up one.", Outcome: "recipient_supported",
+		Provider: "Microsoft 365", Attempts: 1}
+	switch {
+	case strings.HasPrefix(email, "gone@"):
+		r.Status, r.Outcome, r.Reason = mailcheck.Invalid, "recipient_missing", "The mail server explicitly reported that this mailbox does not exist."
+	case strings.HasPrefix(email, "busy@"):
+		r.Status, r.Outcome, r.Reason, r.Retryable = mailcheck.Unknown, "temporary", "The server temporarily deferred the mailbox check.", true
+	}
+	return r, nil
+}
+
+func (f *fakeMailboxes) callsFor(email string) []fakeMailboxCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []fakeMailboxCall
+	for _, c := range f.calls {
+		if c.Email == email {
+			out = append(out, c)
+		}
+	}
+	return out
 }

@@ -405,6 +405,24 @@ type ContactEmploymentCheck struct {
 	CreatedAt  time.Time
 }
 
+type ContactMailboxCheck struct {
+	TenantID         string
+	ContactID        string
+	Email            string
+	Status           string
+	Reason           *string
+	Outcome          *string
+	Provider         *string
+	Attempts         int32
+	ControlID        string
+	ControlExpiresAt time.Time
+	Rechecks         int32
+	RecheckAt        *time.Time
+	RequestedBy      string
+	RequestedAt      time.Time
+	CheckedAt        *time.Time
+}
+
 type CvImport struct {
 	ID        string
 	TenantID  string

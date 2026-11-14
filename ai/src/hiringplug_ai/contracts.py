@@ -153,6 +153,7 @@ class JobKind(StrEnum):
     automation_event = "automation.event"
     automation_run = "automation.run"
     company_autofill = "company.autofill"
+    contact_check_mailbox = "contact.check_mailbox"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
     cv_format_studio = "cv.format_studio"
@@ -1202,29 +1203,52 @@ class ContactUpdate(BaseModel):
     notes: Annotated[str | None, Field(max_length=4000)] = None
 
 
-class ContactSummary(BaseModel):
-    id: ContactId
-    fullName: str
-    title: Annotated[str | None, Field(...)]
+class MailboxCheckStatus(StrEnum):
+    checking = "checking"
+    accepted = "accepted"
+    catch_all = "catch_all"
+    invalid = "invalid"
+    unknown = "unknown"
+
+
+class ContactMailboxCheck(BaseModel):
+    email: Annotated[str, Field(description="The address checked.")]
+    status: MailboxCheckStatus
+    reason: Annotated[str | None, Field(description="What was established, in words.")]
+    provider: Annotated[
+        str | None,
+        Field(description="Microsoft 365, Google Workspace or another mail server (from the server's name)."),
+    ]
+    attempts: Annotated[int, Field(description="Sessions with mail servers.")]
+    recheckAt: Annotated[
+        AwareDatetime | None,
+        Field(description="When an inconclusive answer (the server was busy) is checked again on its own."),
+    ]
+    requestedAt: AwareDatetime
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class ContactMailboxChecksStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
     companyId: CompanyId
-    companyName: str
-    email: Annotated[str | None, Field(...)]
-    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
-    phone: Annotated[str | None, Field(...)]
-    mobile: Annotated[str | None, Field(...)]
-    status: ContactStatus
-    role: Annotated[
-        ContactRole | None,
-        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
-    ]
-    updatedAt: AwareDatetime
 
 
-class ContactPage(BaseModel):
-    items: list[ContactSummary]
-    nextCursor: Annotated[
-        ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+class ContactMailboxChecksStarted(BaseModel):
+    started: Annotated[int, Field(description="Contacts whose email is being checked.")]
+    skipped: Annotated[int, Field(description="Contacts without an email, or being checked already.")]
+
+
+class ContactCheckMailboxJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    contactId: ContactId
+    email: Annotated[
+        str, Field(description="The address to check (skipped if the contact's email changed since).")
     ]
+    deep: Annotated[bool, Field(description="Compare the domain's mail servers (an automatic recheck).")]
 
 
 class ContactEmploymentCheckId(RootModel[str]):
@@ -4686,6 +4710,35 @@ class CompanyUpdate(BaseModel):
     about: Annotated[str | None, Field(max_length=4000)] = None
 
 
+class ContactSummary(BaseModel):
+    id: ContactId
+    fullName: str
+    title: Annotated[str | None, Field(...)]
+    companyId: CompanyId
+    companyName: str
+    email: Annotated[str | None, Field(...)]
+    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
+    mailboxStatus: Annotated[
+        MailboxCheckStatus | None,
+        Field(description="The latest mailbox check of `email`; null before the first."),
+    ]
+    phone: Annotated[str | None, Field(...)]
+    mobile: Annotated[str | None, Field(...)]
+    status: ContactStatus
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ]
+    updatedAt: AwareDatetime
+
+
+class ContactPage(BaseModel):
+    items: list[ContactSummary]
+    nextCursor: Annotated[
+        ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
+
+
 class ContactEmployment(BaseModel):
     id: ContactEmploymentCheckId
     status: Status1
@@ -5764,6 +5817,12 @@ class Contact(BaseModel):
         ContactEmployment | None,
         Field(
             description="The latest employment check (from their LinkedIn profile); null before the first."
+        ),
+    ]
+    mailboxCheck: Annotated[
+        ContactMailboxCheck | None,
+        Field(
+            description="The latest mailbox check of `email`; null before the first (or after the email changed)."
         ),
     ]
     createdAt: AwareDatetime

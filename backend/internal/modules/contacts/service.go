@@ -30,6 +30,7 @@ type Service struct {
 	roles     Roles
 	mail      MailServers
 	files     *blob.Store
+	mailboxes Mailboxes
 }
 
 // Create adds a contact. The email is checked before the transaction starts
@@ -242,7 +243,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		for i, r := range rows {
 			page.Items[i] = Summary{
 				ID: r.ID, CompanyID: r.CompanyID, CompanyName: names[r.CompanyID], FirstName: r.FirstName, LastName: r.LastName,
-				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus,
+				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus, MailboxStatus: r.MailboxStatus,
 				Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
 			}
 		}
@@ -363,6 +364,9 @@ func (s *Service) withCompanyName(ctx context.Context, tx pgx.Tx, c Contact) (Co
 		return c, err
 	}
 	c.CompanyName = names[c.Details.CompanyID]
+	if c.Mailbox, err = mailboxOf(ctx, store.New(tx), c.ID, c.Details.Email); err != nil {
+		return c, err
+	}
 	check, err := store.New(tx).LatestEmploymentCheck(ctx, c.ID)
 	if database.IsNoRows(err) {
 		return c, nil

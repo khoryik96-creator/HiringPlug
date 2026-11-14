@@ -28,6 +28,10 @@ x-module:
       payload: ContactLinkedinReadJob
       priority: high
       description: Save what the profile says about where the contact works now (Go worker).
+    contact.check_mailbox:
+      queue: core
+      payload: ContactCheckMailboxJob
+      description: Ask a contact's mail server whether their mailbox exists (no email is sent).
 
 paths:
   /v1/contacts:
@@ -159,6 +163,52 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/contacts/{contactId}/mailbox-check:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    post:
+      operationId: checkContactMailbox
+      tags: [contacts]
+      summary: Verify the contact's email with their mail server
+      description: >
+        Asks the mail server, in the background, whether it takes mail for
+        the address and for a made-up address beside it (no email is sent).
+        The result shows on the contact (`mailboxCheck`): invalid when the
+        server says the mailbox does not exist (an email would bounce).
+      x-permission: contacts:update
+      responses:
+        '202':
+          description: Being checked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactMailboxCheck' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/contacts/mailbox-checks:
+    post:
+      operationId: checkCompanyMailboxes
+      tags: [contacts]
+      summary: Verify the emails of all a company's contacts
+      description: Starts a mailbox check for each of the company's contacts with an email (those being checked already are skipped).
+      x-permission: contacts:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactMailboxChecksStart' }
+      responses:
+        '202':
+          description: Being checked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactMailboxChecksStarted' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/contacts/{contactId}/linkedin-profile:
     parameters:
       - $ref: '#/components/parameters/ContactIdPath'
@@ -235,7 +285,7 @@ components:
 
     Contact:
       type: object
-      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, mailboxCheck, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         version: { type: integer }
@@ -262,6 +312,10 @@ components:
         employment:
           description: The latest employment check (from their LinkedIn profile); null before the first.
           allOf: [{ $ref: '#/components/schemas/ContactEmployment' }]
+          nullable: true
+        mailboxCheck:
+          description: The latest mailbox check of `email`; null before the first (or after the email changed).
+          allOf: [{ $ref: '#/components/schemas/ContactMailboxCheck' }]
           nullable: true
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -309,7 +363,7 @@ components:
 
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, phone, mobile, status, role, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, phone, mobile, status, role, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         fullName: { type: string }
@@ -319,6 +373,10 @@ components:
         email: { type: string, nullable: true }
         emailCheckStatus:
           allOf: [{ $ref: '#/components/schemas/EmailCheckStatus' }]
+          nullable: true
+        mailboxStatus:
+          description: The latest mailbox check of `email`; null before the first.
+          allOf: [{ $ref: '#/components/schemas/MailboxCheckStatus' }]
           nullable: true
         phone: { type: string, nullable: true }
         mobile: { type: string, nullable: true }
@@ -339,6 +397,53 @@ components:
           description: Pass as `cursor` to get the next page; null on the last page.
           allOf: [{ $ref: '#/components/schemas/ContactId' }]
           nullable: true
+
+    MailboxCheckStatus:
+      type: string
+      description: >
+        checking = being checked; accepted = the mail server takes this mailbox
+        and refused a made-up one (delivery is still not guaranteed);
+        catch_all = the server takes any address, so the mailbox is not
+        established; invalid = the mailbox does not exist or the domain takes
+        no mail (an email would bounce); unknown = no conclusion (the server
+        restricts checks, was busy or unreachable): not a sign it is invalid.
+      enum: [checking, accepted, catch_all, invalid, unknown]
+    ContactMailboxCheck:
+      type: object
+      required: [email, status, reason, provider, attempts, recheckAt, requestedAt, checkedAt]
+      properties:
+        email: { type: string, description: The address checked. }
+        status: { $ref: '#/components/schemas/MailboxCheckStatus' }
+        reason: { type: string, nullable: true, description: "What was established, in words." }
+        provider: { type: string, nullable: true, description: "Microsoft 365, Google Workspace or another mail server (from the server's name)." }
+        attempts: { type: integer, description: Sessions with mail servers. }
+        recheckAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When an inconclusive answer (the server was busy) is checked again on its own.
+        requestedAt: { type: string, format: date-time }
+        checkedAt: { type: string, format: date-time, nullable: true }
+    ContactMailboxChecksStart:
+      type: object
+      additionalProperties: false
+      required: [companyId]
+      properties:
+        companyId: { $ref: '#/components/schemas/CompanyId' }
+    ContactMailboxChecksStarted:
+      type: object
+      required: [started, skipped]
+      properties:
+        started: { type: integer, description: Contacts whose email is being checked. }
+        skipped: { type: integer, description: "Contacts without an email, or being checked already." }
+    ContactCheckMailboxJob:
+      type: object
+      additionalProperties: false
+      required: [contactId, email, deep]
+      properties:
+        contactId: { $ref: '#/components/schemas/ContactId' }
+        email: { type: string, description: The address to check (skipped if the contact's email changed since). }
+        deep: { type: boolean, description: Compare the domain's mail servers (an automatic recheck). }
 
     ContactEmploymentCheckId:
       type: string

@@ -36,6 +36,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 			Id: s.ID, FullName: FullName(s.FirstName, s.LastName), Title: c.OrNull(s.Title),
 			CompanyId: s.CompanyID, CompanyName: s.CompanyName, Email: c.OrNull(s.Email),
 			EmailCheckStatus: c.OrNull(c.Convert[api.EmailCheckStatus](s.EmailCheckStatus)),
+			MailboxStatus:    c.OrNull(c.Convert[api.MailboxCheckStatus](s.MailboxStatus)),
 			Phone:            c.OrNull(s.Phone), Mobile: c.OrNull(s.Mobile), Status: api.ContactStatus(s.Status), Role: c.OrNull(s.Role), UpdatedAt: s.UpdatedAt,
 		}
 	}
@@ -118,6 +119,10 @@ func toAPI(ct Contact) api.Contact {
 		check = &api.EmailCheck{Status: api.EmailCheckStatus(r.Status), Reasons: r.Reasons, CheckedAt: r.CheckedAt}
 	}
 	out.EmailCheck = c.OrNull(check)
+	out.MailboxCheck.SetNull()
+	if ct.Mailbox != nil {
+		out.MailboxCheck.Set(mailboxToAPI(*ct.Mailbox))
+	}
 	out.Employment.SetNull()
 	if ct.Employment != nil {
 		out.Employment.Set(employmentToAPI(*ct.Employment))

@@ -114,6 +114,15 @@ export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; m
   unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
 };
 
+/** A mailbox check (asking the contact's mail server whether the mailbox exists). */
+export const MAILBOX_CHECK: Record<Schemas["MailboxCheckStatus"], { badge: string; meaning: string }> = {
+  checking: { badge: "Verifying…", meaning: "Asking their mail server." },
+  accepted: { badge: "✓ Mailbox exists", meaning: "Their mail server accepts this mailbox (delivery is still not guaranteed)." },
+  catch_all: { badge: "⚠ Accepts any address", meaning: "Their mail server accepts any address, so this mailbox cannot be confirmed." },
+  invalid: { badge: "✗ Bounces", meaning: "This mailbox does not exist: an email would bounce." },
+  unknown: { badge: "? Not confirmed", meaning: "Their mail server gave no clear answer. This does not mean the address is wrong." },
+};
+
 export const JOB_STATUS: Record<Schemas["JobStatus"], string> = {
   open: "Open",
   on_hold: "On hold",

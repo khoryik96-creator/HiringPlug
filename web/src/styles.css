@@ -978,3 +978,13 @@ select.status-select:hover, select.status-select:focus-visible { border-color: v
 
 /* A field that has to be filled in before saving (requiredFields.ts). */
 [data-missing]:invalid { outline: 2px solid #dc2626 !important; outline-offset: 1px; border-color: #dc2626 !important; }
+
+/* Mailbox checks: does the contact's mailbox exist (an email would bounce)? */
+.badge.mailbox-checking { background: #e0e7ff; }
+.badge.mailbox-accepted { background: #dcfce7; color: #166534; }
+.badge.mailbox-catch_all { background: #fef3c7; color: #92400e; }
+.badge.mailbox-invalid { background: #fee2e2; color: #991b1b; }
+.badge.mailbox-unknown { background: #f3f4f6; color: #4b5563; }
+tr.bounces td { background: #fef2f2; }
+tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+.check-summary { margin: 0.25rem 0 0.5rem; }

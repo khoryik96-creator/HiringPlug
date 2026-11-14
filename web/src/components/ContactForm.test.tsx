@@ -15,7 +15,7 @@ const contact: Contact = {
   id: "cont_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank",
   firstName: "Aisyah", lastName: "Rahman", fullName: "Aisyah Rahman", title: "HR Manager", email: "hr@maybank.com",
   emailCheck: { status: "risky", reasons: ["a shared mailbox (hr@), not a person"], checkedAt: "2026-11-01T00:00:00Z" },
-  phone: null, mobile: "+60 12-345 6789", linkedinUrl: null, status: "active", role: "hr", notes: null, employment: null,
+  phone: null, mobile: "+60 12-345 6789", linkedinUrl: null, status: "active", role: "hr", notes: null, employment: null, mailboxCheck: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 

@@ -56,7 +56,8 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
     </> },
     { id: "jobs", label: "Jobs", content: <CompanyJobs company={c} canCreate={permissions.includes("jobs:create")} /> },
     { id: "contacts", label: "Contacts", content:
-      <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} canEmail={permissions.includes("emails:send")} /> },
+      <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} canEmail={permissions.includes("emails:send")}
+        canCheck={permissions.includes("contacts:update")} /> },
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="company" subjectId={c.id} permissions={permissions} /> },
   ];
 

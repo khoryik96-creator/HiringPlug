@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
-import { contactKey } from "../api/keys";
+import { contactKey, contactsKey } from "../api/keys";
 import { ContactBanner } from "../components/ContactBanner";
 import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
+import { MailboxBadge } from "../components/MailboxBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { roleLabel } from "../components/contactRole";
@@ -30,12 +31,19 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
   const contact = useQuery({
     queryKey: contactKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId: id } } })),
-    // Follow an employment check still being read.
-    refetchInterval: (q) => (q.state.data?.employment?.status === "reading" ? 2000 : false),
+    // Follow an employment check still being read, or an email being verified.
+    refetchInterval: (q) => (q.state.data?.employment?.status === "reading" || q.state.data?.mailboxCheck?.status === "checking" ? 2000 : false),
   });
   const recheck = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/contacts/{contactId}/email-check", { params: { path: { contactId: id } } })),
     onSuccess: (updated) => { queryClient.setQueryData(contactKey(id), updated); },
+  });
+  const verify = useMutation({
+    mutationFn: async () => unwrap(await api.POST("/v1/contacts/{contactId}/mailbox-check", { params: { path: { contactId: id } } })),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: contactKey(id) });
+      await queryClient.invalidateQueries({ queryKey: contactsKey });
+    },
   });
   const c = contact.data;
   if (!c) return contact.error ? <ErrorMessage error={contact.error} /> : <p className="muted">Loading…</p>;
@@ -64,6 +72,8 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
               </>
             )}
           </dd>
+          <dt>Mailbox</dt>
+          <dd>{c.mailboxCheck ? <MailboxBadge check={c.mailboxCheck} detailed /> : <span className="muted">Not verified yet</span>}</dd>
           <dt>Notes</dt><dd className="pre">{c.notes ?? "—"}</dd>
         </dl>
         <ErrorMessage error={recheck.error} />
@@ -87,11 +97,19 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
         <div className="row spread">
           <span />
           <span className="row">
+            {canEdit && c.email && (
+              <button type="button" disabled={verify.isPending || c.mailboxCheck?.status === "checking"}
+                title="Ask their mail server whether this mailbox exists (no email is sent)"
+                onClick={() => { setActive("details"); verify.mutate(); }}>
+                {c.mailboxCheck?.status === "checking" ? "Verifying…" : "Verify email"}
+              </button>
+            )}
             {canEmail && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
             {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit contact</button>}
           </span>
         </div>
       )}
+      <ErrorMessage error={verify.error} />
       <ContactBanner contact={c} canEdit={canEdit && !editing} />
       <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
     </main>

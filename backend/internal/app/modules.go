@@ -95,7 +95,7 @@ func NewModules(d Deps) *Modules {
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
-	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Files, d.Config.MaxUploadBytes)
+	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Mailboxes, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
 	m.Pipeline.NameUsersWith(m.Identity)
