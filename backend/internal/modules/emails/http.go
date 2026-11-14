@@ -263,6 +263,7 @@ func emailToAPI(v EmailView) api.Email {
 		To: r.ToAddresses, Cc: r.CcAddresses, Bcc: r.BccAddresses, Subject: r.Subject, Body: r.Body, BodyHtml: c.OrNull(r.BodyHtml),
 		DeliveryMode: &mode, Attachments: files, Salary: r.Salary, Status: api.EmailStatus(r.Status), Error: c.OrNull(r.Error),
 		SentBy: r.SentBy, SentByName: r.SenderName, CreatedAt: r.CreatedAt, SentAt: c.OrNull(r.SentAt),
+		BouncedTo: r.BouncedTo, BouncedAt: c.OrNull(r.BouncedAt),
 	}
 }
 

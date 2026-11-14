@@ -145,8 +145,9 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 	// when nothing checked the address since.
 	refresh := j.Refresh != nil && *j.Refresh
 	due := (!j.Deep && !refresh && check.Status == MailboxChecking) || (j.Deep && check.Status != MailboxChecking && check.RecheckAt != nil)
-	if refresh {
-		due = check.Status != MailboxChecking && check.CheckedAt != nil && time.Since(*check.CheckedAt) >= refreshAfter-refreshSlack
+	if refresh { // a real bounce stays: a server that takes any address can still bounce later
+		due = check.Status != MailboxChecking && check.CheckedAt != nil && time.Since(*check.CheckedAt) >= refreshAfter-refreshSlack &&
+			(check.Outcome == nil || *check.Outcome != "bounced")
 	}
 	if !due || check.Email != j.Email {
 		return nil // superseded: a newer check, or the email changed

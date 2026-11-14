@@ -17,7 +17,7 @@ const template = (name: string, id: string): Schemas["EmailTemplate"] => ({
 const sent: Schemas["Email"] = {
   id: "eml_1", candidateId: "cand_1", contactId: null, applicationId: null, to: ["siti@example.com"], cc: [], bcc: [], bodyHtml: null, attachments: [], salary: false, subject: "Your application",
   body: "Dear Siti,\n\nThanks.", status: "failed", error: "550 no such user", sentBy: "usr_1", sentByName: "Aina",
-  createdAt: "2026-11-01T00:00:00Z", sentAt: null,
+  createdAt: "2026-11-01T00:00:00Z", sentAt: null, bouncedTo: [], bouncedAt: null,
 };
 const reads = (emails: Schemas["Email"][]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) => {
@@ -50,6 +50,15 @@ describe("candidate emails", () => {
     expect(screen.getByText("Not sent")).toBeTruthy();
     expect(screen.getByText("Why: 550 no such user")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Write email" })).toBeNull(); // reading is not sending
+    expect(screen.queryByText("Bounced")).toBeNull();
+  });
+
+  it("shows which recipients a sent email bounced back from", async () => {
+    reads([{ ...sent, status: "sent", error: null, deliveryMode: "live", to: ["siti@example.com", "nur@example.com"],
+      bouncedTo: ["nur@example.com"], bouncedAt: "2026-11-01T00:20:00Z" }]);
+    renderWithClient(<CandidateEmails candidateId="cand_1" permissions={["emails:read"]} />);
+    expect(await screen.findByText("Bounced")).toBeTruthy();
+    expect(screen.getByText("Bounced back from nur@example.com: the mailbox does not exist.")).toBeTruthy();
   });
 
   it("fills a template for a job, waits for missing values, then sends", async () => {

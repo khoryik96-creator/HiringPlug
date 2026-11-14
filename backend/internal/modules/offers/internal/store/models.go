@@ -539,6 +539,8 @@ type Email struct {
 	ContactID        *string
 	MailboxRef       *string
 	DeliveryMode     string
+	BouncedTo        []string
+	BouncedAt        *time.Time
 }
 
 type EmailAttachment struct {

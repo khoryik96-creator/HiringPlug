@@ -682,6 +682,44 @@ func (q *Queries) MarkContactLeft(ctx context.Context, arg MarkContactLeftParams
 	return version, err
 }
 
+const markMailboxBounced = `-- name: MarkMailboxBounced :many
+INSERT INTO contact_mailbox_check (tenant_id, contact_id, email, status, reason, outcome, control_id, control_expires_at, requested_by, checked_at)
+SELECT c.tenant_id, c.id, c.email, 'invalid', $1, 'bounced', $2, now(), 'mail-bounce', now()
+FROM contact c WHERE lower(c.email) = $3::text
+ON CONFLICT (tenant_id, contact_id) DO UPDATE SET
+  email = EXCLUDED.email, status = 'invalid', reason = EXCLUDED.reason, outcome = 'bounced',
+  rechecks = 0, recheck_at = NULL, checked_at = now()
+RETURNING contact_id
+`
+
+type MarkMailboxBouncedParams struct {
+	Reason    *string
+	ControlID string
+	Email     string
+}
+
+// A real email to the address bounced: its mailbox is gone (stronger than any
+// check, and kept by the monthly re-checks).
+func (q *Queries) MarkMailboxBounced(ctx context.Context, arg MarkMailboxBouncedParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, markMailboxBounced, arg.Reason, arg.ControlID, arg.Email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var contact_id string
+		if err := rows.Scan(&contact_id); err != nil {
+			return nil, err
+		}
+		items = append(items, contact_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const newEmploymentCheckID = `-- name: NewEmploymentCheckID :one
 SELECT new_id('cec')::text
 `

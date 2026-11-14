@@ -77,6 +77,11 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(status), Error: reason}); err != nil {
 		return err
 	}
+	if sendErr == nil { // sent from a mailbox HiringPlug may read: look for bounces later
+		if err := scheduleBounceScans(ctx, tx, job.TenantID, e); err != nil {
+			return err
+		}
+	}
 	return audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "email", EntityID: e.ID, Changes: changes})
 }
 

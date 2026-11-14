@@ -166,6 +166,7 @@ class JobKind(StrEnum):
     document_pdf_rendered = "document.pdf_rendered"
     document_render_pdf = "document.render_pdf"
     document_text_extracted = "document.text_extracted"
+    email_bounce_scan = "email.bounce_scan"
     email_send = "email.send"
     interview_remind = "interview.remind"
     jd_blind = "jd.blind"
@@ -2084,6 +2085,13 @@ class CcItem(RootModel[EmailStr]):
 
 class BccItem(RootModel[EmailStr]):
     root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class EmailBounceScanJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emailId: EmailId
 
 
 class EmailSendJob(BaseModel):
@@ -5244,6 +5252,13 @@ class Email1(BaseModel):
         DeliveryMode1 | None,
         Field(description="Local test inbox, live provider acceptance, or unknown historical delivery."),
     ] = None
+    bouncedTo: Annotated[
+        list[str],
+        Field(
+            description="Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox)."
+        ),
+    ]
+    bouncedAt: Annotated[AwareDatetime | None, Field(...)]
     id: EmailId
     candidateId: Annotated[CandidateId | None, Field(...)]
     contactId: Annotated[

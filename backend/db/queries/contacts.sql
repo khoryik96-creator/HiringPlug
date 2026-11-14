@@ -202,3 +202,14 @@ WHERE lower(c.email) = ANY(@emails::text[]) AND (c.status = 'left' OR m.status =
 SELECT first_name, last_name, email::text AS email FROM contact
 WHERE company_id = @company_id AND id <> @contact_id AND email IS NOT NULL
 ORDER BY id LIMIT 500;
+
+-- A real email to the address bounced: its mailbox is gone (stronger than any
+-- check, and kept by the monthly re-checks).
+-- name: MarkMailboxBounced :many
+INSERT INTO contact_mailbox_check (tenant_id, contact_id, email, status, reason, outcome, control_id, control_expires_at, requested_by, checked_at)
+SELECT c.tenant_id, c.id, c.email, 'invalid', @reason, 'bounced', @control_id, now(), 'mail-bounce', now()
+FROM contact c WHERE lower(c.email) = @email::text
+ON CONFLICT (tenant_id, contact_id) DO UPDATE SET
+  email = EXCLUDED.email, status = 'invalid', reason = EXCLUDED.reason, outcome = 'bounced',
+  rechecks = 0, recheck_at = NULL, checked_at = now()
+RETURNING contact_id;

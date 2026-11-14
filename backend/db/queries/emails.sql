@@ -151,3 +151,6 @@ ON CONFLICT (tenant_id, provider) DO UPDATE SET client_id = EXCLUDED.client_id, 
 
 -- name: DeleteMailApp :exec
 DELETE FROM email_mail_app WHERE provider = @provider;
+
+-- name: MarkBounced :exec
+UPDATE email SET bounced_to = @bounced_to, bounced_at = coalesce(bounced_at, now()) WHERE id = @id;

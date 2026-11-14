@@ -3626,7 +3626,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "automation.event" | "automation.run" | "company.autofill" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "assistant.answered" | "assistant.ask" | "automation.event" | "automation.run" | "company.autofill" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -5504,6 +5504,10 @@ export interface components {
              * @enum {string}
              */
             deliveryMode?: "test" | "live" | "unknown";
+            /** @description Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox). */
+            bouncedTo: string[];
+            /** Format: date-time */
+            bouncedAt: string | null;
             id: components["schemas"]["EmailId"];
             candidateId: components["schemas"]["CandidateId"] | null;
             /** @description The client's contact it was written to (from the contact's page). */
@@ -5554,6 +5558,9 @@ export interface components {
             attachmentIds?: components["schemas"]["EmailAttachmentId"][];
             /** @description The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs. */
             cvs?: components["schemas"]["EmailCvAttachment"][];
+        };
+        EmailBounceScanJob: {
+            emailId: components["schemas"]["EmailId"];
         };
         EmailSendJob: {
             emailId: components["schemas"]["EmailId"];

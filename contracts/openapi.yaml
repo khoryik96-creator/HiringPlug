@@ -5543,6 +5543,7 @@ components:
         - document.pdf_rendered
         - document.render_pdf
         - document.text_extracted
+        - email.bounce_scan
         - email.send
         - interview.remind
         - jd.blind
@@ -8116,9 +8117,14 @@ components:
       enum: [queued, sent, failed]
     Email:
       type: object
-      required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
+      required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt, bouncedTo, bouncedAt]
       properties:
         deliveryMode: {type: string, enum: [test, live, unknown], description: 'Local test inbox, live provider acceptance, or unknown historical delivery.'}
+        bouncedTo:
+          type: array
+          description: Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox).
+          items: {type: string}
+        bouncedAt: {type: string, format: date-time, nullable: true}
         id: {$ref: '#/components/schemas/EmailId'}
         candidateId:
           allOf: [{$ref: '#/components/schemas/CandidateId'}]
@@ -8204,6 +8210,12 @@ components:
           maxItems: 10
           description: The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs.
           items: {$ref: '#/components/schemas/EmailCvAttachment'}
+    EmailBounceScanJob:
+      type: object
+      additionalProperties: false
+      required: [emailId]
+      properties:
+        emailId: {$ref: '#/components/schemas/EmailId'}
     EmailSendJob:
       type: object
       additionalProperties: false
@@ -11565,6 +11577,12 @@ x-jobs:
     payload: DocumentTextExtractedJob
     priority: normal
     description: Save the result of text extraction on the document (Go worker).
+  email.bounce_scan:
+    module: emails
+    queue: core
+    payload: EmailBounceScanJob
+    priority: normal
+    description: Look in the sending Microsoft 365 mailbox's inbox for bounce notices about a sent email (Go worker).
   email.send:
     module: emails
     queue: core

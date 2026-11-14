@@ -7,13 +7,16 @@ package contacts
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mailcheck"
 )
 
 // Address problems.
@@ -96,4 +99,22 @@ func (h *HTTP) CheckContactAddresses(ctx context.Context, req api.CheckContactAd
 			Problem: api.ContactAddressProblemProblem(a.Problem)}
 	}
 	return out, nil
+}
+
+// Bounced marks the mailbox of the contact at address as gone: a real email
+// to it bounced (in the caller's transaction, for the emails module).
+func (m *Module) Bounced(ctx context.Context, tx pgx.Tx, address string) error {
+	ids, err := store.New(tx).MarkMailboxBounced(ctx, store.MarkMailboxBouncedParams{
+		Email: strings.ToLower(strings.TrimSpace(address)), ControlID: mailcheck.NewControlID(),
+		Reason: ptr("A real email to this address bounced on " + time.Now().UTC().Format("2 Jan 2006") + ": the mailbox does not exist."),
+	})
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := audit.Record(ctx, tx, audit.Entry{Action: "contact.mailbox_bounced", EntityType: "contact", EntityID: id}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
