@@ -1,7 +1,9 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,6 +70,13 @@ func TestSuggestingAnEmailFromHowColleaguesAddressesAreSpelled(t *testing.T) {
 	assert.True(t, suggest(ana.Id).Suggestion.IsNull(), "no colleagues yet")
 	a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Siti", "lastName": "Aisyah", "email": "siti.aisyah@acme.test"})
 	a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Wei", "lastName": "Chen", "email": "wei.chen@acme.test"})
+	// Addresses found not to work do not count, however many.
+	for _, name := range [][2]string{{"Ahmad", "Ali"}, {"Mei", "Tan"}, {"Raj", "Kumar"}} {
+		a.createContact(token, map[string]any{"companyId": company.Id, "firstName": name[0], "lastName": name[1], "email": strings.ToLower(name[0] + "_" + name[1] + "@acme.test")})
+	}
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	_, err := testutil.Current.Admin.Exec(context.Background(), `UPDATE contact_mailbox_check SET status = 'invalid' WHERE tenant_id = $1 AND email LIKE '%\_%'`, tenant.ID)
+	require.NoError(t, err)
 	got := suggest(ana.Id).Suggestion.MustGet()
 	assert.Equal(t, api.EmailGuess{Email: "ana.lim@acme.test", Pattern: "first.last", Matches: 2, Of: 2}, got)
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/contacts/"+ana.Id+"/email-suggestion",

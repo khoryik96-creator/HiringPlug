@@ -52,3 +52,11 @@ func TestNormalize(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{"firstName", "email", "linkedinUrl"}, fields)
 }
+
+func TestPersonalAddressesAreAtFreeMailServices(t *testing.T) {
+	assert.True(t, PersonalAddress("ana.lim@gmail.com"))
+	assert.True(t, PersonalAddress("Ana@Yahoo.com.my"))
+	assert.False(t, PersonalAddress("ana@maju.com.my"))
+	assert.False(t, PersonalAddress("ana@gmail.com.attacker.test"))
+	assert.False(t, PersonalAddress("not an address"))
+}

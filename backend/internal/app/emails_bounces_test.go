@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,7 +35,8 @@ func (a *testApp) connectOAuthMailbox(token, provider string, server *httptest.S
 	require.Contains(a.t, r.Header.Get("Location"), "mailbox=connected")
 }
 
-// fakeMailProvider is a provider's sign-in, profile, send and inbox.
+// fakeMailProvider is a provider's sign-in, profile, send and inbox (inbox
+// returns {"value":[{"id","subject","body":{"content"}}]}).
 func fakeMailProvider(t *testing.T, inbox func() string, reads *atomic.Int32) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +52,26 @@ func fakeMailProvider(t *testing.T, inbox func() string, reads *atomic.Int32) *h
 			reads.Add(1)
 			assert.Equal(t, "Bearer synthetic-access", r.Header.Get("Authorization"))
 			assert.Contains(t, r.URL.Query().Get("$filter"), "receivedDateTime ge ")
-			_, _ = w.Write([]byte(inbox()))
+			var list struct{ Value []map[string]any }
+			require.NoError(t, json.Unmarshal([]byte(inbox()), &list))
+			for _, m := range list.Value {
+				delete(m, "body") // subjects only
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": list.Value}))
 		default:
+			var list struct {
+				Value []struct {
+					ID   string         `json:"id"`
+					Body map[string]any `json:"body"`
+				}
+			}
+			require.NoError(t, json.Unmarshal([]byte(inbox()), &list))
+			for _, m := range list.Value {
+				if r.URL.Path == "/me/messages/"+m.ID {
+					require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"body": m.Body}))
+					return
+				}
+			}
 			t.Errorf("unexpected provider path %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -101,8 +121,8 @@ func TestARealBounceInTheSendersOutlookMarksTheContactsMailboxAsGone(t *testing.
 
 	// Then a notice for Ana's address (not a colleague's whose address contains it).
 	notices.Store(`{"value":[
-		{"subject":"Out of office","body":{"content":"ana@maju.test is away"}},
-		{"subject":"Undeliverable: Synthetic shortlist","body":{"content":"<p>Delivery has failed to these recipients:</p><p><a href=\"mailto:ana@maju.test\">ana@maju.test</a></p><p>The email address couldn&#39;t be found.</p>"}}]}`)
+		{"id":"m1","subject":"Out of office","body":{"content":"ana@maju.test is away"}},
+		{"id":"m2","subject":"Undeliverable: Synthetic shortlist","body":{"content":"<p>Delivery has failed to these recipients:</p><p><a href=\"mailto:ana@maju.test\">ana@maju.test</a></p><p>The email address couldn&#39;t be found.</p><p>Original message headers:</p><pre>To: ana@maju.test\nCc: joana@maju.test</pre>"}}]}`)
 	makeBounceScansDue(t, tenant.ID)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	assert.EqualValues(t, 2, reads.Load())

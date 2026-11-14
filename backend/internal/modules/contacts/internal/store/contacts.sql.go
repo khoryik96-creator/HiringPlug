@@ -11,9 +11,10 @@ import (
 )
 
 const colleagueAddresses = `-- name: ColleagueAddresses :many
-SELECT first_name, last_name, email::text AS email FROM contact
-WHERE company_id = $1 AND id <> $2 AND email IS NOT NULL
-ORDER BY id LIMIT 500
+SELECT c.first_name, c.last_name, c.email::text AS email
+FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
+WHERE c.company_id = $1 AND c.id <> $2 AND c.email IS NOT NULL AND m.status IS DISTINCT FROM 'invalid'
+ORDER BY c.id LIMIT 500
 `
 
 type ColleagueAddressesParams struct {
@@ -27,6 +28,8 @@ type ColleagueAddressesRow struct {
 	Email     string
 }
 
+// Colleagues' addresses, except those found not to work (a check or a real
+// bounce): how the company spells its addresses.
 func (q *Queries) ColleagueAddresses(ctx context.Context, arg ColleagueAddressesParams) ([]ColleagueAddressesRow, error) {
 	rows, err := q.db.Query(ctx, colleagueAddresses, arg.CompanyID, arg.ContactID)
 	if err != nil {

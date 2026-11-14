@@ -21,6 +21,11 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
       const old = unwrap(await api.GET("/v1/contacts/{contactId}", { params: { path: { contactId } } }));
       const found = unwrap(await api.GET("/v1/companies", { params: { query: { linkedinCompany: slugOf(move.companyUrl), limit: 1 } } })).items[0];
       const company = found ?? unwrap(await api.POST("/v1/companies", { body: { name: move.companyName, linkedinUrl: move.companyUrl } }));
+      if (found) { // followed already (or added by hand): not twice
+        const there = unwrap(await api.GET("/v1/contacts", { params: { query: { companyId: company.id, q: old.fullName, limit: 20 } } })).items
+          .find((c) => c.fullName.toLowerCase() === old.fullName.toLowerCase());
+        if (there) return { company, added: there, isNew: false, already: true };
+      }
       const since = move.since ? ` in ${linkedinDates(move.since)}` : "";
       const added = unwrap(await api.POST("/v1/contacts", {
         body: {
@@ -35,7 +40,7 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
           body: `Lead: ${old.fullName}${old.title ? `, ${old.title}` : ""} at ${old.companyName} (our contact), joined ${move.companyName}${since}${move.title ? ` as ${move.title}` : ""}.`,
         },
       }));
-      return { company, added, isNew: !found };
+      return { company, added, isNew: !found, already: false };
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: contactsKey });
@@ -43,11 +48,12 @@ export function FollowLeaver({ contactId, move }: { contactId: string; move: Mov
     },
   });
   if (follow.data) {
-    const { company, added, isNew } = follow.data;
+    const { company, added, isNew, already } = follow.data;
     return (
       <span className="follow-done" role="status">
-        Added: <a href={`#/contacts/${added.id}`}>{added.fullName}</a> at <a href={`#/companies/${company.id}`}>{company.name}</a>
-        {isNew ? " (new company, with a lead note)" : " (with a lead note)"}
+        {already ? "Already a contact: " : "Added: "}
+        <a href={`#/contacts/${added.id}`}>{added.fullName}</a> at <a href={`#/companies/${company.id}`}>{company.name}</a>
+        {already ? "" : isNew ? " (new company, with a lead note)" : " (with a lead note)"}
       </span>
     );
   }

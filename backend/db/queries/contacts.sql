@@ -198,10 +198,13 @@ SELECT c.id, c.company_id, c.first_name, c.last_name, c.email::text AS email, c.
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
 WHERE lower(c.email) = ANY(@emails::text[]) AND (c.status = 'left' OR m.status = 'invalid');
 
+-- Colleagues' addresses, except those found not to work (a check or a real
+-- bounce): how the company spells its addresses.
 -- name: ColleagueAddresses :many
-SELECT first_name, last_name, email::text AS email FROM contact
-WHERE company_id = @company_id AND id <> @contact_id AND email IS NOT NULL
-ORDER BY id LIMIT 500;
+SELECT c.first_name, c.last_name, c.email::text AS email
+FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
+WHERE c.company_id = @company_id AND c.id <> @contact_id AND c.email IS NOT NULL AND m.status IS DISTINCT FROM 'invalid'
+ORDER BY c.id LIMIT 500;
 
 -- A real email to the address bounced: its mailbox is gone (stronger than any
 -- check, and kept by the monthly re-checks).

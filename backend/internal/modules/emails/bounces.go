@@ -13,6 +13,7 @@ import (
 	"html"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,14 +39,26 @@ var bounceSubject = regexp.MustCompile(`(?i)^\s*(undeliverable|undelivered mail 
 // a plain-text notice); a tag naming one (a mailto: link) is kept, harmlessly.
 var tags = regexp.MustCompile(`(?s)<[^>@]*>`)
 
+// ProviderMicrosoft is the mailbox provider whose inbox HiringPlug may read
+// (Mail.ReadWrite); Gmail and SMTP mailboxes are connected to send only.
+const ProviderMicrosoft = "microsoft"
+
+// quoted is where a notice starts quoting the email it returns (its headers
+// name every recipient, not only those that bounced): the text after it is
+// not read.
+var quoted = regexp.MustCompile(`(?im)original message headers|-{2,}\s*original message|this is a copy of the message|message/rfc822|^\s*(to|cc|from|received|subject|date|message-id|return-path):`)
+
 // BouncedRecipients returns which of recipients a notice says could not be
 // reached: only for a bounce notice's subject, and only addresses it names
-// exactly (any letter case).
+// exactly (any letter case) before it quotes the returned email.
 func BouncedRecipients(subject, body string, recipients []string) []string {
 	if !bounceSubject.MatchString(subject) {
 		return nil
 	}
-	text := strings.ToLower(html.UnescapeString(tags.ReplaceAllString(body, " ")))
+	text := strings.ToLower(html.UnescapeString(tags.ReplaceAllString(body, "\n")))
+	if at := quoted.FindStringIndex(text); at != nil {
+		text = text[:at[0]]
+	}
 	var out []string
 	seen := map[string]bool{}
 	for _, r := range recipients {
@@ -93,36 +106,74 @@ func addressChar(b byte) bool {
 	return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || strings.IndexByte("._%+-@", b) >= 0
 }
 
-type graphMessages struct {
-	Value []struct {
-		Subject string `json:"subject"`
-		Body    struct {
-			Content string `json:"content"`
-		} `json:"body"`
-	} `json:"value"`
-}
+// Reading the inbox: subjects first (small), up to inboxPages pages of
+// inboxPage; then the text of at most maxNotices that look like bounces.
+const (
+	inboxPage  = 100
+	inboxPages = 5
+	maxNotices = 20
+)
+
+// bounceNotice is a bounce notice's subject and text.
+type bounceNotice struct{ Subject, Body string }
 
 // bounceNotices reads, from a Microsoft 365 inbox, the messages received
-// since a moment whose subject looks like a bounce notice (up to 50).
-func (s *Service) bounceNotices(ctx context.Context, sendURL, token string, since time.Time) (graphMessages, error) {
-	inbox := strings.TrimSuffix(sendURL, "/sendMail") + "/mailFolders/inbox/messages"
+// since a moment whose subject looks like a bounce notice.
+func (s *Service) bounceNotices(ctx context.Context, sendURL, token string, since time.Time) ([]bounceNotice, error) {
+	root := strings.TrimSuffix(sendURL, "/sendMail")
+	inbox := root + "/mailFolders/inbox/messages"
 	q := url.Values{}
 	q.Set("$filter", "receivedDateTime ge "+since.UTC().Format(time.RFC3339))
-	q.Set("$select", "subject,body")
-	q.Set("$top", "50")
-	raw, err := s.providerRequest(ctx, "GET", inbox+"?"+q.Encode(), "application/json", token, nil)
-	if err != nil {
-		return graphMessages{}, err
+	q.Set("$select", "id,subject")
+	q.Set("$top", strconv.Itoa(inboxPage))
+	var ids []string
+	var subjects []string
+	for page, next := 0, inbox+"?"+q.Encode(); next != "" && page < inboxPages && len(ids) < maxNotices; page++ {
+		raw, err := s.providerRequest(ctx, "GET", next, "application/json", token, nil)
+		if err != nil {
+			return nil, err
+		}
+		var list struct {
+			Value []struct {
+				ID      string `json:"id"`
+				Subject string `json:"subject"`
+			} `json:"value"`
+			Next string `json:"@odata.nextLink"`
+		}
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return nil, err
+		}
+		for _, m := range list.Value {
+			if m.ID != "" && bounceSubject.MatchString(m.Subject) && len(ids) < maxNotices {
+				ids, subjects = append(ids, m.ID), append(subjects, m.Subject)
+			}
+		}
+		next = ""
+		if strings.HasPrefix(list.Next, inbox+"?") { // only the same folder: the token goes with it
+			next = list.Next
+		}
 	}
-	var out graphMessages
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return graphMessages{}, err
+	out := make([]bounceNotice, 0, len(ids))
+	for i, id := range ids {
+		raw, err := s.providerRequest(ctx, "GET", root+"/messages/"+url.PathEscape(id)+"?%24select=body", "application/json", token, nil)
+		if err != nil {
+			return nil, err
+		}
+		var m struct {
+			Body struct {
+				Content string `json:"content"`
+			} `json:"body"`
+		}
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return nil, err
+		}
+		out = append(out, bounceNotice{Subject: subjects[i], Body: m.Body.Content})
 	}
 	return out, nil
 }
 
 // readableMailbox returns the mailbox an email went through, if HiringPlug
-// may read its inbox (Microsoft 365: Gmail and SMTP mailboxes may only send).
+// may read its inbox and it is still the sender's.
 func readableMailbox(ctx context.Context, q *store.Queries, e store.Email) (store.EmailMailbox, bool, error) {
 	if e.MailboxRef == nil {
 		return store.EmailMailbox{}, false, nil
@@ -134,16 +185,14 @@ func readableMailbox(ctx context.Context, q *store.Queries, e store.Email) (stor
 	if err != nil {
 		return row, false, err
 	}
-	return row, row.ID == *e.MailboxRef && row.Provider == "microsoft", nil // not disconnected since
+	return row, row.ID == *e.MailboxRef && row.Provider == ProviderMicrosoft, nil // not disconnected since
 }
 
-// scheduleBounceScans queues the looks for bounce notices of a sent email.
-func scheduleBounceScans(ctx context.Context, tx pgx.Tx, tenantID string, e store.Email) error {
-	if _, ok, err := readableMailbox(ctx, store.New(tx), e); !ok || err != nil {
-		return err
-	}
+// scheduleBounceScans queues the looks for bounce notices of an email sent
+// through a Microsoft 365 mailbox.
+func scheduleBounceScans(ctx context.Context, tx pgx.Tx, tenantID, emailID string) error {
 	for _, after := range BounceScans {
-		if _, err := jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindEmailBounceScan, api.EmailBounceScanJob{EmailId: e.ID}, time.Now().Add(after)); err != nil {
+		if _, err := jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindEmailBounceScan, api.EmailBounceScanJob{EmailId: emailID}, time.Now().Add(after)); err != nil {
 			return err
 		}
 	}
@@ -189,8 +238,8 @@ func (s *Service) scanBounces(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 		bounced[b] = true
 	}
 	var found []string
-	for _, m := range notices.Value {
-		for _, addr := range BouncedRecipients(m.Subject, m.Body.Content, recipients) {
+	for _, m := range notices {
+		for _, addr := range BouncedRecipients(m.Subject, m.Body, recipients) {
 			if !bounced[addr] {
 				bounced[addr] = true
 				found = append(found, addr)

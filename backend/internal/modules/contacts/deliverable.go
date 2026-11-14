@@ -1,7 +1,7 @@
 package contacts
 
-// Addresses that would not reach their contact: they left, or their mailbox
-// does not exist. Asked by the email composer (to warn) and by automated
+// Addresses that would not reach their contact: they left (a work address;
+// a personal one still reaches them), or their mailbox does not exist. Asked by the email composer (to warn) and by automated
 // emails (not sent; the recruiter gets a task).
 
 import (
@@ -52,22 +52,31 @@ func (s *Service) undeliverable(ctx context.Context, tx pgx.Tx, emails []string)
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]string, len(rows))
-	for i, r := range rows {
-		ids[i] = r.CompanyID
+	var problems []AddressProblem
+	var ids []string
+	for _, r := range rows {
+		p := AddressProblem{Email: r.Email, ContactID: r.ID, ContactName: FullName(r.FirstName, r.LastName)}
+		switch {
+		case r.Status == "left" && !PersonalAddress(r.Email):
+			p.Problem = ProblemLeft // the stronger reason
+		case r.MailboxStatus != nil && *r.MailboxStatus == "invalid":
+			p.Problem = ProblemBounces
+		default:
+			continue // left, but their own address still reaches them
+		}
+		problems, ids = append(problems, p), append(ids, r.CompanyID)
+	}
+	if len(problems) == 0 {
+		return nil, nil
 	}
 	names, err := s.companies.Names(ctx, tx, ids)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]AddressProblem, len(rows))
-	for i, r := range rows {
-		out[i] = AddressProblem{Email: r.Email, ContactID: r.ID, ContactName: FullName(r.FirstName, r.LastName), CompanyName: names[r.CompanyID], Problem: ProblemBounces}
-		if r.Status == "left" {
-			out[i].Problem = ProblemLeft // the stronger reason
-		}
+	for i := range problems {
+		problems[i].CompanyName = names[ids[i]]
 	}
-	return out, nil
+	return problems, nil
 }
 
 // Undeliverable returns the addresses among emails that would not reach

@@ -25,13 +25,17 @@ func TestEmailsToAContactWhoLeftOrWhoseMailboxIsGone(t *testing.T) {
 	ana := a.createContact(recruiter, map[string]any{"companyId": company.Id, "firstName": "Ana", "lastName": "Lim", "email": hr})
 	gone := a.createContact(recruiter, map[string]any{"companyId": company.Id, "firstName": "Gone", "email": "gone@maju.test"})
 	fine := a.createContact(recruiter, map[string]any{"companyId": company.Id, "firstName": "Wei", "email": "wei@maju.test"})
+	// Left too, but with her own address: it still reaches her.
+	own := a.createContact(recruiter, map[string]any{"companyId": company.Id, "firstName": "Mei", "email": "mei." + tenant.ID + "@gmail.com"})
 	runCoreJobsUntilIdle(t, a, tenant.ID) // gone@ bounces (the fake mail servers)
 	job := a.createJob(recruiter, map[string]any{"companyId": company.Id, "contactId": ana.Id, "title": "Accountant"})
 	res := a.request(http.MethodPatch, "/v1/contacts/"+ana.Id, recruiter, map[string]any{"version": ana.Version, "status": "left"})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPatch, "/v1/contacts/"+own.Id, recruiter, map[string]any{"version": own.Version, "status": "left"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 
 	// The composer asks before sending.
-	res = a.request(http.MethodPost, "/v1/contacts/address-check", recruiter, map[string]any{"emails": []string{strings.ToUpper(hr), "gone@maju.test", fine.Email.MustGet(), "x@y.test"}})
+	res = a.request(http.MethodPost, "/v1/contacts/address-check", recruiter, map[string]any{"emails": []string{strings.ToUpper(hr), "gone@maju.test", fine.Email.MustGet(), own.Email.MustGet(), "x@y.test"}})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	var problems api.ContactAddressProblems
 	res.JSON(&problems)

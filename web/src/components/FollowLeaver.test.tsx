@@ -40,7 +40,8 @@ describe("following a contact who left", () => {
 
   it("uses the company already here with that LinkedIn page", async () => {
     const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
-      path === "/v1/companies" ? { items: [{ id: "comp_acme", name: "Acme Berhad" }], nextCursor: null } : ana,
+      path === "/v1/companies" ? { items: [{ id: "comp_acme", name: "Acme Berhad" }], nextCursor: null }
+        : path === "/v1/contacts" ? { items: [{ id: "cont_other", fullName: "Ana Tan" }], nextCursor: null } : ana,
     ))) as never);
     const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/contacts" ? { id: "cont_new", fullName: "Ana Lim" } : {}))) as never);
     renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
@@ -49,6 +50,20 @@ describe("following a contact who left", () => {
     const lookup = (get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/companies");
     expect(lookup?.[1]).toEqual({ params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } });
     expect(post.mock.calls.map((c) => c[0])).not.toContain("/v1/companies");
+  });
+
+  it("does not add them twice where they are a contact already", async () => {
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/companies" ? { items: [{ id: "comp_acme", name: "Acme Berhad" }], nextCursor: null }
+        : path === "/v1/contacts" ? { items: [{ id: "cont_followed", fullName: "ana lim" }], nextCursor: null } : ana,
+    ))) as never);
+    const post = vi.spyOn(api, "POST");
+    renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Already a contact: ana lim at Acme Berhad");
+    expect(screen.getByRole("link", { name: "ana lim" }).getAttribute("href")).toBe("#/contacts/cont_followed");
+    expect((get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/contacts")?.[1]).toEqual({ params: { query: { companyId: "comp_acme", q: "Ana Lim", limit: 20 } } });
+    expect(post).not.toHaveBeenCalled();
   });
 
   it("lists the open jobs they were the hiring contact for", async () => {

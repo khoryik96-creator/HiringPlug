@@ -55,13 +55,14 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		msg.Calendar = *e.Calendar
 	}
 	var sendErr error
+	var provider string
 	switch partsErr := s.files2parts(ctx, q, e, &msg); {
 	case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help
 		sendErr = fmt.Errorf("%w: a banner or attached file of this email is missing", mail.ErrPermanent)
 	case partsErr != nil:
 		return partsErr
 	default:
-		sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
+		provider, sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
 	}
 	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
 		return sendErr
@@ -77,8 +78,8 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(status), Error: reason}); err != nil {
 		return err
 	}
-	if sendErr == nil { // sent from a mailbox HiringPlug may read: look for bounces later
-		if err := scheduleBounceScans(ctx, tx, job.TenantID, e); err != nil {
+	if sendErr == nil && provider == ProviderMicrosoft { // a mailbox HiringPlug may read: look for bounces later
+		if err := scheduleBounceScans(ctx, tx, job.TenantID, e.ID); err != nil {
 			return err
 		}
 	}
