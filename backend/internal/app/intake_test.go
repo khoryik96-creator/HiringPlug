@@ -179,7 +179,7 @@ func TestAnImportedCVIsFilledInSafely(t *testing.T) {
 		assert.Equal(t, "Mei", c.FirstName)
 	})
 
-	t.Run("a candidate merged away while read is shown to fill in, and the reading is kept", func(t *testing.T) {
+	t.Run("a candidate merged away while read: the file fills in the one kept, and the reading is kept", func(t *testing.T) {
 		it := add("Ravi.pdf")
 		keep := a.createCandidate(token, map[string]any{"firstName": "Ravi"})
 		res := a.request(http.MethodPost, "/v1/candidates/"+keep.Id+"/merge", token,
@@ -195,8 +195,9 @@ func TestAnImportedCVIsFilledInSafely(t *testing.T) {
 				got = i
 			}
 		}
-		assert.Equal(t, api.CvImportItemStatusUnread, got.Status)
-		assert.Contains(t, got.Error.MustGet(), "fill them in")
+		assert.Equal(t, api.CvImportItemStatusAdded, got.Status, "it went to a candidate already here")
+		assert.Equal(t, keep.Id, got.CandidateId.MustGet(), "the one kept, not the one merged away")
+		assert.True(t, got.Error.IsNull())
 		var docs api.DocumentList
 		a.request(http.MethodGet, "/v1/candidates/"+keep.Id+"/documents", token, nil).JSON(&docs)
 		require.Len(t, docs.Items, 1)

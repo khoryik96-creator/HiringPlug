@@ -433,6 +433,7 @@ type CvImportItem struct {
 	Error       *string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Merged      bool
 }
 
 type CvSearch struct {

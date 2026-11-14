@@ -29,4 +29,4 @@ WHERE id = @id;
 
 -- Merging candidates: import files that made the duplicate point to the one kept.
 -- name: MoveImportItems :exec
-UPDATE cv_import_item SET candidate_id = sqlc.arg(to_id)::text WHERE candidate_id = sqlc.arg(from_id)::text;
+UPDATE cv_import_item SET candidate_id = sqlc.arg(to_id)::text, merged = true WHERE candidate_id = sqlc.arg(from_id)::text;

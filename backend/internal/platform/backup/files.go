@@ -231,7 +231,7 @@ func Own(dir string, uid, gid int) error {
 				return err
 			}
 			if d.IsDir() || d.Type().IsRegular() { // its folders and files; links are left alone
-				return os.Chown(p, uid, gid)
+				return os.Lchown(p, uid, gid) //nolint:gosec // our own backups folder; Lchown never follows a link
 			}
 			return nil
 		}))

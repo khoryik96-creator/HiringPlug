@@ -71,7 +71,7 @@ func (q *Queries) InsertImport(ctx context.Context, source string) (CvImport, er
 const insertItem = `-- name: InsertItem :one
 INSERT INTO cv_import_item (tenant_id, import_id, file_name, document_id, candidate_id, status, error)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6)
-RETURNING id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at
+RETURNING id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at, merged
 `
 
 type InsertItemParams struct {
@@ -104,6 +104,7 @@ func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) (CvImpor
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Merged,
 	)
 	return i, err
 }
@@ -140,7 +141,7 @@ func (q *Queries) ListImports(ctx context.Context) ([]CvImport, error) {
 }
 
 const listItems = `-- name: ListItems :many
-SELECT id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at FROM cv_import_item WHERE import_id = ANY($1::text[]) ORDER BY created_at, id
+SELECT id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at, merged FROM cv_import_item WHERE import_id = ANY($1::text[]) ORDER BY created_at, id
 `
 
 func (q *Queries) ListItems(ctx context.Context, importIds []string) ([]CvImportItem, error) {
@@ -163,6 +164,7 @@ func (q *Queries) ListItems(ctx context.Context, importIds []string) ([]CvImport
 			&i.Error,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Merged,
 		); err != nil {
 			return nil, err
 		}
@@ -175,7 +177,7 @@ func (q *Queries) ListItems(ctx context.Context, importIds []string) ([]CvImport
 }
 
 const moveImportItems = `-- name: MoveImportItems :exec
-UPDATE cv_import_item SET candidate_id = $1::text WHERE candidate_id = $2::text
+UPDATE cv_import_item SET candidate_id = $1::text, merged = true WHERE candidate_id = $2::text
 `
 
 type MoveImportItemsParams struct {
@@ -190,7 +192,7 @@ func (q *Queries) MoveImportItems(ctx context.Context, arg MoveImportItemsParams
 }
 
 const readingItemByDocument = `-- name: ReadingItemByDocument :one
-SELECT id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at FROM cv_import_item WHERE document_id = $1 AND status = 'reading'
+SELECT id, tenant_id, import_id, file_name, document_id, candidate_id, status, error, created_at, updated_at, merged FROM cv_import_item WHERE document_id = $1 AND status = 'reading'
 `
 
 // The import file a document came from, while it is being read.
@@ -208,6 +210,7 @@ func (q *Queries) ReadingItemByDocument(ctx context.Context, documentID *string)
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Merged,
 	)
 	return i, err
 }

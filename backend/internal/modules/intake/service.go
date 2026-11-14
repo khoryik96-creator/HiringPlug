@@ -146,7 +146,7 @@ func (s *Service) readDone(ctx context.Context, tx pgx.Tx, documentID string, pr
 	if profile != nil && item.CandidateID != nil {
 		// A problem here must not undo the CV's reading (this runs in its
 		// transaction): the file is then shown as one to fill in by hand.
-		status, candidateID, err := s.fill(ctx, tx, *item.CandidateID, *profile)
+		status, candidateID, err := s.fill(ctx, tx, *item.CandidateID, item.Merged, *profile)
 		if err != nil {
 			logx.From(ctx).Warn("an imported CV could not fill its candidate in", "item_id", item.ID, "error", err)
 			msg := "The details read from the file could not be saved: fill them in."
@@ -165,7 +165,7 @@ func (s *Service) readDone(ctx context.Context, tx pgx.Tx, documentID string, pr
 
 // fill fills the file's candidate in from the CV, or merges them into the
 // candidate who already has its email, in a savepoint.
-func (s *Service) fill(ctx context.Context, tx pgx.Tx, candidateID string, profile api.ParsedProfile) (status, finalID string, err error) {
+func (s *Service) fill(ctx context.Context, tx pgx.Tx, candidateID string, merged bool, profile api.ParsedProfile) (status, finalID string, err error) {
 	sp, err := tx.Begin(ctx)
 	if err != nil {
 		return "", "", err
@@ -176,6 +176,9 @@ func (s *Service) fill(ctx context.Context, tx pgx.Tx, candidateID string, profi
 		return "", "", err
 	}
 	status, finalID = Created, candidateID
+	if merged { // its new candidate was merged into one already here
+		status = Added
+	}
 	if owner != "" { // one candidate per email: the file joins them
 		if err := s.deps.Candidates.MergeInto(ctx, sp, owner, candidateID); err != nil {
 			return "", "", err

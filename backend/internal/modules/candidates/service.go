@@ -29,8 +29,8 @@ type Service struct {
 	rules       FieldRules // the company's mandatory fields and sources
 	salaryRules SalaryRules
 	movers      []RecordMover
-	notes       Notes // screening calls' notes
-	cvs         CVs   // CV text, for advanced search
+	notes       Notes     // screening calls' notes
+	cvs         CVs       // CV text, for advanced search
 	used        usedCache // the suggestions of values already used
 }
 
