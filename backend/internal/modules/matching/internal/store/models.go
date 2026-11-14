@@ -1030,14 +1030,15 @@ type RevokedSession struct {
 }
 
 type RoleSetting struct {
-	TenantID       string
-	Role           string
-	Permissions    []string
-	CandidateScope string
-	JobCandidates  bool
-	Version        int32
-	UpdatedBy      string
-	UpdatedAt      time.Time
+	TenantID         string
+	Role             string
+	Permissions      []string
+	CandidateScope   string
+	JobCandidates    bool
+	Version          int32
+	UpdatedBy        string
+	UpdatedAt        time.Time
+	KnownPermissions []string
 }
 
 type Schedule struct {

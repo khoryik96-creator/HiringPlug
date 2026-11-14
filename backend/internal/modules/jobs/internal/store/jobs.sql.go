@@ -296,11 +296,16 @@ func (q *Queries) GetJobSalary(ctx context.Context, jobOrderID string) (GetJobSa
 
 const getPublishedAd = `-- name: GetPublishedAd :one
 SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad
-WHERE id = $1 AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+WHERE id = $1 AND status = 'published' AND (closes_on IS NULL OR closes_on >= $2::date)
 `
 
-func (q *Queries) GetPublishedAd(ctx context.Context, id string) (JobAd, error) {
-	row := q.db.QueryRow(ctx, getPublishedAd, id)
+type GetPublishedAdParams struct {
+	ID    string
+	Today pgtype.Date
+}
+
+func (q *Queries) GetPublishedAd(ctx context.Context, arg GetPublishedAdParams) (JobAd, error) {
+	row := q.db.QueryRow(ctx, getPublishedAd, arg.ID, arg.Today)
 	var i JobAd
 	err := row.Scan(
 		&i.ID,
@@ -915,13 +920,14 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 
 const listPublishedAds = `-- name: ListPublishedAds :many
 SELECT id, tenant_id, job_order_id, version, title, location, work_type, work_arrangement, salary_text, description, closes_on, status, published_at, created_by, created_at, updated_at, country, client_description, blind_title_edit, blind_description_edit, blind_edited, blind_source_hash, publish_blind FROM job_ad
-WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= $1::date)
 ORDER BY published_at DESC LIMIT 200
 `
 
-// The careers page: published ads still open (no closing date, or not past it).
-func (q *Queries) ListPublishedAds(ctx context.Context) ([]JobAd, error) {
-	rows, err := q.db.Query(ctx, listPublishedAds)
+// The careers page: published ads still open (no closing date, or not past
+// it on @today, the agency's date: not the database's, which is UTC).
+func (q *Queries) ListPublishedAds(ctx context.Context, today pgtype.Date) ([]JobAd, error) {
+	rows, err := q.db.Query(ctx, listPublishedAds, today)
 	if err != nil {
 		return nil, err
 	}

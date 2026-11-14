@@ -91,15 +91,15 @@ SELECT * FROM role_setting WHERE role = @role;
 SELECT * FROM role_setting ORDER BY role;
 
 -- name: InsertRoleSetting :one
-INSERT INTO role_setting (tenant_id, role, permissions, candidate_scope, job_candidates, updated_by)
-VALUES (app_current_tenant(), @role, @permissions, @candidate_scope, @job_candidates, app_current_user())
+INSERT INTO role_setting (tenant_id, role, permissions, known_permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), @role, @permissions, @known_permissions, @candidate_scope, @job_candidates, app_current_user())
 ON CONFLICT (tenant_id, role) DO NOTHING
 RETURNING *;
 
 -- Optimistic concurrency: no row returned = stale version.
 -- name: UpdateRoleSetting :one
 UPDATE role_setting
-SET permissions = @permissions, candidate_scope = @candidate_scope, job_candidates = @job_candidates,
+SET permissions = @permissions, known_permissions = @known_permissions, candidate_scope = @candidate_scope, job_candidates = @job_candidates,
     updated_by = app_current_user(), version = version + 1, updated_at = now()
 WHERE role = @role AND version = @version
 RETURNING *;

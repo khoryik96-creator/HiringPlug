@@ -30,7 +30,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 )
 
-const jdLinkTTL = 30 * time.Minute
+const jdLinkTTL = 7 * 24 * time.Hour // as long as a CV's: the AI worker may be busy or down for a while
 
 // JDFile is an uploaded job description and, once read, the ad details in it.
 type JDFile struct {

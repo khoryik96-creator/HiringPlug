@@ -131,15 +131,16 @@ RETURNING *;
 UPDATE job_ad SET status = 'closed', version = version + 1, updated_at = now()
 WHERE job_order_id = @job_order_id AND status = 'published';
 
--- The careers page: published ads still open (no closing date, or not past it).
+-- The careers page: published ads still open (no closing date, or not past
+-- it on @today, the agency's date: not the database's, which is UTC).
 -- name: ListPublishedAds :many
 SELECT * FROM job_ad
-WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= current_date)
+WHERE status = 'published' AND (closes_on IS NULL OR closes_on >= @today::date)
 ORDER BY published_at DESC LIMIT 200;
 
 -- name: GetPublishedAd :one
 SELECT * FROM job_ad
-WHERE id = @id AND status = 'published' AND (closes_on IS NULL OR closes_on >= current_date);
+WHERE id = @id AND status = 'published' AND (closes_on IS NULL OR closes_on >= @today::date);
 
 -- name: SetJobOwner :execrows
 UPDATE job_order SET owner_id = sqlc.narg(owner_id), version = version + 1, updated_at = now() WHERE id = @id;

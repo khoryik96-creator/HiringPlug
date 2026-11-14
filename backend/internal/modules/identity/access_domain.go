@@ -58,6 +58,32 @@ func CheckAccess(in Access) (Access, error) {
 	return in, errs.Err()
 }
 
+// WithLaterDefaults is a company's saved permissions for role, plus the
+// permissions added since it was saved (not in known) that role has by
+// default: a new feature reaches the roles meant to have it, until the owner
+// chooses otherwise. What the owner took away stays away.
+func WithLaterDefaults(role string, saved, known []api.Permission) []api.Permission {
+	out := slices.Clone(saved)
+	for _, perm := range authz.PermissionsForRole(api.Role(role)) {
+		if !slices.Contains(known, perm) && !slices.Contains(out, perm) {
+			out = append(out, perm)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// AllPermissions is every permission there is now (what a saved setting knew).
+func AllPermissions() []api.Permission {
+	all := authz.Catalog()
+	out := make([]api.Permission, len(all))
+	for i, p := range all {
+		out[i] = p.Permission
+	}
+	slices.Sort(out)
+	return out
+}
+
 // ScopeFor is which candidates a user with this access sees: all, or those
 // owned by them (own) or by their team (team; just them without a team),
 // with JobCandidates also those on jobs these people own.

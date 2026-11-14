@@ -21,7 +21,7 @@ func TestJobsHaveACountryAndAnIntakeDate(t *testing.T) {
 	company := a.createCompany(token, map[string]any{"name": "Contoh"})
 
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Clerk", "country": "SG"})
-	assert.Equal(t, time.Now().UTC().Format(time.DateOnly), job.IntakeDate.Format(time.DateOnly), "today unless chosen")
+	assert.Equal(t, klDay(t, 0), job.IntakeDate.Format(time.DateOnly), "today (the agency's day, not UTC's) unless chosen")
 	assert.Equal(t, "SG", job.Country.MustGet())
 
 	job = a.createJob(token, map[string]any{"companyId": company.Id, "title": "Analyst", "intakeDate": "2026-10-01"})

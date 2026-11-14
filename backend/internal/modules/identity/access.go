@@ -101,12 +101,16 @@ func (m *Module) SetAccess(ctx context.Context, p authz.Principal, in Access, ve
 		for i, perm := range in.Permissions {
 			perms[i] = string(perm)
 		}
+		var known []string
+		for _, perm := range AllPermissions() {
+			known = append(known, string(perm))
+		}
 		var row store.RoleSetting
 		if version == 0 {
-			row, err = q.InsertRoleSetting(ctx, store.InsertRoleSettingParams{Role: in.Role, Permissions: perms, CandidateScope: in.Scope, JobCandidates: in.JobCandidates})
+			row, err = q.InsertRoleSetting(ctx, store.InsertRoleSettingParams{Role: in.Role, Permissions: perms, KnownPermissions: known, CandidateScope: in.Scope, JobCandidates: in.JobCandidates})
 		} else {
 			row, err = q.UpdateRoleSetting(ctx, store.UpdateRoleSettingParams{
-				Role: in.Role, Permissions: perms, CandidateScope: in.Scope, JobCandidates: in.JobCandidates, Version: int32(version), //nolint:gosec // a version is small
+				Role: in.Role, Permissions: perms, KnownPermissions: known, CandidateScope: in.Scope, JobCandidates: in.JobCandidates, Version: int32(version), //nolint:gosec // a version is small
 			})
 		}
 		if database.IsNoRows(err) {
@@ -231,10 +235,14 @@ func sameTeamName() error {
 }
 
 func accessFromRow(r store.RoleSetting) Access {
-	perms := make([]api.Permission, len(r.Permissions))
-	for i, perm := range r.Permissions {
-		perms[i] = api.Permission(perm)
+	toPerms := func(in []string) []api.Permission {
+		out := make([]api.Permission, len(in))
+		for i, perm := range in {
+			out[i] = api.Permission(perm)
+		}
+		return out
 	}
+	perms := WithLaterDefaults(r.Role, toPerms(r.Permissions), toPerms(r.KnownPermissions))
 	return Access{Role: r.Role, Permissions: perms, Scope: r.CandidateScope, JobCandidates: r.JobCandidates, Custom: true, Version: int(r.Version)}
 }
 

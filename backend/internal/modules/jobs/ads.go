@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -252,15 +253,29 @@ func toDate(t *time.Time) pgtype.Date {
 	return pgtype.Date{Time: *t, Valid: true}
 }
 
-func today() time.Time {
-	y, m, d := time.Now().UTC().Date()
+// agencyZone is where "today" is (HP_TIME_ZONE): a day is the agency's day,
+// not UTC's, which in Kuala Lumpur is still yesterday until 8 in the morning.
+var agencyZone atomic.Pointer[time.Location]
+
+// UseTimeZone sets the zone the module's dates are in (once, when wired).
+func (m *Module) UseTimeZone(loc *time.Location) { agencyZone.Store(loc) }
+
+// DayIn is the calendar day of now in loc, at midnight UTC (how days are kept).
+func DayIn(now time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	y, m, d := now.In(loc).Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
+
+// today is the agency's date now.
+func today() time.Time { return DayIn(time.Now(), agencyZone.Load()) }
 
 // PublishedAds returns the ads on the careers page: published and not past
 // their closing date, newest first, in the caller's transaction.
 func (m *Module) PublishedAds(ctx context.Context, tx pgx.Tx) ([]Ad, error) {
-	rows, err := store.New(tx).ListPublishedAds(ctx)
+	rows, err := store.New(tx).ListPublishedAds(ctx, toDate(dayPtr(today())))
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +314,7 @@ func (m *Module) BestAd(ctx context.Context, tx pgx.Tx, jobID string) (*Ad, erro
 // PublishedAd returns one ad on the careers page; anything else (a draft, a
 // closed or expired ad) is not found.
 func (m *Module) PublishedAd(ctx context.Context, tx pgx.Tx, id string) (Ad, error) {
-	row, err := store.New(tx).GetPublishedAd(ctx, id)
+	row, err := store.New(tx).GetPublishedAd(ctx, store.GetPublishedAdParams{ID: id, Today: toDate(dayPtr(today()))})
 	if database.IsNoRows(err) {
 		return Ad{}, apperr.NotFound("job ad")
 	}
@@ -309,3 +324,5 @@ func (m *Module) PublishedAd(ctx context.Context, tx pgx.Tx, id string) (Ad, err
 	ad := adFromRow(row)
 	return ad, m.service.withBlind(ctx, tx, &ad)
 }
+
+func dayPtr(d time.Time) *time.Time { return &d }

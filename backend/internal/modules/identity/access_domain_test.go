@@ -35,3 +35,29 @@ func TestWhichCandidatesAUserSees(t *testing.T) {
 	assert.Equal(t, authz.Scope{Users: []string{"usr_a", "usr_me"}}, ScopeFor(Access{Scope: ScopeTeam}, "usr_me", []string{"usr_a", "usr_me"}))
 	assert.Equal(t, authz.Scope{Users: []string{"usr_me"}}, ScopeFor(Access{Scope: ScopeTeam}, "usr_me", nil), "no team: their own")
 }
+
+// A permission added after a company customised a role reaches that role
+// when the role has it by default; what the owner took away stays away.
+func TestLaterPermissionsFollowTheRolesDefault(t *testing.T) {
+	defaults := authz.PermissionsForRole(api.RoleAdmin)
+	if len(defaults) < 2 {
+		t.Skip("needs two admin permissions")
+	}
+	added, removed := defaults[0], defaults[1]
+	var known, saved []api.Permission
+	for _, p := range AllPermissions() {
+		if p != added { // added in a later version: the saved setting never saw it
+			known = append(known, p)
+		}
+	}
+	for _, p := range defaults {
+		if p != removed && p != added {
+			saved = append(saved, p)
+		}
+	}
+	got := WithLaterDefaults("admin", saved, known)
+	assert.Contains(t, got, added, "a new admin permission reaches a customised admin role")
+	assert.NotContains(t, got, removed, "one the owner took away stays away")
+	assert.Equal(t, saved, WithLaterDefaults("admin", saved, AllPermissions())[:len(saved)], "nothing new: the saved setting as it is")
+	assert.NotContains(t, WithLaterDefaults("viewer", nil, known), added, "only to roles that have it by default")
+}

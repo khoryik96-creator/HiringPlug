@@ -208,7 +208,7 @@ func (q *Queries) GetPreferences(ctx context.Context) ([]string, error) {
 }
 
 const getRoleSetting = `-- name: GetRoleSetting :one
-SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at FROM role_setting WHERE role = $1
+SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at, known_permissions FROM role_setting WHERE role = $1
 `
 
 // A company's own settings for one role (none: the contract's defaults).
@@ -224,6 +224,7 @@ func (q *Queries) GetRoleSetting(ctx context.Context, role string) (RoleSetting,
 		&i.Version,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.KnownPermissions,
 	)
 	return i, err
 }
@@ -317,23 +318,25 @@ func (q *Queries) InsertLink(ctx context.Context, arg InsertLinkParams) (string,
 }
 
 const insertRoleSetting = `-- name: InsertRoleSetting :one
-INSERT INTO role_setting (tenant_id, role, permissions, candidate_scope, job_candidates, updated_by)
-VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+INSERT INTO role_setting (tenant_id, role, permissions, known_permissions, candidate_scope, job_candidates, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, app_current_user())
 ON CONFLICT (tenant_id, role) DO NOTHING
-RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at
+RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at, known_permissions
 `
 
 type InsertRoleSettingParams struct {
-	Role           string
-	Permissions    []string
-	CandidateScope string
-	JobCandidates  bool
+	Role             string
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
 }
 
 func (q *Queries) InsertRoleSetting(ctx context.Context, arg InsertRoleSettingParams) (RoleSetting, error) {
 	row := q.db.QueryRow(ctx, insertRoleSetting,
 		arg.Role,
 		arg.Permissions,
+		arg.KnownPermissions,
 		arg.CandidateScope,
 		arg.JobCandidates,
 	)
@@ -347,6 +350,7 @@ func (q *Queries) InsertRoleSetting(ctx context.Context, arg InsertRoleSettingPa
 		&i.Version,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.KnownPermissions,
 	)
 	return i, err
 }
@@ -465,7 +469,7 @@ func (q *Queries) ListActiveUsers(ctx context.Context) ([]ListActiveUsersRow, er
 }
 
 const listRoleSettings = `-- name: ListRoleSettings :many
-SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at FROM role_setting ORDER BY role
+SELECT tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at, known_permissions FROM role_setting ORDER BY role
 `
 
 func (q *Queries) ListRoleSettings(ctx context.Context) ([]RoleSetting, error) {
@@ -486,6 +490,7 @@ func (q *Queries) ListRoleSettings(ctx context.Context) ([]RoleSetting, error) {
 			&i.Version,
 			&i.UpdatedBy,
 			&i.UpdatedAt,
+			&i.KnownPermissions,
 		); err != nil {
 			return nil, err
 		}
@@ -824,24 +829,26 @@ func (q *Queries) UpdateMember(ctx context.Context, arg UpdateMemberParams) (Upd
 
 const updateRoleSetting = `-- name: UpdateRoleSetting :one
 UPDATE role_setting
-SET permissions = $1, candidate_scope = $2, job_candidates = $3,
+SET permissions = $1, known_permissions = $2, candidate_scope = $3, job_candidates = $4,
     updated_by = app_current_user(), version = version + 1, updated_at = now()
-WHERE role = $4 AND version = $5
-RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at
+WHERE role = $5 AND version = $6
+RETURNING tenant_id, role, permissions, candidate_scope, job_candidates, version, updated_by, updated_at, known_permissions
 `
 
 type UpdateRoleSettingParams struct {
-	Permissions    []string
-	CandidateScope string
-	JobCandidates  bool
-	Role           string
-	Version        int32
+	Permissions      []string
+	KnownPermissions []string
+	CandidateScope   string
+	JobCandidates    bool
+	Role             string
+	Version          int32
 }
 
 // Optimistic concurrency: no row returned = stale version.
 func (q *Queries) UpdateRoleSetting(ctx context.Context, arg UpdateRoleSettingParams) (RoleSetting, error) {
 	row := q.db.QueryRow(ctx, updateRoleSetting,
 		arg.Permissions,
+		arg.KnownPermissions,
 		arg.CandidateScope,
 		arg.JobCandidates,
 		arg.Role,
@@ -857,6 +864,7 @@ func (q *Queries) UpdateRoleSetting(ctx context.Context, arg UpdateRoleSettingPa
 		&i.Version,
 		&i.UpdatedBy,
 		&i.UpdatedAt,
+		&i.KnownPermissions,
 	)
 	return i, err
 }

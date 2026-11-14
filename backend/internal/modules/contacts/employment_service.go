@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	profileLinkTTL = 30 * time.Minute
+	profileLinkTTL = 7 * 24 * time.Hour // the AI worker may be busy or down for a while
 	// readingGivenUp is when a check still being read counts as failed: its
 	// job died (worker down, link expired), and the user can drop the PDF again.
 	readingGivenUp = time.Hour
