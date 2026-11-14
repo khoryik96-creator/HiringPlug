@@ -1311,26 +1311,20 @@ class ContactLinkedinCheckSkipped(BaseModel):
     ]
 
 
-class ContactLinkedinCheckAnswer(BaseModel):
+class LinkedinMove(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    profileUrl: Annotated[str | None, Field(max_length=300)] = None
-    companyUrl: Annotated[str | None, Field(max_length=300)] = None
-    linkedinCompanyId: Annotated[
-        str | None, Field(description="LinkedIn's number for the company.", pattern="^[0-9]{1,24}$")
-    ] = None
-    joined: Annotated[
-        str | None, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)
-    ] = None
-    left: Annotated[
-        str | None, Field(description="YYYY or YYYY-MM; empty while current or not shown.", max_length=7)
-    ] = None
-    current: bool | None = None
-    error: Annotated[
-        str | None,
-        Field(description="Why the profile could not be read (then nothing else).", max_length=300),
-    ] = None
+    companyUrl: Annotated[
+        str,
+        Field(
+            description="Their new company's LinkedIn page, https://www.linkedin.com/company/.../",
+            max_length=300,
+        ),
+    ]
+    companyName: Annotated[str, Field(max_length=200)]
+    title: Annotated[str, Field(description="Their job title there; empty when not shown.", max_length=200)]
+    since: Annotated[str, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)]
 
 
 class Status1(StrEnum):
@@ -1354,6 +1348,12 @@ class ContactLinkedinCheck(BaseModel):
         Field(description="true = a current role there; false = their time there ended; null = unclear."),
     ]
     markedLeft: Annotated[bool, Field(description='This check set the contact to "has left".')]
+    movedTo: Annotated[
+        list[LinkedinMove],
+        Field(
+            description="Where they work now, when their time at the company ended (from the same profile)."
+        ),
+    ]
     error: Annotated[str | None, Field(...)]
     createdAt: AwareDatetime
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
@@ -4861,6 +4861,35 @@ class ContactLinkedinChecksStarted(BaseModel):
     skipped: Annotated[
         list[ContactLinkedinCheckSkipped], Field(description="Contacts not checked this time, and why.")
     ]
+
+
+class ContactLinkedinCheckAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profileUrl: Annotated[str | None, Field(max_length=300)] = None
+    companyUrl: Annotated[str | None, Field(max_length=300)] = None
+    linkedinCompanyId: Annotated[
+        str | None, Field(description="LinkedIn's number for the company.", pattern="^[0-9]{1,24}$")
+    ] = None
+    joined: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)
+    ] = None
+    left: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty while current or not shown.", max_length=7)
+    ] = None
+    current: bool | None = None
+    movedTo: Annotated[
+        list[LinkedinMove] | None,
+        Field(
+            description="With current false, their current roles elsewhere, as the profile shows them.",
+            max_length=3,
+        ),
+    ] = None
+    error: Annotated[
+        str | None,
+        Field(description="Why the profile could not be read (then nothing else).", max_length=300),
+    ] = None
 
 
 class ContactEmployment(BaseModel):

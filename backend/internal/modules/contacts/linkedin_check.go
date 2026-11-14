@@ -11,6 +11,7 @@ package contacts
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,14 +48,17 @@ type LinkedinCheck struct {
 	ID, ContactID, Status string // pending, observed, failed, expired
 	Joined, Left, Error   *string
 	Current               *bool
-	MarkedLeft            bool // it set the contact to "has left"
+	MarkedLeft            bool           // it set the contact to "has left"
+	MovedTo               []LinkedinMove // where they work now, when they left
 	CreatedAt             time.Time
 	CheckedAt             *time.Time
 }
 
 func linkedinCheckFrom(r store.ContactLinkedinCheck) LinkedinCheck {
-	return LinkedinCheck{ID: r.ID, ContactID: r.ContactID, Status: r.Status, Joined: r.Joined, Left: r.LeftOn, Error: r.Error,
-		Current: r.CurrentJob, MarkedLeft: r.MarkedLeft, CreatedAt: r.CreatedAt, CheckedAt: r.CheckedAt}
+	out := LinkedinCheck{ID: r.ID, ContactID: r.ContactID, Status: r.Status, Joined: r.Joined, Left: r.LeftOn, Error: r.Error,
+		Current: r.CurrentJob, MarkedLeft: r.MarkedLeft, MovedTo: []LinkedinMove{}, CreatedAt: r.CreatedAt, CheckedAt: r.CheckedAt}
+	_ = json.Unmarshal(r.MovedTo, &out.MovedTo) // checked when saved
+	return out
 }
 
 // LinkedinAnswer is what the companion read (or why it could not).
@@ -62,6 +66,7 @@ type LinkedinAnswer struct {
 	ProfileURL, CompanyURL, LinkedinCompanyID string
 	Joined, Left                              string
 	Current                                   *bool
+	MovedTo                                   []LinkedinMove
 	Error                                     string
 }
 
@@ -151,7 +156,7 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 		if check.Status != "pending" {
 			return apperr.New(api.ErrorCodeCONTACTLINKEDINCHECKCLOSED, "This LinkedIn check was already answered, or expired. Check again.")
 		}
-		params := store.SaveLinkedinCheckParams{ID: checkID, Status: "failed"}
+		params := store.SaveLinkedinCheckParams{ID: checkID, Status: "failed", MovedTo: []byte("[]")}
 		if a.Error != "" {
 			params.Error = ptr(clip(a.Error, 300))
 		} else {
@@ -168,11 +173,18 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 			if !ValidEmployment(a.Joined, a.Left, a.Current) {
 				errs.Add("joined", "the dates do not make sense: current (joined), former (joined and left) or neither")
 			}
+			moves, ok := CleanMoves(a.MovedTo)
+			if !ok || (len(moves) > 0 && (a.Current == nil || *a.Current)) {
+				errs.Add("movedTo", "up to 3 roles elsewhere, each with its company's LinkedIn page and name, and only when their time there ended")
+			}
 			if err := errs.Err(); err != nil {
 				return err
 			}
 			params.Status, params.CurrentJob, params.LinkedinCompanyID = "observed", a.Current, &a.LinkedinCompanyID
 			params.Joined, params.LeftOn = optional(a.Joined), optional(a.Left)
+			if params.MovedTo, err = json.Marshal(moves); err != nil {
+				return err
+			}
 			if a.Current != nil && !*a.Current {
 				if params.MarkedLeft, err = s.markLeft(ctx, q, check); err != nil {
 					return err
@@ -187,7 +199,7 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 			return err
 		}
 		out = linkedinCheckFrom(saved)
-		changes := map[string]any{"status": out.Status, "current": out.Current, "joined": out.Joined, "left": out.Left}
+		changes := map[string]any{"status": out.Status, "current": out.Current, "joined": out.Joined, "left": out.Left, "movedTo": len(out.MovedTo)}
 		if out.MarkedLeft {
 			changes["contactStatus"] = map[string]any{"from": "active", "to": "left"}
 		}
@@ -245,6 +257,11 @@ func (h *HTTP) AnswerContactLinkedinCheck(ctx context.Context, req api.AnswerCon
 	if v, err := b.Current.Get(); err == nil {
 		a.Current = &v
 	}
+	if b.MovedTo != nil {
+		for _, m := range *b.MovedTo {
+			a.MovedTo = append(a.MovedTo, LinkedinMove{CompanyURL: m.CompanyUrl, CompanyName: m.CompanyName, Title: m.Title, Since: m.Since})
+		}
+	}
 	row, err := h.svc.AnswerLinkedinCheck(ctx, authz.MustFromContext(ctx), req.CheckId, a)
 	if err != nil {
 		return nil, err
@@ -255,7 +272,7 @@ func (h *HTTP) AnswerContactLinkedinCheck(ctx context.Context, req api.AnswerCon
 func linkedinCheckToAPI(r LinkedinCheck) api.ContactLinkedinCheck {
 	return api.ContactLinkedinCheck{
 		Id: r.ID, ContactId: r.ContactID, Status: api.ContactLinkedinCheckStatus(r.Status), Joined: c.OrNull(r.Joined), Left: c.OrNull(r.Left),
-		Current: c.OrNull(r.Current), MarkedLeft: r.MarkedLeft, Error: c.OrNull(r.Error), CreatedAt: r.CreatedAt, CheckedAt: c.OrNull(r.CheckedAt),
+		Current: c.OrNull(r.Current), MarkedLeft: r.MarkedLeft, MovedTo: movesToAPI(r.MovedTo), Error: c.OrNull(r.Error), CreatedAt: r.CreatedAt, CheckedAt: c.OrNull(r.CheckedAt),
 	}
 }
 
@@ -271,4 +288,12 @@ func linkedinEmploymentToAPI(l *LinkedinEmployment) *api.LinkedinEmployment {
 		return nil
 	}
 	return &api.LinkedinEmployment{Current: c.OrNull(l.Current), Joined: c.OrNull(l.Joined), Left: c.OrNull(l.Left), CheckedAt: l.CheckedAt}
+}
+
+func movesToAPI(in []LinkedinMove) []api.LinkedinMove {
+	out := make([]api.LinkedinMove, len(in))
+	for i, m := range in {
+		out[i] = api.LinkedinMove{CompanyUrl: m.CompanyURL, CompanyName: m.CompanyName, Title: m.Title, Since: m.Since}
+	}
+	return out
 }

@@ -74,7 +74,9 @@ test('reads the dates of the time at the company in a background tab, then close
   let opened = null;
   const b = browser({page: tab => { opened = {url: tab.url, active: tab.active}; return {joined: '2019-04', left: '2025-08', current: false}; }});
   const reply = await b.send(check);
-  assert.deepEqual({...reply.result}, {url: profile, company_url: company, company_id: '123456', joined: '2019-04', left: '2025-08', current: false});
+  const {moved_to: moved, ...dates} = reply.result;
+  assert.deepEqual({...dates}, {url: profile, company_url: company, company_id: '123456', joined: '2019-04', left: '2025-08', current: false});
+  assert.equal(moved.length, 0, 'no current role elsewhere shown');
   assert.deepEqual(opened, {url: profile + '/details/experience/', active: false});
   assert.equal(b.tabs.size, 1, 'its tab is closed (the HiringPlug tab stays)');
 });
@@ -91,6 +93,15 @@ test('like CV Studio, keeps the HiringPlug tab and the tabs it opens in one "Hir
   assert.deepEqual(seen, [{group: id, opener: 1, window: 7}, {group: id, opener: 1, window: 7}]);
   const plain = browser({grouping: false});
   assert.equal((await plain.send(check)).result.current, false, 'grouping is only for looks: the check still runs');
+});
+
+test('for a contact who left, also where they work now (from the same page)', async () => {
+  const acme = {company_url: 'https://www.linkedin.com/company/acme-bhd/', company_name: 'Acme Bhd', title: 'Head of HR', since: '2025-09'};
+  const roles = [acme, {company_url: 'https://evil.test/company/x/', company_name: 'X', title: '', since: ''}, {...acme, since: 'Sep 2025'}];
+  const b = browser({page: (tab, args) => (args.length === 2 ? roles : {joined: '2019-04', left: '2025-08', current: false})});
+  assert.deepEqual((await b.send(check)).result.moved_to.map(r => ({...r})), [acme], 'only well-formed roles, each with its exact company page');
+  const there = browser({page: (tab, args) => (args.length === 2 ? roles : {joined: '2021', left: '', current: true})});
+  assert.equal((await there.send(check)).result.moved_to, undefined, 'not asked while they still work there');
 });
 
 test('dates that make no sense are refused', async () => {

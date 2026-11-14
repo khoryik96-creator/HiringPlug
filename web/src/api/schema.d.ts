@@ -4783,8 +4783,19 @@ export interface components {
             /** @description YYYY or YYYY-MM; empty while current or not shown. */
             left?: string;
             current?: boolean | null;
+            /** @description With current false, their current roles elsewhere, as the profile shows them. */
+            movedTo?: components["schemas"]["LinkedinMove"][];
             /** @description Why the profile could not be read (then nothing else). */
             error?: string;
+        };
+        LinkedinMove: {
+            /** @description Their new company's LinkedIn page, https://www.linkedin.com/company/.../ */
+            companyUrl: string;
+            companyName: string;
+            /** @description Their job title there; empty when not shown. */
+            title: string;
+            /** @description YYYY or YYYY-MM; empty when not shown. */
+            since: string;
         };
         ContactLinkedinCheck: {
             id: components["schemas"]["ContactLinkedinCheckId"];
@@ -4800,6 +4811,8 @@ export interface components {
             current: boolean | null;
             /** @description This check set the contact to "has left". */
             markedLeft: boolean;
+            /** @description Where they work now, when their time at the company ended (from the same profile). */
+            movedTo: components["schemas"]["LinkedinMove"][];
             error: string | null;
             /** Format: date-time */
             createdAt: string;
@@ -9035,6 +9048,8 @@ export interface operations {
                 type?: components["schemas"]["CompanyType"];
                 /** @description Only companies in this category (a key of the company_category list). */
                 category?: string;
+                /** @description Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case). */
+                linkedinCompany?: string;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CompanyId"];
@@ -12070,6 +12085,8 @@ export interface operations {
                 status?: components["schemas"]["JobStatus"];
                 /** @description Only this company's jobs. */
                 companyId?: components["schemas"]["CompanyId"];
+                /** @description Only jobs with this hiring contact. */
+                contactId?: components["schemas"]["ContactId"];
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["JobOrderId"];

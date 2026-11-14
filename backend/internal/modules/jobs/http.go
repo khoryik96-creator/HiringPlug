@@ -24,7 +24,7 @@ func (h *HTTP) ListJobs(ctx context.Context, req api.ListJobsRequestObject) (api
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, c.Convert[string](req.Params.Status), req.Params.CompanyId, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, c.Convert[string](req.Params.Status), req.Params.CompanyId, req.Params.ContactId, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}

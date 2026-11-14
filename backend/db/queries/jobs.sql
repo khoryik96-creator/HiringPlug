@@ -44,6 +44,7 @@ FROM job_order
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
+  AND (sqlc.narg(contact_id)::text IS NULL OR contact_id = sqlc.narg(contact_id)::text)
   AND (sqlc.narg(query)::text IS NULL OR NOT EXISTS (
          -- every word in the title or location, or in the client's name (@company_hits: "n:companyId")
          SELECT 1 FROM app_search_words(sqlc.narg(query)::text) w

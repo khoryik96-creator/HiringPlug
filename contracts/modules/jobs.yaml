@@ -76,6 +76,10 @@ paths:
           in: query
           description: Only this company's jobs.
           schema: { $ref: '#/components/schemas/CompanyId' }
+        - name: contactId
+          in: query
+          description: Only jobs with this hiring contact.
+          schema: { $ref: '#/components/schemas/ContactId' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }

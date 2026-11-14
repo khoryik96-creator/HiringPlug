@@ -63,6 +63,37 @@ func CompanyPageURL(raw string) string {
 	return "https://www.linkedin.com/company/" + m[1] + "/"
 }
 
+// LinkedinMove is a current role elsewhere of a contact who left, as their
+// profile shows it.
+type LinkedinMove struct {
+	CompanyURL  string `json:"companyUrl"`
+	CompanyName string `json:"companyName"`
+	Title       string `json:"title"`
+	Since       string `json:"since"`
+}
+
+// CleanMoves tidies and checks where a contact moved: the company's exact
+// LinkedIn page and its name, at most 3, each company once.
+func CleanMoves(in []LinkedinMove) ([]LinkedinMove, bool) {
+	if len(in) > 3 {
+		return nil, false
+	}
+	out := []LinkedinMove{}
+	seen := map[string]bool{}
+	for _, m := range in {
+		m.CompanyName, m.Title, m.Since = strings.Join(strings.Fields(m.CompanyName), " "), strings.Join(strings.Fields(m.Title), " "), strings.TrimSpace(m.Since)
+		if CompanyPageURL(m.CompanyURL) != m.CompanyURL || m.CompanyName == "" || len([]rune(m.CompanyName)) > 200 ||
+			len([]rune(m.Title)) > 200 || (m.Since != "" && !yearMonthRe.MatchString(m.Since)) {
+			return nil, false
+		}
+		if !seen[m.CompanyURL] {
+			seen[m.CompanyURL] = true
+			out = append(out, m)
+		}
+	}
+	return out, true
+}
+
 // ValidEmployment reports whether what a profile shows of someone's time at
 // a company makes sense: current (joined, no end), former (joined and left,
 // in order) or unknown (neither). Dates are a year or a year and month, as

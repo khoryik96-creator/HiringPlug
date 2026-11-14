@@ -998,3 +998,9 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .tone-failed { border-left-color: #d97706 !important; }
 .linkedin-note { display: block; margin-top: 0.15rem; }
 .companion-help ol { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+
+/* Following a contact who left (FollowLeaver). */
+.leaver-moves { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.25rem; font-size: 0.92rem; }
+.leaver-moves li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.follow-done { color: #166534; }
+.jobs-needing-contact { margin: 0.35rem 0 0; }

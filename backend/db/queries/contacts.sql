@@ -163,7 +163,7 @@ SELECT * FROM contact_linkedin_check WHERE id = @id;
 -- name: SaveLinkedinCheck :one
 UPDATE contact_linkedin_check SET
   status = @status, joined = sqlc.narg(joined), left_on = sqlc.narg(left_on), current_job = sqlc.narg(current_job),
-  linkedin_company_id = sqlc.narg(linkedin_company_id), marked_left = @marked_left, error = sqlc.narg(error), checked_at = now()
+  linkedin_company_id = sqlc.narg(linkedin_company_id), marked_left = @marked_left, moved_to = @moved_to, error = sqlc.narg(error), checked_at = now()
 WHERE id = @id AND status = 'pending'
 RETURNING *;
 

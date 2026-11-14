@@ -8,6 +8,7 @@ import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
+import { JobsNeedingContact } from "../components/FollowLeaver";
 import { LinkedinCheckResult, LinkedinChecks } from "../components/LinkedinChecks";
 import { MailboxBadge } from "../components/MailboxBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -123,6 +124,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
       )}
       <ErrorMessage error={verify.error} />
       <ContactBanner contact={c} canEdit={canEdit && !editing} />
+      {c.status === "left" && <JobsNeedingContact contactId={c.id} />}
       <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
     </main>
   );

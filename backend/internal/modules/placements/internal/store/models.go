@@ -422,6 +422,7 @@ type ContactLinkedinCheck struct {
 	RequestedBy       string
 	CreatedAt         time.Time
 	CheckedAt         *time.Time
+	MovedTo           []byte
 }
 
 type ContactMailboxCheck struct {

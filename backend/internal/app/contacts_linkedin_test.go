@@ -54,8 +54,9 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	answer := func(token, id string, body map[string]any) *response {
 		return a.request(http.MethodPost, "/v1/contacts/linkedin-checks/"+id+"/answer", token, body)
 	}
+	acme := map[string]any{"companyUrl": "https://www.linkedin.com/company/acme-bhd/", "companyName": "Acme Bhd", "title": "Head of HR", "since": "2025-09"}
 	former := map[string]any{"profileUrl": checks["Ana Lim"].ProfileUrl, "companyUrl": started.CompanyUrl, "linkedinCompanyId": "123456",
-		"joined": "2019-04", "left": "2025-08", "current": false}
+		"joined": "2019-04", "left": "2025-08", "current": false, "movedTo": []any{acme}}
 
 	// Only whoever started the check may answer it, about that profile and company.
 	assert.Equal(t, http.StatusNotFound, answer(tenant.Users[api.RoleAdmin].Token, checks["Ana Lim"].Id, former).Status)
@@ -76,6 +77,8 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	assert.Equal(t, api.ContactStatusLeft, got.Status)
 	assert.Equal(t, ana.Version+1, got.Version)
 	assert.Equal(t, "2025-08", got.LinkedinCheck.MustGet().Left.MustGet())
+	assert.Equal(t, []api.LinkedinMove{{CompanyUrl: "https://www.linkedin.com/company/acme-bhd/", CompanyName: "Acme Bhd", Title: "Head of HR", Since: "2025-09"}},
+		got.LinkedinCheck.MustGet().MovedTo, "where they work now")
 	assert.Equal(t, http.StatusConflict, answer(token, checks["Ana Lim"].Id, former).Status, "answered once")
 
 	// Unclear dates change nothing.
@@ -90,6 +93,11 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	assert.Equal(t, "2019-04", employment.Joined.MustGet())
 	assert.True(t, listed["Wei"].LinkedinEmployment.MustGet().Current.IsNull())
 	assert.True(t, listed["Nobody"].LinkedinEmployment.IsNull())
+
+	// Somewhere else only when their time there ended.
+	stillThere := a.startLinkedinChecks(token, map[string]any{"contactId": wei.Id})
+	assert.Equal(t, []string{"movedTo"}, fieldNames(t, answer(token, stillThere.Checks[0].Id, map[string]any{"profileUrl": stillThere.Checks[0].ProfileUrl,
+		"companyUrl": stillThere.CompanyUrl, "linkedinCompanyId": "123456", "joined": "2021", "left": "", "current": true, "movedTo": []any{acme}}).Error()))
 
 	// One contact; still at the company; a check left too long expires; a
 	// profile that could not be read is kept as failed.

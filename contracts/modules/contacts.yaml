@@ -589,10 +589,24 @@ components:
         joined: { type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty when not shown." }
         left: { type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty while current or not shown." }
         current: { type: boolean, nullable: true }
+        movedTo:
+          type: array
+          maxItems: 3
+          description: With current false, their current roles elsewhere, as the profile shows them.
+          items: { $ref: '#/components/schemas/LinkedinMove' }
         error: { type: string, maxLength: 300, description: "Why the profile could not be read (then nothing else)." }
+    LinkedinMove:
+      type: object
+      additionalProperties: false
+      required: [companyUrl, companyName, title, since]
+      properties:
+        companyUrl: { type: string, maxLength: 300, description: "Their new company's LinkedIn page, https://www.linkedin.com/company/.../" }
+        companyName: { type: string, maxLength: 200 }
+        title: { type: string, maxLength: 200, description: Their job title there; empty when not shown. }
+        since: { type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty when not shown." }
     ContactLinkedinCheck:
       type: object
-      required: [id, contactId, status, joined, left, current, markedLeft, error, createdAt, checkedAt]
+      required: [id, contactId, status, joined, left, current, markedLeft, movedTo, error, createdAt, checkedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactLinkedinCheckId' }
         contactId: { $ref: '#/components/schemas/ContactId' }
@@ -608,6 +622,10 @@ components:
           nullable: true
         current: { type: boolean, nullable: true, description: "true = a current role there; false = their time there ended; null = unclear." }
         markedLeft: { type: boolean, description: This check set the contact to "has left". }
+        movedTo:
+          type: array
+          description: Where they work now, when their time at the company ended (from the same profile).
+          items: { $ref: '#/components/schemas/LinkedinMove' }
         error: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         checkedAt: { type: string, format: date-time, nullable: true }

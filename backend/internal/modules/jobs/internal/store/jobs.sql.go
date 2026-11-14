@@ -850,18 +850,20 @@ FROM job_order
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR status = $2::text)
   AND ($3::text IS NULL OR company_id = $3::text)
-  AND ($4::text IS NULL OR NOT EXISTS (
+  AND ($4::text IS NULL OR contact_id = $4::text)
+  AND ($5::text IS NULL OR NOT EXISTS (
          -- every word in the title or location, or in the client's name (@company_hits: "n:companyId")
-         SELECT 1 FROM app_search_words($4::text) w
-         WHERE NOT (strpos(search_text, w.word) > 0 OR (w.n::text || ':' || company_id) = ANY(coalesce($5::text[], ARRAY[]::text[])))))
+         SELECT 1 FROM app_search_words($5::text) w
+         WHERE NOT (strpos(search_text, w.word) > 0 OR (w.n::text || ':' || company_id) = ANY(coalesce($6::text[], ARRAY[]::text[])))))
 ORDER BY id DESC
-LIMIT $6
+LIMIT $7
 `
 
 type ListJobOrdersParams struct {
 	Cursor      *string
 	Status      *string
 	CompanyID   *string
+	ContactID   *string
 	Query       *string
 	CompanyHits []string
 	RowLimit    int32
@@ -883,6 +885,7 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 		arg.Cursor,
 		arg.Status,
 		arg.CompanyID,
+		arg.ContactID,
 		arg.Query,
 		arg.CompanyHits,
 		arg.RowLimit,

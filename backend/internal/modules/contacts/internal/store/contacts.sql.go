@@ -238,7 +238,7 @@ func (q *Queries) GetEmploymentCheck(ctx context.Context, id string) (ContactEmp
 }
 
 const getLinkedinCheck = `-- name: GetLinkedinCheck :one
-SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at FROM contact_linkedin_check WHERE id = $1
+SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at, moved_to FROM contact_linkedin_check WHERE id = $1
 `
 
 func (q *Queries) GetLinkedinCheck(ctx context.Context, id string) (ContactLinkedinCheck, error) {
@@ -261,6 +261,7 @@ func (q *Queries) GetLinkedinCheck(ctx context.Context, id string) (ContactLinke
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.CheckedAt,
+		&i.MovedTo,
 	)
 	return i, err
 }
@@ -410,7 +411,7 @@ func (q *Queries) InsertEmploymentCheck(ctx context.Context, arg InsertEmploymen
 const insertLinkedinCheck = `-- name: InsertLinkedinCheck :one
 INSERT INTO contact_linkedin_check (tenant_id, contact_id, company_id, profile_url, company_url, requested_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
-RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at
+RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at, moved_to
 `
 
 type InsertLinkedinCheckParams struct {
@@ -445,6 +446,7 @@ func (q *Queries) InsertLinkedinCheck(ctx context.Context, arg InsertLinkedinChe
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.CheckedAt,
+		&i.MovedTo,
 	)
 	return i, err
 }
@@ -472,7 +474,7 @@ func (q *Queries) LatestEmploymentCheck(ctx context.Context, contactID string) (
 }
 
 const latestLinkedinCheck = `-- name: LatestLinkedinCheck :one
-SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at FROM contact_linkedin_check WHERE contact_id = $1 AND status IN ('observed', 'failed')
+SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at, moved_to FROM contact_linkedin_check WHERE contact_id = $1 AND status IN ('observed', 'failed')
 ORDER BY checked_at DESC, id DESC LIMIT 1
 `
 
@@ -496,6 +498,7 @@ func (q *Queries) LatestLinkedinCheck(ctx context.Context, contactID string) (Co
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.CheckedAt,
+		&i.MovedTo,
 	)
 	return i, err
 }
@@ -665,9 +668,9 @@ func (q *Queries) SaveEmploymentCheck(ctx context.Context, arg SaveEmploymentChe
 const saveLinkedinCheck = `-- name: SaveLinkedinCheck :one
 UPDATE contact_linkedin_check SET
   status = $1, joined = $2, left_on = $3, current_job = $4,
-  linkedin_company_id = $5, marked_left = $6, error = $7, checked_at = now()
-WHERE id = $8 AND status = 'pending'
-RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at
+  linkedin_company_id = $5, marked_left = $6, moved_to = $7, error = $8, checked_at = now()
+WHERE id = $9 AND status = 'pending'
+RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at, moved_to
 `
 
 type SaveLinkedinCheckParams struct {
@@ -677,6 +680,7 @@ type SaveLinkedinCheckParams struct {
 	CurrentJob        *bool
 	LinkedinCompanyID *string
 	MarkedLeft        bool
+	MovedTo           []byte
 	Error             *string
 	ID                string
 }
@@ -689,6 +693,7 @@ func (q *Queries) SaveLinkedinCheck(ctx context.Context, arg SaveLinkedinCheckPa
 		arg.CurrentJob,
 		arg.LinkedinCompanyID,
 		arg.MarkedLeft,
+		arg.MovedTo,
 		arg.Error,
 		arg.ID,
 	)
@@ -710,6 +715,7 @@ func (q *Queries) SaveLinkedinCheck(ctx context.Context, arg SaveLinkedinCheckPa
 		&i.RequestedBy,
 		&i.CreatedAt,
 		&i.CheckedAt,
+		&i.MovedTo,
 	)
 	return i, err
 }

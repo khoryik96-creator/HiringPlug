@@ -143,6 +143,21 @@ async function withTab(op, url, read, prepare) {
   }
 }
 
+// The roles shown as current at other companies (roles.js); none if unreadable.
+async function currentRoles(tabId, url, leftCompany) {
+  try {
+    const [present] = await chrome.scripting.executeScript({target: {tabId}, func: () => !!globalThis.HiringplugRoles});
+    if (!present?.result) await chrome.scripting.executeScript({target: {tabId}, files: ['roles.js']});
+    const [read] = await chrome.scripting.executeScript({target: {tabId}, func: (u, c) => {
+      try { return globalThis.HiringplugRoles.readCurrentRoles(u, c); } catch { return []; }
+    }, args: [url, leftCompany]});
+    const text = (v, n) => typeof v === 'string' && v.length <= n;
+    return (Array.isArray(read?.result) ? read.result : []).filter(r => r && companyRe.test(r.company_url) && text(r.company_name, 200) && r.company_name &&
+      text(r.title, 200) && typeof r.since === 'string' && /^(?:(?:19|20)\d{2}(?:-(?:0[1-9]|1[0-2]))?)?$/.test(r.since)).slice(0, 3)
+      .map(r => ({company_url: r.company_url, company_name: r.company_name, title: r.title, since: r.since}));
+  } catch { return []; }
+}
+
 // LinkedIn's number for a company, from its People page header.
 async function companyId(op, args) {
   if (!companyRe.test(args.company_url || '')) throw safeError("Add the company's LinkedIn page in HiringPlug first.");
@@ -158,9 +173,15 @@ async function employment(op, args) {
   if (!profileRe.test(args.url || '') || !companyRe.test(args.company_url || '') || !/^[0-9]{1,24}$/.test(args.company_id || '')) {
     throw safeError('Choose a contact with a LinkedIn profile, at a company with a LinkedIn page.');
   }
-  const value = await withTab(op, args.url + '/details/experience/', tabId => inject(tabId, (url, company, id) => {
-    try { return globalThis.SourcerReader.readHRJoined(url, company, id); } catch { return {failed: true}; }
-  }, [args.url, args.company_url, args.company_id], 'The LinkedIn profile could not be read.'),
+  let moves = [];
+  const value = await withTab(op, args.url + '/details/experience/', async tabId => {
+    const read = await inject(tabId, (url, company, id) => {
+      try { return globalThis.SourcerReader.readHRJoined(url, company, id); } catch { return {failed: true}; }
+    }, [args.url, args.company_url, args.company_id], 'The LinkedIn profile could not be read.');
+    // Their time there ended: where they work now, from the same page (best effort).
+    if (read && !read.loading && !read.failed && read.current === false) moves = await currentRoles(tabId, args.url, args.company_url);
+    return read;
+  },
   tabId => inject(tabId, url => (document.visibilityState === 'visible' ? false : globalThis.SourcerReader.prepareHRJoined(url)),
     [args.url], 'The Experience section could not be loaded.'));
   const {joined, left, current: now} = value;
@@ -169,7 +190,7 @@ async function employment(op, args) {
       (left && (joined.length === 4 ? joined + '-01' : joined) > (left.length === 4 ? left + '-12' : left))) {
     throw safeError('The employment dates could not be confirmed.');
   }
-  return {url: args.url, company_url: args.company_url, company_id: args.company_id, joined, left, current: now};
+  return {url: args.url, company_url: args.company_url, company_id: args.company_id, joined, left, current: now, ...(now === false ? {moved_to: moves} : {})};
 }
 
 async function handle(message, sender) {

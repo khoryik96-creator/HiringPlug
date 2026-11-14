@@ -6,15 +6,19 @@ import { contactKey, contactsKey } from "../api/keys";
 import { companionCall, operationId, useCompanion } from "../companion";
 import { formatWhen, linkedinDates } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
+import { JobsNeedingContact, LeaverMoves } from "./FollowLeaver";
 
-type Row = { name: string; contactId: string; text: string; tone: "left" | "there" | "unclear" | "failed" | "waiting" };
+type Row = { name: string; contactId: string; text: string; tone: "left" | "there" | "unclear" | "failed" | "waiting"; check?: Schemas["ContactLinkedinCheck"] };
 
-interface Read { url: string; company_url: string; company_id: string; joined: string; left: string; current: boolean | null }
+interface Read {
+  url: string; company_url: string; company_id: string; joined: string; left: string; current: boolean | null;
+  moved_to?: { company_url: string; company_name: string; title: string; since: string }[];
+}
 
 function rowFor(name: string, contactId: string, check: Schemas["ContactLinkedinCheck"]): Row {
   if (check.status !== "observed") return { name, contactId, tone: "failed", text: check.error ?? "Could not be read." };
   if (check.current === false) {
-    return { name, contactId, tone: "left", text: `Left ${linkedinDates(check.left)}${check.markedLeft ? " · marked as Has left" : ""}` };
+    return { name, contactId, check, tone: "left", text: `Left ${linkedinDates(check.left)}${check.markedLeft ? " · marked as Has left" : ""}` };
   }
   if (check.current) return { name, contactId, tone: "there", text: `Still there, since ${linkedinDates(check.joined)}` };
   return { name, contactId, tone: "unclear", text: "LinkedIn does not show clearly: nothing changed" };
@@ -71,6 +75,9 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
             operation_id: check.id, url: check.profileUrl, company_url: started.companyUrl, company_id: company.company_id,
           });
           body = { profileUrl: read.url, companyUrl: read.company_url, linkedinCompanyId: read.company_id, joined: read.joined, left: read.left, current: read.current };
+          if (read.moved_to?.length) {
+            body.movedTo = read.moved_to.map((m) => ({ companyUrl: m.company_url, companyName: m.company_name, title: m.title, since: m.since }));
+          }
         } catch (e) {
           if (stopped()) break;
           body = { error: e instanceof Error ? e.message.slice(0, 300) : "Could not be read." };
@@ -117,7 +124,11 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
       {rows.length > 0 && (
         <ul className="linkedin-results" aria-label="LinkedIn employment">
           {rows.map((r) => (
-            <li key={r.contactId} className={`tone-${r.tone}`}><strong>{r.name}</strong> — {r.text}</li>
+            <li key={r.contactId} className={`tone-${r.tone}`}>
+              <strong>{r.name}</strong> — {r.text}
+              {r.check?.current === false && <LeaverMoves contactId={r.contactId} moves={r.check.movedTo} />}
+              {r.check?.markedLeft && <JobsNeedingContact contactId={r.contactId} />}
+            </li>
           ))}
         </ul>
       )}
@@ -130,9 +141,10 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
 export function LinkedinCheckResult({ check }: { check: Schemas["ContactLinkedinCheck"] }) {
   const row = rowFor("", check.contactId, check);
   return (
-    <p className={`linkedin-result tone-${row.tone}`}>
+    <div className={`linkedin-result tone-${row.tone}`}>
       {row.text}
       {check.checkedAt && <span className="muted"> · checked {formatWhen(check.checkedAt)}</span>}
-    </p>
+      {check.current === false && <LeaverMoves contactId={check.contactId} moves={check.movedTo} />}
+    </div>
   );
 }

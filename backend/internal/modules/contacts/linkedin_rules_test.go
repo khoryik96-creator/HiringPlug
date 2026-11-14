@@ -56,3 +56,24 @@ func TestEmploymentAnswersMustMakeSense(t *testing.T) {
 		}
 	}
 }
+
+func TestWhereALeaverMovedIsTheirNewCompanysExactPage(t *testing.T) {
+	ok := LinkedinMove{CompanyURL: "https://www.linkedin.com/company/acme-bhd/", CompanyName: "  Acme   Bhd ", Title: "HR Manager", Since: "2025-09"}
+	got, valid := CleanMoves([]LinkedinMove{ok, ok})
+	if !valid || len(got) != 1 || got[0].CompanyName != "Acme Bhd" {
+		t.Fatalf("got %+v %v: tidied, each company once", got, valid)
+	}
+	for _, bad := range []LinkedinMove{
+		{CompanyURL: "https://www.linkedin.com/company/acme-bhd", CompanyName: "Acme"}, // not the exact page form
+		{CompanyURL: "https://evil.test/company/acme/", CompanyName: "Acme"},
+		{CompanyURL: "https://www.linkedin.com/company/acme/", CompanyName: " "},
+		{CompanyURL: "https://www.linkedin.com/company/acme/", CompanyName: "Acme", Since: "Sep 2025"},
+	} {
+		if _, valid := CleanMoves([]LinkedinMove{bad}); valid {
+			t.Errorf("%+v accepted", bad)
+		}
+	}
+	if _, valid := CleanMoves(make([]LinkedinMove, 4)); valid {
+		t.Error("more than 3 accepted")
+	}
+}

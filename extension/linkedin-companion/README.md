@@ -36,6 +36,9 @@ contact with a LinkedIn profile (the company needs its LinkedIn page set).
 
 - `reader.js`: CV Studio's LinkedIn reader (v24.6.585), unchanged
   (`readHRJoined`, `readHRCompany`): what is read and how dates are judged.
+- `roles.js`: HiringPlug's own small reader (in the same style): when a
+  contact's time at the company ended, the roles shown as current at other
+  companies, with each company's LinkedIn page: where they work now.
 - `worker.js`: the background worker: who may ask (connected HiringPlug pages
   only), the tabs it opens and closes, and the checks on what it returns.
 - `bridge.js`: runs on the connected HiringPlug page and passes messages.

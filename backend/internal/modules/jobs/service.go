@@ -201,7 +201,7 @@ type Page struct {
 }
 
 // List returns up to limit jobs, optionally matching query, status or company.
-func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, cursor *string, limit int) (Page, error) {
+func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, contactID, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		// A word of the search may be the client's name rather than in the title.
@@ -213,7 +213,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, status, co
 			}
 		}
 		rows, err := store.New(tx).ListJobOrders(ctx, store.ListJobOrdersParams{
-			Cursor: cursor, Status: status, CompanyID: companyID, Query: query, CompanyHits: hits, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Status: status, CompanyID: companyID, ContactID: contactID, Query: query, CompanyHits: hits, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
