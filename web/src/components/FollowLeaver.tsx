@@ -96,7 +96,7 @@ export function JobsNeedingContact({ contactId }: { contactId: string }) {
   if (!jobs.data?.length) return null;
   return (
     <p className="warning small jobs-needing-contact" role="status">
-      Hiring contact on {jobs.data.length === 1 ? "1 open job" : `${String(jobs.data.length)} open jobs`}, which need a new contact:{" "}
+      Hiring contact on {jobs.data.length === 1 ? "1 open job, which needs" : `${String(jobs.data.length)} open jobs, which need`} a new contact:{" "}
       {jobs.data.map((j, i) => <span key={j.id}>{i > 0 && ", "}<a href={`#/jobs/${j.id}`}>{j.title}</a></span>)}
     </p>
   );
