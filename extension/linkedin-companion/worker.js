@@ -8,6 +8,9 @@
  * - One read at a time. Each opens LinkedIn in a new background tab that the
  *   companion owns, and closes it afterwards, unless the recruiter looked at
  *   it (then it is theirs and stays open). It never touches other tabs.
+ * - Like CV Studio, it puts the HiringPlug tab that asked and the tabs it
+ *   opens in one "HiringPlug" tab group (in that window). Grouping is only
+ *   for looks: it gives no authority, and a check never fails because of it.
  * - Bounded: up to 100 half-second polls per read, 8 scrolls, 40 reads of
  *   the page; it stops at a sign-in, check or restriction page.
  * - The identity of the profile and the company is checked before and after
@@ -94,11 +97,31 @@ async function inject(tabId, func, args, message) {
   } catch { throw safeError(message); }
 }
 
+// Puts a tab we opened in the asking HiringPlug tab's group (or a new
+// "HiringPlug" group with it), in the same window only.
+async function group(tabId, sourceId) {
+  if (typeof chrome.tabs.group !== 'function' || typeof chrome.tabGroups?.update !== 'function') return;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    let anchor = null;
+    try { anchor = await chrome.tabs.get(sourceId); } catch { /* the HiringPlug tab was closed */ }
+    if (anchor && anchor.windowId !== tab.windowId) anchor = null;
+    if (anchor && Number.isInteger(anchor.groupId) && anchor.groupId >= 0) {
+      if (tab.groupId !== anchor.groupId) await chrome.tabs.group({tabIds: [tabId], groupId: anchor.groupId});
+      return;
+    }
+    const groupId = await chrome.tabs.group({tabIds: anchor ? [anchor.id, tabId] : [tabId], createProperties: {windowId: tab.windowId}});
+    await chrome.tabGroups.update(groupId, {title: 'HiringPlug', color: 'purple'});
+  } catch { /* only for looks */ }
+}
+
 // Opens url in a background tab of ours and polls read until it answers.
 async function withTab(op, url, read, prepare) {
   await ready;
-  const tab = await chrome.tabs.create({url, active: false});
+  const source = op.source;
+  const tab = await chrome.tabs.create({url, active: false, ...(source ? {windowId: source.windowId, openerTabId: source.id} : {})});
   owned.set(tab.id, url); await persist();
+  if (source) await group(tab.id, source.id);
   let scrolls = 0, reads = 0;
   try {
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -162,7 +185,7 @@ async function handle(message, sender) {
   if (action !== 'companyId' && action !== 'employment') throw safeError('The companion does not know this action. Update it.');
   if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HiringPlug.');
   if (current) throw safeError('The companion is busy with another check. Wait for it, or stop it.');
-  const op = {operation: args.operation_id, cancelled: false};
+  const op = {operation: args.operation_id, cancelled: false, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
   current = op;
   try {
     return action === 'companyId' ? await companyId(op, args) : await employment(op, args);

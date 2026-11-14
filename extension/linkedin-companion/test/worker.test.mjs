@@ -11,9 +11,11 @@ const profile = 'https://www.linkedin.com/in/ana-lim-example';
 const company = 'https://www.linkedin.com/company/maju-logistik/';
 const op = 'clc_01jbz6w0m0k8q9x2r3s4t5v6w7';
 
-function browser({page = () => ({joined: '2019-04', left: '2025-08', current: false}), origins = [app]} = {}) {
+function browser({page = () => ({joined: '2019-04', left: '2025-08', current: false}), origins = [app], grouping = true} = {}) {
   const listeners = {message: [], activated: [], removed: []};
-  const tabs = new Map();
+  const tabs = new Map([[1, {id: 1, url: app + '/#/companies/comp_1', status: 'complete', active: true, windowId: 7, groupId: -1}]]);
+  const groups = new Map();
+  let nextGroup = 100;
   const store = {local: {hiringplugOrigins: origins}, session: {}};
   let nextId = 10;
   const area = name => ({
@@ -24,7 +26,17 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
     runtime: {id: 'companion', getManifest: () => ({version: '1.0.0'}), onMessage: {addListener: f => listeners.message.push(f)}},
     storage: {local: area('local'), session: area('session')},
     tabs: {
-      create: async ({url, active}) => { const t = {id: nextId++, url, status: 'complete', active}; tabs.set(t.id, t); return t; },
+      create: async ({url, active, windowId, openerTabId}) => {
+        const t = {id: nextId++, url, status: 'complete', active, windowId: windowId ?? 7, openerTabId, groupId: -1};
+        tabs.set(t.id, t); return t;
+      },
+      group: async ({tabIds, groupId}) => {
+        if (!grouping) throw Error('Tabs cannot be edited right now');
+        const id = groupId ?? nextGroup++;
+        if (!groups.has(id)) groups.set(id, {});
+        for (const t of tabIds) tabs.get(t).groupId = id;
+        return id;
+      },
       get: async id => { const t = tabs.get(id); if (!t) throw Error('No tab with id'); return {...t}; },
       remove: async id => { tabs.delete(id); listeners.removed.forEach(f => f(id)); },
       onActivated: {addListener: f => listeners.activated.push(f)},
@@ -39,14 +51,15 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
       },
     },
   };
+  chrome.tabGroups = {update: async (id, props) => { Object.assign(groups.get(id), props); }};
   const context = vm.createContext({chrome, setTimeout, URL, globalThis: {}});
   context.globalThis = context;
   vm.runInContext(source, context);
   const send = (message, origin = app) => new Promise(resolve => {
-    listeners.message[0](message, {id: 'companion', tab: {id: 1}, frameId: 0, origin}, resolve);
+    listeners.message[0](message, {id: 'companion', tab: {id: 1, windowId: 7}, frameId: 0, origin}, resolve);
   });
   const look = id => { tabs.get(id).active = true; listeners.activated.forEach(f => f({tabId: id})); };
-  return {send, tabs, look, context};
+  return {send, tabs, groups, look, context};
 }
 
 const check = {action: 'employment', args: {operation_id: op, url: profile, company_url: company, company_id: '123456'}};
@@ -63,7 +76,21 @@ test('reads the dates of the time at the company in a background tab, then close
   const reply = await b.send(check);
   assert.deepEqual({...reply.result}, {url: profile, company_url: company, company_id: '123456', joined: '2019-04', left: '2025-08', current: false});
   assert.deepEqual(opened, {url: profile + '/details/experience/', active: false});
-  assert.equal(b.tabs.size, 0, 'its tab is closed');
+  assert.equal(b.tabs.size, 1, 'its tab is closed (the HiringPlug tab stays)');
+});
+
+test('like CV Studio, keeps the HiringPlug tab and the tabs it opens in one "HiringPlug" group', async () => {
+  const seen = [];
+  const b = browser({page: tab => { seen.push({group: tab.groupId, opener: tab.openerTabId, window: tab.windowId}); return {joined: '2021', left: '', current: true}; }});
+  await b.send(check);
+  await b.send(check);
+  assert.equal(b.groups.size, 1, 'one group, reused');
+  const [[id, props]] = [...b.groups];
+  assert.deepEqual({...props}, {title: 'HiringPlug', color: 'purple'});
+  assert.equal(b.tabs.get(1).groupId, id, 'with the HiringPlug tab');
+  assert.deepEqual(seen, [{group: id, opener: 1, window: 7}, {group: id, opener: 1, window: 7}]);
+  const plain = browser({grouping: false});
+  assert.equal((await plain.send(check)).result.current, false, 'grouping is only for looks: the check still runs');
 });
 
 test('dates that make no sense are refused', async () => {
@@ -73,7 +100,7 @@ test('dates that make no sense are refused', async () => {
   ]) {
     const b = browser({page: () => dates});
     assert.match((await b.send(check)).error, /could not be confirmed/, JSON.stringify(dates));
-    assert.equal(b.tabs.size, 0);
+    assert.equal(b.tabs.size, 1);
   }
   const unknown = browser({page: () => ({joined: '', left: '', current: null})});
   assert.equal((await unknown.send(check)).result.current, null, 'unclear is an answer, not an error');
@@ -97,7 +124,7 @@ test('a tab the recruiter looked at is theirs: it is not closed', async () => {
   }});
   const reply = await b.send(check);
   assert.equal(reply.result.current, true);
-  assert.equal(b.tabs.size, 1, 'left open');
+  assert.equal(b.tabs.size, 2, 'left open');
 });
 
 test('the reader is put in a page once, however often it is read', async () => {
@@ -116,7 +143,7 @@ test('one read at a time, and Stop stops it', async () => {
   assert.match((await b.send(check)).error, /busy/);
   await b.send({action: 'cancel', args: {operation_id: op}});
   assert.match((await first).error, /stopped/);
-  assert.equal(b.tabs.size, 0);
+  assert.equal(b.tabs.size, 1);
 });
 
 test("finds LinkedIn's number for the company on its People page", async () => {

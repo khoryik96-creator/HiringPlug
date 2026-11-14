@@ -23,6 +23,8 @@ contact with a LinkedIn profile (the company needs its LinkedIn page set).
   page in a background tab, reads the dates of their time at the company's
   exact LinkedIn page (by its link and LinkedIn's number for the company), and
   closes the tab, unless you looked at it (then it is yours and stays open).
+- Like CV Studio, the HiringPlug tab and the LinkedIn tabs it opens are kept
+  together in a purple "HiringPlug" tab group (in that window only).
 - One read at a time, bounded (about 50 seconds at most), stoppable. It stops
   at a sign-in, check or restriction page; it never tries to get past one.
 - No AI, no LinkedIn messages, no browsing of its own; it sends the dates only
