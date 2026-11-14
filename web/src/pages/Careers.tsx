@@ -8,6 +8,7 @@ import { SaveError } from "../components/SaveError";
 import type { CareersRoute } from "../careersRoute";
 import { countryName, WORK_ARRANGEMENT, WORK_TYPE } from "../labels";
 import { CV_TYPES } from "../components/DropZone";
+import { useRequiredFile } from "../requiredFields";
 
 type Ad = Schemas["PublicJobAd"];
 
@@ -72,6 +73,7 @@ function AdPage({ slug, ad, company, via, back }: { slug: string; ad: Ad; compan
 function ApplyForm({ slug, adId, company, via }: { slug: string; adId: string; company: string; via: string | undefined }) {
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", consent: false, website: "" });
   const [file, setFile] = useState<File | null>(null);
+  const fileField = useRequiredFile(file);
   const apply = useMutation({
     mutationFn: async () => {
       const body = new FormData();
@@ -92,7 +94,7 @@ function ApplyForm({ slug, adId, company, via }: { slug: string; adId: string; c
   }
   const text = (name: "firstName" | "lastName" | "email" | "phone", label: string, type = "text") => (
     <label className="field">{label}
-      <input type={type} value={form[name]} autoComplete={name === "phone" ? "tel" : name === "email" ? "email" : name === "firstName" ? "given-name" : "family-name"}
+      <input type={type} required={name === "firstName" || name === "email"} value={form[name]} autoComplete={name === "phone" ? "tel" : name === "email" ? "email" : name === "firstName" ? "given-name" : "family-name"}
         onChange={(e) => { setForm({ ...form, [name]: e.target.value }); }} />
     </label>
   );
@@ -104,18 +106,18 @@ function ApplyForm({ slug, adId, company, via }: { slug: string; adId: string; c
       {text("email", "Email", "email")}
       {text("phone", "Phone", "tel")}
       <label className="field full">CV (PDF, Word, text or a photo)
-        <input type="file" accept={CV_TYPES} onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} />
+        <input ref={fileField} type="file" accept={CV_TYPES} onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} />
       </label>
       {/* A trap for robots: hidden from people (and screen readers), so it stays empty. */}
       <label className="trap" aria-hidden="true">Website
         <input tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => { setForm({ ...form, website: e.target.value }); }} />
       </label>
       <label className="row full">
-        <input type="checkbox" checked={form.consent} onChange={(e) => { setForm({ ...form, consent: e.target.checked }); }} />{" "}
+        <input type="checkbox" required checked={form.consent} onChange={(e) => { setForm({ ...form, consent: e.target.checked }); }} />{" "}
         I agree that {company} keeps my details to handle my application.
       </label>
       <div className="full">
-        <button type="submit" disabled={apply.isPending || !file || !form.consent}>Send application</button>
+        <button type="submit" disabled={apply.isPending}>Send application</button>
       </div>
       <SaveError error={apply.error} shown={[]} onReload={() => { apply.reset(); }} />
     </form>

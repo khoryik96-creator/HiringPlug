@@ -4,9 +4,10 @@ import type { Candidate } from "../api/client";
 import { useCandidateUpdate } from "./useCandidateUpdate";
 import { formatNotice, regionName } from "../labels";
 import {
-  AVAILABILITY, type Availability, jobLine, NO_STATUS_BG, raiseText, rangeText, salaryText, sinceText,
+  AVAILABILITY, type Availability, jobLine, NO_STATUS_EDGE, raiseText, rangeText, salaryText, sinceText,
   WA_KIND, waColumnLabel, waKind,
 } from "./candidateLook";
+import { cardGradient } from "./companyCategory";
 import { ErrorMessage } from "./ErrorMessage";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -25,7 +26,7 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
   const expected = comp?.expectedSalary ? rangeText(comp.expectedSalary) : null;
 
   return (
-    <section className="banner candidate-banner" aria-label="Candidate" style={{ background: status?.bg ?? NO_STATUS_BG }}>
+    <section className="banner candidate-banner" aria-label="Candidate" style={{ background: status ? cardGradient(status.edge, status.bg) : cardGradient(NO_STATUS_EDGE) }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">

@@ -117,12 +117,12 @@ function ProviderCard({ entry, active, disabled, onSaved }: {
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <div className="field">
           <label htmlFor={`${listId}-model`}>Model</label>
-          <input id={`${listId}-model`} list={listId} value={model} disabled={disabled} onChange={(e) => { setModel(e.target.value); }} />
+          <input id={`${listId}-model`} required list={listId} value={model} disabled={disabled} onChange={(e) => { setModel(e.target.value); }} />
           <datalist id={listId}>{info.models.map((m) => <option key={m} value={m} />)}</datalist>
         </div>
         <div className="field">
           <label htmlFor={`${listId}-key`}>{hasKey ? `API key (saved: ${entry.keyHint ?? ""})` : "API key"}</label>
-          <input id={`${listId}-key`} type="password" autoComplete="off" spellCheck={false} value={key} disabled={disabled}
+          <input id={`${listId}-key`} type="password" required={!hasKey} autoComplete="off" spellCheck={false} value={key} disabled={disabled}
             onChange={(e) => { setKey(e.target.value); }} />
         </div>
         <div className="row spread">
@@ -138,7 +138,7 @@ function ProviderCard({ entry, active, disabled, onSaved }: {
                 </button>
               </>
             )}
-            <button type="submit" className="primary" disabled={disabled || save.isPending || !model.trim() || (!hasKey && !key.trim())}>
+            <button type="submit" className="primary" disabled={disabled || save.isPending}>
               Save
             </button>
           </span>

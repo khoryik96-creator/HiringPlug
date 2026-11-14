@@ -62,6 +62,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
   // Whom the fields are filled from: the candidate (and a job), or the contact (and their company).
   const who = contactId ? { contactId } : { candidateId };
   const [html, setHtml] = useState("");
+  const [tried, setTried] = useState(false); // Send was pressed: an empty message is outlined
   const [reset, setReset] = useState(0); // puts html back into the editor (a template)
   const [missing, setMissing] = useState<string[]>([]);
   const packages=useCandidatePackages();
@@ -144,7 +145,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
   const set = (field: keyof typeof form) => (e: { target: { value: string } }) => { setForm({ ...form, [field]: e.target.value }); };
 
   return (
-    <form className="panel form-grid" aria-label="Write email" onSubmit={(e) => { e.preventDefault(); send.mutate(); }}>
+    <form className="panel form-grid" aria-label="Write email" onSubmit={(e) => { e.preventDefault(); setTried(true); if (unfilled.length === 0 && textOf(html)) send.mutate(); }}>
       <MailDeliveryNotice/>
       <ErrorMessage error={templates.error ?? draft.error ?? uploadBanner.error} />
       <label className="field">Template
@@ -163,7 +164,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       )}
       <EmailRecipients to={form.to} cc={form.cc} bcc={form.bcc} errors={errors}
         onChange={(field, value) => { setForm((current) => ({ ...current, [field]: value })); }}/>
-      <label className="field full">Subject<input ref={subjectBox} aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
+      <label className="field full">Subject<input ref={subjectBox} required aria-invalid={!!errors.subject || undefined} value={subject} onChange={set("subject")}
         onFocus={() => { inSubject.current = true; }} /></label>
       {permissions.includes("candidates:read") && <div className="full">
         <details className="email-candidates"><summary>Candidates and CVs ({packages.people.length})</summary>
@@ -175,7 +176,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       </div>}
       <div className="field full">
         <span>Message</span>
-        <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
+        <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0 || (tried && !textOf(html))} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
           bannerUrls={urls} onUploadBanner={canManageTemplates ? (f) => { uploadBanner.mutate(f); } : undefined}
           values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f, value) => {
@@ -198,7 +199,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       <SaveError error={send.error} shown={[]} onReload={()=>{packages.clear();void list.refresh();send.reset();}} reloadLabel="Refresh candidate details (your message is kept)" />
       <div className="row full">
         <button type="button" disabled={show.isPending || list.loading} onClick={()=>{show.mutate();}}>Preview email</button>
-        <button type="submit" disabled={uploading || (packages.people.length>0 && (list.loading || !!list.error)) || send.isPending || draft.isPending || unfilled.length > 0 || !form.to.trim() || !subject.trim() || !textOf(html)}>
+        <button type="submit" disabled={uploading || (packages.people.length>0 && (list.loading || !!list.error)) || send.isPending || draft.isPending}>
           Send
         </button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>

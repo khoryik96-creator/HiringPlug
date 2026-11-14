@@ -157,9 +157,9 @@ function Conversation({ subject }: { subject: Subject }) {
         ))}
       </div>
       <form className="assistant-ask" onSubmit={(e) => { e.preventDefault(); if (question.trim()) ask.mutate({ kind: "question", text: question.trim() }); }}>
-        <input aria-label="Ask a question" placeholder="Ask a question" maxLength={1000}
+        <input required aria-label="Ask a question" placeholder="Ask a question" maxLength={1000}
           value={question} onChange={(e) => { setQuestion(e.target.value); }} />
-        <button type="submit" disabled={waiting || !question.trim()}>Ask</button>
+        <button type="submit" disabled={waiting}>Ask</button>
       </form>
       <ErrorMessage error={ask.error ?? answers.error} />
       {answers.data?.length === 0 && <p className="muted small">Ask for a summary, the gaps and red flags, or anything about them.</p>}

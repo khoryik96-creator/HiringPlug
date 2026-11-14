@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api, unwrap } from "../api/client";
 import { setToken } from "../auth";
@@ -13,6 +13,8 @@ export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedI
     queryFn: async () => unwrap(await api.GET("/v1/auth/links/{linkToken}", { params: { path: { linkToken: token } } })),
   });
   const [form, setForm] = useState({ name: "", password: "", repeat: "" });
+  const repeat = useRef<HTMLInputElement>(null);
+  useEffect(() => { repeat.current?.setCustomValidity(form.repeat === form.password ? "" : "The two passwords differ."); }, [form.password, form.repeat]);
   const save = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/auth/links/{linkToken}", {
       params: { path: { linkToken: token } },
@@ -41,15 +43,15 @@ export function ChoosePassword({ token, onSignedIn }: { token: string; onSignedI
           )}
           <input type="email" autoComplete="username" value={l.email} readOnly hidden />
           <label className="field full">Password (at least 10 characters)
-            <input type="password" autoComplete="new-password" value={form.password} onChange={(e) => { setForm({ ...form, password: e.target.value }); }} />
+            <input type="password" required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => { setForm({ ...form, password: e.target.value }); }} />
           </label>
           <label className="field full">The same again
-            <input type="password" autoComplete="new-password" value={form.repeat} onChange={(e) => { setForm({ ...form, repeat: e.target.value }); }} />
+            <input ref={repeat} type="password" required autoComplete="new-password" value={form.repeat} onChange={(e) => { setForm({ ...form, repeat: e.target.value }); }} />
           </label>
           {form.repeat && form.repeat !== form.password && <p className="full warning" role="status">The two passwords differ.</p>}
           <SaveError error={save.error} shown={[]} onReload={() => undefined} />
           <div className="row full">
-            <button type="submit" disabled={save.isPending || form.password.length < 10 || form.password !== form.repeat}>
+            <button type="submit" disabled={save.isPending}>
               {l.kind === "invite" ? "Join" : "Save password"}
             </button>
           </div>

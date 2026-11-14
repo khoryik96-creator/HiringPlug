@@ -3,7 +3,7 @@
 // A check says who gets it and who does not (and why) before sending.
 import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
@@ -11,6 +11,7 @@ import { Attachments } from "./clientEmail/Attachments";
 import { RichEditor } from "./clientEmail/RichEditor";
 import { plainToHtml, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
+import { filledIn } from "../requiredFields";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** Someone to write to: a candidate or a client's contact. */
@@ -27,6 +28,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
   const { banners, urls } = useBanners();
   const [picked, setPicked] = useState("");
   const [subject, setSubject] = useState("");
+  const subjectField = useRef<HTMLInputElement>(null);
   const [html, setHtml] = useState("");
   const [reset, setReset] = useState(0);
   const [uploads, setUploads] = useState<Schemas["EmailAttachment"][]>([]);
@@ -97,7 +99,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
           setReset((n) => n + 1);
         }}>Use selected template</button>
       </div>
-      <label className="field">Subject<input value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
+      <label className="field">Subject<input ref={subjectField} required value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
       <RichEditor compact html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
       <Attachments candidateId="" canSeeCvs={false} cvs={[]} onCvs={() => undefined} uploads={uploads} onUploads={setUploads} />
 
@@ -107,9 +109,9 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
             {people.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.name}</option>)}
           </select>
         </label>
-        <button type="button" disabled={preview.isPending || !subject.trim()} onClick={() => { preview.mutate(); }}>Preview</button>
-        <button type="button" disabled={check.isPending || !subject.trim()} onClick={() => { check.mutate(); }}>Check who gets it</button>
-        <button type="button" className="primary" disabled={send.isPending || !subject.trim()} onClick={() => { send.mutate(); }}>
+        <button type="button" disabled={preview.isPending} onClick={() => { if (filledIn(subjectField.current)) preview.mutate(); }}>Preview</button>
+        <button type="button" disabled={check.isPending} onClick={() => { if (filledIn(subjectField.current)) check.mutate(); }}>Check who gets it</button>
+        <button type="button" className="primary" disabled={send.isPending} onClick={() => { if (filledIn(subjectField.current)) send.mutate(); }}>
           Send to each separately
         </button>
       </div>

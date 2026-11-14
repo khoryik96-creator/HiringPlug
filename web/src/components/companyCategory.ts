@@ -4,6 +4,11 @@
 /** The category of a company without one. */
 export const UNKNOWN_CATEGORY = "unknown";
 
+/** A card's background: the colour, pale, shading to near white (companies, contacts and candidates alike). */
+export function cardGradient(hex: string, from = tint(hex, 0.72)): string {
+  return `linear-gradient(120deg, ${from}, ${tint(hex, 0.9)})`;
+}
+
 /** A colour mixed with white: 0 is the colour, 1 is white. */
 export function tint(hex: string, toWhite: number): string {
   const n = parseInt(hex.replace("#", ""), 16);

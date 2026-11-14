@@ -64,7 +64,7 @@ function HoursForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (s: Sch
             return (
               <div key={d} className="hours-day">
                 <label className="hours-toggle">
-                  <input type="checkbox" checked={list.length > 0}
+                  <input type="checkbox" name="days" required={form.hours.length === 0} checked={list.length > 0}
                     onChange={(e) => { setDay(d, e.target.checked ? [{ day: d, start: "09:00", end: "17:00" }] : []); }} />
                   {label}
                 </label>
@@ -112,7 +112,7 @@ function HoursForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (s: Sch
           <p>Only busy times are read, never what your meetings are.</p>
         </details>
         <ErrorMessage error={save.error} />
-        <button type="submit" className="primary" disabled={save.isPending || form.hours.length === 0}>Save</button>
+        <button type="submit" className="primary" disabled={save.isPending}>Save</button>
       </form>
     </section>
   );

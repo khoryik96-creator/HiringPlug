@@ -46,7 +46,7 @@ describe("candidate banner", () => {
       workAuthorization: { status: "local" }, skills: ["SAP FICO", "IFRS"], compensation: salary,
     })} />);
     const banner = screen.getByRole("region", { name: "Candidate" });
-    expect(banner.style.background).toBe("rgb(205, 239, 200)"); // light green: passive
+    expect(banner.style.background).toMatch(/^linear-gradient\(120deg, rgb\(205, 239, 200\), /); // light green, shading to white: passive
     expect(within(banner).getByText("Passive")).toBeTruthy();
     expect(within(banner).getByText("Accountant · Maju Foods")).toBeTruthy();
     expect(within(banner).getByText("Petaling Jaya, Malaysia")).toBeTruthy();

@@ -76,9 +76,9 @@ function AgencyName() {
       <h3>Agency</h3>
       <form className="row" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <label className="field">Agency name
-          <input value={current} maxLength={200} onChange={(e) => { setName(e.target.value); }} />
+          <input required value={current} maxLength={200} onChange={(e) => { setName(e.target.value); }} />
         </label>
-        <button type="submit" disabled={save.isPending || name === null || !current.trim()}>Save</button>
+        <button type="submit" disabled={save.isPending || name === null}>Save</button>
         {save.isSuccess && <span role="status" className="muted">Saved.</span>}
       </form>
       {errors.name && <small className="error">{errors.name}</small>}

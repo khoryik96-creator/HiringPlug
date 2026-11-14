@@ -11,11 +11,12 @@ import { MarketMap } from "../components/MarketMap";
 import { JdFiles } from "../components/JdFiles";
 import { JobForm } from "../components/JobForm";
 import { JobRetainer } from "../components/JobRetainer";
+import { JobStatusSelect } from "../components/JobStatusSelect";
 import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { PossibleCandidates } from "../components/PossibleCandidates";
-import { countryName, formatDay, JOB_STATUS } from "../labels";
+import { countryName, formatDay } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
 
 /** One job. Render it with key={id} so edit state never carries over. */
@@ -46,7 +47,10 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
         </ErrorMessage>
       )}
       <div className="row spread">
-        <h2>{j.title} <span className={`badge ${j.status}`}>{JOB_STATUS[j.status]}</span></h2>
+        <div className="row job-title">
+          <h2>{j.title}</h2>
+          <JobStatusSelect job={j} canChange={permissions.includes("jobs:update") && !editing} />
+        </div>
         {permissions.includes("jobs:update") && !editing && (
           <button type="button" onClick={() => { setEditing(true); }}>Edit job</button>
         )}

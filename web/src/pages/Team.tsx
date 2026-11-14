@@ -114,8 +114,8 @@ function Teams({ groups }: { groups: Group[] }) {
         ))}
       </ul>
       <form className="row" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
-        <input aria-label="New team" placeholder="New team" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); }} />
-        <button type="submit" disabled={add.isPending || !name.trim()}>Add team</button>
+        <input required aria-label="New team" placeholder="New team" maxLength={100} value={name} onChange={(e) => { setName(e.target.value); }} />
+        <button type="submit" disabled={add.isPending}>Add team</button>
       </form>
       <ErrorMessage error={add.error ?? remove.error} />
     </section>
@@ -131,8 +131,8 @@ function TeamName({ group, onDone }: { group: Group; onDone: () => Promise<void>
   if (name === null) return <button type="button" className="link" title="Rename" onClick={() => { setName(group.name); }}>{group.name}</button>;
   return (
     <form className="row" style={{ display: "inline-flex" }} onSubmit={(e) => { e.preventDefault(); rename.mutate(name.trim()); }}>
-      <input aria-label={`Rename ${group.name}`} value={name} maxLength={100} onChange={(e) => { setName(e.target.value); }} />
-      <button type="submit" disabled={rename.isPending || !name.trim()}>Rename</button>
+      <input required aria-label={`Rename ${group.name}`} value={name} maxLength={100} onChange={(e) => { setName(e.target.value); }} />
+      <button type="submit" disabled={rename.isPending}>Rename</button>
       <button type="button" className="link" onClick={() => { setName(null); }}>Cancel</button>
       <ErrorMessage error={rename.error} />
     </form>
@@ -162,15 +162,15 @@ function Invite({ myRole }: { myRole: Schemas["Role"] }) {
         </div>
       )}
       <form className="form-grid" onSubmit={(e) => { e.preventDefault(); invite.mutate(); }}>
-        <label className="field">Email<input type="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
-        <label className="field">Name<input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
+        <label className="field">Email<input type="email" required value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
+        <label className="field">Name<input required value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
         <label className="field">Role
           <select value={form.role} onChange={(e) => { setForm({ ...form, role: e.target.value as Schemas["Role"] }); }}>
             {roles(myRole).map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
           </select>
         </label>
         <SaveError error={invite.error} shown={[]} onReload={() => undefined} />
-        <div className="row full"><button type="submit" disabled={invite.isPending || !form.email.trim() || !form.name.trim()}>Invite</button></div>
+        <div className="row full"><button type="submit" disabled={invite.isPending}>Invite</button></div>
       </form>
     </section>
   );
@@ -193,10 +193,10 @@ export function ChangePassword() {
       <h3>Your password</h3>
       {done && <p role="status">Password changed. Your other sessions are signed out.</p>}
       <form className="form-grid" onSubmit={(e) => { e.preventDefault(); setDone(false); change.mutate(); }}>
-        <label className="field">Current password<input type="password" autoComplete="current-password" value={form.currentPassword} onChange={(e) => { setForm({ ...form, currentPassword: e.target.value }); }} /></label>
-        <label className="field">New password (at least 10 characters)<input type="password" autoComplete="new-password" value={form.newPassword} onChange={(e) => { setForm({ ...form, newPassword: e.target.value }); }} /></label>
+        <label className="field">Current password<input type="password" required autoComplete="current-password" value={form.currentPassword} onChange={(e) => { setForm({ ...form, currentPassword: e.target.value }); }} /></label>
+        <label className="field">New password (at least 10 characters)<input type="password" required minLength={10} autoComplete="new-password" value={form.newPassword} onChange={(e) => { setForm({ ...form, newPassword: e.target.value }); }} /></label>
         <SaveError error={change.error} shown={[]} onReload={() => undefined} />
-        <div className="row full"><button type="submit" disabled={change.isPending || !form.currentPassword || form.newPassword.length < 10}>Change password</button></div>
+        <div className="row full"><button type="submit" disabled={change.isPending}>Change password</button></div>
       </form>
     </section>
   );

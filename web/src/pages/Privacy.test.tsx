@@ -39,7 +39,10 @@ describe("data protection dashboard", () => {
     renderWithClient(<Privacy />);
     const access = await screen.findByRole("article", { name: "A copy of their data: Siti" });
     const done = within(access).getByRole("button", { name: "Done" });
-    expect((done as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(done);
+    fireEvent.click(within(access).getByRole("button", { name: "Decline" }));
+    expect(patch).not.toHaveBeenCalled();
+    expect(within(access).getByLabelText<HTMLInputElement>("What was done").validity.valueMissing).toBe(true);
     fireEvent.change(within(access).getByLabelText("What was done"), { target: { value: "Emailed a copy." } });
     fireEvent.click(done);
     await waitFor(() => { expect(patch).toHaveBeenCalled(); });

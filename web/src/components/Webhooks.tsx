@@ -40,15 +40,15 @@ export function Webhooks() {
       <ErrorMessage error={list.error} />
       {list.data?.items.map((w) => <WebhookItem key={w.id} webhook={w} />)}
       <form className="form-grid" aria-label="New webhook" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <label className="field full">Address<input value={form.url} onChange={(e) => { setForm({ ...form, url: e.target.value }); }} /></label>
+        <label className="field full">Address<input required value={form.url} onChange={(e) => { setForm({ ...form, url: e.target.value }); }} /></label>
         <fieldset className="full">
           <legend>Events</legend>
           {list.data?.events.map((e) => (
-            <label key={e} className="row"><input type="checkbox" checked={form.events.includes(e)} onChange={() => { toggle(e); }} /> <code>{e}</code></label>
+            <label key={e} className="row"><input type="checkbox" name="events" required={form.events.length === 0} checked={form.events.includes(e)} onChange={() => { toggle(e); }} /> <code>{e}</code></label>
           ))}
         </fieldset>
         <SaveError error={create.error} shown={[]} onReload={() => undefined} />
-        <div className="row full"><button type="submit" disabled={create.isPending || !form.url.trim() || form.events.length === 0}>Add webhook</button></div>
+        <div className="row full"><button type="submit" disabled={create.isPending}>Add webhook</button></div>
       </form>
     </section>
   );

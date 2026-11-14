@@ -1,8 +1,9 @@
 // Booking links: make one to put in an email, and see a candidate's bookings.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
+import { filledIn } from "../requiredFields";
 import { ErrorMessage } from "./ErrorMessage";
 
 type Link = Schemas["BookingLink"];
@@ -21,6 +22,7 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
   candidateId: string; applicationId?: string; onInsert: (text: string) => void; onCancel: () => void;
 }) {
   const queryClient = useQueryClient();
+  const box = useRef<HTMLDivElement>(null);
   const [form, setForm] = useState({ title: "Call with the recruiter", durationMinutes: 30 as Schemas["BookingLinkInput"]["durationMinutes"], location: "" });
   const create = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/booking-links", {
@@ -32,8 +34,8 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
     },
   });
   return (
-    <div className="booking-link-form" role="group" aria-label="Booking link">
-      <label className="field">Meeting<input value={form.title} maxLength={120} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
+    <div ref={box} className="booking-link-form" role="group" aria-label="Booking link">
+      <label className="field">Meeting<input required value={form.title} maxLength={120} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
       <label className="field">Length
         <select value={form.durationMinutes} onChange={(e) => { setForm({ ...form, durationMinutes: Number(e.target.value) as typeof form.durationMinutes }); }}>
           {[15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
@@ -41,7 +43,7 @@ export function BookingLinkForm({ candidateId, applicationId, onInsert, onCancel
       </label>
       <label className="field">Where (link, phone or address)<input value={form.location} maxLength={500} onChange={(e) => { setForm({ ...form, location: e.target.value }); }} /></label>
       <span className="row">
-        <button type="button" className="primary" disabled={create.isPending || !form.title.trim()} onClick={() => { create.mutate(); }}>Insert link</button>
+        <button type="button" className="primary" disabled={create.isPending} onClick={() => { if (filledIn(box.current)) create.mutate(); }}>Insert link</button>
         <button type="button" className="link" onClick={onCancel}>Cancel</button>
       </span>
       <ErrorMessage error={create.error} />

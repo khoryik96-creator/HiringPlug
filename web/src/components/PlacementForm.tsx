@@ -109,7 +109,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone, o
         <input value={form.poNumber} maxLength={100} onChange={set("poNumber")} />
       </Field>
       <Field label="Start date" error={errors.startDate}>
-        <input type="date" value={form.startDate} onChange={set("startDate")} />
+        <input type="date" required value={form.startDate} onChange={set("startDate")} />
       </Field>
       <Field label="End date" error={errors.endDate}>
         <input type="date" value={form.endDate} min={form.startDate || undefined} onChange={set("endDate")} />
@@ -195,7 +195,7 @@ export function PlacementForm({ applicationId, placement, permissions, onDone, o
         terms={placement ? undefined : defaults.data} tier={tier} errors={errors} />
       <SaveError error={save.error} shown={shown} onReload={onDone} />
       <div className="row full">
-        <button type="submit" disabled={save.isPending || !form.startDate}>{placement ? "Save" : "Record placement"}</button>
+        <button type="submit" disabled={save.isPending}>{placement ? "Save" : "Record placement"}</button>
         <button type="button" className="link" onClick={onCancel ?? onDone}>Cancel</button>
       </div>
     </form>

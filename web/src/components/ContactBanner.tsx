@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, type Contact, type Schemas, unwrap } from "../api/client";
 import { contactKey, contactsKey } from "../api/keys";
 import { CONTACT_STATUS, keysOf } from "../labels";
-import { tint } from "./companyCategory";
+import { cardGradient } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { ErrorMessage } from "./ErrorMessage";
@@ -36,7 +36,7 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
 
   return (
     <section className={left ? "banner candidate-banner contact-banner has-left" : "banner candidate-banner contact-banner"} aria-label="Contact"
-      style={{ background: `linear-gradient(120deg, ${tint(color, 0.72)}, ${tint(color, 0.9)})` }}>
+      style={{ background: cardGradient(color) }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">

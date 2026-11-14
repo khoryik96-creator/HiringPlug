@@ -63,7 +63,8 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
-**The candidate's page** opens with a banner coloured by their status: their
+**The candidate's page** opens with a banner coloured by their status (the
+colour shading to white, like the company and contact cards): their
 name and status, job title and company, and in the top-right corner their
 nationality, where they live and the source; the status buttons; their skills;
 then notice period, current and expected salary (with "+26% on current" when
@@ -500,7 +501,8 @@ lead's company (with the built-in email check).
   company, hiring contact (must work at that company), title, status (open,
   on hold, filled, closed), location and country, work type, on site / hybrid /
   remote, openings, description and the **official intake date** (today
-  unless chosen), listed on the company's page. The **salary
+  unless chosen), listed on the company's page. The status is a coloured
+  dropdown next to the job's title, for those who may edit jobs. The **salary
   budget** follows the salary pattern: its own permissions (hiring managers
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
@@ -1096,6 +1098,16 @@ decide otherwise**: it shows you what needs deciding and records what you did.
   sensitive notes). Each download is in the audit log.
 - Merging duplicates keeps both candidates' requests, and withdrawn consent
   wins.
+
+## Filling in forms ✅
+
+Save buttons stay usable while a form is incomplete. Pressing one with a
+required field empty (or a value out of range) saves nothing: every such
+field is outlined in red and the first one gets the focus; the outline goes
+as soon as it is filled. Fields that hold a number (amounts, percentages,
+days) take only digits (and "." or "," for amounts): letters and symbols
+typed are ignored, and pasting "RM 12,000" keeps "12,000". Both apply to
+every form in the app (`web/src/requiredFields.ts`, `web/src/numericInput.ts`).
 
 ## Main settings ✅
 

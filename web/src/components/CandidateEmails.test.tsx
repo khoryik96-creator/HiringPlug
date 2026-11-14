@@ -72,9 +72,12 @@ describe("candidate emails", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Dear [company.name] team");
     expect(screen.getByRole("status").textContent).toContain("[company.name]");
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
-    expect(send.disabled).toBe(true);
+    const calls = post.mock.calls.length;
+    fireEvent.click(send); // [company.name] is still to fill in
+    expect(post.mock.calls.length).toBe(calls);
+    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBe("true");
     typeMessage("<p>Dear <b>Contoh</b> team</p>");
-    expect(send.disabled).toBe(false);
+    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Cc" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cc" }));
     fireEvent.change(screen.getByLabelText("Cc"), { target: { value: "me@agency.test; boss@agency.test" } });

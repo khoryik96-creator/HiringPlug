@@ -22,8 +22,11 @@ it("requires a replacement for used categories and preserves the retirement choi
  const row = screen.getByText("Financial Services").closest("tr");expect(row).toBeTruthy();
  fireEvent.click(within(row as HTMLTableRowElement).getByRole("button", { name: "Delete" }));
  const dialog = await screen.findByRole("region", { name: "Delete category" });
- expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Reassign and delete" }).disabled).toBe(true);
+ const del = vi.spyOn(api, "POST");
+ fireEvent.click(within(dialog).getByRole("button", { name: "Reassign and delete" }));
+ expect(del).not.toHaveBeenCalled();
+ expect(within(dialog).getByLabelText<HTMLSelectElement>("Replacement").validity.valueMissing).toBe(true);
  expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Retire" }).disabled).toBe(false);
  fireEvent.change(within(dialog).getByLabelText("Replacement"), { target: { value: "industry_education" } });
- expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Reassign and delete" }).disabled).toBe(false);
+ expect(within(dialog).getByLabelText<HTMLSelectElement>("Replacement").validity.valid).toBe(true);
 });

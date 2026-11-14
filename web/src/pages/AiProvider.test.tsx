@@ -32,7 +32,9 @@ describe("AI provider settings", () => {
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(withClaude));
     renderWithClient(<AiProvider />);
     const card = await screen.findByRole("region", { name: "Claude" });
-    expect(within(card).getByRole("button", { name: "Save" })).toHaveProperty("disabled", true); // no key yet
+    fireEvent.click(within(card).getByRole("button", { name: "Save" })); // no key yet
+    expect(put).not.toHaveBeenCalled();
+    expect(within(card).getByLabelText<HTMLInputElement>("API key").validity.valueMissing).toBe(true);
     expect(screen.getByRole("radio", { name: "Claude" })).toHaveProperty("disabled", true);
     fireEvent.change(within(card).getByLabelText("API key"), { target: { value: " sk-ant-secret-5678 " } });
     fireEvent.click(within(card).getByRole("button", { name: "Save" }));

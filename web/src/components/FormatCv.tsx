@@ -99,7 +99,7 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
   return (
     <form className="form-grid" aria-label="Format their CV" onSubmit={(e) => { e.preventDefault(); start.mutate(); }}>
       <label className="field full">CV
-        <select value={documentId} onChange={(e) => { setForm({ ...form, documentId: e.target.value }); }}>
+        <select required value={documentId} onChange={(e) => { setForm({ ...form, documentId: e.target.value }); }}>
           {cvs.map((d) => <option key={d.id} value={d.id}>{d.fileName} ({d.source}, {new Date(d.createdAt).toLocaleDateString("en-GB")})</option>)}
         </select>
       </label>
@@ -126,7 +126,7 @@ function StudioForm({ candidateId, cvs, onDone }: { candidateId: string; cvs: Do
       </label>
       <ErrorMessage error={fieldErrors(start.error).summaryDirection ? null : start.error} />
       <div className="row full">
-        <button type="submit" disabled={start.isPending || !documentId}>Format CV</button>
+        <button type="submit" disabled={start.isPending}>Format CV</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>

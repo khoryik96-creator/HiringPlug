@@ -55,8 +55,8 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
   return (
     <form className="panel form-grid" aria-label={interview ? "Change interview" : "Schedule interview"}
       onSubmit={(e) => { e.preventDefault(); save.mutate(false); }}>
-      <label className="field">Title<input value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
-      <label className="field">Date and time<input type="datetime-local" value={form.startsAt} onChange={(e) => { setForm({ ...form, startsAt: e.target.value }); }} /></label>
+      <label className="field">Title<input required value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
+      <label className="field">Date and time<input type="datetime-local" required value={form.startsAt} onChange={(e) => { setForm({ ...form, startsAt: e.target.value }); }} /></label>
       <label className="field">Length
         <select value={form.durationMinutes} onChange={(e) => { setForm({ ...form, durationMinutes: Number(e.target.value) }); }}>
           {[15, 30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m} minutes</option>)}
@@ -74,7 +74,7 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
         <legend>Interviewers</legend>
         {users.data?.filter((u) => u.canInterview || form.interviewerIds.includes(u.id)).map((u) => (
           <label key={u.id} className="row">
-            <input type="checkbox" checked={form.interviewerIds.includes(u.id)} onChange={() => { toggle(u.id); }} /> {u.name}
+            <input type="checkbox" name="interviewers" required={form.interviewerIds.length === 0} checked={form.interviewerIds.includes(u.id)} onChange={() => { toggle(u.id); }} /> {u.name}
           </label>
         ))}
       </fieldset>
@@ -91,7 +91,7 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
         <SaveError error={save.error} shown={[]} onReload={onDone} />
       )}
       <div className="row full">
-        <button type="submit" disabled={save.isPending || !form.startsAt || form.interviewerIds.length === 0}>
+        <button type="submit" disabled={save.isPending}>
           {interview ? "Save" : "Schedule"}
         </button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>

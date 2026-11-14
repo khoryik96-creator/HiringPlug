@@ -107,9 +107,9 @@ function ConsentForm({ candidateId, consent, onDone }: { candidateId: string; co
       <select aria-label="How" value={method} onChange={(e) => { setMethod(e.target.value as typeof method); }}>
         {keysOf(CONSENT_METHOD).filter((m) => m !== "request").map((m) => <option key={m} value={m}>{CONSENT_METHOD[m]}</option>)}
       </select>
-      <input aria-label="On" type="date" value={day} max={todayISO()} onChange={(e) => { setDay(e.target.value); }} />
+      <input aria-label="On" type="date" required value={day} max={todayISO()} onChange={(e) => { setDay(e.target.value); }} />
       <input aria-label="Note (optional)" placeholder="Note (optional)" maxLength={1000} value={note} onChange={(e) => { setNote(e.target.value); }} />
-      <button type="submit" disabled={save.isPending || !day}>Save</button>
+      <button type="submit" disabled={save.isPending}>Save</button>
       <button type="button" className="link" onClick={onDone}>Cancel</button>
       <ErrorMessage error={save.error} />
     </form>
@@ -135,9 +135,9 @@ function RequestForm({ candidateId, onDone }: { candidateId: string; onDone: () 
       <select aria-label="Request" value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); }}>
         {keysOf(PRIVACY_KIND).map((k) => <option key={k} value={k}>{PRIVACY_KIND[k]}</option>)}
       </select>
-      <input aria-label="Received on" type="date" value={receivedOn} max={todayISO()} onChange={(e) => { setReceivedOn(e.target.value); }} />
+      <input aria-label="Received on" type="date" required value={receivedOn} max={todayISO()} onChange={(e) => { setReceivedOn(e.target.value); }} />
       <input aria-label="Details (optional)" placeholder="Details (optional)" maxLength={2000} value={details} onChange={(e) => { setDetails(e.target.value); }} />
-      <button type="submit" disabled={save.isPending || !receivedOn}>Log request</button>
+      <button type="submit" disabled={save.isPending}>Log request</button>
       <button type="button" className="link" onClick={onDone}>Cancel</button>
       <ErrorMessage error={save.error} />
     </form>

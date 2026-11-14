@@ -12,7 +12,8 @@ export const AVAILABILITY: Record<Availability, { label: string; bg: string; edg
   placed: { label: "Placed", bg: "#E0D4F7", edge: "#7C5BC4" },
   not_looking: { label: "Not looking", bg: "#F9CFDF", edge: "#C2456F" },
 };
-export const NO_STATUS_BG = "#EEF1F5";
+/** The colour a card without an availability is drawn from (slate, like a company without a category). */
+export const NO_STATUS_EDGE = "#6B7280";
 
 /** The work authorization choices on the page (each a colour), from the stored status and pass. */
 export type WaKind = "local" | "pr" | "expat" | "needsPass" | "unknown";

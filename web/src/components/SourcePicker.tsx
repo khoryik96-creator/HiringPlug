@@ -26,10 +26,10 @@ export function SourceIcon({ source, label }: { source: string; label: string })
 }
 
 /** Pick one source; picking the chosen one again clears it. */
-export function SourcePicker({ value, onChange, label = "Source" }: { value: string; onChange: (v: string) => void; label?: string }) {
+export function SourcePicker({ value, onChange, label = "Source", invalid = false }: { value: string; onChange: (v: string) => void; label?: string; invalid?: boolean }) {
   const fs = useFieldSettings();
   return (
-    <div className="source-picker" role="group" aria-label={label}>
+    <div className="source-picker" role="group" aria-label={label} aria-invalid={invalid || undefined}>
       {fs.options("candidate_source", value || null).map((o) => (
         <button key={o.key} type="button" aria-pressed={value === o.key} title={o.label}
           onClick={() => { onChange(value === o.key ? "" : o.key); }}>

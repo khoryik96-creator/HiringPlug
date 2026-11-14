@@ -967,3 +967,14 @@ body.dock-right { padding-right: var(--dock-w, 420px); }
 .mail-app { display: grid; grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto auto; gap: 0.5rem; align-items: center; padding: 0.5rem 0; border-top: 1px solid var(--line); }
 .mail-app .full { grid-column: 1 / -1; }
 @media (max-width: 760px) { .mail-app { grid-template-columns: 1fr; } }
+
+/* A job's status, changed where it is shown. */
+.job-title { gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.job-title h2 { margin: 0; }
+.job-status { display: inline-flex; flex-direction: column; gap: 0.25rem; }
+select.badge.status-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23374151' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.6rem center; background-size: 10px 7px; }
+select.status-select { width: auto; min-height: 0; border: 1px solid transparent; border-radius: 999px; padding: 0.2rem 1.8rem 0.2rem 0.75rem; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+select.status-select:hover, select.status-select:focus-visible { border-color: var(--border-strong, #9ca3af); }
+
+/* A field that has to be filled in before saving (requiredFields.ts). */
+[data-missing]:invalid { outline: 2px solid #dc2626 !important; outline-offset: 1px; border-color: #dc2626 !important; }

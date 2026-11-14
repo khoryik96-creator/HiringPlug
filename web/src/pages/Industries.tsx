@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Field } from "../components/Field";
 import { fieldErrors } from "../components/forms";
 import { categoryMatches, industryKey, useIndustries, type Category } from "../components/IndustryPicker";
+import { filledIn } from "../requiredFields";
 
 type Edit = { item?: Category; parentId?: string };
 /** Shared catalogue administration; server checks usage and versions in one transaction. */
@@ -73,6 +74,7 @@ function EditCategory({ edit, catalogue, onDone }: { edit: Edit; catalogue: Sche
 }
 function RemoveCategory({ item, catalogue, onDone }: { item: Category; catalogue: Schemas["IndustryCatalogue"]; onDone: () => void }) {
   const [replacement, setReplacement] = useState("");
+  const replacementField = useRef<HTMLSelectElement>(null);
   const [version] = useState(catalogue.version);
   const saved = useSaved(onDone);
   const used = item.candidateCount + item.companyCount > 0;
@@ -83,11 +85,11 @@ function RemoveCategory({ item, catalogue, onDone }: { item: Category; catalogue
   return <section className="industry-dialog" aria-label="Delete category"><h3>Delete {item.label}?</h3>
     <p>{item.candidateCount} profiles · {item.companyCount} companies{children.length ? ` · ${children.length} subindustries` : ""}</p>
     {used && <p>Retire to keep existing selections, or choose where to move them before deletion.</p>}
-    <Field label="Replacement" error={fieldErrors(remove.error).replacementId}><select value={replacement} onChange={(e) => { setReplacement(e.target.value); }}>
+    <Field label="Replacement" error={fieldErrors(remove.error).replacementId}><select ref={replacementField} required={used} value={replacement} onChange={(e) => { setReplacement(e.target.value); }}>
       <option value="">Choose replacement</option>{catalogue.items.filter((i) => !i.retired && !catalogue.items.find((p) => p.id === i.parentId)?.retired && i.id !== item.id && i.parentId !== item.id).map((i) => <option value={i.id} key={i.id}>{i.parentId ? `${catalogue.items.find((p) => p.id === i.parentId)?.label ?? ""} / ` : ""}{i.label}</option>)}
     </select></Field>
     <div className="row"><button type="button" className="secondary" disabled={remove.isPending} onClick={() => { remove.mutate("retire"); }}>Retire</button>
-      <button type="button" className="danger" disabled={remove.isPending || used && !replacement} onClick={() => { remove.mutate("delete"); }}>{used ? "Reassign and delete" : "Delete category"}</button>
+      <button type="button" className="danger" disabled={remove.isPending} onClick={() => { if (filledIn(replacementField.current)) remove.mutate("delete"); }}>{used ? "Reassign and delete" : "Delete category"}</button>
       <button type="button" className="link" disabled={remove.isPending} onClick={onDone}>Cancel</button></div>
     <ErrorMessage error={remove.error} />
   </section>;

@@ -28,6 +28,8 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   const [unusedWording, setUnusedWording] = useState<string[]>([]);
   const current = form.currentDescription ?? describeCurrent(form);
   const expected = form.expectedDescription ?? describeExpected(form);
+  const [tried, setTried] = useState(false); // Calculate was pressed: missing salaries are outlined
+  const noSalary = tried && !current.trim() && !expected.trim();
   const selectedCurrency = form.currentCurrency.trim().toUpperCase();
 
   const calculate = useMutation({
@@ -124,10 +126,10 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   return (
     <section className="full screening-salary" aria-label="Salary calculation">
       <div className="row"><h3>Salary</h3></div>
-      <Field label="Current salary breakdown" error={errors["currentSalary.description"]}>
+      <Field label="Current salary breakdown" error={errors["currentSalary.description"] ?? (noSalary ? "enter this or the expected salary" : undefined)}>
         <textarea rows={3} maxLength={2000} value={current} onChange={(e) => { edit({ currentDescription: e.target.value }); }} />
       </Field>
-      <Field label="Expected salary" error={errors["expectedSalary.description"]}>
+      <Field label="Expected salary" error={errors["expectedSalary.description"] ?? (noSalary ? "enter this or the current salary" : undefined)}>
         <input maxLength={2000} value={expected} onChange={(e) => { edit({ expectedDescription: e.target.value }); }} />
       </Field>
       <Field label="Salary notes" error={errors.salaryNotes}>
@@ -136,8 +138,10 @@ export function ScreeningSalary({ form, patch, set, errors }: {
       <div className="row">
         <button
           type="button"
-          disabled={calculate.isPending || (!current.trim() && !expected.trim())}
+          disabled={calculate.isPending}
           onClick={() => {
+            setTried(true);
+            if (!current.trim() && !expected.trim()) return;
             setApplied(false);
             calculate.mutate({ current, expected, ...(selectedCurrency ? { currentCurrency: selectedCurrency } : {}) });
           }}

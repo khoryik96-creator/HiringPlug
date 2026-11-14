@@ -56,7 +56,9 @@ describe("pipeline board", () => {
     choose("Siti Aisyah");
     moveChosen("rejected");
     const form = screen.getByRole("form", { name: "Rejected: why?" });
-    expect(within(form).getByRole<HTMLButtonElement>("button", { name: "Rejected 1" }).disabled).toBe(true);
+    fireEvent.click(within(form).getByRole("button", { name: "Rejected 1" }));
+    expect(post).not.toHaveBeenCalled();
+    expect(within(form).getByLabelText<HTMLSelectElement>("Reason").validity.valueMissing).toBe(true);
     fireEvent.change(within(form).getByLabelText("Reason"), { target: { value: "not_qualified" } });
     fireEvent.change(within(form).getByLabelText("Note (optional)"), { target: { value: " No CPA " } });
     fireEvent.click(within(form).getByRole("button", { name: "Rejected 1" }));

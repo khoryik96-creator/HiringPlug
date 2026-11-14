@@ -35,7 +35,9 @@ describe("AI candidate search", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ ...done, status: "queued", results: [] }));
     renderWithClient(<AiSearch canSeeSalary canReadJd={false} />);
     const find = screen.getByRole("button", { name: "Find candidates" });
-    expect((find as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(find); // a JD or a boolean first
+    expect(post).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText<HTMLTextAreaElement>(/Responsibilities, requirements/).validity.valueMissing).toBe(true);
     fireEvent.change(screen.getByPlaceholderText(/Responsibilities, requirements/), { target: { value: "SAP BW consultant" } });
     fireEvent.click(screen.getByText(/^Filters/));
     fireEvent.click(screen.getByRole("button", { name: /^Lives in/ }));
