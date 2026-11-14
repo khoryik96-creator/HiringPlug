@@ -21,6 +21,7 @@ const EmailConnection = page(() => import("./pages/EmailConnection"), "EmailConn
 const Access = page(() => import("./pages/Access"), "Access");
 const AiProvider = page(() => import("./pages/AiProvider"), "AiProvider");
 const BookingHours = page(() => import("./components/BookingHours"), "BookingHours");
+const TeamBookings = page(() => import("./components/TeamBookings"), "TeamBookings");
 const CandidateDetail = page(() => import("./pages/CandidateDetail"), "CandidateDetail");
 const CandidateList = page(() => import("./pages/CandidateList"), "CandidateList");
 const ChangePassword = page(() => import("./pages/Team"), "ChangePassword");
@@ -143,6 +144,8 @@ export const ROUTES: Route[] = [
     render: () => <System /> },
   { section: "backups", path: /^#\/backups/, permission: "settings.backups:manage", menu: { in: "settings", label: "Backups", href: "#/backups" },
     render: () => <BackupsPage /> },
+  { section: "booking-calendars", path: /^#\/booking-calendars/, permission: "scheduling.team:read", menu: { in: "settings", label: "Booking calendars", href: "#/booking-calendars" },
+    render: () => <TeamBookings /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
     render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
 ];

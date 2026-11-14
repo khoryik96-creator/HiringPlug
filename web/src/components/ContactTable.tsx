@@ -24,12 +24,8 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   onPick?: (contacts: ContactSummary[], on: boolean) => void;
 }) {
   const fs = useFieldSettings();
-  const all = contacts.length > 0 && contacts.every((c) => picked?.has(c.id));
   return (
     <>
-    {onPick && contacts.length > 0 && (
-      <button type="button" className="link small" onClick={() => { onPick(contacts, !all); }}>{all ? "Unselect all shown" : "Select all shown"}</button>
-    )}
     <PinnedScroll>
     <table className={onPick ? "pick-table" : undefined}>
       <thead>

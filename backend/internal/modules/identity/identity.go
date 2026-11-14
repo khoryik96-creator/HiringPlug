@@ -177,3 +177,22 @@ func (m *Module) ActiveContacts(ctx context.Context, tx pgx.Tx, ids []string) (m
 	}
 	return out, err
 }
+
+// ActiveMember is an active user's ID and name.
+type ActiveMember struct{ ID, Name string }
+
+// ActiveMembers returns the company's active users, by name, in the caller's
+// transaction.
+func (m *Module) ActiveMembers(ctx context.Context, tx pgx.Tx) ([]ActiveMember, error) {
+	rows, err := store.New(tx).ListTeam(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ActiveMember, 0, len(rows))
+	for _, r := range rows {
+		if r.Active {
+			out = append(out, ActiveMember{ID: r.ID, Name: r.Name})
+		}
+	}
+	return out, nil
+}

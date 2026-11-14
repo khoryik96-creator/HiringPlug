@@ -4847,6 +4847,27 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/scheduling/team:
+    get:
+      operationId: listTeamSchedules
+      tags: [scheduling]
+      summary: "Everyone's booking set-up (owner): hours, calendar status, booking links"
+      description: Calendar addresses are private to each person and never listed.
+      x-permission: scheduling.team:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/TeamSchedule'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/booking-links:
     get:
       operationId: listBookingLinks
@@ -5463,6 +5484,7 @@ components:
         - privacy:read
         - privacy:record
         - reports:read
+        - scheduling.team:read
         - scheduling:use
         - settings.backups:manage
         - settings:manage
@@ -10708,6 +10730,24 @@ components:
           description: Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none.
           allOf: [{$ref: '#/components/schemas/CalendarFeed'}]
           nullable: true
+    TeamSchedule:
+      type: object
+      required: [userId, name, set, timeZone, hours, calendar, openLinks, upcoming, nextAt]
+      properties:
+        userId: {type: string}
+        name: {type: string}
+        set: {type: boolean, description: They have saved their hours.}
+        timeZone: {type: string}
+        hours:
+          type: array
+          items: {$ref: '#/components/schemas/WeeklyHours'}
+        calendar:
+          description: Their calendar's status (its host only); null when none.
+          allOf: [{$ref: '#/components/schemas/CalendarFeed'}]
+          nullable: true
+        openLinks: {type: integer, description: Booking links sent and not booked yet (not expired).}
+        upcoming: {type: integer, description: Booked meetings still to come.}
+        nextAt: {type: string, format: date-time, nullable: true, description: When the next booked meeting starts.}
     CalendarFeed:
       type: object
       required: [host, status, error, checkedAt, busyCount]
@@ -11447,6 +11487,11 @@ x-permissions:
     description: See the reports (fees in them need placements.fees:read).
     sensitive: false
     roles: [owner, admin, recruiter]
+  scheduling.team:read:
+    module: scheduling
+    description: 'See everyone''s booking set-up: hours, whether their calendar is connected and read, and their booking links (never their calendar address).'
+    sensitive: false
+    roles: [owner]
   scheduling:use:
     module: scheduling
     description: Set your hours for calls and send candidates booking links.

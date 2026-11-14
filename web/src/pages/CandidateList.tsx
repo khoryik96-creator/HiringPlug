@@ -121,11 +121,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <WaLegend />
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
-      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
-      {canEmail && hits.length > 0 && !emailing && (
-        <button type="button" className="link small" onClick={() => { pick.pick(hits.map((h) => personOf(h.candidate)), !allShown); }}>
-          {allShown ? "Unselect all shown" : "Select all shown"}
-        </button>
+      {canEmail && !emailing && (
+        <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
+          shown={{ count: hits.length, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
       )}
       <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>

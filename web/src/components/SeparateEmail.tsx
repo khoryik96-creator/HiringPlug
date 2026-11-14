@@ -147,16 +147,38 @@ function RecipientTable({ rows, title }: { rows: Schemas["EmailBatchRecipient"][
   );
 }
 
-/** "3 chosen · Email each separately · Clear", over a list with ticks. */
-export function PickBar({ count, onEmail, onClear, children }: { count: number; onEmail: () => void; onClear: () => void; children?: React.ReactNode }) {
-  if (count === 0) return null;
+/** What "All" chooses: the rows shown, and whether all of them are chosen. */
+export interface Shown { count: number; all: boolean; onAll: () => void }
+
+/**
+ * Over a list whose rows can be chosen: "Choose: All 24 | None", and once any
+ * are chosen, "3 chosen · Email each separately · Clear".
+ */
+export function PickBar({ count, shown, onEmail, onClear, children }: {
+  count: number; shown?: Shown; onEmail: () => void; onClear: () => void; children?: React.ReactNode;
+}) {
+  const choose = shown && shown.count > 0;
+  if (count === 0 && !choose) return null;
   return (
-    <div className="pick-bar" role="status">
-      <span>{count} chosen</span>
-      {children}
-      <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>
-      <button type="button" className="link" onClick={onClear}>Clear</button>
-      {count > 50 && <span className="warning small">At most 50 at a time.</span>}
+    <div className="choose-row">
+      {choose && (
+        <span className="choose" role="group" aria-label="Choose">
+          <span className="choose-label" aria-hidden="true">Choose</span>
+          <span className="segmented">
+            <button type="button" className={shown.all ? "on" : undefined} aria-pressed={shown.all} onClick={shown.onAll}>All {shown.count}</button>
+            <button type="button" className={count === 0 ? "on" : undefined} aria-pressed={count === 0} onClick={onClear}>None</button>
+          </span>
+        </span>
+      )}
+      {count > 0 && (
+        <div className="pick-bar" role="status">
+          <strong>{count} chosen</strong>
+          {children}
+          <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>
+          <button type="button" className="link" onClick={onClear}>Clear</button>
+          {count > 50 && <span className="warning small">At most 50 at a time.</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type ContactSummary } from "../api/client";
@@ -89,13 +89,11 @@ describe("ticking contacts", () => {
     onPick.mockClear();
     fireEvent.click(screen.getByRole("link", { name: "Ali Hassan" }));
     expect(onPick).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
-    expect(onPick).toHaveBeenLastCalledWith(list, true);
   });
 
   it("does not choose rows for those who may not send email", async () => {
     renderWithClient(<ContactTable contacts={list} empty="none" />);
-    await waitFor(() => { expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull(); });
+    await screen.findByText("Mei Tan");
     expect((screen.getByText("Mei Tan").closest("tr") as HTMLElement).className).not.toContain("pick-row");
   });
 });

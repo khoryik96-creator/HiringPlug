@@ -40,6 +40,10 @@ type Mail struct {
 	To                         string
 	Subject, Body, Calendar    string
 	CandidateID, ApplicationID *string
+	// From is the host: it goes from their connected mailbox, if they have
+	// one, in their name; else from the server's address.
+	From     *string
+	FromName string
 }
 
 // Deps are what this module needs from others.
@@ -58,6 +62,8 @@ type Deps struct {
 	Users interface {
 		Person(ctx context.Context, tx pgx.Tx, userID string) (*Person, error)
 		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
+		// Members are the company's active users, by name.
+		Members(ctx context.Context, tx pgx.Tx) ([]Member, error)
 	}
 	// Interviews gives the interviews a user is on: busy times.
 	Interviews interface {

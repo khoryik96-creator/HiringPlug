@@ -52,8 +52,14 @@ describe("candidate list", () => {
     fireEvent.click(cell);
     expect(screen.queryByText("1 chosen")).toBeNull();
     window.getSelection()?.removeAllRanges();
-    fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
+    const none = screen.getByRole("button", { name: "None" });
+    expect(none.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "All 2" }));
     expect(screen.getByText("2 chosen")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "All 2" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(none);
+    expect(screen.queryByText("2 chosen")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All 2" }));
     fireEvent.click(screen.getByRole("button", { name: "Email each separately" }));
     const panel = await screen.findByRole("region", { name: "Email each separately" });
     expect(panel.querySelectorAll(".person-chip")).toHaveLength(2);
@@ -64,7 +70,7 @@ describe("candidate list", () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByText("Siti Aisyah");
-    expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Choose" })).toBeNull();
     fireEvent.click((screen.getByText("Siti Aisyah").closest("tr") as HTMLElement).querySelector("td:last-child") as Element);
     expect(screen.queryByText("1 chosen")).toBeNull();
   });

@@ -8,7 +8,7 @@ import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { findMatches, matchText } from "./duplicateCvs";
-import { SourcePicker } from "./SourcePicker";
+import { SourceSelect } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Item = Schemas["CvImportItem"];
@@ -115,7 +115,7 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
   return (
     <section className="panel" aria-label="CV import">
       <h3>Import profiles <span className="muted small">CVs and LinkedIn PDFs</span></h3>
-      <SourcePicker value={source} onChange={setSource} label="Source of these candidates" invalid={tried && source === ""} />
+      <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} />
       <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {

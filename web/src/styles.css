@@ -793,6 +793,15 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 .card.pickable:hover { border-color: var(--accent); }
 .pick-bar select { width: auto; min-height: 34px; }
 .card.picked { border-color: var(--accent); background: var(--accent-soft); }
+.choose-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0; }
+.choose-row .pick-bar { margin: 0; padding: 0.35rem 0.5rem 0.35rem 0.85rem; }
+.choose { display: inline-flex; align-items: center; gap: 0.6rem; }
+.choose-label { font-weight: 700; font-size: 0.85rem; color: var(--muted); }
+.segmented { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.segmented > button { border: 0; border-radius: 0; min-height: 34px; padding: 0.35rem 0.95rem; font-weight: 600; background: transparent; color: var(--text); }
+.segmented > button + button { border-left: 1px solid var(--line-strong); }
+.segmented > button:hover:not(.on) { background: var(--soft); }
+.segmented > button.on { background: var(--accent); color: #fff; }
 .pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0; padding: 0.5rem 0.75rem; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
 
 /* The candidates on an email to the client. */
@@ -1006,3 +1015,9 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .jobs-needing-contact { margin: 0.35rem 0 0; }
 .recipient-warnings p { margin: 0.15rem 0; }
 .email-suggestion { margin: 0.5rem 0; padding: 0.5rem 0.75rem; border-radius: 8px; background: #f5f3ff; border: 1px solid #ddd6fe; }
+
+/* Import profiles: "Preset the source [LinkedIn ▾]" on one line. */
+.source-select { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.25rem 0 0.75rem; }
+.source-select-label { font-weight: 600; }
+.source-select select { width: auto; min-width: 12rem; }
+.source-select > span { display: inline-flex; flex: none; }

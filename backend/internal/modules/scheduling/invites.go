@@ -72,11 +72,15 @@ func (s *Service) sendInvites(ctx context.Context, tx pgx.Tx, tenantID string, r
 	calendar := in.Render(s.now())
 	body := in.Body + "\n\nThe invitation is attached: add it to your calendar."
 	app := row.ApplicationID
+	from, fromName := &row.HostUserID, hostName
+	if hostName == "the recruiter" {
+		fromName = ""
+	}
 	if cand.Email != nil {
 		cid := row.CandidateID
 		if err := s.deps.Mailer.Send(ctx, tx, tenantID, Mail{
 			To: *cand.Email, Subject: subject, Body: body + "\nTo move it, open the booking link again.", Calendar: calendar,
-			CandidateID: &cid, ApplicationID: app,
+			CandidateID: &cid, ApplicationID: app, From: from, FromName: fromName,
 		}); err != nil {
 			return err
 		}
@@ -84,6 +88,7 @@ func (s *Service) sendInvites(ctx context.Context, tx pgx.Tx, tenantID string, r
 	if host != nil && host.Email != nil {
 		return s.deps.Mailer.Send(ctx, tx, tenantID, Mail{
 			To: *host.Email, Subject: subject + " (" + cand.Name + ")", Body: fmt.Sprintf("Booked by %s.\n\n%s", cand.Name, body), Calendar: calendar,
+			From: from, FromName: fromName,
 		})
 	}
 	return nil

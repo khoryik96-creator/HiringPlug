@@ -328,6 +328,48 @@ func (q *Queries) HostBookings(ctx context.Context, arg HostBookingsParams) ([]H
 	return items, nil
 }
 
+const hostLinkCounts = `-- name: HostLinkCounts :many
+SELECT host_user_id,
+  count(*) FILTER (WHERE status = 'open' AND expires_at > now())::int AS open_links,
+  count(*) FILTER (WHERE status = 'booked' AND starts_at > now())::int AS upcoming,
+  -- now() when none is booked (upcoming = 0): never shown
+  coalesce(min(starts_at) FILTER (WHERE status = 'booked' AND starts_at > now()), now())::timestamptz AS next_at
+FROM booking_link GROUP BY host_user_id
+`
+
+type HostLinkCountsRow struct {
+	HostUserID string
+	OpenLinks  int32
+	Upcoming   int32
+	NextAt     time.Time
+}
+
+// Each host's booking links: open (sent, not booked or expired) and booked meetings to come.
+func (q *Queries) HostLinkCounts(ctx context.Context) ([]HostLinkCountsRow, error) {
+	rows, err := q.db.Query(ctx, hostLinkCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []HostLinkCountsRow
+	for rows.Next() {
+		var i HostLinkCountsRow
+		if err := rows.Scan(
+			&i.HostUserID,
+			&i.OpenLinks,
+			&i.Upcoming,
+			&i.NextAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertBookingLink = `-- name: InsertBookingLink :one
 INSERT INTO booking_link (tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, expires_at, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8, app_current_user())

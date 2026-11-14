@@ -86,6 +86,7 @@ class Permission(StrEnum):
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
     reports_read = "reports:read"
+    scheduling_team_read = "scheduling.team:read"
     scheduling_use = "scheduling:use"
     settings_backups_manage = "settings.backups:manage"
     settings_manage = "settings:manage"
@@ -5901,6 +5902,20 @@ class Schedule(BaseModel):
             description="Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none."
         ),
     ]
+
+
+class TeamSchedule(BaseModel):
+    userId: str
+    name: str
+    set: Annotated[bool, Field(description="They have saved their hours.")]
+    timeZone: str
+    hours: list[WeeklyHours]
+    calendar: Annotated[
+        CalendarFeed | None, Field(description="Their calendar's status (its host only); null when none.")
+    ]
+    openLinks: Annotated[int, Field(description="Booking links sent and not booked yet (not expired).")]
+    upcoming: Annotated[int, Field(description="Booked meetings still to come.")]
+    nextAt: Annotated[AwareDatetime | None, Field(description="When the next booked meeting starts.")]
 
 
 class BookingLink(BaseModel):

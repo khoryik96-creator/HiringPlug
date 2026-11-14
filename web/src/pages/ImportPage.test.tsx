@@ -54,15 +54,17 @@ describe("importing CVs and LinkedIn PDFs", () => {
     vi.stubGlobal("fetch", send);
     renderWithClient(<CvImports />);
 
-    const picker = screen.getByRole("group", { name: "Source of these candidates" });
-    expect((await within(picker).findByRole("button", { name: /LinkedIn/ })).getAttribute("aria-pressed")).toBe("true");
+    const preset = screen.getByRole("combobox", { name: "Preset the source" });
+    await within(preset).findByRole("option", { name: "JobStreet" });
+    expect((preset as HTMLSelectElement).value).toBe("linkedin");
+    fireEvent.change(preset, { target: { value: "jobstreet" } });
     fireEvent.change(screen.getByLabelText("Drop CVs here"), {
       target: { files: [new File(["%PDF"], "Siti Aisyah.pdf"), new File(["%PDF"], "huge.pdf")] },
     });
     fireEvent.click(screen.getByRole("button", { name: "Import 2 files" }));
 
     expect(await screen.findByText("huge.pdf: The file is too large.")).toBeTruthy();
-    expect(post).toHaveBeenCalledWith("/v1/cv-imports", { body: { source: "linkedin" } });
+    expect(post).toHaveBeenCalledWith("/v1/cv-imports", { body: { source: "jobstreet" } });
     expect(post).toHaveBeenCalledWith("/v1/document-matches", expect.anything()); // looked for CVs already here first
     expect(send).toHaveBeenCalledTimes(2);
     const [url, init] = send.mock.calls[0] as [string, RequestInit];
@@ -122,7 +124,7 @@ describe("importing CVs and LinkedIn PDFs", () => {
     const send = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(item({ status: "reading" })), { status: 201 })));
     vi.stubGlobal("fetch", send);
     renderWithClient(<CvImports />);
-    await within(screen.getByRole("group", { name: "Source of these candidates" })).findByRole("button", { name: /LinkedIn/ });
+    await within(screen.getByRole("combobox", { name: "Preset the source" })).findByRole("option", { name: "LinkedIn" });
     fireEvent.change(screen.getByLabelText("Drop CVs here"), {
       target: { files: [new File(["one"], "same.pdf"), new File(["two"], "Nurul CV.pdf"), new File(["three"], "new.pdf")] },
     });

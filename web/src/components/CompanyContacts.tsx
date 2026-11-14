@@ -67,7 +67,11 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
         </p>
       )}
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
-      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
+      {canEmail && !emailing && (
+        <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
+          shown={{ count: list.data?.length ?? 0, all: (list.data?.length ?? 0) > 0 && (list.data ?? []).every((c) => pick.ids.has(c.id)),
+            onAll: () => { pick.pick((list.data ?? []).map(contactPerson), true); } }} />
+      )}
       {list.data && (
         <ContactTable contacts={list.data} empty="No contacts at this company yet." picked={pick.ids}
           onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />

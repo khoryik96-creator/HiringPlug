@@ -3316,6 +3316,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/scheduling/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone's booking set-up (owner): hours, calendar status, booking links
+         * @description Calendar addresses are private to each person and never listed.
+         */
+        get: operations["listTeamSchedules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/booking-links": {
         parameters: {
             query?: never;
@@ -3622,7 +3642,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -7548,6 +7568,25 @@ export interface components {
             maxDaysAhead: number;
             /** @description Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none. */
             calendar: components["schemas"]["CalendarFeed"] | null;
+        };
+        TeamSchedule: {
+            userId: string;
+            name: string;
+            /** @description They have saved their hours. */
+            set: boolean;
+            timeZone: string;
+            hours: components["schemas"]["WeeklyHours"][];
+            /** @description Their calendar's status (its host only); null when none. */
+            calendar: components["schemas"]["CalendarFeed"] | null;
+            /** @description Booking links sent and not booked yet (not expired). */
+            openLinks: number;
+            /** @description Booked meetings still to come. */
+            upcoming: number;
+            /**
+             * Format: date-time
+             * @description When the next booked meeting starts.
+             */
+            nextAt: string | null;
         };
         CalendarFeed: {
             /** @description The address's host only, e.g. calendar.google.com (the address itself is private). */
@@ -14226,6 +14265,30 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listTeamSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TeamSchedule"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

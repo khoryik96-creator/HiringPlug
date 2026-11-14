@@ -188,6 +188,9 @@ type Notice struct {
 	ShowsFees bool
 	// SenderName is who it is from ("HiringPlug" when empty).
 	SenderName string
+	// SentBy, when given, is the user it is sent for: from their connected
+	// mailbox if they have one (else the server's), replies going to them.
+	SentBy *string
 }
 
 // NoticeFile is a file attached to a notice. Key, when given, names it in

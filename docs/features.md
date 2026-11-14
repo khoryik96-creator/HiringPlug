@@ -733,7 +733,8 @@ lead's company (with the built-in email check).
   client about N candidates".
 - **One email to many, each their own copy** ✅: tick candidates (the
   candidates list, or a job's board), or contacts (the contacts list, or a
-  company's contacts), and **Email each separately**. Up to 50 people get
+  company's contacts), and **Email each separately**. Above each list,
+  **Choose: All N | None** picks every row shown, or none. Up to 50 people get
   the same email, each their own: to them alone (nobody sees the others; no
   cc or bcc), with fields such as [First name] filled from them, and kept on
   their emails. Pick a template, write with the toolbar, attach files (each
@@ -811,7 +812,15 @@ lead's company (with the built-in email check).
   Mail recognise, plus `invite.ics`), which they add to the calendar. The
   candidate can move the time with the same link (the invitation is updated:
   same UID, next SEQUENCE) until the minimum notice; you can cancel from the
-  candidate's page (a `METHOD:CANCEL` takes it off both calendars).
+  candidate's page (a `METHOD:CANCEL` takes it off both calendars). The
+  invitations go from your connected mailbox, in your name (Settings > Email
+  connection), else from the server's address (`HP_SMTP_FROM`). In the Docker
+  set-up for development, the server's email is caught by Mailpit
+  (http://localhost:8025), not delivered.
+- **Booking calendars** (Settings, owners: `scheduling.team:read`): everyone
+  who takes bookings, their hours, whether their calendar is connected and
+  read (its host only: the address stays private to them) and their booking
+  links waiting and booked.
 - **Later**: connecting Google or Microsoft accounts directly (OAuth), to
   write the event straight into the calendar and read busy times live.
 
@@ -1030,7 +1039,7 @@ timeline, each answer after its question. One referee per note.
 
 ✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick
 one file or many (PDF, .docx, .doc; on LinkedIn: *More → Save to PDF*) and
-their source (LinkedIn to start). Each file becomes a candidate named after
+their source (**Preset the source**, a dropdown: LinkedIn to start). Each file becomes a candidate named after
 the file, owned by whoever imported it, and is read like any CV; when the
 reading is done the candidate is filled in from it: name, email, phone,
 location, nationality, country of residence, LinkedIn link, current title and

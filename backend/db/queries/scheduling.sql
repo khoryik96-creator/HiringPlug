@@ -79,3 +79,12 @@ WHERE id = @id RETURNING *;
 -- The public page knows only the token: its company, outside any tenant scope.
 -- name: BookingTenant :one
 SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_booking_tenant(@token_hash::text);
+
+-- Each host's booking links: open (sent, not booked or expired) and booked meetings to come.
+-- name: HostLinkCounts :many
+SELECT host_user_id,
+  count(*) FILTER (WHERE status = 'open' AND expires_at > now())::int AS open_links,
+  count(*) FILTER (WHERE status = 'booked' AND starts_at > now())::int AS upcoming,
+  -- now() when none is booked (upcoming = 0): never shown
+  coalesce(min(starts_at) FILTER (WHERE status = 'booked' AND starts_at > now()), now())::timestamptz AS next_at
+FROM booking_link GROUP BY host_user_id;

@@ -371,7 +371,7 @@ INSERT INTO email (tenant_id, candidate_id, application_id, contact_id, to_addre
                    body_html, salary, salary_restricted, fees_restricted, sent_by, sender_name, reply_to)
 VALUES (app_current_tenant(), $1, $2, $3, $4::text[],
         $5::text[], $6::text[], $7, $8, $9, $10, $11,
-        $12, app_current_user(), $13, $14)
+        $12, coalesce($13::text, app_current_user()), $14, $15)
 RETURNING id, tenant_id, candidate_id, application_id, to_addresses, cc_addresses, subject, body, sent_by, sender_name, reply_to, status, error, created_at, sent_at, body_html, bcc_addresses, salary, salary_restricted, calendar, fees_restricted, contact_id, mailbox_ref, delivery_mode, bounced_to, bounced_at
 `
 
@@ -388,6 +388,7 @@ type InsertEmailParams struct {
 	Salary           bool
 	SalaryRestricted bool
 	FeesRestricted   bool
+	SentBy           *string
 	SenderName       string
 	ReplyTo          string
 }
@@ -406,6 +407,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (Email
 		arg.Salary,
 		arg.SalaryRestricted,
 		arg.FeesRestricted,
+		arg.SentBy,
 		arg.SenderName,
 		arg.ReplyTo,
 	)
