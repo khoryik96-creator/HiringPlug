@@ -88,3 +88,10 @@ SELECT host_user_id,
   -- now() when none is booked (upcoming = 0): never shown
   coalesce(min(starts_at) FILTER (WHERE status = 'booked' AND starts_at > now()), now())::timestamptz AS next_at
 FROM booking_link GROUP BY host_user_id;
+
+-- Everyone's saved hours and calendar status (the owner's view).
+-- name: ListSchedules :many
+SELECT * FROM schedule ORDER BY user_id LIMIT 1000;
+
+-- name: BusyCounts :many
+SELECT user_id, count(*)::int AS busy FROM calendar_busy WHERE ends_at > now() GROUP BY user_id;

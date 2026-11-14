@@ -63,6 +63,12 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		return partsErr
 	default:
 		provider, sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
+		if errors.Is(sendErr, mail.ErrPermanent) && e.MailboxRef != nil && e.Calendar != nil {
+			// An invitation must arrive: when the sender's mailbox cannot send
+			// it (disconnected, signed out), it goes from the server's address.
+			logx.From(ctx).Info("invitation sent from the server: the mailbox could not send it", "email_id", e.ID)
+			provider, sendErr = "", s.sender.Send(ctx, msg)
+		}
 	}
 	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
 		return sendErr

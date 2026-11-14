@@ -44,11 +44,29 @@ func (s *Service) TeamSchedules(ctx context.Context, p authz.Principal) ([]TeamS
 		for _, c := range counts {
 			byHost[c.HostUserID] = c
 		}
+		saved, err := q.ListSchedules(ctx)
+		if err != nil {
+			return err
+		}
+		schedules := make(map[string]store.Schedule, len(saved))
+		for _, r := range saved {
+			schedules[r.UserID] = r
+		}
+		busyRows, err := q.BusyCounts(ctx)
+		if err != nil {
+			return err
+		}
+		busy := make(map[string]int, len(busyRows))
+		for _, b := range busyRows {
+			busy[b.UserID] = int(b.Busy)
+		}
 		out = make([]TeamSchedule, 0, len(members))
 		for _, m := range members {
-			sched, err := s.schedule(ctx, q, m.ID)
-			if err != nil {
-				return err
+			sched := Schedule{Settings: DefaultSettings(s.settings.DefaultTimeZone.String())}
+			if row, ok := schedules[m.ID]; ok {
+				if sched, err = scheduleFrom(row, busy[m.ID]); err != nil {
+					return err
+				}
 			}
 			c := byHost[m.ID]
 			t := TeamSchedule{UserID: m.ID, Name: m.Name, Schedule: sched, OpenLinks: int(c.OpenLinks), Coming: int(c.Upcoming)}

@@ -148,12 +148,17 @@ func (m *Module) ActiveUsers(ctx context.Context, tx pgx.Tx, ids []string) (map[
 		return nil, err
 	}
 	out := make(map[string][]api.Permission, len(found))
+	byRole := map[string][]api.Permission{} // each role's access is read once
 	for _, u := range found {
-		a, err := roleAccess(ctx, q, u.Role)
-		if err != nil {
-			return nil, err
+		perms, ok := byRole[u.Role]
+		if !ok {
+			a, err := roleAccess(ctx, q, u.Role)
+			if err != nil {
+				return nil, err
+			}
+			perms, byRole[u.Role] = a.Permissions, a.Permissions
 		}
-		out[u.ID] = a.Permissions
+		out[u.ID] = perms
 	}
 	return out, nil
 }

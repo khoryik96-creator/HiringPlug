@@ -123,7 +123,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {canEmail && !emailing && (
         <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
-          shown={{ count: hits.length, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
+          shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
       )}
       <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>

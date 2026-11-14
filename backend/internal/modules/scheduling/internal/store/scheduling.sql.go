@@ -104,6 +104,35 @@ func (q *Queries) BookingTenant(ctx context.Context, tokenHash string) (BookingT
 	return i, err
 }
 
+const busyCounts = `-- name: BusyCounts :many
+SELECT user_id, count(*)::int AS busy FROM calendar_busy WHERE ends_at > now() GROUP BY user_id
+`
+
+type BusyCountsRow struct {
+	UserID string
+	Busy   int32
+}
+
+func (q *Queries) BusyCounts(ctx context.Context) ([]BusyCountsRow, error) {
+	rows, err := q.db.Query(ctx, busyCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BusyCountsRow
+	for rows.Next() {
+		var i BusyCountsRow
+		if err := rows.Scan(&i.UserID, &i.Busy); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const calendarBusy = `-- name: CalendarBusy :many
 SELECT starts_at, ends_at FROM calendar_busy WHERE user_id = $1 AND ends_at > $2::timestamptz AND starts_at < $3::timestamptz
 `
@@ -435,6 +464,45 @@ type InsertBusyParams struct {
 func (q *Queries) InsertBusy(ctx context.Context, arg InsertBusyParams) error {
 	_, err := q.db.Exec(ctx, insertBusy, arg.UserID, arg.Starts, arg.Ends)
 	return err
+}
+
+const listSchedules = `-- name: ListSchedules :many
+SELECT tenant_id, user_id, time_zone, hours, buffer_minutes, min_notice_hours, max_days_ahead, calendar_url, calendar_status, calendar_error, calendar_read_at, calendar_asked_at, updated_at FROM schedule ORDER BY user_id LIMIT 1000
+`
+
+// Everyone's saved hours and calendar status (the owner's view).
+func (q *Queries) ListSchedules(ctx context.Context) ([]Schedule, error) {
+	rows, err := q.db.Query(ctx, listSchedules)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Schedule
+	for rows.Next() {
+		var i Schedule
+		if err := rows.Scan(
+			&i.TenantID,
+			&i.UserID,
+			&i.TimeZone,
+			&i.Hours,
+			&i.BufferMinutes,
+			&i.MinNoticeHours,
+			&i.MaxDaysAhead,
+			&i.CalendarUrl,
+			&i.CalendarStatus,
+			&i.CalendarError,
+			&i.CalendarReadAt,
+			&i.CalendarAskedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockBookingLink = `-- name: LockBookingLink :one

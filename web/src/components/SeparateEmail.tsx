@@ -147,8 +147,11 @@ function RecipientTable({ rows, title }: { rows: Schemas["EmailBatchRecipient"][
   );
 }
 
-/** What "All" chooses: the rows shown, and whether all of them are chosen. */
-export interface Shown { count: number; all: boolean; onAll: () => void }
+/**
+ * What "All" chooses: the rows shown (more: the list has more not loaded yet,
+ * so "All 25 shown"), and whether all of them are chosen.
+ */
+export interface Shown { count: number; more?: boolean; all: boolean; onAll: () => void }
 
 /**
  * Over a list whose rows can be chosen: "Choose: All 24 | None", and once any
@@ -165,7 +168,7 @@ export function PickBar({ count, shown, onEmail, onClear, children }: {
         <span className="choose" role="group" aria-label="Choose">
           <span className="choose-label" aria-hidden="true">Choose</span>
           <span className="segmented">
-            <button type="button" className={shown.all ? "on" : undefined} aria-pressed={shown.all} onClick={shown.onAll}>All {shown.count}</button>
+            <button type="button" className={shown.all ? "on" : undefined} aria-pressed={shown.all} onClick={shown.onAll}>All {shown.count}{shown.more ? " shown" : ""}</button>
             <button type="button" className={count === 0 ? "on" : undefined} aria-pressed={count === 0} onClick={onClear}>None</button>
           </span>
         </span>

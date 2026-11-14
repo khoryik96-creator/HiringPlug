@@ -69,17 +69,24 @@ func (s *Service) sendInvites(ctx context.Context, tx pgx.Tx, tenantID string, r
 		}
 	}
 	in.Body = strings.Join(lines, "\n")
-	calendar := in.Render(s.now())
+	calendar := in.Render(s.now()) // the host's copy, organised by the server's address: their calendar takes it as an invitation
 	body := in.Body + "\n\nThe invitation is attached: add it to your calendar."
 	app := row.ApplicationID
-	from, fromName := &row.HostUserID, hostName
-	if hostName == "the recruiter" {
-		fromName = ""
+	// An active host sends it from their own mailbox (if connected), in their
+	// name, and organises the candidate's copy: the candidate's answer goes
+	// to them. Otherwise it comes from the server, in the company's name.
+	var from *string
+	var fromName string
+	candidateCalendar := calendar
+	if host != nil && host.Email != nil {
+		from, fromName = &row.HostUserID, host.Name
+		in.Organizer = ical.Person{Name: host.Name, Email: *host.Email}
+		candidateCalendar = in.Render(s.now())
 	}
 	if cand.Email != nil {
 		cid := row.CandidateID
 		if err := s.deps.Mailer.Send(ctx, tx, tenantID, Mail{
-			To: *cand.Email, Subject: subject, Body: body + "\nTo move it, open the booking link again.", Calendar: calendar,
+			To: *cand.Email, Subject: subject, Body: body + "\nTo move it, open the booking link again.", Calendar: candidateCalendar,
 			CandidateID: &cid, ApplicationID: app, From: from, FromName: fromName,
 		}); err != nil {
 			return err

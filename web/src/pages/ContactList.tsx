@@ -68,7 +68,7 @@ export function ContactList({ canCreate, canEmail = false }: { canCreate: boolea
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {canEmail && !emailing && (
         <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
-          shown={{ count: contacts?.length ?? 0, all: (contacts?.length ?? 0) > 0 && (contacts ?? []).every((c) => pick.ids.has(c.id)),
+          shown={{ count: contacts?.length ?? 0, more: list.hasNextPage, all: (contacts?.length ?? 0) > 0 && (contacts ?? []).every((c) => pick.ids.has(c.id)),
             onAll: () => { pick.pick((contacts ?? []).map(contactPerson), true); } }} />
       )}
       {contacts && (
