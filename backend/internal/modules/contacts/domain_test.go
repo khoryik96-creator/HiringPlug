@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptr(s string) *string { return &s }
-
 func TestCheckEmail(t *testing.T) {
 	tests := []struct {
 		email, mailServer, status string

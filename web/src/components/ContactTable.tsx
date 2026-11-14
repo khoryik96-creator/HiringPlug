@@ -1,4 +1,5 @@
 import type { ContactSummary } from "../api/client";
+import { formatWhen, linkedinDates } from "../labels";
 import { chipStyle } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
@@ -6,6 +7,12 @@ import { MailboxBadge } from "./MailboxBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
 import { useFieldSettings } from "./useFieldSettings";
+
+/** What LinkedIn showed of a contact's time at the company, under their status. */
+function LinkedinNote({ e }: { e: NonNullable<ContactSummary["linkedinEmployment"]> }) {
+  const text = e.current === null ? "LinkedIn: unclear" : e.current ? `LinkedIn: since ${linkedinDates(e.joined)}` : `LinkedIn: left ${linkedinDates(e.left)}`;
+  return <span className="muted small linkedin-note" title={`Checked ${formatWhen(e.checkedAt)}`}>{text}</span>;
+}
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
 export function ContactTable({ contacts, showCompany = false, empty, picked, onPick }: {
@@ -49,7 +56,10 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
             <td>
               <span className="category-chip" style={chipStyle(roleColor(fs, c.role))}>{roleLabel(fs, c.role)}</span>
             </td>
-            <td>{c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}</td>
+            <td>
+              {c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}
+              {c.linkedinEmployment && <LinkedinNote e={c.linkedinEmployment} />}
+            </td>
             <td>{c.title}</td>
             {showCompany && <td><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></td>}
             <td>

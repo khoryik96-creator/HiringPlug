@@ -405,6 +405,25 @@ type ContactEmploymentCheck struct {
 	CreatedAt  time.Time
 }
 
+type ContactLinkedinCheck struct {
+	ID                string
+	TenantID          string
+	ContactID         string
+	CompanyID         string
+	ProfileUrl        string
+	CompanyUrl        string
+	LinkedinCompanyID *string
+	Status            string
+	Joined            *string
+	LeftOn            *string
+	CurrentJob        *bool
+	MarkedLeft        bool
+	Error             *string
+	RequestedBy       string
+	CreatedAt         time.Time
+	CheckedAt         *time.Time
+}
+
 type ContactMailboxCheck struct {
 	TenantID         string
 	ContactID        string

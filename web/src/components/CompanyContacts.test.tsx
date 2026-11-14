@@ -13,7 +13,7 @@ afterEach(() => {
 const company = { id: "comp_1", name: "Maju Sdn Bhd" } as Company;
 const contact = (fullName: string, email: string | null, mailboxStatus: ContactSummary["mailboxStatus"]): ContactSummary => ({
   id: `cont_${fullName}`, fullName, title: null, companyId: "comp_1", companyName: "Maju Sdn Bhd", email, emailCheckStatus: email ? "valid" : null,
-  mailboxStatus, phone: null, mobile: null, status: "active", role: null, updatedAt: "2026-11-01T00:00:00Z",
+  mailboxStatus, linkedinEmployment: null, phone: null, mobile: null, status: "active", role: null, updatedAt: "2026-11-01T00:00:00Z",
 });
 
 describe("a company's contacts", () => {

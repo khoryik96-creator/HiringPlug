@@ -6,6 +6,7 @@ import { contactsKey } from "../api/keys";
 import { ContactForm } from "./ContactForm";
 import { ContactTable } from "./ContactTable";
 import { ErrorMessage } from "./ErrorMessage";
+import { useLinkedinChecks } from "./LinkedinChecks";
 import { PickBar, SeparateEmail } from "./SeparateEmail";
 import { contactPerson, usePicked } from "./usePicked";
 
@@ -33,11 +34,14 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
   const checking = list.data?.filter((c) => c.mailboxStatus === "checking").length ?? 0;
   const bounces = list.data?.filter((c) => c.mailboxStatus === "invalid").length ?? 0;
   const withEmail = list.data?.filter((c) => c.email).length ?? 0;
+  const linkedin = useLinkedinChecks({ companyId: company.id });
+  const canLinkedin = canCheck && !!company.linkedinUrl && (list.data?.length ?? 0) > 0;
   return (
     <section className="panel" aria-label="Contacts">
       <div className="row spread">
         <h3>Contacts</h3>
         <span className="row">
+          {canLinkedin && linkedin.button}
           {canCheck && withEmail > 0 && (
             <button type="button" disabled={verify.isPending || checking > 0}
               title="Ask each contact's mail server whether their mailbox exists (no email is sent)"
@@ -53,6 +57,10 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
       )}
       <ErrorMessage error={list.error} />
       <ErrorMessage error={verify.error} />
+      {canLinkedin && linkedin.panel}
+      {canCheck && !company.linkedinUrl && (list.data?.length ?? 0) > 0 && (
+        <p className="muted small">Add the company&apos;s LinkedIn page to check on LinkedIn whether contacts still work here.</p>
+      )}
       {bounces > 0 && checking === 0 && (
         <p className="check-summary warning" role="status">
           {bounces === 1 ? "1 contact's email bounces" : `${String(bounces)} contacts' emails bounce`}: their mailbox no longer exists (often because they left). Marked in red below.

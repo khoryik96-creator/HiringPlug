@@ -79,6 +79,16 @@ func (m *Module) Website(ctx context.Context, tx pgx.Tx, companyID string) (stri
 	return w, err
 }
 
+// LinkedinURL returns a company's LinkedIn page ("" when none or no such
+// company), for other modules (e.g. checking where contacts work now).
+func (m *Module) LinkedinURL(ctx context.Context, tx pgx.Tx, companyID string) (string, error) {
+	u, err := store.New(tx).CompanyLinkedin(ctx, companyID)
+	if database.IsNoRows(err) {
+		return "", nil
+	}
+	return u, err
+}
+
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindCompanyAutofill: m.service.autofill}

@@ -17,6 +17,9 @@ x-module:
     CONTACT_DUPLICATE_EMAIL:
       status: 409
       description: Another contact already has this email. `details.existingContactId` points to them.
+    CONTACT_LINKEDIN_CHECK_CLOSED:
+      status: 409
+      description: The LinkedIn check was already answered, or expired (15 minutes). Start a new one.
   jobs:
     contact.read_linkedin:
       queue: ai
@@ -209,6 +212,66 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/contacts/linkedin-checks:
+    post:
+      operationId: startContactLinkedinChecks
+      tags: [contacts]
+      summary: Start checking on LinkedIn where a company's contacts (or one contact) work
+      description: >
+        For each contact with a LinkedIn profile, a check bound to the contact,
+        their profile and the company's LinkedIn page. The recruiter's
+        HiringPlug LinkedIn companion (a browser extension) reads the dates of
+        their time at that company from the profile and answers each check
+        within 15 minutes. LinkedIn is never read by the server.
+      x-permission: contacts:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactLinkedinChecksStart' }
+      responses:
+        '201':
+          description: Checks to answer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactLinkedinChecksStarted' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/contacts/linkedin-checks/{checkId}/answer:
+    parameters:
+      - name: checkId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/ContactLinkedinCheckId' }
+    post:
+      operationId: answerContactLinkedinCheck
+      tags: [contacts]
+      summary: Answer a LinkedIn check with what the profile shows
+      description: >
+        Only by whoever started it. When the profile shows the contact's time
+        at the company ended, with no current role there, a contact who
+        "works there" becomes "has left". Unclear dates change nothing.
+      x-permission: contacts:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactLinkedinCheckAnswer' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactLinkedinCheck' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /v1/contacts/{contactId}/linkedin-profile:
     parameters:
       - $ref: '#/components/parameters/ContactIdPath'
@@ -285,7 +348,7 @@ components:
 
     Contact:
       type: object
-      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, mailboxCheck, createdAt, updatedAt]
+      required: [id, version, companyId, companyName, firstName, lastName, fullName, title, email, emailCheck, phone, mobile, linkedinUrl, status, role, notes, employment, linkedinCheck, mailboxCheck, createdAt, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         version: { type: integer }
@@ -312,6 +375,10 @@ components:
         employment:
           description: The latest employment check (from their LinkedIn profile); null before the first.
           allOf: [{ $ref: '#/components/schemas/ContactEmployment' }]
+          nullable: true
+        linkedinCheck:
+          description: The latest answered LinkedIn check (by the LinkedIn companion); null before the first.
+          allOf: [{ $ref: '#/components/schemas/ContactLinkedinCheck' }]
           nullable: true
         mailboxCheck:
           description: The latest mailbox check of `email`; null before the first (or after the email changed).
@@ -363,7 +430,7 @@ components:
 
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, phone, mobile, status, role, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, linkedinEmployment, phone, mobile, status, role, updatedAt]
       properties:
         id: { $ref: '#/components/schemas/ContactId' }
         fullName: { type: string }
@@ -377,6 +444,10 @@ components:
         mailboxStatus:
           description: The latest mailbox check of `email`; null before the first.
           allOf: [{ $ref: '#/components/schemas/MailboxCheckStatus' }]
+          nullable: true
+        linkedinEmployment:
+          description: What the latest LinkedIn check saw of their time at the company; null before the first.
+          allOf: [{ $ref: '#/components/schemas/LinkedinEmployment' }]
           nullable: true
         phone: { type: string, nullable: true }
         mobile: { type: string, nullable: true }
@@ -444,6 +515,98 @@ components:
         contactId: { $ref: '#/components/schemas/ContactId' }
         email: { type: string, description: The address to check (skipped if the contact's email changed since). }
         deep: { type: boolean, description: Compare the domain's mail servers (an automatic recheck). }
+
+    ContactLinkedinCheckId:
+      type: string
+      pattern: '^clc_[0-9a-hjkmnp-tv-z]{26}$'
+      example: clc_01jbz6w0m0k8q9x2r3s4t5v6w7
+    LinkedinYearMonth:
+      type: string
+      pattern: '^(19|20)[0-9]{2}(-(0[1-9]|1[0-2]))?$'
+      description: A year (2020) or year and month (2020-06), as precise as the profile shows.
+    LinkedinEmployment:
+      type: object
+      required: [current, joined, left, checkedAt]
+      properties:
+        current:
+          type: boolean
+          nullable: true
+          description: true = a current role at the company; false = their time there ended; null = could not tell.
+        joined:
+          allOf: [{ $ref: '#/components/schemas/LinkedinYearMonth' }]
+          nullable: true
+        left:
+          allOf: [{ $ref: '#/components/schemas/LinkedinYearMonth' }]
+          nullable: true
+        checkedAt: { type: string, format: date-time }
+    ContactLinkedinChecksStart:
+      type: object
+      additionalProperties: false
+      description: A company (all its contacts) or one contact.
+      properties:
+        companyId: { $ref: '#/components/schemas/CompanyId' }
+        contactId: { $ref: '#/components/schemas/ContactId' }
+    ContactLinkedinCheckRequest:
+      type: object
+      required: [id, contactId, contactName, profileUrl]
+      properties:
+        id: { $ref: '#/components/schemas/ContactLinkedinCheckId' }
+        contactId: { $ref: '#/components/schemas/ContactId' }
+        contactName: { type: string }
+        profileUrl: { type: string, description: "https://www.linkedin.com/in/..." }
+    ContactLinkedinChecksStarted:
+      type: object
+      required: [companyUrl, checks, skipped]
+      properties:
+        companyUrl: { type: string, description: "The company's LinkedIn page, https://www.linkedin.com/company/.../" }
+        checks:
+          type: array
+          items: { $ref: '#/components/schemas/ContactLinkedinCheckRequest' }
+        skipped:
+          type: array
+          description: Contacts without a LinkedIn profile address (or with a short lnkd.in link).
+          items: { $ref: '#/components/schemas/ContactLinkedinCheckSkipped' }
+    ContactLinkedinCheckSkipped:
+      type: object
+      required: [contactId, contactName]
+      properties:
+        contactId: { $ref: '#/components/schemas/ContactId' }
+        contactName: { type: string }
+    ContactLinkedinCheckAnswer:
+      type: object
+      additionalProperties: false
+      description: >
+        What the profile shows (profileUrl, companyUrl and linkedinCompanyId
+        must be the check's), or why it could not be read (error).
+      properties:
+        profileUrl: { type: string, maxLength: 300 }
+        companyUrl: { type: string, maxLength: 300 }
+        linkedinCompanyId: { type: string, pattern: '^[0-9]{1,24}$', description: "LinkedIn's number for the company." }
+        joined: { type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty when not shown." }
+        left: { type: string, maxLength: 7, description: "YYYY or YYYY-MM; empty while current or not shown." }
+        current: { type: boolean, nullable: true }
+        error: { type: string, maxLength: 300, description: "Why the profile could not be read (then nothing else)." }
+    ContactLinkedinCheck:
+      type: object
+      required: [id, contactId, status, joined, left, current, markedLeft, error, createdAt, checkedAt]
+      properties:
+        id: { $ref: '#/components/schemas/ContactLinkedinCheckId' }
+        contactId: { $ref: '#/components/schemas/ContactId' }
+        status:
+          type: string
+          enum: [pending, observed, failed, expired]
+          description: observed = read (the dates may still be unclear); failed = could not be read.
+        joined:
+          allOf: [{ $ref: '#/components/schemas/LinkedinYearMonth' }]
+          nullable: true
+        left:
+          allOf: [{ $ref: '#/components/schemas/LinkedinYearMonth' }]
+          nullable: true
+        current: { type: boolean, nullable: true, description: "true = a current role there; false = their time there ended; null = unclear." }
+        markedLeft: { type: boolean, description: This check set the contact to "has left". }
+        error: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        checkedAt: { type: string, format: date-time, nullable: true }
 
     ContactEmploymentCheckId:
       type: string

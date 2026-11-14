@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "HiringPlug LinkedIn Companion",
+  "version": "1.0.0",
+  "description": "Checks on LinkedIn, in your own browser, whether HiringPlug contacts still work at their company. No AI, no messages.",
+  "minimum_chrome_version": "116",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://www.linkedin.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": {"service_worker": "worker.js"},
+  "action": {"default_title": "HiringPlug LinkedIn Companion", "default_popup": "popup.html"}
+}

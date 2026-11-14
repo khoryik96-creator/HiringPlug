@@ -12,7 +12,7 @@ afterEach(() => {
 
 const contact: Schemas["Contact"] = {
   id: "cont_1", version: 2, companyId: "comp_1", companyName: "Maju Sdn Bhd", firstName: "Nur", lastName: "Aina", fullName: "Nur Aina",
-  title: "HR Manager", email: null, emailCheck: null, phone: null, mobile: null, linkedinUrl: null, status: "active", role: null, notes: null, mailboxCheck: null,
+  title: "HR Manager", email: null, emailCheck: null, phone: null, mobile: null, linkedinUrl: null, status: "active", role: null, notes: null, mailboxCheck: null, linkedinCheck: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z", employment: null,
 };
 const moved: Schemas["ContactEmployment"] = {

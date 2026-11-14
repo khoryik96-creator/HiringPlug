@@ -450,11 +450,40 @@ for each of their jobs, with **Score fit** / **Score again**.
   MX records, looked up with a 3-second limit outside any database
   transaction), and shared (`hr@`) or disposable addresses. The result is
   **valid**, **risky**, **invalid** or **unknown** (lookup failed: "Check
-  again"), with the reasons in words. Next: optionally the mailbox itself. Each result is
-  stored with its evidence and date: valid, risky (catch-all, role, disposable),
-  invalid or unknown. Mailbox checks need outbound port 25, which home ISPs and
-  cloud providers often block, so a paid verification service can be plugged
-  in instead. CV Studio's email verifier notes will be reused.
+  again"), with the reasons in words.
+- **Email verifier** ✅ (CV Studio's, in Go: `platform/mailcheck`): **Verify
+  email** on a contact, **Verify emails** on a company's contacts. In the
+  background (`contact.check_mailbox`) it asks the contact's mail server, on
+  port 25, whether it takes mail for the address and for a made-up one beside
+  it; no email is sent (never DATA, AUTH, VRFY or EXPN). Only public addresses
+  are contacted, with verified TLS when offered, bounded replies and 25
+  seconds per check, two at a time and one per domain. Results: **mailbox
+  exists** (and a made-up one is refused: delivery is still not guaranteed),
+  **accepts any address** (catch-all: a caution, not a verdict), **bounces**
+  (the server says the mailbox does not exist, 5.1.1, or Microsoft 365's
+  directory rejection on a Microsoft 365 server; or the domain takes no mail)
+  and **not confirmed** (the server restricts checks, greylists, is full or
+  unreachable: never counted as invalid). A busy server is asked again once,
+  two minutes later, comparing the domain's servers, about the same made-up
+  mailbox (kept 4 hours). Contacts whose email bounces are marked in red in the
+  company's contacts, with a count. Servers often block port 25 from homes
+  and clouds: then every answer is "not confirmed", never a wrong "bounces".
+- **Employment check on LinkedIn** ✅ (CV Studio's, with the **HiringPlug
+  LinkedIn companion**, `extension/linkedin-companion`): **Check employment on
+  LinkedIn** on a company's contacts (or **Check on LinkedIn now** on one
+  contact). The companion, a browser extension connected to this HiringPlug
+  only, reads each contact's LinkedIn profile in the recruiter's own browser
+  (with their LinkedIn sign-in; the server never reads LinkedIn), in a
+  background tab it closes afterwards, unless the recruiter looked at it. It
+  takes the dates of their time at the company's exact LinkedIn page (by its
+  link and LinkedIn's number for the company, never by a similar name or job
+  title), as precise as shown: still there since 2021-06, left in 2025-08, or
+  unclear (collapsed, missing or ambiguous roles). The server makes each check
+  (bound to the contact, their profile and the company's page; answered only
+  by whoever asked, within 15 minutes) and checks the dates make sense. A
+  contact whose time there ended, with no current role there, becomes **has
+  left** (audited; change it back with Edit); unclear changes nothing. The
+  company's contacts show what LinkedIn showed under each status.
 - **Employment check** ✅: whether a contact still works at their company.
   LinkedIn cannot be read automatically (it refuses automated access), so a
   person drops the contact's LinkedIn profile saved as PDF (More > Save to PDF)

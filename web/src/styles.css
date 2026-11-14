@@ -988,3 +988,13 @@ select.status-select:hover, select.status-select:focus-visible { border-color: v
 tr.bounces td { background: #fef2f2; }
 tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .check-summary { margin: 0.25rem 0 0.5rem; }
+
+/* LinkedIn employment checks (the LinkedIn companion). */
+.linkedin-checks { margin: 0.5rem 0; }
+.linkedin-results { list-style: none; padding: 0; margin: 0.5rem 0; display: grid; gap: 0.25rem; }
+.linkedin-results li, .linkedin-result { padding: 0.3rem 0.6rem; border-radius: 6px; background: #f8fafc; border-left: 3px solid #cbd5e1; }
+.tone-left { background: #fef2f2 !important; border-left-color: #dc2626 !important; }
+.tone-there { border-left-color: #16a34a !important; }
+.tone-failed { border-left-color: #d97706 !important; }
+.linkedin-note { display: block; margin-top: 0.15rem; }
+.companion-help ol { margin: 0.25rem 0 0; padding-left: 1.2rem; }

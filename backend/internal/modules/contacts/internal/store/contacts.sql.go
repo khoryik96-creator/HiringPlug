@@ -10,6 +10,44 @@ import (
 	"time"
 )
 
+const companyContactsForLinkedin = `-- name: CompanyContactsForLinkedin :many
+SELECT id, first_name, last_name, linkedin_url FROM contact WHERE company_id = $1 ORDER BY first_name, last_name, id
+`
+
+type CompanyContactsForLinkedinRow struct {
+	ID          string
+	FirstName   string
+	LastName    string
+	LinkedinUrl *string
+}
+
+// LinkedIn checks (by the recruiter's LinkedIn companion): one per contact
+// and request, answered only by whoever asked, within 15 minutes.
+func (q *Queries) CompanyContactsForLinkedin(ctx context.Context, companyID string) ([]CompanyContactsForLinkedinRow, error) {
+	rows, err := q.db.Query(ctx, companyContactsForLinkedin, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CompanyContactsForLinkedinRow
+	for rows.Next() {
+		var i CompanyContactsForLinkedinRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.LinkedinUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const companyContactsWithEmail = `-- name: CompanyContactsWithEmail :many
 SELECT c.id, c.email::text AS email, m.status AS mailbox_status
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
@@ -104,6 +142,15 @@ func (q *Queries) CountContactsWithRole(ctx context.Context, role *string) (int6
 	return count, err
 }
 
+const expireLinkedinCheck = `-- name: ExpireLinkedinCheck :exec
+UPDATE contact_linkedin_check SET status = 'expired' WHERE id = $1 AND status = 'pending'
+`
+
+func (q *Queries) ExpireLinkedinCheck(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, expireLinkedinCheck, id)
+	return err
+}
+
 const fillLinkedinURL = `-- name: FillLinkedinURL :execrows
 UPDATE contact SET linkedin_url = $1, version = version + 1, updated_at = now()
 WHERE id = $2 AND linkedin_url IS NULL
@@ -186,6 +233,34 @@ func (q *Queries) GetEmploymentCheck(ctx context.Context, id string) (ContactEmp
 		&i.Result,
 		&i.CreatedBy,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getLinkedinCheck = `-- name: GetLinkedinCheck :one
+SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at FROM contact_linkedin_check WHERE id = $1
+`
+
+func (q *Queries) GetLinkedinCheck(ctx context.Context, id string) (ContactLinkedinCheck, error) {
+	row := q.db.QueryRow(ctx, getLinkedinCheck, id)
+	var i ContactLinkedinCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.CompanyID,
+		&i.ProfileUrl,
+		&i.CompanyUrl,
+		&i.LinkedinCompanyID,
+		&i.Status,
+		&i.Joined,
+		&i.LeftOn,
+		&i.CurrentJob,
+		&i.MarkedLeft,
+		&i.Error,
+		&i.RequestedBy,
+		&i.CreatedAt,
+		&i.CheckedAt,
 	)
 	return i, err
 }
@@ -332,6 +407,48 @@ func (q *Queries) InsertEmploymentCheck(ctx context.Context, arg InsertEmploymen
 	return i, err
 }
 
+const insertLinkedinCheck = `-- name: InsertLinkedinCheck :one
+INSERT INTO contact_linkedin_check (tenant_id, contact_id, company_id, profile_url, company_url, requested_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at
+`
+
+type InsertLinkedinCheckParams struct {
+	ContactID  string
+	CompanyID  string
+	ProfileUrl string
+	CompanyUrl string
+}
+
+func (q *Queries) InsertLinkedinCheck(ctx context.Context, arg InsertLinkedinCheckParams) (ContactLinkedinCheck, error) {
+	row := q.db.QueryRow(ctx, insertLinkedinCheck,
+		arg.ContactID,
+		arg.CompanyID,
+		arg.ProfileUrl,
+		arg.CompanyUrl,
+	)
+	var i ContactLinkedinCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.CompanyID,
+		&i.ProfileUrl,
+		&i.CompanyUrl,
+		&i.LinkedinCompanyID,
+		&i.Status,
+		&i.Joined,
+		&i.LeftOn,
+		&i.CurrentJob,
+		&i.MarkedLeft,
+		&i.Error,
+		&i.RequestedBy,
+		&i.CreatedAt,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
 const latestEmploymentCheck = `-- name: LatestEmploymentCheck :one
 SELECT id, tenant_id, contact_id, file_name, storage_key, status, error, result, created_by, created_at FROM contact_employment_check WHERE contact_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1
 `
@@ -354,11 +471,45 @@ func (q *Queries) LatestEmploymentCheck(ctx context.Context, contactID string) (
 	return i, err
 }
 
+const latestLinkedinCheck = `-- name: LatestLinkedinCheck :one
+SELECT id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at FROM contact_linkedin_check WHERE contact_id = $1 AND status IN ('observed', 'failed')
+ORDER BY checked_at DESC, id DESC LIMIT 1
+`
+
+func (q *Queries) LatestLinkedinCheck(ctx context.Context, contactID string) (ContactLinkedinCheck, error) {
+	row := q.db.QueryRow(ctx, latestLinkedinCheck, contactID)
+	var i ContactLinkedinCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.CompanyID,
+		&i.ProfileUrl,
+		&i.CompanyUrl,
+		&i.LinkedinCompanyID,
+		&i.Status,
+		&i.Joined,
+		&i.LeftOn,
+		&i.CurrentJob,
+		&i.MarkedLeft,
+		&i.Error,
+		&i.RequestedBy,
+		&i.CreatedAt,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
 const listContacts = `-- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
   contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
-  m.status AS mailbox_status
+  m.status AS mailbox_status, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
+  l.checked_at AS linkedin_checked_at
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
+  LEFT JOIN LATERAL (
+    SELECT lc.current_job, lc.joined, lc.left_on, lc.checked_at FROM contact_linkedin_check lc
+    WHERE lc.contact_id = contact.id AND lc.status = 'observed' ORDER BY lc.checked_at DESC LIMIT 1
+  ) l ON true
 WHERE ($1::text IS NULL OR contact.id < $1::text)
   AND ($2::text IS NULL OR contact.company_id = $2::text)
   AND ($3::text IS NULL OR contact.status = $3::text)
@@ -386,19 +537,23 @@ type ListContactsParams struct {
 }
 
 type ListContactsRow struct {
-	ID               string
-	CompanyID        string
-	FirstName        string
-	LastName         string
-	Title            *string
-	Email            *string
-	EmailCheckStatus *string
-	Phone            *string
-	Mobile           *string
-	Status           string
-	Role             *string
-	UpdatedAt        time.Time
-	MailboxStatus    *string
+	ID                string
+	CompanyID         string
+	FirstName         string
+	LastName          string
+	Title             *string
+	Email             *string
+	EmailCheckStatus  *string
+	Phone             *string
+	Mobile            *string
+	Status            string
+	Role              *string
+	UpdatedAt         time.Time
+	MailboxStatus     *string
+	LinkedinCurrent   *bool
+	LinkedinJoined    *string
+	LinkedinLeft      *string
+	LinkedinCheckedAt *time.Time
 }
 
 // Newest first, keyset pagination on id (IDs sort by creation time).
@@ -436,6 +591,10 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 			&i.Role,
 			&i.UpdatedAt,
 			&i.MailboxStatus,
+			&i.LinkedinCurrent,
+			&i.LinkedinJoined,
+			&i.LinkedinLeft,
+			&i.LinkedinCheckedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -445,6 +604,25 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const markContactLeft = `-- name: MarkContactLeft :one
+UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
+WHERE id = $1 AND status = 'active' AND company_id = $2
+RETURNING version
+`
+
+type MarkContactLeftParams struct {
+	ID        string
+	CompanyID string
+}
+
+// A contact found to have left (an edit: the version changes).
+func (q *Queries) MarkContactLeft(ctx context.Context, arg MarkContactLeftParams) (int32, error) {
+	row := q.db.QueryRow(ctx, markContactLeft, arg.ID, arg.CompanyID)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
 }
 
 const newEmploymentCheckID = `-- name: NewEmploymentCheckID :one
@@ -482,6 +660,58 @@ func (q *Queries) SaveEmploymentCheck(ctx context.Context, arg SaveEmploymentChe
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const saveLinkedinCheck = `-- name: SaveLinkedinCheck :one
+UPDATE contact_linkedin_check SET
+  status = $1, joined = $2, left_on = $3, current_job = $4,
+  linkedin_company_id = $5, marked_left = $6, error = $7, checked_at = now()
+WHERE id = $8 AND status = 'pending'
+RETURNING id, tenant_id, contact_id, company_id, profile_url, company_url, linkedin_company_id, status, joined, left_on, current_job, marked_left, error, requested_by, created_at, checked_at
+`
+
+type SaveLinkedinCheckParams struct {
+	Status            string
+	Joined            *string
+	LeftOn            *string
+	CurrentJob        *bool
+	LinkedinCompanyID *string
+	MarkedLeft        bool
+	Error             *string
+	ID                string
+}
+
+func (q *Queries) SaveLinkedinCheck(ctx context.Context, arg SaveLinkedinCheckParams) (ContactLinkedinCheck, error) {
+	row := q.db.QueryRow(ctx, saveLinkedinCheck,
+		arg.Status,
+		arg.Joined,
+		arg.LeftOn,
+		arg.CurrentJob,
+		arg.LinkedinCompanyID,
+		arg.MarkedLeft,
+		arg.Error,
+		arg.ID,
+	)
+	var i ContactLinkedinCheck
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.ContactID,
+		&i.CompanyID,
+		&i.ProfileUrl,
+		&i.CompanyUrl,
+		&i.LinkedinCompanyID,
+		&i.Status,
+		&i.Joined,
+		&i.LeftOn,
+		&i.CurrentJob,
+		&i.MarkedLeft,
+		&i.Error,
+		&i.RequestedBy,
+		&i.CreatedAt,
+		&i.CheckedAt,
+	)
+	return i, err
 }
 
 const saveMailboxCheck = `-- name: SaveMailboxCheck :one

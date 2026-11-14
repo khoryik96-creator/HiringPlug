@@ -86,6 +86,9 @@ UPDATE company_suggestion SET status = @status WHERE id = @id;
 -- name: CompanyWebsite :one
 SELECT coalesce(website, '')::text FROM company WHERE id = @id;
 
+-- name: CompanyLinkedin :one
+SELECT coalesce(linkedin_url, '')::text FROM company WHERE id = @id;
+
 -- For each word of a job search (numbered as app_search_words numbers them),
 -- the companies whose name or website has it: "n:companyId".
 -- name: CompanyWordHits :many

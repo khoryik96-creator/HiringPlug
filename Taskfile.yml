@@ -126,7 +126,10 @@ tasks:
 
   test:web:
     dir: web
-    cmds: [pnpm run test]
+    cmds:
+      - pnpm run test
+      # The LinkedIn companion (browser extension) with a fake browser.
+      - node --test ../extension/linkedin-companion/test/worker.test.mjs
 
   build:web:
     dir: web

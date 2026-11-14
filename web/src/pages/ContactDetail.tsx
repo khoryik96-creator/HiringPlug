@@ -8,6 +8,7 @@ import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
 import { EmploymentCheck } from "../components/EmploymentCheck";
+import { LinkedinCheckResult, LinkedinChecks } from "../components/LinkedinChecks";
 import { MailboxBadge } from "../components/MailboxBadge";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { type Section, SectionTabs } from "../components/SectionTabs";
@@ -79,7 +80,18 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
         <ErrorMessage error={recheck.error} />
       </section>
     ) },
-    { id: "employment", label: "Employment check", content: <EmploymentCheck contact={c} canCheck={canEdit && !editing} /> },
+    { id: "employment", label: "Employment check", content: (
+      <>
+        {canEdit && !editing && c.linkedinUrl && (
+          <section className="panel" aria-label="LinkedIn check">
+            <h3>On LinkedIn</h3>
+            {c.linkedinCheck && <LinkedinCheckResult check={c.linkedinCheck} />}
+            <LinkedinChecks contactId={c.id} label="Check on LinkedIn now" />
+          </section>
+        )}
+        <EmploymentCheck contact={c} canCheck={canEdit && !editing} />
+      </>
+    ) },
     ...(permissions.includes("emails:read") ? [{ id: "email" as const, label: "Email", content:
       <ContactEmails contactId={c.id} email={c.email} permissions={permissions} writing={writing} onWritingChange={setWriting} /> }] : []),
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="contact" subjectId={c.id} permissions={permissions} /> },

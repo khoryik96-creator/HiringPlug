@@ -12,7 +12,7 @@ afterEach(() => {
 
 const contact = (over: Partial<ContactSummary>): ContactSummary => ({
   id: "cont_01jbz6w0m0k8q9x2r3s4t5v6w7", fullName: "Mei Tan", title: "HR Manager", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
-  companyName: "Maju", email: null, emailCheckStatus: null, mailboxStatus: null, phone: null, mobile: null, status: "active", role: "hr",
+  companyName: "Maju", email: null, emailCheckStatus: null, mailboxStatus: null, linkedinEmployment: null, phone: null, mobile: null, status: "active", role: "hr",
   updatedAt: "2026-11-01T00:00:00Z", ...over,
 });
 

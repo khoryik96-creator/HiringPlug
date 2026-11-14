@@ -59,8 +59,13 @@ RETURNING *;
 -- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
   contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
-  m.status AS mailbox_status
+  m.status AS mailbox_status, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
+  l.checked_at AS linkedin_checked_at
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
+  LEFT JOIN LATERAL (
+    SELECT lc.current_job, lc.joined, lc.left_on, lc.checked_at FROM contact_linkedin_check lc
+    WHERE lc.contact_id = contact.id AND lc.status = 'observed' ORDER BY lc.checked_at DESC LIMIT 1
+  ) l ON true
 WHERE (sqlc.narg(cursor)::text IS NULL OR contact.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR contact.company_id = sqlc.narg(company_id)::text)
   AND (sqlc.narg(status)::text IS NULL OR contact.status = sqlc.narg(status)::text)
@@ -141,3 +146,36 @@ SELECT c.id, c.email::text AS email, m.status AS mailbox_status
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
 WHERE c.company_id = @company_id AND c.email IS NOT NULL
 ORDER BY c.id;
+
+-- LinkedIn checks (by the recruiter's LinkedIn companion): one per contact
+-- and request, answered only by whoever asked, within 15 minutes.
+-- name: CompanyContactsForLinkedin :many
+SELECT id, first_name, last_name, linkedin_url FROM contact WHERE company_id = @company_id ORDER BY first_name, last_name, id;
+
+-- name: InsertLinkedinCheck :one
+INSERT INTO contact_linkedin_check (tenant_id, contact_id, company_id, profile_url, company_url, requested_by)
+VALUES (app_current_tenant(), @contact_id, @company_id, @profile_url, @company_url, app_current_user())
+RETURNING *;
+
+-- name: GetLinkedinCheck :one
+SELECT * FROM contact_linkedin_check WHERE id = @id;
+
+-- name: SaveLinkedinCheck :one
+UPDATE contact_linkedin_check SET
+  status = @status, joined = sqlc.narg(joined), left_on = sqlc.narg(left_on), current_job = sqlc.narg(current_job),
+  linkedin_company_id = sqlc.narg(linkedin_company_id), marked_left = @marked_left, error = sqlc.narg(error), checked_at = now()
+WHERE id = @id AND status = 'pending'
+RETURNING *;
+
+-- name: ExpireLinkedinCheck :exec
+UPDATE contact_linkedin_check SET status = 'expired' WHERE id = @id AND status = 'pending';
+
+-- name: LatestLinkedinCheck :one
+SELECT * FROM contact_linkedin_check WHERE contact_id = @contact_id AND status IN ('observed', 'failed')
+ORDER BY checked_at DESC, id DESC LIMIT 1;
+
+-- A contact found to have left (an edit: the version changes).
+-- name: MarkContactLeft :one
+UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
+WHERE id = @id AND status = 'active' AND company_id = @company_id
+RETURNING version;

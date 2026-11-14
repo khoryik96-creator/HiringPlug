@@ -42,15 +42,24 @@ type Contact struct {
 	EmailCheck  *EmailCheckResult // nil without an email
 	Employment  *EmploymentCheck  // the latest LinkedIn check; nil before the first
 	Mailbox     *MailboxCheck     // the latest mailbox check of Details.Email; nil before the first
+	Linkedin    *LinkedinCheck    // the latest answered LinkedIn check; nil before the first
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
 // Summary is a contact in a list.
 type Summary struct {
-	ID, CompanyID, CompanyName, FirstName, LastName, Status string
+	ID, CompanyID, CompanyName, FirstName, LastName, Status            string
 	Title, Email, EmailCheckStatus, MailboxStatus, Phone, Mobile, Role *string
-	UpdatedAt                                               time.Time
+	UpdatedAt                                                          time.Time
+	Linkedin                                                           *LinkedinEmployment // nil before the first LinkedIn check
+}
+
+// LinkedinEmployment is what the latest LinkedIn check saw.
+type LinkedinEmployment struct {
+	Current      *bool
+	Joined, Left *string
+	CheckedAt    time.Time
 }
 
 // Patch is a partial update of Details.

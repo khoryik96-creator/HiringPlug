@@ -201,4 +201,4 @@ func mailboxToAPI(m MailboxCheck) api.ContactMailboxCheck {
 	}
 }
 
-func ptr(s string) *string { return &s }
+func ptr[T any](v T) *T { return &v }

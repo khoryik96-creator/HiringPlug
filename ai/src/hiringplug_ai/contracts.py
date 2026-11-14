@@ -107,6 +107,7 @@ class ErrorCode(StrEnum):
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
+    CONTACT_LINKEDIN_CHECK_CLOSED = "CONTACT_LINKEDIN_CHECK_CLOSED"
     CV_NOT_BLIND = "CV_NOT_BLIND"
     DOCUMENT_DUPLICATE = "DOCUMENT_DUPLICATE"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
@@ -1251,13 +1252,109 @@ class ContactCheckMailboxJob(BaseModel):
     deep: Annotated[bool, Field(description="Compare the domain's mail servers (an automatic recheck).")]
 
 
+class ContactLinkedinCheckId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["clc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^clc_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class LinkedinYearMonth(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A year (2020) or year and month (2020-06), as precise as the profile shows.",
+            pattern="^(19|20)[0-9]{2}(-(0[1-9]|1[0-2]))?$",
+        ),
+    ]
+
+
+class LinkedinEmployment(BaseModel):
+    current: Annotated[
+        bool | None,
+        Field(
+            description="true = a current role at the company; false = their time there ended; null = could not tell."
+        ),
+    ]
+    joined: Annotated[LinkedinYearMonth | None, Field(...)]
+    left: Annotated[LinkedinYearMonth | None, Field(...)]
+    checkedAt: AwareDatetime
+
+
+class ContactLinkedinChecksStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId | None = None
+    contactId: ContactId | None = None
+
+
+class ContactLinkedinCheckRequest(BaseModel):
+    id: ContactLinkedinCheckId
+    contactId: ContactId
+    contactName: str
+    profileUrl: Annotated[str, Field(description="https://www.linkedin.com/in/...")]
+
+
+class ContactLinkedinCheckSkipped(BaseModel):
+    contactId: ContactId
+    contactName: str
+
+
+class ContactLinkedinCheckAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profileUrl: Annotated[str | None, Field(max_length=300)] = None
+    companyUrl: Annotated[str | None, Field(max_length=300)] = None
+    linkedinCompanyId: Annotated[
+        str | None, Field(description="LinkedIn's number for the company.", pattern="^[0-9]{1,24}$")
+    ] = None
+    joined: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)
+    ] = None
+    left: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty while current or not shown.", max_length=7)
+    ] = None
+    current: bool | None = None
+    error: Annotated[
+        str | None,
+        Field(description="Why the profile could not be read (then nothing else).", max_length=300),
+    ] = None
+
+
+class Status1(StrEnum):
+    pending = "pending"
+    observed = "observed"
+    failed = "failed"
+    expired = "expired"
+
+
+class ContactLinkedinCheck(BaseModel):
+    id: ContactLinkedinCheckId
+    contactId: ContactId
+    status: Annotated[
+        Status1,
+        Field(description="observed = read (the dates may still be unclear); failed = could not be read."),
+    ]
+    joined: Annotated[LinkedinYearMonth | None, Field(...)]
+    left: Annotated[LinkedinYearMonth | None, Field(...)]
+    current: Annotated[
+        bool | None,
+        Field(description="true = a current role there; false = their time there ended; null = unclear."),
+    ]
+    markedLeft: Annotated[bool, Field(description='This check set the contact to "has left".')]
+    error: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
 class ContactEmploymentCheckId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["cec_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cec_[0-9a-hjkmnp-tv-z]{26}$")
     ]
 
 
-class Status1(StrEnum):
+class Status2(StrEnum):
     reading = "reading"
     read = "read"
     failed = "failed"
@@ -2228,7 +2325,7 @@ class IndustryEmployer(BaseModel):
     current: bool
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     ready = "ready"
     needs_review = "needs_review"
 
@@ -2239,7 +2336,7 @@ class IndustrySuggestion(BaseModel):
     )
     catalogueVersion: int
     candidateVersion: int
-    status: Status2
+    status: Status3
     reason: str
     categoryId: IndustryId | None = None
     employerIndex: int | None = None
@@ -2596,7 +2693,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -4000,7 +4097,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status4(StrEnum):
+class Status5(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -4013,7 +4110,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status4
+    status: Status5
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -4115,7 +4212,7 @@ class FailedJob(BaseModel):
     failedAt: AwareDatetime
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -4125,7 +4222,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status5
+    status: Status6
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -4722,6 +4819,12 @@ class ContactSummary(BaseModel):
         MailboxCheckStatus | None,
         Field(description="The latest mailbox check of `email`; null before the first."),
     ]
+    linkedinEmployment: Annotated[
+        LinkedinEmployment | None,
+        Field(
+            description="What the latest LinkedIn check saw of their time at the company; null before the first."
+        ),
+    ]
     phone: Annotated[str | None, Field(...)]
     mobile: Annotated[str | None, Field(...)]
     status: ContactStatus
@@ -4739,9 +4842,20 @@ class ContactPage(BaseModel):
     ]
 
 
+class ContactLinkedinChecksStarted(BaseModel):
+    companyUrl: Annotated[
+        str, Field(description="The company's LinkedIn page, https://www.linkedin.com/company/.../")
+    ]
+    checks: list[ContactLinkedinCheckRequest]
+    skipped: Annotated[
+        list[ContactLinkedinCheckSkipped],
+        Field(description="Contacts without a LinkedIn profile address (or with a short lnkd.in link)."),
+    ]
+
+
 class ContactEmployment(BaseModel):
     id: ContactEmploymentCheckId
-    status: Status1
+    status: Status2
     verdict: Annotated[
         Verdict,
         Field(
@@ -5167,7 +5281,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status3, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status4, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]
@@ -5817,6 +5931,12 @@ class Contact(BaseModel):
         ContactEmployment | None,
         Field(
             description="The latest employment check (from their LinkedIn profile); null before the first."
+        ),
+    ]
+    linkedinCheck: Annotated[
+        ContactLinkedinCheck | None,
+        Field(
+            description="The latest answered LinkedIn check (by the LinkedIn companion); null before the first."
         ),
     ]
     mailboxCheck: Annotated[

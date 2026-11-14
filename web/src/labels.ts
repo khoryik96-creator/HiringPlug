@@ -114,6 +114,15 @@ export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; m
   unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
 };
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A LinkedIn date as precise as it was shown: "2025-08" -> "Aug 2025", "2025" -> "2025". */
+export function linkedinDates(value: string | null): string {
+  if (!value) return "?";
+  const [year, month] = value.split("-");
+  return month ? `${MONTHS[Number(month) - 1] ?? month} ${year ?? ""}` : (year ?? value);
+}
+
 /** A mailbox check (asking the contact's mail server whether the mailbox exists). */
 export const MAILBOX_CHECK: Record<Schemas["MailboxCheckStatus"], { badge: string; meaning: string }> = {
   checking: { badge: "Verifying…", meaning: "Asking their mail server." },

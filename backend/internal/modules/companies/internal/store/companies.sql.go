@@ -56,6 +56,17 @@ func (q *Queries) CompanyExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const companyLinkedin = `-- name: CompanyLinkedin :one
+SELECT coalesce(linkedin_url, '')::text FROM company WHERE id = $1
+`
+
+func (q *Queries) CompanyLinkedin(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, companyLinkedin, id)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const companyNames = `-- name: CompanyNames :many
 SELECT id, name FROM company WHERE id = ANY($1::text[])
 `

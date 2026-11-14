@@ -246,6 +246,9 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus, MailboxStatus: r.MailboxStatus,
 				Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
 			}
+			if r.LinkedinCheckedAt != nil {
+				page.Items[i].Linkedin = &LinkedinEmployment{Current: r.LinkedinCurrent, Joined: r.LinkedinJoined, Left: r.LinkedinLeft, CheckedAt: *r.LinkedinCheckedAt}
+			}
 		}
 		return nil
 	})
@@ -365,6 +368,12 @@ func (s *Service) withCompanyName(ctx context.Context, tx pgx.Tx, c Contact) (Co
 	}
 	c.CompanyName = names[c.Details.CompanyID]
 	if c.Mailbox, err = mailboxOf(ctx, store.New(tx), c.ID, c.Details.Email); err != nil {
+		return c, err
+	}
+	if l, err := store.New(tx).LatestLinkedinCheck(ctx, c.ID); err == nil {
+		check := linkedinCheckFrom(l)
+		c.Linkedin = &check
+	} else if !database.IsNoRows(err) {
 		return c, err
 	}
 	check, err := store.New(tx).LatestEmploymentCheck(ctx, c.ID)
