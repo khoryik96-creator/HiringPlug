@@ -24,7 +24,7 @@ func TestIsDown(t *testing.T) {
 			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
 		}
 	}
-	if ProviderLabel("deepseek") != "DeepSeek" || ProviderLabel("server") != "The server's AI" {
-		t.Error("provider names as people know them")
+	if ProviderLabel("deepseek") != "AI 1" || ProviderLabel("claude") != "AI 2" || ProviderLabel("openai") != "AI 3" || ProviderLabel("server") != "The server's AI" {
+		t.Error("the notice numbers the providers instead of naming them")
 	}
 }

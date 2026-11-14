@@ -311,7 +311,10 @@ class AiProviderCheckJob(BaseModel):
 class AiStatus(BaseModel):
     down: Annotated[bool, Field(description="The latest call to the provider failed, within the last hour.")]
     provider: Annotated[
-        str | None, Field(description="Its name as shown: DeepSeek, Claude, ChatGPT, or the server's AI.")
+        str | None,
+        Field(
+            description="As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI."
+        ),
     ]
     message: Annotated[str | None, Field(description="Why, in words safe to show (never a key).")]
     since: Annotated[AwareDatetime | None, Field(description="When the failures began.")]

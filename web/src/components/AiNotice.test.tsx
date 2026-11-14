@@ -6,7 +6,7 @@ import { ok, renderWithClient } from "../test-utils";
 import { AiNotice, sentence } from "./AiNotice";
 
 const down: Schemas["AiStatus"] = {
-  down: true, provider: "DeepSeek", message: "the AI provider could not be reached",
+  down: true, provider: "AI 1", message: "the AI provider could not be reached",
   since: "2026-11-13T02:40:00Z", failedAt: "2026-11-13T02:45:00Z",
 };
 const fine: Schemas["AiStatus"] = { down: false, provider: null, message: null, since: null, failedAt: null };
@@ -22,7 +22,7 @@ describe("the notice when the AI is not answering", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(down));
     renderWithClient(<AiNotice permissions={[]} />);
     const notice = await screen.findByRole("alert");
-    expect(notice.textContent).toContain("DeepSeek is not answering");
+    expect(notice.textContent).toContain("AI 1 is not answering");
     expect(notice.textContent).toContain("The AI provider could not be reached.");
     expect(notice.textContent).toContain("fit scores");
     expect(screen.queryByRole("link", { name: "Check the AI provider" }), "only for those who manage it").toBeNull();

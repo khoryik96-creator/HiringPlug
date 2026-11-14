@@ -242,7 +242,7 @@ components:
       required: [down, provider, message, since, failedAt]
       properties:
         down: { type: boolean, description: "The latest call to the provider failed, within the last hour." }
-        provider: { type: string, nullable: true, description: "Its name as shown: DeepSeek, Claude, ChatGPT, or the server's AI." }
+        provider: { type: string, nullable: true, description: "As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI." }
         message: { type: string, nullable: true, description: "Why, in words safe to show (never a key)." }
         since: { type: string, format: date-time, nullable: true, description: When the failures began. }
         failedAt: { type: string, format: date-time, nullable: true, description: The latest failure. }

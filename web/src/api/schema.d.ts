@@ -3640,7 +3640,7 @@ export interface components {
         AiStatus: {
             /** @description The latest call to the provider failed, within the last hour. */
             down: boolean;
-            /** @description Its name as shown: DeepSeek, Claude, ChatGPT, or the server's AI. */
+            /** @description As the notice shows it, numbered, not named: AI 1 (DeepSeek), AI 2 (Claude), AI 3 (ChatGPT), or the server's AI. */
             provider: string | null;
             /** @description Why, in words safe to show (never a key). */
             message: string | null;

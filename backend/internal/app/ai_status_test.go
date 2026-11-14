@@ -56,7 +56,7 @@ func TestAIStatusTellsWhenTheProviderIsDown(t *testing.T) {
 	report(false, "the AI provider did not answer in time", began.Add(5*time.Minute))
 	s := status(viewer)
 	require.True(t, s.Down)
-	assert.Equal(t, "DeepSeek", s.Provider.MustGet())
+	assert.Equal(t, "AI 1", s.Provider.MustGet(), "numbered, not named")
 	assert.Equal(t, "the AI provider did not answer in time", s.Message.MustGet(), "the latest reason")
 	assert.True(t, s.Since.MustGet().Equal(began), "since the failures began")
 	assert.False(t, status(other.Users[api.RoleViewer].Token).Down, "another company's AI is its own")

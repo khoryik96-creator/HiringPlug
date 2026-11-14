@@ -27,15 +27,17 @@ type Status struct {
 	FailedAt *time.Time // the latest one
 }
 
-// ProviderLabel is a provider's name as people know it.
+// ProviderLabel is how the notice everyone sees names a provider: by number,
+// not by brand (AI 1 is DeepSeek, AI 2 Claude, AI 3 ChatGPT, in the order
+// Settings › AI provider lists them, where the real names are shown).
 func ProviderLabel(provider string) string {
 	switch provider {
 	case string(api.AiProviderNameDeepseek):
-		return "DeepSeek"
+		return "AI 1"
 	case string(api.AiProviderNameClaude):
-		return "Claude"
+		return "AI 2"
 	case string(api.AiProviderNameOpenai):
-		return "ChatGPT"
+		return "AI 3"
 	}
 	return "The server's AI"
 }
