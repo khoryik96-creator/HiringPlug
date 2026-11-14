@@ -42,8 +42,8 @@ export function guarantee(p: Placement, today: string): { state: GuaranteeState;
 /** The placement happened (or is about to): not one that did not start or was backed out of. */
 export const stood = (p: Placement) => p.status !== "cancelled" && p.status !== "backed_out";
 
-/** The invoice was sent and its due day has passed without payment. */
-export const overdue = (p: Placement, today: string) => p.invoiceStatus === "invoiced" && p.invoicing.dueOn < today;
+/** The invoice was sent and its due day has passed without payment (of a placement that stands). */
+export const overdue = (p: Placement, today: string) => stood(p) && p.invoiceStatus === "invoiced" && p.invoicing.dueOn < today;
 
 export type Kpi = "all" | "starting" | "in_guarantee" | "ending_soon" | "not_invoiced" | "overdue" | "replacement";
 export const KPIS: { key: Kpi; label: string; hint: string }[] = [

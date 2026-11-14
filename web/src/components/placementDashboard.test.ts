@@ -31,6 +31,9 @@ it("counts each card as its label says", () => {
   expect(onCard(p({ invoiceStatus: "paid", invoicing: { ...p().invoicing, dueOn: "2026-01-01" } }), "overdue", today)).toBe(false);
   expect(onCard(p({ status: "cancelled" }), "not_invoiced", today), "a no-start owes no invoice").toBe(false);
   expect(onCard(p({ status: "backed_out" }), "not_invoiced", today), "nor does one backed out of").toBe(false);
+  const sent = { invoiceStatus: "invoiced" as const, invoicing: { ...p({}).invoicing, dueOn: "2026-01-01" } };
+  expect(onCard(p(sent), "overdue", today), "an unpaid invoice past its day is overdue").toBe(true);
+  expect(onCard(p({ ...sent, status: "backed_out" }), "overdue", today), "but not once they pulled out: nothing is owed").toBe(false);
   expect(onCard(p(), "not_invoiced", today)).toBe(true);
   expect(onCard(p({ status: "fell_through", replacement: "owed" }), "replacement", today)).toBe(true);
   expect(onCard(p({ status: "fell_through" }), "in_guarantee", today)).toBe(false);

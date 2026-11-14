@@ -34,6 +34,10 @@ export type InvoiceBadge = { state: "paid" | "due" | "overdue" | "none"; label: 
 export function invoiceBadge(p: Placement, today: string): InvoiceBadge {
   const due = `due ${formatDay(p.invoicing.dueOn)}`;
   if ((p.status === "cancelled" || p.status === "backed_out") && p.invoiceStatus === "not_invoiced") return { state: "none", label: "No invoice", note: "" };
+  // Invoiced, then the candidate or client pulled out: nothing is owed now.
+  if ((p.status === "cancelled" || p.status === "backed_out") && p.invoiceStatus === "invoiced") {
+    return { state: "none", label: "Invoice to cancel", note: [p.invoiceNumber, "not owed: send a credit note"].filter(Boolean).join(" · ") };
+  }
   if (p.invoiceStatus === "paid") return { state: "paid", label: "Paid", note: p.paidOn ? formatDay(p.paidOn) : "" };
   if (p.invoiceStatus === "invoiced") {
     const late = p.invoicing.dueOn < today;

@@ -56,6 +56,12 @@ describe("invoiceBadge", () => {
     expect(invoiceBadge({ ...base, invoiceStatus: "invoiced" }, "2027-01-01").label).toBe("Overdue");
     expect(invoiceBadge({ ...base, invoiceStatus: "paid", paidOn: "2026-12-20" }, "2027-01-01")).toEqual({ state: "paid", label: "Paid", note: "20 Dec 2026" });
   });
+
+  it("an invoice sent before they pulled out is to cancel, not overdue", () => {
+    expect(invoiceBadge({ ...base, status: "backed_out", invoiceStatus: "invoiced", invoiceNumber: "INV-1" }, "2027-01-01"))
+      .toEqual({ state: "none", label: "Invoice to cancel", note: "INV-1 · not owed: send a credit note" });
+    expect(invoiceBadge({ ...base, status: "backed_out" }, "2027-01-01").label).toBe("No invoice");
+  });
 });
 
 describe("figures", () => {
