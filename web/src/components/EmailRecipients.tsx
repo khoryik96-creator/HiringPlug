@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
 
+import { RecipientWarnings } from "./RecipientWarnings";
+
 type Props = {
   to: string;
   cc: string;
@@ -41,5 +43,6 @@ export function EmailRecipients({ to, cc, bcc, errors, onChange }: Props) {
       {showCc && copy("cc", "Cc", cc)}
       {showBcc && copy("bcc", "Bcc", bcc)}
     </div>}
+    <RecipientWarnings text={[to, cc, bcc].join(" ")} />
   </div>;
 }

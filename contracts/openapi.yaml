@@ -112,6 +112,10 @@ x-error-codes:
     module: emails
     status: 409
     description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
+  EMAIL_UNDELIVERABLE:
+    module: emails
+    status: 409
+    description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
   FORBIDDEN:
     module: shared
     status: 403
@@ -1586,6 +1590,27 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /v1/contacts/address-check:
+    post:
+      operationId: checkContactAddresses
+      tags: [contacts]
+      summary: Which of these addresses would bounce, or reach someone who left
+      description: For the email composer, before sending. Addresses that are not a contact's, or that are fine, are left out.
+      x-permission: contacts:read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ContactAddressCheck'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContactAddressProblems'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /v1/contacts/{contactId}/linkedin-profile:
     parameters:
       - $ref: '#/components/parameters/ContactIdPath'
@@ -5445,6 +5470,7 @@ components:
         - DOCUMENT_HAS_NO_TEXT
         - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
+        - EMAIL_UNDELIVERABLE
         - FORBIDDEN
         - INTERNAL
         - INTERVIEW_CLASH
@@ -7149,6 +7175,34 @@ components:
         error: {type: string, nullable: true}
         createdAt: {type: string, format: date-time}
         checkedAt: {type: string, format: date-time, nullable: true}
+    ContactAddressCheck:
+      type: object
+      additionalProperties: false
+      required: [emails]
+      properties:
+        emails:
+          type: array
+          maxItems: 100
+          items: {type: string, maxLength: 320}
+    ContactAddressProblems:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ContactAddressProblem'}
+    ContactAddressProblem:
+      type: object
+      required: [email, contactId, contactName, companyName, problem]
+      properties:
+        email: {type: string}
+        contactId: {$ref: '#/components/schemas/ContactId'}
+        contactName: {type: string}
+        companyName: {type: string}
+        problem:
+          type: string
+          enum: [bounces, left]
+          description: bounces = their mail server says the mailbox does not exist; left = they have left the company.
     ContactEmploymentCheckId:
       type: string
       pattern: '^cec_[0-9a-hjkmnp-tv-z]{26}$'

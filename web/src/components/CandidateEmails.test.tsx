@@ -72,9 +72,8 @@ describe("candidate emails", () => {
     expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Dear [company.name] team");
     expect(screen.getByRole("status").textContent).toContain("[company.name]");
     const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
-    const calls = post.mock.calls.length;
     fireEvent.click(send); // [company.name] is still to fill in
-    expect(post.mock.calls.length).toBe(calls);
+    expect(bodyTo(post, "/v1/emails")).toBeUndefined();
     expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBe("true");
     typeMessage("<p>Dear <b>Contoh</b> team</p>");
     expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-invalid")).toBeNull();

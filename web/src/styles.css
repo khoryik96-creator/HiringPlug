@@ -1004,3 +1004,4 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .leaver-moves li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
 .follow-done { color: #166534; }
 .jobs-needing-contact { margin: 0.35rem 0 0; }
+.recipient-warnings p { margin: 0.15rem 0; }

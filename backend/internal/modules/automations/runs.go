@@ -260,8 +260,19 @@ func (s *Service) run(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
 		if err != nil {
 			return err
 		}
-		if problem != "" {
-			return finish(Failed, sentence(append(did, "not emailed: "+problem)))
+		if problem != nil && problem.Code == api.ErrorCodeEMAILUNDELIVERABLE {
+			// The client contact left, or their mailbox is gone: not sent; the
+			// recruiter is asked to find who to tell instead.
+			if _, err := q.InsertTask(ctx, store.InsertTaskParams{
+				UserID: p.UserID, Title: clip("Not emailed: "+problemText(problem)+". Update "+f.app.CompanyName+"'s contact for "+f.app.JobTitle, 200),
+				DueOn: s.localToday(), ApplicationID: &run.ApplicationID, RunID: &run.ID, AutomationName: &row.Name,
+			}); err != nil {
+				return err
+			}
+			return finish(Skipped, sentence(append(did, "not emailed: "+problemText(problem), "added a task for "+p.Name)))
+		}
+		if problem != nil {
+			return finish(Failed, sentence(append(did, "not emailed: "+problemText(problem))))
 		}
 		did = append(did, "emailed from "+p.Name+"'s mailbox")
 	}
@@ -271,10 +282,10 @@ func (s *Service) run(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
 
 // sendEmails sends a run's emails as sender, in a savepoint: problem says why
 // they could not go (nothing is sent then).
-func (s *Service) sendEmails(ctx context.Context, tx pgx.Tx, sender authz.Principal, run store.AutomationRun, f facts, r Rule) (string, error) {
+func (s *Service) sendEmails(ctx context.Context, tx pgx.Tx, sender authz.Principal, run store.AutomationRun, f facts, r Rule) (*apperr.Error, error) {
 	sp, err := tx.Begin(ctx)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() { _ = sp.Rollback(ctx) }()
 	to := map[string]string{EmailCandidate: "candidate", EmailClient: "client", EmailRecruiter: "sender"}
@@ -287,13 +298,13 @@ func (s *Service) sendEmails(ctx context.Context, tx pgx.Tx, sender authz.Princi
 			To: to[a.Kind], Subject: a.Subject, Body: a.Body, TimeZone: s.deps.TimeZone,
 		})
 		if e, ok := apperr.As(err); ok {
-			return problemText(e), nil
+			return e, nil
 		}
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
-	return "", sp.Commit(ctx)
+	return nil, sp.Commit(ctx)
 }
 
 // problemText is why an email cannot go, in words (a field error's own message).
@@ -341,8 +352,8 @@ func (s *Service) Approve(ctx context.Context, p authz.Principal, id string) (Ru
 		if err != nil {
 			return "", "", err
 		}
-		if problem != "" {
-			return "", "", apperr.New(api.ErrorCodeAUTOMATIONNOTALLOWED, problem)
+		if problem != nil {
+			return "", "", apperr.New(api.ErrorCodeAUTOMATIONNOTALLOWED, problemText(problem))
 		}
 		return Done, "Sent by " + p.Name + ".", nil
 	})

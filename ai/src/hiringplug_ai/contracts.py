@@ -113,6 +113,7 @@ class ErrorCode(StrEnum):
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
+    EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
@@ -1370,6 +1371,35 @@ class ContactLinkedinCheck(BaseModel):
     error: Annotated[str | None, Field(...)]
     createdAt: AwareDatetime
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class Email(RootModel[str]):
+    root: Annotated[str, Field(max_length=320)]
+
+
+class ContactAddressCheck(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emails: Annotated[list[Email], Field(max_length=100)]
+
+
+class Problem(StrEnum):
+    bounces = "bounces"
+    left = "left"
+
+
+class ContactAddressProblem(BaseModel):
+    email: str
+    contactId: ContactId
+    contactName: str
+    companyName: str
+    problem: Annotated[
+        Problem,
+        Field(
+            description="bounces = their mail server says the mailbox does not exist; left = they have left the company."
+        ),
+    ]
 
 
 class ContactEmploymentCheckId(RootModel[str]):
@@ -4906,6 +4936,10 @@ class ContactLinkedinCheckAnswer(BaseModel):
     ] = None
 
 
+class ContactAddressProblems(BaseModel):
+    items: list[ContactAddressProblem]
+
+
 class ContactEmployment(BaseModel):
     id: ContactEmploymentCheckId
     status: Status2
@@ -5192,7 +5226,7 @@ class EmailDraftRequest(BaseModel):
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
 
 
-class Email(BaseModel):
+class Email1(BaseModel):
     deliveryMode: Annotated[
         DeliveryMode1 | None,
         Field(description="Local test inbox, live provider acceptance, or unknown historical delivery."),
@@ -5226,7 +5260,7 @@ class Email(BaseModel):
 
 
 class EmailList(BaseModel):
-    items: list[Email]
+    items: list[Email1]
 
 
 class EmailSend(BaseModel):

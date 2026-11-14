@@ -88,10 +88,10 @@ describe("checking employment on LinkedIn", () => {
     await new Promise((r) => setTimeout(r, 50));
     fireEvent.click(screen.getByRole("button", { name: "Check employment on LinkedIn" }));
     expect((await screen.findByText(/2 contacts were checked on LinkedIn in the last 90 days/)).textContent).toBeTruthy();
-    expect((post.mock.calls[0]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: true });
+    expect(((post.mock.calls as unknown[][])[0]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: true });
     fireEvent.click(screen.getByRole("button", { name: "Check them again too" }));
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
-    expect((post.mock.calls[1]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: false });
+    expect(((post.mock.calls as unknown[][])[1]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: false });
   });
 
   it("says how to install the companion when it is not there", async () => {

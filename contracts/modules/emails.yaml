@@ -31,6 +31,9 @@ x-module:
     EMAIL_DO_NOT_CONTACT:
       status: 409
       description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
+    EMAIL_UNDELIVERABLE:
+      status: 409
+      description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
   jobs:
     email.send:
       queue: core

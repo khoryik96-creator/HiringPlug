@@ -190,3 +190,10 @@ RETURNING version;
 -- name: RenewMailboxControl :exec
 UPDATE contact_mailbox_check SET control_id = @control_id, control_expires_at = @control_expires_at
 WHERE contact_id = @contact_id AND email = @email AND control_expires_at <= now();
+
+-- Contacts at these addresses (any letter case) who have left, or whose
+-- mailbox does not exist: an email to them would not reach them.
+-- name: UndeliverableContacts :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.email::text AS email, c.status, m.status AS mailbox_status
+FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
+WHERE lower(c.email) = ANY(@emails::text[]) AND (c.status = 'left' OR m.status = 'invalid');

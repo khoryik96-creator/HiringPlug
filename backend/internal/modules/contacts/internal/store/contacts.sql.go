@@ -925,6 +925,52 @@ func (q *Queries) StartMailboxCheck(ctx context.Context, arg StartMailboxCheckPa
 	return i, err
 }
 
+const undeliverableContacts = `-- name: UndeliverableContacts :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.email::text AS email, c.status, m.status AS mailbox_status
+FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
+WHERE lower(c.email) = ANY($1::text[]) AND (c.status = 'left' OR m.status = 'invalid')
+`
+
+type UndeliverableContactsRow struct {
+	ID            string
+	CompanyID     string
+	FirstName     string
+	LastName      string
+	Email         string
+	Status        string
+	MailboxStatus *string
+}
+
+// Contacts at these addresses (any letter case) who have left, or whose
+// mailbox does not exist: an email to them would not reach them.
+func (q *Queries) UndeliverableContacts(ctx context.Context, emails []string) ([]UndeliverableContactsRow, error) {
+	rows, err := q.db.Query(ctx, undeliverableContacts, emails)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UndeliverableContactsRow
+	for rows.Next() {
+		var i UndeliverableContactsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Email,
+			&i.Status,
+			&i.MailboxStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateContact = `-- name: UpdateContact :one
 UPDATE contact SET
   company_id = $1,

@@ -259,3 +259,19 @@ func cleanSalaryWording(value *string) *string {
 	clean := candidates.CleanSalaryWording(*value)
 	return &clean
 }
+
+// emailUndeliverable tells the emails module which addresses would not reach
+// their contact (contacts module).
+type emailUndeliverable struct{ contacts *contacts.Module }
+
+func (a emailUndeliverable) Undeliverable(ctx context.Context, tx pgx.Tx, addresses []string) (map[string]string, error) {
+	problems, err := a.contacts.Undeliverable(ctx, tx, addresses)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]string, len(problems))
+	for _, p := range problems {
+		out[p.Email] = p.Why()
+	}
+	return out, nil
+}

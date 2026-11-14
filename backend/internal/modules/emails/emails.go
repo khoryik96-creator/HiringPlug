@@ -113,6 +113,12 @@ type Deps struct {
 	Contacts interface {
 		Contact(ctx context.Context, tx pgx.Tx, id string) (Contact, error)
 	}
+	// Undeliverable says which addresses would not reach their contact
+	// (contacts module: they left, or the mailbox does not exist), with why
+	// in words; automated emails to them are not sent. Nil: none.
+	Undeliverable interface {
+		Undeliverable(ctx context.Context, tx pgx.Tx, addresses []string) (map[string]string, error)
+	}
 	// Consent says whether a candidate asked not to be contacted (privacy
 	// module); emails to them are refused. Nil: nobody is.
 	Consent interface {

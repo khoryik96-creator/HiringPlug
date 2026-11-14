@@ -71,6 +71,15 @@ func (s *Service) sendAutomated(ctx context.Context, tx pgx.Tx, p authz.Principa
 	if to == nil || *to == "" {
 		return "", apperr.New(api.ErrorCodeVALIDATIONFAILED, "There is no email address to send it to.")
 	}
+	if s.deps.Undeliverable != nil {
+		bad, err := s.deps.Undeliverable.Undeliverable(ctx, tx, []string{*to})
+		if err != nil {
+			return "", err
+		}
+		for _, why := range bad {
+			return "", apperr.New(api.ErrorCodeEMAILUNDELIVERABLE, why)
+		}
+	}
 	values, err := s.values(ctx, tx, p, &e.CandidateID, &e.ApplicationID, e.InterviewID, nil, loc)
 	if err != nil {
 		return "", err
