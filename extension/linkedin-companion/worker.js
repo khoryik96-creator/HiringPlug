@@ -86,7 +86,9 @@ chrome.tabs.onRemoved.addListener(tabId => {
 
 async function inject(tabId, func, args, message) {
   try {
-    await chrome.scripting.executeScript({target: {tabId}, files: ['reader.js']});
+    // The reader once per page (it stays until the page changes), then the read.
+    const [present] = await chrome.scripting.executeScript({target: {tabId}, func: () => !!globalThis.SourcerReader});
+    if (!present?.result) await chrome.scripting.executeScript({target: {tabId}, files: ['reader.js']});
     const [read] = await chrome.scripting.executeScript({target: {tabId}, func, args});
     return read?.result;
   } catch { throw safeError(message); }

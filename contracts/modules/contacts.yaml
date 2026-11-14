@@ -564,14 +564,18 @@ components:
           items: { $ref: '#/components/schemas/ContactLinkedinCheckRequest' }
         skipped:
           type: array
-          description: Contacts without a LinkedIn profile address (or with a short lnkd.in link).
+          description: Contacts not checked this time, and why.
           items: { $ref: '#/components/schemas/ContactLinkedinCheckSkipped' }
     ContactLinkedinCheckSkipped:
       type: object
-      required: [contactId, contactName]
+      required: [contactId, contactName, reason]
       properties:
         contactId: { $ref: '#/components/schemas/ContactId' }
         contactName: { type: string }
+        reason:
+          type: string
+          enum: [no_profile, too_many]
+          description: no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest).
     ContactLinkedinCheckAnswer:
       type: object
       additionalProperties: false

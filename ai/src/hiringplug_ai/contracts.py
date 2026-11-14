@@ -1295,9 +1295,20 @@ class ContactLinkedinCheckRequest(BaseModel):
     profileUrl: Annotated[str, Field(description="https://www.linkedin.com/in/...")]
 
 
+class Reason1(StrEnum):
+    no_profile = "no_profile"
+    too_many = "too_many"
+
+
 class ContactLinkedinCheckSkipped(BaseModel):
     contactId: ContactId
     contactName: str
+    reason: Annotated[
+        Reason1,
+        Field(
+            description="no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest)."
+        ),
+    ]
 
 
 class ContactLinkedinCheckAnswer(BaseModel):
@@ -4848,8 +4859,7 @@ class ContactLinkedinChecksStarted(BaseModel):
     ]
     checks: list[ContactLinkedinCheckRequest]
     skipped: Annotated[
-        list[ContactLinkedinCheckSkipped],
-        Field(description="Contacts without a LinkedIn profile address (or with a short lnkd.in link)."),
+        list[ContactLinkedinCheckSkipped], Field(description="Contacts not checked this time, and why.")
     ]
 
 

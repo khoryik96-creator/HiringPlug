@@ -63,7 +63,7 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
       )}
       {bounces > 0 && checking === 0 && (
         <p className="check-summary warning" role="status">
-          {bounces === 1 ? "1 contact's email bounces" : `${String(bounces)} contacts' emails bounce`}: their mailbox no longer exists (often because they left). Marked in red below.
+          {bounces === 1 ? "1 contact's email bounces" : `${String(bounces)} contacts' emails bounce`}: the mailbox, or its domain, does not exist (a mailbox often goes when someone leaves; check the domain for a typo). Marked in red below.
         </p>
       )}
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}

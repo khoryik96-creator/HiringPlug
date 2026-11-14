@@ -4760,12 +4760,17 @@ export interface components {
             /** @description The company's LinkedIn page, https://www.linkedin.com/company/.../ */
             companyUrl: string;
             checks: components["schemas"]["ContactLinkedinCheckRequest"][];
-            /** @description Contacts without a LinkedIn profile address (or with a short lnkd.in link). */
+            /** @description Contacts not checked this time, and why. */
             skipped: components["schemas"]["ContactLinkedinCheckSkipped"][];
         };
         ContactLinkedinCheckSkipped: {
             contactId: components["schemas"]["ContactId"];
             contactName: string;
+            /**
+             * @description no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest).
+             * @enum {string}
+             */
+            reason: "no_profile" | "too_many";
         };
         /** @description What the profile shows (profileUrl, companyUrl and linkedinCompanyId must be the check's), or why it could not be read (error). */
         ContactLinkedinCheckAnswer: {

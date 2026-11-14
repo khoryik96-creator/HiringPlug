@@ -31,7 +31,7 @@ describe("a company's contacts", () => {
     expect(post.mock.calls[0]?.[0]).toBe("/v1/contacts/mailbox-checks");
     expect(sentBody(post)).toEqual({ companyId: "comp_1" });
 
-    expect((await screen.findByRole("status")).textContent).toContain("1 contact's email bounces");
+    expect((await screen.findByRole("status")).textContent).toContain("1 contact's email bounces: the mailbox, or its domain, does not exist");
     const gone = screen.getByRole("link", { name: "Gone" }).closest("tr");
     expect(gone?.className).toContain("bounces");
     expect(within(gone as HTMLElement).getByText("✗ Bounces")).toBeTruthy();

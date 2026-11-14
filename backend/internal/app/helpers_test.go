@@ -273,7 +273,8 @@ func (fakeMailServers) LookupHost(_ context.Context, host string) ([]string, err
 
 // fakeMailboxes answers mailbox checks without the network, by the address's
 // local part: gone@ does not exist, busy@ is inconclusive (worth a recheck),
-// any other is accepted. It keeps what it was asked.
+// queued@ finds the verifier busy the first time, any other is accepted. It
+// keeps what it was asked.
 type fakeMailboxes struct {
 	mu    sync.Mutex
 	calls []fakeMailboxCall
@@ -284,7 +285,11 @@ type fakeMailboxCall struct{ Email, Mode, ControlID string }
 func (f *fakeMailboxes) Check(_ context.Context, email, mode, controlID string) (mailcheck.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, fakeMailboxCall{email, mode, controlID})
+	first := len(f.callsLocked(email)) == 1
 	f.mu.Unlock()
+	if strings.HasPrefix(email, "queued@") && first {
+		return mailcheck.Result{}, mailcheck.ErrBusy
+	}
 	r := mailcheck.Result{Status: mailcheck.Accepted, Reason: "The server accepted this mailbox and rejected a made-up one.", Outcome: "recipient_supported",
 		Provider: "Microsoft 365", Attempts: 1}
 	switch {
@@ -299,6 +304,10 @@ func (f *fakeMailboxes) Check(_ context.Context, email, mode, controlID string) 
 func (f *fakeMailboxes) callsFor(email string) []fakeMailboxCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	return f.callsLocked(email)
+}
+
+func (f *fakeMailboxes) callsLocked(email string) []fakeMailboxCall {
 	var out []fakeMailboxCall
 	for _, c := range f.calls {
 		if c.Email == email {

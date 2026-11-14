@@ -105,6 +105,25 @@ func TestVerifyingTheEmailsOfACompanysContacts(t *testing.T) {
 	require.Len(t, anaCalls, 2)
 	assert.Equal(t, anaCalls[0].ControlID, anaCalls[1].ControlID)
 
+	// Asked twice before it ran: one check, not two.
+	res = a.request(http.MethodPost, "/v1/contacts/"+ana.Id+"/mailbox-check", token, nil)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	res = a.request(http.MethodPost, "/v1/contacts/"+ana.Id+"/mailbox-check", token, nil)
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Len(t, fake.callsFor("ana@maju.test"), 3)
+
+	// A busy verifier: the check is tried again shortly, not lost and not waited for.
+	queued := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Queued", "email": "queued@maju.test"})
+	require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/contacts/"+queued.Id+"/mailbox-check", token, nil).Status)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Equal(t, api.MailboxCheckStatusChecking, a.contact(token, queued.Id).MailboxCheck.MustGet().Status)
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'contact.check_mailbox' AND status = 'pending'`, tenant.ID)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Equal(t, api.MailboxCheckStatusAccepted, a.contact(token, queued.Id).MailboxCheck.MustGet().Status)
+	assert.Len(t, fake.callsFor("queued@maju.test"), 2)
+
 	// A changed email has no check until it is checked.
 	res = a.request(http.MethodPatch, "/v1/contacts/"+gone.Id, token, map[string]any{"version": gone.Version, "email": "nur@maju.test"})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)

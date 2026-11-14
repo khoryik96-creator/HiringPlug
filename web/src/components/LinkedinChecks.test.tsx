@@ -41,7 +41,7 @@ const started = {
     { id: "clc_01jbz6w0m0k8q9x2r3s4t5v6w1", contactId: "cont_ana", contactName: "Ana Lim", profileUrl: "https://www.linkedin.com/in/ana" },
     { id: "clc_01jbz6w0m0k8q9x2r3s4t5v6w2", contactId: "cont_wei", contactName: "Wei", profileUrl: "https://www.linkedin.com/in/wei" },
   ],
-  skipped: [{ contactId: "cont_nobody", contactName: "Nobody" }],
+  skipped: [{ contactId: "cont_nobody", contactName: "Nobody", reason: "no_profile" }],
 };
 
 describe("checking employment on LinkedIn", () => {

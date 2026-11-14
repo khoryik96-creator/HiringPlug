@@ -31,9 +31,10 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
       onRemoved: {addListener: f => listeners.removed.push(f)},
     },
     scripting: {
-      executeScript: async ({target, files, args}) => {
-        if (files) return [{}];
+      executeScript: async ({target, files, func, args}) => {
         const tab = tabs.get(target.tabId);
+        if (files) { tab.reader = (tab.reader || 0) + 1; return [{}]; }
+        if (!args) return [{result: !!tab.reader}]; // is the reader there?
         return [{result: page(tab, args)}];
       },
     },
@@ -97,6 +98,14 @@ test('a tab the recruiter looked at is theirs: it is not closed', async () => {
   const reply = await b.send(check);
   assert.equal(reply.result.current, true);
   assert.equal(b.tabs.size, 1, 'left open');
+});
+
+test('the reader is put in a page once, however often it is read', async () => {
+  let reads = 0, injected = -1;
+  let b;
+  b = browser({page: tab => { injected = tab.reader; return ++reads < 4 ? {loading: true} : {joined: '2021', left: '', current: true}; }});
+  assert.equal((await b.send(check)).result.current, true);
+  assert.equal(injected, 1);
 });
 
 test('one read at a time, and Stop stops it', async () => {

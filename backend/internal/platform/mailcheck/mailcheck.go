@@ -9,13 +9,14 @@
 // missing mailbox, and any network or DNS failure is "unknown", never
 // "invalid". Only public addresses are contacted, on port 25 only, within a
 // 25-second budget per check; at most two checks run at a time per process,
-// and one per domain.
+// and one per domain (others get ErrBusy, to try again shortly).
 package mailcheck
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net"
 	"regexp"
 	"strings"
@@ -76,7 +77,7 @@ type Verifier struct {
 
 	slots   chan struct{}
 	mu      sync.Mutex
-	domains map[string]chan struct{}
+	domains map[string]bool
 }
 
 // New returns a verifier using the system DNS and public port-25 connections.
@@ -89,33 +90,27 @@ func (v *Verifier) init() {
 	defer v.mu.Unlock()
 	if v.slots == nil {
 		v.slots = make(chan struct{}, 2)
-		v.domains = map[string]chan struct{}{}
+		v.domains = map[string]bool{}
 	}
 }
 
-// lockDomain waits until no other check of domain runs (or ctx ends).
-func (v *Verifier) lockDomain(ctx context.Context, domain string) (func(), error) {
-	for {
-		v.mu.Lock()
-		busy, taken := v.domains[domain]
-		if !taken {
-			ch := make(chan struct{})
-			v.domains[domain] = ch
-			v.mu.Unlock()
-			return func() {
-				v.mu.Lock()
-				delete(v.domains, domain)
-				v.mu.Unlock()
-				close(ch)
-			}, nil
-		}
-		v.mu.Unlock()
-		select {
-		case <-busy:
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+// ErrBusy: two checks are running already, or one of the same domain. Try
+// again shortly (a check never waits, so a caller never holds work idle).
+var ErrBusy = errors.New("mailcheck: busy")
+
+// lockDomain marks domain as being checked, unless it is already.
+func (v *Verifier) lockDomain(domain string) (func(), bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.domains[domain] {
+		return nil, false
 	}
+	v.domains[domain] = true
+	return func() {
+		v.mu.Lock()
+		delete(v.domains, domain)
+		v.mu.Unlock()
+	}, true
 }
 
 // Check checks email's mailbox. controlID (from NewControlID) names the
@@ -137,13 +132,13 @@ func (v *Verifier) Check(ctx context.Context, email, mode, controlID string) (Re
 	}
 	select {
 	case v.slots <- struct{}{}:
-	case <-ctx.Done():
-		return r, ctx.Err()
+	default:
+		return r, ErrBusy
 	}
 	defer func() { <-v.slots }()
-	unlock, err := v.lockDomain(ctx, domain)
-	if err != nil {
-		return r, err
+	unlock, ok := v.lockDomain(domain)
+	if !ok {
+		return r, ErrBusy
 	}
 	defer unlock()
 
@@ -152,8 +147,8 @@ func (v *Verifier) Check(ctx context.Context, email, mode, controlID string) (Re
 		deadline = d
 	}
 	unavailableResult := func(err error) Result {
-		u, ok := err.(*unavailable)
-		if !ok {
+		var u *unavailable
+		if !errors.As(err, &u) {
 			u = errDNSFailed
 		}
 		r.Status, r.Reason, r.Retryable = Unknown, u.reason, u.transient

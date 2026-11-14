@@ -55,7 +55,8 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
       }));
       setRows([
         ...started.checks.map((c): Row => ({ name: c.contactName, contactId: c.contactId, tone: "waiting", text: "Waiting…" })),
-        ...started.skipped.map((s): Row => ({ name: s.contactName, contactId: s.contactId, tone: "unclear", text: "No LinkedIn profile address" })),
+        ...started.skipped.map((s): Row => ({ name: s.contactName, contactId: s.contactId, tone: "unclear",
+          text: s.reason === "too_many" ? "Not checked this time (over 200 at once): check again for the rest" : "No LinkedIn profile address" })),
       ]);
       if (started.checks.length === 0) return;
       token.operation = operationId();
@@ -82,7 +83,8 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
     } finally {
       setRunning(false);
       stop.current = null;
-      setRows((rs) => rs.map((r) => (r.tone === "waiting" ? { ...r, text: "Not checked (stopped)" } : r)));
+      const why = token.stopped ? "Not checked (stopped)" : "Not checked (see the message above)";
+      setRows((rs) => rs.map((r) => (r.tone === "waiting" ? { ...r, text: why } : r)));
       await queryClient.invalidateQueries({ queryKey: contactsKey });
       if (contactId) await queryClient.invalidateQueries({ queryKey: contactKey(contactId) });
     }

@@ -7,6 +7,7 @@ package contacts
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,6 +25,9 @@ import (
 
 // MailboxCheckStatus "checking": asked, not answered yet.
 const MailboxChecking = "checking"
+
+// busyRetry is when a check that found the verifier busy is tried again.
+const busyRetry = 20 * time.Second
 
 // controlLifetime is how long a check's made-up mailbox is reused by rechecks.
 const controlLifetime = 4 * time.Hour
@@ -58,7 +62,8 @@ func start(ctx context.Context, tx pgx.Tx, tenantID, contactID, email string) (s
 func (s *Service) CheckMailbox(ctx context.Context, p authz.Principal, contactID string) (MailboxCheck, error) {
 	var out MailboxCheck
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		row, err := getRow(ctx, store.New(tx), contactID)
+		q := store.New(tx)
+		row, err := getRow(ctx, q, contactID)
 		if err != nil {
 			return err
 		}
@@ -66,6 +71,12 @@ func (s *Service) CheckMailbox(ctx context.Context, p authz.Principal, contactID
 			var errs apperr.FieldErrors
 			errs.Add("email", "add an email address first")
 			return errs.Err()
+		}
+		if current, err := q.GetMailboxCheck(ctx, contactID); err == nil && current.Status == MailboxChecking && current.Email == *row.Email {
+			out = mailboxFrom(current) // being checked already: not twice
+			return nil
+		} else if err != nil && !database.IsNoRows(err) {
+			return err
 		}
 		check, err := start(ctx, tx, p.TenantID, contactID, *row.Email)
 		if err != nil {
@@ -121,19 +132,33 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 	if err != nil {
 		return err
 	}
-	due := check.Status == MailboxChecking || (j.Deep && check.RecheckAt != nil)
+	// A check runs once: the first check while "checking", a recheck while
+	// one is due (a new check meanwhile replaces it).
+	due := (!j.Deep && check.Status == MailboxChecking) || (j.Deep && check.Status != MailboxChecking && check.RecheckAt != nil)
+	if !due || check.Email != j.Email {
+		return nil // superseded: a newer check, or the email changed
+	}
 	contact, err := q.GetContact(ctx, j.ContactId)
-	if err != nil && !database.IsNoRows(err) {
+	if database.IsNoRows(err) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
-	if !due || check.Email != j.Email || err != nil || contact.Email == nil || *contact.Email != j.Email {
-		return nil // superseded: a newer check, or the email changed
+	if contact.Email == nil || *contact.Email != j.Email {
+		return nil // the email changed
 	}
 	mode := mailcheck.Full
 	if j.Deep {
 		mode = mailcheck.Deep
 	}
 	r, err := s.mailboxes.Check(ctx, j.Email, mode, check.ControlID)
+	if errors.Is(err, mailcheck.ErrBusy) {
+		// Another check of this domain (or two others) is running: try again
+		// shortly rather than wait here, holding the job.
+		_, err = jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindContactCheckMailbox, j, time.Now().Add(busyRetry))
+		return err
+	}
 	if err != nil {
 		return err // stopped (shutting down): the job runs again
 	}

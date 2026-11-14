@@ -30,7 +30,10 @@ const LinkedinCheckLifetime = 15 * time.Minute
 const maxLinkedinChecks = 200
 
 // LinkedinCheckRequest is a check for the companion to answer.
-type LinkedinCheckRequest struct{ ID, ContactID, ContactName, ProfileURL string }
+type LinkedinCheckRequest struct {
+	ID, ContactID, ContactName, ProfileURL string
+	Skipped                                string // why there is no check: no_profile, too_many
+}
 
 // LinkedinChecks are the checks started for a company (or one contact).
 type LinkedinChecks struct {
@@ -105,6 +108,10 @@ func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, co
 				r.ProfileURL = ProfileURL(*person.LinkedinUrl)
 			}
 			if r.ProfileURL == "" || len(out.Checks) == maxLinkedinChecks {
+				r.Skipped = "no_profile"
+				if r.ProfileURL != "" {
+					r.Skipped = "too_many"
+				}
 				out.Skipped = append(out.Skipped, r)
 				continue
 			}
@@ -173,6 +180,9 @@ func (s *Service) AnswerLinkedinCheck(ctx context.Context, p authz.Principal, ch
 			}
 		}
 		saved, err := q.SaveLinkedinCheck(ctx, params)
+		if database.IsNoRows(err) { // answered at the same moment by another request
+			return apperr.New(api.ErrorCodeCONTACTLINKEDINCHECKCLOSED, "This LinkedIn check was already answered, or expired. Check again.")
+		}
 		if err != nil {
 			return err
 		}
@@ -222,7 +232,7 @@ func (h *HTTP) StartContactLinkedinChecks(ctx context.Context, req api.StartCont
 		out.Checks[i] = api.ContactLinkedinCheckRequest{Id: r.ID, ContactId: r.ContactID, ContactName: r.ContactName, ProfileUrl: r.ProfileURL}
 	}
 	for i, r := range started.Skipped {
-		out.Skipped[i] = api.ContactLinkedinCheckSkipped{ContactId: r.ContactID, ContactName: r.ContactName}
+		out.Skipped[i] = api.ContactLinkedinCheckSkipped{ContactId: r.ContactID, ContactName: r.ContactName, Reason: api.ContactLinkedinCheckSkippedReason(r.Skipped)}
 	}
 	return out, nil
 }

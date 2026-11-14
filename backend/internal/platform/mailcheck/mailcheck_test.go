@@ -23,7 +23,9 @@ type fakeDNS struct {
 	calls atomic.Int32
 }
 
-func notFound(name string) error { return &net.DNSError{Err: "no such host", Name: name, IsNotFound: true} }
+func notFound(name string) error {
+	return &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+}
 
 func (f *fakeDNS) LookupMX(_ context.Context, name string) ([]*net.MX, error) {
 	f.calls.Add(1)
@@ -337,7 +339,7 @@ func TestDeepCheckComparesServersAndReportsConflicts(t *testing.T) {
 	}))
 	no := newServer(t, "220 b", script(func(string) string { return "550 5.1.1 no such user" }))
 	dns := &fakeDNS{
-		mx: map[string][]*net.MX{"example.com.": {{Host: "mx1.example.com.", Pref: 10}, {Host: "mx2.example.com.", Pref: 20}}},
+		mx:  map[string][]*net.MX{"example.com.": {{Host: "mx1.example.com.", Pref: 10}, {Host: "mx2.example.com.", Pref: 20}}},
 		ips: map[string][]net.IP{"ip4 mx1.example.com.": {net.ParseIP("8.8.8.8")}, "ip4 mx2.example.com.": {net.ParseIP("1.1.1.1")}},
 	}
 	v := &Verifier{DNS: dns, Dial: dialTo(map[string]*server{"8.8.8.8": yes, "1.1.1.1": no})}
@@ -366,7 +368,7 @@ func TestABlockedIPv4RouteTriesTheIPv6Address(t *testing.T) {
 	}
 }
 
-func TestChecksAreBoundedToTwoAtATimeAndOnePerDomain(t *testing.T) {
+func TestChecksAreBoundedToTwoAtATimeAndOnePerDomainWithoutWaiting(t *testing.T) {
 	var running, most atomic.Int32
 	slow := func(ctx context.Context, _ string) (net.Conn, error) {
 		n := running.Add(1)
@@ -376,7 +378,7 @@ func TestChecksAreBoundedToTwoAtATimeAndOnePerDomain(t *testing.T) {
 				break
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		running.Add(-1)
 		return nil, &net.OpError{Op: "dial", Err: errors.New("refused")}
 	}
@@ -387,17 +389,36 @@ func TestChecksAreBoundedToTwoAtATimeAndOnePerDomain(t *testing.T) {
 	}
 	v := &Verifier{DNS: dns, Dial: slow}
 	var wg sync.WaitGroup
+	var busy, done atomic.Int32
 	for _, d := range []string{"a.com", "b.com", "c.com", "d.com", "a.com", "a.com"} {
 		wg.Add(1)
-		go func() { defer wg.Done(); _, _ = v.Check(context.Background(), "x@"+d, Full, control) }()
+		go func() {
+			defer wg.Done()
+			_, err := v.Check(context.Background(), "x@"+d, Full, control)
+			switch {
+			case errors.Is(err, ErrBusy):
+				busy.Add(1)
+			case err == nil:
+				done.Add(1)
+			}
+		}()
 	}
 	wg.Wait()
-	if most.Load() > 2 {
-		t.Fatalf("%d checks at once", most.Load())
+	if most.Load() > 2 || busy.Load() < 4 || busy.Load()+done.Load() != 6 {
+		t.Fatalf("%d at once, %d busy, %d done", most.Load(), busy.Load(), done.Load())
 	}
 	if len(v.domains) != 0 || len(v.slots) != 0 {
 		t.Fatal("slots or domains not released")
 	}
+	// The same domain twice at once: the second is told to come back.
+	unlock, ok := v.lockDomain("a.com")
+	if !ok {
+		t.Fatal("domain not free")
+	}
+	if _, err := v.Check(context.Background(), "y@a.com", Full, control); !errors.Is(err, ErrBusy) {
+		t.Fatalf("got %v", err)
+	}
+	unlock()
 }
 
 func contains(list []string, s string) bool {

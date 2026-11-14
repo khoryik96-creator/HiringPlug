@@ -43,7 +43,8 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	started := a.startLinkedinChecks(token, map[string]any{"companyId": company.Id})
 	assert.Equal(t, "https://www.linkedin.com/company/maju-logistik/", started.CompanyUrl)
 	require.Len(t, started.Checks, 2)
-	assert.Len(t, started.Skipped, 2, "no profile, or a short link")
+	require.Len(t, started.Skipped, 2, "no profile, or a short link")
+	assert.Equal(t, api.ContactLinkedinCheckSkippedReasonNoProfile, started.Skipped[0].Reason)
 	checks := map[string]api.ContactLinkedinCheckRequest{}
 	for _, c := range started.Checks {
 		checks[c.ContactName] = c
