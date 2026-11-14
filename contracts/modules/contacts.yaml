@@ -294,6 +294,29 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/contacts/{contactId}/email-suggestion:
+    parameters:
+      - $ref: '#/components/parameters/ContactIdPath'
+    get:
+      operationId: suggestContactEmail
+      tags: [contacts]
+      summary: Suggest an email address from how colleagues' addresses are spelled
+      description: >
+        From the addresses of the contact's colleagues at the same company
+        (first.last@, flast@, first@ ...): a suggestion when at least two
+        follow the same pattern at the company's main domain. Verify it
+        before relying on it (setting it as the email verifies it).
+      x-permission: contacts:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContactEmailSuggestion' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/contacts/{contactId}/linkedin-profile:
     parameters:
       - $ref: '#/components/parameters/ContactIdPath'
@@ -683,6 +706,23 @@ components:
           type: string
           enum: [bounces, left]
           description: bounces = their mail server says the mailbox does not exist; left = they have left the company.
+
+    ContactEmailSuggestion:
+      type: object
+      required: [suggestion]
+      properties:
+        suggestion:
+          description: Null when colleagues' addresses show no clear pattern.
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/EmailGuess' }]
+    EmailGuess:
+      type: object
+      required: [email, pattern, matches, of]
+      properties:
+        email: { type: string }
+        pattern: { type: string, description: "e.g. first.last, flast, first" }
+        matches: { type: integer, description: Colleagues whose address follows the pattern. }
+        of: { type: integer, description: Colleagues with an address at that domain. }
 
     ContactEmploymentCheckId:
       type: string

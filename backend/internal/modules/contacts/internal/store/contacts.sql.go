@@ -10,6 +10,43 @@ import (
 	"time"
 )
 
+const colleagueAddresses = `-- name: ColleagueAddresses :many
+SELECT first_name, last_name, email::text AS email FROM contact
+WHERE company_id = $1 AND id <> $2 AND email IS NOT NULL
+ORDER BY id LIMIT 500
+`
+
+type ColleagueAddressesParams struct {
+	CompanyID string
+	ContactID string
+}
+
+type ColleagueAddressesRow struct {
+	FirstName string
+	LastName  string
+	Email     string
+}
+
+func (q *Queries) ColleagueAddresses(ctx context.Context, arg ColleagueAddressesParams) ([]ColleagueAddressesRow, error) {
+	rows, err := q.db.Query(ctx, colleagueAddresses, arg.CompanyID, arg.ContactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ColleagueAddressesRow
+	for rows.Next() {
+		var i ColleagueAddressesRow
+		if err := rows.Scan(&i.FirstName, &i.LastName, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const companyContactsWithEmail = `-- name: CompanyContactsWithEmail :many
 SELECT c.id, c.email::text AS email, m.status AS mailbox_status
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email

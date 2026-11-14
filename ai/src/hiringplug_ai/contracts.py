@@ -1402,6 +1402,13 @@ class ContactAddressProblem(BaseModel):
     ]
 
 
+class EmailGuess(BaseModel):
+    email: str
+    pattern: Annotated[str, Field(description="e.g. first.last, flast, first")]
+    matches: Annotated[int, Field(description="Colleagues whose address follows the pattern.")]
+    of: Annotated[int, Field(description="Colleagues with an address at that domain.")]
+
+
 class ContactEmploymentCheckId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["cec_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cec_[0-9a-hjkmnp-tv-z]{26}$")
@@ -4938,6 +4945,12 @@ class ContactLinkedinCheckAnswer(BaseModel):
 
 class ContactAddressProblems(BaseModel):
     items: list[ContactAddressProblem]
+
+
+class ContactEmailSuggestion(BaseModel):
+    suggestion: Annotated[
+        EmailGuess | None, Field(description="Null when colleagues' addresses show no clear pattern.")
+    ]
 
 
 class ContactEmployment(BaseModel):

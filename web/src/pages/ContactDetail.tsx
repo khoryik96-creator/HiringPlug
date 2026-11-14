@@ -7,6 +7,7 @@ import { ContactBanner } from "../components/ContactBanner";
 import { ContactEmails } from "../components/ContactEmails";
 import { ContactForm } from "../components/ContactForm";
 import { EmailCheckBadge } from "../components/EmailCheckBadge";
+import { EmailSuggestion } from "../components/EmailSuggestion";
 import { EmploymentCheck } from "../components/EmploymentCheck";
 import { JobsNeedingContact } from "../components/FollowLeaver";
 import { LinkedinCheckResult, LinkedinChecks } from "../components/LinkedinChecks";
@@ -125,6 +126,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
       <ErrorMessage error={verify.error} />
       <ContactBanner contact={c} canEdit={canEdit && !editing} />
       {c.status === "left" && <JobsNeedingContact contactId={c.id} />}
+      {c.status === "active" && <EmailSuggestion contact={c} canEdit={canEdit && !editing} />}
       <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />
     </main>
   );

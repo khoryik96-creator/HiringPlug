@@ -971,6 +971,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contacts/{contactId}/email-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Suggest an email address from how colleagues' addresses are spelled
+         * @description From the addresses of the contact's colleagues at the same company (first.last@, flast@, first@ ...): a suggestion when at least two follow the same pattern at the company's main domain. Verify it before relying on it (setting it as the email verifies it).
+         */
+        get: operations["suggestContactEmail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts/{contactId}/linkedin-profile": {
         parameters: {
             query?: never;
@@ -4864,6 +4886,19 @@ export interface components {
              * @enum {string}
              */
             problem: "bounces" | "left";
+        };
+        ContactEmailSuggestion: {
+            /** @description Null when colleagues' addresses show no clear pattern. */
+            suggestion: components["schemas"]["EmailGuess"] | null;
+        };
+        EmailGuess: {
+            email: string;
+            /** @description e.g. first.last, flast, first */
+            pattern: string;
+            /** @description Colleagues whose address follows the pattern. */
+            matches: number;
+            /** @description Colleagues with an address at that domain. */
+            of: number;
         };
         /** @example cec_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactEmploymentCheckId: string;
@@ -9826,6 +9861,31 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    suggestContactEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactEmailSuggestion"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     checkContactEmployment: {

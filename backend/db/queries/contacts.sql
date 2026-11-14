@@ -197,3 +197,8 @@ WHERE contact_id = @contact_id AND email = @email AND control_expires_at <= now(
 SELECT c.id, c.company_id, c.first_name, c.last_name, c.email::text AS email, c.status, m.status AS mailbox_status
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
 WHERE lower(c.email) = ANY(@emails::text[]) AND (c.status = 'left' OR m.status = 'invalid');
+
+-- name: ColleagueAddresses :many
+SELECT first_name, last_name, email::text AS email FROM contact
+WHERE company_id = @company_id AND id <> @contact_id AND email IS NOT NULL
+ORDER BY id LIMIT 500;
