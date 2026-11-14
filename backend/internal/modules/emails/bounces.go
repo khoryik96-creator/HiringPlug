@@ -9,6 +9,7 @@ package emails
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"html"
 	"net/url"
 	"regexp"
@@ -23,6 +24,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
 )
 
 // BounceScans are when, after sending, the mailbox is looked at for notices.
@@ -170,9 +172,12 @@ func (s *Service) scanBounces(ctx context.Context, tx pgx.Tx, job jobqueue.Job) 
 		return err // disconnected since, or a mailbox HiringPlug cannot read
 	}
 	token, err := s.mailboxAccess(ctx, row)
-	if err != nil {
+	if errors.Is(err, mail.ErrPermanent) { // to be connected again: nothing to retry here
 		logx.From(ctx).Info("bounce scan skipped: mailbox not usable", "email_id", e.ID)
-		return nil // a later send asks again; nothing to retry here
+		return nil
+	}
+	if err != nil {
+		return err // e.g. the provider was briefly unavailable: the queue tries again
 	}
 	notices, err := s.bounceNotices(ctx, s.endpoint(row.Provider).SendURL, token, e.SentAt.Add(-time.Minute))
 	if err != nil {
