@@ -74,6 +74,11 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 		}); err != nil {
 			return err
 		}
+		if row.Email != nil { // verify the new address with its mail server, in the background
+			if _, err := start(ctx, tx, p.TenantID, row.ID, *row.Email); err != nil {
+				return err
+			}
+		}
 		out, err = s.withCompanyName(ctx, tx, fromRow(row))
 		return err
 	})
@@ -159,6 +164,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		}
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "contact.updated", EntityType: "contact", EntityID: id, Changes: changes}); err != nil {
 			return err
+		}
+		if updated.Email != nil && !sameString(updated.Email, current.Details.Email) { // a new address: verify it too
+			if _, err := start(ctx, tx, p.TenantID, id, *updated.Email); err != nil {
+				return err
+			}
 		}
 		out, err = s.withCompanyName(ctx, tx, fromRow(updated))
 		return err
@@ -246,6 +256,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 				Status: r.Status, Title: r.Title, Email: r.Email, EmailCheckStatus: r.EmailCheckStatus, MailboxStatus: r.MailboxStatus,
 				Phone: r.Phone, Mobile: r.Mobile, Role: r.Role, UpdatedAt: r.UpdatedAt,
 			}
+			page.Items[i].MailboxCheckedAt = r.MailboxCheckedAt
 			if r.LinkedinCheckedAt != nil {
 				page.Items[i].Linkedin = &LinkedinEmployment{Current: r.LinkedinCurrent, Joined: r.LinkedinJoined, Left: r.LinkedinLeft, CheckedAt: *r.LinkedinCheckedAt}
 			}

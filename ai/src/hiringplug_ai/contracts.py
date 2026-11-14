@@ -1250,6 +1250,12 @@ class ContactCheckMailboxJob(BaseModel):
         str, Field(description="The address to check (skipped if the contact's email changed since).")
     ]
     deep: Annotated[bool, Field(description="Compare the domain's mail servers (an automatic recheck).")]
+    refresh: Annotated[
+        bool | None,
+        Field(
+            description="The monthly re-check: runs only if the address was last checked 25 days ago or more, for a contact who still works there."
+        ),
+    ] = None
 
 
 class ContactLinkedinCheckId(RootModel[str]):
@@ -1286,6 +1292,12 @@ class ContactLinkedinChecksStart(BaseModel):
     )
     companyId: CompanyId | None = None
     contactId: ContactId | None = None
+    dueOnly: Annotated[
+        bool | None,
+        Field(
+            description="Only contacts not checked on LinkedIn in the last 90 days (the others are skipped: recent)."
+        ),
+    ] = None
 
 
 class ContactLinkedinCheckRequest(BaseModel):
@@ -1298,6 +1310,7 @@ class ContactLinkedinCheckRequest(BaseModel):
 class Reason1(StrEnum):
     no_profile = "no_profile"
     too_many = "too_many"
+    recent = "recent"
 
 
 class ContactLinkedinCheckSkipped(BaseModel):
@@ -1306,7 +1319,7 @@ class ContactLinkedinCheckSkipped(BaseModel):
     reason: Annotated[
         Reason1,
         Field(
-            description="no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest)."
+            description="no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly)."
         ),
     ]
 
@@ -4830,6 +4843,7 @@ class ContactSummary(BaseModel):
         MailboxCheckStatus | None,
         Field(description="The latest mailbox check of `email`; null before the first."),
     ]
+    mailboxCheckedAt: Annotated[AwareDatetime | None, Field(description="When the mailbox was last checked.")]
     linkedinEmployment: Annotated[
         LinkedinEmployment | None,
         Field(

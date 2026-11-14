@@ -10,44 +10,6 @@ import (
 	"time"
 )
 
-const companyContactsForLinkedin = `-- name: CompanyContactsForLinkedin :many
-SELECT id, first_name, last_name, linkedin_url FROM contact WHERE company_id = $1 ORDER BY first_name, last_name, id
-`
-
-type CompanyContactsForLinkedinRow struct {
-	ID          string
-	FirstName   string
-	LastName    string
-	LinkedinUrl *string
-}
-
-// LinkedIn checks (by the recruiter's LinkedIn companion): one per contact
-// and request, answered only by whoever asked, within 15 minutes.
-func (q *Queries) CompanyContactsForLinkedin(ctx context.Context, companyID string) ([]CompanyContactsForLinkedinRow, error) {
-	rows, err := q.db.Query(ctx, companyContactsForLinkedin, companyID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []CompanyContactsForLinkedinRow
-	for rows.Next() {
-		var i CompanyContactsForLinkedinRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.FirstName,
-			&i.LastName,
-			&i.LinkedinUrl,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const companyContactsWithEmail = `-- name: CompanyContactsWithEmail :many
 SELECT c.id, c.email::text AS email, m.status AS mailbox_status
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
@@ -128,6 +90,59 @@ func (q *Queries) ContactExists(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const contactsForLinkedin = `-- name: ContactsForLinkedin :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.linkedin_url, l.checked_at AS last_checked
+FROM contact c LEFT JOIN LATERAL (
+  SELECT lc.checked_at FROM contact_linkedin_check lc WHERE lc.contact_id = c.id AND lc.status = 'observed' ORDER BY lc.checked_at DESC LIMIT 1
+) l ON true
+WHERE ($1::text IS NULL OR c.company_id = $1::text)
+  AND ($2::text IS NULL OR c.id = $2::text)
+ORDER BY c.first_name, c.last_name, c.id
+`
+
+type ContactsForLinkedinParams struct {
+	CompanyID *string
+	ContactID *string
+}
+
+type ContactsForLinkedinRow struct {
+	ID          string
+	CompanyID   string
+	FirstName   string
+	LastName    string
+	LinkedinUrl *string
+	LastChecked *time.Time
+}
+
+// LinkedIn checks (by the recruiter's LinkedIn companion): one per contact
+// and request, answered only by whoever asked, within 15 minutes.
+func (q *Queries) ContactsForLinkedin(ctx context.Context, arg ContactsForLinkedinParams) ([]ContactsForLinkedinRow, error) {
+	rows, err := q.db.Query(ctx, contactsForLinkedin, arg.CompanyID, arg.ContactID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactsForLinkedinRow
+	for rows.Next() {
+		var i ContactsForLinkedinRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CompanyID,
+			&i.FirstName,
+			&i.LastName,
+			&i.LinkedinUrl,
+			&i.LastChecked,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const countContactsWithRole = `-- name: CountContactsWithRole :one
@@ -506,7 +521,7 @@ func (q *Queries) LatestLinkedinCheck(ctx context.Context, contactID string) (Co
 const listContacts = `-- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
   contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
-  m.status AS mailbox_status, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
+  m.status AS mailbox_status, m.checked_at AS mailbox_checked_at, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
   l.checked_at AS linkedin_checked_at
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
   LEFT JOIN LATERAL (
@@ -553,6 +568,7 @@ type ListContactsRow struct {
 	Role              *string
 	UpdatedAt         time.Time
 	MailboxStatus     *string
+	MailboxCheckedAt  *time.Time
 	LinkedinCurrent   *bool
 	LinkedinJoined    *string
 	LinkedinLeft      *string
@@ -594,6 +610,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 			&i.Role,
 			&i.UpdatedAt,
 			&i.MailboxStatus,
+			&i.MailboxCheckedAt,
 			&i.LinkedinCurrent,
 			&i.LinkedinJoined,
 			&i.LinkedinLeft,
@@ -637,6 +654,29 @@ func (q *Queries) NewEmploymentCheckID(ctx context.Context) (string, error) {
 	var column_1 string
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const renewMailboxControl = `-- name: RenewMailboxControl :exec
+UPDATE contact_mailbox_check SET control_id = $1, control_expires_at = $2
+WHERE contact_id = $3 AND email = $4 AND control_expires_at <= now()
+`
+
+type RenewMailboxControlParams struct {
+	ControlID        string
+	ControlExpiresAt time.Time
+	ContactID        string
+	Email            string
+}
+
+// A new made-up mailbox for a check after the old one's lifetime (the monthly re-check).
+func (q *Queries) RenewMailboxControl(ctx context.Context, arg RenewMailboxControlParams) error {
+	_, err := q.db.Exec(ctx, renewMailboxControl,
+		arg.ControlID,
+		arg.ControlExpiresAt,
+		arg.ContactID,
+		arg.Email,
+	)
+	return err
 }
 
 const saveEmploymentCheck = `-- name: SaveEmploymentCheck :execrows

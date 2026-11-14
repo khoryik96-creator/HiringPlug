@@ -4676,6 +4676,11 @@ export interface components {
             emailCheckStatus: components["schemas"]["EmailCheckStatus"] | null;
             /** @description The latest mailbox check of `email`; null before the first. */
             mailboxStatus: components["schemas"]["MailboxCheckStatus"] | null;
+            /**
+             * Format: date-time
+             * @description When the mailbox was last checked.
+             */
+            mailboxCheckedAt: string | null;
             /** @description What the latest LinkedIn check saw of their time at the company; null before the first. */
             linkedinEmployment: components["schemas"]["LinkedinEmployment"] | null;
             phone: string | null;
@@ -4731,6 +4736,8 @@ export interface components {
             email: string;
             /** @description Compare the domain's mail servers (an automatic recheck). */
             deep: boolean;
+            /** @description The monthly re-check: runs only if the address was last checked 25 days ago or more, for a contact who still works there. */
+            refresh?: boolean;
         };
         /** @example clc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactLinkedinCheckId: string;
@@ -4748,6 +4755,8 @@ export interface components {
         ContactLinkedinChecksStart: {
             companyId?: components["schemas"]["CompanyId"];
             contactId?: components["schemas"]["ContactId"];
+            /** @description Only contacts not checked on LinkedIn in the last 90 days (the others are skipped: recent). */
+            dueOnly?: boolean;
         };
         ContactLinkedinCheckRequest: {
             id: components["schemas"]["ContactLinkedinCheckId"];
@@ -4767,10 +4776,10 @@ export interface components {
             contactId: components["schemas"]["ContactId"];
             contactName: string;
             /**
-             * @description no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest).
+             * @description no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly).
              * @enum {string}
              */
-            reason: "no_profile" | "too_many";
+            reason: "no_profile" | "too_many" | "recent";
         };
         /** @description What the profile shows (profileUrl, companyUrl and linkedinCompanyId must be the check's), or why it could not be read (error). */
         ContactLinkedinCheckAnswer: {

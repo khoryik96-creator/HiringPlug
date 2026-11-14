@@ -46,7 +46,9 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
   const [help, setHelp] = useState(false);
   const stop = useRef<{ stopped: boolean; operation: string } | null>(null);
 
-  const run = async () => {
+  const [recent, setRecent] = useState(0); // contacts skipped as checked recently
+  // A company: only those due (not checked in 90 days), unless asked for all.
+  const run = async (dueOnly = !contactId) => {
     setError(null);
     if (!companion.ready) { setHelp(true); return; }
     const token = { stopped: false, operation: "" };
@@ -55,13 +57,14 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
     setRunning(true);
     try {
       const started = unwrap(await api.POST("/v1/contacts/linkedin-checks", {
-        body: contactId ? { contactId } : { companyId: companyId ?? "" },
+        body: contactId ? { contactId } : { companyId: companyId ?? "", dueOnly },
       }));
       setRows([
         ...started.checks.map((c): Row => ({ name: c.contactName, contactId: c.contactId, tone: "waiting", text: "Waiting…" })),
-        ...started.skipped.map((s): Row => ({ name: s.contactName, contactId: s.contactId, tone: "unclear",
+        ...started.skipped.filter((s) => s.reason !== "recent").map((s): Row => ({ name: s.contactName, contactId: s.contactId, tone: "unclear",
           text: s.reason === "too_many" ? "Not checked this time (over 200 at once): check again for the rest" : "No LinkedIn profile address" })),
       ]);
+      setRecent(started.skipped.filter((s) => s.reason === "recent").length);
       if (started.checks.length === 0) return;
       token.operation = operationId();
       const company = await companionCall<{ company_id: string }>("companyId", { operation_id: token.operation, company_url: started.companyUrl });
@@ -121,6 +124,12 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
         </div>
       )}
       <ErrorMessage error={error} />
+      {recent > 0 && !running && (
+        <p className="muted small" role="status">
+          {recent === 1 ? "1 contact was" : `${String(recent)} contacts were`} checked on LinkedIn in the last 90 days, so not again.{" "}
+          <button type="button" className="link" onClick={() => { void run(false); }}>Check them again too</button>
+        </p>
+      )}
       {rows.length > 0 && (
         <ul className="linkedin-results" aria-label="LinkedIn employment">
           {rows.map((r) => (

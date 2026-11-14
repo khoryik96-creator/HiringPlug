@@ -59,7 +59,7 @@ RETURNING *;
 -- name: ListContacts :many
 SELECT contact.id, contact.company_id, contact.first_name, contact.last_name, contact.title, contact.email,
   contact.email_check_status, contact.phone, contact.mobile, contact.status, contact.role, contact.updated_at,
-  m.status AS mailbox_status, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
+  m.status AS mailbox_status, m.checked_at AS mailbox_checked_at, l.current_job AS linkedin_current, l.joined AS linkedin_joined, l.left_on AS linkedin_left,
   l.checked_at AS linkedin_checked_at
 FROM contact LEFT JOIN contact_mailbox_check m ON m.contact_id = contact.id AND m.email = contact.email
   LEFT JOIN LATERAL (
@@ -149,8 +149,14 @@ ORDER BY c.id;
 
 -- LinkedIn checks (by the recruiter's LinkedIn companion): one per contact
 -- and request, answered only by whoever asked, within 15 minutes.
--- name: CompanyContactsForLinkedin :many
-SELECT id, first_name, last_name, linkedin_url FROM contact WHERE company_id = @company_id ORDER BY first_name, last_name, id;
+-- name: ContactsForLinkedin :many
+SELECT c.id, c.company_id, c.first_name, c.last_name, c.linkedin_url, l.checked_at AS last_checked
+FROM contact c LEFT JOIN LATERAL (
+  SELECT lc.checked_at FROM contact_linkedin_check lc WHERE lc.contact_id = c.id AND lc.status = 'observed' ORDER BY lc.checked_at DESC LIMIT 1
+) l ON true
+WHERE (sqlc.narg(company_id)::text IS NULL OR c.company_id = sqlc.narg(company_id)::text)
+  AND (sqlc.narg(contact_id)::text IS NULL OR c.id = sqlc.narg(contact_id)::text)
+ORDER BY c.first_name, c.last_name, c.id;
 
 -- name: InsertLinkedinCheck :one
 INSERT INTO contact_linkedin_check (tenant_id, contact_id, company_id, profile_url, company_url, requested_by)
@@ -179,3 +185,8 @@ ORDER BY checked_at DESC, id DESC LIMIT 1;
 UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
 WHERE id = @id AND status = 'active' AND company_id = @company_id
 RETURNING version;
+
+-- A new made-up mailbox for a check after the old one's lifetime (the monthly re-check).
+-- name: RenewMailboxControl :exec
+UPDATE contact_mailbox_check SET control_id = @control_id, control_expires_at = @control_expires_at
+WHERE contact_id = @contact_id AND email = @email AND control_expires_at <= now();

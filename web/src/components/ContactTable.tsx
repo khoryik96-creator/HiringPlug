@@ -1,5 +1,5 @@
 import type { ContactSummary } from "../api/client";
-import { formatWhen, linkedinDates } from "../labels";
+import { formatWhen, linkedinDates, timeAgo } from "../labels";
 import { chipStyle } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
@@ -11,7 +11,7 @@ import { useFieldSettings } from "./useFieldSettings";
 /** What LinkedIn showed of a contact's time at the company, under their status. */
 function LinkedinNote({ e }: { e: NonNullable<ContactSummary["linkedinEmployment"]> }) {
   const text = e.current === null ? "LinkedIn: unclear" : e.current ? `LinkedIn: since ${linkedinDates(e.joined)}` : `LinkedIn: left ${linkedinDates(e.left)}`;
-  return <span className="muted small linkedin-note" title={`Checked ${formatWhen(e.checkedAt)}`}>{text}</span>;
+  return <span className="muted small linkedin-note" title={`Checked ${formatWhen(e.checkedAt)}`}>{text} · {timeAgo(e.checkedAt)}</span>;
 }
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
@@ -66,6 +66,9 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
               {c.email}{" "}
               {/* A mailbox answer says more than the quick check of the address. */}
               {c.mailboxStatus ? <MailboxBadge check={c.mailboxStatus} /> : <EmailCheckBadge check={c.emailCheckStatus} />}
+              {c.mailboxCheckedAt && c.mailboxStatus !== "checking" && (
+                <span className="muted small freshness" title={`Mail server asked ${formatWhen(c.mailboxCheckedAt)}`}> {timeAgo(c.mailboxCheckedAt)}</span>
+              )}
             </td>
             <td>{c.mobile ?? c.phone}</td>
           </tr>

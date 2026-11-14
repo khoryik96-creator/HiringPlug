@@ -38,6 +38,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 			EmailCheckStatus:   c.OrNull(c.Convert[api.EmailCheckStatus](s.EmailCheckStatus)),
 			MailboxStatus:      c.OrNull(c.Convert[api.MailboxCheckStatus](s.MailboxStatus)),
 			LinkedinEmployment: c.OrNull(linkedinEmploymentToAPI(s.Linkedin)),
+			MailboxCheckedAt:   c.OrNull(s.MailboxCheckedAt),
 			Phone:              c.OrNull(s.Phone), Mobile: c.OrNull(s.Mobile), Status: api.ContactStatus(s.Status), Role: c.OrNull(s.Role), UpdatedAt: s.UpdatedAt,
 		}
 	}

@@ -6953,7 +6953,7 @@ components:
         notes: {type: string, maxLength: 4000, nullable: true}
     ContactSummary:
       type: object
-      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, linkedinEmployment, phone, mobile, status, role, updatedAt]
+      required: [id, fullName, title, companyId, companyName, email, emailCheckStatus, mailboxStatus, mailboxCheckedAt, linkedinEmployment, phone, mobile, status, role, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/ContactId'}
         fullName: {type: string}
@@ -6968,6 +6968,7 @@ components:
           description: The latest mailbox check of `email`; null before the first.
           allOf: [{$ref: '#/components/schemas/MailboxCheckStatus'}]
           nullable: true
+        mailboxCheckedAt: {type: string, format: date-time, nullable: true, description: When the mailbox was last checked.}
         linkedinEmployment:
           description: What the latest LinkedIn check saw of their time at the company; null before the first.
           allOf: [{$ref: '#/components/schemas/LinkedinEmployment'}]
@@ -7033,6 +7034,7 @@ components:
         contactId: {$ref: '#/components/schemas/ContactId'}
         email: {type: string, description: The address to check (skipped if the contact's email changed since).}
         deep: {type: boolean, description: Compare the domain's mail servers (an automatic recheck).}
+        refresh: {type: boolean, description: "The monthly re-check: runs only if the address was last checked 25 days ago or more, for a contact who still works there."}
     ContactLinkedinCheckId:
       type: string
       pattern: '^clc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -7063,6 +7065,7 @@ components:
       properties:
         companyId: {$ref: '#/components/schemas/CompanyId'}
         contactId: {$ref: '#/components/schemas/ContactId'}
+        dueOnly: {type: boolean, description: "Only contacts not checked on LinkedIn in the last 90 days (the others are skipped: recent)."}
     ContactLinkedinCheckRequest:
       type: object
       required: [id, contactId, contactName, profileUrl]
@@ -7091,8 +7094,8 @@ components:
         contactName: {type: string}
         reason:
           type: string
-          enum: [no_profile, too_many]
-          description: no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest).
+          enum: [no_profile, too_many, recent]
+          description: no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly).
     ContactLinkedinCheckAnswer:
       type: object
       additionalProperties: false

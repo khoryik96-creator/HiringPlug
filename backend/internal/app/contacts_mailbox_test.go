@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,26 +56,23 @@ func TestVerifyingTheEmailsOfACompanysContacts(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, a.request(http.MethodPost, "/v1/contacts/mailbox-checks", tenant.Users[api.RoleViewer].Token,
 		map[string]any{"companyId": company.Id}).Status)
 
-	res = a.request(http.MethodPost, "/v1/contacts/mailbox-checks", token, map[string]any{"companyId": company.Id})
-	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
-	var started api.ContactMailboxChecksStarted
-	res.JSON(&started)
-	assert.Equal(t, api.ContactMailboxChecksStarted{Started: 3, Skipped: 0}, started, "contacts without an email are not listed")
+	// Added with an email: verified at once, in the background.
 	listed := a.companyContacts(token, company.Id)
 	assert.Equal(t, "checking", mailboxStatus(listed["Ana"]))
 	assert.Empty(t, mailboxStatus(listed["Nobody"]))
 
-	// Asking again while they are being checked starts nothing twice.
+	// Verifying the company's emails while they are being checked starts nothing twice.
 	res = a.request(http.MethodPost, "/v1/contacts/mailbox-checks", token, map[string]any{"companyId": company.Id})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var started api.ContactMailboxChecksStarted
 	res.JSON(&started)
-	assert.Equal(t, api.ContactMailboxChecksStarted{Started: 0, Skipped: 3}, started)
+	assert.Equal(t, api.ContactMailboxChecksStarted{Started: 0, Skipped: 3}, started, "contacts without an email are not listed")
 
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	listed = a.companyContacts(token, company.Id)
 	assert.Equal(t, "accepted", mailboxStatus(listed["Ana"]))
 	assert.Equal(t, "invalid", mailboxStatus(listed["Gone"]), "the mailbox does not exist: an email would bounce")
 	assert.Equal(t, "unknown", mailboxStatus(listed["Busy"]))
-	assert.Empty(t, fake.callsFor("x@other.test"), "only this company's contacts")
 
 	check := a.contact(token, gone.Id).MailboxCheck.MustGet()
 	assert.Equal(t, api.MailboxCheckStatusInvalid, check.Status)
@@ -124,11 +122,19 @@ func TestVerifyingTheEmailsOfACompanysContacts(t *testing.T) {
 	assert.Equal(t, api.MailboxCheckStatusAccepted, a.contact(token, queued.Id).MailboxCheck.MustGet().Status)
 	assert.Len(t, fake.callsFor("queued@maju.test"), 2)
 
+	// Verifying the company's emails again checks only this company's contacts.
+	res = a.request(http.MethodPost, "/v1/contacts/mailbox-checks", token, map[string]any{"companyId": company.Id})
+	res.JSON(&started)
+	assert.Equal(t, api.ContactMailboxChecksStarted{Started: 4, Skipped: 0}, started)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Len(t, fake.callsFor("x@other.test"), 1, "only when it was added")
+
 	// A changed email has no check until it is checked.
 	res = a.request(http.MethodPatch, "/v1/contacts/"+gone.Id, token, map[string]any{"version": gone.Version, "email": "nur@maju.test"})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
-	assert.True(t, a.contact(token, gone.Id).MailboxCheck.IsNull())
-	assert.Empty(t, mailboxStatus(a.companyContacts(token, company.Id)["Gone"]))
+	assert.Equal(t, "nur@maju.test", a.contact(token, gone.Id).MailboxCheck.MustGet().Email, "the new address is verified at once")
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Equal(t, "accepted", mailboxStatus(a.companyContacts(token, company.Id)["Gone"]))
 
 	// Another agency cannot check (or see) these contacts.
 	stranger := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
@@ -141,4 +147,41 @@ func (a *testApp) contactByName(token, companyID, name string) string {
 	c, ok := a.companyContacts(token, companyID)[name]
 	require.True(a.t, ok, name)
 	return c.Id
+}
+
+func TestVerifiedEmailsAreCheckedAgainEachMonthWhileTheContactWorksThere(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	fake := a.deps.Mailboxes.(*fakeMailboxes)
+	company := a.createCompany(token, map[string]any{"name": "Maju Sdn Bhd"})
+	ana := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Ana", "email": "ana@maju.test"})
+	gone := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Gone", "email": "left@maju.test"})
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+
+	// A month passes: the checks are due, and their made-up mailbox has expired.
+	monthLater := func() {
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE contact_mailbox_check SET checked_at = now() - interval '31 days',
+			control_expires_at = now() - interval '1 hour' WHERE tenant_id = $1`, tenant.ID)
+		require.NoError(t, err)
+		_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'contact.check_mailbox' AND status = 'pending'`, tenant.ID)
+		require.NoError(t, err)
+	}
+	res := a.request(http.MethodPatch, "/v1/contacts/"+gone.Id, token, map[string]any{"version": gone.Version, "status": "left"})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	monthLater()
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	calls := fake.callsFor("ana@maju.test")
+	require.Len(t, calls, 2, "checked again a month on")
+	assert.NotEqual(t, calls[0].ControlID, calls[1].ControlID, "with a new made-up mailbox")
+	assert.Len(t, fake.callsFor("left@maju.test"), 1, "not someone who left")
+	assert.Less(t, time.Since(a.contact(token, ana.Id).MailboxCheck.MustGet().CheckedAt.MustGet()), time.Minute)
+
+	// Checked by hand meanwhile: the month starts again from that check.
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'contact.check_mailbox' AND status = 'pending'`, tenant.ID)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Len(t, fake.callsFor("ana@maju.test"), 2, "not again so soon")
 }

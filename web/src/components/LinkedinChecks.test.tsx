@@ -58,7 +58,7 @@ describe("checking employment on LinkedIn", () => {
       const failed = init.body.error !== undefined;
       return Promise.resolve(ok({
         id: "clc_x", contactId: failed ? "cont_wei" : "cont_ana", status: failed ? "failed" : "observed", joined: failed ? null : "2019-04",
-        left: failed ? null : "2025-08", current: failed ? null : false, markedLeft: !failed, error: init.body.error ?? null,
+        left: failed ? null : "2025-08", current: failed ? null : false, markedLeft: !failed, movedTo: [], error: init.body.error ?? null,
         createdAt: "2026-11-14T00:00:00Z", checkedAt: "2026-11-14T00:00:00Z",
       }));
     }) as never);
@@ -76,6 +76,22 @@ describe("checking employment on LinkedIn", () => {
       { profileUrl: "https://www.linkedin.com/in/ana", companyUrl: started.companyUrl, linkedinCompanyId: "123456", joined: "2019-04", left: "2025-08", current: false },
       { error: "LinkedIn needs you to sign in, or the profile or company could not be confirmed." },
     ]);
+  });
+
+  it("checks only those due on a company, and can check the recent ones again too", async () => {
+    companion((action, args) => (action === "companyId" ? { result: { company_url: args.company_url, company_id: "1" } } : { error: "x" }));
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({
+      companyUrl: started.companyUrl, checks: [],
+      skipped: [{ contactId: "cont_ana", contactName: "Ana Lim", reason: "recent" }, { contactId: "cont_wei", contactName: "Wei", reason: "recent" }],
+    }));
+    renderWithClient(<LinkedinChecks companyId="comp_1" />);
+    await new Promise((r) => setTimeout(r, 50));
+    fireEvent.click(screen.getByRole("button", { name: "Check employment on LinkedIn" }));
+    expect((await screen.findByText(/2 contacts were checked on LinkedIn in the last 90 days/)).textContent).toBeTruthy();
+    expect((post.mock.calls[0]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: true });
+    fireEvent.click(screen.getByRole("button", { name: "Check them again too" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect((post.mock.calls[1]?.[1] as { body: unknown }).body).toEqual({ companyId: "comp_1", dueOnly: false });
   });
 
   it("says how to install the companion when it is not there", async () => {

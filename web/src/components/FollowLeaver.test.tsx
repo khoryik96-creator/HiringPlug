@@ -46,7 +46,8 @@ describe("following a contact who left", () => {
     renderWithClient(<LeaverMoves contactId="cont_ana" moves={[move]} />);
     fireEvent.click(screen.getByRole("button", { name: "Add at Acme Bhd" }));
     expect((await screen.findByRole("status")).textContent).toContain("at Acme Berhad (with a lead note)");
-    expect(get.mock.calls.find((c) => c[0] === "/v1/companies")?.[1]).toEqual({ params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } });
+    const lookup = (get.mock.calls as unknown[][]).find((c) => c[0] === "/v1/companies");
+    expect(lookup?.[1]).toEqual({ params: { query: { linkedinCompany: "acme-bhd", limit: 1 } } });
     expect(post.mock.calls.map((c) => c[0])).not.toContain("/v1/companies");
   });
 

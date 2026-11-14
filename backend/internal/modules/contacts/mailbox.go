@@ -26,6 +26,14 @@ import (
 // MailboxCheckStatus "checking": asked, not answered yet.
 const MailboxChecking = "checking"
 
+// refreshAfter is when a checked address is checked again (contacts who still
+// work there): mailboxes go when people leave.
+const refreshAfter = 30 * 24 * time.Hour
+
+// refreshSlack lets a monthly re-check run a little early (it is skipped
+// when the address was checked more recently than that).
+const refreshSlack = 5 * 24 * time.Hour
+
 // busyRetry is when a check that found the verifier busy is tried again.
 const busyRetry = 20 * time.Second
 
@@ -133,8 +141,13 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 		return err
 	}
 	// A check runs once: the first check while "checking", a recheck while
-	// one is due (a new check meanwhile replaces it).
-	due := (!j.Deep && check.Status == MailboxChecking) || (j.Deep && check.Status != MailboxChecking && check.RecheckAt != nil)
+	// one is due (a new check meanwhile replaces it), the monthly re-check
+	// when nothing checked the address since.
+	refresh := j.Refresh != nil && *j.Refresh
+	due := (!j.Deep && !refresh && check.Status == MailboxChecking) || (j.Deep && check.Status != MailboxChecking && check.RecheckAt != nil)
+	if refresh {
+		due = check.Status != MailboxChecking && check.CheckedAt != nil && time.Since(*check.CheckedAt) >= refreshAfter-refreshSlack
+	}
 	if !due || check.Email != j.Email {
 		return nil // superseded: a newer check, or the email changed
 	}
@@ -145,8 +158,17 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 	if err != nil {
 		return err
 	}
-	if contact.Email == nil || *contact.Email != j.Email {
-		return nil // the email changed
+	if contact.Email == nil || *contact.Email != j.Email || (refresh && contact.Status != "active") {
+		return nil // the email changed; or, monthly, they left (no need to keep checking)
+	}
+	if refresh { // a month on: a new made-up mailbox
+		if err := q.RenewMailboxControl(ctx, store.RenewMailboxControlParams{ContactID: j.ContactId, Email: j.Email,
+			ControlID: mailcheck.NewControlID(), ControlExpiresAt: time.Now().Add(controlLifetime)}); err != nil {
+			return err
+		}
+		if check, err = q.GetMailboxCheck(ctx, j.ContactId); err != nil {
+			return err
+		}
 	}
 	mode := mailcheck.Full
 	if j.Deep {
@@ -179,6 +201,11 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 		}
 	}
 	if _, err := q.SaveMailboxCheck(ctx, params); err != nil {
+		return err
+	}
+	// Check it again in a month (it runs only if nothing checked it since).
+	if _, err := jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindContactCheckMailbox,
+		api.ContactCheckMailboxJob{ContactId: j.ContactId, Email: j.Email, Refresh: ptr(true)}, time.Now().Add(refreshAfter)); err != nil {
 		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "contact.mailbox_checked", EntityType: "contact", EntityID: j.ContactId,

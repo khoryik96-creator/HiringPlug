@@ -53,6 +53,7 @@ type Summary struct {
 	Title, Email, EmailCheckStatus, MailboxStatus, Phone, Mobile, Role *string
 	UpdatedAt                                                          time.Time
 	Linkedin                                                           *LinkedinEmployment // nil before the first LinkedIn check
+	MailboxCheckedAt                                                   *time.Time
 }
 
 // LinkedinEmployment is what the latest LinkedIn check saw.

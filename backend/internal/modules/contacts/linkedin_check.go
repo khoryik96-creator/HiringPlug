@@ -25,6 +25,9 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
+// LinkedinCheckDue is when a contact's LinkedIn check is due again.
+const LinkedinCheckDue = 90 * 24 * time.Hour
+
 // LinkedinCheckLifetime is how long a LinkedIn check waits for its answer.
 const LinkedinCheckLifetime = 15 * time.Minute
 
@@ -72,7 +75,7 @@ type LinkedinAnswer struct {
 
 // StartLinkedinChecks starts a check for each of a company's contacts with a
 // LinkedIn profile, or for one contact.
-func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, companyID, contactID *string) (LinkedinChecks, error) {
+func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, companyID, contactID *string, dueOnly bool) (LinkedinChecks, error) {
 	var out LinkedinChecks
 	if (companyID == nil) == (contactID == nil) {
 		var errs apperr.FieldErrors
@@ -81,22 +84,22 @@ func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, co
 	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		var people []store.CompanyContactsForLinkedinRow
 		if contactID != nil {
 			row, err := getRow(ctx, q, *contactID)
 			if err != nil {
 				return err
 			}
 			companyID = &row.CompanyID
-			people = append(people, store.CompanyContactsForLinkedinRow{ID: row.ID, FirstName: row.FirstName, LastName: row.LastName, LinkedinUrl: row.LinkedinUrl})
-		} else {
-			if err := s.checkCompany(ctx, tx, *companyID); err != nil {
-				return err
-			}
-			var err error
-			if people, err = q.CompanyContactsForLinkedin(ctx, *companyID); err != nil {
-				return err
-			}
+		} else if err := s.checkCompany(ctx, tx, *companyID); err != nil {
+			return err
+		}
+		filter := store.ContactsForLinkedinParams{ContactID: contactID}
+		if contactID == nil {
+			filter.CompanyID = companyID
+		}
+		people, err := q.ContactsForLinkedin(ctx, filter)
+		if err != nil {
+			return err
 		}
 		page, err := s.companies.LinkedinURL(ctx, tx, *companyID)
 		if err != nil {
@@ -112,11 +115,15 @@ func (s *Service) StartLinkedinChecks(ctx context.Context, p authz.Principal, co
 			if person.LinkedinUrl != nil {
 				r.ProfileURL = ProfileURL(*person.LinkedinUrl)
 			}
-			if r.ProfileURL == "" || len(out.Checks) == maxLinkedinChecks {
+			switch {
+			case r.ProfileURL == "":
 				r.Skipped = "no_profile"
-				if r.ProfileURL != "" {
-					r.Skipped = "too_many"
-				}
+			case dueOnly && person.LastChecked != nil && time.Since(*person.LastChecked) < LinkedinCheckDue:
+				r.Skipped = "recent"
+			case len(out.Checks) == maxLinkedinChecks:
+				r.Skipped = "too_many"
+			}
+			if r.Skipped != "" {
 				out.Skipped = append(out.Skipped, r)
 				continue
 			}
@@ -234,7 +241,7 @@ func optional(s string) *string {
 
 // StartContactLinkedinChecks handles POST /v1/contacts/linkedin-checks.
 func (h *HTTP) StartContactLinkedinChecks(ctx context.Context, req api.StartContactLinkedinChecksRequestObject) (api.StartContactLinkedinChecksResponseObject, error) {
-	started, err := h.svc.StartLinkedinChecks(ctx, authz.MustFromContext(ctx), req.Body.CompanyId, req.Body.ContactId)
+	started, err := h.svc.StartLinkedinChecks(ctx, authz.MustFromContext(ctx), req.Body.CompanyId, req.Body.ContactId, req.Body.DueOnly != nil && *req.Body.DueOnly)
 	if err != nil {
 		return nil, err
 	}

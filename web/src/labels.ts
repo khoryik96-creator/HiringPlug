@@ -114,6 +114,17 @@ export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; m
   unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
 };
 
+/** How long ago, roughly: "today", "3 days ago", "2 months ago", "1 year ago". */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const days = Math.floor((now - new Date(iso).getTime()) / 86_400_000);
+  if (days < 1) return "today";
+  if (days < 31) return days === 1 ? "yesterday" : `${String(days)} days ago`;
+  const months = Math.floor(days / 30.4);
+  if (months < 12) return months === 1 ? "1 month ago" : `${String(months)} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "1 year ago" : `${String(years)} years ago`;
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** A LinkedIn date as precise as it was shown: "2025-08" -> "Aug 2025", "2025" -> "2025". */

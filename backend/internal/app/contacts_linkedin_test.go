@@ -116,6 +116,21 @@ func TestCheckingOnLinkedInWhetherAContactHasLeft(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	assert.Equal(t, api.ContactLinkedinCheckStatusFailed, a.contact(token, wei.Id).LinkedinCheck.MustGet().Status)
 
+	// Only those due: not checked on LinkedIn in 90 days.
+	due := a.startLinkedinChecks(token, map[string]any{"companyId": company.Id, "dueOnly": true})
+	assert.Empty(t, due.Checks, "both were checked just now")
+	reasons := map[string]api.ContactLinkedinCheckSkippedReason{}
+	for _, s := range due.Skipped {
+		reasons[s.ContactName] = s.Reason
+	}
+	assert.Equal(t, api.ContactLinkedinCheckSkippedReasonRecent, reasons["Wei"])
+	assert.Equal(t, api.ContactLinkedinCheckSkippedReasonNoProfile, reasons["Nobody"])
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE contact_linkedin_check SET checked_at = now() - interval '91 days' WHERE contact_id = $1`, wei.Id)
+	require.NoError(t, err)
+	due = a.startLinkedinChecks(token, map[string]any{"companyId": company.Id, "dueOnly": true})
+	require.Len(t, due.Checks, 1)
+	assert.Equal(t, "Wei", due.Checks[0].ContactName)
+
 	// Another agency cannot start or answer these checks.
 	stranger := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
 	assert.Equal(t, http.StatusNotFound, a.request(http.MethodPost, "/v1/contacts/linkedin-checks", stranger, map[string]any{"contactId": wei.Id}).Status)
