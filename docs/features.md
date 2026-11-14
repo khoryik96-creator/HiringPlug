@@ -484,6 +484,33 @@ for each of their jobs, with **Score fit** / **Score again**.
   contact whose time there ended, with no current role there, becomes **has
   left** (audited; change it back with Edit); unclear changes nothing. The
   company's contacts show what LinkedIn showed under each status.
+- **Follow leavers** ✅: when LinkedIn shows a contact has left, the companion
+  also reads their current roles elsewhere (up to three: company, LinkedIn
+  page, title, since when). The contact shows **Now at ...** with **Add at
+  ...**: it finds that company by its LinkedIn page (or creates it), adds the
+  person there as a new contact and writes a lead note. The old company's open
+  jobs that had them as contact are listed as needing a new contact.
+- **Fresh contact data** ✅: a new or changed email is verified at once; a
+  verified address is checked again every month while the contact works
+  there (not if nothing changed it sooner, nor for someone who left). The
+  company's LinkedIn check only checks contacts due (never checked, or 90 days
+  since), with "Check them again too". Contact lists show how long ago each
+  address was checked.
+- **Emails that would not arrive** ✅: the composer warns about recipients who
+  left or whose mailbox is gone (`POST /v1/contacts/address-check`).
+  Automations do not send to them (`EMAIL_UNDELIVERABLE`): the run is skipped
+  and the recruiter gets a task to update the company's contact for the job.
+- **Email suggestion** ✅: for a contact without an email, the address their
+  colleagues' addresses suggest (first.last@, flast@, first@ ... at the
+  company's main domain; at least two colleagues agreeing, no tie), with
+  **Use and verify**. A guess, until verified.
+- **Real bounces** ✅: after an email goes through a connected **Microsoft
+  365** mailbox, its inbox is read 15 minutes and 2 hours later
+  (`email.bounce_scan`) for bounce notices ("Undeliverable: ...") naming one
+  of the recipients exactly. The email shows **Bounced** and from whom; that
+  contact's mailbox is marked as gone (and stays so through monthly
+  re-checks). Notices are not kept. Gmail (connected to send only: reading
+  needs Google's restricted scope and review) and SMTP mailboxes are not read.
 - **Employment check** ✅: whether a contact still works at their company.
   LinkedIn cannot be read automatically (it refuses automated access), so a
   person drops the contact's LinkedIn profile saved as PDF (More > Save to PDF)

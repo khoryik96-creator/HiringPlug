@@ -21,7 +21,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
 - Nothing uncommitted, nothing half-built. Start new work on a fresh branch
   from main.
-- Latest migration: `00093_contact_linkedin_check.sql`. Migrations are append-only.
+- Latest migration: `00095_email_bounces.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
