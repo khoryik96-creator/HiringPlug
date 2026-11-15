@@ -182,15 +182,20 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 }
 
 const getPreferences = `-- name: GetPreferences :one
-SELECT candidate_columns FROM user_preference WHERE user_id = app_current_user()
+SELECT candidate_columns, dashboard_blocks FROM user_preference WHERE user_id = app_current_user()
 `
 
+type GetPreferencesRow struct {
+	CandidateColumns []string
+	DashboardBlocks  []string
+}
+
 // The signed-in person's own settings (none until they change one).
-func (q *Queries) GetPreferences(ctx context.Context) ([]string, error) {
+func (q *Queries) GetPreferences(ctx context.Context) (GetPreferencesRow, error) {
 	row := q.db.QueryRow(ctx, getPreferences)
-	var candidate_columns []string
-	err := row.Scan(&candidate_columns)
-	return candidate_columns, err
+	var i GetPreferencesRow
+	err := row.Scan(&i.CandidateColumns, &i.DashboardBlocks)
+	return i, err
 }
 
 const getRoleSetting = `-- name: GetRoleSetting :one
@@ -663,6 +668,18 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET candidate_columns = EXCLUDED.cand
 
 func (q *Queries) SetCandidateColumns(ctx context.Context, candidateColumns []string) error {
 	_, err := q.db.Exec(ctx, setCandidateColumns, candidateColumns)
+	return err
+}
+
+const setDashboardBlocks = `-- name: SetDashboardBlocks :exec
+INSERT INTO user_preference (tenant_id, user_id, dashboard_blocks)
+VALUES (app_current_tenant(), app_current_user(), $1::text[])
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET dashboard_blocks = EXCLUDED.dashboard_blocks, updated_at = now()
+`
+
+// NULL: back to the default order.
+func (q *Queries) SetDashboardBlocks(ctx context.Context, dashboardBlocks []string) error {
+	_, err := q.db.Exec(ctx, setDashboardBlocks, dashboardBlocks)
 	return err
 }
 

@@ -1106,3 +1106,16 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .copy-btn { flex: none; display: inline-flex; align-items: center; gap: 0.25rem; min-height: 0; padding: 0.2rem 0.35rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 0.72rem; font-weight: 700; cursor: pointer; }
 .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
 .copy-btn.copied { color: #15803d; border-color: #bfe5cc; background: #e6f6ec; }
+
+/* Dashboard blocks: a handle drags each one (or moves it with the arrow keys). */
+.dashboard-blocks { display: flex; flex-direction: column; gap: 1.1rem; margin-top: 0.4rem; }
+.dash-block > :not(.drag-handle) { margin-top: 0; margin-bottom: 0; } /* the gap spaces blocks, so each handle sits inside its panel */
+.dashboard-blocks .reset-order { align-self: flex-end; margin-bottom: -0.6rem; }
+.dash-block { position: relative; }
+.dash-block.dragging { opacity: 0.45; }
+.dash-block.drop-here::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 4px; border-radius: 4px; background: var(--accent); }
+.drag-handle { position: absolute; top: 0.7rem; right: 0.7rem; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; min-height: 0; padding: 0;
+  border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a39cb8; cursor: grab; }
+.dash-block:hover .drag-handle, .drag-handle:focus-visible { border-color: var(--line); background: var(--surface); color: var(--accent); }
+.drag-handle:active { cursor: grabbing; }
+.dash-block > .kpis { padding-right: 2.2rem; }

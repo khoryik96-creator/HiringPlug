@@ -65,7 +65,7 @@ export function useCandidateColumns() {
     // The list changes at once.
     onMutate: async (candidateColumns) => {
       await queryClient.cancelQueries({ queryKey: preferencesKey });
-      queryClient.setQueryData(preferencesKey, { candidateColumns });
+      queryClient.setQueryData(preferencesKey, (old: Schemas["Preferences"] | undefined) => ({ ...old, candidateColumns }));
     },
     // Once the last save is done (or one failed), show what is saved.
     onSettled: async () => {

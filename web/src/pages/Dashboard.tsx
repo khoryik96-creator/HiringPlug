@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
 import { CvImports } from "../components/CvImports";
+import { DashboardBlocks } from "../components/DashboardBlocks";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
 import { useJobProgress } from "../components/JobProgressTable";
@@ -51,19 +52,24 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
     <main>
       <h2>Dashboard</h2>
       <QuickSearch permissions={permissions} />
+      <DashboardBlocks blocks={[
+        { id: "numbers", label: "the numbers", node: (
       <div className="kpis">
         <div className="kpi"><span className="kpi-label">Open jobs</span><strong>{s.openJobs}</strong><Change by={s.openedLast7Days} text="{n} new this week" /></div>
         <div className="kpi"><span className="kpi-label">In progress</span><strong>{active(s.stageCounts)}</strong><Change by={s.addedLast7Days} text="{n} added this week" /></div>
         <div className="kpi"><span className="kpi-label">Moved this week</span><strong>{s.movedLast7Days}</strong><Change by={s.movedLast7Days - s.movedPrev7Days} text="{n} vs last week" /></div>
         <div className="kpi"><span className="kpi-label">Placed in 30 days</span><strong>{s.placedLast30Days}</strong></div>
       </div>
-
-      <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} />
-      {permissions.includes("intake:create") && <CvImports foldedHistory />}
-      {permissions.includes("automations.tasks:read") && <MyTasks approvals={permissions.includes("automations:approve")} />}
-      {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
-      {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
-
+        ) },
+        { id: "needsYou", label: "Needs you today", node: <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} /> },
+        ...(permissions.includes("intake:create") ? [{ id: "import" as const, label: "Import profiles", node: <CvImports foldedHistory /> }] : []),
+        ...(permissions.includes("automations.tasks:read")
+          ? [{ id: "tasks" as const, label: "Your tasks", node: <MyTasks approvals={permissions.includes("automations:approve")} /> }] : []),
+        ...(permissions.includes("offers:approve")
+          ? [{ id: "offersToApprove" as const, label: "Offers to approve", node: <OffersToApprove permissions={permissions} /> }] : []),
+        ...(permissions.includes("interviews:read")
+          ? [{ id: "interviews" as const, label: "My upcoming interviews", node: <MyInterviews permissions={permissions} /> }] : []),
+        { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>
         <table className="heat-table">
@@ -99,6 +105,8 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
           <span><i className="heat-key ring" />someone waiting over 7 days</span>
         </p>
       </section>
+        ) },
+      ]} />
     </main>
   );
 }

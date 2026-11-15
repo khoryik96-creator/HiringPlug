@@ -737,7 +737,10 @@ lead's company (with the built-in email check).
   someone waits over 7 days in amber, one line per job), the 5 most urgent
   with "Show all"; importing on one line; the open jobs as a heat map
   (stronger purple for more people, an amber ring where someone waits over
-  7 days) with each job's last activity.
+  7 days) with each job's last activity. Everything below search can be
+  dragged by its handle (or moved with the arrow keys) into each person's
+  own order, kept with their settings (`dashboardBlocks`); "Reset order"
+  restores the default.
 - **Copy** ✅: one click copies a candidate's email or phone number.
 - **Jobs list** ✅: each job with a bar of where its candidates are (and the
   counts), how many days it has been open and its owner's initials

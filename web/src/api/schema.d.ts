@@ -1688,7 +1688,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your own settings, such as the columns of your candidate list */
+        /** Your own settings, such as the columns of your candidate list and your dashboard's order */
         get: operations["getMyPreferences"];
         /** Change your own settings (no one else's) */
         put: operations["putMyPreferences"];
@@ -5666,10 +5666,18 @@ export interface components {
             name: string;
             role: components["schemas"]["Role"];
         };
+        /** @description Saving sends only the settings it changes; one left out keeps its value. */
         Preferences: {
+            /** @description The dashboard's blocks below search, in the order you dragged them (null: the default order). */
+            dashboardBlocks?: components["schemas"]["DashboardBlock"][] | null;
             /** @description The candidate list's columns, in order, after the name (null: the default ones). */
-            candidateColumns: components["schemas"]["CandidateColumn"][] | null;
+            candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
         };
+        /**
+         * @description A block of the dashboard that can be moved.
+         * @enum {string}
+         */
+        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "openJobs";
         /**
          * @description A column the candidate list can show.
          * @enum {string}

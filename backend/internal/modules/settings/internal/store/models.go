@@ -1193,6 +1193,7 @@ type UserPreference struct {
 	UserID           string
 	CandidateColumns []string
 	UpdatedAt        time.Time
+	DashboardBlocks  []string
 }
 
 type Webhook struct {

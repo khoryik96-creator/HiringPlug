@@ -2188,6 +2188,16 @@ class UserSummary(BaseModel):
     role: Role
 
 
+class DashboardBlock(StrEnum):
+    numbers = "numbers"
+    needsYou = "needsYou"
+    import_ = "import"
+    tasks = "tasks"
+    offersToApprove = "offersToApprove"
+    interviews = "interviews"
+    openJobs = "openJobs"
+
+
 class CandidateColumn(StrEnum):
     currentRole = "currentRole"
     status = "status"
@@ -5368,13 +5378,20 @@ class Preferences(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    dashboardBlocks: Annotated[
+        list[DashboardBlock] | None,
+        Field(
+            description="The dashboard's blocks below search, in the order you dragged them (null: the default order).",
+            max_length=20,
+        ),
+    ] = None
     candidateColumns: Annotated[
         list[CandidateColumn] | None,
         Field(
             description="The candidate list's columns, in order, after the name (null: the default ones).",
             max_length=20,
         ),
-    ]
+    ] = None
 
 
 class Me(BaseModel):
