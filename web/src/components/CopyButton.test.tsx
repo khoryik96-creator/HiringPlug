@@ -16,3 +16,14 @@ it("copies the text in one click and says so for a moment", async () => {
   act(() => { vi.advanceTimersByTime(1600); });
   expect(screen.getByRole("button", { name: "Copy email" })).toBeTruthy();
 });
+
+it("still copies where the browser has no clipboard API (the app opened over plain http)", async () => {
+  Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  const exec = vi.fn().mockReturnValue(true);
+  Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
+  render(<CopyButton text="+60102215849" what="phone number" />);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Copy phone number" })); await Promise.resolve(); });
+  expect(exec).toHaveBeenCalledWith("copy");
+  expect(screen.getByRole("button", { name: "phone number copied" })).toBeTruthy();
+  expect(document.querySelector("textarea")).toBeNull(); // the helper is removed
+});
