@@ -88,11 +88,11 @@ func adminPool(ctx context.Context) (*pgxpool.Pool, error) {
 // Safe to run on every deploy.
 func bootstrap(ctx context.Context) error {
 	if err := database.Migrate(ctx, adminURL(), db.Migrations()); err != nil {
-		return err
+		return app.ExplainAdminLogin(err)
 	}
 	admin, err := adminPool(ctx)
 	if err != nil {
-		return err
+		return app.ExplainAdminLogin(err)
 	}
 	defer admin.Close()
 	appURL := os.Getenv("HP_DATABASE_URL")

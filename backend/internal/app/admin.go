@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
@@ -116,4 +117,20 @@ func SetPassword(ctx context.Context, admin *pgxpool.Pool, userID, password stri
 	}
 	_, err = admin.Exec(ctx, `UPDATE app_user SET password_hash = $2, invited = false WHERE id = $1`, userID, hash)
 	return err
+}
+
+// ExplainAdminLogin turns "password authentication failed" for the admin
+// connection into what to do: with Docker, the admin password is fixed when
+// the database is first created, so setting HP_DB_ADMIN_PASSWORD later does
+// not change it. Other errors are returned as they are.
+func ExplainAdminLogin(err error) error {
+	var pgErr *pgconn.PgError
+	if err == nil || !errors.As(err, &pgErr) || pgErr.Code != "28P01" {
+		return err
+	}
+	return fmt.Errorf("the database refused the admin password (HP_DATABASE_ADMIN_URL). "+
+		"With Docker, the admin password is set only when the database is first created: "+
+		"if you set or changed HP_DB_ADMIN_PASSWORD after that, either put back the password it was created with "+
+		"(\"postgres\" for a laptop setup), or change it inside the database first "+
+		"(docker compose -f deploy/docker-compose.yml exec postgres psql -U postgres -c \"ALTER USER postgres PASSWORD '<new>'\"): %w", err)
 }

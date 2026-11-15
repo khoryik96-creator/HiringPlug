@@ -169,6 +169,7 @@ func (s *Service) mergeRows(ctx context.Context, tx pgx.Tx, keepRow, dupRow stor
 		if row, err = q.UpdateCandidate(ctx, updateParams(keepID, version, after)); err != nil {
 			return keepRow, err
 		}
+		s.used.learnAny(after) // the duplicate's tags and skills are suggested at once
 	} else {
 		var err error
 		row, err = q.TouchCandidate(ctx, store.TouchCandidateParams{ID: keepID, ExpectedVersion: int32(version)}) //nolint:gosec // checked record version

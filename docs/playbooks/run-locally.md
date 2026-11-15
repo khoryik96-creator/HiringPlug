@@ -54,6 +54,7 @@ HP_AUTH_JWT_SECRET=<32+ random characters>
 HP_FILES_URL_SECRET=<32+ random characters>
 HP_MAIL_KEYS_SECRET=<32+ random characters>
 HP_AI_KEYS_SECRET=<32+ random characters>
+HP_WEBHOOK_KEYS_SECRET=<32+ random characters>
 HP_DB_ADMIN_PASSWORD=<letters and digits>
 HP_DB_API_PASSWORD=<letters and digits>
 HP_DB_AI_PASSWORD=<letters and digits>
@@ -61,7 +62,10 @@ HP_DB_AI_PASSWORD=<letters and digits>
 
 With `HP_ENV=production` HiringPlug refuses to start while any of them is
 still a published default. Set the database passwords before the first start
-(the admin password is fixed when the database is first created). The
+(the admin password is fixed when the database is first created; if you set
+HP_DB_ADMIN_PASSWORD later, HiringPlug stops with a message saying so: change
+it inside the database first, with
+`docker compose -f deploy/docker-compose.yml exec postgres psql -U postgres -c "ALTER USER postgres PASSWORD '<new>'"`). The
 database, the API port and the mail catcher listen on the machine itself only;
 other computers reach the web app (port 3000). Put HTTPS in front (e.g. Caddy).
 

@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -159,7 +158,7 @@ func (s *Service) UpdateAd(ctx context.Context, p authz.Principal, id string, ex
 				return err
 			}
 			becoming := current.Details.Status != "published"
-			if problem := PublishProblem(after, job.Status, today(), becoming); problem != "" {
+			if problem := PublishProblem(after, job.Status, s.today(), becoming); problem != "" {
 				return apperr.New(api.ErrorCodeJOBADNOTPUBLISHABLE, problem)
 			}
 			if becoming {
@@ -253,12 +252,10 @@ func toDate(t *time.Time) pgtype.Date {
 	return pgtype.Date{Time: *t, Valid: true}
 }
 
-// agencyZone is where "today" is (HP_TIME_ZONE): a day is the agency's day,
-// not UTC's, which in Kuala Lumpur is still yesterday until 8 in the morning.
-var agencyZone atomic.Pointer[time.Location]
-
-// UseTimeZone sets the zone the module's dates are in (once, when wired).
-func (m *Module) UseTimeZone(loc *time.Location) { agencyZone.Store(loc) }
+// UseTimeZone sets the agency's time zone (HP_TIME_ZONE), where "today" is:
+// a day is the agency's day, not UTC's, which in Kuala Lumpur is still
+// yesterday until 8 in the morning.
+func (m *Module) UseTimeZone(loc *time.Location) { m.service.zone = loc }
 
 // DayIn is the calendar day of now in loc, at midnight UTC (how days are kept).
 func DayIn(now time.Time, loc *time.Location) time.Time {
@@ -270,12 +267,12 @@ func DayIn(now time.Time, loc *time.Location) time.Time {
 }
 
 // today is the agency's date now.
-func today() time.Time { return DayIn(time.Now(), agencyZone.Load()) }
+func (s *Service) today() time.Time { return DayIn(time.Now(), s.zone) }
 
 // PublishedAds returns the ads on the careers page: published and not past
 // their closing date, newest first, in the caller's transaction.
 func (m *Module) PublishedAds(ctx context.Context, tx pgx.Tx) ([]Ad, error) {
-	rows, err := store.New(tx).ListPublishedAds(ctx, toDate(dayPtr(today())))
+	rows, err := store.New(tx).ListPublishedAds(ctx, toDate(dayPtr(m.service.today())))
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +311,7 @@ func (m *Module) BestAd(ctx context.Context, tx pgx.Tx, jobID string) (*Ad, erro
 // PublishedAd returns one ad on the careers page; anything else (a draft, a
 // closed or expired ad) is not found.
 func (m *Module) PublishedAd(ctx context.Context, tx pgx.Tx, id string) (Ad, error) {
-	row, err := store.New(tx).GetPublishedAd(ctx, store.GetPublishedAdParams{ID: id, Today: toDate(dayPtr(today()))})
+	row, err := store.New(tx).GetPublishedAd(ctx, store.GetPublishedAdParams{ID: id, Today: toDate(dayPtr(m.service.today()))})
 	if database.IsNoRows(err) {
 		return Ad{}, apperr.NotFound("job ad")
 	}

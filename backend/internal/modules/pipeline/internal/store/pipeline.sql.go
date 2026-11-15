@@ -390,7 +390,7 @@ func (q *Queries) MoveApplicationsToCandidate(ctx context.Context, arg MoveAppli
 }
 
 const overlappingApplications = `-- name: OverlappingApplications :many
-SELECT a.id AS from_id, k.id AS to_id, a.job_order_id, a.stage_changed_at AS from_changed_at, k.stage_changed_at AS to_changed_at
+SELECT a.id AS from_id, k.id AS to_id, a.job_order_id
 FROM application a
 JOIN application k ON k.job_order_id = a.job_order_id AND k.candidate_id = $1
 WHERE a.candidate_id = $2
@@ -403,11 +403,9 @@ type OverlappingApplicationsParams struct {
 }
 
 type OverlappingApplicationsRow struct {
-	FromID        string
-	ToID          string
-	JobOrderID    string
-	FromChangedAt time.Time
-	ToChangedAt   time.Time
+	FromID     string
+	ToID       string
+	JobOrderID string
 }
 
 // Merging candidates: the jobs both are on, with each one's application
@@ -421,13 +419,7 @@ func (q *Queries) OverlappingApplications(ctx context.Context, arg OverlappingAp
 	var items []OverlappingApplicationsRow
 	for rows.Next() {
 		var i OverlappingApplicationsRow
-		if err := rows.Scan(
-			&i.FromID,
-			&i.ToID,
-			&i.JobOrderID,
-			&i.FromChangedAt,
-			&i.ToChangedAt,
-		); err != nil {
+		if err := rows.Scan(&i.FromID, &i.ToID, &i.JobOrderID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

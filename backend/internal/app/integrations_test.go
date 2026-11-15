@@ -102,7 +102,7 @@ func (r *receiver) count() int {
 
 func TestWebhooks(t *testing.T) {
 	t.Parallel()
-	a := newTestApp(t)
+	a := newTestApp(t, webhookKeys)
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
 	owner := tenant.Users[api.RoleOwner].Token
 	rec, srv := newReceiver(t)
@@ -169,11 +169,14 @@ func TestWebhooks(t *testing.T) {
 	})
 }
 
+// webhookKeys turns on sealing webhook secrets (HP_WEBHOOK_KEYS_SECRET).
+var webhookKeys = map[string]string{"HP_WEBHOOK_KEYS_SECRET": "test-webhook-keys-secret-0123456789-0123"}
+
 // A webhook saved before secrets were sealed keeps signing with its secret,
 // which is sealed the first time it is used.
 func TestWebhookSecretsSavedBeforeSealingStillWork(t *testing.T) {
 	t.Parallel()
-	a := newTestApp(t)
+	a := newTestApp(t, webhookKeys)
 	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
 	owner := tenant.Users[api.RoleOwner].Token
 	rec, srv := newReceiver(t)

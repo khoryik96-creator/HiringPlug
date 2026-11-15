@@ -19,9 +19,12 @@ func TestTodayIsTheAgencysDay(t *testing.T) {
 	if got := DayIn(morning, nil); !got.Equal(time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("no zone set: %s, want UTC's day", got)
 	}
-	agencyZone.Store(kl)
-	defer agencyZone.Store(nil)
-	if today() != DayIn(time.Now(), kl) {
+	s := &Service{zone: kl}
+	if s.today() != DayIn(time.Now(), kl) {
 		t.Error("today is the agency's")
+	}
+	other := &Service{zone: time.UTC}
+	if other.zone == s.zone {
+		t.Error("each app keeps its own zone: nothing is shared between them")
 	}
 }

@@ -27,6 +27,9 @@ func TestAIStatusTellsWhenTheProviderIsDown(t *testing.T) {
 	other := testutil.Current.NewTenant(t, api.RoleViewer)
 	viewer := tenant.Users[api.RoleViewer].Token
 	ctx := context.Background()
+	// The company uses DeepSeek (its key saved in Settings).
+	_, err := testutil.Current.Admin.Exec(ctx, `INSERT INTO ai_provider_choice (tenant_id, provider, updated_by) VALUES ($1, 'deepseek', 'usr_x')`, tenant.ID)
+	require.NoError(t, err)
 	report := func(ok bool, problem string, at time.Time) {
 		t.Helper()
 		r := api.AiProviderReportedJob{Provider: "deepseek", Ok: ok, At: at, Error: nullable.NewNullNullable[string]()}
@@ -71,4 +74,11 @@ func TestAIStatusTellsWhenTheProviderIsDown(t *testing.T) {
 
 	report(false, "the AI provider could not be reached", time.Now().Add(-2*time.Hour))
 	assert.False(t, status(viewer).Down, "older than the answer")
+
+	// DeepSeek down; the company switches to the server's AI: not its problem now.
+	report(false, "the AI provider could not be reached", time.Now())
+	require.True(t, status(viewer).Down)
+	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE ai_provider_choice SET provider = 'server' WHERE tenant_id = $1`, tenant.ID)
+	require.NoError(t, err)
+	assert.False(t, status(viewer).Down, "another AI is in use now")
 }

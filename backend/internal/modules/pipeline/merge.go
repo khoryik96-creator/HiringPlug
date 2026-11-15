@@ -20,28 +20,23 @@ type Attached func(ctx context.Context, tx pgx.Tx, applicationIDs []string) (map
 func (m *Module) KeepRecordsWith(checks ...Attached) { m.service.attached = checks }
 
 // Overlap is a job both merged candidates are on: the duplicate's
-// application there and the kept candidate's, whether each carries records,
-// and whether the duplicate's stage changed last.
+// application there and the kept candidate's, and whether each carries
+// records.
 type Overlap struct {
-	FromID, ToID      string
-	FromHas, ToHas    bool
-	FromChangedLatest bool
+	FromID, ToID   string
+	FromHas, ToHas bool
 }
 
 // Drop is which of the two applications goes when candidates are merged (a
 // candidate is on a job once), or ok false when neither may: both carry
 // records. An application with interviews, offers or a placement is never
-// the one dropped for a bare one; between two bare ones the one whose stage
-// changed last is the truth and stays.
+// the one dropped for a bare one; between two bare ones the kept candidate's
+// stays, with its fit score and the emails linked to it.
 func (o Overlap) Drop() (id string, ok bool) {
 	switch {
 	case o.FromHas && o.ToHas:
 		return "", false
 	case o.FromHas:
-		return o.ToID, true
-	case o.ToHas:
-		return o.FromID, true
-	case o.FromChangedLatest:
 		return o.ToID, true
 	}
 	return o.FromID, true
@@ -74,8 +69,7 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 		}
 		drop := make([]string, 0, len(rows))
 		for _, r := range rows {
-			id, ok := Overlap{FromID: r.FromID, ToID: r.ToID, FromHas: has[r.FromID], ToHas: has[r.ToID],
-				FromChangedLatest: r.FromChangedAt.After(r.ToChangedAt)}.Drop()
+			id, ok := Overlap{FromID: r.FromID, ToID: r.ToID, FromHas: has[r.FromID], ToHas: has[r.ToID]}.Drop()
 			if !ok {
 				title := "a job"
 				if jobs, err := m.service.jobs.Info(ctx, tx, []string{r.JobOrderID}); err != nil {

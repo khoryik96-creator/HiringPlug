@@ -98,10 +98,28 @@ func TestPlacementBackedOut(t *testing.T) {
 		}
 	})
 
-	t.Run("it can be set by hand on the sheet", func(t *testing.T) {
+	t.Run("set by hand on the sheet, the board follows", func(t *testing.T) {
 		third := a.addToJob(admin.Token, job.Id, a.createCandidate(admin.Token, map[string]any{"firstName": "Lim", "lastName": "Hui"}).Id)
 		made := a.placement(http.MethodPost, "/v1/applications/"+third.Id+"/placement", admin.Token, map[string]any{"startDate": "2026-12-01"}, http.StatusCreated)
 		made = a.placement(http.MethodPatch, "/v1/placements/"+made.Id, admin.Token, map[string]any{"version": made.Version, "status": "backed_out"}, http.StatusOK)
 		assert.Equal(t, api.PlacementStatusBackedOut, made.Status)
+		assert.Equal(t, "offer", string(a.applicationOn(admin.Token, job.Id, third.Id).Stage), "backed out on the sheet: back to Offer on the board")
+
+		made = a.placement(http.MethodPatch, "/v1/placements/"+made.Id, admin.Token, map[string]any{"version": made.Version, "status": "active"}, http.StatusOK)
+		assert.Equal(t, "placed", string(a.applicationOn(admin.Token, job.Id, third.Id).Stage), "active again: placed again")
+
+		// Withdrawn on the board: making the sheet active again asks to reopen first.
+		require.Equal(t, http.StatusOK, a.move(admin.Token, a.applicationOn(admin.Token, job.Id, third.Id),
+			map[string]any{"stage": "withdrawn", "reason": "accepted_other_offer"}).Status)
+		made = a.placements(admin.Token, "").Items[0]
+		for _, item := range a.placements(admin.Token, "").Items {
+			if item.ApplicationId == third.Id {
+				made = item
+			}
+		}
+		require.Equal(t, api.PlacementStatusBackedOut, made.Status)
+		res := a.request(http.MethodPatch, "/v1/placements/"+made.Id, admin.Token, map[string]any{"version": made.Version, "status": "active"})
+		assert.Equal(t, http.StatusUnprocessableEntity, res.Status, "%s", res.Body)
+		assert.Contains(t, res.Error().Error.Message, "Reopen the application")
 	})
 }

@@ -55,7 +55,7 @@ FROM application;
 -- Merging candidates: the jobs both are on, with each one's application
 -- there (one of the two has to go: a candidate is on a job once).
 -- name: OverlappingApplications :many
-SELECT a.id AS from_id, k.id AS to_id, a.job_order_id, a.stage_changed_at AS from_changed_at, k.stage_changed_at AS to_changed_at
+SELECT a.id AS from_id, k.id AS to_id, a.job_order_id
 FROM application a
 JOIN application k ON k.job_order_id = a.job_order_id AND k.candidate_id = @to_id
 WHERE a.candidate_id = @from_id

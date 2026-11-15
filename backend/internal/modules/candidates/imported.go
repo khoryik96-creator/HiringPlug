@@ -108,6 +108,7 @@ func (m *Module) FillFromCV(ctx context.Context, tx pgx.Tx, id string, cv FromCV
 	if _, err := q.UpdateCandidate(ctx, updateParams(id, int(row.Version), normal)); err != nil {
 		return "", err
 	}
+	m.service.used.learnAny(normal) // skills read from the CV are suggested at once
 	if err := m.service.saveIndustries(ctx, tx, id, normal); err != nil {
 		return "", err
 	}

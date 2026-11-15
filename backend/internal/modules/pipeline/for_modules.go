@@ -166,6 +166,28 @@ func reach(ctx context.Context, tx pgx.Tx, id, stage, via string) error {
 	})
 }
 
+// Unplace moves a placed application back to offer, in the caller's
+// transaction: its placement was marked backed out on the placement sheet.
+// The move hooks do not run (the placement is already backed out). Not
+// placed: nothing changes.
+func (m *Module) Unplace(ctx context.Context, tx pgx.Tx, id string) error {
+	q := store.New(tx)
+	row, err := q.GetApplication(ctx, id)
+	if database.IsNoRows(err) {
+		return apperr.NotFound("application")
+	}
+	if err != nil || row.Stage != Placed {
+		return err
+	}
+	if _, err := q.MoveApplication(ctx, store.MoveApplicationParams{ID: id, ExpectedVersion: row.Version, Stage: Offer}); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{
+		Action: "application.moved", EntityType: "application", EntityID: id,
+		Changes: map[string]any{"stage": map[string]string{"from": Placed, "to": Offer}, "via": "placement backed out"},
+	})
+}
+
 // Place moves an application to placed (recording a placement), in the
 // caller's transaction, by the pipeline rules: a closed application is
 // reopened first. Already placed: nothing changes.

@@ -65,6 +65,10 @@ type Config struct {
 	// X-Real-IP). Empty when the API is reached directly. Never a header
 	// clients could set themselves.
 	ClientIPHeader string // HP_CLIENT_IP_HEADER
+	// WebhookKeysSecret seals the webhook signing secrets the database keeps
+	// (empty: they are kept as they are). Its own setting, so changing the
+	// sign-in secret never breaks webhooks.
+	WebhookKeysSecret []byte // HP_WEBHOOK_KEYS_SECRET
 	// PublicURL is where people reach the web app, e.g. https://hire.example.com:
 	// links in job feeds (and later emails) point there.
 	PublicURL string // HP_PUBLIC_URL
@@ -127,6 +131,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxUploadBytes:    r.int64("HP_MAX_UPLOAD_BYTES", 10<<20),
 		DefaultPhoneArea:  strings.ToUpper(r.str("HP_DEFAULT_PHONE_REGION", "MY")),
 		ClientIPHeader:    r.str("HP_CLIENT_IP_HEADER", ""),
+		WebhookKeysSecret: []byte(r.str("HP_WEBHOOK_KEYS_SECRET", "")),
 		PublicURL:         strings.TrimRight(r.url("HP_PUBLIC_URL", "http://localhost:5173"), "/"),
 	}
 	c.LogLevel = r.level("HP_LOG_LEVEL", slog.LevelInfo)
@@ -141,6 +146,9 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if n := len(c.AI.KeysSecret); n > 0 && n < 32 {
 		r.fail("HP_AI_KEYS_SECRET must be at least 32 characters (or empty: companies cannot save AI keys)")
+	}
+	if n := len(c.WebhookKeysSecret); n > 0 && n < 32 {
+		r.fail("HP_WEBHOOK_KEYS_SECRET must be at least 32 characters (or empty)")
 	}
 	if c.WorkerConcurrency < 1 || c.WorkerConcurrency > 32 {
 		r.fail("HP_WORKER_CONCURRENCY must be 1 to 32")
@@ -202,6 +210,9 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 		if strings.HasPrefix(string(c.AI.KeysSecret), "dev-only-") {
 			r.fail("HP_AI_KEYS_SECRET must be a real secret in production (or empty)")
+		}
+		if strings.HasPrefix(string(c.WebhookKeysSecret), "dev-only-") {
+			r.fail("HP_WEBHOOK_KEYS_SECRET must be a real secret in production (or empty)")
 		}
 		if strings.HasPrefix(string(c.MailConnections.KeysSecret), "dev-only-") {
 			r.fail("HP_MAIL_KEYS_SECRET must be a real secret in production (or empty: no mailboxes can be connected)")

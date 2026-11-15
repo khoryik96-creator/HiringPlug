@@ -42,6 +42,12 @@ func ProviderLabel(provider string) string {
 	return "The server's AI"
 }
 
+// InUse reports whether a report about provider is about the AI the company
+// uses now (by its choice: a provider, "server" or "off").
+func InUse(reported, choice string) bool {
+	return choice != "off" && reported == choice
+}
+
 // IsDown reports whether the provider counts as down now: its latest call
 // failed (no answer since), within DownFor.
 func IsDown(lastOK, failedAt *time.Time, now time.Time) bool {
@@ -76,7 +82,8 @@ func (s *Service) reported(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 func (s *Service) Status(ctx context.Context, p authz.Principal, now time.Time) (Status, error) {
 	var out Status
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		row, err := store.New(tx).ProviderStatus(ctx)
+		q := store.New(tx)
+		row, err := q.ProviderStatus(ctx)
 		if database.IsNoRows(err) {
 			return nil // nothing tried yet
 		}
@@ -84,6 +91,15 @@ func (s *Service) Status(ctx context.Context, p authz.Principal, now time.Time) 
 			return err
 		}
 		if !IsDown(row.LastOkAt, row.FailedAt, now) {
+			return nil
+		}
+		// A failure of a provider the company has since moved away from (or
+		// AI turned off) is not today's problem.
+		choice, err := choiceIn(ctx, q)
+		if err != nil {
+			return err
+		}
+		if !InUse(row.Provider, choice) {
 			return nil
 		}
 		out = Status{Down: true, Provider: ProviderLabel(row.Provider), Since: row.FailingSince, FailedAt: row.FailedAt}

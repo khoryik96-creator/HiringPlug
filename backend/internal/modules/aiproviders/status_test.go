@@ -28,3 +28,12 @@ func TestIsDown(t *testing.T) {
 		t.Error("the notice numbers the providers instead of naming them")
 	}
 }
+
+func TestOnlyTheAIInUseCountsAsDown(t *testing.T) {
+	if !InUse("deepseek", "deepseek") || !InUse("server", "server") {
+		t.Error("the AI in use")
+	}
+	if InUse("deepseek", "claude") || InUse("deepseek", "off") || InUse("server", "off") {
+		t.Error("switched away, or AI off: not down")
+	}
+}

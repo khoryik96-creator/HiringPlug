@@ -6,6 +6,7 @@ package candidates
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,9 +30,10 @@ type Service struct {
 	rules       FieldRules // the company's mandatory fields and sources
 	salaryRules SalaryRules
 	movers      []RecordMover
-	notes       Notes     // screening calls' notes
-	cvs         CVs       // CV text, for advanced search
-	used        usedCache // the suggestions of values already used
+	notes       Notes          // screening calls' notes
+	cvs         CVs            // CV text, for advanced search
+	used        usedCache      // the suggestions of values already used
+	zone        *time.Location // the agency's time zone: what day it is (UseTimeZone)
 }
 
 // Create adds a candidate.

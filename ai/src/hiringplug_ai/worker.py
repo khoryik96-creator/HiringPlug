@@ -25,14 +25,20 @@ from .config import Config, ConfigError, load_config
 from .contracts import JobKind
 from .download import download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
-from .jobs import HANDLERS, Deps, ProviderLog
+from .jobs import HANDLERS, Deps, ProviderLog, ReportGate
 from .providers import OpenAICompatible, connect
 from .queue import ClaimedJob, LeaseLostError, Queue
 
 log = logging.getLogger("hiringplug_ai.worker")
 
 
-def process(queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None = None) -> None:
+# Which provider outcomes are told to the app (see ReportGate).
+GATE = ReportGate()
+
+
+def process(
+    queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None = None, gate: ReportGate = GATE
+) -> None:
     with logs.context(
         job_id=job.id,
         job_kind=job.kind,
@@ -49,7 +55,11 @@ def process(queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None
             if lease_seconds:
                 deps = dataclasses.replace(deps, keep_alive=lambda: queue.extend(job, lease_seconds))
             follow_ups = handler.run(payload, deps)
-            report = calls.report()
+            report = (
+                calls.report()
+                if calls.ok is not None and gate.should(job.tenant_id, calls.provider, calls.ok)
+                else None
+            )
             queue.complete(job, [*follow_ups, report] if report else follow_ups)
             log.info("job done", extra={"duration_ms": int((time.monotonic() - started) * 1000)})
         except LeaseLostError:
@@ -57,9 +67,10 @@ def process(queue: Queue, job: ClaimedJob, deps: Deps, lease_seconds: int | None
         except Exception as exc:  # every failure must be recorded on the job
             status = queue.fail(job, f"{type(exc).__name__}: {exc}")
             log.exception("job failed", extra={"new_status": status, "max_attempts": job.max_attempts})
-            report = calls.report()
             # The provider is why: say so now, not after the retries.
-            if report is not None and calls.ok is False:
+            failed = calls.ok is False and gate.should(job.tenant_id, calls.provider, False)
+            report = calls.report() if failed else None
+            if report is not None:
                 try:
                     queue.enqueue(job, report)
                 except psycopg.Error:  # telling is best effort; the failure itself is recorded

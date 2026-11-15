@@ -104,6 +104,9 @@ type Applications interface {
 	// JobExists reports whether the job exists (for its retainer).
 	JobExists(ctx context.Context, tx pgx.Tx, jobID string) (bool, error)
 	Place(ctx context.Context, tx pgx.Tx, id string) error
+	// Unplace moves a placed application back to offer (its placement was
+	// backed out on the sheet).
+	Unplace(ctx context.Context, tx pgx.Tx, id string) error
 }
 
 // Users checks and names the recruiters credited (identity module).

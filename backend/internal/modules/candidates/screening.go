@@ -6,7 +6,6 @@ package candidates
 import (
 	"context"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -79,12 +78,10 @@ func SalaryFollows(calledOn time.Time, latest *time.Time) bool {
 	return latest == nil || !calledOn.Before(*latest)
 }
 
-// agencyZone is where "today" is (HP_TIME_ZONE): a day is the agency's day,
-// not UTC's, which in Kuala Lumpur is still yesterday until 8 in the morning.
-var agencyZone atomic.Pointer[time.Location]
-
-// UseTimeZone sets the zone the module's dates are in (once, when wired).
-func (m *Module) UseTimeZone(loc *time.Location) { agencyZone.Store(loc) }
+// UseTimeZone sets the agency's time zone (HP_TIME_ZONE), where "today" is:
+// a day is the agency's day, not UTC's, which in Kuala Lumpur is still
+// yesterday until 8 in the morning.
+func (m *Module) UseTimeZone(loc *time.Location) { m.service.zone = loc }
 
 // DayIn is the calendar day of now in loc, at midnight UTC (how days are kept).
 func DayIn(now time.Time, loc *time.Location) time.Time {
@@ -96,7 +93,7 @@ func DayIn(now time.Time, loc *time.Location) time.Time {
 }
 
 // today is the agency's date now.
-func today() time.Time { return DayIn(time.Now(), agencyZone.Load()) }
+func (s *Service) today() time.Time { return DayIn(time.Now(), s.zone) }
 
 // RecordScreening saves a screening call in one transaction: the profile
 // fields asked, the salary, and the notes.
@@ -113,14 +110,14 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 			return ScreeningResult{}, err
 		}
 	}
-	calledOn, calledBy := today(), p.UserID
+	calledOn, calledBy := s.today(), p.UserID
 	if in.CalledOn != nil {
 		calledOn = *in.CalledOn
 	}
 	if in.CalledBy != nil {
 		calledBy = *in.CalledBy
 	}
-	if calledOn.After(today().AddDate(0, 0, 1)) { // a day's grace for someone ahead of the agency's time zone
+	if calledOn.After(s.today().AddDate(0, 0, 1)) { // a day's grace for someone ahead of the agency's time zone
 		var errs apperr.FieldErrors
 		errs.Add("calledOn", "cannot be in the future")
 		return ScreeningResult{}, errs.Err()
@@ -175,7 +172,7 @@ func (s *Service) RecordScreening(ctx context.Context, p authz.Principal, id str
 				return apperr.New(api.ErrorCodeINTERNAL, "notes are not available")
 			}
 			body := notes
-			if calledBy != p.UserID || !calledOn.Equal(today()) {
+			if calledBy != p.UserID || !calledOn.Equal(s.today()) {
 				// Who made the call and when, when that is not the note's own author and day.
 				body = "Call on " + calledOn.Format("2 Jan 2006") + " by " + byName + "\n\n" + notes
 			}

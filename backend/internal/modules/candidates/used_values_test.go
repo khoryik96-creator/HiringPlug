@@ -39,3 +39,16 @@ func TestSuggestionsAreRememberedUntilSomethingNewIsSaved(t *testing.T) {
 		t.Fatal("counted again after a few minutes")
 	}
 }
+
+func TestAProfileWrittenElsewhereRefreshesTheSuggestions(t *testing.T) {
+	c := usedCache{}
+	c.put("tnt_a", "all", UsedValues{Skills: []string{"Audit"}})
+	c.put("tnt_b", "all", UsedValues{Skills: []string{"Audit", "SAP S/4HANA"}})
+	c.learnAny(Profile{Skills: []string{"SAP S/4HANA"}}) // read from an imported CV
+	if _, ok := c.get("tnt_a", "all"); ok {
+		t.Error("a company without the new skill counts its suggestions again")
+	}
+	if _, ok := c.get("tnt_b", "all"); !ok {
+		t.Error("one that already suggests it keeps its suggestions")
+	}
+}

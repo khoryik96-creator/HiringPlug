@@ -20,7 +20,7 @@ from hiringplug_ai.contracts import (
     JobKind,
 )
 from hiringplug_ai.extraction import DEFAULT_LIMITS
-from hiringplug_ai.jobs import HANDLERS, Deps, ProviderLog, ai_check, assistant_ask
+from hiringplug_ai.jobs import HANDLERS, Deps, ProviderLog, ReportGate, ai_check, assistant_ask
 from hiringplug_ai.jobs import Handler as JobHandler
 from hiringplug_ai.keys import SealedKeyError, open_key
 from hiringplug_ai.providers import Completion, ProviderError, connect
@@ -345,8 +345,8 @@ def test_each_request_closes_its_connections() -> None:
     assert client.is_closed, "a worker must not keep a connection pool open per call"
 
 
-# The worker tells the app whether the provider answered each job's last
-# call, so people see a notice when the AI is down.
+# The worker tells the app whether the provider answered, so people see a
+# notice when the AI is down. A test handler stands for any AI job.
 
 
 class RecordingQueue:
@@ -366,13 +366,15 @@ class RecordingQueue:
         self.enqueued.append(follow_up)
 
 
-def check_job() -> ClaimedJob:
-    access = {"provider": "deepseek", "model": "deepseek-chat", "sealedKey": "v1.sealed"}
+ACCESS = {"provider": "deepseek", "model": "deepseek-chat", "sealedKey": "v1.sealed"}
+
+
+def ai_job(kind: str = "aiprovider.check") -> ClaimedJob:
     return ClaimedJob(
         id="job_01jbz6w0m0k8q9x2r3s4t5v6w7",
         tenant_id="tnt_01jbz6w0m0k8q9x2r3s4t5v6w7",
-        kind="aiprovider.check",
-        payload={"provider": "deepseek", "access": access},
+        kind=kind,
+        payload={"provider": "deepseek", "access": ACCESS},
         attempts=1,
         max_attempts=5,
         request_id="req_test",
@@ -384,39 +386,10 @@ def reported(f: FollowUp) -> AiProviderReportedJob:
     return AiProviderReportedJob.model_validate(f.payload.model_dump(mode="json"))
 
 
-def test_a_job_whose_provider_fails_tells_the_app_why() -> None:
-    queue = RecordingQueue()
-    down = ProviderError("the AI provider could not be reached")
-    process(queue, check_job(), deps(company=Fake(down)))  # type: ignore[arg-type]
-    assert queue.failed == []
-    [_result, report] = queue.completed[0]
-    r = reported(report)
-    assert (r.provider, r.ok, r.error) == ("deepseek", False, "the AI provider could not be reached")
-
-
-def test_a_job_whose_provider_answers_says_so_and_clears_the_notice() -> None:
-    queue = RecordingQueue()
-    process(queue, check_job(), deps(company=Fake(OK)))  # type: ignore[arg-type]
-    r = reported(queue.completed[0][-1])
-    assert (r.provider, r.ok, r.error) == ("deepseek", True, None)
-
-
-def test_a_job_that_calls_no_provider_reports_nothing() -> None:
-    log = ProviderLog()
-    assert log.report() is None
-
-
-def test_a_key_that_cannot_be_opened_is_reported_too() -> None:
-    queue = RecordingQueue()
-    process(queue, check_job(), deps())  # type: ignore[arg-type]  # no HP_AI_KEYS_SECRET: connect is None
-    r = reported(queue.completed[0][-1])
-    assert r.ok is False
-    assert "HP_AI_KEYS_SECRET" in (r.error or "")
-
-
-def test_a_job_that_dies_on_the_provider_still_tells_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A handler that lets the provider's error out fails the job (it is
-    retried); the app is told at once, not after the last retry."""
+@pytest.fixture
+def an_ai_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check job's kind runs a plain AI job: it calls the provider and
+    lets a ProviderError fail the job, as an AI job may."""
 
     def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
         ai = deps.provider(payload.access)
@@ -425,10 +398,64 @@ def test_a_job_that_dies_on_the_provider_still_tells_the_app(monkeypatch: pytest
         return []
 
     monkeypatch.setitem(HANDLERS, JobKind.aiprovider_check, JobHandler(AiProviderCheckJob, run))
+
+
+@pytest.mark.usefixtures("an_ai_job")
+def test_a_job_whose_provider_fails_tells_the_app_why_at_once() -> None:
     queue = RecordingQueue()
-    down = ProviderError("the AI provider did not answer in time")
-    process(queue, check_job(), deps(company=Fake(down)))  # type: ignore[arg-type]
+    down = ProviderError("the AI provider could not be reached")
+    process(queue, ai_job(), deps(company=Fake(down)), gate=ReportGate())  # type: ignore[arg-type]
     assert queue.completed == []
-    assert len(queue.failed) == 1
+    assert len(queue.failed) == 1, "the job is retried"
     [report] = queue.enqueued
-    assert reported(report).error == "the AI provider did not answer in time"
+    r = reported(report)
+    assert (r.provider, r.ok, r.error) == ("deepseek", False, "the AI provider could not be reached")
+
+
+@pytest.mark.usefixtures("an_ai_job")
+def test_a_job_whose_provider_answers_says_so() -> None:
+    queue = RecordingQueue()
+    process(queue, ai_job(), deps(company=Fake(OK)), gate=ReportGate())  # type: ignore[arg-type]
+    r = reported(queue.completed[0][-1])
+    assert (r.provider, r.ok, r.error) == ("deepseek", True, None)
+
+
+@pytest.mark.usefixtures("an_ai_job")
+def test_a_key_that_cannot_be_opened_is_reported_too() -> None:
+    queue = RecordingQueue()
+    process(queue, ai_job(), deps(), gate=ReportGate())  # type: ignore[arg-type]  # no HP_AI_KEYS_SECRET: connect is None
+    [report] = queue.enqueued
+    assert reported(report).ok is False
+    assert "HP_AI_KEYS_SECRET" in (reported(report).error or "")
+
+
+def test_a_job_that_calls_no_provider_reports_nothing() -> None:
+    assert ProviderLog().report() is None
+
+
+def test_checking_a_key_in_settings_is_never_reported_as_an_outage() -> None:
+    """Trying a wrong key of a provider the company does not use says nothing
+    about the AI in use."""
+    queue = RecordingQueue()
+    down = ProviderError("the AI provider refused the API key")
+    process(queue, ai_job(), deps(company=Fake(down)), gate=ReportGate())  # type: ignore[arg-type]
+    [follow_ups] = queue.completed
+    assert [f.kind for f in follow_ups] == [JobKind.aiprovider_checked], "the check's result only"
+    assert queue.enqueued == []
+
+
+def test_only_changes_are_reported_during_a_big_import() -> None:
+    now = [0.0]
+    gate = ReportGate(clock=lambda: now[0])
+    tenant = "tnt_01jbz6w0m0k8q9x2r3s4t5v6w7"
+    assert gate.should(tenant, "deepseek", True), "the first answer is told (it clears an old notice)"
+    assert not any(gate.should(tenant, "deepseek", True) for _ in range(1000)), "the next thousand are not"
+    assert gate.should(tenant, "deepseek", False), "a failure is told at once"
+    assert not gate.should(tenant, "deepseek", False), "and again only after a minute"
+    now[0] += 61
+    assert gate.should(tenant, "deepseek", False), "so the notice stays up while it fails"
+    assert gate.should(tenant, "deepseek", True), "answering again is told at once"
+    assert gate.should(tenant, "claude", True), "another provider is a change"
+    assert gate.should("tnt_other", "claude", True), "each company on its own"
+    now[0] += 601
+    assert gate.should(tenant, "claude", True), "and an answer is told again every ten minutes"

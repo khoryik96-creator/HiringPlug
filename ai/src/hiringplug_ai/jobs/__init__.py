@@ -9,6 +9,8 @@ code and easy to test.
 from __future__ import annotations
 
 import dataclasses
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -77,6 +79,33 @@ class ProviderLog:
                 at=datetime.now(UTC),
             ),
         )
+
+
+class ReportGate:
+    """Which provider outcomes are worth telling the app: a change (it failed,
+    or answered again), and otherwise at most once a minute while it fails
+    (keeping the notice up) and once every ten minutes while it answers. A big
+    import makes thousands of AI calls: without this, each would queue a job
+    and update the same row. Shared by the worker's slots (threads)."""
+
+    STILL_FAILING_EVERY = 60.0
+    STILL_ANSWERING_EVERY = 600.0
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._last: dict[str, tuple[str, bool, float]] = {}
+        self._lock = threading.Lock()
+
+    def should(self, tenant_id: str, provider: str, ok: bool) -> bool:
+        now = self._clock()
+        with self._lock:
+            prev = self._last.get(tenant_id)
+            if prev is not None and prev[0] == provider and prev[1] == ok:
+                every = self.STILL_ANSWERING_EVERY if ok else self.STILL_FAILING_EVERY
+                if now - prev[2] < every:
+                    return False
+            self._last[tenant_id] = (provider, ok, now)
+            return True
 
 
 @dataclass(frozen=True)

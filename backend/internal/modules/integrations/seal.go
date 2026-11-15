@@ -11,22 +11,37 @@ import (
 )
 
 // Webhook signing secrets are sealed (AES-256-GCM) before they are stored,
-// so a database dump or a backup file does not give them away. The key comes
-// from the server's own secret; the company is bound in, so a sealed secret
-// copied to another company's webhook does not open.
+// so a database dump or a backup does not give them away. The key comes from
+// HP_WEBHOOK_KEYS_SECRET, a setting of its own: changing the sign-in secret
+// never breaks webhooks. The company is bound in, so a sealed secret copied
+// to another company's webhook does not open. Without that setting, secrets
+// are kept as they are.
 
 const sealedPrefix = "v1."
 
 // Sealer seals and opens webhook secrets.
-type Sealer struct{ key [32]byte }
-
-// NewSealer derives the sealing key from the server's secret.
-func NewSealer(serverSecret []byte) Sealer {
-	return Sealer{key: sha256.Sum256(append([]byte("hiringplug-webhook-secret:"), serverSecret...))}
+type Sealer struct {
+	key    *[32]byte // nil: secrets are kept as they are
+	legacy *[32]byte // the key of an earlier version (derived from the sign-in secret), to open what it sealed
 }
 
-func (s Sealer) gcm() (cipher.AEAD, error) {
-	block, err := aes.NewCipher(s.key[:])
+func derive(secret []byte) *[32]byte {
+	if len(secret) == 0 {
+		return nil
+	}
+	k := sha256.Sum256(append([]byte("hiringplug-webhook-secret:"), secret...))
+	return &k
+}
+
+// NewSealer seals with keysSecret (HP_WEBHOOK_KEYS_SECRET; empty: no
+// sealing). legacySecret is the sign-in secret, which an earlier version
+// sealed with: what it sealed still opens, and is sealed again with the key.
+func NewSealer(keysSecret, legacySecret []byte) Sealer {
+	return Sealer{key: derive(keysSecret), legacy: derive(legacySecret)}
+}
+
+func gcmOf(key *[32]byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key[:])
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +50,10 @@ func (s Sealer) gcm() (cipher.AEAD, error) {
 
 // Seal returns the secret as it is stored.
 func (s Sealer) Seal(tenantID, secret string) (string, error) {
-	gcm, err := s.gcm()
+	if s.key == nil {
+		return secret, nil
+	}
+	gcm, err := gcmOf(s.key)
 	if err != nil {
 		return "", err
 	}
@@ -46,25 +64,32 @@ func (s Sealer) Seal(tenantID, secret string) (string, error) {
 	return sealedPrefix + base64.RawURLEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(secret), []byte("webhook:"+tenantID))), nil
 }
 
-// ErrSecretLost: the stored secret cannot be opened (the server's secret
-// changed since it was saved).
-var ErrSecretLost = errors.New("the webhook's signing secret can no longer be opened (the server's secret changed): remove this webhook and add it again")
+// ErrSecretLost: the stored secret cannot be opened (HP_WEBHOOK_KEYS_SECRET
+// changed or was removed since it was saved).
+var ErrSecretLost = errors.New("the webhook's signing secret can no longer be opened (HP_WEBHOOK_KEYS_SECRET changed or was removed): remove this webhook and add it again")
 
-// Open returns the secret from what is stored. One stored before sealing
-// (as it was made: whsec_...) is returned as it is; sealed reports whether
-// it was sealed.
-func (s Sealer) Open(tenantID, stored string) (secret string, sealed bool, err error) {
+// Open returns the secret from what is stored, and whether it should be
+// stored again (kept as it was while a key is set, or sealed by an earlier
+// version's key).
+func (s Sealer) Open(tenantID, stored string) (secret string, restore bool, err error) {
 	if !strings.HasPrefix(stored, sealedPrefix) {
-		return stored, false, nil
+		return stored, s.key != nil, nil
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(stored, sealedPrefix))
-	gcm, gerr := s.gcm()
-	if err != nil || gerr != nil || len(raw) <= gcm.NonceSize() {
-		return "", true, ErrSecretLost
-	}
-	plain, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], []byte("webhook:"+tenantID))
 	if err != nil {
-		return "", true, ErrSecretLost
+		return "", false, ErrSecretLost
 	}
-	return string(plain), true, nil
+	for i, key := range []*[32]byte{s.key, s.legacy} {
+		if key == nil {
+			continue
+		}
+		gcm, err := gcmOf(key)
+		if err != nil || len(raw) <= gcm.NonceSize() {
+			return "", false, ErrSecretLost
+		}
+		if plain, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], []byte("webhook:"+tenantID)); err == nil {
+			return string(plain), i == 1, nil
+		}
+	}
+	return "", false, ErrSecretLost
 }

@@ -70,3 +70,24 @@ func (m *Module) OnApplications(ctx context.Context, tx pgx.Tx, applicationIDs [
 	}
 	return out, err
 }
+
+// followOnBoard keeps the board in step with a status set on the sheet:
+// backed out moves the candidate back to Offer; one that did not start or was
+// backed out of, made active again, places them (a rejected or withdrawn
+// application must be reopened first).
+func (s *Service) followOnBoard(ctx context.Context, tx pgx.Tx, appID, before, after string) error {
+	switch {
+	case before == Active && after == BackedOut:
+		return s.applications.Unplace(ctx, tx, appID)
+	case !Stood(before) && Stood(after):
+		apps, err := s.applications.Briefs(ctx, tx, []string{appID})
+		if err != nil {
+			return err
+		}
+		if app := apps[appID]; app.Stage == "rejected" || app.Stage == "withdrawn" {
+			return notAllowed("Reopen the application (move it to an open stage) before making the placement active again.")
+		}
+		return s.applications.Place(ctx, tx, appID)
+	}
+	return nil
+}

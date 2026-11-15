@@ -23,14 +23,18 @@ type Service struct {
 	companies Companies
 	contacts  Contacts
 	users     Users
-	rules     FieldRules  // the company's mandatory fields
-	files     *blob.Store // uploaded job descriptions
-	ai        AI          // the company's AI, for blind ad rewrites (nil: off)
+	rules     FieldRules     // the company's mandatory fields
+	files     *blob.Store    // uploaded job descriptions
+	ai        AI             // the company's AI, for blind ad rewrites (nil: off)
+	zone      *time.Location // the agency's time zone: what day it is (UseTimeZone)
 }
 
 // Create adds a job; jdFileID (or "") is the job description its form was
 // filled in from, kept with the job.
 func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, jdFileID string) (View, error) {
+	if in.IntakeDate.IsZero() {
+		in.IntakeDate = s.today() // today, the agency's day, unless chosen
+	}
 	d, errs := Normalize(in)
 	if err := errs.Err(); err != nil {
 		return View{}, err

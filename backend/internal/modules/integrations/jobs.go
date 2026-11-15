@@ -37,12 +37,12 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		msg := "The webhook is turned off."
 		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg})
 	}
-	secret, sealed, err := s.sealer.Open(job.TenantID, d.Secret)
+	secret, restore, err := s.sealer.Open(job.TenantID, d.Secret)
 	if err != nil {
 		msg := err.Error()
 		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg})
 	}
-	if !sealed { // saved before secrets were sealed: sealed now
+	if restore { // saved in the clear, or sealed by an earlier version's key: sealed (again) now
 		if stored, err := s.sealer.Seal(job.TenantID, secret); err != nil {
 			return err
 		} else if err := q.SealWebhookSecret(ctx, store.SealWebhookSecretParams{Sealed: stored, Plain: d.Secret}); err != nil {

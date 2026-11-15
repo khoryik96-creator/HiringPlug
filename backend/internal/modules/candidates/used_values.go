@@ -104,6 +104,22 @@ func (c *usedCache) learn(tenantID string, p Profile) {
 	}
 }
 
+// learnAny is learn when the company is not at hand (a profile written in
+// another module's transaction: CV reading, imports, merges): the
+// suggestions of every company that lacks one of these labels are
+// forgotten. Counting them again is cheap next to suggesting stale ones.
+func (c *usedCache) learnAny(p Profile) {
+	c.mu.Lock()
+	tenants := make([]string, 0, len(c.entries))
+	for t := range c.entries {
+		tenants = append(tenants, t)
+	}
+	c.mu.Unlock()
+	for _, t := range tenants {
+		c.learn(t, p)
+	}
+}
+
 // Used returns the values already used, for suggestions.
 func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, error) {
 	scope := p.ScopeUsersSetting() + "|" + p.ScopeJobsSetting()

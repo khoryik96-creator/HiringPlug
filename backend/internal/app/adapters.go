@@ -133,6 +133,10 @@ func (a placementApplications) Briefs(ctx context.Context, tx pgx.Tx, ids []stri
 	return out, nil
 }
 
+func (a placementApplications) Unplace(ctx context.Context, tx pgx.Tx, id string) error {
+	return a.pipeline.Unplace(ctx, tx, id)
+}
+
 func (a placementApplications) Place(ctx context.Context, tx pgx.Tx, id string) error {
 	return a.pipeline.Place(ctx, tx, id)
 }

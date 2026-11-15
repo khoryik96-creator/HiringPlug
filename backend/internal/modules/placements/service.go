@@ -178,6 +178,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, vers
 				return err
 			}
 		}
+		// The board follows the sheet: backed out moves the candidate back to
+		// Offer; active again places them (a withdrawn one is reopened first).
+		if err := s.followOnBoard(ctx, tx, row.ApplicationID, before.Status, after.Status); err != nil {
+			return err
+		}
 		updated, err := q.UpdatePlacement(ctx, store.UpdatePlacementParams{
 			ID: id, ExpectedVersion: int32(version), //nolint:gosec // versions are small
 			RecruiterID: after.RecruiterID, StartDate: after.StartDate, GuaranteeDays: int32(after.GuaranteeDays), //nolint:gosec // 0..365

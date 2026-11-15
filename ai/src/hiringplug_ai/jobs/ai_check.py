@@ -3,6 +3,7 @@ whether the key and model it saved in Settings work."""
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,9 @@ MAX_TOKENS = 16
 
 def run(payload: AiProviderCheckJob, deps: Deps) -> list[FollowUp]:
     message: str | None = None
+    # Checking a key (often of a provider the company does not use yet) says
+    # nothing about the AI in use: it is not reported as an outage.
+    deps = dataclasses.replace(deps, log=None)
     try:
         ai = deps.provider(payload.access)
         if ai is None:  # cannot happen: a check always carries the access

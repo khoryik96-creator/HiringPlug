@@ -14,6 +14,7 @@
 #   HP_FILES_URL_SECRET=...      32+ random characters (signs file links)
 #   HP_MAIL_KEYS_SECRET=...      32+ random characters (seals mailbox sign-ins)
 #   HP_AI_KEYS_SECRET=...        32+ random characters (seals AI keys)
+#   HP_WEBHOOK_KEYS_SECRET=...   32+ random characters (seals webhook secrets)
 #   HP_DB_ADMIN_PASSWORD=...     letters and digits; set before the first start
 #   HP_DB_API_PASSWORD=...  HP_DB_AI_PASSWORD=...
 # The database, the API port and the mail catcher listen on this machine only
@@ -50,6 +51,8 @@ x-backend-env: &backend-env
   HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
   # Seals the AI keys companies enter in Settings > AI provider (the AI worker opens them).
   HP_AI_KEYS_SECRET: ${HP_AI_KEYS_SECRET:-dev-only-ai-keys-secret-change-me-0123456789}
+  # Seals webhook signing secrets in the database (empty: kept as they are).
+  HP_WEBHOOK_KEYS_SECRET: ${HP_WEBHOOK_KEYS_SECRET:-}
   HP_AI_MONTHLY_TOKENS: ${HP_AI_MONTHLY_TOKENS:-2000000}
 
 services:

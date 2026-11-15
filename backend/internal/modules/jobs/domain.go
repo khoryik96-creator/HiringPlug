@@ -114,9 +114,6 @@ func Normalize(d Details) (Details, apperr.FieldErrors) {
 	if d.Openings == 0 {
 		d.Openings = 1
 	}
-	if d.IntakeDate.IsZero() {
-		d.IntakeDate = today()
-	}
 	if d.Location != nil {
 		t := strings.Join(strings.Fields(*d.Location), " ")
 		d.Location = &t
