@@ -69,6 +69,13 @@ describe("candidate banner", () => {
     expect(sinceText(new Date(2026, 10, 7, 23, 0).toISOString(), new Date(2026, 10, 8, 9, 0))).toBe("since 7 Nov 2026 · 1 day");
   });
 
+  it("shows a dash, not \"NA\", where it does not know where they live", () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    renderWithClient(<CandidateBanner candidate={testCandidate({ residenceCountry: null, location: null })} canEdit={false} />);
+    const lives = screen.getByText("Lives in").nextElementSibling;
+    expect(lives?.textContent).toBe("—");
+  });
+
   it("says when the salary is restricted for the role", () => {
     settings();
     renderWithClient(<CandidateBanner canEdit={false} candidate={testCandidate({ restrictedFields: ["compensation"] })} />);

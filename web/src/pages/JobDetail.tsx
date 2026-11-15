@@ -16,12 +16,16 @@ import { JobSalaryPanel } from "../components/JobSalaryPanel";
 import { Owner } from "../components/Owner";
 import { PipelineBoard } from "../components/PipelineBoard";
 import { PossibleCandidates } from "../components/PossibleCandidates";
+import { type Section, SectionTabs } from "../components/SectionTabs";
 import { countryName, formatDay } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
 
-/** One job. Render it with key={id} so edit state never carries over. */
+type JobTab = "activity" | "details" | "ads" | "market" | "money";
+
+/** One job: the pipeline on top, the rest in tabs. Render it with key={id} so edit state never carries over. */
 export function JobDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<JobTab>("activity");
   const fs = useFieldSettings();
   const queryClient = useQueryClient();
   const job = useQuery({
@@ -38,8 +42,25 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
     `${String(j.openings)} opening${j.openings === 1 ? "" : "s"}`,
     `intake ${formatDay(j.intakeDate)}`,
   ].filter(Boolean).join(" · ");
+  const sections: Section<JobTab>[] = [
+    { id: "activity", label: "Notes & activity", content: <Timeline subjectType="job" subjectId={j.id} permissions={permissions} /> },
+    { id: "details", label: "Job details", content: (
+      <section className="panel" aria-label="Job details">
+        <p>{facts}</p>
+        <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
+        <JdFiles jobId={j.id} permissions={permissions} />
+      </section>
+    ) },
+    { id: "ads", label: "Job ads", content: <JobAds job={j} canEdit={permissions.includes("jobs:update")} /> },
+    { id: "market", label: "Market map", content: <MarketMap jobId={j.id} permissions={permissions} /> },
+    { id: "money", label: "Budget & retainer", content: <>
+      <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
+      <JobRetainer jobId={j.id} permissions={permissions} />
+    </> },
+  ];
+
   return (
-    <main>
+    <main className="list-page">
       <a href="#/jobs">← Jobs</a>
       {job.error && (
         <ErrorMessage error={job.error}>
@@ -72,20 +93,12 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
           <PossibleCandidates jobId={j.id} permissions={permissions} />
         </PipelineBoard>
       )}
-      <Timeline subjectType="job" subjectId={j.id} permissions={permissions} />
-      {!editing && (
-        <details className="panel fold" aria-label="Job details">
-          <summary><span className="fold-title">Job details</span></summary>
-          <p>{facts}</p>
-          <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
-          <JdFiles jobId={j.id} permissions={permissions} />
+      <SectionTabs name="job" label="Job sections" sections={sections} active={tab} onChange={setTab} />
+      {permissions.includes("assistant:use") && (
+        <details className="candidate-assistant"><summary>AI assistant</summary>
+          <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
         </details>
       )}
-      <JobAds job={j} canEdit={permissions.includes("jobs:update")} />
-      <MarketMap jobId={j.id} permissions={permissions} />
-      <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
-      <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
-      <JobRetainer jobId={j.id} permissions={permissions} />
     </main>
   );
 }

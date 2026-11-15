@@ -79,3 +79,9 @@
 .status-chip { display: inline-block; font-size: 0.78rem; font-weight: 650; padding: 0.15rem 0.6rem; border-radius: 999px; border: 1.5px solid #15803d; color: #15803d; background: #f0fdf4; white-space: nowrap; }
 .status-chip.left { border-color: #b91c1c; color: #b91c1c; background: #fef2f2; }
 @media (max-width: 760px) { .company-banner .banner-strip.four { grid-template-columns: 1fr; } }
+
+/* On a phone the candidate's actions stay on one line (swipe for more). */
+@media (max-width: 640px) {
+  .candidate-actions { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding-bottom: 2px; }
+  .candidate-actions > * { flex: none; min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.88rem; }
+}

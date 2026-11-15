@@ -17,7 +17,8 @@ export const preferencesKey = ["me", "preferences"] as const;
 const saveColumnsKey = ["save-candidate-columns"] as const;
 
 /** What a list shows until its person chooses. */
-export const DEFAULT_COLUMNS: Column[] = ["currentRole", "status", "noticePeriod", "currentSalary", "expectedSalary", "workAuthorization", "email"];
+// Work authorization is not one: it shows under each name, in colour.
+export const DEFAULT_COLUMNS: Column[] = ["currentRole", "status", "noticePeriod", "currentSalary", "expectedSalary", "email"];
 
 const restricted = <span className="muted">Restricted</span>;
 const pair = (p: [string, string] | null) => p && <>{p[0]} <span className="muted small">{p[1]}</span></>;

@@ -72,6 +72,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
         { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>
+        <div className="table-scroll">
         <table className="heat-table">
           <thead>
             <tr>
@@ -100,6 +101,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
             {s.jobs.length === 0 && <tr><td colSpan={8} className="muted">No open jobs. Add one under Jobs.</td></tr>}
           </tbody>
         </table>
+        </div>
         <p className="heat-legend muted small">
           <span><i className="heat-key h1" />1</span><span><i className="heat-key h2" />2–3</span><span><i className="heat-key h3" />4+</span>
           <span><i className="heat-key ring" />someone waiting over 7 days</span>

@@ -27,7 +27,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   return (
     <>
     <PinnedScroll>
-    <table className={onPick ? "pick-table" : undefined}>
+    <table className={onPick ? "contacts-table pick-table" : "contacts-table"}>
       <thead>
         <tr>
           <th>Name</th>

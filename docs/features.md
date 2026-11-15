@@ -413,7 +413,7 @@ for each of their jobs, with **Score fit** / **Score again**.
   Settings, Roles and access.
 - **Company categories and card** ✅: each company is in a category
   (Signed client, Prospective client, Unknown, VIP client to start with),
-  set from Settings, General, Company categories: rename them, add your
+  set from Settings, Dropdowns & categories, Company categories: rename them, add your
   own and choose each one's colour. A company's page opens with a card in
   its category's colour (like a candidate's): its name, category (also
   down its right edge), type and industry, where it is based, size and
@@ -446,7 +446,7 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **Contacts** ✅: people at companies (hiring managers, HR) with job title,
   email, office phone, mobile, LinkedIn, status (works there / has left) and
   notes; listed on their company's page. Each has a **role** (Hiring manager,
-  HR to start with; Settings, General, Contact roles: rename them, add your
+  HR to start with; Settings, Dropdowns & categories, Contact roles: rename them, add your
   own and choose each one's colour). A contact's page opens with a card in
   their role's colour (like a candidate's): name, whether they still work
   there (one click to mark them as having left), job title and company, the
@@ -537,7 +537,9 @@ for each of their jobs, with **Score fit** / **Score again**.
 ## 1.5 Job ads puller ✅
 
 Finds companies that are hiring, as business development leads (the
-**Leads** page; owners, admins, recruiters and sourcers).
+**Leads** page, under More in the top bar; owners, admins, recruiters and
+sourcers). Like the other lists, its filters and buttons sit beside the
+title: **Sources** opens the sources, **+ Save a lead** an ad found elsewhere.
 
 **Legal note:** automatically scraping LinkedIn or JobStreet breaks their terms
 of use, and LinkedIn takes scrapers to court. The puller only uses sources that
@@ -585,9 +587,11 @@ lead's company (with the built-in email check).
   file downloads as sent, and those given "Delete job descriptions"
   (`jobs.documents:delete`, admins to start with) delete it; what was filled
   in from it stays.
-- **The job page** ✅: the pipeline comes first, with the possible candidates
-  folded under it, then notes and activity, the job's details and JDs, and the
-  ads. The ads panel folds away, and each ad is a card (title, status, facts and
+- **The job page** ✅: the pipeline comes first, across the width of the
+  screen, with the possible candidates folded under it; the rest is in tabs
+  under it, like a candidate's: **Notes & activity**, **Job details** (and its
+  JDs), **Job ads**, **Market map** and **Budget & retainer**, with the AI
+  assistant folded at the bottom. The ads panel folds away, and each ad is a card (title, status, facts and
   its buttons) that opens to its versions, side by side or one at a time; the
   newest is open, older ones folded.
 - **Blind ads** ✅: every ad is shown in two columns, as written and blind.
@@ -1086,7 +1090,8 @@ file), refreshing while files are read, with a link to each candidate. Your
 imports are yours: others do not see them, and a candidate you may not see is
 not named.
 
-✅ **Import** (menu: Import) candidates, companies or contacts from a CSV file
+✅ **Import** (top bar: More, Import): CVs and LinkedIn PDFs (as on the
+dashboard), and candidates, companies or contacts from a CSV file
 (in Excel: Save As, CSV). Columns are matched to fields by their names
 (`Full Name`, `E-mail`, `Mobile Number`, `Designation`, ...) and can be
 changed; the first rows are shown. Each row goes through the same API as the
@@ -1129,8 +1134,10 @@ page has the same timeline for them (**Stage history**).
 
 ## Reports ✅
 
-The **Reports** page (owners, admins and recruiters), for a period (the last
-90 days unless chosen; days in the company's time zone):
+The **Reports** page (top bar: More, Reports; owners, admins and recruiters),
+for a period: **Last 90 days** (the start), **This year**, **Last year** or
+**Custom** (two dates), as on the placements page; days in the company's time
+zone:
 
 - **Pipeline conversion:** applications made in the period by the furthest
   stage they reached, and what share of those at the stage before got there.
@@ -1206,11 +1213,22 @@ days) take only digits (and "." or "," for amounts): letters and symbols
 typed are ignored, and pasting "RM 12,000" keeps "12,000". Both apply to
 every form in the app (`web/src/requiredFields.ts`, `web/src/numericInput.ts`).
 
+## The top bar and page widths ✅
+
+The top bar lists Dashboard, Jobs, Candidates, Companies, Contacts and
+Placements; **More** holds Leads, Reports and Import (it shows the name of the
+one open). On a phone the pages wrap onto two lines. The lists (candidates,
+jobs, companies, contacts, placements, leads) and the job's pipeline use the
+width of the screen; a record's page stays centred.
+
 ## Main settings ✅
 
 One **Settings** button in the top bar leads to everything that is set up
 rather than worked on, with a menu of its parts on the left; each person sees
-the parts they may change: **General** (below), **AI provider**, **Team**,
+the parts they may change: **General** (the agency's name and mandatory
+fields), **Salary** (salary in emails and how a package is worked out),
+**Dropdowns & categories** (the dropdowns' options, company categories,
+contact roles and the benefits template), **Industries**, **AI provider**, **Team**,
 **Roles and access**, **Data protection**, **Integrations**, **CV templates**,
 **Email templates**, **System** and **Your account** (booking hours,
 password), which everyone has.

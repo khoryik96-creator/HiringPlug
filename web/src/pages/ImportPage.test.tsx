@@ -26,12 +26,12 @@ const reads = (imports: Schemas["CvImport"][]) =>
     Promise.resolve(ok(path === "/v1/settings/fields" ? testFieldSettings() : { items: imports }))) as never);
 
 describe("importing CVs and LinkedIn PDFs", () => {
-  it("is not on the Import page (it is on the dashboard), which keeps the spreadsheet import", () => {
+  it("is on the Import page too (as on the dashboard), beside the spreadsheet import", async () => {
     reads([]);
     renderWithClient(<ImportPage permissions={["intake:create"]} />);
-    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
-    expect(screen.getByRole("link", { name: "dashboard" })).toBeTruthy();
+    expect(await screen.findByRole("region", { name: "CV import" })).toBeTruthy();
     cleanup();
+    vi.restoreAllMocks(); // the next check counts its own requests
 
     const get = reads([]);
     renderWithClient(<ImportPage permissions={["companies:create"]} />);

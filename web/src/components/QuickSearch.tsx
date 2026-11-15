@@ -60,10 +60,10 @@ async function findJobs(q: string): Promise<Found> {
   return one(page.items.map((j) => ({ id: j.id, href: `#/jobs/${j.id}`, name: j.title, detail: line(j.companyName, j.location), status: j.status })));
 }
 
-type Box = { label: string; list: string; key: readonly unknown[]; find: (q: string) => Promise<Found>; hint: string };
+type Box = { label: string; list: string; key: readonly unknown[]; find: (q: string) => Promise<Found>; hint: string; tip?: string };
 
 const BOXES: { permission: Permission; box: Box }[] = [
-  { permission: "candidates:read", box: { label: "Candidates", list: "#/candidates", key: candidatesKey, find: findCandidates, hint: "Name, email or phone; commas for several" } },
+  { permission: "candidates:read", box: { label: "Candidates", list: "#/candidates", key: candidatesKey, find: findCandidates, hint: "Name, email or phone", tip: "Several at once: separate them with commas" } },
   { permission: "jobs:read", box: { label: "Jobs", list: "#/jobs", key: jobsKey, find: findJobs, hint: "Title, location or client" } },
   { permission: "companies:read", box: { label: "Companies", list: "#/companies", key: companiesKey, find: findCompanies, hint: "Name or phone" } },
   { permission: "contacts:read", box: { label: "Contacts", list: "#/contacts", key: contactsKey, find: findContacts, hint: "Name, email or phone" } },
@@ -108,7 +108,7 @@ function SearchBox({ box }: { box: Box }) {
       }}>
         <label>
           <span className="search-label">{box.label}</span>
-          <input type="search" value={text} placeholder={box.hint} aria-label={`Search ${box.label.toLowerCase()}`}
+          <input type="search" value={text} placeholder={box.hint} title={box.tip} aria-label={`Search ${box.label.toLowerCase()}`}
             onChange={(e) => { setText(e.target.value); }} />
         </label>
       </form>

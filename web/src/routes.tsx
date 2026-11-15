@@ -48,6 +48,8 @@ const ScreeningCall = page(() => import("./pages/ScreeningCall"), "ScreeningCall
 const ReferenceCheck = page(() => import("./pages/ReferenceCheck"), "ReferenceCheck");
 const Industries = page(() => import("./pages/Industries"), "Industries");
 const Settings = page(() => import("./pages/Settings"), "Settings");
+const SalarySettings = page(() => import("./pages/Settings"), "SalarySettings");
+const ListSettings = page(() => import("./pages/Settings"), "ListSettings");
 const System = page(() => import("./pages/System"), "System");
 const BackupsPage = page(() => import("./pages/Backups"), "BackupsPage");
 const Team = page(() => import("./pages/Team"), "Team");
@@ -65,7 +67,7 @@ export type Route = {
   /** Left out for those who have this permission (they get the full page instead). */
   unless?: Permission;
   /** Listed in the top bar or the Settings menu, with this label. */
-  menu?: { in: "main" | "settings"; label: string; href: string };
+  menu?: { in: "main" | "settings"; label: string; href: string; /** In the top bar's "More" list, not on the bar itself. */ more?: boolean };
   render: (c: PageContext) => ReactNode;
 };
 
@@ -99,16 +101,21 @@ export const ROUTES: Route[] = [
     render: (c) => <ContactList canCreate={can(c, "contacts:create")} canEmail={can(c, "emails:send")} /> },
   { section: "placements", path: /^#\/placements/, permission: "placements:read", menu: { in: "main", label: "Placements", href: "#/placements" },
     render: (c) => <Placements permissions={c.permissions} /> },
-  { section: "leads", path: /^#\/leads/, permission: "leads:read", menu: { in: "main", label: "Leads", href: "#/leads" },
+  { section: "leads", path: /^#\/leads/, permission: "leads:read", menu: { in: "main", label: "Leads", href: "#/leads", more: true },
     render: (c) => <Leads permissions={c.permissions} /> },
-  { section: "reports", path: /^#\/reports/, permission: "reports:read", menu: { in: "main", label: "Reports", href: "#/reports" },
+  { section: "reports", path: /^#\/reports/, permission: "reports:read", menu: { in: "main", label: "Reports", href: "#/reports", more: true },
     render: () => <Reports /> },
-  { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import" },
+  { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
   // Settings, in its menu's order.
-  { section: "settings", path: /^#\/settings/, permission: "settings:manage", menu: { in: "settings", label: "General", href: "#/settings" },
+  // "#/settings" (and "#/settings#…") is General; its other parts have their own addresses.
+  { section: "settings", path: /^#\/settings(?!\/)/, permission: "settings:manage", menu: { in: "settings", label: "General", href: "#/settings" },
     render: () => <Settings /> },
+  { section: "settings-salary", path: /^#\/settings\/salary/, permission: "settings:manage", menu: { in: "settings", label: "Salary", href: "#/settings/salary" },
+    render: () => <SalarySettings /> },
+  { section: "settings-lists", path: /^#\/settings\/lists/, permission: "settings:manage", menu: { in: "settings", label: "Dropdowns & categories", href: "#/settings/lists" },
+    render: () => <ListSettings /> },
   { section: "industries", path: /^#\/industries/, permission: "settings:manage", menu: { in: "settings", label: "Industries", href: "#/industries" }, render: () => <Industries /> },
   { section: "ai-provider", path: /^#\/ai-provider/, permission: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
     render: () => <AiProvider /> },

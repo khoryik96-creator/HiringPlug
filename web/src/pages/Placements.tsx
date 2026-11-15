@@ -52,7 +52,7 @@ export function Placements({ permissions }: { permissions: Permission[] }) {
   const seesFees = permissions.includes("placements.fees:read");
 
   return (
-    <main className="placements-dashboard">
+    <main className="placements-dashboard list-page">
       <div className="row spread">
         <h2>Placements</h2>
         <div className="row" role="group" aria-label="Start dates">

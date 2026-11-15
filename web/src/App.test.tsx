@@ -41,7 +41,7 @@ describe("app", () => {
     window.location.hash = `#/candidates/${bob.id}`;
     await screen.findByRole("heading", { name: "Bob Lee" });
     expect(screen.queryByRole("form", { name: "Edit profile" })).toBeNull();
-    expect(within(screen.getByRole("region", {name: "Profile"})).getByText("bob@example.com")).toBeTruthy();
+    expect(within(screen.getByRole("complementary", {name: "Contact summary"})).getByText("bob@example.com")).toBeTruthy();
   });
 });
 
@@ -74,7 +74,7 @@ describe("top bar", () => {
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
     // The profile is fetched again on each page load (an earlier test may have left another one cached).
     await waitFor(() => {
-      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "Industries", "AI provider", "Team", "System", "Your account"]);
+      expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["General", "Salary", "Dropdowns & categories", "Industries", "AI provider", "Team", "System", "Your account"]);
     });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
     expect(screen.queryByText("Admin")).toBeNull();
@@ -85,6 +85,18 @@ describe("top bar", () => {
     const menu = () => screen.getByRole("navigation", { name: "Settings" });
     await waitFor(() => { expect(within(menu()).getAllByRole("link").map((a) => a.textContent)).toEqual(["AI provider", "Your account"]); });
     expect(within(menu()).getByRole("link", { name: "Your account" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("keeps Leads, Reports and Import under More, which names the one open", async () => {
+    signedIn([...RECRUITER, "leads:read", "reports:read"], "#/reports");
+    const nav = await screen.findByRole("navigation", { name: "Main" });
+    const more = await within(nav).findByLabelText("More pages");
+    await waitFor(() => { expect(more.textContent).toContain("Reports"); }); // on the Reports page
+    expect(within(nav).getByRole("link", { name: "Leads" }).closest(".menu-list"), "not on the bar itself").toBeTruthy();
+    fireEvent.click(more);
+    const list = nav.querySelector(".menu-list") as HTMLElement;
+    expect(within(list).getAllByRole("link").map((a) => a.textContent)).toEqual(["Leads", "Reports", "Import"]);
+    expect(within(list).getByRole("link", { name: "Reports" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("does not open a part the user may not change", async () => {

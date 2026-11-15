@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import { invalidField, ok, renderWithClient, sentBody, testFieldSettings, testMe } from "../test-utils";
-import { Settings } from "./Settings";
+import { ListSettings, SalarySettings, Settings } from "./Settings";
 
 afterEach(() => {
   cleanup();
@@ -21,7 +21,7 @@ describe("settings", () => {
     const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { options: { key?: string; label: string; hidden: boolean }[] } }) =>
       Promise.resolve(ok({ name: "candidate_source", label: "Candidate source", kind: "open",
         options: init.body.options.map((o) => ({ key: o.key ?? "job_fair", label: o.label, hidden: o.hidden, builtIn: !!o.key })) }))) as never);
-    renderWithClient(<Settings />);
+    renderWithClient(<ListSettings />);
     const sources = await screen.findByRole("region", { name: "Candidate source" });
     expect(within(sources).queryByRole("button", { name: "Remove" })).toBeNull(); // built-in ones are hidden, not removed
 
@@ -41,7 +41,7 @@ describe("settings", () => {
   it("edits the company benefits template: items with what to write for each", async () => {
     answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ name: "company_benefits", label: "Company benefits", kind: "open", hints: true, options: [] }));
-    renderWithClient(<Settings />);
+    renderWithClient(<ListSettings />);
     const benefits = await screen.findByRole("region", { name: "Company benefits" });
     expect(screen.getByRole("heading", { name: "Company benefits template" })).toBeTruthy();
     expect(within(benefits).getByLabelText<HTMLInputElement>("Hint for Annual leave").value).toBe("If it grows with service or grade, give the detail");
@@ -77,7 +77,7 @@ describe("settings", () => {
   it("adds a notice period as a number and unit", async () => {
     answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(invalidField("options[4].key", "a number of days, weeks or months"));
-    renderWithClient(<Settings />);
+    renderWithClient(<ListSettings />);
     const notice = await screen.findByRole("region", { name: "Notice period" });
     fireEvent.change(within(notice).getByLabelText("Number"), { target: { value: "6" } });
     fireEvent.click(within(notice).getByRole("button", { name: "Add" }));
@@ -100,7 +100,7 @@ describe("settings", () => {
     const panel = await screen.findByRole("region", { name: "Mandatory fields" });
     expect(within(panel).getByRole<HTMLInputElement>("checkbox", { name: /First name/ }).disabled).toBe(true);
     fireEvent.click(within(panel).getByRole("checkbox", { name: "Email" }));
-    fireEvent.click(within(panel).getByRole("button", { name: "Save mandatory fields" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Save" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({ fields: [
       { form: "candidate", field: "firstName", mandatory: true },
@@ -112,7 +112,7 @@ describe("settings", () => {
   it("chooses who sees emails that show salary", async () => {
     answerGets();
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok({ emailSalaryVisibility: "everyone" }));
-    renderWithClient(<Settings />);
+    renderWithClient(<SalarySettings />);
     const choice = await screen.findByLabelText<HTMLSelectElement>("Who sees emails that show salary");
     expect(choice.value).toBe("salary_roles");
     fireEvent.change(choice, { target: { value: "everyone" } });

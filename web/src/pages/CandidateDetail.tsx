@@ -56,13 +56,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
       ) : (
         <section className="panel candidate-profile" aria-label="Profile">
+          {/* Email, phone and LinkedIn are in the Contact box beside the tabs. */}
           <dl>
-            <dt>Email</dt>
-            <dd>{c.email ?? "—"}</dd>
-            <dt>Phone</dt>
-            <dd>{c.phone ?? "—"}</dd>
-            <dt>LinkedIn</dt>
-            <dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">{c.linkedinUrl.replace(/^https:\/\/(www\.)?/, "")}</a> : "—"}</dd>
             <dt>Work authorization</dt>
             <dd><WorkAuthorizationPicker candidate={c} canEdit={permissions.includes("candidates:update")} /></dd>
             <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
@@ -106,7 +101,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             await queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
           }} /></span>
         {permissions.includes("candidates:update") && !editing && (
-          <span className="row">
+          <span className="row candidate-actions">
             {permissions.includes("emails:read") && permissions.includes("emails:send") && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
             <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
             {permissions.includes("notes:create") && <a className="button" href={`#/candidates/${c.id}/reference-check`}>Reference check</a>}
@@ -121,9 +116,9 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       <div className="candidate-workspace">
         <aside className="candidate-contact panel" aria-label="Contact summary">
           <h3>Contact</h3>
-          <dl><dt>Email</dt><dd className="copyable">{c.email ? <><a href={`mailto:${c.email}`}>{c.email}</a><CopyButton text={c.email} what="email" /></> : "—"}</dd>
+          <dl><dt>Email</dt><dd className="copyable">{c.email ? <><a href={`mailto:${c.email}`} title={c.email}>{c.email}</a><CopyButton text={c.email} what="email" /></> : "—"}</dd>
           <dt>Phone</dt><dd className="copyable">{c.phone ? <><a href={`tel:${c.phone}`}>{c.phone}</a><CopyButton text={c.phone} what="phone number" /></> : "—"}</dd>
-          <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">LinkedIn profile</a> : "—"}</dd></dl>
+          <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>LinkedIn profile</a> : "—"}</dd></dl>
         </aside>
         <CandidateTabs sections={sections} active={active} onChange={setActive} />
       </div>

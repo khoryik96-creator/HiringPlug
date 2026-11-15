@@ -36,7 +36,7 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
   const views: [View, string][] = [["all", status === "open" ? "All open" : "All"], ["mine", "Mine"], ["attention", `Needs attention ${String(needing.length)}`]];
 
   return (
-    <main>
+    <main className="list-page">
       <div className="row spread">
         <h2>Jobs</h2>
         <div className="row">

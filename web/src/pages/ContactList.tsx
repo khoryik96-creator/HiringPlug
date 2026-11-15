@@ -39,7 +39,7 @@ export function ContactList({ canCreate, canEmail = false }: { canCreate: boolea
   const filtered = !!(q || role || status);
 
   return (
-    <main>
+    <main className="list-page">
       <div className="row spread">
         <h2>Contacts</h2>
         <div className="row">
@@ -66,16 +66,18 @@ export function ContactList({ canCreate, canEmail = false }: { canCreate: boolea
       )}
       <ErrorMessage error={list.error} />
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
-      {canEmail && !emailing && (
-        <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
-          shown={{ count: contacts?.length ?? 0, more: list.hasNextPage, all: (contacts?.length ?? 0) > 0 && (contacts ?? []).every((c) => pick.ids.has(c.id)),
-            onAll: () => { pick.pick((contacts ?? []).map(contactPerson), true); } }} />
-      )}
       {contacts && (
         <>
-          <p className="muted small" role="status">
-            {contacts.length}{list.hasNextPage ? "+" : ""} contact{contacts.length === 1 ? "" : "s"}{list.hasNextPage ? ", more below" : ""}
-          </p>
+          <div className="list-meta">
+            <span role="status">
+              {contacts.length}{list.hasNextPage ? "+" : ""} contact{contacts.length === 1 ? "" : "s"}{list.hasNextPage ? ", more below" : ""}
+            </span>
+            {canEmail && !emailing && (
+              <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
+                shown={{ count: contacts.length, more: list.hasNextPage, all: contacts.length > 0 && contacts.every((c) => pick.ids.has(c.id)),
+                  onAll: () => { pick.pick(contacts.map(contactPerson), true); } }} />
+            )}
+          </div>
           <ContactTable contacts={contacts} showCompany empty={filtered ? "No contacts match." : "No contacts yet."}
             picked={pick.ids} onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
           {list.hasNextPage && (

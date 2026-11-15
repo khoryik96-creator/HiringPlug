@@ -20,35 +20,38 @@ export function Leads({ permissions }: { permissions: Permission[] }) {
       params: { query: { status: filters.status || undefined, open: filters.open === "" ? undefined : filters.open === "true", q: filters.q.trim() || undefined } },
     })).items,
   });
+  const [adding, setAdding] = useState(false);
+  const [sources, setSources] = useState(false);
   return (
-    <main>
-      <h2>Leads</h2>
-      <section className="panel" aria-label="Hiring leads">
+    <main className="list-page">
+      {/* Like the other lists: the filters and the buttons beside the title. */}
+      <div className="row spread">
+        <h2>Leads</h2>
         <div className="row">
-          <label>Search <input value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} /></label>
-          <label>Status{" "}
-            <select value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
-              <option value="">Any</option>
-              {keysOf(LEAD_STATUS).map((s) => <option key={s} value={s}>{LEAD_STATUS[s]}</option>)}
-            </select>
-          </label>
-          <label>Openings{" "}
-            <select value={filters.open} onChange={(e) => { setFilters({ ...filters, open: e.target.value as Filters["open"] }); }}>
-              <option value="true">Still listed</option><option value="false">Closed</option><option value="">All</option>
-            </select>
-          </label>
+          <input aria-label="Search leads" placeholder="Search" value={filters.q} onChange={(e) => { setFilters({ ...filters, q: e.target.value }); }} />
+          <select aria-label="Status" value={filters.status} onChange={(e) => { setFilters({ ...filters, status: e.target.value as Filters["status"] }); }}>
+            <option value="">Any status</option>
+            {keysOf(LEAD_STATUS).map((s) => <option key={s} value={s}>{LEAD_STATUS[s]}</option>)}
+          </select>
+          <select aria-label="Openings" value={filters.open} onChange={(e) => { setFilters({ ...filters, open: e.target.value as Filters["open"] }); }}>
+            <option value="true">Still listed</option><option value="false">Closed</option><option value="">Listed or closed</option>
+          </select>
+          <button type="button" aria-expanded={sources} onClick={() => { setSources(!sources); }}>Sources</button>
+          {canManage && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Save a lead</button>}
         </div>
+      </div>
+      {canManage && adding && <SaveAd onDone={() => { setAdding(false); }} />}
+      {sources && <LeadSources canManage={canManage} />}
+      <section className="panel" aria-label="Hiring leads">
         <ErrorMessage error={list.error} />
-        {list.data?.length === 0 && <p className="muted">No leads here yet.</p>}
+        {list.data?.length === 0 && <p className="muted">No leads here yet.{canManage && " Save an ad you found, or add a source that brings them in."}</p>}
         {list.data && list.data.length > 0 && (
           <table>
             <thead><tr><th>Company</th><th>Job</th><th>Where</th><th>Seen</th><th>Status</th></tr></thead>
             <tbody>{list.data.map((l) => <LeadRow key={l.id} lead={l} canManage={canManage} />)}</tbody>
           </table>
         )}
-        {canManage && <SaveAd />}
       </section>
-      <LeadSources canManage={canManage} />
     </main>
   );
 }
@@ -80,7 +83,7 @@ function LeadRow({ lead: l, canManage }: { lead: Lead; canManage: boolean }) {
 }
 
 /** Save a job ad found anywhere (LinkedIn, JobStreet, a newspaper) as a lead. */
-function SaveAd() {
+function SaveAd({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ companyName: "", title: "", location: "", url: "", notes: "" });
   const save = useMutation({
@@ -94,11 +97,12 @@ function SaveAd() {
     onSuccess: async () => {
       setForm({ companyName: "", title: "", location: "", url: "", notes: "" });
       await queryClient.invalidateQueries({ queryKey: ["job-leads"] });
+      onDone();
     },
   });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => { setForm({ ...form, [k]: e.target.value }); };
   return (
-    <form className="form-grid" aria-label="Save an ad" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <form className="panel form-grid" aria-label="Save an ad" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <h4 className="full">Save an ad you found</h4>
       <label className="field">Company<input required value={form.companyName} onChange={set("companyName")} /></label>
       <label className="field">Job<input required value={form.title} onChange={set("title")} /></label>
@@ -106,7 +110,10 @@ function SaveAd() {
       <label className="field">Ad address<input value={form.url} onChange={set("url")} /></label>
       <label className="field full">Notes<input value={form.notes} onChange={set("notes")} /></label>
       <SaveError error={save.error} shown={[]} onReload={() => undefined} />
-      <div className="row full"><button type="submit" disabled={save.isPending}>Save lead</button></div>
+      <div className="row full">
+        <button type="submit" className="primary" disabled={save.isPending}>Save lead</button>
+        <button type="button" className="link" onClick={onDone}>Cancel</button>
+      </div>
     </form>
   );
 }

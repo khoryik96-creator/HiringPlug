@@ -50,7 +50,7 @@ export function CandidateBanner({ candidate: c, canEdit, onAdd, canEditSalary = 
           </div>
           <dl className="banner-facts">
             <div><dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd></div>
-            <div><dt>Lives in</dt><dd>{lives || "NA"}</dd></div>
+            <div><dt>Lives in</dt><dd>{lives || "—"}</dd></div>
             <div><dt>Source</dt><dd>{c.source ? fs.label("candidate_source", c.source) : "—"}</dd></div>
           </dl>
         </div>

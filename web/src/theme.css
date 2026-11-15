@@ -112,7 +112,16 @@ dd { margin: 0; }
 /* Keep navigation and account actions usable on narrow settings screens. */
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; gap: 0.5rem; padding: 0.65rem 1rem; }
-  .topbar nav { order: 3; flex-basis: 100%; width: 100%; }
+  .topbar nav { order: 3; flex-basis: 100%; width: 100%; flex-wrap: wrap; overflow: visible; row-gap: 0.25rem; }
+  .topbar nav a, .topbar nav .menu > summary.more-pages { padding: 0.35rem 0.65rem; } /* every page shows, on two lines if need be */
   .topbar .who { margin-left: auto; }
   .topbar .who .name { display: none; }
 }
+
+/* The top bar's "More" list (Leads, Reports, Import): looks like the other pages on the bar. */
+.topbar nav .menu > summary.more-pages { color: var(--topbar-text); font-weight: 550; white-space: nowrap; padding: 0.45rem 0.8rem; border-radius: 999px; }
+.topbar nav .menu > summary.more-pages:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
+.topbar nav .menu > summary.more-pages.here { color: var(--topbar-active-text); background: var(--topbar-active); }
+.topbar .menu-list a { display: block; padding: 0.45rem 0.7rem; border-radius: 6px; color: var(--text); text-decoration: none; font-weight: 550; }
+.topbar .menu-list a:hover { background: var(--soft); }
+.topbar .menu-list a[aria-current="page"] { color: var(--accent-dark); background: var(--accent-soft); }

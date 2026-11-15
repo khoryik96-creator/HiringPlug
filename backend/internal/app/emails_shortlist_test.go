@@ -111,3 +111,44 @@ func TestEmailingTheClientAboutSeveralCandidates(t *testing.T) {
 		assert.Equal(t, sent.Id, emails[0].Id)
 	})
 }
+
+// The CVs go out, and are listed, in the order the recruiter chose them,
+// though they are saved in the same instant.
+func TestEmailedCVsKeepTheOrderChosen(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	client := "hr." + tenant.ID + "@client.test"
+	company := a.createCompany(token, map[string]any{"name": "Maju Logistik Sdn Bhd"})
+	hr := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Aisyah", "lastName": "Rahman", "email": client})
+	job := a.createJob(token, map[string]any{"companyId": company.Id, "contactId": hr.Id, "title": "Hub Operations Manager"})
+	farid := a.createCandidate(token, map[string]any{"firstName": "Farid", "lastName": "Hassan"})
+	nurul := a.createCandidate(token, map[string]any{"firstName": "Nurul", "lastName": "Huda"})
+	faridApp, nurulApp := a.addToJob(token, job.Id, farid.Id), a.addToJob(token, job.Id, nurul.Id)
+	cvOf := func(c api.Candidate, name string) api.Document {
+		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", name, minimalPDF)
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var d api.Document
+		res.JSON(&d)
+		return d
+	}
+	faridCV, nurulCV := cvOf(farid, "Farid Hassan CV.pdf"), cvOf(nurul, "Nurul Huda CV.pdf")
+	both := []map[string]any{{"candidateId": farid.Id, "applicationId": faridApp.Id}, {"candidateId": nurul.Id, "applicationId": nurulApp.Id}}
+	// Each way round, several times: saved in one instant, a random order would show.
+	for i := range 10 {
+		chosen := []api.Document{faridCV, nurulCV}
+		if i%2 == 1 {
+			chosen = []api.Document{nurulCV, faridCV}
+		}
+		res := a.request(http.MethodPost, "/v1/emails", token, map[string]any{
+			"to": []string{client}, "subject": "Candidates", "bodyHtml": "<p>Hi</p>", "candidates": both,
+			"cvs": []map[string]any{{"documentId": chosen[0].Id}, {"documentId": chosen[1].Id}},
+		})
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		var sent api.Email
+		res.JSON(&sent)
+		require.Len(t, sent.Attachments, 2)
+		assert.Equal(t, []string{chosen[0].FileName, chosen[1].FileName}, []string{sent.Attachments[0].FileName, sent.Attachments[1].FileName}, "send %d", i)
+	}
+}

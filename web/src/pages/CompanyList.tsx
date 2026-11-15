@@ -32,7 +32,7 @@ export function CompanyList({ canCreate }: { canCreate: boolean }) {
   });
 
   return (
-    <main>
+    <main className="list-page">
       <div className="row spread">
         <h2>Companies</h2>
         <div className="row">

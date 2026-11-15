@@ -270,4 +270,12 @@ describe("candidate list", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search candidates" }), { target: { value: "a" } });
     expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
   });
+
+  it("by default leaves out a Work authorization column: it shows in colour under each name", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate={false} canSeeSalary />);
+    await screen.findByRole("link", { name: "Siti Aisyah" });
+    const headers = screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""));
+    expect(headers).toEqual(["Name", "Current role", "Status", "Notice period", "Current salary", "Expected salary", "Email"]);
+  });
 });

@@ -55,7 +55,7 @@ export function CompanyBenefits({ companyId, companyName, permissions }: { compa
           <div className="row">
             {data.version > 0 && <><button type="button" className="link" onClick={() => { get("docx"); }}>Word</button>
               <button type="button" className="link" onClick={() => { get("pdf"); }}>PDF</button></>}
-            {permissions.includes("settings:manage") && <a className="small" href="#/settings">Change the template</a>}
+            {permissions.includes("settings:manage") && <a className="small" href="#/settings/lists#benefits-template">Change the template</a>}
             {canEdit && <button type="button" onClick={() => { setEditing(true); }}>{data.version === 0 ? "Fill in" : "Edit"}</button>}
           </div>
         )}

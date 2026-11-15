@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { fieldSettingsKey, policiesKey } from "../api/keys";
@@ -14,45 +14,75 @@ type Row = { key?: string; label: string; hint: string; color: string; hidden: b
 
 const rowOf = (o: Schemas["FieldOption"]): Row => ({ ...o, hint: o.hint ?? "", color: o.color ?? "#6b7280" });
 
-/** General settings: the company's mandatory fields, salary in emails and dropdown options. */
+/** General settings: the agency's name and the mandatory fields. */
 export function Settings() {
-  const settings = useQuery({ queryKey: fieldSettingsKey, queryFn: async () => unwrap(await api.GET("/v1/settings/fields")) });
+  const settings = useFieldSettingsQuery();
   return (
     <main>
       <h2>General</h2>
       <ErrorMessage error={settings.error} />
+      <AgencyName />
+      {settings.data && <MandatoryFields fields={settings.data.mandatory} />}
+    </main>
+  );
+}
+
+/** Salary settings: who sees salary in emails, and how a package becomes the salary in emails. */
+export function SalarySettings() {
+  return (
+    <main>
+      <h2>Salary</h2>
+      <Policies />
+      <SalaryCalculationSettings />
+    </main>
+  );
+}
+
+/** The dropdowns' options, company categories, contact roles and the benefits template. */
+export function ListSettings() {
+  const settings = useFieldSettingsQuery();
+  const lists = settings.data?.lists ?? [];
+  // "#/settings/lists#contact-roles" opens the page at that part (links from a contact's card).
+  const part = window.location.hash.split("#")[2];
+  useEffect(() => {
+    if (!part || !settings.data) return;
+    const el = document.getElementById(part);
+    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start" });
+  }, [part, settings.data]);
+  return (
+    <main>
+      <h2>Dropdowns &amp; categories</h2>
+      <ErrorMessage error={settings.error} />
       {settings.data && (
         <>
-          <AgencyName />
-          <MandatoryFields fields={settings.data.mandatory} />
-          <Policies />
-          <SalaryCalculationSettings />
-          <p><a href="#/industries">Manage industries &amp; subindustries</a></p>
+          <p className="muted">Industries and subindustries have <a href="#/industries">their own page</a>.</p>
           <h3>Dropdowns</h3>
-          {settings.data.lists.filter((l) => !l.hints && !l.colors && l.name !== "industry").map((l) => <ListEditor key={l.name} list={l} />)}
+          {lists.filter((l) => !l.hints && !l.colors && l.name !== "industry").map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="company-categories">Company categories</h3>
           <p className="muted">
             The categories a company can be in (signed client, prospect, VIP…), each with its colour: the colour of its card on the
             company&apos;s page and its chip in the list. Rename them, add your own, choose the colours.
           </p>
-          {settings.data.lists.filter((l) => l.name === "company_category").map((l) => <ListEditor key={l.name} list={l} />)}
+          {lists.filter((l) => l.name === "company_category").map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="contact-roles">Contact roles</h3>
           <p className="muted">
             What a contact does in hiring (hiring manager, HR…), each with its colour: the colour of their card and their chip in
             the contact list, where you can filter by it. Rename them, add your own, choose the colours.
           </p>
-          {settings.data.lists.filter((l) => l.name === "contact_role").map((l) => <ListEditor key={l.name} list={l} />)}
+          {lists.filter((l) => l.name === "contact_role").map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="benefits-template">Company benefits template</h3>
           <p className="muted">
             What to record for each client on its page: its benefits, and the steps it takes before an offer. Rename, reorder,
             hide or add items; the hint under each says what to write.
           </p>
-          {settings.data.lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
+          {lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
         </>
       )}
     </main>
   );
 }
+
+const useFieldSettingsQuery = () => useQuery({ queryKey: fieldSettingsKey, queryFn: async () => unwrap(await api.GET("/v1/settings/fields")) });
 
 const SALARY_CHOICES: Record<Schemas["EmailSalaryVisibility"], string> = {
   salary_roles: "Only roles that may see salaries (recommended)",
@@ -74,15 +104,18 @@ function AgencyName() {
   return (
     <section className="panel" aria-label="Agency">
       <h3>Agency</h3>
-      <form className="row" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
         <label className="field">Agency name
           <input required value={current} maxLength={200} onChange={(e) => { setName(e.target.value); }} />
         </label>
-        <button type="submit" disabled={save.isPending || name === null}>Save</button>
-        {save.isSuccess && <span role="status" className="muted">Saved.</span>}
+        {errors.name && <small className="error">{errors.name}</small>}
+        <p className="muted small">On formatted CVs and their file names, e.g. “{example}”, and on the careers page.</p>
+        {/* Save under what it saves, as in every part of Settings. */}
+        <div className="row">
+          <button type="submit" disabled={save.isPending || name === null}>Save</button>
+          {save.isSuccess && <span role="status" className="muted">Saved.</span>}
+        </div>
       </form>
-      {errors.name && <small className="error">{errors.name}</small>}
-      <p className="muted small">On formatted CVs and their file names, e.g. “{example}”, and on the careers page.</p>
       <ErrorMessage error={me.error ?? (errors.name ? null : save.error)} />
     </section>
   );
@@ -140,8 +173,10 @@ function MandatoryFields({ fields }: { fields: Schemas["MandatoryField"][] }) {
     <section className="panel" aria-label="Mandatory fields">
       <h3>Mandatory fields</h3>
       <div className="row">{group("candidate", "Candidates")}{group("job", "Jobs")}</div>
-      <button type="button" disabled={save.isPending} onClick={() => { save.mutate(); }}>Save mandatory fields</button>
-      {save.isSuccess && <span className="muted" role="status"> Saved.</span>}
+      <div className="row">
+        <button type="button" className="primary" disabled={save.isPending} onClick={() => { save.mutate(); }}>Save</button>
+        {save.isSuccess && <span className="muted" role="status">Saved.</span>}
+      </div>
       <ErrorMessage error={save.error} />
     </section>
   );

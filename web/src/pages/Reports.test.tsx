@@ -46,9 +46,16 @@ describe("reports", () => {
     const get = reads(report({ feesHidden: true, recruiters: [] }));
     renderWithClient(<Reports />);
     expect(await screen.findByText(/Fees are not shown to your role/)).toBeTruthy();
+    expect(screen.queryByLabelText("From"), "dates only for a custom period").toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Last year" }));
+    const y = new Date().getFullYear() - 1;
+    await waitFor(() => {
+      expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: `${String(y)}-01-01`, to: `${String(y)}-12-31` } } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
     await waitFor(() => {
-      expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: "2026-01-01", to: undefined } } });
+      expect(get).toHaveBeenLastCalledWith("/v1/reports/summary", { params: { query: { from: "2026-01-01", to: `${String(y)}-12-31` } } });
     });
   });
 

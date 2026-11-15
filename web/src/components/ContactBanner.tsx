@@ -68,7 +68,7 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
                 {o.label}
               </button>
             ))}
-            <a className="small" href="#/settings#contact-roles">Change the roles</a>
+            <a className="small" href="#/settings/lists#contact-roles">Change the roles</a>
           </div>
         )}
         <ErrorMessage error={save.error} />

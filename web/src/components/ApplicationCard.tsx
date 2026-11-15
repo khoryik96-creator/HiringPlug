@@ -127,7 +127,7 @@ export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove
         <Initials name={app.candidateName} />
         <div className="who-text">
           <span className="card-name">
-            <a href={`#/candidates/${app.candidateId}`}
+            <a href={`#/candidates/${app.candidateId}`} title={app.candidateName}
               onKeyDown={(e) => { if (onPick && e.key === " ") { e.preventDefault(); onPick(app, !picked); } }}>
               {app.candidateName}
             </a>

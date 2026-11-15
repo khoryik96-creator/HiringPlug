@@ -29,7 +29,9 @@ describe("leads", () => {
     reads();
     renderWithClient(<Leads permissions={[...manage]} />);
     expect((await screen.findByRole("link", { name: "Account Executive" })).getAttribute("href")).toBe("https://contoh.com.my/careers");
-    expect(screen.getByText("Last check: the site answered HTTP 503")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Sources" }), "the sources fold away behind their button").toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
+    expect(await screen.findByText("Last check: the site answered HTTP 503")).toBeTruthy();
   });
 
   it("never makes a link of an address that is not a web address", async () => {
@@ -52,6 +54,7 @@ describe("leads", () => {
     reads();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(source));
     renderWithClient(<Leads permissions={[...manage]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sources" }));
     const form = await screen.findByRole("form", { name: "New source" });
     fireEvent.change(within(form).getByLabelText("Board"), { target: { value: "acme" } });
     fireEvent.change(within(form).getByLabelText("Company name"), { target: { value: "Acme" } });
@@ -66,5 +69,23 @@ describe("leads", () => {
     expect(await screen.findByText("Account Executive")).toBeTruthy();
     expect(screen.queryByRole("form", { name: "New source" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
+  });
+
+  it("saves an ad found elsewhere from the + Save a lead button", async () => {
+    reads();
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(lead));
+    renderWithClient(<Leads permissions={[...manage]} />);
+    expect(screen.queryByRole("form", { name: "Save an ad" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "+ Save a lead" }));
+    const form = screen.getByRole("form", { name: "Save an ad" });
+    fireEvent.change(within(form).getByLabelText("Company"), { target: { value: "Contoh Berhad" } });
+    fireEvent.change(within(form).getByLabelText("Job"), { target: { value: "Account Executive" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save lead" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    await waitFor(() => { expect(screen.queryByRole("form", { name: "Save an ad" })).toBeNull(); });
+    cleanup();
+    reads();
+    renderWithClient(<Leads permissions={["leads:read"]} />);
+    expect(screen.queryByRole("button", { name: "+ Save a lead" })).toBeNull();
   });
 });

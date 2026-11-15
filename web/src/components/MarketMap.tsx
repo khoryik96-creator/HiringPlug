@@ -142,6 +142,8 @@ function Insights({ insights, enabled, canAsk, canSetUp, asking, onAsk }: {
   insights: Schemas["MarketInsights"] | null; enabled: boolean; canAsk: boolean; canSetUp: boolean; asking: boolean; onAsk: () => void;
 }) {
   const queued = insights?.status === "queued";
+  // With the AI off, only those who can set it up hear about it (and earlier insights stay).
+  if (!enabled && !insights && !canSetUp) return null;
   return (
     <div className="market-insights">
       <div className="row spread">
@@ -150,7 +152,7 @@ function Insights({ insights, enabled, canAsk, canSetUp, asking, onAsk }: {
           <button type="button" className="primary" disabled={asking || queued} onClick={onAsk}>{insights ? "Refresh insights" : "Get insights"}</button>
         )}
       </div>
-      {!enabled && <p className="muted small">Off: no AI provider is set up.{canSetUp && <> <a href="#/ai-provider">Set one up</a></>}</p>}
+      {!enabled && canSetUp && <p className="muted small">Off: no AI provider is set up. <a href="#/ai-provider">Set one up</a></p>}
       {queued && <p className="muted small" role="status">Writing…</p>}
       {insights?.status === "failed" && <p className="warning small">No insights this time: try again.</p>}
       {insights?.status === "done" && insights.text && (

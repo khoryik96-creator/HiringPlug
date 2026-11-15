@@ -88,13 +88,13 @@ describe("job page", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(job))) as never);
     renderWithClient(<JobDetail id={job.id} permissions={["jobs:read", "jobs:update", "jobs.salary:read", "jobs.salary:update"]} />);
     await screen.findByRole("heading", { name: /Senior Auditor/ });
+    expect(screen.getByRole("tab", { name: "Notes & activity" }).getAttribute("aria-selected")).toBe("true"); // the rest in tabs
+    expect(screen.queryByText("MYR 9000.00 – 12000.00 / month")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Budget & retainer" }));
     expect(screen.getByText("MYR 9000.00 – 12000.00 / month")).toBeTruthy();
-    expect(screen.getByText("Kuala Lumpur, Malaysia (MY) · Full time · Hybrid · 2 openings · intake 1 Nov 2026")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit budget" })).toBeTruthy();
-    const details=screen.getByText("Job details",{exact:true}).closest("details");
-    expect(details?.open).toBe(false);
-    fireEvent.click(screen.getByText("Job details",{exact:true}));
-    expect(details?.open).toBe(true);
+    fireEvent.click(screen.getByRole("tab", { name: "Job details" }));
+    expect(screen.getByText("Kuala Lumpur, Malaysia (MY) · Full time · Hybrid · 2 openings · intake 1 Nov 2026")).toBeTruthy();
   });
 
   it("says the budget is restricted, without edit buttons, for other roles", async () => {
@@ -103,6 +103,7 @@ describe("job page", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(restricted))) as never);
     renderWithClient(<JobDetail id={job.id} permissions={["jobs:read"]} />);
     await screen.findByRole("heading", { name: /Senior Auditor/ });
+    fireEvent.click(screen.getByRole("tab", { name: "Budget & retainer" }));
     expect(screen.getByText(/restricted for your role/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /budget|Edit job/ })).toBeNull();
   });

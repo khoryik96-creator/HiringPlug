@@ -91,14 +91,14 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       <div className="page-head">
         <h2>Candidates</h2>
         <div className="row">
-          {canAiSearch && <a className="doc-btn ai-link" href="#/candidates/ai-search">✦ AI search</a>}
+          {canAiSearch && <a className="button ai-link" href="#/candidates/ai-search">✦ AI search</a>}
           {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
         </div>
       </div>
       {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
       <div className="list-toolbar">
         <div className="search-box">
-          <span aria-hidden="true">⌕</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input aria-label="Search candidates" placeholder="Search by name, email, phone, title or company" value={q} onChange={(e) => { setQ(e.target.value); }} />
         </div>
         <label className={`toggle-chip${mine ? " on" : ""}`}><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine only</label>
@@ -127,16 +127,16 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
           {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
+        {canEmail && !emailing && (
+          <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
+            shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
+        )}
         <span className="list-meta-end">
           {openAs === "profile" && <WaLegend />}
           <OpenAsSwitch value={openAs} onChange={setOpenAs} />
         </span>
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
-      {canEmail && !emailing && (
-        <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
-          shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
-      )}
       {openAs === "resume" && (
         <ResumeReader key={JSON.stringify([q, mine, adv, sortBy])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
           chosen={canEmail ? pick.ids : undefined} onChoose={canEmail ? (c, on) => { pick.pick([personOf(c)], on); } : undefined}

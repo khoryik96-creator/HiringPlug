@@ -44,7 +44,7 @@ test("selects several candidates in contact, candidate and job emails, preservin
    :page.getByRole("form",{name:"Write email",exact:true});
   await target.screenshot({path:`${dir}/${name}.png`,style:".topbar { visibility: hidden !important; }"});
  };
- await page.goto("/#/settings");
+ await page.goto("/#/settings/salary");
  await page.getByRole("combobox",{name:"Salary in emails",exact:true}).selectOption("breakdown");await page.getByRole("button",{name:"Save calculation rules",exact:true}).click();await expect(page.getByRole("status").filter({hasText:"Saved"})).toBeVisible();
  if(process.env.HP_UI_SCREENSHOT_DIR)await page.getByRole("region",{name:"Salary calculation",exact:true}).screenshot({path:`${process.env.HP_UI_SCREENSHOT_DIR}/settings.png`,style:".topbar {visibility:hidden !important;}"});
  await page.goto(`/#/candidates/${first.id}/screening`);
@@ -68,7 +68,7 @@ test("selects several candidates in contact, candidate and job emails, preservin
  const send=page.waitForResponse(r=>r.url().endsWith("/v1/emails")&&r.request().method()==="POST");await page.getByRole("button",{name:"Send",exact:true}).click();const sent=await send;expect(sent.status(),await sent.text()).toBe(202);const email=await sent.json() as Schemas["Email"];expect(email.attachments).toHaveLength(2);expect(email.contactId).toBe(contact.id);
  await page.goto(`/#/candidates/${first.id}`);await page.getByRole("button",{name:"Email",exact:true}).click();await page.getByText("Candidates and CVs (0)",{exact:true}).click();await page.getByRole("button",{name:"Use this candidate’s details",exact:true}).click();await page.getByLabel("Add candidates",{exact:true}).fill(second.fullName);await page.getByRole("button",{name:`${second.fullName} · ${second.currentTitle}`,exact:true}).click();await page.getByRole("button",{name:"Insert candidates into the message",exact:true}).click();await expect(editor).toContainText(second.fullName);await shot("candidate-email-multiple-candidates");
  await page.goto(`/#/jobs/${job.id}`);
- const details=page.getByLabel("Job details",{exact:true});await expect(details).not.toHaveAttribute("open");await details.locator("summary").click();await expect(details).toHaveAttribute("open");await details.locator("summary").click();
+ await page.getByRole("tab",{name:"Job details",exact:true}).click();const details=page.getByRole("region",{name:"Job details",exact:true});await expect(details).toBeVisible();await page.getByRole("tab",{name:"Notes & activity",exact:true}).click();
  if(process.env.HP_UI_SCREENSHOT_DIR)await details.screenshot({path:`${process.env.HP_UI_SCREENSHOT_DIR}/collapsed-job-details.png`,style:".topbar {visibility:hidden !important;}"});
  const applied=page.getByRole("button",{name:/^Choose all \d+ in Applied$/});await applied.click();await applied.click();await applied.click(); // choose, unchoose, choose the column
  if(process.env.HP_UI_SCREENSHOT_DIR)await page.getByRole("region",{name:"Pipeline",exact:true}).screenshot({path:`${process.env.HP_UI_SCREENSHOT_DIR}/bulk-selection.png`,style:".topbar {visibility:hidden !important;}"});await page.getByRole("button",{name:"Email client about 2 candidates",exact:true}).click();await page.getByText("Candidates and CVs (2)",{exact:true}).click();await page.getByRole("button",{name:"Insert candidates into the message",exact:true}).click();await expect(page.getByRole("textbox",{name:"Message",exact:true})).toContainText(first.fullName);await shot("job-client-email");

@@ -54,13 +54,16 @@ describe("market map", () => {
     expect(sentBody(post)).toEqual({ subjectType: "job", subjectId: "jo_1", kind: "market_map" });
   });
 
-  it("shows the AI's insights, or says the AI is off; nothing without the permission", async () => {
+  it("shows the AI's insights, or tells those who can set it up that the AI is off; nothing without the permission", async () => {
     reads(map({}, { answerId: "ask_1", status: "done", text: "Target companies\n- Nestlé\n- Dutch Lady", model: "m", askedAt: "2026-11-06T00:00:00Z" }), false);
     renderWithClient(<MarketMap jobId="jo_1" permissions={["market:read"]} />);
     expect(await screen.findByText("Dutch Lady")).toBeTruthy();
     expect(screen.getByText(/AI estimates/)).toBeTruthy();
-    expect(screen.getByText("Off: no AI provider is set up.")).toBeTruthy();
+    expect(screen.queryByText(/Off: no AI provider/)).toBeNull(); // only those who can set it up are told
     expect(screen.queryByRole("button", { name: /insights/ })).toBeNull();
+    cleanup();
+    renderWithClient(<MarketMap jobId="jo_1" permissions={["market:read", "aiproviders:manage"]} />);
+    expect(await screen.findByText(/Off: no AI provider is set up/)).toBeTruthy();
     cleanup();
     renderWithClient(<MarketMap jobId="jo_1" permissions={["jobs:read"]} />);
     expect(screen.queryByRole("region", { name: "Market map" })).toBeNull();

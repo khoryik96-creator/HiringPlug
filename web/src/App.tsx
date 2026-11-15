@@ -12,7 +12,8 @@ import { BookingPage, bookingRoute } from "./pages/BookingPage";
 import { Careers } from "./pages/Careers";
 import { ChoosePassword } from "./pages/ChoosePassword";
 import { SignIn } from "./pages/SignIn";
-import { menu, resolve } from "./routes";
+import { Menu } from "./components/Menu";
+import { menu, resolve, type Route } from "./routes";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -53,11 +54,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     <>
       <header className="topbar">
         <span className="brand">Hiring<span>Plug</span></span>
-        <nav aria-label="Main">
-          {menu("main", permissions).map((r) => (
-            <a key={r.section} href={r.menu?.href} aria-current={route.section === r.section ? "page" : undefined}>{r.menu?.label}</a>
-          ))}
-        </nav>
+        <MainMenu routes={menu("main", permissions)} current={route.section} />
         <a className="settings-link" href="#/settings" aria-current={inSettings ? "page" : undefined}>
           <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
@@ -126,4 +123,24 @@ export function App() {
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+/** The top bar's pages; the less used ones (Leads, Reports, Import) under "More". */
+function MainMenu({ routes, current }: { routes: Route[]; current: string }) {
+  const link = (r: Route, close?: () => void) => (
+    <a key={r.section} href={r.menu?.href} aria-current={current === r.section ? "page" : undefined} onClick={close}>{r.menu?.label}</a>
+  );
+  const more = routes.filter((r) => r.menu?.more);
+  const open = more.find((r) => r.section === current);
+  return (
+    <nav aria-label="Main">
+      {routes.filter((r) => !r.menu?.more).map((r) => link(r))}
+      {more.length > 0 && (
+        <Menu label={<>{open?.menu?.label ?? "More"} <span aria-hidden="true">▾</span></>} ariaLabel="More pages"
+          className={open ? "more-pages here" : "more-pages"}>
+          {(close) => more.map((r) => link(r, close))}
+        </Menu>
+      )}
+    </nav>
+  );
 }

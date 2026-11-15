@@ -28,7 +28,7 @@ input.code { text-transform: uppercase; }
 .badge.on_hold { background: #fef3c7; }
 .badge.filled { background: #dbeafe; }
 .badge.closed { background: #e5e7eb; }
-.board { display: grid; grid-template-columns: repeat(6, minmax(11.5rem, 1fr)); gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; }
+.board { display: grid; grid-template-columns: repeat(6, minmax(12.5rem, 1fr)); gap: 0.6rem; overflow-x: auto; padding-bottom: 0.25rem; }
 .column { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem; min-height: 6rem; }
 .column.drop { outline: 2px dashed var(--accent); }
 .column h4 { margin: 0.1rem 0.2rem 0.6rem; font-size: 0.74rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
@@ -91,6 +91,8 @@ textarea { width: 100%; box-sizing: border-box; font: inherit; }
 .badge.scheduled { background: #dbeafe; } .badge.completed { background: #dcfce7; } .badge.cancelled, .badge.no_show { background: #fee2e2; }
 .feedback { display: grid; gap: 0.5rem; max-width: 40rem; }
 .bar { display: inline-block; height: 0.75rem; min-width: 2px; background: var(--accent); border-radius: 2px; }
+.bar-col { width: 45%; } /* the bars get room to show the drop from stage to stage */
+td.bar-col .bar { height: 0.9rem; border-radius: 4px; }
 .badge.pending_approval, .badge.draft { background: #fef3c7; } .badge.approved, .badge.accepted { background: #dcfce7; } .badge.declined, .badge.withdrawn { background: #fee2e2; }
 .secret { word-break: break-all; user-select: all; }
 .badge.fit-strong { background: #dcfce7; } .badge.fit-partial { background: #fef3c7; } .badge.fit-weak { background: #fee2e2; }
@@ -118,6 +120,8 @@ section[aria-label="Mandatory fields"] fieldset { border: 1px solid #e5e7eb; bor
 /* Screening call: the CV beside the notes, the CV staying in view while the form scrolls. */
 main.wide { max-width: none; padding: 0 1rem; }
 main.roomy { max-width: 1200px; }
+/* Lists and the job's pipeline use the width of the screen, like the candidate list. */
+main.list-page { max-width: 1600px; padding: 0 1.5rem; }
 .screening-side label.row { flex-wrap: nowrap; align-items: flex-start; }
 .screening-side label.row input[type="checkbox"] { margin-top: 0.25rem; }
 .screening { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); gap: 1rem; align-items: start; }
@@ -359,7 +363,7 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .column-choice { display: grid; grid-template-columns: 1fr auto auto; gap: 0.25rem; align-items: center; min-height: 2rem; }
 .column-choice .tool { padding: 0 0.45rem; }
 .table-scroll { overflow-x: auto; }
-.candidates-table .col-status { min-width: 10rem; }
+.candidates-table .col-status { min-width: 7rem; }
 /* An email template previewed with one candidate's values. */
 .template-preview { border-top: 1px solid var(--border, #d0d7de); padding-top: 0.6rem; }
 .template-preview .preview-hits { list-style: none; padding: 0; margin: 0.3rem 0; }
@@ -451,7 +455,7 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .page-head h2 { margin: 0; }
 .list-toolbar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; background: #fff; border: 1px solid var(--border, #e5e7eb); border-radius: 14px; padding: 0.55rem 0.65rem; margin-bottom: 0.75rem; }
 .list-toolbar .search-box { flex: 1; min-width: 16rem; display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border, #d0d7de); border-radius: 10px; padding: 0 0.7rem; background: #fff; }
-.list-toolbar .search-box span { color: var(--muted); font-size: 1.1rem; }
+.list-toolbar .search-box > svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
 .list-toolbar .search-box input { border: 0; outline: none; flex: 1; padding: 0.5rem 0; background: transparent; box-shadow: none; }
 .list-toolbar .search-box:focus-within { border-color: var(--accent); }
 .toggle-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.75rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; font-size: 0.85rem; font-weight: 550; cursor: pointer; }
@@ -465,8 +469,10 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .add-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.6rem; }
 .candidates-page .candidates-table td { vertical-align: middle; }
 .candidates-page .candidates-table .col-currentRole { min-width: 11rem; }
-.candidates-page .candidates-table .col-email { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.candidates-page .candidates-table .col-email { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .candidates-page .candidates-table .col-currentSalary, .candidates-page .candidates-table .col-expectedSalary, .candidates-page .candidates-table .col-noticePeriod { white-space: nowrap; }
+/* "RM 21,000 / month" on one line, so each row stays one line tall. */
+.candidates-table :is(.col-currentSalary, .col-expectedSalary) .small { display: inline; margin-left: 0.15rem; }
 .snippet-row td { padding-left: 2.2rem; }
 main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto; padding: 0 1.5rem; }
 /* AI candidate search: what you need on the left, the shortlist on the right. */
@@ -800,6 +806,13 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 .pick-bar select { width: auto; min-height: 34px; }
 .card.picked { border-color: var(--accent); background: var(--accent-soft); }
 .choose-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0; }
+/* On a list's count line: small, and quiet until someone is chosen. */
+.list-meta .choose-row { margin: 0; flex: 1; }
+.list-meta .choose .segmented { margin: 0; border-radius: 999px; }
+.list-meta .choose .segmented > button { padding: 0.15rem 0.65rem; min-height: 0; font-size: 0.78rem; }
+.list-meta .choose-label { font-size: 0.78rem; font-weight: 600; }
+/* "All / None" (lists and the job's pipeline): the pressed one in soft purple, so "None" does not shout. */
+.choose .segmented > button.on { background: var(--accent-soft); color: var(--accent-dark); }
 .choose-row .pick-bar { margin: 0; padding: 0.35rem 0.5rem 0.35rem 0.85rem; }
 .choose { display: inline-flex; align-items: center; gap: 0.6rem; }
 .choose-label { font-weight: 700; font-size: 0.85rem; color: var(--muted); }
@@ -1057,6 +1070,10 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .app-card .who-text { min-width: 0; }
 .app-card .card-name a { font-weight: 700; color: var(--ink); }
 .app-card .who-title { font-size: 0.76rem; color: var(--muted); }
+/* Long names: at most two lines on a narrow pipeline card (the whole name on hover). */
+.card .app-card-name, .board .app-card .card-name a { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.board .app-card .who { gap: 0.4rem; }
+.board .app-card .who-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-card .avatar { width: 30px; height: 30px; }
 .app-card .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; align-items: center; }
 .chip { font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
@@ -1111,7 +1128,7 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 
 /* One-click copy next to an email or number. */
 .copyable { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
-.copyable > a { min-width: 0; overflow-wrap: anywhere; }
+.copyable > a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* the whole address shows on hover and is copied by the button */
 .copy-btn { flex: none; display: inline-flex; align-items: center; gap: 0.25rem; min-height: 0; padding: 0.2rem 0.35rem; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--muted); font-size: 0.72rem; font-weight: 700; cursor: pointer; }
 .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
 .copy-btn.copied { color: #15803d; border-color: #bfe5cc; background: #e6f6ec; }
@@ -1124,10 +1141,19 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .dash-block.dragging { opacity: 0.45; }
 .dash-block.drop-here::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 4px; border-radius: 4px; background: var(--accent); }
 .drag-handle { position: absolute; top: 0.7rem; right: 0.7rem; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px; min-height: 0; padding: 0;
-  border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a39cb8; cursor: grab; }
-.dash-block:hover .drag-handle, .drag-handle:focus-visible { border-color: var(--line); background: var(--surface); color: var(--accent); }
+  border: 1px solid transparent; border-radius: 7px; background: transparent; color: #a39cb8; cursor: grab; opacity: 0; transition: opacity 0.12s; }
+/* The handle shows when the pointer is over its block (or it has the keyboard's focus). */
+.dash-block:hover .drag-handle, .drag-handle:focus-visible { opacity: 1; border-color: var(--line); background: var(--surface); color: var(--accent); }
 .drag-handle:active { cursor: grabbing; }
-.dash-block > .kpis { padding-right: 2.2rem; }
+.dash-block > .kpis .kpi:last-child { padding-right: 2.4rem; } /* room for the handle when it shows */
+/* A block with nothing to show today (no tasks, no offers to approve) leaves no gap. */
+.dash-block:not(:has(> :not(.drag-handle))) { display: none; }
+@media (hover: none) { .drag-handle { display: none; } } /* phones and tablets: no dragging */
 
 /* "Change" next to a candidate card box's label (the salaries). */
 .fact .label .fact-change { margin-left: 0.4rem; font-size: 0.72rem; font-weight: 500; text-transform: none; letter-spacing: 0; padding: 0; }
+
+/* Contacts: names and phone numbers on one line; long company names and emails wrap instead. */
+.contacts-table td:first-child, .contacts-table td:last-child { white-space: nowrap; }
+.contacts-table td:nth-child(2), .contacts-table td:nth-child(3) { white-space: nowrap; }
+.contacts-table td { overflow-wrap: break-word; }
