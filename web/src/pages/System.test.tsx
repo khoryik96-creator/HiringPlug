@@ -12,6 +12,7 @@ afterEach(() => {
 
 const lastBackup: NonNullable<Schemas["SystemStatus"]["backup"]> = {
   name: "hiringplug-20261107-020000", startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), status: "done", sizeBytes: 5 * 1024 * 1024, error: null,
+  offsiteStatus: "done", offsiteAt: new Date().toISOString(), offsiteError: null,
 };
 
 const status = (over: Partial<Schemas["SystemStatus"]> = {}): Schemas["SystemStatus"] => ({
@@ -58,6 +59,22 @@ describe("System", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(status({ backup: { ...lastBackup, status: "failed", error: "pg_dump: disk full" } })));
     renderWithClient(<System />);
     expect((await screen.findByRole("alert")).textContent).toContain("pg_dump: disk full");
+  });
+
+  it("says whether the last backup was also copied off the server", async () => {
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok(status()));
+    renderWithClient(<System />);
+    expect(await screen.findByText(/Also copied off the server/)).toBeTruthy();
+    cleanup();
+    get.mockResolvedValue(ok(status({ backup: { ...lastBackup, offsiteStatus: "failed", offsiteError: "rclone: access denied" } })));
+    renderWithClient(<System />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("copy off the server failed");
+    expect(alert.textContent).toContain("rclone: access denied");
+    cleanup();
+    get.mockResolvedValue(ok(status({ backup: { ...lastBackup, offsiteStatus: "off", offsiteAt: null } })));
+    renderWithClient(<System />);
+    expect(await screen.findByText(/no off-site storage is set up/)).toBeTruthy();
   });
 
   it("writes sizes people read", () => {

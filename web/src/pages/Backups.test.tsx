@@ -14,7 +14,8 @@ afterEach(() => {
 
 const backups = (over: Partial<Schemas["Backups"]> = {}): Schemas["Backups"] => ({
   available: true, auto: true, serviceRunning: true, serviceSeenAt: "2026-11-12T02:01:30Z", requestedAt: null,
-  last: { name: "hiringplug-20261112-020000", startedAt: "2026-11-12T02:00:00Z", finishedAt: "2026-11-12T02:01:00Z", status: "done", sizeBytes: 3_565_158, error: null },
+  last: { name: "hiringplug-20261112-020000", startedAt: "2026-11-12T02:00:00Z", finishedAt: "2026-11-12T02:01:00Z", status: "done", sizeBytes: 3_565_158, error: null,
+    offsiteStatus: "off", offsiteAt: "2026-11-12T02:01:05Z", offsiteError: null },
   backups: [
     { name: "hiringplug-20261112-020000", createdAt: "2026-11-12T02:00:00Z", sizeBytes: 3_565_158, files: 120 },
     { name: "hiringplug-20261111-020000", createdAt: "2026-11-11T02:00:00Z", sizeBytes: 1_288_490_189, files: 118 },

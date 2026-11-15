@@ -9,6 +9,7 @@
 //	hp token -user usr_... [-ttl 12h]  print a sign-in token for a user (development)
 //	hp backup [-every 24h]             back up the database and files into HP_BACKUP_DIR
 //	hp restore NAME -yes               put a backup back (stop the API and workers first)
+//	hp fetch [NAME]                    bring a backup back from off the server (the newest unless named), then restore it
 package main
 
 import (
@@ -45,7 +46,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: hp <migrate|bootstrap|dev-setup|tenant|user|token|password-link|backup|restore|fetch> [flags]")
 }
 
 func run(ctx context.Context, cmd string, args []string) error {
@@ -66,6 +67,8 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return printPasswordLink(ctx, args)
 	case "backup":
 		return runBackup(ctx, args)
+	case "fetch":
+		return runFetch(ctx, args)
 	case "restore":
 		return runRestore(ctx, args)
 	default:

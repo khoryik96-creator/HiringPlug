@@ -1,0 +1,48 @@
+# On a server people reach at your web address, with HTTPS. Used on top of
+# docker-compose.yml (Docker Compose 2.24 or newer):
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+# What it changes:
+# - Caddy answers on ports 80 and 443 and gets the certificate for HP_DOMAIN
+#   by itself (the domain must point at this server first).
+# - The web app is no longer opened on port 3000: only Caddy reaches it.
+# - The app runs in production mode: it refuses to start with a published
+#   password or secret, the mail catcher, or an address that is not https.
+# - No mail catcher: email goes to your mail server (HP_SMTP_* in deploy/.env).
+# - Each night's backup is also copied off this server (offsite, below).
+# All settings are in deploy/.env: see docs/playbooks/deploy-to-a-server.md.
+
+x-production: &production
+  HP_ENV: production
+  HP_PUBLIC_URL: https://${HP_DOMAIN:?set HP_DOMAIN in deploy/.env, e.g. app.youragency.com}
+  HP_SMTP_TLS: ${HP_SMTP_TLS:-starttls}
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      HP_DOMAIN: ${HP_DOMAIN:?set HP_DOMAIN in deploy/.env, e.g. app.youragency.com}
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy-data:/data, caddy-config:/config]
+    depends_on: [web]
+
+  web:
+    ports: !reset []
+    volumes: [./real-ip.conf:/etc/nginx/real-ip.conf:ro]
+
+  bootstrap:
+    environment: *production
+  api:
+    environment: *production
+  worker:
+    environment: *production
+  backup:
+    environment: *production
+
+  # Not on a server: it would hold every email instead of sending it.
+  mailpit:
+    profiles: [laptop-only]
+
+volumes:
+  caddy-data: # the certificates: kept across restarts
+  caddy-config:

@@ -7826,6 +7826,18 @@ export interface components {
             failedAt: string;
         };
         BackupStatus: {
+            /**
+             * @description Its copy off the server (HP_OFFSITE_*): done, failed, off (no off-site storage set up), or null (not tried yet).
+             * @enum {string|null}
+             */
+            offsiteStatus: "done" | "failed" | "off" | null;
+            /**
+             * Format: date-time
+             * @description When the off-site copy finished or failed.
+             */
+            offsiteAt: string | null;
+            /** @description Why the off-site copy failed. */
+            offsiteError: string | null;
             /** @description The backup's folder, e.g. hiringplug-20261107-020000. */
             name: string;
             /** Format: date-time */

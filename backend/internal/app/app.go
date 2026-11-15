@@ -18,6 +18,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/db"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/alerts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authn"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
@@ -192,6 +193,9 @@ func RunWorker(ctx context.Context, getenv func(string) string, out io.Writer) e
 		return err
 	}
 	go pruneJobs(ctx, d)
+	// Tells HP_ALERT_EMAIL when the server needs someone (failed backups, a full disk...).
+	go (&alerts.Watcher{Checks: alerts.Checks{DB: d.Pool, FilesDir: cfg.FilesDir}, Mail: d.Mail, To: cfg.AlertEmails,
+		Server: cfg.PublicURL, Log: logger.With("part", "alerts")}).Run(ctx)
 	return w.Run(ctx)
 }
 

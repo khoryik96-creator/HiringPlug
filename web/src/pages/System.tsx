@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { OffsiteCopy } from "../components/OffsiteCopy";
 import { formatWhen } from "../labels";
 
 const systemKey = ["settings", "system"] as const;
@@ -123,6 +124,7 @@ function Backup({ backup, auto }: { backup: Schemas["SystemStatus"]["backup"]; a
           {stale && " That is more than two days ago: check that the backup service is running."}
         </p>
       )}
+      <OffsiteCopy backup={backup} />
       {backup?.status === "running" && <p>A backup is being made (started {formatWhen(backup.startedAt)}).</p>}
       {backup?.status === "failed" && (
         <p className="warning" role="alert">The last backup failed ({formatWhen(backup.startedAt)}): {backup.error}</p>

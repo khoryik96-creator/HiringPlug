@@ -94,7 +94,7 @@ tasks:
 
   lint:shell:
     desc: Check CI shell scripts (requires ShellCheck)
-    cmds: [shellcheck .github/scripts/*.sh]
+    cmds: [shellcheck .github/scripts/*.sh deploy/*.sh]
 
   lint:go:
     dir: backend

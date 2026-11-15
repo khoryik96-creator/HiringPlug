@@ -55,7 +55,41 @@ func TestProductionRefusesDevelopmentSecrets(t *testing.T) {
 	_, err = Load(env(map[string]string{
 		"HP_ENV": "production", "HP_DATABASE_URL": "postgres://hp_api:s3cretpw@db:5432/hp",
 		"HP_AUTH_JWT_SECRET": real, "HP_FILES_URL_SECRET": real, "HP_MAIL_KEYS_SECRET": real,
+		"HP_PUBLIC_URL": "https://app.example.com",
 	}))
+	require.NoError(t, err)
+}
+
+func TestProductionRefusesTheLaptopsAddressAndMailCatcher(t *testing.T) {
+	real := "a-real-secret-0123456789-0123456789-xyz"
+	base := map[string]string{
+		"HP_ENV": "production", "HP_DATABASE_URL": "postgres://hp_api:s3cretpw@db:5432/hp",
+		"HP_AUTH_JWT_SECRET": real, "HP_FILES_URL_SECRET": real, "HP_MAIL_KEYS_SECRET": real,
+	}
+	with := func(extra map[string]string) error {
+		m := map[string]string{}
+		for k, v := range base {
+			m[k] = v
+		}
+		for k, v := range extra {
+			m[k] = v
+		}
+		_, err := Load(env(m))
+		return err
+	}
+	for _, address := range []string{"", "http://app.example.com", "https://localhost:3000"} {
+		err := with(map[string]string{"HP_PUBLIC_URL": address})
+		require.Error(t, err, address)
+		assert.Contains(t, err.Error(), "HP_PUBLIC_URL must be the app's https:// address", address)
+	}
+	err := with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HP_SMTP_HOST must be your mail server in production")
+	err = with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "smtp.example.com:587", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"})
+	require.Error(t, err, "real mail is sent encrypted")
+	require.NoError(t, with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "smtp.example.com:587", "HP_SMTP_FROM": "no-reply@example.com"}))
+	// Outside production the laptop's settings stay fine.
+	_, err = Load(env(map[string]string{"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"}))
 	require.NoError(t, err)
 }
 
@@ -80,4 +114,12 @@ func TestMailServerSettings(t *testing.T) {
 		assert.Contains(t, err.Error(), want)
 	}
 	assert.NotContains(t, err.Error(), "hunter2")
+}
+
+func TestAlertEmailsAreAddresses(t *testing.T) {
+	c, err := Load(env(map[string]string{"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_ALERT_EMAIL": " you@agency.com, it@agency.com "}))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"you@agency.com", "it@agency.com"}, c.AlertEmails)
+	_, err = Load(env(map[string]string{"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_ALERT_EMAIL": "you at agency"}))
+	assert.ErrorContains(t, err, "HP_ALERT_EMAIL must be email addresses")
 }

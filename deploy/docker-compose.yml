@@ -47,6 +47,8 @@ x-backend-env: &backend-env
   HP_SMTP_PASSWORD: ${HP_SMTP_PASSWORD:-}
   HP_SMTP_FROM: ${HP_SMTP_FROM:-no-reply@hiringplug.local}
   HP_SMTP_TLS: ${HP_SMTP_TLS:-none}
+  # Who is emailed when the server needs someone (failed backups, a full disk...).
+  HP_ALERT_EMAIL: ${HP_ALERT_EMAIL:-}
   # The AI assistant: off until a provider is set up (see docs/playbooks/run-locally.md).
   HP_AI_PROVIDER: ${HP_AI_PROVIDER:-off}
   # Seals the AI keys companies enter in Settings > AI provider (the AI worker opens them).
@@ -114,12 +116,14 @@ services:
 
   # A backup of the database and the uploaded files every night (only files
   # new since the night before are copied; unchanged ones are shared), the newest
-  # 14 kept, in the backups folder next to this repository (copy them to
-  # another disk or the cloud too). Settings > Backups turns the nightly
+  # 14 kept, in the backups folder next to this repository, and each copied
+  # off this server when HP_OFFSITE_S3_* are set (deploy/.env). Settings > Backups turns the nightly
   # backup off or on, makes one now, and downloads one. Restore one with:
   #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
   #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
   #   docker compose -f deploy/docker-compose.yml up -d
+  # On a new server, bring the newest back from off the server first:
+  #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp fetch
   backup:
     build: { context: .., dockerfile: deploy/backup.Dockerfile }
     restart: unless-stopped
@@ -130,6 +134,13 @@ services:
       # The API runs as this user (not root): it is given the backups, so
       # Settings > Backups can list, download and delete them.
       HP_BACKUP_OWNER: "65532:65532"
+      # Each backup also copied off this server (see .env.example and
+      # docs/playbooks/deploy-to-a-server.md); empty: not set up.
+      HP_OFFSITE_S3_BUCKET: ${HP_OFFSITE_S3_BUCKET:-}
+      HP_OFFSITE_S3_ENDPOINT: ${HP_OFFSITE_S3_ENDPOINT:-}
+      HP_OFFSITE_S3_REGION: ${HP_OFFSITE_S3_REGION:-}
+      HP_OFFSITE_S3_ACCESS_KEY: ${HP_OFFSITE_S3_ACCESS_KEY:-}
+      HP_OFFSITE_S3_SECRET_KEY: ${HP_OFFSITE_S3_SECRET_KEY:-}
     volumes: [files:/data/files, ../backups:/backups]
     depends_on:
       bootstrap: { condition: service_completed_successfully }

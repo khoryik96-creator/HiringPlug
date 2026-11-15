@@ -2,6 +2,7 @@ package main
 
 // hp backup [-every 24h]   copy the database and files into HP_BACKUP_DIR (keeps HP_BACKUP_KEEP)
 // hp restore NAME -yes     put a backup back (stop the API and workers first)
+// hp fetch [NAME]          bring a backup back from off the server (HP_OFFSITE_*) into HP_BACKUP_DIR
 
 import (
 	"context"
@@ -26,6 +27,11 @@ func backupOptions() (backup.Options, error) {
 	if o.FilesDir == "" {
 		return o, errors.New("HP_FILES_DIR is required (the uploaded files to back up)")
 	}
+	off, err := offsiteOptions()
+	if err != nil {
+		return o, err
+	}
+	o.Offsite = off
 	if v := os.Getenv("HP_BACKUP_KEEP"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
@@ -34,6 +40,26 @@ func backupOptions() (backup.Options, error) {
 		o.Keep = n
 	}
 	return o, nil
+}
+
+// offsiteOptions reads where backups are also copied, off this server: an
+// S3-compatible bucket (HP_OFFSITE_S3_*), or a folder on another disk
+// (HP_OFFSITE_DIR). Neither: not set up.
+func offsiteOptions() (backup.Offsite, error) {
+	bucket, dir := os.Getenv("HP_OFFSITE_S3_BUCKET"), os.Getenv("HP_OFFSITE_DIR")
+	switch {
+	case bucket != "" && dir != "":
+		return backup.Offsite{}, errors.New("set HP_OFFSITE_S3_BUCKET or HP_OFFSITE_DIR, not both")
+	case bucket != "":
+		key, secret := os.Getenv("HP_OFFSITE_S3_ACCESS_KEY"), os.Getenv("HP_OFFSITE_S3_SECRET_KEY")
+		if key == "" || secret == "" {
+			return backup.Offsite{}, errors.New("HP_OFFSITE_S3_ACCESS_KEY and HP_OFFSITE_S3_SECRET_KEY are required with HP_OFFSITE_S3_BUCKET")
+		}
+		return backup.S3Offsite(bucket, os.Getenv("HP_OFFSITE_S3_ENDPOINT"), os.Getenv("HP_OFFSITE_S3_REGION"), key, secret), nil
+	case dir != "":
+		return backup.Offsite{Remote: dir}, nil
+	}
+	return backup.Offsite{}, nil
 }
 
 // backupOwner reads HP_BACKUP_OWNER ("uid:gid"): who the backups are handed
@@ -159,5 +185,22 @@ func runRestore(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Println("restored", fs.Arg(0), "- run `hp bootstrap` if this backup is from an older version, then start the API and workers")
+	return nil
+}
+
+func runFetch(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("fetch", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	o, err := backupOptions()
+	if err != nil {
+		return err
+	}
+	name, err := backup.Fetch(ctx, o.Offsite, o.Dir, fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	fmt.Printf("fetched %s into %s - to put it back, stop the API and workers, then: hp restore %s -yes\n", name, o.Dir, name)
 	return nil
 }

@@ -110,8 +110,19 @@ func systemToAPI(st SystemStatus) api.SystemStatus {
 	}
 	out.Backup.SetNull()
 	if b := st.Backup; b != nil {
-		out.Backup.Set(api.BackupStatus{Name: b.Name, StartedAt: b.StartedAt, FinishedAt: c.OrNull(b.FinishedAt),
-			Status: api.BackupStatusStatus(b.Status), SizeBytes: c.OrNull(b.SizeBytes), Error: c.OrNull(b.Error)})
+		out.Backup.Set(backupStatusToAPI(*b))
+	}
+	return out
+}
+
+// backupStatusToAPI is a backup run, with its copy off the server.
+func backupStatusToAPI(b backup.Last) api.BackupStatus {
+	out := api.BackupStatus{Name: b.Name, StartedAt: b.StartedAt, FinishedAt: c.OrNull(b.FinishedAt),
+		Status: api.BackupStatusStatus(b.Status), SizeBytes: c.OrNull(b.SizeBytes), Error: c.OrNull(b.Error),
+		OffsiteAt: c.OrNull(b.OffsiteAt), OffsiteError: c.OrNull(b.OffsiteError)}
+	out.OffsiteStatus.SetNull()
+	if b.OffsiteStatus != nil {
+		out.OffsiteStatus.Set(api.BackupStatusOffsiteStatus(*b.OffsiteStatus))
 	}
 	return out
 }

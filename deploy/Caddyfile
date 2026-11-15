@@ -1,0 +1,13 @@
+# The HTTPS front for a server (deploy/docker-compose.prod.yml): it gets and
+# renews the certificate for your web address (HP_DOMAIN) on its own, sends
+# plain http:// visitors to https://, and passes everything to the web app.
+{$HP_DOMAIN} {
+	encode zstd gzip
+	# Browsers use https:// only, for a year, once they have seen this.
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:80 {
+		# The visitor's own address, for sign-in limits and the audit trail
+		# (the web app trusts it only behind this front: real-ip.conf).
+		header_up X-Real-IP {remote_host}
+	}
+}

@@ -90,8 +90,7 @@ func backupsToAPI(b Backups) api.Backups {
 		ServiceSeenAt: c.OrNull(b.Control.ServiceSeenAt), RequestedAt: c.OrNull(b.Control.RequestedAt)}
 	out.Last.SetNull()
 	if l := b.Last; l != nil {
-		out.Last.Set(api.BackupStatus{Name: l.Name, StartedAt: l.StartedAt, FinishedAt: c.OrNull(l.FinishedAt),
-			Status: api.BackupStatusStatus(l.Status), SizeBytes: c.OrNull(l.SizeBytes), Error: c.OrNull(l.Error)})
+		out.Last.Set(backupStatusToAPI(*l))
 	}
 	for _, f := range b.List {
 		out.Backups = append(out.Backups, api.BackupFile{Name: f.Name, CreatedAt: f.CreatedAt, SizeBytes: f.SizeBytes, Files: f.Files})

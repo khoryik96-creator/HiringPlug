@@ -31,10 +31,11 @@ import (
 
 // Options say what to back up and where.
 type Options struct {
-	AdminURL string // the database, as its owner (pg_dump needs to read every table)
-	FilesDir string // the uploaded files (HP_FILES_DIR)
-	Dir      string // where backups go (HP_BACKUP_DIR)
-	Keep     int    // how many backups to keep (older ones are deleted)
+	AdminURL string  // the database, as its owner (pg_dump needs to read every table)
+	FilesDir string  // the uploaded files (HP_FILES_DIR)
+	Dir      string  // where backups go (HP_BACKUP_DIR)
+	Keep     int     // how many backups to keep (older ones are deleted)
+	Offsite  Offsite // where each backup is also copied, off this server (zero: not set up)
 	Now      func() time.Time
 	finder   *toolFinder // tests
 }
@@ -56,15 +57,19 @@ type Last struct {
 	Status     string // running, done or failed
 	SizeBytes  *int64
 	Error      *string
+	// Its copy off the server: done, failed, off (none set up) or nil (not tried yet).
+	OffsiteStatus *string
+	OffsiteAt     *time.Time
+	OffsiteError  *string
 }
 
 // LastRun returns the latest backup run; ok is false when there has been none.
 func LastRun(ctx context.Context, db interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }) (l Last, ok bool, err error) {
-	err = db.QueryRow(ctx, `SELECT name, started_at, finished_at, status, size_bytes, error
+	err = db.QueryRow(ctx, `SELECT name, started_at, finished_at, status, size_bytes, error, offsite_status, offsite_at, offsite_error
 		FROM backup_run ORDER BY started_at DESC, id DESC LIMIT 1`).
-		Scan(&l.Name, &l.StartedAt, &l.FinishedAt, &l.Status, &l.SizeBytes, &l.Error)
+		Scan(&l.Name, &l.StartedAt, &l.FinishedAt, &l.Status, &l.SizeBytes, &l.Error, &l.OffsiteStatus, &l.OffsiteAt, &l.OffsiteError)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Last{}, false, nil
 	}
@@ -102,7 +107,44 @@ func Run(ctx context.Context, admin *pgxpool.Pool, o Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return dir, prune(o.Dir, o.Keep)
+	if err := prune(o.Dir, o.Keep); err != nil {
+		return dir, err
+	}
+	return dir, offsite(ctx, admin, o, runID, name)
+}
+
+// offsite copies the new backup off the server and records how it went.
+func offsite(ctx context.Context, admin *pgxpool.Pool, o Options, runID int64, name string) error {
+	status, msg := "off", ""
+	var err error
+	if o.Offsite.On() {
+		status = "done"
+		if err = copyOffsite(ctx, o.Offsite, o.Dir, name, kept(o.Dir)); err != nil {
+			status, msg = "failed", clip(err.Error(), 2000)
+		}
+	}
+	recCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if _, recErr := admin.Exec(recCtx, `UPDATE backup_run SET offsite_status = $2, offsite_at = now(), offsite_error = NULLIF($3, '') WHERE id = $1`,
+		runID, status, msg); recErr != nil {
+		err = errors.Join(err, fmt.Errorf("recording the off-site copy: %w", recErr))
+	}
+	if err != nil {
+		return fmt.Errorf("the backup %s is made, but its copy off the server failed: %w", name, err)
+	}
+	return nil
+}
+
+// kept lists the backups in dir.
+func kept(dir string) []string {
+	entries, _ := os.ReadDir(dir)
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() && nameRe.MatchString(e.Name()) {
+			names = append(names, e.Name())
+		}
+	}
+	return names
 }
 
 func write(ctx context.Context, o Options, name string) (string, int64, error) {

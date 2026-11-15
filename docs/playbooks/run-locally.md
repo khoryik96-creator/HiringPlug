@@ -44,6 +44,9 @@ For development, `task db:setup` (`hp dev-setup`) creates demo users who sign
 in with their email (e.g. `owner@demo.hiringplug.local`) and the password
 `demo-password-2026`.
 
+**On a rented server** (your agency online, with HTTPS, off-site backups and
+alerts), follow [deploy-to-a-server.md](deploy-to-a-server.md) instead.
+
 **Before anything beyond your own laptop** (an office server, the cloud): the
 passwords and secrets in `deploy/docker-compose.yml` are published defaults.
 Put your own in `deploy/.env` (next to `docker-compose.yml`; never commit it):

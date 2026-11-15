@@ -179,13 +179,16 @@ type BackupDownload struct {
 }
 
 type BackupRun struct {
-	ID         int64
-	Name       string
-	StartedAt  time.Time
-	FinishedAt *time.Time
-	Status     string
-	SizeBytes  *int64
-	Error      *string
+	ID            int64
+	Name          string
+	StartedAt     time.Time
+	FinishedAt    *time.Time
+	Status        string
+	SizeBytes     *int64
+	Error         *string
+	OffsiteStatus *string
+	OffsiteAt     *time.Time
+	OffsiteError  *string
 }
 
 type BookingLink struct {

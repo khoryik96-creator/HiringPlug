@@ -4344,6 +4344,12 @@ class FailedJob(BaseModel):
     failedAt: AwareDatetime
 
 
+class OffsiteStatus(StrEnum):
+    done = "done"
+    failed = "failed"
+    off = "off"
+
+
 class Status6(StrEnum):
     running = "running"
     done = "done"
@@ -4351,6 +4357,16 @@ class Status6(StrEnum):
 
 
 class BackupStatus(BaseModel):
+    offsiteStatus: Annotated[
+        OffsiteStatus | None,
+        Field(
+            description="Its copy off the server (HP_OFFSITE_*): done, failed, off (no off-site storage set up), or null (not tried yet)."
+        ),
+    ]
+    offsiteAt: Annotated[
+        AwareDatetime | None, Field(description="When the off-site copy finished or failed.")
+    ]
+    offsiteError: Annotated[str | None, Field(description="Why the off-site copy failed.")]
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]

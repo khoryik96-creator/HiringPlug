@@ -73,6 +73,8 @@ jobs:
             sudo chmod +x /usr/lib/postgresql/16/bin/$tool
           done
           /usr/lib/postgresql/16/bin/pg_dump --version
+      - name: rclone (backups are also copied off the server)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq rclone && rclone version
       - name: Test (unit and integration, real PostgreSQL)
         run: task test:go
       - name: A newly generated module passes every check

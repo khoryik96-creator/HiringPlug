@@ -113,6 +113,9 @@ Cloud hosting (file storage, managed database, backups with restore drills),
 single sign-on, alerts and tracing, company sign-up and billing for SaaS.
 ✅ Done early: each company's own role permissions and "own / team / all"
 candidate scope (Roles and access).
+✅ One agency on its own server: HTTPS with automatic certificates, production
+checks, backups copied off the server with a restore drill (`hp fetch`), email
+alerts and an uptime check ([the guide](playbooks/deploy-to-a-server.md)).
 
 ## Older milestone names
 

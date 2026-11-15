@@ -76,6 +76,9 @@ type Config struct {
 	// host, emails are recorded but fail with "no mail server is set up".
 	SMTP            SMTP
 	MailConnections MailConnections
+	// AlertEmails are told when the server needs someone (a failed backup, a
+	// nearly full disk...): the worker emails them. None: only logged.
+	AlertEmails []string // HP_ALERT_EMAIL: one address, or several with commas
 	// AllowPrivateNetworks lets the server fetch from and post to private and
 	// local network addresses users typed (webhooks, careers pages), and
 	// webhooks use plain HTTP. Off by default: such an address must not reach
@@ -186,6 +189,17 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 
+	for _, a := range strings.Split(r.str("HP_ALERT_EMAIL", ""), ",") {
+		if a = strings.TrimSpace(a); a == "" {
+			continue
+		}
+		if parsed, err := mail.ParseAddress(a); err != nil || parsed.Address != a {
+			r.fail("HP_ALERT_EMAIL must be email addresses separated by commas, e.g. you@youragency.com")
+			break
+		}
+		c.AlertEmails = append(c.AlertEmails, a)
+	}
+
 	if c.DatabaseURL == "" {
 		r.fail("HP_DATABASE_URL is required (the restricted application role, not the admin)")
 	}
@@ -219,6 +233,14 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 		if strings.Contains(c.DatabaseURL, ":hp_api_dev@") {
 			r.fail("HP_DATABASE_URL must not use the published development password in production")
+		}
+		// Links in emails (bookings, profiles, password set-up) use this address.
+		if u, err := url.Parse(c.PublicURL); err != nil || u.Scheme != "https" || u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" {
+			r.fail("HP_PUBLIC_URL must be the app's https:// address in production, e.g. https://app.youragency.com")
+		}
+		// The mail catcher keeps every email: none would reach a real inbox.
+		if host, _, _ := net.SplitHostPort(c.SMTP.Addr); host == "mailpit" || (c.SMTP.Addr != "" && c.SMTP.TLS == "none") {
+			r.fail("HP_SMTP_HOST must be your mail server in production, with HP_SMTP_TLS starttls or tls (the mail catcher only holds email)")
 		}
 	}
 	if len(r.problems) > 0 {

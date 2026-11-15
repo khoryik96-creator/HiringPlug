@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
+import { OffsiteCopy } from "../components/OffsiteCopy";
 import { formatWhen } from "../labels";
 
 type Backups = Schemas["Backups"];
@@ -76,6 +77,7 @@ export function BackupsPage() {
               {b.requestedAt && <span className="small" role="status">Asked for {formatWhen(b.requestedAt)}: it is made within a minute while the backup service runs.</span>}
               {!b.requestedAt && b.last?.status === "running" && <span className="small" role="status">A backup is being made (started {formatWhen(b.last.startedAt)}).</span>}
             </div>
+            <OffsiteCopy backup={b.last} />
             {b.last?.status === "failed" && <p className="warning" role="alert">The last backup failed ({formatWhen(b.last.startedAt)}): {b.last.error}</p>}
           </section>
           <BackupList backups={b} onDelete={(name) => { remove.mutate(name); }} deleting={remove.isPending} />

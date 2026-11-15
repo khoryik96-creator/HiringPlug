@@ -367,8 +367,15 @@ components:
         failedAt: { type: string, format: date-time }
     BackupStatus:
       type: object
-      required: [name, startedAt, finishedAt, status, sizeBytes, error]
+      required: [name, startedAt, finishedAt, status, sizeBytes, error, offsiteStatus, offsiteAt, offsiteError]
       properties:
+        offsiteStatus:
+          type: string
+          nullable: true
+          enum: [done, failed, "off"]
+          description: "Its copy off the server (HP_OFFSITE_*): done, failed, off (no off-site storage set up), or null (not tried yet)."
+        offsiteAt: { type: string, format: date-time, nullable: true, description: When the off-site copy finished or failed. }
+        offsiteError: { type: string, nullable: true, description: Why the off-site copy failed. }
         name: { type: string, description: "The backup's folder, e.g. hiringplug-20261107-020000." }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: string, format: date-time, nullable: true }

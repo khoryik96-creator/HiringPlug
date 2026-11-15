@@ -31,6 +31,7 @@ Read in this order. Each page is short and links to the next.
 - [Efficient development and CI diagnosis](playbooks/development-workflow.md)
 - [Debug a problem](playbooks/debug-a-problem.md)
 - [Run it on your own machine or server](playbooks/run-locally.md)
+- [Put it on a server, with HTTPS, off-site backups and alerts](playbooks/deploy-to-a-server.md)
 
 ## Decisions (and why)
 

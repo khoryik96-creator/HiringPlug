@@ -81,6 +81,25 @@ func TestBackupsInSettings(t *testing.T) {
 		assert.False(t, none.Available)
 	})
 
+	t.Run("says whether the last backup was also copied off the server", func(t *testing.T) {
+		ctx := context.Background()
+		var id int64
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `INSERT INTO backup_run (name, started_at, finished_at, status, size_bytes,
+			offsite_status, offsite_at, offsite_error) VALUES ('hiringplug-20991231-020000', now() + interval '1 hour', now() + interval '1 hour',
+			'done', 10, 'failed', now() + interval '1 hour', 'rclone: access denied') RETURNING id`).Scan(&id))
+		t.Cleanup(func() {
+			_, _ = testutil.Current.Admin.Exec(context.Background(), `DELETE FROM backup_run WHERE id = $1`, id)
+		})
+		var got api.Backups
+		a.request(http.MethodGet, "/v1/settings/backups", owner, nil).JSON(&got)
+		last := got.Last.MustGet()
+		assert.Equal(t, api.BackupStatusOffsiteStatusFailed, last.OffsiteStatus.MustGet())
+		assert.Equal(t, "rclone: access denied", last.OffsiteError.MustGet())
+		var sys api.SystemStatus
+		a.request(http.MethodGet, "/v1/settings/system", owner, nil).JSON(&sys)
+		assert.Equal(t, api.BackupStatusOffsiteStatusFailed, sys.Backup.MustGet().OffsiteStatus.MustGet(), "also on the System page")
+	})
+
 	t.Run("the nightly switch and Back up now", func(t *testing.T) {
 		a.request(http.MethodPut, "/v1/settings/backups/auto", owner, map[string]any{"auto": false}).JSON(&b)
 		assert.False(t, b.Auto)
