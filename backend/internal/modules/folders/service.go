@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/folders/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
@@ -54,6 +55,12 @@ func load(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Folder,
 		return Folder{}, err
 	}
 	return fromRow(store.VisibleFoldersRow(row), p), nil
+}
+
+// OwnerOnly is the error for someone it is shared with trying what only the
+// owner may do (rename, delete, share).
+func OwnerOnly() error {
+	return apperr.New(api.ErrorCodeFOLDEROWNERONLY, "Only the folder's owner can do that.")
 }
 
 // owned is load, for what only the owner may do.

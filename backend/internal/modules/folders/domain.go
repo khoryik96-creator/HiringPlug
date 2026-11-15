@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
 
@@ -65,10 +64,4 @@ func ItemIDs(kind string, ids []string) ([]string, apperr.FieldErrors) {
 		}
 	}
 	return out, errs
-}
-
-// OwnerOnly is the error for someone it is shared with trying what only the
-// owner may do (rename, delete, share).
-func OwnerOnly() error {
-	return apperr.New(api.ErrorCodeFOLDEROWNERONLY, "Only the folder's owner can do that.")
 }
