@@ -3061,6 +3061,9 @@ class JobOrderUpdate(BaseModel):
 
 class JobOrderSummary(BaseModel):
     id: JobOrderId
+    ownerId: Annotated[str | None, Field(...)]
+    ownerName: Annotated[str | None, Field(...)]
+    createdAt: Annotated[AwareDatetime, Field(description="When the job was added.")]
     title: str
     companyId: CompanyId
     companyName: str
@@ -3735,6 +3738,18 @@ class StageCounts(BaseModel):
     interview: int
     offer: int
     placed: int
+
+
+class JobProgress(BaseModel):
+    jobId: JobOrderId
+    stageCounts: StageCounts
+    lastMovedAt: Annotated[
+        AwareDatetime | None,
+        Field(description="When a candidate last joined or moved stage; null with none."),
+    ]
+    waiting: Annotated[
+        int, Field(description="Candidates over 7 days in one open stage (offer and earlier).")
+    ]
 
 
 class DashboardJob(BaseModel):

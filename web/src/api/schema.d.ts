@@ -2928,6 +2928,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pipeline/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jobs' progress: candidates per stage, when anything last moved, how many wait over 7 days */
+        get: operations["listJobProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pipeline/moves": {
         parameters: {
             query?: never;
@@ -6380,6 +6397,13 @@ export interface components {
         };
         JobOrderSummary: {
             id: components["schemas"]["JobOrderId"];
+            ownerId: string | null;
+            ownerName: string | null;
+            /**
+             * Format: date-time
+             * @description When the job was added.
+             */
+            createdAt: string;
             title: string;
             companyId: components["schemas"]["CompanyId"];
             companyName: string;
@@ -6984,6 +7008,17 @@ export interface components {
             interview: number;
             offer: number;
             placed: number;
+        };
+        JobProgress: {
+            jobId: components["schemas"]["JobOrderId"];
+            stageCounts: components["schemas"]["StageCounts"];
+            /**
+             * Format: date-time
+             * @description When a candidate last joined or moved stage; null with none.
+             */
+            lastMovedAt: string | null;
+            /** @description Candidates over 7 days in one open stage (offer and earlier). */
+            waiting: number;
         };
         DashboardJob: {
             jobId: components["schemas"]["JobOrderId"];
@@ -12266,6 +12301,8 @@ export interface operations {
                 companyId?: components["schemas"]["CompanyId"];
                 /** @description Only jobs with this hiring contact. */
                 contactId?: components["schemas"]["ContactId"];
+                /** @description Only the jobs you own. */
+                mine?: boolean;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["JobOrderId"];
@@ -13659,6 +13696,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineSummary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listJobProgress: {
+        parameters: {
+            query: {
+                jobId: components["schemas"]["JobOrderId"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["JobProgress"][];
+                    };
                 };
             };
             400: components["responses"]["ValidationFailed"];

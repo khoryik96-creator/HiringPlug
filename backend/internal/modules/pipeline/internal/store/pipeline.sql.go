@@ -213,6 +213,42 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 	return i, err
 }
 
+const jobActivity = `-- name: JobActivity :many
+SELECT job_order_id, max(stage_changed_at)::timestamptz AS last_moved,
+  count(*) FILTER (WHERE stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
+                     AND stage_changed_at < now() - interval '7 days')::integer AS waiting
+FROM application WHERE job_order_id = ANY($1::text[])
+GROUP BY job_order_id
+`
+
+type JobActivityRow struct {
+	JobOrderID string
+	LastMoved  time.Time
+	Waiting    int32
+}
+
+// The jobs list: when anything last moved on each job, and how many wait
+// over 7 days in one open stage (offer and earlier).
+func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivityRow, error) {
+	rows, err := q.db.Query(ctx, jobActivity, jobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []JobActivityRow
+	for rows.Next() {
+		var i JobActivityRow
+		if err := rows.Scan(&i.JobOrderID, &i.LastMoved, &i.Waiting); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCandidateApplications = `-- name: ListCandidateApplications :many
 SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `

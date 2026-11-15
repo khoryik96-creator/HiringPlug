@@ -24,7 +24,12 @@ func (h *HTTP) ListJobs(ctx context.Context, req api.ListJobsRequestObject) (api
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, c.Convert[string](req.Params.Status), req.Params.CompanyId, req.Params.ContactId, req.Params.Cursor, limit)
+	p := authz.MustFromContext(ctx)
+	var owner *string
+	if req.Params.Mine != nil && *req.Params.Mine {
+		owner = &p.UserID
+	}
+	page, err := h.svc.List(ctx, p, req.Params.Q, c.Convert[string](req.Params.Status), req.Params.CompanyId, req.Params.ContactId, owner, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +37,8 @@ func (h *HTTP) ListJobs(ctx context.Context, req api.ListJobsRequestObject) (api
 	for i, s := range page.Items {
 		out.Items[i] = api.JobOrderSummary{
 			Id: s.ID, Title: s.Title, CompanyId: s.CompanyID, CompanyName: s.CompanyName, Status: api.JobStatus(s.Status),
-			Location: c.OrNull(s.Location), Openings: s.Openings, UpdatedAt: s.UpdatedAt,
+			Location: c.OrNull(s.Location), Openings: s.Openings, OwnerId: c.OrNull(s.OwnerID), OwnerName: c.OrNull(s.OwnerName),
+			CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
 		}
 	}
 	return out, nil

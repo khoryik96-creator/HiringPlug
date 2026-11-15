@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -81,6 +82,50 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int)
 		recent, err := q.RecentResults(ctx)
 		out.PlacedLast30Days, out.MovedLast7Days = int(recent.PlacedLast30Days), int(recent.MovedLast7Days)
 		return err
+	})
+	return out, err
+}
+
+// JobProgress is a job's candidates per open stage, when anything last
+// moved on it, and how many wait over 7 days in one open stage.
+type JobProgress struct {
+	JobID     string
+	Counts    StageCounts
+	LastMoved *time.Time
+	Waiting   int
+}
+
+// Progress returns the progress of the given jobs (the jobs list).
+func (s *Service) Progress(ctx context.Context, p authz.Principal, jobIDs []string) ([]JobProgress, error) {
+	var out []JobProgress
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		counts, err := q.StageCounts(ctx, jobIDs)
+		if err != nil {
+			return err
+		}
+		activity, err := q.JobActivity(ctx, jobIDs)
+		if err != nil {
+			return err
+		}
+		byJob := make(map[string]*JobProgress, len(jobIDs))
+		out = make([]JobProgress, len(jobIDs))
+		for i, id := range jobIDs {
+			out[i] = JobProgress{JobID: id, Counts: StageCounts{}}
+			byJob[id] = &out[i]
+		}
+		for _, c := range counts {
+			if j := byJob[c.JobOrderID]; j != nil && !IsClosed(c.Stage) {
+				j.Counts[c.Stage] += int(c.N)
+			}
+		}
+		for _, a := range activity {
+			if j := byJob[a.JobOrderID]; j != nil {
+				last := a.LastMoved
+				j.LastMoved, j.Waiting = &last, int(a.Waiting)
+			}
+		}
+		return nil
 	})
 	return out, err
 }

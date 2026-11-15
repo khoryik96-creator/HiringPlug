@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"slices"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
@@ -97,4 +98,18 @@ func countsToAPI(c StageCounts) api.StageCounts {
 		Applied: c[Applied], Screening: c[Screening], Submitted: c[Submitted],
 		Interview: c[Interview], Offer: c[Offer], Placed: c[Placed],
 	}
+}
+
+// ListJobProgress handles GET /v1/pipeline/jobs.
+func (h *HTTP) ListJobProgress(ctx context.Context, req api.ListJobProgressRequestObject) (api.ListJobProgressResponseObject, error) {
+	ids := slices.Compact(slices.Sorted(slices.Values(req.Params.JobId)))
+	rows, err := h.svc.Progress(ctx, authz.MustFromContext(ctx), ids)
+	if err != nil {
+		return nil, err
+	}
+	out := api.ListJobProgress200JSONResponse{Items: make([]api.JobProgress, len(rows))}
+	for i, r := range rows {
+		out.Items[i] = api.JobProgress{JobId: r.JobID, StageCounts: countsToAPI(r.Counts), LastMovedAt: c.OrNull(r.LastMoved), Waiting: r.Waiting}
+	}
+	return out, nil
 }

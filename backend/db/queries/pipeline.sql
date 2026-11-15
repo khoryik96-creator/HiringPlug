@@ -96,3 +96,12 @@ WHERE a.job_order_id = ANY(@job_order_ids::text[])
   AND (a.stage = 'placed' OR EXISTS (
     SELECT 1 FROM application_stage_change c
     WHERE c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'));
+
+-- The jobs list: when anything last moved on each job, and how many wait
+-- over 7 days in one open stage (offer and earlier).
+-- name: JobActivity :many
+SELECT job_order_id, max(stage_changed_at)::timestamptz AS last_moved,
+  count(*) FILTER (WHERE stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
+                     AND stage_changed_at < now() - interval '7 days')::integer AS waiting
+FROM application WHERE job_order_id = ANY(@job_ids::text[])
+GROUP BY job_order_id;

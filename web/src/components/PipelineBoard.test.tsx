@@ -20,7 +20,7 @@ const wei: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w2", candi
 
 /** Clicking a card (not its name) ticks it. */
 /** A candidate's card on the board, by their name. */
-const cardOf = (name: string) => { const card = screen.getByRole("link", { name }).closest(".card"); if (!card) throw new Error("no card"); return card; };
+const cardOf = (name: string) => { const card = screen.getByRole("link", { name }).closest<HTMLElement>(".card"); if (!card) throw new Error("no card"); return card; };
 const choose = (name: string) => { fireEvent.click(cardOf(name)); };
 const moveChosen = (stage: string) => { fireEvent.change(screen.getByRole("combobox", { name: "Move the chosen candidates" }), { target: { value: stage } }); };
 
@@ -34,7 +34,7 @@ describe("pipeline board", () => {
   it("shows each candidate in their stage, and closed ones with the reason", async () => {
     await showBoard();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByRole("link", { name: "Siti Aisyah" })).toBeTruthy();
-    expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3 days in screening")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3 days")).toBeTruthy();
     expect(screen.getByText("Rejected or withdrawn").closest("summary")?.textContent).toBe("Rejected or withdrawn 1");
     expect(screen.getByText(/Salary does not match: Wants 15k/)).toBeTruthy();
   });
@@ -126,11 +126,12 @@ describe("pipeline board", () => {
     expect(within(email).getByRole("heading", { name: "Email client" })).toBeTruthy(); // about this application, not a list
   });
 
-  it("shows the name with no tick box and no title; Space on the name chooses the card", async () => {
+  it("shows initials, the name and current title, with no tick box; Space on the name chooses the card", async () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });
     const card = cardOf("Siti Aisyah");
-    expect(card.textContent).not.toContain("Accountant");
+    expect(card.textContent).toContain("Accountant");
+    expect(within(card).getByLabelText("Siti Aisyah").textContent).toBe("SA");
     expect(card.querySelector("input")).toBeNull();
     fireEvent.keyDown(name, { key: " " });
     expect(card.className).toContain("picked");
@@ -172,17 +173,42 @@ describe("pipeline board", () => {
   });
 });
 
-it("selects and clears each early stage without losing candidates in other stages",async()=>{
- const applied={...siti,id:"appl_applied",candidateId:"cand_applied",candidateName:"Applied Person",stage:"applied"};
- vi.spyOn(api,"GET").mockResolvedValue(ok({items:[siti,applied,wei]}));
- renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read","emails:send"]}/>);
- fireEvent.click(await screen.findByRole("button",{name:"Select all Applied candidates"}));
- fireEvent.click(screen.getByRole("button",{name:"Select all Screening candidates"}));
- fireEvent.click(screen.getByRole("button",{name:"Select all Screening candidates"}));
+it("chooses a column with its count, or the whole board with All / None", async () => {
+ const applied = { ...siti, id: "appl_applied", candidateId: "cand_applied", candidateName: "Applied Person", stage: "applied" as const };
+ vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, applied, wei] }));
+ renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
+ fireEvent.click(await screen.findByRole("button", { name: "Choose all 1 in Applied" }));
+ fireEvent.click(screen.getByRole("button", { name: "Choose all 1 in Screening" }));
  expect(screen.getByText("2 chosen")).toBeTruthy();
- fireEvent.click(screen.getByRole("button",{name:"Unselect all Applied candidates"}));
+ fireEvent.click(screen.getByRole("button", { name: "Choose all 1 in Applied" })); // again: unchooses the column only
  expect(cardOf("Siti Aisyah").className).toContain("picked");
  expect(cardOf("Applied Person").className).not.toContain("picked");
- fireEvent.click(screen.getByRole("button",{name:"Unselect all Screening candidates"}));
- expect(screen.queryByText("1 chosen")).toBeNull();
+ const board = screen.getByRole("group", { name: "Choose" });
+ fireEvent.click(within(board).getByRole("button", { name: /^All \d+$/ }));
+ expect(within(board).getByRole("button", { name: /^All \d+$/ }).getAttribute("aria-pressed")).toBe("true");
+ fireEvent.click(within(board).getByRole("button", { name: "None" }));
+ expect(screen.queryByText(/chosen$/)).toBeNull();
+});
+
+it("flags who waits too long, the next interview and an offer's deadline", async () => {
+  const days = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+  const t = new Date(Date.now() + 86_400_000);
+  const tomorrow = `${String(t.getFullYear())}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  const stale = { ...siti, stageChangedAt: days(16) };
+  const meeting = { ...siti, id: "appl_meet", candidateId: "cand_meet", candidateName: "Mei Lim", stage: "interview" as const, stageChangedAt: days(8) };
+  const offered = { ...siti, id: "appl_offer", candidateId: "cand_offer", candidateName: "Aina Liyana", stage: "offer" as const, stageChangedAt: days(2) };
+  const at = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+    path === "/v1/interviews" ? { items: [{ applicationId: "appl_meet", startsAt: at, status: "scheduled" }, { applicationId: "appl_meet", startsAt: at.replace(/^\d{4}/, "2099"), status: "scheduled" }] }
+      : path === "/v1/offers" ? { items: [{ applicationId: "appl_offer", expiresOn: tomorrow, status: "sent" }] }
+        : { items: [stale, meeting, offered] },
+  ))) as never);
+  renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "interviews:read", "offers:read"]} />);
+  await screen.findByRole("link", { name: "Siti Aisyah" });
+  expect((await within(cardOf("Siti Aisyah")).findByText("16 days")).className).toBe("chip red");
+  expect(within(cardOf("Mei Lim")).getByText("8 days").className).toBe("chip amber");
+  expect(await within(cardOf("Aina Liyana")).findByText("answer by tomorrow")).toBeTruthy();
+  const chips = cardOf("Mei Lim").querySelectorAll(".chip.cal");
+  expect(chips).toHaveLength(1); // the next one only
+  expect(chips[0]?.textContent).toBe(new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(at)));
 });

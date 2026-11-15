@@ -1021,3 +1021,36 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .source-select-label { font-weight: 600; }
 .source-select select { width: auto; min-width: 12rem; }
 .source-select > span { display: inline-flex; flex: none; }
+
+/* Jobs list: each job's pipeline, how long it is open, its owner, and why it needs attention. */
+.job-views { margin: 0.25rem 0 0.75rem; }
+.job-progress td { vertical-align: middle; }
+.job-progress .job-title { font-weight: 700; color: var(--ink); }
+.job-progress .quiet-link { color: inherit; }
+.job-progress tr.needs-attention td:first-child { box-shadow: inset 3px 0 0 #e8a317; }
+.pipeline-bar { display: flex; width: 170px; height: 10px; border-radius: 99px; overflow: hidden; background: var(--line); }
+.pipeline-bar > i { display: block; height: 100%; }
+.pipeline-text { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+.attention-why { font-size: 0.82rem; font-weight: 700; color: #93500a; }
+.avatar { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 0.72rem; font-weight: 800; flex: none; }
+.nowrap { white-space: nowrap; }
+
+/* A job's board: a coloured top per stage, a count that chooses the column, cards that say who needs a nudge. */
+.column { padding-top: 0; border-top: 4px solid var(--stage, var(--line-strong)); }
+.column.stage-applied { --stage: #94a3b8; } .column.stage-screening { --stage: #a78bfa; } .column.stage-submitted { --stage: #7352d8; }
+.column.stage-interview { --stage: #2563eb; } .column.stage-offer { --stage: #e8a317; } .column.stage-placed { --stage: #16a34a; }
+.column-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; padding: 0.55rem 0.2rem 0.5rem; }
+.column-head h4 { margin: 0; color: var(--ink); }
+.column-count { border: 0; cursor: pointer; min-height: 0; padding: 0 0.5rem; line-height: 1.5; }
+.column-count[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.column-empty { margin: 1.2rem 0; text-align: center; font-size: 0.8rem; color: var(--muted); }
+.app-card .who { display: flex; gap: 0.5rem; align-items: center; }
+.app-card .who-text { min-width: 0; }
+.app-card .card-name a { font-weight: 700; color: var(--ink); }
+.app-card .who-title { font-size: 0.76rem; color: var(--muted); }
+.app-card .avatar { width: 30px; height: 30px; }
+.app-card .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; align-items: center; }
+.chip { font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.chip.amber { background: #fff4dc; color: #93500a; border-color: #f5dfae; }
+.chip.red { background: #fde8e6; color: #a8231a; border-color: #f3c4c0; }
+.chip.cal { background: var(--accent-soft); color: var(--accent-dark); border-color: #d9cdfb; }

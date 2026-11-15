@@ -39,9 +39,10 @@ RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListJobOrders :many
-SELECT id, title, company_id, status, location, openings, updated_at
+SELECT id, title, company_id, status, location, openings, owner_id, created_at, updated_at
 FROM job_order
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
+  AND (sqlc.narg(owner_id)::text IS NULL OR owner_id = sqlc.narg(owner_id)::text)
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
   AND (sqlc.narg(contact_id)::text IS NULL OR contact_id = sqlc.narg(contact_id)::text)

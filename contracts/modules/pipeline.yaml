@@ -132,6 +132,39 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/pipeline/jobs:
+    get:
+      operationId: listJobProgress
+      tags: [pipeline]
+      summary: "Jobs' progress: candidates per stage, when anything last moved, how many wait over 7 days"
+      x-permission: pipeline:read
+      parameters:
+        - name: jobId
+          in: query
+          required: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items: { $ref: '#/components/schemas/JobOrderId' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/JobProgress' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/pipeline/moves:
     get:
       operationId: listStageMoves
@@ -256,6 +289,14 @@ components:
         interview: { type: integer }
         offer: { type: integer }
         placed: { type: integer }
+    JobProgress:
+      type: object
+      required: [jobId, stageCounts, lastMovedAt, waiting]
+      properties:
+        jobId: { $ref: '#/components/schemas/JobOrderId' }
+        stageCounts: { $ref: '#/components/schemas/StageCounts' }
+        lastMovedAt: { type: string, format: date-time, nullable: true, description: When a candidate last joined or moved stage; null with none. }
+        waiting: { type: integer, description: Candidates over 7 days in one open stage (offer and earlier). }
     DashboardJob:
       type: object
       required: [jobId, title, companyId, companyName, stageCounts]

@@ -731,6 +731,16 @@ lead's company (with the built-in email check).
   job's, its client's and the sender's, never one candidate's. The email is
   kept on each candidate's emails, and the job's activity says "emailed the
   client about N candidates".
+- **Jobs list** ✅: each job with a bar of where its candidates are (and the
+  counts), how many days it has been open and its owner's initials
+  (`GET /v1/pipeline/jobs`). An open job needs attention (amber edge, and
+  why) when it has had no candidates for 2 weeks, someone has waited over 7
+  days in one stage, or nothing has moved for 7 days. **All open / Mine /
+  Needs attention** pick which jobs show.
+- **A job's board** ✅: each card shows initials, the candidate's current
+  title, days in the stage (amber after 7, red after 14), their next
+  interview and a sent offer's last day to answer. **Choose: All | None**
+  picks the whole board; a column's count picks that column.
 - **One email to many, each their own copy** ✅: tick candidates (the
   candidates list, or a job's board), or contacts (the contacts list, or a
   company's contacts), and **Email each separately**. Above each list,
