@@ -112,6 +112,9 @@ describe("possible duplicates", () => {
     }));
     renderWithClient(<CandidateDetail id={testCandidate().id} permissions={RECRUITER} />);
     const warning = await screen.findByRole("region", { name: "Possible duplicates" });
+    expect(warning.textContent).toContain("1 possible duplicate · similar name");
+    expect(warning.textContent).not.toContain("Siti Aishah"); // one line until opened
+    fireEvent.click(within(warning).getByRole("button", { name: "Review" }));
     expect(warning.textContent).toContain("Siti Aishah");
     expect(warning.textContent).toContain("similar name; Accountant");
   });
@@ -127,7 +130,8 @@ describe("possible duplicates", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(testCandidate({ version: 4 })));
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithClient(<CandidateDetail id={testCandidate().id} permissions={[...RECRUITER, "candidates:merge"]} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Merge into this one" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Review and merge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge into this one" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ duplicateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", version: 3 });
   });

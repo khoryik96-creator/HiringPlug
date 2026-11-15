@@ -1,5 +1,5 @@
 // Availability colours the card; work authorization is edited in Details.
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { Candidate } from "../api/client";
 import { useCandidateUpdate } from "./useCandidateUpdate";
 import { formatNotice, regionName } from "../labels";
@@ -13,7 +13,11 @@ import { useFieldSettings } from "./useFieldSettings";
 
 const SHOWN_SKILLS = 6;
 
-export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidate; canEdit: boolean }) {
+export function CandidateBanner({ candidate: c, canEdit, onAdd }: {
+  candidate: Candidate; canEdit: boolean;
+  /** Opens the profile's form, to fill in a box left empty. */
+  onAdd?: () => void;
+}) {
   const fs = useFieldSettings();
   const [expanded, setExpanded] = useState(false);
   const save = useCandidateUpdate(c);
@@ -39,7 +43,6 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
               </select> : status && <span className="banner-status">{status.label}</span>}
               {status && sinceText(c.availabilitySince) && <span className="banner-since">{sinceText(c.availabilitySince)}</span>}
             </div>
-            {jobLine(c) && <p className="banner-job">{jobLine(c)}</p>}
           </div>
           <dl className="banner-facts">
             <div><dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd></div>
@@ -57,18 +60,13 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
         )}
 
         <div className="banner-strip">
-          <div><span className="label">Notice period</span><span className="figure">{formatNotice(c.noticePeriod)}</span></div>
-          <div>
-            <span className="label">Current salary</span>
-            {restricted ? <span className="figure small">Restricted</span>
-              : current ? <span className="figure">{current[0]} <small>{current[1]}</small></span> : <span className="figure">—</span>}
-          </div>
-          <div>
-            <span className="label">Expected salary</span>
-            {restricted ? <span className="figure small">Restricted</span>
-              : expected ? <span className="figure">{expected[0]} <small>{expected[1]}</small></span> : <span className="figure">—</span>}
-            {!restricted && raiseText(comp) && <span className="note">{raiseText(comp)}</span>}
-          </div>
+          <Fact label="Job title" value={jobLine(c) || null} onAdd={canEdit ? onAdd : undefined} />
+          <Fact label="Current salary" restricted={restricted} onAdd={canEdit ? onAdd : undefined}
+            value={current && <>{current[0]} <small>{current[1]}</small></>} />
+          <Fact label="Expected salary" restricted={restricted} onAdd={canEdit ? onAdd : undefined}
+            value={expected && <>{expected[0]} <small>{expected[1]}</small></>}
+            note={!restricted && raiseText(comp) ? raiseText(comp) : null} />
+          <Fact label="Notice period" value={c.noticePeriod ? formatNotice(c.noticePeriod) : null} onAdd={canEdit ? onAdd : undefined} />
         </div>
 
         <ErrorMessage error={save.error} />
@@ -77,6 +75,22 @@ export function CandidateBanner({ candidate: c, canEdit }: { candidate: Candidat
         <span><span className="visually-hidden">Work authorization: </span>{waColumnLabel(c.workAuthorization)}</span>
       </div>
     </section>
+  );
+}
+
+/** One of the card's boxes; an empty one asks to be filled in (dashed, "+ Add"). */
+function Fact({ label, value, note, restricted = false, onAdd }: {
+  label: string; value: ReactNode; note?: string | null; restricted?: boolean; onAdd?: () => void;
+}) {
+  const empty = !restricted && (value === null || value === undefined || value === "");
+  return (
+    <div className={empty ? "fact empty" : "fact"}>
+      <span className="label">{label}</span>
+      {restricted ? <span className="figure small">Restricted</span>
+        : empty ? (onAdd ? <button type="button" className="link add" onClick={onAdd}>+ Add</button> : <span className="figure small">—</span>)
+          : <span className="figure">{value}</span>}
+      {note && <span className="note">{note}</span>}
+    </div>
   );
 }
 

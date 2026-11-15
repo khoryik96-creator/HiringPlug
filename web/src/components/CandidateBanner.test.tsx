@@ -120,3 +120,19 @@ describe("candidate banner", () => {
   });
 
 });
+
+describe("the card's boxes", () => {
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+  it("are job title, current salary, expected salary and notice period; an empty one offers + Add", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    const onAdd = vi.fn();
+    renderWithClient(<CandidateBanner canEdit onAdd={onAdd} candidate={testCandidate({ currentTitle: "Finance Executive", currentCompany: "Maju Foods", noticePeriod: null })} />);
+    const strip = (await screen.findByText("Job title")).closest(".banner-strip") as HTMLElement;
+    expect([...strip.querySelectorAll(".label")].map((l) => l.textContent)).toEqual(["Job title", "Current salary", "Expected salary", "Notice period"]);
+    expect(strip.textContent).toContain("Finance Executive · Maju Foods");
+    const notice = screen.getByText("Notice period").closest(".fact") as HTMLElement;
+    expect(notice.className).toContain("empty");
+    fireEvent.click(within(notice).getByRole("button", { name: "+ Add" }));
+    expect(onAdd).toHaveBeenCalled();
+  });
+});

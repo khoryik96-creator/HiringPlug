@@ -1054,3 +1054,15 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .chip.amber { background: #fff4dc; color: #93500a; border-color: #f5dfae; }
 .chip.red { background: #fde8e6; color: #a8231a; border-color: #f3c4c0; }
 .chip.cal { background: var(--accent-soft); color: var(--accent-dark); border-color: #d9cdfb; }
+
+/* Candidate card: four boxes (job title, current, expected, notice); an empty one is dashed with "+ Add". */
+.candidate-banner .banner-strip > .fact { background: #fff; border: 1px solid #E3E6EB; border-radius: 10px; }
+.candidate-banner .banner-strip > .fact + .fact { border-left: 1px solid #E3E6EB; }
+.candidate-banner .banner-strip > .fact.empty { background: rgba(255, 255, 255, 0.45); border-style: dashed; border-color: #b9b2cc; }
+.candidate-banner .banner-strip .add { font-weight: 700; font-size: 1rem; padding: 0; text-align: left; }
+/* Possible duplicates: one amber line; the list opens from it. */
+.dupe-line { background: #fffaf0; border: 1px solid #f5dfae; border-radius: 12px; padding: 0.6rem 0.9rem; margin-bottom: 0.9rem; }
+.dupe-head { display: flex; align-items: center; gap: 0.75rem; }
+.dupe-icon { width: 26px; height: 26px; border-radius: 50%; background: #fff1cc; color: #93500a; display: grid; place-items: center; font-weight: 800; flex: none; }
+.dupe-text { flex: 1; min-width: 0; }
+.dupe-line ul { margin: 0.6rem 0 0.2rem; }

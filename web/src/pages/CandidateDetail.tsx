@@ -111,7 +111,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </span>
         )}
       </div>
-      <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")} />
+      <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")}
+        onAdd={() => { setEditing(true); setActive("details"); }} />
       <div className="candidate-workspace">
         <aside className="candidate-contact panel" aria-label="Contact summary">
           <h3>Contact</h3>
