@@ -69,14 +69,7 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
           <div className="banner-who">
             <div className="row">
               <h2 className="banner-name">{c.name}</h2>
-              {/* The category: picked here (saved straight away), shown in colour down the card's edge. */}
-              {canEdit ? (
-                <select className="banner-status" aria-label="Category" value={category} disabled={save.isPending}
-                  style={{ color: color === "#6b7280" ? undefined : color }}
-                  onChange={(e) => { save.mutate(e.target.value === UNKNOWN_CATEGORY ? null : e.target.value); }}>
-                  {fs.options("company_category", c.category).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-                </select>
-              ) : <span className="banner-status" style={{ color: color === "#6b7280" ? undefined : color }}>{fs.label("company_category", category)}</span>}
+              <span className="banner-status" style={{ color: color === "#6b7280" ? undefined : color }}>{fs.label("company_category", category)}</span>
             </div>
             <p className="banner-job">{[COMPANY_TYPE[c.type], c.industry].filter(Boolean).join(" · ")}</p>
           </div>
@@ -88,6 +81,18 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
           </dl>
         </div>
 
+        {canEdit && (
+          <div className="row" role="group" aria-label="Category">
+            {fs.options("company_category", c.category).map((o) => (
+              <button key={o.key} type="button" className="banner-pill" aria-pressed={category === o.key} disabled={save.isPending}
+                onClick={() => { save.mutate(o.key === UNKNOWN_CATEGORY ? null : o.key); }}>
+                <span className="dot" style={{ background: fs.color("company_category", o.key), borderColor: fs.color("company_category", o.key) }} />
+                {o.label}
+              </button>
+            ))}
+            <a className="small" href="#/settings/lists#company-categories">Change the categories</a>
+          </div>
+        )}
         <ErrorMessage error={save.error} />
 
         <div className={seesFees ? "banner-strip four" : "banner-strip"}>
