@@ -1,27 +1,29 @@
 // Search results read as resumes: the results down the left, the chosen
 // candidate's full CV on the right (with the search's words marked). Next and
 // Prev (or the ← → keys) move through the results without leaving the page.
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { api, type Schemas, unwrap } from "../../api/client";
-import { applicationsKey, jobsKey } from "../../api/keys";
+import type { Schemas } from "../../api/client";
+import { jobsKey } from "../../api/keys";
 import { formatNotice } from "../../labels";
+import { searchOpenJobs, useAddToJob } from "../addToJob";
 import { CandidateCv } from "../CandidateCv";
-import { initials, workAuth } from "../candidateColumns";
-import { rangeText, salaryText, WA_KIND, waColumnLabel, waKind } from "../candidateLook";
+import { WaDisc, workAuth } from "../candidateColumns";
+import { rangeText, salaryText, waColumnLabel } from "../candidateLook";
 import { ErrorMessage } from "../ErrorMessage";
 import { type Picked, SearchPicker } from "../SearchPicker";
 
 type Hit = Schemas["CandidateSearchHit"];
 type Summary = Schemas["CandidateSummary"];
 
-export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chosen, onChoose, canAddToJob, more }: {
+/**
+ * Reads the results as resumes. Give it a new `key` for each new search, so it
+ * starts again at the first result (and, on a phone, at the list).
+ */
+export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, canAddToJob, more, onMore }: {
   hits: Hit[];
-  /** The boolean search whose words are marked in the CV ("" for none). */
+  /** The boolean search whose words are marked in the CV (and on the profile it opens; "" for none). */
   highlight: string;
-  /** Added to the profile's link so its CV is marked too ("?hl=…" or ""). */
-  profileQuery: string;
   /** Candidates already looked at in this search. */
   seen: ReadonlySet<string>;
   onSeen: (id: string) => void;
@@ -31,18 +33,28 @@ export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chos
   canAddToJob: boolean;
   /** "Show more", under the list. */
   more?: ReactNode;
+  /** Loads the next page of results (when there is one): Next goes on into it. */
+  onMore?: () => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [reading, setReading] = useState(false); // on a phone: the resume fills the screen
   const pane = useRef<HTMLElement>(null);
   const [addingFor, setAddingFor] = useState<string | null>(null); // the candidate being added to a job
-  const at = Math.max(0, hits.findIndex((h) => h.candidate.id === openId));
+  const [nextWhenLoaded, setNextWhenLoaded] = useState<string | null>(null); // Next was pressed on this last result
+  const profileQuery = highlight ? `?hl=${encodeURIComponent(highlight)}` : "";
+  // Once the next page is in, Next carries on into it.
+  const after = nextWhenLoaded ? hits.findIndex((h) => h.candidate.id === nextWhenLoaded) + 1 : 0;
+  const waitingFor = after > 0 ? hits[after]?.candidate.id : undefined;
+  const shownId = waitingFor ?? openId;
+  const loading = nextWhenLoaded !== null && !waitingFor;
+  const at = Math.max(0, hits.findIndex((h) => h.candidate.id === shownId));
   const current = hits[at];
   const currentId = current?.candidate.id;
   const open = (i: number, focus = false) => {
     const h = hits[i];
     if (!h) return;
     setOpenId(h.candidate.id);
+    setNextWhenLoaded(null);
     const el = document.getElementById(hitId(h.candidate.id));
     if (el) {
       reveal(el);
@@ -50,24 +62,34 @@ export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chos
     }
   };
 
+  const last = at === hits.length - 1;
+  const next = () => {
+    if (!last) open(at + 1);
+    else if (onMore && currentId) { setNextWhenLoaded(currentId); onMore(); } // again if a load failed
+  };
   useEffect(() => { if (currentId) onSeen(currentId); }, [currentId, onSeen]);
-  // ← and → move through the results, unless the person is typing.
+  // ← and → move through the results, unless the person is typing, selecting
+  // (Shift) or another control already used the key.
+  const keys = useRef<(e: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target)) return;
-      if (e.key === "ArrowRight") { e.preventDefault(); open(at + 1); }
+    keys.current = (e) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || typing(e.target)) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); next(); }
       if (e.key === "ArrowLeft") { e.preventDefault(); open(at - 1); }
     };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { keys.current(e); };
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); };
-  });
+  }, []);
 
   if (!current) return null;
   return (
     <div className={`reader${reading ? " reading" : ""}`}>
       <div className="reader-list">
         <ul aria-label="Results" onKeyDown={(e) => {
-          if (e.key === "ArrowDown") { e.preventDefault(); open(at + 1, true); }
+          if (e.key === "ArrowDown") { e.preventDefault(); if (last) next(); else open(at + 1, true); }
           if (e.key === "ArrowUp") { e.preventDefault(); open(at - 1, true); }
         }}>
           {hits.map(({ candidate: c, matchedIn }) => (
@@ -76,11 +98,12 @@ export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chos
                 aria-current={c.id === currentId ? "true" : undefined}
                 onClick={() => {
                   setOpenId(c.id);
+                  setNextWhenLoaded(null);
                   setReading(true);
                   // On a phone the resume replaces the list: start at its top.
                   if (narrow()) requestAnimationFrame(() => { if (pane.current) reveal(pane.current, "start"); });
                 }}>
-                <Disc c={c} />
+                <WaDisc c={c} />
                 <span className="who">
                   <span className="nm">{c.fullName}</span>
                   <span className="ln">{[c.currentTitle, c.currentCompany].filter(Boolean).join(" · ") || "—"}</span>
@@ -106,7 +129,9 @@ export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chos
         <div className="pane-bar">
           <button type="button" className="pill-btn" disabled={at === 0} onClick={() => { open(at - 1); }}>‹ Prev</button>
           <span role="status">{String(at + 1)} of {String(hits.length)}</span>
-          <button type="button" className="pill-btn" disabled={at === hits.length - 1} onClick={() => { open(at + 1); }}>Next ›</button>
+          <button type="button" className="pill-btn" disabled={last && !onMore} onClick={next}>
+            {last && onMore ? (loading ? "Loading…" : "Load more ›") : "Next ›"}
+          </button>
           <span className="muted small keys"><kbd>←</kbd> <kbd>→</kbd> to move</span>
           <span className="sp" />
           <a className="pill-btn" href={`#/candidates/${current.candidate.id}${profileQuery}`}>Open profile</a>
@@ -123,7 +148,8 @@ export function ResumeReader({ hits, highlight, profileQuery, seen, onSeen, chos
         </div>
         {canAddToJob && addingFor === currentId && <AddToJob key={current.candidate.id} candidateId={current.candidate.id} />}
         <div className="reader-cv">
-          <CandidateCv key={current.candidate.id} candidateId={current.candidate.id} highlight={highlight} unified
+          {/* A new search marks its own words: the CV starts again. */}
+          <CandidateCv key={`${current.candidate.id} ${highlight}`} candidateId={current.candidate.id} highlight={highlight} unified
             empty={<p className="muted reader-empty">No CV on file for this candidate yet. Open their profile to add one.</p>} />
         </div>
       </section>
@@ -146,14 +172,6 @@ function typing(target: EventTarget | null): boolean {
   return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
-function Disc({ c, big = false }: { c: Summary; big?: boolean }) {
-  const kind = WA_KIND[waKind(workAuth(c))];
-  return (
-    <span className={`wa-disc${big ? " big" : ""}`} aria-hidden="true"
-      style={{ background: kind.color, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${kind.color}` }}>{initials(c.fullName)}</span>
-  );
-}
-
 /** "RM 8,000 → RM 9,500 · 1 month": pay (when the person may see it) and notice. */
 function payLine(c: Summary): string {
   const parts: string[] = [];
@@ -174,7 +192,7 @@ function PaneHead({ c }: { c: Summary }) {
   );
   return (
     <div className="pane-head">
-      <Disc c={c} big />
+      <WaDisc c={c} big />
       <div className="pane-who">
         <h3>{c.fullName}</h3>
         <div className="muted">{[c.currentTitle, c.currentCompany, wa ? waColumnLabel(wa) : null].filter(Boolean).join(" · ")}</div>
@@ -192,21 +210,13 @@ function PaneHead({ c }: { c: Summary }) {
 
 /** Add the candidate to an open job, from the resume. */
 function AddToJob({ candidateId }: { candidateId: string }) {
-  const queryClient = useQueryClient();
   const [job, setJob] = useState<Picked | null>(null);
-  const add = useMutation({
-    mutationFn: async (jobId: string) =>
-      unwrap(await api.POST("/v1/jobs/{jobId}/applications", { params: { path: { jobId } }, body: { candidateId } })),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: applicationsKey }); // the candidate's jobs too
-    },
-  });
+  const add = useAddToJob(candidateId);
   return (
     <div className="pane-bar add-to-job">
       <span className="muted small">Add to a job</span>
       <SearchPicker value={job} onChange={(p) => { setJob(p); add.reset(); }} queryKey={jobsKey}
-        placeholder="Type a job title" noMatch="No open job matches."
-        search={async (q) => unwrap(await api.GET("/v1/jobs", { params: { query: { q, status: "open", limit: 8 } } })).items.map((j) => ({ id: j.id, name: j.title, detail: j.companyName }))} />
+        placeholder="Type a job title" noMatch="No open job matches." search={searchOpenJobs} />
       {job && !add.isSuccess && <button type="button" className="pill-btn primary" disabled={add.isPending} onClick={() => { add.mutate(job.id); }}>Add</button>}
       {add.isSuccess && job && <span role="status" className="small">✓ Added to {job.name}</span>}
       <ErrorMessage error={add.error} />

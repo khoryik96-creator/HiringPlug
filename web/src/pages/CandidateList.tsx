@@ -105,7 +105,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
           Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
         </button>
-        <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />
+        {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && chips.length > 0 && (
@@ -138,9 +138,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
       )}
       {openAs === "resume" && (
-        <ResumeReader hits={hits} highlight={advanced ? adv.boolean.trim() : ""} profileQuery={hl} seen={seen} onSeen={markSeen}
+        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
           chosen={canEmail ? pick.ids : undefined} onChoose={canEmail ? (c, on) => { pick.pick([personOf(c)], on); } : undefined}
-          canAddToJob={canAddToJob} more={more} />
+          canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
       {openAs === "profile" && <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>

@@ -89,12 +89,22 @@ export function WaName({ c, href, children }: { c: Summary; href: string; childr
   const label = wa ? waColumnLabel(wa) : kind.label;
   return (
     <span className="wa-who">
-      <span className="wa-disc" style={{ background: kind.color, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${kind.color}` }}
-        role="img" aria-label={`Work authorization: ${label}`} title={`Work authorization: ${label}`}>{initials(c.fullName)}</span>
+      <WaDisc c={c} label={label} />
       <span className="wa-name">
         <span><a href={href}>{c.fullName}</a>{children}</span>
         <small className="wa-label" style={{ color: kind.color }}>{label}</small>
       </span>
+    </span>
+  );
+}
+
+/** Their initials in a disc of their work authorization's colour; with a label, said to screen readers too. */
+export function WaDisc({ c, label, big = false }: { c: Summary; label?: string; big?: boolean }) {
+  const color = WA_KIND[waKind(workAuth(c))].color;
+  const said = label ? { role: "img", "aria-label": `Work authorization: ${label}`, title: `Work authorization: ${label}` } : { "aria-hidden": true };
+  return (
+    <span className={big ? "wa-disc big" : "wa-disc"} style={{ background: color, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${color}` }} {...said}>
+      {initials(c.fullName)}
     </span>
   );
 }

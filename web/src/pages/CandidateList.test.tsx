@@ -258,4 +258,16 @@ describe("candidate list", () => {
     expect(screen.getByRole("link", { name: "Siti Aisyah" }).closest("table")).toBeTruthy();
     expect(localStorage.getItem("hiringplug.candidates.openAs")).toBe("profile");
   });
+
+  it("in Full resume, starts again at the first result for a new search, and has no column picker", async () => {
+    const wei = { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Wei Tan" };
+    vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
+    localStorage.setItem("hiringplug.candidates.openAs", "resume");
+    renderWithClient(<CandidateList canCreate={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Wei Tan/ }));
+    expect(screen.getByRole("region", { name: "Resume of Wei Tan" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Search candidates" }), { target: { value: "a" } });
+    expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
+  });
 });

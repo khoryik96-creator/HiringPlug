@@ -8,6 +8,7 @@ import { markedWords } from "./CvPane";
 
 afterEach(() => {
   cleanup();
+  Reflect.deleteProperty(Element.prototype, "scrollIntoView");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -102,7 +103,7 @@ describe("the candidate's CV", () => {
       ? Promise.resolve(ok({ parts, matches: 3 }))
       : served(path, init)) as never);
     const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
+    Element.prototype.scrollIntoView = scrolled; // jsdom has none; removed after each test
     renderWithClient(<CandidateCv candidateId="cand_1" highlight="finance OR SAP" />);
     const finance = await screen.findByRole("button", { name: "Finance 2" });
     expect(screen.getByRole("button", { name: "SAP 1" })).toBeTruthy();
@@ -116,7 +117,6 @@ describe("the candidate's CV", () => {
     fireEvent.click(screen.getByRole("button", { name: /Next place/ }));
     expect(marks()).toEqual(["Finance", "SAP*", "finance"]);
     expect(scrolled).toHaveBeenCalledTimes(4);
-    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
   });
 });
 

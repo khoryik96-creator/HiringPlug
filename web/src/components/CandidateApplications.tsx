@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
-import { applicationsKey, candidateApplicationsKey, jobsKey } from "../api/keys";
+import { candidateApplicationsKey, jobsKey } from "../api/keys";
 import { CLOSE_REASON, STAGE } from "../labels";
 import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ApplicationPlacement } from "./ApplicationPlacement";
@@ -11,13 +11,13 @@ import { ApplicationOffers } from "./Offers";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import { ErrorMessage } from "./ErrorMessage";
 import { ApplicationInterviews } from "./Interviews";
+import { searchOpenJobs, useAddToJob } from "./addToJob";
 import { type Picked, SearchPicker } from "./SearchPicker";
 import { needsDetails, StagePrompt } from "./StagePrompt";
 import { type MoveRequest, useMoveApplication } from "./useMoveApplication";
 
 /** The jobs a candidate is on, with their stage; add them to another job. */
 export function CandidateApplications({ candidateId, canUpdate, permissions }: { candidateId: string; canUpdate: boolean; permissions: Permission[] }) {
-  const queryClient = useQueryClient();
   const list = useQuery({
     queryKey: candidateApplicationsKey(candidateId),
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/applications", { params: { path: { candidateId } } })),
@@ -28,14 +28,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
   const requestMove = (m: MoveRequest) => { if (needsDetails(m, permissions)) setAsking(m); else move.mutate(m); };
   const [job, setJob] = useState<Picked | null>(null);
   const [emailing, setEmailing] = useState<string | null>(null); // the application the client email is about
-  const add = useMutation({
-    mutationFn: async (jobId: string) =>
-      unwrap(await api.POST("/v1/jobs/{jobId}/applications", { params: { path: { jobId } }, body: { candidateId } })),
-    onSuccess: () => {
-      setJob(null);
-      void queryClient.invalidateQueries({ queryKey: applicationsKey });
-    },
-  });
+  const add = useAddToJob(candidateId, () => { setJob(null); });
 
   return (
     <section className="panel" aria-label="Jobs">
@@ -86,8 +79,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
             queryKey={jobsKey}
             placeholder="Add to a job"
             noMatch="No open job matches."
-            search={async (q) =>
-              unwrap(await api.GET("/v1/jobs", { params: { query: { q, status: "open", limit: 8 } } })).items.map((j) => ({ id: j.id, name: j.title, detail: j.companyName }))}
+            search={searchOpenJobs}
           />
           {job && <button type="button" disabled={add.isPending} onClick={() => { add.mutate(job.id); }}>Add to job</button>}
           <ErrorMessage error={add.error} />

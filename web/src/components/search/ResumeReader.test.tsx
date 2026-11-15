@@ -30,6 +30,10 @@ function serveCvs() {
       return Promise.resolve(ok({ items: id === "cand_3" ? [] : [cv(id)] }));
     }
     if (path === "/v1/documents/{documentId}") return Promise.resolve(ok(cv((init.params.path.documentId ?? "").replace("doc_", ""))));
+    if (path === "/v1/documents/{documentId}/highlights") {
+      const { query } = init.params as unknown as { query: { boolean: string } };
+      return Promise.resolve(ok({ parts: [{ text: query.boolean, match: true }], matches: 1 }));
+    }
     if (path === "/v1/jobs") return Promise.resolve(ok({ items: [{ id: "job_1", title: "Finance Manager", companyName: "Acme" }] }));
     return Promise.resolve(ok({}));
   }) as never);
@@ -43,10 +47,11 @@ const cv = (candidateId: string) => ({
 function reader(more: Partial<Parameters<typeof ResumeReader>[0]> = {}) {
   const seen = new Set<string>();
   const props = {
-    hits: [hit(nurul), hit(wei, ["profile"]), hit(siti, [])] as never, highlight: "", profileQuery: "?hl=finance",
+    hits: [hit(nurul), hit(wei, ["profile"]), hit(siti, [])] as never, highlight: "",
     seen, onSeen: (id: string) => { seen.add(id); }, canAddToJob: false, ...more,
   };
-  return { ...renderWithClient(<ResumeReader {...props} />), seen };
+  const shown = renderWithClient(<ResumeReader {...props} />);
+  return { ...shown, seen, again: (next: Partial<Parameters<typeof ResumeReader>[0]>) => { shown.rerender(<ResumeReader {...props} {...next} />); } };
 }
 
 describe("reading search results as resumes", () => {
@@ -58,7 +63,7 @@ describe("reading search results as resumes", () => {
     expect(pane.textContent).toContain("RM 8,000");
     expect(pane.textContent).toContain("RM 9,500");
     expect(pane.textContent).toContain("1 month");
-    expect(screen.getByRole("link", { name: "Open profile" }).getAttribute("href")).toBe("#/candidates/cand_1?hl=finance");
+    expect(screen.getByRole("link", { name: "Open profile" }).getAttribute("href")).toBe("#/candidates/cand_1");
     expect(screen.getByRole("status").textContent).toBe("1 of 3");
     const first = screen.getByRole("button", { name: /Nurul Aisyah/ });
     expect(first.getAttribute("aria-current")).toBe("true");
@@ -132,5 +137,40 @@ describe("reading search results as resumes", () => {
     reader();
     await screen.findByText("the CV of cand_1");
     expect(screen.queryByRole("button", { name: "+ Add to job" })).toBeNull();
+  });
+
+  it("marks a new search's words in the CV that stays open", async () => {
+    const get = serveCvs();
+    const { again } = reader({ highlight: "finance" });
+    expect((await screen.findByText("finance", { selector: "pre mark" })).tagName).toBe("MARK");
+    again({ highlight: "SAP" });
+    expect(await screen.findByText("SAP", { selector: "pre mark" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open profile" }).getAttribute("href")).toBe("#/candidates/cand_1?hl=SAP"); // marked there too
+    expect(get).toHaveBeenCalledWith("/v1/documents/{documentId}/highlights", { params: { path: { documentId: "doc_cand_1" }, query: { boolean: "SAP" } } });
+  });
+
+  it("leaves the arrow keys to text selection and to controls that used them", async () => {
+    serveCvs();
+    reader();
+    await screen.findByText("the CV of cand_1");
+    fireEvent.keyDown(window, { key: "ArrowRight", shiftKey: true });
+    const used = new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true });
+    used.preventDefault();
+    window.dispatchEvent(used);
+    expect(screen.getByRole("status").textContent).toBe("1 of 3");
+  });
+
+  it("goes on into the next page of results", async () => {
+    serveCvs();
+    const onMore = vi.fn();
+    const { again } = reader({ onMore });
+    fireEvent.click(await screen.findByRole("button", { name: /Siti Hajar/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Load more ›" }));
+    expect(onMore).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Loading…" })).toBeTruthy();
+    const ana = person("cand_4", "Ana Lopez");
+    again({ onMore, hits: [hit(nurul), hit(wei), hit(siti), hit(ana)] as never });
+    expect(screen.getByRole("region", { name: "Resume of Ana Lopez" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("4 of 4");
   });
 });
