@@ -8,6 +8,7 @@ import { CandidateList } from "./CandidateList";
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  localStorage.removeItem("hiringplug.candidates.openAs");
   vi.restoreAllMocks();
 });
 
@@ -238,5 +239,23 @@ describe("candidate list", () => {
     pending[0]?.(ok({ candidateColumns: ["nationality", "residence"] }));
     await waitFor(() => { expect(put).toHaveBeenCalledTimes(2); });
     expect(put.mock.calls[1]).toEqual(["/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "industry"] } }]);
+  });
+
+  it("switches clicks between opening the profile and reading the full resume, and remembers it", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate={false} />);
+    const resume = await screen.findByRole("button", { name: "Full resume" });
+    expect(screen.getByRole("button", { name: "Profile" }).getAttribute("aria-pressed")).toBe("true");
+    await screen.findByRole("link", { name: "Siti Aisyah" }); // the usual table
+    fireEvent.click(resume);
+    expect(resume.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
+    expect(document.querySelector("table.candidates-table")).toBeNull();
+    cleanup();
+    renderWithClient(<CandidateList canCreate={false} />); // later, on this computer
+    expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+    expect(screen.getByRole("link", { name: "Siti Aisyah" }).closest("table")).toBeTruthy();
+    expect(localStorage.getItem("hiringplug.candidates.openAs")).toBe("profile");
   });
 });

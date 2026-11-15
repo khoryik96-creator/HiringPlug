@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
@@ -9,6 +9,8 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
+import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
+import { ResumeReader } from "../components/search/ResumeReader";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
@@ -18,7 +20,7 @@ import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean }) {
+export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
@@ -27,6 +29,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const cols = useCandidateColumns();
   const pick = usePicked();
   const [emailing, setEmailing] = useState(false);
+  const [openAs, setOpenAs] = useOpenAs();
+  const [seen, setSeen] = useState<ReadonlySet<string>>(new Set()); // resumes read, while on this page
+  const markSeen = useCallback((id: string) => { setSeen((s) => (s.has(id) ? s : new Set(s).add(id))); }, []);
   const personOf = (c: Schemas["CandidateSummary"]) => ({ id: c.id, person: { candidateId: c.id, name: c.fullName, email: c.email } });
   const advanced = !isEmpty(adv);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
@@ -77,6 +82,10 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     return { ...row, className: `${row.className}${snippet ? " has-snippet" : ""}` };
   };
 
+  const more = shownList.hasNextPage && (
+    <button type="button" className="doc-btn" disabled={shownList.isFetchingNextPage} onClick={() => { void shownList.fetchNextPage(); }}>Show more</button>
+  );
+
   return (
     <main className="candidates-page wide">
       <div className="page-head">
@@ -118,14 +127,22 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
           {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
-        <WaLegend />
+        <span className="list-meta-end">
+          {openAs === "profile" && <WaLegend />}
+          <OpenAsSwitch value={openAs} onChange={setOpenAs} />
+        </span>
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {canEmail && !emailing && (
         <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
           shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
       )}
-      <PinnedScroll>
+      {openAs === "resume" && (
+        <ResumeReader hits={hits} highlight={advanced ? adv.boolean.trim() : ""} profileQuery={hl} seen={seen} onSeen={markSeen}
+          chosen={canEmail ? pick.ids : undefined} onChoose={canEmail ? (c, on) => { pick.pick([personOf(c)], on); } : undefined}
+          canAddToJob={canAddToJob} more={more} />
+      )}
+      {openAs === "profile" && <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
           <thead>
             <tr>
@@ -159,10 +176,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             ))}
           </tbody>
         </table>
-      </PinnedScroll>
-      {shownList.hasNextPage && (
-        <button type="button" className="doc-btn" disabled={shownList.isFetchingNextPage} onClick={() => { void shownList.fetchNextPage(); }}>Show more</button>
-      )}
+      </PinnedScroll>}
+      {openAs === "profile" && more}
     </main>
   );
 }

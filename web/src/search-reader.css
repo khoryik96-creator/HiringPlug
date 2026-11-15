@@ -1,0 +1,69 @@
+/* Candidate search: "Click opens Profile | Full resume", and the resume reader. */
+.list-meta-end { display: inline-flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.open-as { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--muted); }
+.open-as .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); padding: 3px; gap: 2px; }
+.open-as .seg button { border: 0; background: transparent; border-radius: 999px; padding: 0.32rem 0.8rem; min-height: 0; font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; box-shadow: none; }
+.open-as .seg button:hover { color: var(--accent-dark); }
+.open-as .seg button.on { background: var(--accent); color: #fff; box-shadow: 0 1px 2px #5d3dc244; }
+.open-as .seg svg { width: 15px; height: 15px; }
+
+.reader { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.reader-list { position: sticky; top: 4.5rem; max-height: calc(100vh - 5.5rem); overflow: auto; display: grid; gap: 0.6rem; }
+.reader-list ul { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.reader-list li + li { border-top: 1px solid var(--line); }
+.reader-hit { all: unset; box-sizing: border-box; width: 100%; display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.7rem 0.85rem 0.7rem 1rem; cursor: pointer; position: relative; }
+.reader-hit:hover { background: var(--soft); }
+.reader-hit:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.reader-hit.on { background: var(--accent-soft); }
+.reader-hit.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
+.reader-hit .wa-disc { margin-top: 2px; }
+.reader-hit .who { flex: 1; min-width: 0; display: grid; gap: 0.1rem; }
+.reader-hit .nm { font-weight: 650; color: var(--ink); font-size: 0.92rem; }
+.reader-hit .ln { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reader-hit .tags { display: grid; justify-items: end; gap: 0.2rem; }
+.reader-hit .found-in { margin: 0; white-space: nowrap; }
+.reader-hit .seen, .reader-hit .chosen-mark { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+.reader-hit .chosen-mark { color: var(--accent-dark); font-weight: 650; }
+
+.reader-pane { position: sticky; top: 4.5rem; max-height: calc(100vh - 5.5rem); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.reader-back { display: none; }
+.pane-head { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fbfaff, #fff); }
+.wa-disc.big { width: 2.9rem; height: 2.9rem; font-size: 0.95rem; }
+.pane-who { min-width: 0; }
+.pane-who h3 { margin: 0; font: 700 1.55rem/1.1 var(--display); color: var(--ink); }
+.pane-who .muted { font-size: 0.85rem; }
+.pane-head .facts { display: flex; gap: 1.3rem; margin-left: auto; font-size: 0.76rem; color: var(--muted); }
+.pane-head .fact b { display: block; font: 700 1.05rem var(--display); color: var(--ink); white-space: nowrap; }
+.pane-head .fact small { font: 500 0.75rem system-ui, sans-serif; color: var(--muted); }
+.pane-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 1.1rem; border-bottom: 1px solid var(--line); font-size: 0.82rem; color: var(--muted); background: var(--soft); }
+.pane-bar .sp { flex: 1; }
+.pane-bar kbd { font: 600 0.7rem ui-monospace, Menlo, monospace; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.3rem; background: var(--surface); color: var(--muted); }
+.pane-bar.add-to-job { background: var(--surface); }
+.pane-bar.add-to-job input { min-width: 16rem; }
+.pill-btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px; padding: 0.3rem 0.7rem; min-height: 0; font: 600 0.8rem/1.4 inherit; color: var(--ink); cursor: pointer; text-decoration: none; box-shadow: none; }
+.pill-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-dark); }
+.pill-btn:disabled { opacity: 0.45; cursor: default; }
+.pill-btn.primary, .pill-btn.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pill-btn.primary:hover:not(:disabled) { background: var(--accent-dark); }
+.reader-cv { flex: 1; min-height: 0; overflow: auto; }
+.reader-cv .candidate-cv > .panel { border: 0; border-radius: 0; box-shadow: none; margin: 0; }
+.reader-cv .cv-frame { height: calc(100vh - 19rem); min-height: 24rem; }
+.reader-cv pre.extracted { max-height: none; overflow: visible; background: var(--surface); font: 0.88rem/1.55 Calibri, Carlito, Arial, sans-serif; color: #1f2937; padding: 0.5rem 0.25rem; }
+.reader-empty { padding: 2rem 1.1rem; }
+
+/* The marking bar's words: each jumps to its next place. */
+.kw { display: inline-flex; align-items: center; gap: 0.3rem; background: #fef3c7; color: #78350f; border: 1px solid #fde68a; border-radius: 999px; padding: 0.1rem 0.6rem; min-height: 0; font: 600 0.78rem/1.4 inherit; cursor: pointer; box-shadow: none; }
+.kw:hover { background: #fde68a; }
+.kw i { font-style: normal; opacity: 0.7; }
+pre.extracted mark.cur { outline: 2px solid #f59e0b; background: #fbbf24; }
+
+/* A phone: the results, then a tapped resume fills the screen. */
+@media (max-width: 820px) {
+  .reader { grid-template-columns: minmax(0, 1fr); }
+  .reader-list, .reader-pane { position: static; max-height: none; }
+  .reader.reading .reader-list, .reader:not(.reading) .reader-pane { display: none; }
+  .reader-back { display: block; padding: 0.6rem 1.1rem 0; text-align: left; }
+  .pane-head .facts { margin-left: 0; width: 100%; }
+  .pane-bar .keys { display: none; }
+  .reader-cv .cv-frame { height: 80vh; }
+}

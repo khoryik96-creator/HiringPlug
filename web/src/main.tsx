@@ -11,6 +11,7 @@ import { guardRequiredFields } from "./requiredFields";
 import "./theme.css";
 import "./styles.css";
 import "./candidate-workspace.css";
+import "./search-reader.css";
 
 guardNumberFields();
 guardRequiredFields();

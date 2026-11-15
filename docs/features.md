@@ -101,9 +101,20 @@ updated. What is set shows as chips to remove one by one; the search is
 kept while you open candidates and come back. Each result says whether it
 was found in the CV or the profile, with the lines of the CV where the
 words are, marked. Opening a candidate from the results shows their CV as
-text with the words marked ("4 places for ...", "Go to the first", "Stop
-marking"). Words are matched in their other forms (manager, managers), as
-CVs are indexed; symbols are not searchable (C++ is C, .NET is NET).
+text with the words marked ("4 places for ...", each word with its count
+to jump to its next place, "Next place", "Stop marking"). Words are matched
+in their other forms (manager, managers), as CVs are indexed; symbols are
+not searchable (C++ is C, .NET is NET).
+
+**Click opens: Profile | Full resume** (the switch above the results, kept
+on that computer). Profile is the usual table. Full resume reads the
+results without leaving the list: the results down the left (pay, notice,
+"in CV", "✓ read" for those already looked at), the chosen candidate's
+newest CV on the right with the search's words marked, their current and
+expected pay and notice on top (pay only for roles that may see it), Prev
+and Next (or the ← → keys), Open profile, + Add to job (open jobs) and
+Choose to email. On a phone the list and the resume take turns ("Back to
+results").
 
 **AI candidate search** (Candidates, "AI search"; CV Studio's AI Crawler, on
 the company's own candidates): drop the client's JD (PDF, Word or text; it is

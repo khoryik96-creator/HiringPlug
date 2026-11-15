@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { ok, renderWithClient } from "../test-utils";
 import { CandidateCv } from "./CandidateCv";
+import { markedWords } from "./CvPane";
 
 afterEach(() => {
   cleanup();
@@ -76,10 +77,54 @@ describe("the candidate's CV", () => {
       ? Promise.resolve(ok({ parts: [{ text: "Led ", match: false }, { text: "SAP", match: true }, { text: " upgrades", match: false }], matches: 1 }))
       : served(path, init)) as never);
     renderWithClient(<CandidateCv candidateId="cand_1" highlight="SAP NOT intern" />);
-    expect((await screen.findByText("SAP")).tagName).toBe("MARK");
+    expect((await screen.findByText("SAP", { selector: "pre mark" })).tagName).toBe("MARK");
     expect(screen.getByRole("status").textContent).toContain("1 place for");
     expect(get).toHaveBeenCalledWith("/v1/documents/{documentId}/highlights", { params: { path: { documentId: "doc_p" }, query: { boolean: "SAP NOT intern" } } });
     fireEvent.click(screen.getByRole("button", { name: "Stop marking" }));
     expect(await screen.findByText("text of cv.pdf")).toBeTruthy();
+  });
+
+  it("says so, when asked, if there is no CV", async () => {
+    serve([]);
+    renderWithClient(<CandidateCv candidateId="cand_1" empty={<p>No CV on file</p>} />);
+    expect(await screen.findByText("No CV on file")).toBeTruthy();
+  });
+
+  it("lists each marked word with its count; clicking one goes to its next place", async () => {
+    serve([doc("doc_p", "application/pdf", null, "cv.pdf")]);
+    const get = api.GET as unknown as ReturnType<typeof vi.fn>;
+    const served = get.getMockImplementation() as (path: string, init: unknown) => Promise<unknown>;
+    const parts = [
+      { text: "Finance", match: true }, { text: " lead, ", match: false }, { text: "SAP", match: true },
+      { text: " and group ", match: false }, { text: "finance", match: true }, { text: ".", match: false },
+    ];
+    get.mockImplementation(((path: string, init: unknown) => path === "/v1/documents/{documentId}/highlights"
+      ? Promise.resolve(ok({ parts, matches: 3 }))
+      : served(path, init)) as never);
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    renderWithClient(<CandidateCv candidateId="cand_1" highlight="finance OR SAP" />);
+    const finance = await screen.findByRole("button", { name: "Finance 2" });
+    expect(screen.getByRole("button", { name: "SAP 1" })).toBeTruthy();
+    const marks = () => [...document.querySelectorAll("pre.extracted mark")].map((m) => `${m.textContent}${m.className ? "*" : ""}`);
+    fireEvent.click(finance);
+    expect(marks()).toEqual(["Finance*", "SAP", "finance"]);
+    fireEvent.click(finance);
+    expect(marks()).toEqual(["Finance", "SAP", "finance*"]);
+    fireEvent.click(finance); // round to the first again
+    expect(marks()).toEqual(["Finance*", "SAP", "finance"]);
+    fireEvent.click(screen.getByRole("button", { name: /Next place/ }));
+    expect(marks()).toEqual(["Finance", "SAP*", "finance"]);
+    expect(scrolled).toHaveBeenCalledTimes(4);
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  });
+});
+
+describe("marked words", () => {
+  it("counts each word once whatever its case, in the order first seen", () => {
+    const w = markedWords([{ text: "SAP", match: true }, { text: " x ", match: false }, { text: "Finance", match: true }, { text: "sap", match: true }]);
+    expect(w.words).toEqual([{ key: "sap", shown: "SAP", count: 2 }, { key: "finance", shown: "Finance", count: 1 }]);
+    expect(w.order).toEqual(["sap", "finance", "sap"]);
+    expect(w.placeOf).toEqual({ 0: 0, 2: 1, 3: 2 });
   });
 });

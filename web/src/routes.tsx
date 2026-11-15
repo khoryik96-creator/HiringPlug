@@ -88,7 +88,7 @@ export const ROUTES: Route[] = [
   { section: "candidates", path: /^#\/candidates\/(cand_[0-9a-z]+)$/,
     render: (c) => <CandidateDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "candidates", path: /^#\/candidates/, menu: { in: "main", label: "Candidates", href: "#/candidates" },
-    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} /> },
+    render: (c) => <CandidateList canCreate={can(c, "candidates:create")} canSeeSalary={can(c, "candidates.compensation:read")} canAiSearch={can(c, "matching:create")} canEmail={can(c, "emails:send")} canAddToJob={can(c, "pipeline:update")} /> },
   { section: "companies", path: /^#\/companies\/(comp_[0-9a-z]+)$/,
     render: (c) => <CompanyDetail key={c.id} id={c.id} permissions={c.permissions} /> },
   { section: "companies", path: /^#\/companies/, menu: { in: "main", label: "Companies", href: "#/companies" },

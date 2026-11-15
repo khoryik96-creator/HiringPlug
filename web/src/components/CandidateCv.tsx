@@ -9,8 +9,11 @@ import { ErrorMessage } from "./ErrorMessage";
 
 const WORD = new Set(["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"]);
 
-/** highlight: a boolean search whose words to mark (opened from the search's results). */
-export function CandidateCv({ candidateId, highlight = "", selectedId, actions, unified = false }: { candidateId: string; highlight?: string; selectedId?: string; actions?: ReactNode; unified?: boolean }) {
+/**
+ * highlight: a boolean search whose words to mark (opened from the search's results).
+ * empty: what to show when the candidate has no CV (nothing by default).
+ */
+export function CandidateCv({ candidateId, highlight = "", selectedId, actions, unified = false, empty = null }: { candidateId: string; highlight?: string; selectedId?: string; actions?: ReactNode; unified?: boolean; empty?: ReactNode }) {
   const queryClient = useQueryClient();
   const docs = useQuery({
     queryKey: ["documents", candidateId],
@@ -32,7 +35,7 @@ export function CandidateCv({ candidateId, highlight = "", selectedId, actions, 
       .then(() => queryClient.invalidateQueries({ queryKey: ["documents", candidateId] }));
   }, [fromList, candidateId, queryClient]);
   if (docs.error || doc.error) return <ErrorMessage error={docs.error ?? doc.error} />;
-  if (list.length === 0) return null; // no CV yet: the documents panel below takes one
+  if (list.length === 0) return docs.data ? empty : null; // no CV yet: on their page, the documents panel below takes one
   // The list knows when a preview is ready; the document itself has the text.
   const shown = doc.data && fromList ? { ...doc.data, pdfStatus: fromList.pdfStatus } : doc.data;
   return (
