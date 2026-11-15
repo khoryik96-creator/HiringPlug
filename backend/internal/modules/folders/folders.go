@@ -15,7 +15,6 @@ package folders
 
 import (
 	"context"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,8 +31,8 @@ type Module struct {
 }
 
 // New wires the module.
-func New(pool *pgxpool.Pool, users Users) *Module {
-	svc := &Service{pool: pool, users: users}
+func New(pool *pgxpool.Pool, users Users, records Records) *Module {
+	svc := &Service{pool: pool, users: users, records: records}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc}}
 }
 
@@ -55,6 +54,13 @@ func (m *Module) Items(ctx context.Context, tx pgx.Tx, p authz.Principal, folder
 	return ids, err
 }
 
+// ItemsOf is Items for one kind of record, for the list of that kind.
+func (m *Module) ItemsOf(kind string) func(ctx context.Context, tx pgx.Tx, p authz.Principal, folderID string) ([]string, error) {
+	return func(ctx context.Context, tx pgx.Tx, p authz.Principal, folderID string) ([]string, error) {
+		return m.Items(ctx, tx, p, folderID, kind)
+	}
+}
+
 // MoveCandidate puts a merged duplicate's place in folders on the record kept
 // (once in each folder), in the merge's transaction.
 func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID string) error {
@@ -62,8 +68,5 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 	if err := q.MoveItems(ctx, store.MoveItemsParams{FromID: fromID, ToID: toID}); err != nil {
 		return err
 	}
-	if err := q.DropItem(ctx, fromID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
-	}
-	return nil
+	return q.DropItem(ctx, fromID) // the folders that held both
 }

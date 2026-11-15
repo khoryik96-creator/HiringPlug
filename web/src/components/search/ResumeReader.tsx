@@ -20,7 +20,7 @@ type Summary = Schemas["CandidateSummary"];
  * Reads the results as resumes. Give it a new `key` for each new search, so it
  * starts again at the first result (and, on a phone, at the list).
  */
-export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, canAddToJob, more, onMore }: {
+export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, chooseToEmail = true, canAddToJob, more, onMore }: {
   hits: Hit[];
   /** The boolean search whose words are marked in the CV (and on the profile it opens; "" for none). */
   highlight: string;
@@ -30,6 +30,8 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
   /** People chosen to email (when the person may email). */
   chosen?: ReadonlySet<string>;
   onChoose?: (c: Summary, on: boolean) => void;
+  /** Chosen to email (else only to put in a folder): how the button reads. */
+  chooseToEmail?: boolean;
   canAddToJob: boolean;
   /** "Show more", under the list. */
   more?: ReactNode;
@@ -111,7 +113,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
                 </span>
                 <span className="tags">
                   {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
-                  {chosen?.has(c.id) && <span className="chosen-mark">✉ chosen</span>}
+                  {chosen?.has(c.id) && <span className="chosen-mark">{chooseToEmail ? "✉ " : "✓ "}chosen</span>}
                   {seen.has(c.id) && c.id !== currentId && <span className="seen">✓ read</span>}
                 </span>
               </button>
@@ -142,7 +144,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
           {onChoose && chosen && (
             <button type="button" className={`pill-btn${chosen.has(current.candidate.id) ? " primary" : ""}`} aria-pressed={chosen.has(current.candidate.id)}
               onClick={() => { onChoose(current.candidate, !chosen.has(current.candidate.id)); }}>
-              {chosen.has(current.candidate.id) ? "✓ Chosen to email" : "Choose to email"}
+              {chosen.has(current.candidate.id) ? `✓ Chosen${chooseToEmail ? " to email" : ""}` : `Choose${chooseToEmail ? " to email" : ""}`}
             </button>
           )}
         </div>

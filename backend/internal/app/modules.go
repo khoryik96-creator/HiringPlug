@@ -185,11 +185,11 @@ func NewModules(d Deps) *Modules {
 		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
 		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
 	})
-	m.Folders = folders.New(d.Pool, folderUsers{m.Identity})
+	m.Folders = folders.New(d.Pool, folderUsers{m.Identity}, folderRecords{m.Candidates, m.Contacts, m.Companies})
 	// The lists show a folder's records.
-	m.Candidates.UseFolders(m.Folders)
-	m.Contacts.UseFolders(m.Folders)
-	m.Companies.UseFolders(m.Folders)
+	m.Candidates.UseFolders(m.Folders.ItemsOf(folders.Candidates))
+	m.Contacts.UseFolders(m.Folders.ItemsOf(folders.Contacts))
+	m.Companies.UseFolders(m.Folders.ItemsOf(folders.Companies))
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders)

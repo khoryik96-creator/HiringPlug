@@ -67,7 +67,7 @@ tenant ─┬─ app_user (role)
 | `note` | subject (candidate/job/company/contact + id, checked by the service through its module), kind (general/screening/interview/call), body, sensitive (row-level security: only with `notes.sensitive:read`), author id + name |
 | `folder` | a folder of candidates, contacts or companies (kind): name (1-100 characters), owner (who made it), `version` |
 | `folder_share` | a folder and someone of the agency it is shared with (they see it and add or remove records; only the owner renames, deletes or shares it) |
-| `folder_item` | a folder and a record in it (candidate, contact or company id, checked by its kind), who put it there and when; a candidate merge moves the duplicate's places to the one kept |
+| `folder_item` | a folder and a record in it (candidate, contact or company id, checked by its kind), who put it there and when; a candidate merge moves the duplicate's places to the one kept; row-level security: a candidate's row only for those whose scope sees them |
 | `cv_import` | an import of CVs or LinkedIn PDFs: source given to the new candidates, who started it (only they see it) |
 | `cv_import_item` | one file of an import: file name, status (reading/created/added/unread/failed), candidate, document, error |
 | `candidate_work` | candidate, position (0 = newest), title, company, start/end (YYYY-MM or YYYY), current, description; a title or company required |

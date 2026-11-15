@@ -25,6 +25,11 @@ WHERE f.id = @id
   AND (f.owner_id = app_current_user()
        OR EXISTS (SELECT 1 FROM folder_share s WHERE s.folder_id = f.id AND s.user_id = app_current_user()));
 
+-- Holds a folder while records or people are added to it, so a delete waits
+-- (and the addition then finds no folder) instead of failing halfway.
+-- name: LockFolder :one
+SELECT id FROM folder WHERE id = @id FOR SHARE;
+
 -- name: RenameFolder :execrows
 UPDATE folder SET name = @name, version = version + 1, updated_at = now()
 WHERE id = @id AND version = @version;
@@ -32,8 +37,10 @@ WHERE id = @id AND version = @version;
 -- name: DeleteFolder :execrows
 DELETE FROM folder WHERE id = @id;
 
+-- Records and people coming and going do not change the folder itself (its
+-- version), so they never make the owner's rename stale.
 -- name: TouchFolder :exec
-UPDATE folder SET updated_at = now(), version = version + 1 WHERE id = @id;
+UPDATE folder SET updated_at = now() WHERE id = @id;
 
 -- name: AddShare :execrows
 INSERT INTO folder_share (folder_id, tenant_id, user_id)
@@ -43,13 +50,16 @@ ON CONFLICT DO NOTHING;
 -- name: RemoveShare :execrows
 DELETE FROM folder_share WHERE folder_id = @folder_id AND user_id = @user_id;
 
--- name: AddItems :execrows
+-- AddItems and RemoveItems return the records actually put in or taken out.
+-- name: AddItems :many
 INSERT INTO folder_item (folder_id, tenant_id, item_id, added_by)
 SELECT @folder_id, app_current_tenant(), unnest(@item_ids::text[]), app_current_user()
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING
+RETURNING item_id;
 
--- name: RemoveItems :execrows
-DELETE FROM folder_item WHERE folder_id = @folder_id AND item_id = ANY (@item_ids::text[]);
+-- name: RemoveItems :many
+DELETE FROM folder_item WHERE folder_id = @folder_id AND item_id = ANY (@item_ids::text[])
+RETURNING item_id;
 
 -- name: FolderItemIDs :many
 SELECT item_id FROM folder_item WHERE folder_id = @folder_id ORDER BY added_at DESC, item_id;

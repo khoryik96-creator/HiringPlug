@@ -10,6 +10,9 @@ import { candidatesKey, companiesKey, contactsKey, foldersKey, usersKey } from "
 export type Folder = Schemas["Folder"];
 export type FolderKind = Schemas["FolderKind"];
 
+/** The most records put in or taken out of a folder at once (the API's limit). */
+export const MAX_AT_ONCE = 500;
+
 /** "candidate" → "candidates" (and the like), for labels. */
 export const plural = (kind: FolderKind, n = 2) => (n === 1 ? kind : kind === "company" ? "companies" : `${kind}s`);
 
@@ -80,8 +83,8 @@ export function useMemberships(kind: FolderKind, ids: string[], enabled = true) 
     enabled: enabled && sorted.length > 0,
     queryFn: async () => {
       const out = new Map<string, string[]>();
-      for (let i = 0; i < sorted.length; i += 500) { // the most one call takes
-        const got = unwrap(await api.POST("/v1/folders/memberships", { body: { kind, itemIds: sorted.slice(i, i + 500) } }));
+      for (let i = 0; i < sorted.length; i += MAX_AT_ONCE) { // the most one call takes
+        const got = unwrap(await api.POST("/v1/folders/memberships", { body: { kind, itemIds: sorted.slice(i, i + MAX_AT_ONCE) } }));
         for (const { folderId, itemIds } of got.items) {
           for (const id of itemIds) out.set(id, [...(out.get(id) ?? []), folderId]);
         }

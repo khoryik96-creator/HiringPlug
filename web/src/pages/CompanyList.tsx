@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
@@ -23,9 +23,9 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
   const [category, setCategory] = useState("");
   const fs = useFieldSettings();
   const [adding, setAdding] = useState(false);
-  const folders = useFolderView("company", canFolders, meId);
-  const folder = folders.filter;
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set()); // to put in a folder
+  const folders = useFolderView("company", canFolders, meId, () => { setChosen(new Set()); });
+  const folder = folders.filter;
   const choose = (ids: string[], on: boolean) => {
     setChosen((cur) => {
       const next = new Set(cur);
@@ -33,19 +33,22 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
       return next;
     });
   };
-  const list = useQuery({
+  const list = useInfiniteQuery({
     queryKey: [...companiesKey, q, type, category, folder],
     enabled: folders.ready,
-    queryFn: async () => {
-      const query: { q?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string } = {};
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      const query: { q?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string; limit: number; cursor?: string } = { limit: 100 };
+      if (pageParam) query.cursor = pageParam;
       if (folder) query.folder = folder;
       if (q.trim()) query.q = q.trim();
       if (type) query.type = type;
       if (category) query.category = category;
       return unwrap(await api.GET("/v1/companies", { params: { query } }));
     },
+    getNextPageParam: (last) => last.nextCursor,
   });
-  const items = list.data?.items;
+  const items = list.data?.pages.flatMap((page) => page.items);
   const inFolders = useInFolders(folders, items?.map((c) => c.id) ?? []);
 
   return (
@@ -76,9 +79,9 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
       <WithFolders view={folders}>
       {canFolders && items && (
         <div className="list-meta">
-          <span role="status">{items.length} compan{items.length === 1 ? "y" : "ies"}</span>
+          <span role="status">{items.length}{list.hasNextPage ? "+" : ""} compan{items.length === 1 ? "y" : "ies"}</span>
           <PickBar count={chosen.size} onClear={() => { setChosen(new Set()); }}
-            shown={{ count: items.length, all: items.length > 0 && items.every((c) => chosen.has(c.id)), onAll: () => { choose(items.map((c) => c.id), true); } }}>
+            shown={{ count: items.length, more: list.hasNextPage, all: items.length > 0 && items.every((c) => chosen.has(c.id)), onAll: () => { choose(items.map((c) => c.id), true); } }}>
             {folders.actions([...chosen])}
           </PickBar>
         </div>
@@ -125,6 +128,9 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
         </tbody>
       </table>
       </PinnedScroll>
+      {list.hasNextPage && (
+        <button type="button" className="doc-btn" disabled={list.isFetchingNextPage} onClick={() => { void list.fetchNextPage(); }}>Show more</button>
+      )}
       </WithFolders>
     </main>
   );

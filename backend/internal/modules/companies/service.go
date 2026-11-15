@@ -24,7 +24,7 @@ type Service struct {
 	allowPrivate bool        // company websites on private networks (local testing only)
 	files        *blob.Store // documents kept with terms and benefits
 	users        Users
-	folders      Folders // a folder's companies (UseFolders)
+	folderItems  FolderItems // a folder's companies (UseFolders)
 }
 
 // Create adds a company.

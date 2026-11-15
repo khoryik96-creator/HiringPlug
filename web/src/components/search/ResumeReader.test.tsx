@@ -118,6 +118,13 @@ describe("reading search results as resumes", () => {
     expect(screen.getByRole("button", { name: /Wei Tan/ }).textContent).toContain("chosen");
   });
 
+  it("chooses the candidate for a folder, for those who may not email", async () => {
+    serveCvs();
+    reader({ chosen: new Set(["cand_2"]), onChoose: vi.fn(), chooseToEmail: false });
+    expect(await screen.findByRole("button", { name: "Choose" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Wei Tan/ }).textContent).toContain("✓ chosen");
+  });
+
   it("adds the candidate to an open job", async () => {
     serveCvs();
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "app_1" }));

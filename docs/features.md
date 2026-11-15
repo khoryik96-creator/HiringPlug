@@ -1015,9 +1015,10 @@ folder last opened on each list opens again next time (on that device).
   a folder shared with them.
 - **Rename** and **Delete folder** (the owner). Deleting a folder, or taking a
   record out of one, never touches the records themselves.
-- A folder shows only records the person may see (e.g. a role that sees only
-  its own candidates sees only those in a shared folder). Merging duplicate
-  candidates keeps the one kept in the duplicate's folders.
+- A folder shows, and counts, only records the person may see (e.g. a role
+  that sees only its own candidates sees only those in a shared folder), and
+  only records that exist and they may see can be put in one. Merging
+  duplicate candidates keeps the one kept in the duplicate's folders.
 - Everyone may use folders by default (`folders:use`); the **Roles and
   access** page can take it away from a role. Every change is in the audit log.
 

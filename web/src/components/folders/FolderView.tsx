@@ -7,7 +7,7 @@ import { ErrorMessage } from "../ErrorMessage";
 import { AddToFolder } from "./AddToFolder";
 import { FolderHead } from "./FolderHead";
 import { FolderPanel } from "./FolderPanel";
-import { dragRows, type FolderKind, keepOpenFolder, readOpenFolder, useFolderChanges, useFolderList, useMemberships } from "./useFolders";
+import { dragRows, type FolderKind, keepOpenFolder, MAX_AT_ONCE, plural, readOpenFolder, useFolderChanges, useFolderList, useMemberships } from "./useFolders";
 
 export interface FolderView {
   /** The person may use folders. */
@@ -29,10 +29,19 @@ export interface FolderView {
   actions: (chosen: string[]) => ReactNode;
 }
 
-export function useFolderView(kind: FolderKind, on: boolean, meId: string): FolderView {
+/**
+ * The folders of a list. `unchoose` clears the chosen rows: after they are
+ * taken out of the open folder, and when another folder opens (they are no
+ * longer shown).
+ */
+export function useFolderView(kind: FolderKind, on: boolean, meId: string, unchoose: () => void): FolderView {
   const list = useFolderList(kind, on);
   const [open, setOpenState] = useState<string | null>(() => (on ? readOpenFolder(kind) : null));
-  const setOpen = (id: string | null) => { setOpenState(id); keepOpenFolder(kind, id); };
+  const setOpen = (id: string | null) => {
+    if (id !== open) unchoose();
+    setOpenState(id);
+    keepOpenFolder(kind, id);
+  };
   const folder = open ? list.data?.find((f) => f.id === open) : undefined;
   // A folder deleted, or no longer shared with them: the list shows everything
   // (folder is undefined), and this device forgets it.
@@ -50,12 +59,12 @@ export function useFolderView(kind: FolderKind, on: boolean, meId: string): Fold
     drag: (id, chosen) => (on ? dragRows(() => (chosen.has(id) ? [...chosen] : [id])) : undefined),
     panel: on && <FolderPanel kind={kind} folders={list.data} open={folder?.id ?? null} onOpen={setOpen} error={list.error} />,
     head: on && folder && <FolderHead key={folder.id} kind={kind} folder={folder} meId={meId} onGone={() => { setOpen(null); }} />,
-    actions: (chosen) => on && (chosen.length > 500 ? <span className="warning small">At most 500 at a time for folders.</span> : (
+    actions: (chosen) => on && (chosen.length > MAX_AT_ONCE ? <span className="warning small">At most {MAX_AT_ONCE} at a time for folders.</span> : (
       <>
         <AddToFolder kind={kind} ids={chosen} />
         {folder && (
-          <button type="button" disabled={change.take.isPending}
-            onClick={() => { change.take.mutate({ folderId: folder.id, itemIds: chosen }); }}>Remove from this folder</button>
+          <button type="button" disabled={change.take.isPending} title={`Takes them out of this folder only: the ${plural(kind)} themselves stay as they are`}
+            onClick={() => { change.take.mutate({ folderId: folder.id, itemIds: chosen }, { onSuccess: unchoose }); }}>Remove from this folder</button>
         )}
         <ErrorMessage error={change.take.error} />
       </>

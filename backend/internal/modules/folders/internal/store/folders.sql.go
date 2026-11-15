@@ -10,10 +10,11 @@ import (
 	"time"
 )
 
-const addItems = `-- name: AddItems :execrows
+const addItems = `-- name: AddItems :many
 INSERT INTO folder_item (folder_id, tenant_id, item_id, added_by)
 SELECT $1, app_current_tenant(), unnest($2::text[]), app_current_user()
 ON CONFLICT DO NOTHING
+RETURNING item_id
 `
 
 type AddItemsParams struct {
@@ -21,12 +22,25 @@ type AddItemsParams struct {
 	ItemIds  []string
 }
 
-func (q *Queries) AddItems(ctx context.Context, arg AddItemsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, addItems, arg.FolderID, arg.ItemIds)
+// AddItems and RemoveItems return the records actually put in or taken out.
+func (q *Queries) AddItems(ctx context.Context, arg AddItemsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, addItems, arg.FolderID, arg.ItemIds)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var item_id string
+		if err := rows.Scan(&item_id); err != nil {
+			return nil, err
+		}
+		items = append(items, item_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const addShare = `-- name: AddShare :execrows
@@ -114,6 +128,19 @@ func (q *Queries) InsertFolder(ctx context.Context, arg InsertFolderParams) (str
 	return id, err
 }
 
+const lockFolder = `-- name: LockFolder :one
+SELECT id FROM folder WHERE id = $1 FOR SHARE
+`
+
+// Holds a folder while records or people are added to it, so a delete waits
+// (and the addition then finds no folder) instead of failing halfway.
+func (q *Queries) LockFolder(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, lockFolder, id)
+	var id_2 string
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const memberships = `-- name: Memberships :many
 SELECT i.folder_id, array_agg(i.item_id ORDER BY i.item_id)::text[] AS item_ids
 FROM folder_item i
@@ -172,8 +199,9 @@ func (q *Queries) MoveItems(ctx context.Context, arg MoveItemsParams) error {
 	return err
 }
 
-const removeItems = `-- name: RemoveItems :execrows
+const removeItems = `-- name: RemoveItems :many
 DELETE FROM folder_item WHERE folder_id = $1 AND item_id = ANY ($2::text[])
+RETURNING item_id
 `
 
 type RemoveItemsParams struct {
@@ -181,12 +209,24 @@ type RemoveItemsParams struct {
 	ItemIds  []string
 }
 
-func (q *Queries) RemoveItems(ctx context.Context, arg RemoveItemsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, removeItems, arg.FolderID, arg.ItemIds)
+func (q *Queries) RemoveItems(ctx context.Context, arg RemoveItemsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, removeItems, arg.FolderID, arg.ItemIds)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var item_id string
+		if err := rows.Scan(&item_id); err != nil {
+			return nil, err
+		}
+		items = append(items, item_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const removeShare = `-- name: RemoveShare :execrows
@@ -226,9 +266,11 @@ func (q *Queries) RenameFolder(ctx context.Context, arg RenameFolderParams) (int
 }
 
 const touchFolder = `-- name: TouchFolder :exec
-UPDATE folder SET updated_at = now(), version = version + 1 WHERE id = $1
+UPDATE folder SET updated_at = now() WHERE id = $1
 `
 
+// Records and people coming and going do not change the folder itself (its
+// version), so they never make the owner's rename stale.
 func (q *Queries) TouchFolder(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, touchFolder, id)
 	return err

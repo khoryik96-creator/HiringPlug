@@ -31,7 +31,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const [adding, setAdding] = useState(false);
   const cols = useCandidateColumns();
   const pick = usePicked();
-  const folders = useFolderView("candidate", canFolders, meId);
+  const folders = useFolderView("candidate", canFolders, meId, pick.clear);
   const folder = folders.filter;
   const canPick = canEmail || canFolders; // rows are chosen to email or to put in a folder
   const [emailing, setEmailing] = useState(false);
@@ -150,7 +150,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {openAs === "resume" && (
         <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
-          chosen={canEmail ? pick.ids : undefined} onChoose={canEmail ? (c, on) => { pick.pick([personOf(c)], on); } : undefined}
+          chosen={canPick ? pick.ids : undefined} onChoose={canPick ? (c, on) => { pick.pick([personOf(c)], on); } : undefined} chooseToEmail={canEmail}
           canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
       {openAs === "profile" && <PinnedScroll>

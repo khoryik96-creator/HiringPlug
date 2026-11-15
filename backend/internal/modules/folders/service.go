@@ -20,10 +20,28 @@ type Users interface {
 	Active(ctx context.Context, tx pgx.Tx, userID string) (bool, error)
 }
 
+// Records says which of some candidates, contacts or companies (kind) exist
+// and the signed-in person may see (their modules): only those go in a folder.
+type Records interface {
+	Visible(ctx context.Context, tx pgx.Tx, kind string, ids []string) ([]string, error)
+}
+
 // Service holds the folders use cases.
 type Service struct {
-	pool  *pgxpool.Pool
-	users Users
+	pool    *pgxpool.Pool
+	users   Users
+	records Records
+}
+
+// held is load for a change to the folder's records or people: the folder is
+// held (FOR SHARE) until the change is done, so it cannot be deleted halfway.
+func held(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Folder, error) {
+	if _, err := store.New(tx).LockFolder(ctx, id); errors.Is(err, pgx.ErrNoRows) {
+		return Folder{}, apperr.NotFound("folder")
+	} else if err != nil {
+		return Folder{}, err
+	}
+	return load(ctx, tx, p, id)
 }
 
 // load returns a folder the signed-in person may see (owner or shared).
@@ -135,7 +153,10 @@ func (s *Service) Delete(ctx context.Context, p authz.Principal, id string) erro
 func (s *Service) Share(ctx context.Context, p authz.Principal, id, userID string) (Folder, error) {
 	var out Folder
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		f, err := owned(ctx, tx, p, id)
+		f, err := held(ctx, tx, p, id)
+		if err == nil && !f.Mine {
+			err = OwnerOnly()
+		}
 		if err != nil {
 			return err
 		}
@@ -218,7 +239,7 @@ func (s *Service) RemoveItems(ctx context.Context, p authz.Principal, id string,
 func (s *Service) changeItems(ctx context.Context, p authz.Principal, id string, ids []string, add bool) (Folder, error) {
 	var out Folder
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		f, err := load(ctx, tx, p, id)
+		f, err := held(ctx, tx, p, id)
 		if err != nil {
 			return err
 		}
@@ -227,23 +248,30 @@ func (s *Service) changeItems(ctx context.Context, p authz.Principal, id string,
 			return err
 		}
 		q := store.New(tx)
-		var n int64
+		var changed []string
 		action := "folder.items_added"
 		if add {
-			n, err = q.AddItems(ctx, store.AddItemsParams{FolderID: id, ItemIds: ids})
+			// Only records that exist and that they may see go in.
+			if ids, err = s.records.Visible(ctx, tx, f.Kind, ids); err != nil {
+				return err
+			}
+			if len(ids) == 0 {
+				return apperr.NotFound(f.Kind)
+			}
+			changed, err = q.AddItems(ctx, store.AddItemsParams{FolderID: id, ItemIds: ids})
 		} else {
 			action = "folder.items_removed"
-			n, err = q.RemoveItems(ctx, store.RemoveItemsParams{FolderID: id, ItemIds: ids})
+			changed, err = q.RemoveItems(ctx, store.RemoveItemsParams{FolderID: id, ItemIds: ids})
 		}
 		if err != nil {
 			return err
 		}
-		if n > 0 {
+		if len(changed) > 0 {
 			if err := q.TouchFolder(ctx, id); err != nil {
 				return err
 			}
 			if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "folder", EntityID: id,
-				Changes: map[string]any{"items": map[string]any{"ids": ids, "count": n}}}); err != nil {
+				Changes: map[string]any{"items": map[string]any{"ids": changed, "count": len(changed)}}}); err != nil {
 				return err
 			}
 		}

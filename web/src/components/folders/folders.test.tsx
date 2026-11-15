@@ -78,6 +78,38 @@ describe("folders on a list", () => {
     expect(row.querySelector("td")?.getAttribute("draggable")).toBe("true"); // and dragged onto a folder
   });
 
+  it("unchooses rows once they are taken out of the folder, or another folder opens", async () => {
+    window.localStorage.setItem("hiringplug.folder.contact", "fld_01jbz6w0m0k8q9x2r3s4t5v6f1");
+    serve([folder({}), folder({ id: "fld_01jbz6w0m0k8q9x2r3s4t5v6f2", name: "Q4 clients" })]);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(folder({ itemCount: 1 })));
+    renderWithClient(<ContactList canCreate={false} canFolders meId={ME} />);
+    const row = (await screen.findByRole("link", { name: "Mei Tan" })).closest("tr");
+    if (!row) throw new Error("row");
+    fireEvent.click(within(row).getByText("HR Manager"));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove from this folder" }));
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith("/v1/folders/{folderId}/items/remove", { params: { path: { folderId: "fld_01jbz6w0m0k8q9x2r3s4t5v6f1" } }, body: { itemIds: [MEI.id] } });
+    });
+    await waitFor(() => { expect(screen.queryByText("1 chosen")).toBeNull(); });
+
+    fireEvent.click(within(row).getByText("HR Manager"));
+    expect(await screen.findByText("1 chosen")).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Folders" })).getByRole("button", { name: /Q4 clients/ }));
+    await waitFor(() => { expect(screen.queryByText("1 chosen")).toBeNull(); });
+  });
+
+  it("refuses more than 500 dropped on a folder at once", async () => {
+    serve([folder({})]);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [] }));
+    renderWithClient(<ContactList canCreate={false} canFolders meId={ME} />);
+    const target = await within(await screen.findByRole("navigation", { name: "Folders" })).findByRole("button", { name: /HR in KL/ });
+    const many = Array.from({ length: 501 }, (_, i) => `cont_${String(i).padStart(26, "0")}`);
+    const dataTransfer = { types: ["application/x-hiringplug-records"], getData: () => JSON.stringify(many), dropEffect: "" };
+    fireEvent.drop(target, { dataTransfer });
+    expect((await screen.findByRole("alert")).textContent).toContain("At most 500 at a time");
+    expect(post).not.toHaveBeenCalledWith("/v1/folders/{folderId}/items", expect.anything());
+  });
+
   it("makes a new folder and opens it", async () => {
     const made = folder({ id: "fld_01jbz6w0m0k8q9x2r3s4t5v6f9", name: "Warm leads", itemCount: 0 });
     const folders: Folder[] = [];
@@ -110,7 +142,7 @@ describe("an open folder", () => {
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(folder({ name: "HR in Penang", version: 2 })));
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(folder({ sharedWith: [AINA] })));
     const del = vi.spyOn(api, "DELETE").mockImplementation(((path: string) => Promise.resolve(path === "/v1/folders/{folderId}" ? gone() : ok({ folder: folder({}) }))) as never);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const onGone = vi.fn();
     renderWithClient(<FolderHead kind="contact" folder={folder({ sharedWith: [BEN] })} meId={ME} onGone={onGone} />);
 
@@ -139,7 +171,7 @@ describe("an open folder", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
-    expect(window.confirm).toHaveBeenCalledWith('Delete the folder "HR in KL"? The contacts in it stay as they are.');
+    expect(confirm).toHaveBeenCalledWith('Delete the folder "HR in KL"? The contacts in it stay as they are.');
     await waitFor(() => { expect(onGone).toHaveBeenCalled(); });
     expect(del).toHaveBeenCalledWith("/v1/folders/{folderId}", { params: { path: { folderId: "fld_01jbz6w0m0k8q9x2r3s4t5v6f1" } } });
   });

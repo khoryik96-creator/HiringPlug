@@ -1,13 +1,16 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -152,6 +155,25 @@ func TestContactAndCompanyFoldersFilterTheirLists(t *testing.T) {
 
 	res := a.request(http.MethodGet, "/v1/companies?folder="+people.Id, token, nil)
 	assert.Equal(t, http.StatusNotFound, res.Status, "a contact folder does not filter companies")
+
+	// Taking records out of a folder, or deleting it, never deletes the records.
+	nurul := a.createCandidate(token, map[string]any{"firstName": "Nurul", "lastName": "Aisyah"})
+	pool := a.folder(http.MethodPost, "/v1/folders", token, map[string]any{"kind": "candidate", "name": "Pool"}, http.StatusCreated)
+	a.folder(http.MethodPost, "/v1/folders/"+pool.Id+"/items", token, map[string]any{"itemIds": []string{nurul.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+people.Id+"/items/remove", token, map[string]any{"itemIds": []string{ana.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+firms.Id+"/items/remove", token, map[string]any{"itemIds": []string{maju.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+pool.Id+"/items/remove", token, map[string]any{"itemIds": []string{nurul.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+pool.Id+"/items", token, map[string]any{"itemIds": []string{nurul.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+firms.Id+"/items", token, map[string]any{"itemIds": []string{maju.Id}}, http.StatusOK)
+	for _, id := range []string{people.Id, firms.Id, pool.Id} {
+		a.folder(http.MethodDelete, "/v1/folders/"+id, token, nil, http.StatusNoContent)
+	}
+	for _, path := range []string{"/v1/candidates/" + nurul.Id, "/v1/contacts/" + ana.Id, "/v1/companies/" + maju.Id, "/v1/companies/" + acme.Id} {
+		assert.Equal(t, http.StatusOK, a.request(http.MethodGet, path, token, nil).Status, "%s is still there", path)
+	}
+	var all api.ContactPage
+	a.request(http.MethodGet, "/v1/contacts", token, nil).JSON(&all)
+	assert.Len(t, all.Items, 2, "both contacts are still listed")
 }
 
 func TestSharedFoldersLetColleaguesAddAndRemoveButOnlyTheOwnerManages(t *testing.T) {
@@ -182,13 +204,18 @@ func TestSharedFoldersLetColleaguesAddAndRemoveButOnlyTheOwnerManages(t *testing
 	assert.Equal(t, 1, added.ItemCount, "those it is shared with add records")
 	assert.Equal(t, 1, a.folders(owner.Token, "candidate")["Team pool"].ItemCount, "and the owner sees them")
 	a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items/remove", sourcer.Token, map[string]any{"itemIds": []string{c.Id}}, http.StatusOK)
+	renamed := a.folder(http.MethodPatch, "/v1/folders/"+f.Id, owner.Token, map[string]any{"name": "Team pool 2", "version": f.Version}, http.StatusOK)
+	assert.Equal(t, "Team pool 2", renamed.Name, "records coming and going never make the owner's rename stale")
+	seen.Version = renamed.Version
 
 	for name, try := range map[string]func() *response{
 		"rename": func() *response {
 			return a.request(http.MethodPatch, "/v1/folders/"+f.Id, sourcer.Token, map[string]any{"name": "Mine", "version": seen.Version})
 		},
 		"delete": func() *response { return a.request(http.MethodDelete, "/v1/folders/"+f.Id, sourcer.Token, nil) },
-		"share":  func() *response { return a.request(http.MethodPut, "/v1/folders/"+f.Id+"/shares/"+sourcer.ID, sourcer.Token, nil) },
+		"share": func() *response {
+			return a.request(http.MethodPut, "/v1/folders/"+f.Id+"/shares/"+sourcer.ID, sourcer.Token, nil)
+		},
 		"remove someone else": func() *response {
 			return a.request(http.MethodDelete, "/v1/folders/"+f.Id+"/shares/"+viewer.ID, sourcer.Token, nil)
 		},
@@ -251,4 +278,64 @@ func candidateIDs(items []api.CandidateSummary) []string {
 		out = append(out, c.Id)
 	}
 	return out
+}
+
+func TestFoldersShowOnlyTheCandidatesSomeoneMaySee(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleSourcer)
+	owner, sourcer := tenant.Users[api.RoleOwner], tenant.Users[api.RoleSourcer]
+	a.setRole(owner.Token, "sourcer", map[string]any{"version": 0, "permissions": authz.PermissionsForRole(api.RoleSourcer), "candidateScope": "own", "jobCandidates": false}, http.StatusOK)
+	theirs := a.createCandidate(sourcer.Token, map[string]any{"firstName": "Siti", "lastName": "Hajar"})
+	mine := a.createCandidate(owner.Token, map[string]any{"firstName": "Wei", "lastName": "Tan"})
+	other := a.createCandidate(owner.Token, map[string]any{"firstName": "Arjun", "lastName": "Mehta"})
+	f := a.folder(http.MethodPost, "/v1/folders", owner.Token, map[string]any{"kind": "candidate", "name": "Pool"}, http.StatusCreated)
+	a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items", owner.Token, map[string]any{"itemIds": []string{theirs.Id, mine.Id, other.Id}}, http.StatusOK)
+	a.folder(http.MethodPut, "/v1/folders/"+f.Id+"/shares/"+sourcer.ID, owner.Token, nil, http.StatusOK)
+
+	assert.Equal(t, 1, a.folders(sourcer.Token, "candidate")["Pool"].ItemCount, "the count never reveals candidates they may not see")
+	var list api.CandidatePage
+	a.request(http.MethodGet, "/v1/candidates?folder="+f.Id, sourcer.Token, nil).JSON(&list)
+	assert.Equal(t, []string{theirs.Id}, candidateIDs(list.Items))
+	var member api.FolderMemberships
+	a.request(http.MethodPost, "/v1/folders/memberships", sourcer.Token, map[string]any{"kind": "candidate", "itemIds": []string{mine.Id, theirs.Id}}).JSON(&member)
+	require.Len(t, member.Items, 1)
+	assert.Equal(t, []string{theirs.Id}, member.Items[0].ItemIds)
+
+	mineToo := a.folder(http.MethodPost, "/v1/folders", sourcer.Token, map[string]any{"kind": "candidate", "name": "Mine"}, http.StatusCreated)
+	res := a.request(http.MethodPost, "/v1/folders/"+mineToo.Id+"/items", sourcer.Token, map[string]any{"itemIds": []string{mine.Id}})
+	assert.Equal(t, http.StatusNotFound, res.Status, "a candidate they may not see does not go in")
+	got := a.folder(http.MethodPost, "/v1/folders/"+mineToo.Id+"/items", sourcer.Token, map[string]any{"itemIds": []string{mine.Id, theirs.Id}}, http.StatusOK)
+	assert.Equal(t, 1, got.ItemCount, "only those they may see")
+	assert.Equal(t, 3, a.folders(owner.Token, "candidate")["Pool"].ItemCount, "the owner, who sees everyone, sees all three")
+}
+
+func TestFoldersTakeOnlyRealRecordsAndLogWhatChanged(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	nurul := a.createCandidate(token, map[string]any{"firstName": "Nurul", "lastName": "Aisyah"})
+	wei := a.createCandidate(token, map[string]any{"firstName": "Wei", "lastName": "Tan"})
+	f := a.folder(http.MethodPost, "/v1/folders", token, map[string]any{"kind": "candidate", "name": "Shortlist"}, http.StatusCreated)
+
+	res := a.request(http.MethodPost, "/v1/folders/"+f.Id+"/items", token, map[string]any{"itemIds": []string{"cand_00000000000000000000000000"}})
+	assert.Equal(t, http.StatusNotFound, res.Status, "a made-up candidate never goes in")
+	elsewhere := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	stranger := a.createCandidate(elsewhere.Users[api.RoleRecruiter].Token, map[string]any{"firstName": "Ali", "lastName": "Hassan"})
+	got := a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items", token, map[string]any{"itemIds": []string{nurul.Id, stranger.Id}}, http.StatusOK)
+	assert.Equal(t, 1, got.ItemCount, "nor one of another agency")
+
+	a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items", token, map[string]any{"itemIds": []string{nurul.Id, wei.Id}}, http.StatusOK)
+	a.folder(http.MethodPost, "/v1/folders/"+f.Id+"/items/remove", token, map[string]any{"itemIds": []string{wei.Id, "cand_00000000000000000000000000"}}, http.StatusOK)
+	logged := func(action string) []string {
+		rows, err := testutil.Current.Admin.Query(context.Background(),
+			`SELECT changes->'items'->>'ids' FROM audit_log WHERE entity_id = $1 AND action = $2 ORDER BY created_at`, f.Id, action)
+		require.NoError(t, err)
+		out, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		require.NoError(t, err)
+		return out
+	}
+	assert.Equal(t, []string{`["` + nurul.Id + `"]`, `["` + wei.Id + `"]`}, logged("folder.items_added"), "only what was put in, not what was already there")
+	assert.Equal(t, []string{`["` + wei.Id + `"]`}, logged("folder.items_removed"), "only what was taken out")
 }

@@ -25,13 +25,13 @@ const (
 
 // Service holds the contacts use cases.
 type Service struct {
-	pool      *pgxpool.Pool
-	companies Companies
-	roles     Roles
-	mail      MailServers
-	files     *blob.Store
-	mailboxes Mailboxes
-	folders   Folders // a folder's contacts (UseFolders)
+	pool        *pgxpool.Pool
+	companies   Companies
+	roles       Roles
+	mail        MailServers
+	files       *blob.Store
+	mailboxes   Mailboxes
+	folderItems FolderItems // a folder's contacts (UseFolders)
 }
 
 // Create adds a contact. The email is checked before the transaction starts

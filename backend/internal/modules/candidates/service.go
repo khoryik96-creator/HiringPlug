@@ -34,7 +34,7 @@ type Service struct {
 	cvs         CVs            // CV text, for advanced search
 	used        usedCache      // the suggestions of values already used
 	zone        *time.Location // the agency's time zone: what day it is (UseTimeZone)
-	folders     Folders        // a folder's candidates (UseFolders)
+	folderItems FolderItems    // a folder's candidates (UseFolders)
 }
 
 // Create adds a candidate.

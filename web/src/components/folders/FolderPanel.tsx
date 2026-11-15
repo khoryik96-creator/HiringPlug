@@ -4,7 +4,7 @@
 import { useState } from "react";
 
 import { ErrorMessage } from "../ErrorMessage";
-import { carriesRows, droppedRows, type Folder, type FolderKind, plural, useFolderChanges, useUsers } from "./useFolders";
+import { carriesRows, droppedRows, MAX_AT_ONCE, type Folder, type FolderKind, plural, useFolderChanges, useUsers } from "./useFolders";
 
 export function FolderPanel({ kind, folders, open, onOpen, error }: {
   kind: FolderKind;
@@ -20,6 +20,7 @@ export function FolderPanel({ kind, folders, open, onOpen, error }: {
   const [name, setName] = useState("");
   const [over, setOver] = useState<string | null>(null); // the folder rows are dragged over
   const [dropped, setDropped] = useState<{ folder: string; n: number } | null>(null);
+  const [tooMany, setTooMany] = useState(false);
   const ownerName = (id: string) => users.data?.find((u) => u.id === id)?.name ?? "a colleague";
   const mine = folders?.filter((f) => f.mine) ?? [];
   const shared = folders?.filter((f) => !f.mine) ?? [];
@@ -39,7 +40,8 @@ export function FolderPanel({ kind, folders, open, onOpen, error }: {
           e.preventDefault();
           setOver(null);
           const ids = droppedRows(e);
-          if (ids.length > 0) change.add.mutate({ folderId: f.id, itemIds: ids }, {
+          setTooMany(ids.length > MAX_AT_ONCE);
+          if (ids.length > 0 && ids.length <= MAX_AT_ONCE) change.add.mutate({ folderId: f.id, itemIds: ids }, {
             onSuccess: () => { setDropped({ folder: f.name, n: ids.length }); window.setTimeout(() => { setDropped(null); }, 4000); },
           });
         }}>
@@ -74,6 +76,7 @@ export function FolderPanel({ kind, folders, open, onOpen, error }: {
       ) : (
         <button type="button" className="folder-add" onClick={() => { setNaming(true); }}>+ New folder</button>
       )}
+      {tooMany && <p role="alert" className="warning small folder-done">At most {MAX_AT_ONCE} at a time: choose fewer.</p>}
       {dropped && <p role="status" className="small folder-done">✓ {dropped.n} {plural(kind, dropped.n)} put in {dropped.folder}</p>}
       <ErrorMessage error={error ?? change.create.error ?? change.add.error} />
     </nav>

@@ -23,7 +23,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
   const [status, setStatus] = useState<Schemas["ContactStatus"] | "">("");
   const [adding, setAdding] = useState(false);
   const pick = usePicked();
-  const folders = useFolderView("contact", canFolders, meId);
+  const folders = useFolderView("contact", canFolders, meId, pick.clear);
   const folder = folders.filter;
   const canPick = canEmail || canFolders; // rows are chosen to email or to put in a folder
   const [emailing, setEmailing] = useState(false);

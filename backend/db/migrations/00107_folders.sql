@@ -47,6 +47,12 @@ ALTER TABLE folder_item ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON folder_item
   USING (tenant_id = app_current_tenant()) WITH CHECK (tenant_id = app_current_tenant());
 
+-- Like every table about candidates: someone sees only the candidates their
+-- role's scope allows, so a shared folder's count and contents never reveal
+-- others (the candidates module keeps the rule in app_sees_candidate).
+CREATE POLICY candidate_scope ON folder_item AS RESTRICTIVE FOR SELECT
+  USING (item_id NOT LIKE 'cand\_%' OR app_sees_candidate(item_id));
+
 -- +goose Down
 DROP TABLE IF EXISTS folder_item;
 DROP TABLE IF EXISTS folder_share;
