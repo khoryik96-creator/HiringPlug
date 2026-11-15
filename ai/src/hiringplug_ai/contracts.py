@@ -3750,6 +3750,7 @@ class JobProgress(BaseModel):
     waiting: Annotated[
         int, Field(description="Candidates over 7 days in one open stage (offer and earlier).")
     ]
+    waitingCounts: Annotated[StageCounts, Field(description="Of them, how many in each stage.")]
 
 
 class DashboardJob(BaseModel):
@@ -3796,6 +3797,11 @@ class PipelineSummary(BaseModel):
     ]
     placedLast30Days: int
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
+    movedPrev7Days: Annotated[
+        int, Field(description="Applications that changed stage in the 7 days before those.")
+    ]
+    addedLast7Days: Annotated[int, Field(description="Applications added in the last 7 days.")]
+    openedLast7Days: Annotated[int, Field(description="Open jobs added in the last 7 days.")]
 
 
 class RetainerDueKind(StrEnum):

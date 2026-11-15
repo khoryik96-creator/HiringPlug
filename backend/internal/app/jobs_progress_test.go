@@ -51,9 +51,18 @@ func TestTheJobsListShowsOwnersAndEachJobsProgress(t *testing.T) {
 	b := byJob[busy.Id]
 	assert.Equal(t, api.StageCounts{Applied: 1, Submitted: 1}, b.StageCounts)
 	assert.Equal(t, 1, b.Waiting, "one candidate over 7 days in Submitted")
+	assert.Equal(t, api.StageCounts{Submitted: 1}, b.WaitingCounts)
 	assert.False(t, b.LastMovedAt.IsNull())
 	q := byJob[quiet.Id]
 	assert.Equal(t, api.StageCounts{}, q.StageCounts)
 	assert.True(t, q.LastMovedAt.IsNull(), "no candidates yet")
 	assert.Zero(t, q.Waiting)
+
+	// The dashboard's week.
+	var sum api.PipelineSummary
+	a.request(http.MethodGet, "/v1/pipeline/summary", recruiter, nil).JSON(&sum)
+	assert.Equal(t, 3, sum.OpenedLast7Days, "three open jobs added this week")
+	assert.Equal(t, 2, sum.AddedLast7Days)
+	assert.Equal(t, 1, sum.MovedLast7Days, "one candidate changed stage")
+	assert.Zero(t, sum.MovedPrev7Days)
 }

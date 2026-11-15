@@ -362,7 +362,7 @@ func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]pip
 	open, err := a.Open(ctx, tx, limit)
 	out := make([]pipeline.OpenJob, len(open))
 	for i, j := range open {
-		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID}
+		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID, CreatedAt: j.CreatedAt}
 	}
 	return out, err
 }

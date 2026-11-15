@@ -7019,6 +7019,8 @@ export interface components {
             lastMovedAt: string | null;
             /** @description Candidates over 7 days in one open stage (offer and earlier). */
             waiting: number;
+            /** @description Of them, how many in each stage. */
+            waitingCounts: components["schemas"]["StageCounts"];
         };
         DashboardJob: {
             jobId: components["schemas"]["JobOrderId"];
@@ -7058,6 +7060,12 @@ export interface components {
             placedLast30Days: number;
             /** @description Applications that changed stage in the last 7 days. */
             movedLast7Days: number;
+            /** @description Applications that changed stage in the 7 days before those. */
+            movedPrev7Days: number;
+            /** @description Applications added in the last 7 days. */
+            addedLast7Days: number;
+            /** @description Open jobs added in the last 7 days. */
+            openedLast7Days: number;
         };
         /**
          * @description on_date: on dueOn; after_signing / after_start: dueDays after the retainer was signed / the placement starts.

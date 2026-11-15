@@ -21,7 +21,7 @@ const counts = (c: Partial<Record<"applied" | "screening" | "submitted" | "inter
 
 describe("the jobs list", () => {
   it("says why an open job needs attention", () => {
-    const p = (c: ReturnType<typeof counts>, lastMovedAt: string | null, waiting = 0) => ({ jobId: "j", stageCounts: c, lastMovedAt, waiting });
+    const p = (c: ReturnType<typeof counts>, lastMovedAt: string | null, waiting = 0) => ({ jobId: "j", stageCounts: c, lastMovedAt, waiting, waitingCounts: counts({}) });
     expect(attention(job("j", "A", 21), p(counts({}), null))).toBe("No candidates in 3 weeks");
     expect(attention(job("j", "A", 5), p(counts({}), null))).toBeNull();
     expect(attention(job("j", "A", 30), p(counts({ submitted: 3 }), ago(9), 3))).toBe("3 waiting over 7 days");
@@ -34,8 +34,8 @@ describe("the jobs list", () => {
     const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/jobs"
       ? { items: [job("jo_1", "Risk Analyst", 34), job("jo_2", "Senior Accountant", 5, "Mei Kee")], nextCursor: null }
       : { items: [
-        { jobId: "jo_1", stageCounts: counts({ applied: 1, screening: 2, submitted: 3 }), lastMovedAt: ago(9), waiting: 3 },
-        { jobId: "jo_2", stageCounts: counts({ applied: 7 }), lastMovedAt: ago(0), waiting: 0 },
+        { jobId: "jo_1", stageCounts: counts({ applied: 1, screening: 2, submitted: 3 }), lastMovedAt: ago(9), waiting: 3, waitingCounts: counts({ submitted: 3 }) },
+        { jobId: "jo_2", stageCounts: counts({ applied: 7 }), lastMovedAt: ago(0), waiting: 0, waitingCounts: counts({}) },
       ] }))) as never);
     renderWithClient(<JobList canCreate={false} />);
     const risk = (await screen.findByRole("link", { name: "Risk Analyst" })).closest("tr") as HTMLElement;

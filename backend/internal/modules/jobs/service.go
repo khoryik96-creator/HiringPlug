@@ -268,7 +268,7 @@ func (s *Service) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, er
 	rows, err := store.New(tx).OpenJobOrders(ctx, int32(limit)) //nolint:gosec // small constant
 	out := make([]OpenJob, len(rows))
 	for i, r := range rows {
-		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID}
+		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID, CreatedAt: r.CreatedAt}
 	}
 	return out, err
 }

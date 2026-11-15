@@ -731,6 +731,14 @@ lead's company (with the built-in email check).
   job's, its client's and the sender's, never one candidate's. The email is
   kept on each candidate's emails, and the job's activity says "emailed the
   client about N candidates".
+- **Dashboard** ✅: search; the week's numbers with their change (open jobs
+  added, candidates added, moved this week against last week); **Needs you
+  today** (an offer about to lapse in red, today's interviews, jobs where
+  someone waits over 7 days in amber, one line per job), the 5 most urgent
+  with "Show all"; importing on one line; the open jobs as a heat map
+  (stronger purple for more people, an amber ring where someone waits over
+  7 days) with each job's last activity.
+- **Copy** ✅: one click copies a candidate's email or phone number.
 - **Jobs list** ✅: each job with a bar of where its candidates are (and the
   counts), how many days it has been open and its owner's initials
   (`GET /v1/pipeline/jobs`). An open job needs attention (amber edge, and

@@ -114,15 +114,17 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
 
   return (
     <section className="panel" aria-label="CV import">
-      <h3>Import profiles <span className="muted small">CVs and LinkedIn PDFs</span></h3>
+      <div className={foldedHistory ? "import-line" : undefined}>
+      <h3>Import profiles {!foldedHistory && <span className="muted small">CVs and LinkedIn PDFs</span>}</h3>
       <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} />
-      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
+      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here" compact={foldedHistory}
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
           setReview(null);
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
         }} />
+      </div>
       {files.length > 0 && (
         <ul className="drop-files" aria-label="Files to import">
           {files.map((f) => (
@@ -136,7 +138,7 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
           ))}
         </ul>
       )}
-      <div className="row">
+      {(!foldedHistory || files.length > 0 || review) && <div className="row">
         {review && review.asks.length > 0 ? (
           <button type="button" className="primary" disabled={start.isPending} onClick={() => { start.mutate(toImport); }}>
             Import {toImport.length === 1 ? "1 file" : `${String(toImport.length)} files`}
@@ -149,7 +151,7 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
         )}
         {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); setReview(null); }}>Clear</button>}
         {sent !== null && <span className="muted">Sent {sent} of {files.length}…</span>}
-      </div>
+      </div>}
       {review && review.skipped.length > 0 && (
         <div className="dup-ask" role="status" aria-label="Skipped files">
           <p><strong>Skipped {review.skipped.length === 1 ? "1 file" : `${String(review.skipped.length)} files`}</strong>: exactly the same file is already in HiringPlug.</p>

@@ -6,6 +6,7 @@ import { candidateKey, candidatesKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateBanner } from "../components/CandidateBanner";
+import { CopyButton } from "../components/CopyButton";
 import { CandidateTabs, type CandidateTab, type CandidateSection } from "../components/CandidateTabs";
 import { WorkAuthorizationPicker } from "../components/WorkAuthorizationPicker";
 import { hashParam } from "../hashQuery";
@@ -116,8 +117,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       <div className="candidate-workspace">
         <aside className="candidate-contact panel" aria-label="Contact summary">
           <h3>Contact</h3>
-          <dl><dt>Email</dt><dd>{c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : "—"}</dd>
-          <dt>Phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
+          <dl><dt>Email</dt><dd className="copyable">{c.email ? <><a href={`mailto:${c.email}`}>{c.email}</a><CopyButton text={c.email} what="email" /></> : "—"}</dd>
+          <dt>Phone</dt><dd className="copyable">{c.phone ? <><a href={`tel:${c.phone}`}>{c.phone}</a><CopyButton text={c.phone} what="phone number" /></> : "—"}</dd>
           <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener">LinkedIn profile</a> : "—"}</dd></dl>
         </aside>
         <CandidateTabs sections={sections} active={active} onChange={setActive} />

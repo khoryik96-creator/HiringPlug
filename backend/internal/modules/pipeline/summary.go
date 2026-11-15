@@ -31,6 +31,9 @@ type Summary struct {
 	Stuck            []View
 	PlacedLast30Days int
 	MovedLast7Days   int
+	MovedPrev7Days   int
+	AddedLast7Days   int
+	OpenedLast7Days  int
 }
 
 // Summary returns the dashboard: open jobs with their pipelines, applications
@@ -80,8 +83,21 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int)
 			return err
 		}
 		recent, err := q.RecentResults(ctx)
-		out.PlacedLast30Days, out.MovedLast7Days = int(recent.PlacedLast30Days), int(recent.MovedLast7Days)
-		return err
+		if err != nil {
+			return err
+		}
+		week, err := q.WeekTrends(ctx)
+		if err != nil {
+			return err
+		}
+		out.PlacedLast30Days, out.MovedLast7Days = int(recent.PlacedLast30Days), int(week.MovedThisWeek)
+		out.MovedPrev7Days, out.AddedLast7Days = int(week.MovedLastWeek), int(week.AddedThisWeek)
+		for _, j := range open {
+			if time.Since(j.CreatedAt) < 7*24*time.Hour {
+				out.OpenedLast7Days++
+			}
+		}
+		return nil
 	})
 	return out, err
 }
@@ -93,6 +109,7 @@ type JobProgress struct {
 	Counts    StageCounts
 	LastMoved *time.Time
 	Waiting   int
+	WaitingIn StageCounts // of them, per stage
 }
 
 // Progress returns the progress of the given jobs (the jobs list).
@@ -111,7 +128,7 @@ func (s *Service) Progress(ctx context.Context, p authz.Principal, jobIDs []stri
 		byJob := make(map[string]*JobProgress, len(jobIDs))
 		out = make([]JobProgress, len(jobIDs))
 		for i, id := range jobIDs {
-			out[i] = JobProgress{JobID: id, Counts: StageCounts{}}
+			out[i] = JobProgress{JobID: id, Counts: StageCounts{}, WaitingIn: StageCounts{}}
 			byJob[id] = &out[i]
 		}
 		for _, c := range counts {
@@ -121,8 +138,13 @@ func (s *Service) Progress(ctx context.Context, p authz.Principal, jobIDs []stri
 		}
 		for _, a := range activity {
 			if j := byJob[a.JobOrderID]; j != nil {
-				last := a.LastMoved
-				j.LastMoved, j.Waiting = &last, int(a.Waiting)
+				if last := a.LastMoved; j.LastMoved == nil || last.After(*j.LastMoved) {
+					j.LastMoved = &last
+				}
+				j.Waiting += int(a.Waiting)
+				if a.Waiting > 0 {
+					j.WaitingIn[a.Stage] += int(a.Waiting)
+				}
 			}
 		}
 		return nil

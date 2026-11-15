@@ -986,13 +986,14 @@ func (q *Queries) NewJdFileID(ctx context.Context) (string, error) {
 }
 
 const openJobOrders = `-- name: OpenJobOrders :many
-SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
+SELECT id, title, company_id, created_at FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
 `
 
 type OpenJobOrdersRow struct {
 	ID        string
 	Title     string
 	CompanyID string
+	CreatedAt time.Time
 }
 
 func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobOrdersRow, error) {
@@ -1004,7 +1005,12 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 	var items []OpenJobOrdersRow
 	for rows.Next() {
 		var i OpenJobOrdersRow
-		if err := rows.Scan(&i.ID, &i.Title, &i.CompanyID); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CompanyID,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

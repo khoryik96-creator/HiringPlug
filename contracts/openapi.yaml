@@ -10081,12 +10081,15 @@ components:
         placed: {type: integer}
     JobProgress:
       type: object
-      required: [jobId, stageCounts, lastMovedAt, waiting]
+      required: [jobId, stageCounts, lastMovedAt, waiting, waitingCounts]
       properties:
         jobId: {$ref: '#/components/schemas/JobOrderId'}
         stageCounts: {$ref: '#/components/schemas/StageCounts'}
         lastMovedAt: {type: string, format: date-time, nullable: true, description: When a candidate last joined or moved stage; null with none.}
         waiting: {type: integer, description: Candidates over 7 days in one open stage (offer and earlier).}
+        waitingCounts:
+          description: Of them, how many in each stage.
+          allOf: [{$ref: '#/components/schemas/StageCounts'}]
     DashboardJob:
       type: object
       required: [jobId, title, companyId, companyName, stageCounts]
@@ -10123,7 +10126,7 @@ components:
           items: {$ref: '#/components/schemas/StageMove'}
     PipelineSummary:
       type: object
-      required: [openJobs, stageCounts, jobs, stuck, placedLast30Days, movedLast7Days]
+      required: [openJobs, stageCounts, jobs, stuck, placedLast30Days, movedLast7Days, movedPrev7Days, addedLast7Days, openedLast7Days]
       properties:
         openJobs: {type: integer, description: Jobs with status open.}
         stageCounts:
@@ -10139,6 +10142,9 @@ components:
           items: {$ref: '#/components/schemas/Application'}
         placedLast30Days: {type: integer}
         movedLast7Days: {type: integer, description: Applications that changed stage in the last 7 days.}
+        movedPrev7Days: {type: integer, description: Applications that changed stage in the 7 days before those.}
+        addedLast7Days: {type: integer, description: Applications added in the last 7 days.}
+        openedLast7Days: {type: integer, description: Open jobs added in the last 7 days.}
     RetainerDueKind:
       type: string
       description: "on_date: on dueOn; after_signing / after_start: dueDays after the retainer was signed / the placement starts."

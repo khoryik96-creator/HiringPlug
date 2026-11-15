@@ -214,21 +214,22 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 }
 
 const jobActivity = `-- name: JobActivity :many
-SELECT job_order_id, max(stage_changed_at)::timestamptz AS last_moved,
+SELECT job_order_id, stage, max(stage_changed_at)::timestamptz AS last_moved,
   count(*) FILTER (WHERE stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
                      AND stage_changed_at < now() - interval '7 days')::integer AS waiting
 FROM application WHERE job_order_id = ANY($1::text[])
-GROUP BY job_order_id
+GROUP BY job_order_id, stage
 `
 
 type JobActivityRow struct {
 	JobOrderID string
+	Stage      string
 	LastMoved  time.Time
 	Waiting    int32
 }
 
-// The jobs list: when anything last moved on each job, and how many wait
-// over 7 days in one open stage (offer and earlier).
+// The jobs list and the dashboard: per job and stage, when anything last
+// moved there, and how many wait over 7 days in an open stage (offer and earlier).
 func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivityRow, error) {
 	rows, err := q.db.Query(ctx, jobActivity, jobIds)
 	if err != nil {
@@ -238,7 +239,12 @@ func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivi
 	var items []JobActivityRow
 	for rows.Next() {
 		var i JobActivityRow
-		if err := rows.Scan(&i.JobOrderID, &i.LastMoved, &i.Waiting); err != nil {
+		if err := rows.Scan(
+			&i.JobOrderID,
+			&i.Stage,
+			&i.LastMoved,
+			&i.Waiting,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -573,4 +579,27 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const weekTrends = `-- name: WeekTrends :one
+SELECT
+  (SELECT count(DISTINCT application_id) FROM application_stage_change WHERE from_stage IS NOT NULL AND changed_at > now() - interval '7 days')::integer AS moved_this_week,
+  (SELECT count(DISTINCT application_id) FROM application_stage_change
+    WHERE from_stage IS NOT NULL AND changed_at > now() - interval '14 days' AND changed_at <= now() - interval '7 days')::integer AS moved_last_week,
+  (SELECT count(*) FROM application WHERE created_at > now() - interval '7 days')::integer AS added_this_week
+`
+
+type WeekTrendsRow struct {
+	MovedThisWeek int32
+	MovedLastWeek int32
+	AddedThisWeek int32
+}
+
+// The dashboard's week: applications that changed stage this week and the
+// week before, and applications added this week.
+func (q *Queries) WeekTrends(ctx context.Context) (WeekTrendsRow, error) {
+	row := q.db.QueryRow(ctx, weekTrends)
+	var i WeekTrendsRow
+	err := row.Scan(&i.MovedThisWeek, &i.MovedLastWeek, &i.AddedThisWeek)
+	return i, err
 }

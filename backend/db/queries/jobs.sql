@@ -88,7 +88,7 @@ RETURNING version, min_amount::text AS min_amount, coalesce(max_amount::text, ''
 DELETE FROM job_order_salary WHERE job_order_id = @job_order_id AND version = @expected_version;
 
 -- name: OpenJobOrders :many
-SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT @row_limit;
+SELECT id, title, company_id, created_at FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT @row_limit;
 
 -- Job ads.
 -- name: InsertJobAd :one

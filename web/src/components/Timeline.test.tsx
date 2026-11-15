@@ -123,19 +123,31 @@ describe("timeline", () => {
 });
 
 describe("dashboard", () => {
-  it("shows open jobs, totals and who is waiting too long", async () => {
-    const counts = { applied: 2, screening: 1, submitted: 0, interview: 1, offer: 0, placed: 1 };
-    vi.spyOn(api, "GET").mockResolvedValue(ok({
-      openJobs: 1, stageCounts: counts, placedLast30Days: 1, movedLast7Days: 3,
-      jobs: [{ jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", title: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank", stageCounts: counts }],
-      stuck: [],
-    }));
+  it("shows the week's numbers, what needs you today, and the open jobs as a heat map", async () => {
+    const counts = { applied: 2, screening: 1, submitted: 3, interview: 1, offer: 0, placed: 1 };
+    const none = { applied: 0, screening: 0, submitted: 0, interview: 0, offer: 0, placed: 0 };
+    const jobId = "jo_01jbz6w0m0k8q9x2r3s4t5v6w7";
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/jobs"
+      ? { items: [{ jobId, stageCounts: counts, lastMovedAt: new Date(Date.now() - 9 * 86_400_000).toISOString(), waiting: 2, waitingCounts: { ...none, submitted: 2 } }] }
+      : {
+        openJobs: 1, stageCounts: counts, placedLast30Days: 1, movedLast7Days: 3, movedPrev7Days: 8, addedLast7Days: 5, openedLast7Days: 1,
+        jobs: [{ jobId, title: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7", companyName: "Maybank", stageCounts: counts }],
+        stuck: [],
+      }))) as never);
     renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
-    await screen.findByRole("link", { name: "Auditor" });
-    expect(screen.getByText("candidates in progress").previousSibling?.textContent).toBe("4");
-    expect(screen.getByText("moved this week").previousSibling?.textContent).toBe("3");
-    expect(screen.getByText(/Nobody has waited more than 14 days/)).toBeTruthy();
+    const job = (await screen.findByRole("link", { name: "Auditor" })).closest("tr") as HTMLElement;
+    const kpi = (label: string) => (screen.getByText(label, { selector: ".kpi-label" }).closest(".kpi") as HTMLElement).textContent;
+    expect(kpi("In progress")).toBe("In progress7▲ 5 added this week");
+    expect(kpi("Moved this week")).toBe("Moved this week3▼ 5 vs last week");
+    expect(kpi("Open jobs")).toBe("Open jobs1▲ 1 new this week");
+    await waitFor(() => { expect(job.querySelector(".last.old")?.textContent).toMatch(/^\d+ days ago$/); });
+    expect(within(job).getByText("3").className).toBe("heat h2 stall"); // 3 submitted, 2 of them waiting
+    expect(within(job).getByText("2").className).toBe("heat h2");
+    const needs = screen.getByRole("region", { name: "Needs you today" });
+    expect(needs.textContent).toContain("2 waiting over 7 days · Auditor, Maybank · Submitted 2");
+    expect(within(needs).getByRole("link", { name: /2 waiting/ }).getAttribute("href")).toBe(`#/jobs/${jobId}`);
   });
+
 });
 
 it("shows protected call history even when the call had no general note", async()=>{
@@ -145,4 +157,18 @@ it("shows protected call history even when the call had no general note", async(
  expect(await screen.findByText("Recorded salary discussion")).toBeTruthy();
  view.rerender(<Timeline subjectType="candidate" subjectId={subjectId} permissions={["candidates:read"]}/>);
  expect(screen.getByLabelText("Latest call")).toBeTruthy();expect(screen.queryByText("Recorded salary discussion")).toBeNull();
+});
+
+it("shows the five most urgent things needing you, then all on request", async () => {
+  const none = { applied: 0, screening: 0, submitted: 0, interview: 0, offer: 0, placed: 0 };
+  const jobs = Array.from({ length: 7 }, (_, i) => ({ jobId: `jo_${String(i)}`, title: `Job ${String(i)}`, companyId: "comp_1", companyName: "Maybank", stageCounts: { ...none, screening: i + 1 } }));
+  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/jobs"
+    ? { items: jobs.map((j, i) => ({ jobId: j.jobId, stageCounts: j.stageCounts, lastMovedAt: null, waiting: i + 1, waitingCounts: { ...none, screening: i + 1 } })) }
+    : { openJobs: 7, stageCounts: none, placedLast30Days: 0, movedLast7Days: 0, movedPrev7Days: 0, addedLast7Days: 0, openedLast7Days: 0, jobs, stuck: [] }))) as never);
+  renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
+  const needs = await screen.findByRole("region", { name: "Needs you today" });
+  await waitFor(() => { expect(needs.querySelectorAll(".todo")).toHaveLength(5); });
+  expect(needs.querySelector(".todo")?.textContent).toContain("7 waiting over 7 days · Job 6"); // most people waiting first
+  fireEvent.click(within(needs).getByRole("button", { name: "Show all 7" }));
+  expect(needs.querySelectorAll(".todo")).toHaveLength(7);
 });
