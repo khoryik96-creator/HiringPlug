@@ -56,15 +56,20 @@
       if (pages.length !== 1 || pages[0] === leftCompany) continue; // no page, several, or the company they left
       const lines = [...new Set([...card.querySelectorAll('p, span[aria-hidden="true"], .pvs-entity__caption-wrapper, time')]
         .filter(visible).map(text).filter(Boolean))];
-      const starts = lines.map(currentSince).filter(Boolean);
+      const starts = lines.map((line, at) => ({at, date: currentSince(line)})).filter(s => s.date);
       if (!starts.length) continue; // not a current role
-      const since = starts.reduce((a, b) => (b.order < a.order ? b : a));
+      const first = starts.reduce((a, b) => (b.date.order < a.date.order ? b : a));
+      const since = first.date;
       // The company's name: its link's label or logo, else the line naming it ("Acme Bhd · Full-time").
       const logo = links.map(a => a.querySelector('img[alt]')?.getAttribute('alt') || '').find(Boolean) || '';
       let name = compact(links.map(a => a.getAttribute('aria-label') || '').find(Boolean) || logo.replace(/\s*logo$/i, ''));
       if (!name) name = (lines.find(l => / · /.test(l) && !isRange(l)) || '').split(' · ')[0];
       if (!name) continue;
-      const title = lines.find(l => l !== name && !isRange(l) && !l.startsWith(name + ' · ') && !/ · /.test(l)) || '';
+      // The role's title: the nearest line above its dates (on a card with
+      // several roles at the company, its location and the other roles are
+      // further up), else the first such line.
+      const titleLike = l => l !== name && !isRange(l) && !l.startsWith(name + ' · ') && !/ · /.test(l);
+      const title = lines.slice(0, first.at).reverse().find(titleLike) || lines.find(titleLike) || '';
       roles.push({company_url: pages[0], company_name: name.slice(0, 200), title: title.slice(0, 200), since: since.value});
       if (roles.length === 3) break;
     }

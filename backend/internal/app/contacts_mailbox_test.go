@@ -114,8 +114,14 @@ func TestVerifyingTheEmailsOfACompanysContacts(t *testing.T) {
 	// A busy verifier: the check is tried again shortly, not lost and not waited for.
 	queued := a.createContact(token, map[string]any{"companyId": company.Id, "firstName": "Queued", "email": "queued@maju.test"})
 	require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/contacts/"+queued.Id+"/mailbox-check", token, nil).Status)
+	jobs := func() (n int) {
+		require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM job WHERE tenant_id = $1 AND kind = 'contact.check_mailbox'`, tenant.ID).Scan(&n))
+		return n
+	}
+	before := jobs()
 	runCoreJobsUntilIdle(t, a, tenant.ID)
 	assert.Equal(t, api.MailboxCheckStatusChecking, a.contact(token, queued.Id).MailboxCheck.MustGet().Status)
+	assert.Equal(t, before, jobs(), "the same job waits: none is added for each try")
 	_, err = testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'contact.check_mailbox' AND status = 'pending'`, tenant.ID)
 	require.NoError(t, err)
 	runCoreJobsUntilIdle(t, a, tenant.ID)

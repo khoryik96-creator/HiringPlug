@@ -34,8 +34,15 @@ const refreshAfter = 30 * 24 * time.Hour
 // when the address was checked more recently than that).
 const refreshSlack = 5 * 24 * time.Hour
 
-// busyRetry is when a check that found the verifier busy is tried again.
+// busyRetry is when a check that found the verifier busy is tried again, at
+// the soonest.
 const busyRetry = 20 * time.Second
+
+// busyWait is how long a check that found the verifier busy waits: longer
+// the more checks are waiting (two run at a time), at most 10 minutes.
+func busyWait(waiting int) time.Duration {
+	return min(busyRetry+time.Duration(waiting)*2*time.Second, 10*time.Minute)
+}
 
 // controlLifetime is how long a check's made-up mailbox is reused by rechecks.
 const controlLifetime = 4 * time.Hour
@@ -177,10 +184,13 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 	}
 	r, err := s.mailboxes.Check(ctx, j.Email, mode, check.ControlID)
 	if errors.Is(err, mailcheck.ErrBusy) {
-		// Another check of this domain (or two others) is running: try again
-		// shortly rather than wait here, holding the job.
-		_, err = jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindContactCheckMailbox, j, time.Now().Add(busyRetry))
-		return err
+		// Another check of this domain (or two others) is running: this job
+		// waits (not holding the worker), longer the more checks are waiting.
+		waiting, err := q.CountMailboxesChecking(ctx)
+		if err != nil {
+			return err
+		}
+		return jobqueue.Later(time.Now().Add(busyWait(int(waiting))))
 	}
 	if err != nil {
 		return err // stopped (shutting down): the job runs again
@@ -204,10 +214,13 @@ func (s *Service) runMailboxCheck(ctx context.Context, tx pgx.Tx, job jobqueue.J
 	if _, err := q.SaveMailboxCheck(ctx, params); err != nil {
 		return err
 	}
-	// Check it again in a month (it runs only if nothing checked it since).
-	if _, err := jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindContactCheckMailbox,
-		api.ContactCheckMailboxJob{ContactId: j.ContactId, Email: j.Email, Refresh: ptr(true)}, time.Now().Add(refreshAfter)); err != nil {
-		return err
+	// Check it again in a month (it runs only if nothing checked it since),
+	// once the answer is final: a recheck queues it when it is done.
+	if params.RecheckAt == nil {
+		if _, err := jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindContactCheckMailbox,
+			api.ContactCheckMailboxJob{ContactId: j.ContactId, Email: j.Email, Refresh: ptr(true)}, time.Now().Add(refreshAfter)); err != nil {
+			return err
+		}
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "contact.mailbox_checked", EntityType: "contact", EntityID: j.ContactId,
 		Changes: map[string]any{"status": r.Status, "outcome": r.Outcome}})

@@ -3,6 +3,7 @@ import { useDeferredValue } from "react";
 
 import { api, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
+import { addresses } from "./emailAddresses";
 
 /**
  * Before sending: recipients who are contacts that have left, or whose
@@ -10,7 +11,7 @@ import { contactsKey } from "../api/keys";
  */
 export function RecipientWarnings({ text }: { text: string }) {
   const deferred = useDeferredValue(text);
-  const emails = [...new Set(deferred.split(/[\s,;]+/).filter((a) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)).map((a) => a.toLowerCase()))].sort().slice(0, 100);
+  const emails = [...new Set(addresses(deferred).filter((a) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)).map((a) => a.toLowerCase()))].sort().slice(0, 100);
   const check = useQuery({
     queryKey: [...contactsKey, "address-check", emails],
     queryFn: async () => unwrap(await api.POST("/v1/contacts/address-check", { body: { emails } })).items,

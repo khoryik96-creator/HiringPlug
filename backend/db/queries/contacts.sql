@@ -216,3 +216,6 @@ ON CONFLICT (tenant_id, contact_id) DO UPDATE SET
   email = EXCLUDED.email, status = 'invalid', reason = EXCLUDED.reason, outcome = 'bounced',
   rechecks = 0, recheck_at = NULL, checked_at = now()
 RETURNING contact_id;
+
+-- name: CountMailboxesChecking :one
+SELECT count(*)::int FROM contact_mailbox_check WHERE status = 'checking';

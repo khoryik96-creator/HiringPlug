@@ -17,8 +17,9 @@ import { ErrorMessage } from "./ErrorMessage";
 import { emailFieldErrors } from "./clientEmail/emailFieldErrors";
 import { SaveError } from "./SaveError";
 
-/** "a@x.com, b@y.com; c@z.com" -> the addresses. */
-export const addresses = (text: string) => text.split(/[\s,;]+/).filter(Boolean);
+import { addresses } from "./emailAddresses";
+
+export { addresses };
 
 /** The sender's time zone, so interview times read as they will be met. */
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;

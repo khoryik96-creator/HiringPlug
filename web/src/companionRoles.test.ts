@@ -38,6 +38,16 @@ describe("where a contact who left works now", () => {
     ]);
   });
 
+  it("takes the title of the current role on a company card with several roles", () => {
+    document.body.innerHTML = `<main><section componentkey="profileExperienceDetailsSection"><ul>
+      ${card("Acme Retail", "acme-retail", ["Acme Retail", "Full-time · 2 yrs 3 mos", "Kuala Lumpur, Malaysia",
+        "Head of People", "Sep 2025 - Present · 3 mos", "HR Manager", "Aug 2023 - Aug 2025 · 2 yrs"])}
+      </ul></section></main>`;
+    expect(globalThis.HiringplugRoles.readCurrentRoles("https://www.linkedin.com/in/ana-lim-example", "")).toEqual([
+      { company_url: "https://www.linkedin.com/company/acme-retail/", company_name: "Acme Retail", title: "Head of People", since: "2025-09" },
+    ]);
+  });
+
   it("is nothing on another profile's page, or without the Experience section", () => {
     document.body.innerHTML = `<main><section componentkey="profileExperienceDetailsSection"><ul>
       ${card("Acme Bhd", "acme-bhd", ["Head of HR", "Sep 2025 - Present"])}</ul></section></main>`;

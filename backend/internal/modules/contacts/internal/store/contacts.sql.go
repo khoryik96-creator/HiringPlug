@@ -197,6 +197,17 @@ func (q *Queries) CountContactsWithRole(ctx context.Context, role *string) (int6
 	return count, err
 }
 
+const countMailboxesChecking = `-- name: CountMailboxesChecking :one
+SELECT count(*)::int FROM contact_mailbox_check WHERE status = 'checking'
+`
+
+func (q *Queries) CountMailboxesChecking(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, countMailboxesChecking)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const expireLinkedinCheck = `-- name: ExpireLinkedinCheck :exec
 UPDATE contact_linkedin_check SET status = 'expired' WHERE id = $1 AND status = 'pending'
 `
