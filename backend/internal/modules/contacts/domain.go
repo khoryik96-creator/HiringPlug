@@ -41,15 +41,26 @@ type Contact struct {
 	Details     Details
 	EmailCheck  *EmailCheckResult // nil without an email
 	Employment  *EmploymentCheck  // the latest LinkedIn check; nil before the first
+	Mailbox     *MailboxCheck     // the latest mailbox check of Details.Email; nil before the first
+	Linkedin    *LinkedinCheck    // the latest answered LinkedIn check; nil before the first
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
 // Summary is a contact in a list.
 type Summary struct {
-	ID, CompanyID, CompanyName, FirstName, LastName, Status string
-	Title, Email, EmailCheckStatus, Phone, Mobile, Role     *string
-	UpdatedAt                                               time.Time
+	ID, CompanyID, CompanyName, FirstName, LastName, Status            string
+	Title, Email, EmailCheckStatus, MailboxStatus, Phone, Mobile, Role *string
+	UpdatedAt                                                          time.Time
+	Linkedin                                                           *LinkedinEmployment // nil before the first LinkedIn check
+	MailboxCheckedAt                                                   *time.Time
+}
+
+// LinkedinEmployment is what the latest LinkedIn check saw.
+type LinkedinEmployment struct {
+	Current      *bool
+	Joined, Left *string
+	CheckedAt    time.Time
 }
 
 // Patch is a partial update of Details.
@@ -145,4 +156,21 @@ func squeezedOrNil(s *string) *string {
 		return nil
 	}
 	return &t
+}
+
+// personalDomains are free mail services: an address there is the person's
+// own, and still reaches them after they leave their company.
+var personalDomains = map[string]bool{
+	"gmail.com": true, "googlemail.com": true, "yahoo.com": true, "yahoo.com.my": true, "yahoo.com.sg": true, "ymail.com": true,
+	"rocketmail.com": true, "hotmail.com": true, "hotmail.my": true, "hotmail.sg": true, "outlook.com": true, "outlook.my": true,
+	"live.com": true, "live.com.my": true, "msn.com": true, "icloud.com": true, "me.com": true, "mac.com": true, "aol.com": true,
+	"proton.me": true, "protonmail.com": true, "gmx.com": true, "mail.com": true, "zoho.com": true, "yandex.com": true,
+	"qq.com": true, "163.com": true, "126.com": true,
+}
+
+// PersonalAddress reports whether email is at a free mail service (it
+// does not end when its owner leaves their company).
+func PersonalAddress(email string) bool {
+	at := strings.LastIndex(email, "@")
+	return at >= 0 && personalDomains[strings.ToLower(strings.TrimSpace(email[at+1:]))]
 }

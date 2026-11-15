@@ -5,10 +5,12 @@ package app
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
@@ -52,10 +54,34 @@ func (a schedulingUsers) TenantName(ctx context.Context, tx pgx.Tx, tenantID str
 	return a.identity.TenantName(ctx, tx, tenantID)
 }
 
+// Members are the active users whose role may take bookings.
+func (a schedulingUsers) Members(ctx context.Context, tx pgx.Tx) ([]scheduling.Member, error) {
+	rows, err := a.identity.ActiveMembers(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	perms, err := a.identity.ActiveUsers(ctx, tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]scheduling.Member, 0, len(rows))
+	for _, r := range rows {
+		if slices.Contains(perms[r.ID], api.PermissionSchedulingUse) {
+			out = append(out, scheduling.Member{ID: r.ID, Name: r.Name})
+		}
+	}
+	return out, nil
+}
+
 type schedulingMailer struct{ emails *emails.Module }
 
 func (a schedulingMailer) Send(ctx context.Context, tx pgx.Tx, tenantID string, m scheduling.Mail) error {
 	return a.emails.Notify(ctx, tx, tenantID, emails.Notice{
 		To: []string{m.To}, Subject: m.Subject, Body: m.Body, Calendar: m.Calendar, CandidateID: m.CandidateID, ApplicationID: m.ApplicationID,
+		SentBy: m.From, SenderName: m.FromName,
 	})
 }

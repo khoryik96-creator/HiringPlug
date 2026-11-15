@@ -19,30 +19,32 @@ import (
 
 var errPrivateMailboxSMTP = errors.New("SMTP server resolves to a private network address")
 
-func (s *Service) deliverThroughMailbox(ctx context.Context, tx pgx.Tx, email store.Email, msg mail.Message) error {
+// deliverThroughMailbox sends msg from the sender's connected mailbox (or the
+// server's), and says which mailbox provider it went through ("" for none).
+func (s *Service) deliverThroughMailbox(ctx context.Context, tx pgx.Tx, email store.Email, msg mail.Message) (string, error) {
 	if email.MailboxRef == nil {
 		mode := s.serverMode()
 		if mode == "unconfigured" {
 			mode = "unknown"
 		}
 		if email.DeliveryMode != "unknown" && mode != email.DeliveryMode {
-			return fmt.Errorf("%w: the server's delivery mode changed; review and send the email again", mail.ErrPermanent)
+			return "", fmt.Errorf("%w: the server's delivery mode changed; review and send the email again", mail.ErrPermanent)
 		}
-		return s.sender.Send(ctx, msg)
+		return "", s.sender.Send(ctx, msg)
 	}
 	row, err := store.New(tx).MailboxForDelivery(ctx, email.SentBy)
 	if database.IsNoRows(err) || err == nil && row.ID != *email.MailboxRef {
-		return fmt.Errorf("%w: the selected mailbox was disconnected or replaced; review and send the email again", mail.ErrPermanent)
+		return "", fmt.Errorf("%w: the selected mailbox was disconnected or replaced; review and send the email again", mail.ErrPermanent)
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 	if row.Provider != "smtp" {
-		return s.sendOAuthMailbox(ctx, row, msg)
+		return row.Provider, s.sendOAuthMailbox(ctx, row, msg)
 	}
 	var secret mailboxSecret
 	if err = s.openMailbox(row.TenantID, row.UserID, row.Provider, row.SealedSecret, &secret); err != nil {
-		return fmt.Errorf("%w: mailbox credentials cannot be opened; reconnect the mailbox", mail.ErrPermanent)
+		return "", fmt.Errorf("%w: mailbox credentials cannot be opened; reconnect the mailbox", mail.ErrPermanent)
 	}
 	dialer := &net.Dialer{Timeout: 15 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
@@ -56,7 +58,7 @@ func (s *Service) deliverThroughMailbox(ctx context.Context, tx pgx.Tx, email st
 	}}
 	sender := mail.NewSMTP(mail.Config{Addr: smtpAddress(row.Host, row.Port), Username: row.Username, Password: secret.Password, From: row.Address, TLS: row.Tls, DialContext: dialer.DialContext})
 	msg.ReplyTo = row.Address
-	return mailboxSMTPError(sender.Send(ctx, msg))
+	return row.Provider, mailboxSMTPError(sender.Send(ctx, msg))
 }
 
 // A remote SMTP response can contain arbitrary text, including message data or

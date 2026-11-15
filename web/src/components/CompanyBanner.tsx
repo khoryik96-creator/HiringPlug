@@ -8,7 +8,7 @@ import { companiesKey, companyKey, jobsKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, countryName } from "../labels";
 import { billingText, useCompanyBilling } from "./companyBilling";
 import { companyTermsKey } from "./CompanyTerms";
-import { tint, UNKNOWN_CATEGORY } from "./companyCategory";
+import { cardGradient, UNKNOWN_CATEGORY } from "./companyCategory";
 import { ErrorMessage } from "./ErrorMessage";
 import { bySalary, guaranteeLabel } from "./termsTiers";
 import { useFieldSettings } from "./useFieldSettings";
@@ -63,7 +63,7 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
   const open = jobs.data?.filter((j) => j.status === "open").length;
 
   return (
-    <section className="banner candidate-banner company-banner" aria-label="Company" style={{ background: `linear-gradient(120deg, ${tint(color, 0.72)}, ${tint(color, 0.9)})` }}>
+    <section className="banner candidate-banner company-banner" aria-label="Company" style={{ background: cardGradient(color) }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">

@@ -111,7 +111,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       </label>
       {canSeeSalary && (
         <label className="adv-field"><span className="multi-label">Expects at most (RM / month)</span>
-          <input inputMode="numeric" value={draft.salaryMax} placeholder="e.g. 12000" onChange={(e) => { set("salaryMax")(e.target.value); }} />
+          <input inputMode="decimal" value={draft.salaryMax} placeholder="e.g. 12000" onChange={(e) => { set("salaryMax")(e.target.value); }} />
         </label>
       )}
       <label className="adv-field"><span className="multi-label">Profile updated</span>

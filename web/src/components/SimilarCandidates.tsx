@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { api, type Candidate, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
@@ -26,11 +27,20 @@ export function SimilarCandidates({ candidate, canMerge }: { candidate: Candidat
       void queryClient.invalidateQueries(); // CVs, jobs, notes and lists all changed
     },
   });
+  const [open, setOpen] = useState(false);
   if (!similar.data || similar.data.length === 0) return null;
+  const n = similar.data.length;
+  const why = [...new Set(similar.data.flatMap((s) => s.reasons))].map((r) => REASON[r]).join(" or ");
   return (
-    <section className="panel warning-panel" aria-label="Possible duplicates">
-      <strong>Possible duplicate{similar.data.length === 1 ? "" : "s"}:</strong>
-      <ul>
+    <section className="dupe-line" aria-label="Possible duplicates">
+      <div className="dupe-head">
+        <span className="dupe-icon" aria-hidden="true">!</span>
+        <span className="dupe-text"><strong>{n === 1 ? "1 possible duplicate" : `${String(n)} possible duplicates`}</strong> <span className="muted">· {why}</span></span>
+        <button type="button" className="small-button" aria-expanded={open} onClick={() => { setOpen(!open); }}>
+          {open ? "Hide" : canMerge ? "Review and merge" : "Review"}
+        </button>
+      </div>
+      {open && <ul>
         {similar.data.map((s) => (
           <li key={s.candidate.id}>
             <a href={`#/candidates/${s.candidate.id}`}>{s.candidate.fullName}</a>{" "}
@@ -53,7 +63,7 @@ export function SimilarCandidates({ candidate, canMerge }: { candidate: Candidat
             )}
           </li>
         ))}
-      </ul>
+      </ul>}
       <ErrorMessage error={merge.error} />
     </section>
   );

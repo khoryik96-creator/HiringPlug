@@ -414,6 +414,44 @@ type ContactEmploymentCheck struct {
 	CreatedAt  time.Time
 }
 
+type ContactLinkedinCheck struct {
+	ID                string
+	TenantID          string
+	ContactID         string
+	CompanyID         string
+	ProfileUrl        string
+	CompanyUrl        string
+	LinkedinCompanyID *string
+	Status            string
+	Joined            *string
+	LeftOn            *string
+	CurrentJob        *bool
+	MarkedLeft        bool
+	Error             *string
+	RequestedBy       string
+	CreatedAt         time.Time
+	CheckedAt         *time.Time
+	MovedTo           []byte
+}
+
+type ContactMailboxCheck struct {
+	TenantID         string
+	ContactID        string
+	Email            string
+	Status           string
+	Reason           *string
+	Outcome          *string
+	Provider         *string
+	Attempts         int32
+	ControlID        string
+	ControlExpiresAt time.Time
+	Rechecks         int32
+	RecheckAt        *time.Time
+	RequestedBy      string
+	RequestedAt      time.Time
+	CheckedAt        *time.Time
+}
+
 type CvImport struct {
 	ID        string
 	TenantID  string
@@ -511,6 +549,8 @@ type Email struct {
 	ContactID        *string
 	MailboxRef       *string
 	DeliveryMode     string
+	BouncedTo        []string
+	BouncedAt        *time.Time
 }
 
 type EmailAttachment struct {
@@ -1166,6 +1206,7 @@ type UserPreference struct {
 	UserID           string
 	CandidateColumns []string
 	UpdatedAt        time.Time
+	DashboardBlocks  []string
 }
 
 type Webhook struct {

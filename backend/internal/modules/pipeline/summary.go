@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -30,6 +31,9 @@ type Summary struct {
 	Stuck            []View
 	PlacedLast30Days int
 	MovedLast7Days   int
+	MovedPrev7Days   int
+	AddedLast7Days   int
+	OpenedLast7Days  int
 }
 
 // Summary returns the dashboard: open jobs with their pipelines, applications
@@ -79,8 +83,71 @@ func (s *Service) Summary(ctx context.Context, p authz.Principal, stuckDays int)
 			return err
 		}
 		recent, err := q.RecentResults(ctx)
-		out.PlacedLast30Days, out.MovedLast7Days = int(recent.PlacedLast30Days), int(recent.MovedLast7Days)
-		return err
+		if err != nil {
+			return err
+		}
+		week, err := q.WeekTrends(ctx)
+		if err != nil {
+			return err
+		}
+		out.PlacedLast30Days, out.MovedLast7Days = int(recent.PlacedLast30Days), int(week.MovedThisWeek)
+		out.MovedPrev7Days, out.AddedLast7Days = int(week.MovedLastWeek), int(week.AddedThisWeek)
+		for _, j := range open {
+			if time.Since(j.CreatedAt) < 7*24*time.Hour {
+				out.OpenedLast7Days++
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// JobProgress is a job's candidates per open stage, when anything last
+// moved on it, and how many wait over 7 days in one open stage.
+type JobProgress struct {
+	JobID     string
+	Counts    StageCounts
+	LastMoved *time.Time
+	Waiting   int
+	WaitingIn StageCounts // of them, per stage
+}
+
+// Progress returns the progress of the given jobs (the jobs list).
+func (s *Service) Progress(ctx context.Context, p authz.Principal, jobIDs []string) ([]JobProgress, error) {
+	var out []JobProgress
+	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		q := store.New(tx)
+		counts, err := q.StageCounts(ctx, jobIDs)
+		if err != nil {
+			return err
+		}
+		activity, err := q.JobActivity(ctx, jobIDs)
+		if err != nil {
+			return err
+		}
+		byJob := make(map[string]*JobProgress, len(jobIDs))
+		out = make([]JobProgress, len(jobIDs))
+		for i, id := range jobIDs {
+			out[i] = JobProgress{JobID: id, Counts: StageCounts{}, WaitingIn: StageCounts{}}
+			byJob[id] = &out[i]
+		}
+		for _, c := range counts {
+			if j := byJob[c.JobOrderID]; j != nil && !IsClosed(c.Stage) {
+				j.Counts[c.Stage] += int(c.N)
+			}
+		}
+		for _, a := range activity {
+			if j := byJob[a.JobOrderID]; j != nil {
+				if last := a.LastMoved; j.LastMoved == nil || last.After(*j.LastMoved) {
+					j.LastMoved = &last
+				}
+				j.Waiting += int(a.Waiting)
+				if a.Waiting > 0 {
+					j.WaitingIn[a.Stage] += int(a.Waiting)
+				}
+			}
+		}
+		return nil
 	})
 	return out, err
 }

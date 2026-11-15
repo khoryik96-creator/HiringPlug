@@ -186,11 +186,11 @@ function NoteForm({ subjectType, subjectId, canSensitive }: { subjectType: Subje
       </Field>
       <div className="full">
         <Field label="Note" error={errors.body}>
-          <textarea rows={kind === "screening" ? 7 : 3} value={body} onChange={(e) => { setBody(e.target.value); }} />
+          <textarea required rows={kind === "screening" ? 7 : 3} value={body} onChange={(e) => { setBody(e.target.value); }} />
         </Field>
       </div>
       <div className="row full">
-        <button type="submit" disabled={save.isPending || body.trim() === ""}>Add note</button>
+        <button type="submit" disabled={save.isPending}>Add note</button>
         {canSensitive && (
           <label className="row">
             <input type="checkbox" checked={sensitive} onChange={(e) => { setSensitive(e.target.checked); }} /> Sensitive (only roles that see salaries)

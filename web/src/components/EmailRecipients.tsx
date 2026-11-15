@@ -1,5 +1,7 @@
 import { useId, useState } from "react";
 
+import { RecipientWarnings } from "./RecipientWarnings";
+
 type Props = {
   to: string;
   cc: string;
@@ -32,7 +34,7 @@ export function EmailRecipients({ to, cc, bcc, errors, onChange }: Props) {
           {!showBcc && <button type="button" className="link small" onClick={() => { setOpened((current) => ({ ...current, bcc: true })); }}>Bcc</button>}
         </div>}
       </div>
-      <input id={`${id}-to`} value={to} aria-invalid={!!errors.to || undefined}
+      <input id={`${id}-to`} required value={to} aria-invalid={!!errors.to || undefined}
         aria-describedby={errors.to ? `${id}-to-error` : undefined}
         onChange={(event) => { onChange("to", event.target.value); }} />
       {errors.to && <small id={`${id}-to-error`} className="error">{errors.to}</small>}
@@ -41,5 +43,6 @@ export function EmailRecipients({ to, cc, bcc, errors, onChange }: Props) {
       {showCc && copy("cc", "Cc", cc)}
       {showBcc && copy("bcc", "Bcc", bcc)}
     </div>}
+    <RecipientWarnings text={[to, cc, bcc].join(" ")} />
   </div>;
 }

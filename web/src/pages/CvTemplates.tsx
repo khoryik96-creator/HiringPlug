@@ -8,6 +8,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { cvTemplatesKey } from "../components/FormatCv";
 import { SaveError } from "../components/SaveError";
 import { formatWhen } from "../labels";
+import { useRequiredFile } from "../requiredFields";
 
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -17,6 +18,7 @@ export function CvTemplates({ canManage }: { canManage: boolean }) {
   const list = useQuery({ queryKey: [...cvTemplatesKey, "full"], queryFn: async () => unwrap(await api.GET("/v1/cv-templates")) });
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const fileField = useRequiredFile(file);
   const refresh = async () => { await queryClient.invalidateQueries({ queryKey: cvTemplatesKey }); };
   const upload = useMutation({
     mutationFn: async () => {
@@ -26,7 +28,11 @@ export function CvTemplates({ canManage }: { canManage: boolean }) {
       const res = await fetch("/v1/cv-templates", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
       if (!res.ok) unwrap({ error: await res.json(), response: res });
     },
-    onSuccess: async () => { setName(""); setFile(null); await refresh(); },
+    onSuccess: async () => {
+      setName("");
+      setFile(null);
+      await refresh();
+    },
   });
   const remove = useMutation({
     mutationFn: async (id: string) => { await api.DELETE("/v1/cv-templates/{cvTemplateId}", { params: { path: { cvTemplateId: id } } }); },
@@ -75,10 +81,10 @@ export function CvTemplates({ canManage }: { canManage: boolean }) {
       </table>
       {canManage && (
         <form className="panel form-grid" aria-label="Upload a template" onSubmit={(e) => { e.preventDefault(); upload.mutate(); }}>
-          <label className="field">Name<input value={name} onChange={(e) => { setName(e.target.value); }} /></label>
-          <label className="field">Word file (.docx)<input type="file" accept=".docx" onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} /></label>
+          <label className="field">Name<input required value={name} onChange={(e) => { setName(e.target.value); }} /></label>
+          <label className="field">Word file (.docx)<input ref={fileField} type="file" accept=".docx" onChange={(e) => { setFile(e.target.files?.[0] ?? null); }} /></label>
           <SaveError error={upload.error} shown={[]} onReload={() => undefined} />
-          <div className="row full"><button type="submit" disabled={upload.isPending || !name.trim() || !file}>Upload</button></div>
+          <div className="row full"><button type="submit" disabled={upload.isPending}>Upload</button></div>
         </form>
       )}
     </main>

@@ -27,6 +27,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mailcheck"
 )
 
 // maxJSONBodyBytes limits JSON request bodies (uploads have their own limit).
@@ -42,6 +43,9 @@ type Deps struct {
 	// MailServers looks up where email domains receive mail (contacts' email
 	// check). Tests replace it with a fake that needs no network.
 	MailServers contacts.MailServers
+	// Mailboxes asks mail servers whether a mailbox exists (contacts' email
+	// verifier, port 25). Tests replace it with a fake that needs no network.
+	Mailboxes contacts.Mailboxes
 	// Mail sends email from the app (the configured SMTP server).
 	Mail mail.Sender
 }
@@ -89,6 +93,7 @@ func NewDeps(ctx context.Context, cfg config.Config, logger *slog.Logger) (Deps,
 		Files:    files,
 
 		MailServers: net.DefaultResolver,
+		Mailboxes:   mailcheck.New(),
 		Mail:        newMailSender(cfg.SMTP),
 	}, pool.Close, nil
 }

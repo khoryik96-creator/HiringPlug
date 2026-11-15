@@ -74,6 +74,7 @@ function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUpl
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: template?.name ?? "", subject: template?.subject ?? "" });
   const [html, setHtml] = useState(() => template?.bodyHtml ?? plainToHtml(template?.body ?? ""));
+  const [tried, setTried] = useState(false); // Save was pressed: an empty message is outlined
   const subject = useRef<HTMLInputElement>(null);
   const save = useMutation({
     mutationFn: async () => {
@@ -92,19 +93,19 @@ function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUpl
   // "Insert field" puts a field where the cursor last was: the subject or the message.
   const inSubject = useRef(false);
   return (
-    <form className="panel form-grid" aria-label={template ? `Change ${template.name}` : "New template"} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+    <form className="panel form-grid" aria-label={template ? `Change ${template.name}` : "New template"} onSubmit={(e) => { e.preventDefault(); setTried(true); if (!empty) save.mutate(); }}>
       <label className="field full">Name
-        <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} />
+        <input required value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} />
         {errors.name && <span className="warning">{errors.name}</span>}
       </label>
       <label className="field full">Subject
-        <input ref={subject} value={form.subject} onFocus={() => { inSubject.current = true; }}
+        <input ref={subject} required value={form.subject} onFocus={() => { inSubject.current = true; }}
           onChange={(e) => { setForm({ ...form, subject: e.target.value }); }} />
         {errors.subject && <span className="warning">{errors.subject}</span>}
       </label>
       <p className="muted small full">&ldquo;Insert field&rdquo; puts a field where your cursor is: in the subject or the message.</p>
       <div className="full">
-        <RichEditor html={html} resetKey={0} onChange={setHtml} fields={fields} banners={banners} bannerUrls={bannerUrls}
+        <RichEditor invalid={tried && empty} html={html} resetKey={0} onChange={setHtml} fields={fields} banners={banners} bannerUrls={bannerUrls}
           onUploadBanner={onUploadBanner} onFocus={() => { inSubject.current = false; }}
           insertElsewhere={(f) => {
             if (!inSubject.current) return false;
@@ -117,7 +118,7 @@ function TemplateForm({ template, canPreview, fields, banners, bannerUrls, onUpl
       <SaveError error={save.error} shown={["name", "subject", "body", "bodyHtml"]}
         onReload={() => { void queryClient.invalidateQueries({ queryKey: emailTemplatesKey }); onDone(); }} />
       <div className="row full">
-        <button type="submit" disabled={save.isPending || !form.name.trim() || !form.subject.trim() || empty}>Save</button>
+        <button type="submit" disabled={save.isPending}>Save</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
     </form>

@@ -121,11 +121,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <WaLegend />
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
-      {canEmail && !emailing && <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear} />}
-      {canEmail && hits.length > 0 && !emailing && (
-        <button type="button" className="link small" onClick={() => { pick.pick(hits.map((h) => personOf(h.candidate)), !allShown); }}>
-          {allShown ? "Unselect all shown" : "Select all shown"}
-        </button>
+      {canEmail && !emailing && (
+        <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
+          shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
       )}
       <PinnedScroll>
         <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
@@ -193,8 +191,9 @@ function AddCandidate({ onCancel }: { onCancel: () => void }) {
       window.location.hash = `#/candidates/${c.id}`;
     },
   });
-  const field = (name: keyof typeof form, label: string) => (
+  const field = (name: keyof typeof form, label: string, required = false) => (
     <input
+      required={required}
       aria-label={label}
       placeholder={label}
       value={form[name]}
@@ -212,14 +211,14 @@ function AddCandidate({ onCancel }: { onCancel: () => void }) {
     >
       <h3>Add a candidate</h3>
       <div className="add-fields">
-        {field("firstName", "First name")}
+        {field("firstName", "First name", true)}
         {field("lastName", "Last name")}
         {field("email", "Email")}
         {field("phone", "Phone")}
         <CandidateExtras values={extras} onChange={setExtras} />
       </div>
       <div className="row">
-        <button type="submit" disabled={!form.firstName.trim() || create.isPending}>Add candidate</button>
+        <button type="submit" disabled={create.isPending}>Add candidate</button>
         <button type="button" className="link" onClick={onCancel}>Cancel</button>
       </div>
       <ErrorMessage error={create.error}><DuplicateEmail error={create.error} /></ErrorMessage>

@@ -46,7 +46,7 @@ describe("candidate banner", () => {
       workAuthorization: { status: "local" }, skills: ["SAP FICO", "IFRS"], compensation: salary,
     })} />);
     const banner = screen.getByRole("region", { name: "Candidate" });
-    expect(banner.style.background).toBe("rgb(205, 239, 200)"); // light green: passive
+    expect(banner.style.background).toMatch(/^linear-gradient\(120deg, rgb\(205, 239, 200\), /); // light green, shading to white: passive
     expect(within(banner).getByText("Passive")).toBeTruthy();
     expect(within(banner).getByText("Accountant · Maju Foods")).toBeTruthy();
     expect(within(banner).getByText("Petaling Jaya, Malaysia")).toBeTruthy();
@@ -119,4 +119,35 @@ describe("candidate banner", () => {
     expect(screen.queryByText(/Appium/)).toBeNull();
   });
 
+});
+
+describe("the card's boxes", () => {
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+  it("are job title, current salary, expected salary and notice period; an empty one offers + Add", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    const onAdd = vi.fn();
+    renderWithClient(<CandidateBanner canEdit onAdd={onAdd} candidate={testCandidate({ currentTitle: "Finance Executive", currentCompany: "Maju Foods", noticePeriod: null })} />);
+    const strip = (await screen.findByText("Job title")).closest(".banner-strip") as HTMLElement;
+    expect([...strip.querySelectorAll(".label")].map((l) => l.textContent)).toEqual(["Job title", "Current salary", "Expected salary", "Notice period"]);
+    expect(strip.textContent).toContain("Finance Executive · Maju Foods");
+    const notice = screen.getByText("Notice period").closest(".fact") as HTMLElement;
+    expect(notice.className).toContain("empty");
+    fireEvent.click(within(notice).getByRole("button", { name: "+ Add" }));
+    expect(onAdd).toHaveBeenCalled();
+  });
+
+  it("a salary box opens the salary form, not the profile's, and only for those who may set salaries", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
+    const onAdd = vi.fn(), onSalary = vi.fn();
+    renderWithClient(<CandidateBanner canEdit onAdd={onAdd} canEditSalary onSalary={onSalary} candidate={testCandidate({ compensation: null })} />);
+    const expected = (await screen.findByText("Expected salary")).closest(".fact") as HTMLElement;
+    fireEvent.click(within(expected).getByRole("button", { name: "+ Add" }));
+    expect(onSalary).toHaveBeenCalled();
+    expect(onAdd).not.toHaveBeenCalled();
+    cleanup();
+
+    renderWithClient(<CandidateBanner canEdit onAdd={onAdd} candidate={testCandidate({ compensation: null })} />);
+    const current = (await screen.findByText("Current salary")).closest(".fact") as HTMLElement;
+    expect(within(current).queryByRole("button"), "may edit the profile but not salaries: nothing to click").toBeNull();
+  });
 });

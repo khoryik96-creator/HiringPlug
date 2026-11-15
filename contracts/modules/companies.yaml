@@ -46,6 +46,10 @@ paths:
           in: query
           description: Only companies in this category (a key of the company_category list).
           schema: { type: string, pattern: '^[a-z0-9_]{1,40}$' }
+        - name: linkedinCompany
+          in: query
+          description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,100}$' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }

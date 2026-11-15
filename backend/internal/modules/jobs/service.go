@@ -201,7 +201,7 @@ type Page struct {
 }
 
 // List returns up to limit jobs, optionally matching query, status or company.
-func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, cursor *string, limit int) (Page, error) {
+func (s *Service) List(ctx context.Context, p authz.Principal, query, status, companyID, contactID, ownerID, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		// A word of the search may be the client's name rather than in the title.
@@ -213,7 +213,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, status, co
 			}
 		}
 		rows, err := store.New(tx).ListJobOrders(ctx, store.ListJobOrdersParams{
-			Cursor: cursor, Status: status, CompanyID: companyID, Query: query, CompanyHits: hits, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Status: status, CompanyID: companyID, ContactID: contactID, OwnerID: ownerID, Query: query, CompanyHits: hits, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err
@@ -231,11 +231,26 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, status, co
 		if err != nil {
 			return err
 		}
+		var owners []string
+		for _, r := range rows {
+			if r.OwnerID != nil {
+				owners = append(owners, *r.OwnerID)
+			}
+		}
+		ownerNames, err := s.users.UserNames(ctx, tx, owners)
+		if err != nil {
+			return err
+		}
 		page.Items = make([]Summary, len(rows))
 		for i, r := range rows {
 			page.Items[i] = Summary{
 				ID: r.ID, Title: r.Title, CompanyID: r.CompanyID, CompanyName: names[r.CompanyID], Status: r.Status,
-				Location: r.Location, Openings: int(r.Openings), UpdatedAt: r.UpdatedAt,
+				Location: r.Location, Openings: int(r.Openings), OwnerID: r.OwnerID, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+			}
+			if r.OwnerID != nil {
+				if n, ok := ownerNames[*r.OwnerID]; ok {
+					page.Items[i].OwnerName = &n
+				}
 			}
 		}
 		return nil
@@ -253,7 +268,7 @@ func (s *Service) Open(ctx context.Context, tx pgx.Tx, limit int) ([]OpenJob, er
 	rows, err := store.New(tx).OpenJobOrders(ctx, int32(limit)) //nolint:gosec // small constant
 	out := make([]OpenJob, len(rows))
 	for i, r := range rows {
-		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID}
+		out[i] = OpenJob{ID: r.ID, Title: r.Title, CompanyID: r.CompanyID, CreatedAt: r.CreatedAt}
 	}
 	return out, err
 }

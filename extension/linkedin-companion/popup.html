@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HiringPlug LinkedIn Companion</title>
+  <style>
+    body { font: 14px system-ui, sans-serif; width: 320px; margin: 0; padding: 14px; color: #1f2937; }
+    h1 { font-size: 15px; margin: 0 0 6px; }
+    p { margin: 6px 0; color: #4b5563; }
+    button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid #7c3aed; background: #7c3aed; color: #fff; cursor: pointer; }
+    button.link { background: none; border: none; color: #7c3aed; padding: 0 0 0 6px; }
+    ul { padding-left: 18px; margin: 6px 0; }
+    #status { min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <h1>HiringPlug LinkedIn Companion</h1>
+  <p>Open HiringPlug in this tab, then connect it. The companion then works only for that address.</p>
+  <p><button id="connect" type="button">Connect this HiringPlug</button></p>
+  <p id="status" role="status"></p>
+  <p>Connected:</p>
+  <ul id="origins"></ul>
+  <script src="popup.js"></script>
+</body>
+</html>

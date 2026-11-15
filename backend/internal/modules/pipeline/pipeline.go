@@ -14,6 +14,7 @@ package pipeline
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,6 +41,7 @@ type Candidates interface {
 // OpenJob is an open job, for the dashboard.
 type OpenJob struct {
 	ID, Title, CompanyID string
+	CreatedAt            time.Time
 }
 
 // Jobs is what this module needs from the jobs module.

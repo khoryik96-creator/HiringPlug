@@ -7,9 +7,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, type Contact, type Schemas, unwrap } from "../api/client";
 import { contactKey, contactsKey } from "../api/keys";
 import { CONTACT_STATUS, keysOf } from "../labels";
-import { tint } from "./companyCategory";
+import { cardGradient } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
+import { MailboxBadge } from "./MailboxBadge";
 import { ErrorMessage } from "./ErrorMessage";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -36,7 +37,7 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
 
   return (
     <section className={left ? "banner candidate-banner contact-banner has-left" : "banner candidate-banner contact-banner"} aria-label="Contact"
-      style={{ background: `linear-gradient(120deg, ${tint(color, 0.72)}, ${tint(color, 0.9)})` }}>
+      style={{ background: cardGradient(color) }}>
       <div className="banner-body">
         <div className="banner-top">
           <div className="banner-who">
@@ -76,7 +77,8 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
           <div>
             <span className="label">Email</span>
             <span className="figure small">{c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : "—"}</span>
-            {c.email && <EmailCheckBadge check={c.emailCheck} />}
+            {/* The mail server's answer says more than the quick check of the address. */}
+            {c.email && (c.mailboxCheck ? <MailboxBadge check={c.mailboxCheck} /> : <EmailCheckBadge check={c.emailCheck} />)}
           </div>
           <div><span className="label">Mobile</span><span className="figure small">{c.mobile ? <a href={`tel:${c.mobile}`}>{c.mobile}</a> : "—"}</span></div>
           <div><span className="label">Office phone</span><span className="figure small">{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</span></div>

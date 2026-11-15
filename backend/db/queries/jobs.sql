@@ -39,11 +39,13 @@ RETURNING *;
 
 -- Newest first, keyset pagination on id (IDs sort by creation time).
 -- name: ListJobOrders :many
-SELECT id, title, company_id, status, location, openings, updated_at
+SELECT id, title, company_id, status, location, openings, owner_id, created_at, updated_at
 FROM job_order
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
+  AND (sqlc.narg(owner_id)::text IS NULL OR owner_id = sqlc.narg(owner_id)::text)
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
   AND (sqlc.narg(company_id)::text IS NULL OR company_id = sqlc.narg(company_id)::text)
+  AND (sqlc.narg(contact_id)::text IS NULL OR contact_id = sqlc.narg(contact_id)::text)
   AND (sqlc.narg(query)::text IS NULL OR NOT EXISTS (
          -- every word in the title or location, or in the client's name (@company_hits: "n:companyId")
          SELECT 1 FROM app_search_words(sqlc.narg(query)::text) w
@@ -86,7 +88,7 @@ RETURNING version, min_amount::text AS min_amount, coalesce(max_amount::text, ''
 DELETE FROM job_order_salary WHERE job_order_id = @job_order_id AND version = @expected_version;
 
 -- name: OpenJobOrders :many
-SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT @row_limit;
+SELECT id, title, company_id, created_at FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT @row_limit;
 
 -- Job ads.
 -- name: InsertJobAd :one

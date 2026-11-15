@@ -49,6 +49,9 @@ FROM company
 WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(type)::text IS NULL OR type = sqlc.narg(type)::text)
   AND (sqlc.narg(category)::text IS NULL OR category = sqlc.narg(category)::text)
+  -- The page's name is letters, digits, _ and - only (the contract), so it is safe in the pattern.
+  AND (sqlc.narg(linkedin_company)::text IS NULL
+       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || sqlc.narg(linkedin_company)::text || '(/|$)'))
   AND (sqlc.narg(query)::text IS NULL
        OR search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
@@ -85,6 +88,9 @@ UPDATE company_suggestion SET status = @status WHERE id = @id;
 
 -- name: CompanyWebsite :one
 SELECT coalesce(website, '')::text FROM company WHERE id = @id;
+
+-- name: CompanyLinkedin :one
+SELECT coalesce(linkedin_url, '')::text FROM company WHERE id = @id;
 
 -- For each word of a job search (numbered as app_search_words numbers them),
 -- the companies whose name or website has it: "n:companyId".

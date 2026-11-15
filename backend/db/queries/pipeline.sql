@@ -102,3 +102,21 @@ WHERE a.job_order_id = ANY(@job_order_ids::text[])
   AND (a.stage = 'placed' OR EXISTS (
     SELECT 1 FROM application_stage_change c
     WHERE c.tenant_id = a.tenant_id AND c.application_id = a.id AND c.to_stage = 'placed'));
+
+-- The jobs list and the dashboard: per job and stage, when anything last
+-- moved there, and how many wait over 7 days in an open stage (offer and earlier).
+-- name: JobActivity :many
+SELECT job_order_id, stage, max(stage_changed_at)::timestamptz AS last_moved,
+  count(*) FILTER (WHERE stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
+                     AND stage_changed_at < now() - interval '7 days')::integer AS waiting
+FROM application WHERE job_order_id = ANY(@job_ids::text[])
+GROUP BY job_order_id, stage;
+
+-- The dashboard's week: applications that changed stage this week and the
+-- week before, and applications added this week.
+-- name: WeekTrends :one
+SELECT
+  (SELECT count(DISTINCT application_id) FROM application_stage_change WHERE from_stage IS NOT NULL AND changed_at > now() - interval '7 days')::integer AS moved_this_week,
+  (SELECT count(DISTINCT application_id) FROM application_stage_change
+    WHERE from_stage IS NOT NULL AND changed_at > now() - interval '14 days' AND changed_at <= now() - interval '7 days')::integer AS moved_last_week,
+  (SELECT count(*) FROM application WHERE created_at > now() - interval '7 days')::integer AS added_this_week;

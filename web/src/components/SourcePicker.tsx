@@ -1,5 +1,5 @@
 // A candidate's source as a row of icons side by side, instead of a dropdown.
-import type { ReactElement } from "react";
+import { type ReactElement, useId } from "react";
 
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -26,10 +26,10 @@ export function SourceIcon({ source, label }: { source: string; label: string })
 }
 
 /** Pick one source; picking the chosen one again clears it. */
-export function SourcePicker({ value, onChange, label = "Source" }: { value: string; onChange: (v: string) => void; label?: string }) {
+export function SourcePicker({ value, onChange, label = "Source", invalid = false }: { value: string; onChange: (v: string) => void; label?: string; invalid?: boolean }) {
   const fs = useFieldSettings();
   return (
-    <div className="source-picker" role="group" aria-label={label}>
+    <div className="source-picker" role="group" aria-label={label} aria-invalid={invalid || undefined}>
       {fs.options("candidate_source", value || null).map((o) => (
         <button key={o.key} type="button" aria-pressed={value === o.key} title={o.label}
           onClick={() => { onChange(value === o.key ? "" : o.key); }}>
@@ -37,6 +37,24 @@ export function SourcePicker({ value, onChange, label = "Source" }: { value: str
           <span>{o.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** One line: "Preset the source [LinkedIn ▾]", with the chosen source's icon. */
+export function SourceSelect({ value, onChange, label = "Preset the source", invalid = false }: { value: string; onChange: (v: string) => void; label?: string; invalid?: boolean }) {
+  const fs = useFieldSettings();
+  const options = fs.options("candidate_source", value || null);
+  const chosen = options.find((o) => o.key === value);
+  const id = useId();
+  return (
+    <div className="source-select">
+      <label className="source-select-label" htmlFor={id}>{label}</label>
+      {chosen && <span aria-hidden="true"><SourceIcon source={chosen.key} label={chosen.label} /></span>}
+      <select id={id} value={value} aria-invalid={invalid || undefined} required onChange={(e) => { onChange(e.target.value); }}>
+        <option value="">Choose a source…</option>
+        {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+      </select>
     </div>
   );
 }

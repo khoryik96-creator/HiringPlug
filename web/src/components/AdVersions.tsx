@@ -91,12 +91,12 @@ function BlindText({ ad, canEdit, facts }: { ad: Ad; canEdit: boolean; facts: st
         e.preventDefault();
         save.mutate({ blindTitle: form.title, blindDescription: form.text.trim() ? form.text : null });
       }}>
-        <label className="field">Blind title<input value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
+        <label className="field">Blind title<input required value={form.title} onChange={(e) => { setForm({ ...form, title: e.target.value }); }} /></label>
         {errors.blindTitle && <small className="error">{errors.blindTitle}</small>}
         <label className="field">Blind text<textarea rows={10} value={form.text} onChange={(e) => { setForm({ ...form, text: e.target.value }); }} /></label>
         {errors.blindDescription && <small className="error">{errors.blindDescription}</small>}
         <div className="row">
-          <button type="submit" disabled={save.isPending || !form.title.trim()}>Save blind ad</button>
+          <button type="submit" disabled={save.isPending}>Save blind ad</button>
           <button type="button" className="link" onClick={() => { setEditing(false); }}>Cancel</button>
         </div>
         <ErrorMessage error={Object.keys(errors).length ? null : save.error} />

@@ -140,7 +140,7 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
   return (
     <form className="panel form-grid" aria-label={ad ? "Edit ad" : "New ad"} onSubmit={(e) => { e.preventDefault(); save.mutate(body); }}>
       <div className="full"><JdDrop jobId={job.id} start={jd} onRead={fillFrom} /></div>
-      <label className="field">Ad title<input value={form.title} onChange={(e) => { set("title", e.target.value); }} /></label>
+      <label className="field">Ad title<input required value={form.title} onChange={(e) => { set("title", e.target.value); }} /></label>
       <label className="field">Location<input value={form.location} onChange={(e) => { set("location", e.target.value); }} /></label>
       <label className="field">Country
         <select value={form.country} onChange={(e) => { set("country", e.target.value); }}>
@@ -182,7 +182,7 @@ function AdForm({ job, ad, jd, onDone }: { job: JobOrder; ad: Ad | null; jd: Fil
         )}
       </div>
       <div className="row full">
-        <button type="submit" disabled={save.isPending || !form.title.trim()}>{ad ? "Save" : "Save as draft"}</button>
+        <button type="submit" disabled={save.isPending}>{ad ? "Save" : "Save as draft"}</button>
         <button type="button" className="link" onClick={onDone}>Cancel</button>
       </div>
       <SaveError error={save.error} shown={[]} onReload={() => { void queryClient.invalidateQueries({ queryKey: jobAdsKey(job.id) }); onDone(); }} />

@@ -55,13 +55,20 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		msg.Calendar = *e.Calendar
 	}
 	var sendErr error
+	var provider string
 	switch partsErr := s.files2parts(ctx, q, e, &msg); {
 	case errors.Is(partsErr, os.ErrNotExist): // gone for good: retrying cannot help
 		sendErr = fmt.Errorf("%w: a banner or attached file of this email is missing", mail.ErrPermanent)
 	case partsErr != nil:
 		return partsErr
 	default:
-		sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
+		provider, sendErr = s.deliverThroughMailbox(ctx, tx, e, msg)
+		if errors.Is(sendErr, mail.ErrPermanent) && e.MailboxRef != nil && e.Calendar != nil {
+			// An invitation must arrive: when the sender's mailbox cannot send
+			// it (disconnected, signed out), it goes from the server's address.
+			logx.From(ctx).Info("invitation sent from the server: the mailbox could not send it", "email_id", e.ID)
+			provider, sendErr = "", s.sender.Send(ctx, msg)
+		}
 	}
 	if sendErr != nil && !errors.Is(sendErr, mail.ErrPermanent) && job.Attempts < job.MaxAttempts {
 		return sendErr
@@ -76,6 +83,11 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	}
 	if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(status), Error: reason}); err != nil {
 		return err
+	}
+	if sendErr == nil && provider == ProviderMicrosoft { // a mailbox HiringPlug may read: look for bounces later
+		if err := scheduleBounceScans(ctx, tx, job.TenantID, e.ID); err != nil {
+			return err
+		}
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "email", EntityID: e.ID, Changes: changes})
 }

@@ -122,6 +122,7 @@ func (m *Module) IDsOfCompany(ctx context.Context, tx pgx.Tx, companyID string) 
 // OpenJob is an open job, for other modules (e.g. the dashboard).
 type OpenJob struct {
 	ID, Title, CompanyID string
+	CreatedAt            time.Time
 }
 
 // Open returns the newest open jobs, at most limit.

@@ -64,9 +64,9 @@ type View struct {
 // Summary is a job in a list.
 type Summary struct {
 	ID, Title, CompanyID, CompanyName, Status string
-	Location                                  *string
+	Location, OwnerID, OwnerName              *string
 	Openings                                  int
-	UpdatedAt                                 time.Time
+	CreatedAt, UpdatedAt                      time.Time
 }
 
 // Patch is a partial update of Details.

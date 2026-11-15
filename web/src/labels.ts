@@ -114,6 +114,35 @@ export const EMAIL_CHECK: Record<Schemas["EmailCheckStatus"], { badge: string; m
   unknown: { badge: "? Not checked", meaning: "The mail server could not be reached; check again later." },
 };
 
+/** How long ago, roughly: "today", "3 days ago", "2 months ago", "1 year ago". */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const days = Math.floor((now - new Date(iso).getTime()) / 86_400_000);
+  if (days < 1) return "today";
+  if (days < 31) return days === 1 ? "yesterday" : `${String(days)} days ago`;
+  const months = Math.floor(days / 30.4);
+  if (months < 12) return months === 1 ? "1 month ago" : `${String(months)} months ago`;
+  const years = Math.floor(days / 365);
+  return years === 1 ? "1 year ago" : `${String(years)} years ago`;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A LinkedIn date as precise as it was shown: "2025-08" -> "Aug 2025", "2025" -> "2025". */
+export function linkedinDates(value: string | null): string {
+  if (!value) return "?";
+  const [year, month] = value.split("-");
+  return month ? `${MONTHS[Number(month) - 1] ?? month} ${year ?? ""}` : (year ?? value);
+}
+
+/** A mailbox check (asking the contact's mail server whether the mailbox exists). */
+export const MAILBOX_CHECK: Record<Schemas["MailboxCheckStatus"], { badge: string; meaning: string }> = {
+  checking: { badge: "Verifying…", meaning: "Asking their mail server." },
+  accepted: { badge: "✓ Mailbox exists", meaning: "Their mail server accepts this mailbox (delivery is still not guaranteed)." },
+  catch_all: { badge: "⚠ Accepts any address", meaning: "Their mail server accepts any address, so this mailbox cannot be confirmed." },
+  invalid: { badge: "✗ Bounces", meaning: "This mailbox does not exist: an email would bounce." },
+  unknown: { badge: "? Not confirmed", meaning: "Their mail server gave no clear answer. This does not mean the address is wrong." },
+};
+
 export const JOB_STATUS: Record<Schemas["JobStatus"], string> = {
   open: "Open",
   on_hold: "On hold",

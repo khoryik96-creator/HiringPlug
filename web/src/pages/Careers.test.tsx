@@ -37,7 +37,9 @@ describe("careers page", () => {
     fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nur" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nur@example.com" } });
     const submit = screen.getByRole<HTMLButtonElement>("button", { name: "Send application" });
-    expect(submit.disabled).toBe(true); // a CV and consent first
+    fireEvent.click(submit); // a CV and consent first
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByLabelText<HTMLInputElement>(/I agree that Contoh Berhad keeps my details/).validity.valueMissing).toBe(true);
     fireEvent.change(screen.getByLabelText("CV (PDF, Word, text or a photo)"), { target: { files: [new File(["%PDF"], "cv.pdf")] } });
     fireEvent.click(screen.getByLabelText(/I agree that Contoh Berhad keeps my details/));
     fireEvent.click(submit);
@@ -57,6 +59,8 @@ describe("careers page", () => {
     }), { status: 400 })));
     renderWithClient(<Careers route={{ slug: "contoh-berhad", adId: ad.id, via: undefined }} pathStyle={false} />);
     await screen.findByRole("heading", { name: "Senior Accountant" });
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nur" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nur@localhost" } });
     fireEvent.change(screen.getByLabelText("CV (PDF, Word, text or a photo)"), { target: { files: [new File(["%PDF"], "cv.pdf")] } });
     fireEvent.click(screen.getByLabelText(/I agree/));
     fireEvent.click(screen.getByRole("button", { name: "Send application" }));
@@ -87,6 +91,8 @@ describe("job board links", () => {
     vi.stubGlobal("fetch", send);
     renderWithClient(<Careers route={{ slug: "contoh-berhad", adId: ad.id, via: "linkedin" }} pathStyle />);
     expect((await screen.findByRole("link", { name: "← All jobs" })).getAttribute("href")).toBe("/careers/contoh-berhad?via=linkedin");
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nur" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nur@example.com" } });
     fireEvent.change(screen.getByLabelText("CV (PDF, Word, text or a photo)"), { target: { files: [new File(["%PDF"], "cv.pdf")] } });
     fireEvent.click(screen.getByLabelText(/I agree/));
     fireEvent.click(screen.getByRole("button", { name: "Send application" }));

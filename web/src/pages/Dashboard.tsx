@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
-import { timeInStage } from "../components/ApplicationCard";
 import { CvImports } from "../components/CvImports";
+import { DashboardBlocks } from "../components/DashboardBlocks";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
+import { useJobProgress } from "../components/JobProgressTable";
 import { MyTasks } from "../components/MyTasks";
+import { NeedsYouToday } from "../components/NeedsYouToday";
 import { OffersToApprove } from "../components/Offers";
 import { QuickSearch } from "../components/QuickSearch";
 import { OPEN_STAGES, STAGE } from "../labels";
@@ -15,12 +18,33 @@ type Counts = Schemas["StageCounts"];
 
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
 
-/** The home page: importing CVs, open jobs and their pipelines, who is stuck. */
+/** "▲ 3 this week", "▼ 5 vs last week": a change, coloured by direction. */
+function Change({ by, text }: { by: number; text: string }) {
+  if (by === 0) return <span className="change flat">{text.replace("{n}", "no change")}</span>;
+  return <span className={`change ${by > 0 ? "up" : "down"}`}>{by > 0 ? "▲" : "▼"} {text.replace("{n}", String(Math.abs(by)))}</span>;
+}
+
+/** Heat: stronger purple for more people; an amber ring when someone there waits over 7 days. */
+function Heat({ n, waiting }: { n: number; waiting: boolean }) {
+  if (n === 0) return <span className="heat h0" aria-label="none">·</span>;
+  const level = n >= 4 ? "h3" : n >= 2 ? "h2" : "h1";
+  return <span className={`heat ${level}${waiting ? " stall" : ""}`} title={waiting ? "Someone here has waited over 7 days" : undefined}>{n}</span>;
+}
+
+function lastActivity(iso: string | null | undefined, now: number): { text: string; old: boolean } {
+  if (!iso) return { text: "no candidates", old: true };
+  const days = Math.floor((now - Date.parse(iso)) / 86_400_000);
+  return { text: days < 1 ? "today" : days === 1 ? "yesterday" : `${String(days)} days ago`, old: days >= 7 };
+}
+
+/** The home page: search, what needs you today, importing CVs, open jobs and their pipelines. */
 export function Dashboard({ permissions }: { permissions: Permission[] }) {
   const summary = useQuery({
     queryKey: summaryKey,
     queryFn: async () => unwrap(await api.GET("/v1/pipeline/summary")),
   });
+  const [now] = useState(() => Date.now());
+  const progress = useJobProgress((summary.data?.jobs ?? []).map((j) => j.jobId));
   const s = summary.data;
   if (!s) return summary.error ? <ErrorMessage error={summary.error} /> : <p className="muted">Loading…</p>;
 
@@ -28,59 +52,61 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
     <main>
       <h2>Dashboard</h2>
       <QuickSearch permissions={permissions} />
-      <div className="stats">
-        <div className="stat"><strong>{s.openJobs}</strong><span>open jobs</span></div>
-        <div className="stat"><strong>{active(s.stageCounts)}</strong><span>candidates in progress</span></div>
-        <div className="stat"><strong>{s.movedLast7Days}</strong><span>moved this week</span></div>
-        <div className="stat"><strong>{s.placedLast30Days}</strong><span>placed in 30 days</span></div>
+      <DashboardBlocks blocks={[
+        { id: "numbers", label: "the numbers", node: (
+      <div className="kpis">
+        <div className="kpi"><span className="kpi-label">Open jobs</span><strong>{s.openJobs}</strong><Change by={s.openedLast7Days} text="{n} new this week" /></div>
+        <div className="kpi"><span className="kpi-label">In progress</span><strong>{active(s.stageCounts)}</strong><Change by={s.addedLast7Days} text="{n} added this week" /></div>
+        <div className="kpi"><span className="kpi-label">Moved this week</span><strong>{s.movedLast7Days}</strong><Change by={s.movedLast7Days - s.movedPrev7Days} text="{n} vs last week" /></div>
+        <div className="kpi"><span className="kpi-label">Placed in 30 days</span><strong>{s.placedLast30Days}</strong></div>
       </div>
-
-      {permissions.includes("intake:create") && <CvImports foldedHistory />}
-      {permissions.includes("automations.tasks:read") && <MyTasks approvals={permissions.includes("automations:approve")} />}
-      {permissions.includes("offers:approve") && <OffersToApprove permissions={permissions} />}
-      {permissions.includes("interviews:read") && <MyInterviews permissions={permissions} />}
-
+        ) },
+        { id: "needsYou", label: "Needs you today", node: <NeedsYouToday permissions={permissions} jobs={s.jobs} progress={progress.data} /> },
+        ...(permissions.includes("intake:create") ? [{ id: "import" as const, label: "Import profiles", node: <CvImports foldedHistory /> }] : []),
+        ...(permissions.includes("automations.tasks:read")
+          ? [{ id: "tasks" as const, label: "Your tasks", node: <MyTasks approvals={permissions.includes("automations:approve")} /> }] : []),
+        ...(permissions.includes("offers:approve")
+          ? [{ id: "offersToApprove" as const, label: "Offers to approve", node: <OffersToApprove permissions={permissions} /> }] : []),
+        ...(permissions.includes("interviews:read")
+          ? [{ id: "interviews" as const, label: "My upcoming interviews", node: <MyInterviews permissions={permissions} /> }] : []),
+        { id: "openJobs", label: "Open jobs", node: (
       <section className="panel" aria-label="Open jobs">
         <h3>Open jobs</h3>
-        <table>
+        <table className="heat-table">
           <thead>
             <tr>
               <th>Job</th>
               {OPEN_STAGES.map((st) => <th key={st}>{STAGE[st]}</th>)}
+              <th className="last">Last activity</th>
             </tr>
           </thead>
           <tbody>
-            {s.jobs.map((j) => (
-              <tr key={j.jobId}>
-                <td><a href={`#/jobs/${j.jobId}`}>{j.title}</a> <span className="muted">{j.companyName}</span></td>
-                {OPEN_STAGES.map((st) => <td key={st}>{j.stageCounts[st] || ""}</td>)}
-              </tr>
-            ))}
+            {s.jobs.map((j) => {
+              const p = progress.data?.get(j.jobId);
+              const last = lastActivity(p?.lastMovedAt, now);
+              return (
+                <tr key={j.jobId}>
+                  <td><a href={`#/jobs/${j.jobId}`}><strong>{j.title}</strong></a> <span className="muted">{j.companyName}</span></td>
+                  {OPEN_STAGES.map((st) => <td key={st}><Heat n={j.stageCounts[st]} waiting={(p?.waitingCounts[st] ?? 0) > 0} /></td>)}
+                  <td className={last.old ? "last old" : "last"}>{p ? last.text : ""}</td>
+                </tr>
+              );
+            })}
             <tr className="total">
               <td>All open jobs</td>
               {OPEN_STAGES.map((st) => <td key={st}>{s.stageCounts[st]}</td>)}
+              <td />
             </tr>
-            {s.jobs.length === 0 && <tr><td colSpan={7} className="muted">No open jobs. Add one under Jobs.</td></tr>}
+            {s.jobs.length === 0 && <tr><td colSpan={8} className="muted">No open jobs. Add one under Jobs.</td></tr>}
           </tbody>
         </table>
+        <p className="heat-legend muted small">
+          <span><i className="heat-key h1" />1</span><span><i className="heat-key h2" />2–3</span><span><i className="heat-key h3" />4+</span>
+          <span><i className="heat-key ring" />someone waiting over 7 days</span>
+        </p>
       </section>
-
-      <section className="panel" aria-label="Waiting too long">
-        <h3>Waiting too long</h3>
-        {s.stuck.length === 0 ? (
-          <p className="muted">Nobody has waited more than 14 days in one stage.</p>
-        ) : (
-          <ul>
-            {s.stuck.map((a) => (
-              <li key={a.id}>
-                <a href={`#/candidates/${a.candidateId}`}>{a.candidateName}</a>{" "}
-                <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>{" "}
-                for {timeInStage(a)} on <a href={`#/jobs/${a.jobId}`}>{a.jobTitle}</a> <span className="muted">({a.companyName})</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        ) },
+      ]} />
     </main>
   );
 }

@@ -113,6 +113,17 @@ type Deps struct {
 	Contacts interface {
 		Contact(ctx context.Context, tx pgx.Tx, id string) (Contact, error)
 	}
+	// Undeliverable says which addresses would not reach their contact
+	// (contacts module: they left, or the mailbox does not exist), with why
+	// in words; automated emails to them are not sent. Nil: none.
+	Undeliverable interface {
+		Undeliverable(ctx context.Context, tx pgx.Tx, addresses []string) (map[string]string, error)
+	}
+	// Bounces is told of an address a real email bounced from (contacts
+	// module: their mailbox is marked as gone). Nil: nobody is.
+	Bounces interface {
+		Bounced(ctx context.Context, tx pgx.Tx, address string) error
+	}
 	// Consent says whether a candidate asked not to be contacted (privacy
 	// module); emails to them are refused. Nil: nobody is.
 	Consent interface {
@@ -143,7 +154,7 @@ func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender, files *blob.Store) *
 
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindEmailSend: m.service.deliver}
+	return jobqueue.Handlers{api.JobKindEmailSend: m.service.deliver, api.JobKindEmailBounceScan: m.service.scanBounces}
 }
 
 // MoveCandidate moves a merged duplicate's emails to the candidate kept, in
@@ -177,6 +188,9 @@ type Notice struct {
 	ShowsFees bool
 	// SenderName is who it is from ("HiringPlug" when empty).
 	SenderName string
+	// SentBy, when given, is the user it is sent for: from their connected
+	// mailbox if they have one (else the server's), replies going to them.
+	SentBy *string
 }
 
 // NoticeFile is a file attached to a notice. Key, when given, names it in

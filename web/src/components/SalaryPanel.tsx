@@ -17,8 +17,14 @@ function formatRange(r: Range): string {
 }
 
 /** Salary details, or a clear "restricted" notice for roles that may not see them. */
-export function SalaryPanel({ candidate, canEdit = false }: { candidate: Candidate; canEdit?: boolean }) {
-  const [editing, setEditing] = useState(false);
+export function SalaryPanel({ candidate, canEdit = false, editing: shownEditing, onEditingChange }: {
+  candidate: Candidate; canEdit?: boolean;
+  /** Whether the form is open, when the page opens it (the card's "+ Add" and "Change"). */
+  editing?: boolean; onEditingChange?: (editing: boolean) => void;
+}) {
+  const [ownEditing, setOwnEditing] = useState(false);
+  const editing = shownEditing ?? ownEditing;
+  const setEditing = onEditingChange ?? setOwnEditing;
   if (candidate.restrictedFields.includes("compensation")) {
     return (
       <section className="panel" aria-label="Salary">

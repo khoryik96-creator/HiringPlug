@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type ContactSummary } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { ContactTable } from "./ContactTable";
-import { SeparateEmail } from "./SeparateEmail";
+import { PickBar, SeparateEmail } from "./SeparateEmail";
 
 afterEach(() => {
   cleanup();
@@ -89,13 +89,24 @@ describe("ticking contacts", () => {
     onPick.mockClear();
     fireEvent.click(screen.getByRole("link", { name: "Ali Hassan" }));
     expect(onPick).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
-    expect(onPick).toHaveBeenLastCalledWith(list, true);
   });
 
   it("does not choose rows for those who may not send email", async () => {
     renderWithClient(<ContactTable contacts={list} empty="none" />);
-    await waitFor(() => { expect(screen.queryByRole("button", { name: "Select all shown" })).toBeNull(); });
+    await screen.findByText("Mei Tan");
     expect((screen.getByText("Mei Tan").closest("tr") as HTMLElement).className).not.toContain("pick-row");
+  });
+});
+
+describe("choosing all or none", () => {
+  it("says 'shown' when the list has more than is loaded", () => {
+    const onAll = vi.fn();
+    const { rerender } = renderWithClient(<PickBar count={0} shown={{ count: 25, more: true, all: false, onAll }} onEmail={vi.fn()} onClear={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "All 25 shown" }));
+    expect(onAll).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "None" }).getAttribute("aria-pressed")).toBe("true");
+    rerender(<PickBar count={3} shown={{ count: 3, all: true, onAll }} onEmail={vi.fn()} onClear={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "All 3" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("status").textContent).toContain("3 chosen");
   });
 });

@@ -174,7 +174,13 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 
 	err = w.handle(ctx, job)
 	log := logx.From(ctx)
+	var later laterError
 	switch {
+	case errors.As(err, &later):
+		if err := w.later(ctx, job, later.at); err != nil {
+			return true, fmt.Errorf("postponing job %s: %w", job.ID, err)
+		}
+		log.Info("job postponed", "run_after", later.at)
 	case err == nil:
 		log.Info("job done", "duration_ms", time.Since(start).Milliseconds())
 	case errors.Is(err, errLeaseLost):
@@ -239,6 +245,30 @@ func (w *Worker) claim(ctx context.Context) (Job, bool, error) {
 		j.RequestID = *reqID
 	}
 	return j, true, nil
+}
+
+// laterError is a handler's answer that its job cannot start its work yet.
+type laterError struct{ at time.Time }
+
+func (e laterError) Error() string { return "job postponed until " + e.at.UTC().Format(time.RFC3339) }
+
+// Later is what a handler returns when its job cannot start its work yet (a
+// limit is reached): the same job runs again at at, without counting an
+// attempt, and nothing the handler did is kept. Better than queuing a new job
+// for each try.
+func Later(at time.Time) error { return laterError{at} }
+
+func (w *Worker) later(ctx context.Context, job Job, at time.Time) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	var ok bool
+	if err := w.Pool.QueryRow(ctx, `SELECT job_later($1, $2, $3)`, job.ID, w.ID, at).Scan(&ok); err != nil {
+		return err
+	}
+	if !ok {
+		return errLeaseLost
+	}
+	return nil
 }
 
 func (w *Worker) fail(ctx context.Context, job Job, jobErr error) (string, error) {

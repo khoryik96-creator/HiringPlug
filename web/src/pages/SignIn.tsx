@@ -42,10 +42,10 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
         <h1>HiringPlug</h1>
         <form className="form-grid" aria-label="Reset password" onSubmit={(e) => { e.preventDefault(); reset.mutate(); }}>
           <p className="full">We will email you a link to choose a new password.</p>
-          <label className="field full">Email<input type="email" autoComplete="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
+          <label className="field full">Email<input type="email" required autoComplete="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); }} /></label>
           <ErrorMessage error={reset.error} />
           <div className="row full">
-            <button type="submit" disabled={reset.isPending || !form.email.trim()}>Send link</button>
+            <button type="submit" disabled={reset.isPending}>Send link</button>
             <button type="button" className="link" onClick={() => { setMode("sign-in"); }}>Cancel</button>
           </div>
         </form>
@@ -57,24 +57,24 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       <h1>HiringPlug</h1>
       <form className="form-grid" aria-label="Sign in" onSubmit={(e) => { e.preventDefault(); signIn.mutate(); }}>
         <label className="field full">Email
-          <input type="email" autoComplete="username" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value, company: "" }); }} />
+          <input type="email" required autoComplete="username" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value, company: "" }); }} />
         </label>
         <label className="field full">Password
-          <input type="password" autoComplete="current-password" value={form.password} onChange={(e) => { setForm({ ...form, password: e.target.value }); }} />
+          <input type="password" required autoComplete="current-password" value={form.password} onChange={(e) => { setForm({ ...form, password: e.target.value }); }} />
         </label>
         {companies && (
           <fieldset className="full">
             <legend>Your account is at several companies. Which one?</legend>
             {companies.map((c) => (
               <label key={c.slug} className="row">
-                <input type="radio" name="company" checked={form.company === c.slug} onChange={() => { setForm({ ...form, company: c.slug }); }} /> {c.name}
+                <input type="radio" name="company" required checked={form.company === c.slug} onChange={() => { setForm({ ...form, company: c.slug }); }} /> {c.name}
               </label>
             ))}
           </fieldset>
         )}
         {!companies && <ErrorMessage error={signIn.error} />}
         <div className="row full">
-          <button type="submit" disabled={signIn.isPending || !form.email.trim() || !form.password || (companies !== null && !form.company)}>Sign in</button>
+          <button type="submit" disabled={signIn.isPending}>Sign in</button>
           <button type="button" className="link" onClick={() => { setMode("forgot"); }}>Forgot your password?</button>
         </div>
       </form>
@@ -90,8 +90,8 @@ function DeveloperToken({ onSignedIn }: { onSignedIn: () => void }) {
     <details className="muted">
       <summary>Sign in with a token (developers)</summary>
       <form onSubmit={(e) => { e.preventDefault(); setToken(token); onSignedIn(); }}>
-        <textarea aria-label="Token" rows={3} value={token} onChange={(e) => { setValue(e.target.value); }} />
-        <button type="submit" disabled={!token.trim()}>Use token</button>
+        <textarea aria-label="Token" required rows={3} value={token} onChange={(e) => { setValue(e.target.value); }} />
+        <button type="submit">Use token</button>
       </form>
     </details>
   );

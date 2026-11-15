@@ -154,6 +154,10 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   lost or point at data that was rolled back.
 - **Claimed with a lease.** If a worker dies, the lease expires and another
   worker takes over; the first worker's late result is discarded.
+- **Postponed, not failed.** A Go handler that cannot start its work yet (a
+  limit is reached: the email verifier runs two checks at a time) returns
+  `jobqueue.Later(at)`: `job_later` puts the same job back to run then,
+  without counting an attempt or queuing another job.
 - **Kept while it runs.** `job_extend` renews a worker's lease before a long
   step (a CV Studio CV makes two AI calls of minutes each), and tells it to
   stop when another worker already took the job.

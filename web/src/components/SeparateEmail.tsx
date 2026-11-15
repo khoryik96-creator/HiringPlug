@@ -3,7 +3,7 @@
 // A check says who gets it and who does not (and why) before sending.
 import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
@@ -11,6 +11,7 @@ import { Attachments } from "./clientEmail/Attachments";
 import { RichEditor } from "./clientEmail/RichEditor";
 import { plainToHtml, withoutCaretMarks } from "./clientEmail/richText";
 import { useBanners } from "./clientEmail/useBanners";
+import { filledIn } from "../requiredFields";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** Someone to write to: a candidate or a client's contact. */
@@ -27,6 +28,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
   const { banners, urls } = useBanners();
   const [picked, setPicked] = useState("");
   const [subject, setSubject] = useState("");
+  const subjectField = useRef<HTMLInputElement>(null);
   const [html, setHtml] = useState("");
   const [reset, setReset] = useState(0);
   const [uploads, setUploads] = useState<Schemas["EmailAttachment"][]>([]);
@@ -97,7 +99,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
           setReset((n) => n + 1);
         }}>Use selected template</button>
       </div>
-      <label className="field">Subject<input value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
+      <label className="field">Subject<input ref={subjectField} required value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
       <RichEditor compact html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
       <Attachments candidateId="" canSeeCvs={false} cvs={[]} onCvs={() => undefined} uploads={uploads} onUploads={setUploads} />
 
@@ -107,9 +109,9 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
             {people.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.name}</option>)}
           </select>
         </label>
-        <button type="button" disabled={preview.isPending || !subject.trim()} onClick={() => { preview.mutate(); }}>Preview</button>
-        <button type="button" disabled={check.isPending || !subject.trim()} onClick={() => { check.mutate(); }}>Check who gets it</button>
-        <button type="button" className="primary" disabled={send.isPending || !subject.trim()} onClick={() => { send.mutate(); }}>
+        <button type="button" disabled={preview.isPending} onClick={() => { if (filledIn(subjectField.current)) preview.mutate(); }}>Preview</button>
+        <button type="button" disabled={check.isPending} onClick={() => { if (filledIn(subjectField.current)) check.mutate(); }}>Check who gets it</button>
+        <button type="button" className="primary" disabled={send.isPending} onClick={() => { if (filledIn(subjectField.current)) send.mutate(); }}>
           Send to each separately
         </button>
       </div>
@@ -145,16 +147,41 @@ function RecipientTable({ rows, title }: { rows: Schemas["EmailBatchRecipient"][
   );
 }
 
-/** "3 chosen · Email each separately · Clear", over a list with ticks. */
-export function PickBar({ count, onEmail, onClear, children }: { count: number; onEmail: () => void; onClear: () => void; children?: React.ReactNode }) {
-  if (count === 0) return null;
+/**
+ * What "All" chooses: the rows shown (more: the list has more not loaded yet,
+ * so "All 25 shown"), and whether all of them are chosen.
+ */
+export interface Shown { count: number; more?: boolean; all: boolean; onAll: () => void }
+
+/**
+ * Over a list whose rows can be chosen: "Choose: All 24 | None", and once any
+ * are chosen, "3 chosen · Email each separately · Clear".
+ */
+export function PickBar({ count, shown, onEmail, onClear, children }: {
+  count: number; shown?: Shown; onEmail: () => void; onClear: () => void; children?: React.ReactNode;
+}) {
+  const choose = shown && shown.count > 0;
+  if (count === 0 && !choose) return null;
   return (
-    <div className="pick-bar" role="status">
-      <span>{count} chosen</span>
-      {children}
-      <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>
-      <button type="button" className="link" onClick={onClear}>Clear</button>
-      {count > 50 && <span className="warning small">At most 50 at a time.</span>}
+    <div className="choose-row">
+      {choose && (
+        <span className="choose" role="group" aria-label="Choose">
+          <span className="choose-label" aria-hidden="true">Choose</span>
+          <span className="segmented">
+            <button type="button" className={shown.all ? "on" : undefined} aria-pressed={shown.all} onClick={shown.onAll}>All {shown.count}{shown.more ? " shown" : ""}</button>
+            <button type="button" className={count === 0 ? "on" : undefined} aria-pressed={count === 0} onClick={onClear}>None</button>
+          </span>
+        </span>
+      )}
+      {count > 0 && (
+        <div className="pick-bar" role="status">
+          <strong>{count} chosen</strong>
+          {children}
+          <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>
+          <button type="button" className="link" onClick={onClear}>Clear</button>
+          {count > 50 && <span className="warning small">At most 50 at a time.</span>}
+        </div>
+      )}
     </div>
   );
 }

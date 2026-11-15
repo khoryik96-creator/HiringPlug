@@ -86,6 +86,7 @@ class Permission(StrEnum):
     privacy_read = "privacy:read"
     privacy_record = "privacy:record"
     reports_read = "reports:read"
+    scheduling_team_read = "scheduling.team:read"
     scheduling_use = "scheduling:use"
     settings_backups_manage = "settings.backups:manage"
     settings_manage = "settings:manage"
@@ -108,11 +109,13 @@ class ErrorCode(StrEnum):
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
+    CONTACT_LINKEDIN_CHECK_CLOSED = "CONTACT_LINKEDIN_CHECK_CLOSED"
     CV_NOT_BLIND = "CV_NOT_BLIND"
     DOCUMENT_DUPLICATE = "DOCUMENT_DUPLICATE"
     DOCUMENT_HAS_NO_TEXT = "DOCUMENT_HAS_NO_TEXT"
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
+    EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
@@ -155,6 +158,7 @@ class JobKind(StrEnum):
     automation_event = "automation.event"
     automation_run = "automation.run"
     company_autofill = "company.autofill"
+    contact_check_mailbox = "contact.check_mailbox"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
     cv_format_studio = "cv.format_studio"
@@ -165,6 +169,7 @@ class JobKind(StrEnum):
     document_pdf_rendered = "document.pdf_rendered"
     document_render_pdf = "document.render_pdf"
     document_text_extracted = "document.text_extracted"
+    email_bounce_scan = "email.bounce_scan"
     email_send = "email.send"
     interview_remind = "interview.remind"
     jd_blind = "jd.blind"
@@ -1232,29 +1237,208 @@ class ContactUpdate(BaseModel):
     notes: Annotated[str | None, Field(max_length=4000)] = None
 
 
-class ContactSummary(BaseModel):
-    id: ContactId
-    fullName: str
-    title: Annotated[str | None, Field(...)]
+class MailboxCheckStatus(StrEnum):
+    checking = "checking"
+    accepted = "accepted"
+    catch_all = "catch_all"
+    invalid = "invalid"
+    unknown = "unknown"
+
+
+class ContactMailboxCheck(BaseModel):
+    email: Annotated[str, Field(description="The address checked.")]
+    status: MailboxCheckStatus
+    reason: Annotated[str | None, Field(description="What was established, in words.")]
+    provider: Annotated[
+        str | None,
+        Field(description="Microsoft 365, Google Workspace or another mail server (from the server's name)."),
+    ]
+    attempts: Annotated[int, Field(description="Sessions with mail servers.")]
+    recheckAt: Annotated[
+        AwareDatetime | None,
+        Field(description="When an inconclusive answer (the server was busy) is checked again on its own."),
+    ]
+    requestedAt: AwareDatetime
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class ContactMailboxChecksStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
     companyId: CompanyId
+
+
+class ContactMailboxChecksStarted(BaseModel):
+    started: Annotated[int, Field(description="Contacts whose email is being checked.")]
+    skipped: Annotated[int, Field(description="Contacts without an email, or being checked already.")]
+
+
+class ContactCheckMailboxJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    contactId: ContactId
+    email: Annotated[
+        str, Field(description="The address to check (skipped if the contact's email changed since).")
+    ]
+    deep: Annotated[bool, Field(description="Compare the domain's mail servers (an automatic recheck).")]
+    refresh: Annotated[
+        bool | None,
+        Field(
+            description="The monthly re-check: runs only if the address was last checked 25 days ago or more, for a contact who still works there."
+        ),
+    ] = None
+
+
+class ContactLinkedinCheckId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["clc_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^clc_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class LinkedinYearMonth(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            description="A year (2020) or year and month (2020-06), as precise as the profile shows.",
+            pattern="^(19|20)[0-9]{2}(-(0[1-9]|1[0-2]))?$",
+        ),
+    ]
+
+
+class LinkedinEmployment(BaseModel):
+    current: Annotated[
+        bool | None,
+        Field(
+            description="true = a current role at the company; false = their time there ended; null = could not tell."
+        ),
+    ]
+    joined: Annotated[LinkedinYearMonth | None, Field(...)]
+    left: Annotated[LinkedinYearMonth | None, Field(...)]
+    checkedAt: AwareDatetime
+
+
+class ContactLinkedinChecksStart(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId | None = None
+    contactId: ContactId | None = None
+    dueOnly: Annotated[
+        bool | None,
+        Field(
+            description="Only contacts not checked on LinkedIn in the last 90 days (the others are skipped: recent)."
+        ),
+    ] = None
+
+
+class ContactLinkedinCheckRequest(BaseModel):
+    id: ContactLinkedinCheckId
+    contactId: ContactId
+    contactName: str
+    profileUrl: Annotated[str, Field(description="https://www.linkedin.com/in/...")]
+
+
+class Reason1(StrEnum):
+    no_profile = "no_profile"
+    too_many = "too_many"
+    recent = "recent"
+
+
+class ContactLinkedinCheckSkipped(BaseModel):
+    contactId: ContactId
+    contactName: str
+    reason: Annotated[
+        Reason1,
+        Field(
+            description="no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly)."
+        ),
+    ]
+
+
+class LinkedinMove(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyUrl: Annotated[
+        str,
+        Field(
+            description="Their new company's LinkedIn page, https://www.linkedin.com/company/.../",
+            max_length=300,
+        ),
+    ]
+    companyName: Annotated[str, Field(max_length=200)]
+    title: Annotated[str, Field(description="Their job title there; empty when not shown.", max_length=200)]
+    since: Annotated[str, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)]
+
+
+class Status1(StrEnum):
+    pending = "pending"
+    observed = "observed"
+    failed = "failed"
+    expired = "expired"
+
+
+class ContactLinkedinCheck(BaseModel):
+    id: ContactLinkedinCheckId
+    contactId: ContactId
+    status: Annotated[
+        Status1,
+        Field(description="observed = read (the dates may still be unclear); failed = could not be read."),
+    ]
+    joined: Annotated[LinkedinYearMonth | None, Field(...)]
+    left: Annotated[LinkedinYearMonth | None, Field(...)]
+    current: Annotated[
+        bool | None,
+        Field(description="true = a current role there; false = their time there ended; null = unclear."),
+    ]
+    markedLeft: Annotated[bool, Field(description='This check set the contact to "has left".')]
+    movedTo: Annotated[
+        list[LinkedinMove],
+        Field(
+            description="Where they work now, when their time at the company ended (from the same profile)."
+        ),
+    ]
+    error: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+    checkedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class Email(RootModel[str]):
+    root: Annotated[str, Field(max_length=320)]
+
+
+class ContactAddressCheck(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emails: Annotated[list[Email], Field(max_length=100)]
+
+
+class Problem(StrEnum):
+    bounces = "bounces"
+    left = "left"
+
+
+class ContactAddressProblem(BaseModel):
+    email: str
+    contactId: ContactId
+    contactName: str
     companyName: str
-    email: Annotated[str | None, Field(...)]
-    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
-    phone: Annotated[str | None, Field(...)]
-    mobile: Annotated[str | None, Field(...)]
-    status: ContactStatus
-    role: Annotated[
-        ContactRole | None,
-        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    problem: Annotated[
+        Problem,
+        Field(
+            description="bounces = their mail server says the mailbox does not exist; left = they have left the company."
+        ),
     ]
-    updatedAt: AwareDatetime
 
 
-class ContactPage(BaseModel):
-    items: list[ContactSummary]
-    nextCursor: Annotated[
-        ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
-    ]
+class EmailGuess(BaseModel):
+    email: str
+    pattern: Annotated[str, Field(description="e.g. first.last, flast, first")]
+    matches: Annotated[int, Field(description="Colleagues whose address follows the pattern.")]
+    of: Annotated[int, Field(description="Colleagues with an address at that domain.")]
 
 
 class ContactEmploymentCheckId(RootModel[str]):
@@ -1263,7 +1447,7 @@ class ContactEmploymentCheckId(RootModel[str]):
     ]
 
 
-class Status1(StrEnum):
+class Status2(StrEnum):
     reading = "reading"
     read = "read"
     failed = "failed"
@@ -1934,6 +2118,13 @@ class BccItem(RootModel[EmailStr]):
     root: Annotated[EmailStr, Field(max_length=254)]
 
 
+class EmailBounceScanJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emailId: EmailId
+
+
 class EmailSendJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -2025,6 +2216,16 @@ class UserSummary(BaseModel):
     id: UserId
     name: str
     role: Role
+
+
+class DashboardBlock(StrEnum):
+    numbers = "numbers"
+    needsYou = "needsYou"
+    import_ = "import"
+    tasks = "tasks"
+    offersToApprove = "offersToApprove"
+    interviews = "interviews"
+    openJobs = "openJobs"
 
 
 class CandidateColumn(StrEnum):
@@ -2234,7 +2435,7 @@ class IndustryEmployer(BaseModel):
     current: bool
 
 
-class Status2(StrEnum):
+class Status3(StrEnum):
     ready = "ready"
     needs_review = "needs_review"
 
@@ -2245,7 +2446,7 @@ class IndustrySuggestion(BaseModel):
     )
     catalogueVersion: int
     candidateVersion: int
-    status: Status2
+    status: Status3
     reason: str
     categoryId: IndustryId | None = None
     employerIndex: int | None = None
@@ -2602,7 +2803,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status3(StrEnum):
+class Status4(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -2900,6 +3101,9 @@ class JobOrderUpdate(BaseModel):
 
 class JobOrderSummary(BaseModel):
     id: JobOrderId
+    ownerId: Annotated[str | None, Field(...)]
+    ownerName: Annotated[str | None, Field(...)]
+    createdAt: Annotated[AwareDatetime, Field(description="When the job was added.")]
     title: str
     companyId: CompanyId
     companyName: str
@@ -3576,6 +3780,19 @@ class StageCounts(BaseModel):
     placed: int
 
 
+class JobProgress(BaseModel):
+    jobId: JobOrderId
+    stageCounts: StageCounts
+    lastMovedAt: Annotated[
+        AwareDatetime | None,
+        Field(description="When a candidate last joined or moved stage; null with none."),
+    ]
+    waiting: Annotated[
+        int, Field(description="Candidates over 7 days in one open stage (offer and earlier).")
+    ]
+    waitingCounts: Annotated[StageCounts, Field(description="Of them, how many in each stage.")]
+
+
 class DashboardJob(BaseModel):
     jobId: JobOrderId
     title: str
@@ -3620,6 +3837,11 @@ class PipelineSummary(BaseModel):
     ]
     placedLast30Days: int
     movedLast7Days: Annotated[int, Field(description="Applications that changed stage in the last 7 days.")]
+    movedPrev7Days: Annotated[
+        int, Field(description="Applications that changed stage in the 7 days before those.")
+    ]
+    addedLast7Days: Annotated[int, Field(description="Applications added in the last 7 days.")]
+    openedLast7Days: Annotated[int, Field(description="Open jobs added in the last 7 days.")]
 
 
 class RetainerDueKind(StrEnum):
@@ -4007,7 +4229,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status4(StrEnum):
+class Status5(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -4020,7 +4242,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status4
+    status: Status5
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -4122,7 +4344,7 @@ class FailedJob(BaseModel):
     failedAt: AwareDatetime
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -4132,7 +4354,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status5
+    status: Status6
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -4717,9 +4939,94 @@ class CompanyUpdate(BaseModel):
     about: Annotated[str | None, Field(max_length=4000)] = None
 
 
+class ContactSummary(BaseModel):
+    id: ContactId
+    fullName: str
+    title: Annotated[str | None, Field(...)]
+    companyId: CompanyId
+    companyName: str
+    email: Annotated[str | None, Field(...)]
+    emailCheckStatus: Annotated[EmailCheckStatus | None, Field(...)]
+    mailboxStatus: Annotated[
+        MailboxCheckStatus | None,
+        Field(description="The latest mailbox check of `email`; null before the first."),
+    ]
+    mailboxCheckedAt: Annotated[AwareDatetime | None, Field(description="When the mailbox was last checked.")]
+    linkedinEmployment: Annotated[
+        LinkedinEmployment | None,
+        Field(
+            description="What the latest LinkedIn check saw of their time at the company; null before the first."
+        ),
+    ]
+    phone: Annotated[str | None, Field(...)]
+    mobile: Annotated[str | None, Field(...)]
+    status: ContactStatus
+    role: Annotated[
+        ContactRole | None,
+        Field(description="Hiring manager, HR… (a key of the contact_role list); null when not set."),
+    ]
+    updatedAt: AwareDatetime
+
+
+class ContactPage(BaseModel):
+    items: list[ContactSummary]
+    nextCursor: Annotated[
+        ContactId | None, Field(description="Pass as `cursor` to get the next page; null on the last page.")
+    ]
+
+
+class ContactLinkedinChecksStarted(BaseModel):
+    companyUrl: Annotated[
+        str, Field(description="The company's LinkedIn page, https://www.linkedin.com/company/.../")
+    ]
+    checks: list[ContactLinkedinCheckRequest]
+    skipped: Annotated[
+        list[ContactLinkedinCheckSkipped], Field(description="Contacts not checked this time, and why.")
+    ]
+
+
+class ContactLinkedinCheckAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profileUrl: Annotated[str | None, Field(max_length=300)] = None
+    companyUrl: Annotated[str | None, Field(max_length=300)] = None
+    linkedinCompanyId: Annotated[
+        str | None, Field(description="LinkedIn's number for the company.", pattern="^[0-9]{1,24}$")
+    ] = None
+    joined: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)
+    ] = None
+    left: Annotated[
+        str | None, Field(description="YYYY or YYYY-MM; empty while current or not shown.", max_length=7)
+    ] = None
+    current: bool | None = None
+    movedTo: Annotated[
+        list[LinkedinMove] | None,
+        Field(
+            description="With current false, their current roles elsewhere, as the profile shows them.",
+            max_length=3,
+        ),
+    ] = None
+    error: Annotated[
+        str | None,
+        Field(description="Why the profile could not be read (then nothing else).", max_length=300),
+    ] = None
+
+
+class ContactAddressProblems(BaseModel):
+    items: list[ContactAddressProblem]
+
+
+class ContactEmailSuggestion(BaseModel):
+    suggestion: Annotated[
+        EmailGuess | None, Field(description="Null when colleagues' addresses show no clear pattern.")
+    ]
+
+
 class ContactEmployment(BaseModel):
     id: ContactEmploymentCheckId
-    status: Status1
+    status: Status2
     verdict: Annotated[
         Verdict,
         Field(
@@ -5003,11 +5310,18 @@ class EmailDraftRequest(BaseModel):
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
 
 
-class Email(BaseModel):
+class Email1(BaseModel):
     deliveryMode: Annotated[
         DeliveryMode1 | None,
         Field(description="Local test inbox, live provider acceptance, or unknown historical delivery."),
     ] = None
+    bouncedTo: Annotated[
+        list[str],
+        Field(
+            description="Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox)."
+        ),
+    ]
+    bouncedAt: Annotated[AwareDatetime | None, Field(...)]
     id: EmailId
     candidateId: Annotated[CandidateId | None, Field(...)]
     contactId: Annotated[
@@ -5037,7 +5351,7 @@ class Email(BaseModel):
 
 
 class EmailList(BaseModel):
-    items: list[Email]
+    items: list[Email1]
 
 
 class EmailSend(BaseModel):
@@ -5095,13 +5409,20 @@ class Preferences(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
+    dashboardBlocks: Annotated[
+        list[DashboardBlock] | None,
+        Field(
+            description="The dashboard's blocks below search, in the order you dragged them (null: the default order).",
+            max_length=20,
+        ),
+    ] = None
     candidateColumns: Annotated[
         list[CandidateColumn] | None,
         Field(
             description="The candidate list's columns, in order, after the name (null: the default ones).",
             max_length=20,
         ),
-    ]
+    ] = None
 
 
 class Me(BaseModel):
@@ -5145,7 +5466,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status3, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status4, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]
@@ -5652,6 +5973,20 @@ class Schedule(BaseModel):
     ]
 
 
+class TeamSchedule(BaseModel):
+    userId: str
+    name: str
+    set: Annotated[bool, Field(description="They have saved their hours.")]
+    timeZone: str
+    hours: list[WeeklyHours]
+    calendar: Annotated[
+        CalendarFeed | None, Field(description="Their calendar's status (its host only); null when none.")
+    ]
+    openLinks: Annotated[int, Field(description="Booking links sent and not booked yet (not expired).")]
+    upcoming: Annotated[int, Field(description="Booked meetings still to come.")]
+    nextAt: Annotated[AwareDatetime | None, Field(description="When the next booked meeting starts.")]
+
+
 class BookingLink(BaseModel):
     id: BookingLinkId
     url: Annotated[
@@ -5800,6 +6135,18 @@ class Contact(BaseModel):
         ContactEmployment | None,
         Field(
             description="The latest employment check (from their LinkedIn profile); null before the first."
+        ),
+    ]
+    linkedinCheck: Annotated[
+        ContactLinkedinCheck | None,
+        Field(
+            description="The latest answered LinkedIn check (by the LinkedIn companion); null before the first."
+        ),
+    ]
+    mailboxCheck: Annotated[
+        ContactMailboxCheck | None,
+        Field(
+            description="The latest mailbox check of `email`; null before the first (or after the email changed)."
         ),
     ]
     createdAt: AwareDatetime

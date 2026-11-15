@@ -887,6 +887,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/contacts/{contactId}/mailbox-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify the contact's email with their mail server
+         * @description Asks the mail server, in the background, whether it takes mail for the address and for a made-up address beside it (no email is sent). The result shows on the contact (`mailboxCheck`): invalid when the server says the mailbox does not exist (an email would bounce).
+         */
+        post: operations["checkContactMailbox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/mailbox-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify the emails of all a company's contacts
+         * @description Starts a mailbox check for each of the company's contacts with an email (those being checked already are skipped).
+         */
+        post: operations["checkCompanyMailboxes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/linkedin-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start checking on LinkedIn where a company's contacts (or one contact) work
+         * @description For each contact with a LinkedIn profile, a check bound to the contact, their profile and the company's LinkedIn page. The recruiter's HiringPlug LinkedIn companion (a browser extension) reads the dates of their time at that company from the profile and answers each check within 15 minutes. LinkedIn is never read by the server.
+         */
+        post: operations["startContactLinkedinChecks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/linkedin-checks/{checkId}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: components["schemas"]["ContactLinkedinCheckId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a LinkedIn check with what the profile shows
+         * @description Only by whoever started it. When the profile shows the contact's time at the company ended, with no current role there, a contact who "works there" becomes "has left". Unclear dates change nothing.
+         */
+        post: operations["answerContactLinkedinCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/address-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Which of these addresses would bounce, or reach someone who left
+         * @description For the email composer, before sending. Addresses that are not a contact's, or that are fine, are left out.
+         */
+        post: operations["checkContactAddresses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/{contactId}/email-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Suggest an email address from how colleagues' addresses are spelled
+         * @description From the addresses of the contact's colleagues at the same company (first.last@, flast@, first@ ...): a suggestion when at least two follow the same pattern at the company's main domain. Verify it before relying on it (setting it as the email verifies it).
+         */
+        get: operations["suggestContactEmail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/contacts/{contactId}/linkedin-profile": {
         parameters: {
             query?: never;
@@ -1602,7 +1728,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Your own settings, such as the columns of your candidate list */
+        /** Your own settings, such as the columns of your candidate list and your dashboard's order */
         get: operations["getMyPreferences"];
         /** Change your own settings (no one else's) */
         put: operations["putMyPreferences"];
@@ -2846,6 +2972,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/pipeline/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jobs' progress: candidates per stage, when anything last moved, how many wait over 7 days */
+        get: operations["listJobProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/pipeline/moves": {
         parameters: {
             query?: never;
@@ -3234,6 +3377,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/scheduling/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone's booking set-up (owner): hours, calendar status, booking links
+         * @description Calendar addresses are private to each person and never listed.
+         */
+        get: operations["listTeamSchedules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/booking-links": {
         parameters: {
             query?: never;
@@ -3540,11 +3703,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "automation.event" | "automation.run" | "company.autofill" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "automation.event" | "automation.run" | "company.autofill" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -4614,6 +4777,10 @@ export interface components {
             notes: string | null;
             /** @description The latest employment check (from their LinkedIn profile); null before the first. */
             employment: components["schemas"]["ContactEmployment"] | null;
+            /** @description The latest answered LinkedIn check (by the LinkedIn companion); null before the first. */
+            linkedinCheck: components["schemas"]["ContactLinkedinCheck"] | null;
+            /** @description The latest mailbox check of `email`; null before the first (or after the email changed). */
+            mailboxCheck: components["schemas"]["ContactMailboxCheck"] | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -4657,6 +4824,15 @@ export interface components {
             companyName: string;
             email: string | null;
             emailCheckStatus: components["schemas"]["EmailCheckStatus"] | null;
+            /** @description The latest mailbox check of `email`; null before the first. */
+            mailboxStatus: components["schemas"]["MailboxCheckStatus"] | null;
+            /**
+             * Format: date-time
+             * @description When the mailbox was last checked.
+             */
+            mailboxCheckedAt: string | null;
+            /** @description What the latest LinkedIn check saw of their time at the company; null before the first. */
+            linkedinEmployment: components["schemas"]["LinkedinEmployment"] | null;
             phone: string | null;
             mobile: string | null;
             status: components["schemas"]["ContactStatus"];
@@ -4669,6 +4845,168 @@ export interface components {
             items: components["schemas"]["ContactSummary"][];
             /** @description Pass as `cursor` to get the next page; null on the last page. */
             nextCursor: components["schemas"]["ContactId"] | null;
+        };
+        /**
+         * @description checking = being checked; accepted = the mail server takes this mailbox and refused a made-up one (delivery is still not guaranteed); catch_all = the server takes any address, so the mailbox is not established; invalid = the mailbox does not exist or the domain takes no mail (an email would bounce); unknown = no conclusion (the server restricts checks, was busy or unreachable): not a sign it is invalid.
+         * @enum {string}
+         */
+        MailboxCheckStatus: "checking" | "accepted" | "catch_all" | "invalid" | "unknown";
+        ContactMailboxCheck: {
+            /** @description The address checked. */
+            email: string;
+            status: components["schemas"]["MailboxCheckStatus"];
+            /** @description What was established, in words. */
+            reason: string | null;
+            /** @description Microsoft 365, Google Workspace or another mail server (from the server's name). */
+            provider: string | null;
+            /** @description Sessions with mail servers. */
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description When an inconclusive answer (the server was busy) is checked again on its own.
+             */
+            recheckAt: string | null;
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            checkedAt: string | null;
+        };
+        ContactMailboxChecksStart: {
+            companyId: components["schemas"]["CompanyId"];
+        };
+        ContactMailboxChecksStarted: {
+            /** @description Contacts whose email is being checked. */
+            started: number;
+            /** @description Contacts without an email, or being checked already. */
+            skipped: number;
+        };
+        ContactCheckMailboxJob: {
+            contactId: components["schemas"]["ContactId"];
+            /** @description The address to check (skipped if the contact's email changed since). */
+            email: string;
+            /** @description Compare the domain's mail servers (an automatic recheck). */
+            deep: boolean;
+            /** @description The monthly re-check: runs only if the address was last checked 25 days ago or more, for a contact who still works there. */
+            refresh?: boolean;
+        };
+        /** @example clc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        ContactLinkedinCheckId: string;
+        /** @description A year (2020) or year and month (2020-06), as precise as the profile shows. */
+        LinkedinYearMonth: string;
+        LinkedinEmployment: {
+            /** @description true = a current role at the company; false = their time there ended; null = could not tell. */
+            current: boolean | null;
+            joined: components["schemas"]["LinkedinYearMonth"] | null;
+            left: components["schemas"]["LinkedinYearMonth"] | null;
+            /** Format: date-time */
+            checkedAt: string;
+        };
+        /** @description A company (all its contacts) or one contact. */
+        ContactLinkedinChecksStart: {
+            companyId?: components["schemas"]["CompanyId"];
+            contactId?: components["schemas"]["ContactId"];
+            /** @description Only contacts not checked on LinkedIn in the last 90 days (the others are skipped: recent). */
+            dueOnly?: boolean;
+        };
+        ContactLinkedinCheckRequest: {
+            id: components["schemas"]["ContactLinkedinCheckId"];
+            contactId: components["schemas"]["ContactId"];
+            contactName: string;
+            /** @description https://www.linkedin.com/in/... */
+            profileUrl: string;
+        };
+        ContactLinkedinChecksStarted: {
+            /** @description The company's LinkedIn page, https://www.linkedin.com/company/.../ */
+            companyUrl: string;
+            checks: components["schemas"]["ContactLinkedinCheckRequest"][];
+            /** @description Contacts not checked this time, and why. */
+            skipped: components["schemas"]["ContactLinkedinCheckSkipped"][];
+        };
+        ContactLinkedinCheckSkipped: {
+            contactId: components["schemas"]["ContactId"];
+            contactName: string;
+            /**
+             * @description no_profile = no LinkedIn profile address (or a short lnkd.in link); too_many = over 200 at once (check again for the rest); recent = checked in the last 90 days (with dueOnly).
+             * @enum {string}
+             */
+            reason: "no_profile" | "too_many" | "recent";
+        };
+        /** @description What the profile shows (profileUrl, companyUrl and linkedinCompanyId must be the check's), or why it could not be read (error). */
+        ContactLinkedinCheckAnswer: {
+            profileUrl?: string;
+            companyUrl?: string;
+            /** @description LinkedIn's number for the company. */
+            linkedinCompanyId?: string;
+            /** @description YYYY or YYYY-MM; empty when not shown. */
+            joined?: string;
+            /** @description YYYY or YYYY-MM; empty while current or not shown. */
+            left?: string;
+            current?: boolean | null;
+            /** @description With current false, their current roles elsewhere, as the profile shows them. */
+            movedTo?: components["schemas"]["LinkedinMove"][];
+            /** @description Why the profile could not be read (then nothing else). */
+            error?: string;
+        };
+        LinkedinMove: {
+            /** @description Their new company's LinkedIn page, https://www.linkedin.com/company/.../ */
+            companyUrl: string;
+            companyName: string;
+            /** @description Their job title there; empty when not shown. */
+            title: string;
+            /** @description YYYY or YYYY-MM; empty when not shown. */
+            since: string;
+        };
+        ContactLinkedinCheck: {
+            id: components["schemas"]["ContactLinkedinCheckId"];
+            contactId: components["schemas"]["ContactId"];
+            /**
+             * @description observed = read (the dates may still be unclear); failed = could not be read.
+             * @enum {string}
+             */
+            status: "pending" | "observed" | "failed" | "expired";
+            joined: components["schemas"]["LinkedinYearMonth"] | null;
+            left: components["schemas"]["LinkedinYearMonth"] | null;
+            /** @description true = a current role there; false = their time there ended; null = unclear. */
+            current: boolean | null;
+            /** @description This check set the contact to "has left". */
+            markedLeft: boolean;
+            /** @description Where they work now, when their time at the company ended (from the same profile). */
+            movedTo: components["schemas"]["LinkedinMove"][];
+            error: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            checkedAt: string | null;
+        };
+        ContactAddressCheck: {
+            emails: string[];
+        };
+        ContactAddressProblems: {
+            items: components["schemas"]["ContactAddressProblem"][];
+        };
+        ContactAddressProblem: {
+            email: string;
+            contactId: components["schemas"]["ContactId"];
+            contactName: string;
+            companyName: string;
+            /**
+             * @description bounces = their mail server says the mailbox does not exist; left = they have left the company.
+             * @enum {string}
+             */
+            problem: "bounces" | "left";
+        };
+        ContactEmailSuggestion: {
+            /** @description Null when colleagues' addresses show no clear pattern. */
+            suggestion: components["schemas"]["EmailGuess"] | null;
+        };
+        EmailGuess: {
+            email: string;
+            /** @description e.g. first.last, flast, first */
+            pattern: string;
+            /** @description Colleagues whose address follows the pattern. */
+            matches: number;
+            /** @description Colleagues with an address at that domain. */
+            of: number;
         };
         /** @example cec_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactEmploymentCheckId: string;
@@ -5274,6 +5612,10 @@ export interface components {
              * @enum {string}
              */
             deliveryMode?: "test" | "live" | "unknown";
+            /** @description Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox). */
+            bouncedTo: string[];
+            /** Format: date-time */
+            bouncedAt: string | null;
             id: components["schemas"]["EmailId"];
             candidateId: components["schemas"]["CandidateId"] | null;
             /** @description The client's contact it was written to (from the contact's page). */
@@ -5324,6 +5666,9 @@ export interface components {
             attachmentIds?: components["schemas"]["EmailAttachmentId"][];
             /** @description The candidate's CVs from the ATS (needs documents:read); with candidates, any of theirs. */
             cvs?: components["schemas"]["EmailCvAttachment"][];
+        };
+        EmailBounceScanJob: {
+            emailId: components["schemas"]["EmailId"];
         };
         EmailSendJob: {
             emailId: components["schemas"]["EmailId"];
@@ -5392,10 +5737,18 @@ export interface components {
             name: string;
             role: components["schemas"]["Role"];
         };
+        /** @description Saving sends only the settings it changes; one left out keeps its value. */
         Preferences: {
+            /** @description The dashboard's blocks below search, in the order you dragged them (null: the default order). */
+            dashboardBlocks?: components["schemas"]["DashboardBlock"][] | null;
             /** @description The candidate list's columns, in order, after the name (null: the default ones). */
-            candidateColumns: components["schemas"]["CandidateColumn"][] | null;
+            candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
         };
+        /**
+         * @description A block of the dashboard that can be moved.
+         * @enum {string}
+         */
+        DashboardBlock: "numbers" | "needsYou" | "import" | "tasks" | "offersToApprove" | "interviews" | "openJobs";
         /**
          * @description A column the candidate list can show.
          * @enum {string}
@@ -6123,6 +6476,13 @@ export interface components {
         };
         JobOrderSummary: {
             id: components["schemas"]["JobOrderId"];
+            ownerId: string | null;
+            ownerName: string | null;
+            /**
+             * Format: date-time
+             * @description When the job was added.
+             */
+            createdAt: string;
             title: string;
             companyId: components["schemas"]["CompanyId"];
             companyName: string;
@@ -6728,6 +7088,19 @@ export interface components {
             offer: number;
             placed: number;
         };
+        JobProgress: {
+            jobId: components["schemas"]["JobOrderId"];
+            stageCounts: components["schemas"]["StageCounts"];
+            /**
+             * Format: date-time
+             * @description When a candidate last joined or moved stage; null with none.
+             */
+            lastMovedAt: string | null;
+            /** @description Candidates over 7 days in one open stage (offer and earlier). */
+            waiting: number;
+            /** @description Of them, how many in each stage. */
+            waitingCounts: components["schemas"]["StageCounts"];
+        };
         DashboardJob: {
             jobId: components["schemas"]["JobOrderId"];
             title: string;
@@ -6766,6 +7139,12 @@ export interface components {
             placedLast30Days: number;
             /** @description Applications that changed stage in the last 7 days. */
             movedLast7Days: number;
+            /** @description Applications that changed stage in the 7 days before those. */
+            movedPrev7Days: number;
+            /** @description Applications added in the last 7 days. */
+            addedLast7Days: number;
+            /** @description Open jobs added in the last 7 days. */
+            openedLast7Days: number;
         };
         /**
          * @description on_date: on dueOn; after_signing / after_start: dueDays after the retainer was signed / the placement starts.
@@ -7311,6 +7690,25 @@ export interface components {
             maxDaysAhead: number;
             /** @description Your calendar address (Google Calendar's secret iCal address, or an Outlook published calendar); null when none. */
             calendar: components["schemas"]["CalendarFeed"] | null;
+        };
+        TeamSchedule: {
+            userId: string;
+            name: string;
+            /** @description They have saved their hours. */
+            set: boolean;
+            timeZone: string;
+            hours: components["schemas"]["WeeklyHours"][];
+            /** @description Their calendar's status (its host only); null when none. */
+            calendar: components["schemas"]["CalendarFeed"] | null;
+            /** @description Booking links sent and not booked yet (not expired). */
+            openLinks: number;
+            /** @description Booked meetings still to come. */
+            upcoming: number;
+            /**
+             * Format: date-time
+             * @description When the next booked meeting starts.
+             */
+            nextAt: string | null;
         };
         CalendarFeed: {
             /** @description The address's host only, e.g. calendar.google.com (the address itself is private). */
@@ -8920,6 +9318,8 @@ export interface operations {
                 type?: components["schemas"]["CompanyType"];
                 /** @description Only companies in this category (a key of the company_category list). */
                 category?: string;
+                /** @description Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case). */
+                linkedinCompany?: string;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["CompanyId"];
@@ -9506,6 +9906,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Contact"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    checkContactMailbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Being checked */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactMailboxCheck"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    checkCompanyMailboxes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactMailboxChecksStart"];
+            };
+        };
+        responses: {
+            /** @description Being checked */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactMailboxChecksStarted"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    startContactLinkedinChecks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactLinkedinChecksStart"];
+            };
+        };
+        responses: {
+            /** @description Checks to answer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactLinkedinChecksStarted"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    answerContactLinkedinCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                checkId: components["schemas"]["ContactLinkedinCheckId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactLinkedinCheckAnswer"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactLinkedinCheck"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    checkContactAddresses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactAddressCheck"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactAddressProblems"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    suggestContactEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactEmailSuggestion"];
                 };
             };
             401: components["responses"]["Unauthenticated"];
@@ -11896,6 +12460,10 @@ export interface operations {
                 status?: components["schemas"]["JobStatus"];
                 /** @description Only this company's jobs. */
                 companyId?: components["schemas"]["CompanyId"];
+                /** @description Only jobs with this hiring contact. */
+                contactId?: components["schemas"]["ContactId"];
+                /** @description Only the jobs you own. */
+                mine?: boolean;
                 limit?: number;
                 /** @description The `nextCursor` of the previous page. */
                 cursor?: components["schemas"]["JobOrderId"];
@@ -13296,6 +13864,33 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    listJobProgress: {
+        parameters: {
+            query: {
+                jobId: components["schemas"]["JobOrderId"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["JobProgress"][];
+                    };
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listStageMoves: {
         parameters: {
             query?: {
@@ -13895,6 +14490,30 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listTeamSchedules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["TeamSchedule"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
         };

@@ -59,13 +59,13 @@ export function ApiKeys() {
         </table>
       )}
       <form className="row" aria-label="New API key" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
-        <label>Name <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
+        <label>Name <input required value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} /></label>
         <label>Acts as{" "}
           <select value={form.role} onChange={(e) => { setForm({ ...form, role: e.target.value as Schemas["ApiKeyRole"] }); }}>
             {keysOf(API_KEY_ROLE).map((r) => <option key={r} value={r}>{API_KEY_ROLE[r]}</option>)}
           </select>
         </label>
-        <button type="submit" disabled={create.isPending || !form.name.trim()}>Create key</button>
+        <button type="submit" disabled={create.isPending}>Create key</button>
       </form>
       <ErrorMessage error={create.error} />
     </section>

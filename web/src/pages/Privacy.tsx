@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { privacyKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { formatDay, formatWhen, PRIVACY_KIND, PRIVACY_STATUS } from "../labels";
+import { filledIn } from "../requiredFields";
 
 type Request = Schemas["PrivacyRequest"];
 
@@ -93,10 +94,10 @@ function OpenRequest({ r }: { r: Request }) {
       {r.kind === "withdraw_consent" && <div className="muted small">Done also marks them do not contact (emails to them are refused).</div>}
       {r.kind === "removal" && <div className="muted small">HiringPlug does not delete anything: say below what you did.</div>}
       <form className="row" onSubmit={(e) => { e.preventDefault(); decide.mutate({ status: "done", outcome }); }}>
-        <input aria-label="What was done" placeholder="Outcome" maxLength={2000} value={outcome}
+        <input required aria-label="What was done" placeholder="Outcome" maxLength={2000} value={outcome}
           onChange={(e) => { setOutcome(e.target.value); }} />
-        <button type="submit" disabled={decide.isPending || !outcome.trim()}>Done</button>
-        <button type="button" disabled={decide.isPending || !outcome.trim()} onClick={() => { decide.mutate({ status: "declined", outcome }); }}>Decline</button>
+        <button type="submit" disabled={decide.isPending}>Done</button>
+        <button type="button" disabled={decide.isPending} onClick={(e) => { if (filledIn(e.currentTarget.form)) decide.mutate({ status: "declined", outcome }); }}>Decline</button>
       </form>
       <ErrorMessage error={decide.error} />
     </article>

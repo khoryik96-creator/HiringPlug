@@ -56,6 +56,17 @@ func (q *Queries) CompanyExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const companyLinkedin = `-- name: CompanyLinkedin :one
+SELECT coalesce(linkedin_url, '')::text FROM company WHERE id = $1
+`
+
+func (q *Queries) CompanyLinkedin(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, companyLinkedin, id)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const companyNames = `-- name: CompanyNames :many
 SELECT id, name FROM company WHERE id = ANY($1::text[])
 `
@@ -566,19 +577,23 @@ FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
   AND ($3::text IS NULL OR category = $3::text)
+  -- The page's name is letters, digits, _ and - only (the contract), so it is safe in the pattern.
   AND ($4::text IS NULL
-       OR search_text LIKE ALL (app_search_patterns($4::text))
-       OR phone_digits LIKE '%' || app_phone_key($4::text) || '%')
+       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || $4::text || '(/|$)'))
+  AND ($5::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns($5::text))
+       OR phone_digits LIKE '%' || app_phone_key($5::text) || '%')
 ORDER BY id DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListCompaniesParams struct {
-	Cursor   *string
-	Type     *string
-	Category *string
-	Query    *string
-	RowLimit int32
+	Cursor          *string
+	Type            *string
+	Category        *string
+	LinkedinCompany *string
+	Query           *string
+	RowLimit        int32
 }
 
 type ListCompaniesRow struct {
@@ -599,6 +614,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 		arg.Cursor,
 		arg.Type,
 		arg.Category,
+		arg.LinkedinCompany,
 		arg.Query,
 		arg.RowLimit,
 	)

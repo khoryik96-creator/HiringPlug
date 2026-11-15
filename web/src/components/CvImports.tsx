@@ -8,7 +8,7 @@ import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { findMatches, matchText } from "./duplicateCvs";
-import { SourcePicker } from "./SourcePicker";
+import { SourceSelect } from "./SourcePicker";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Item = Schemas["CvImportItem"];
@@ -48,6 +48,7 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
   const [source, setSource] = useState("linkedin");
+  const [tried, setTried] = useState(false); // Import was pressed: a missing source is outlined
   const [files, setFiles] = useState<File[]>([]);
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
@@ -113,15 +114,17 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
 
   return (
     <section className="panel" aria-label="CV import">
-      <h3>Import profiles <span className="muted small">CVs and LinkedIn PDFs</span></h3>
-      <SourcePicker value={source} onChange={setSource} label="Source of these candidates" />
-      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
+      <div className={foldedHistory ? "import-line" : undefined}>
+      <h3>Import profiles {!foldedHistory && <span className="muted small">CVs and LinkedIn PDFs</span>}</h3>
+      <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} />
+      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here" compact={foldedHistory}
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
           setReview(null);
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
         }} />
+      </div>
       {files.length > 0 && (
         <ul className="drop-files" aria-label="Files to import">
           {files.map((f) => (
@@ -135,20 +138,20 @@ export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean }
           ))}
         </ul>
       )}
-      <div className="row">
+      {(!foldedHistory || files.length > 0 || review) && <div className="row">
         {review && review.asks.length > 0 ? (
           <button type="button" className="primary" disabled={start.isPending} onClick={() => { start.mutate(toImport); }}>
             Import {toImport.length === 1 ? "1 file" : `${String(toImport.length)} files`}
           </button>
         ) : (
-          <button type="button" className="primary" disabled={files.length === 0 || source === "" || start.isPending || check.isPending}
-            onClick={() => { check.mutate(); }}>
+          <button type="button" className="primary" disabled={files.length === 0 || start.isPending || check.isPending}
+            onClick={() => { setTried(true); if (source !== "") check.mutate(); }}>
             {check.isPending ? "Checking for CVs already here…" : `Import ${files.length === 1 ? "1 file" : `${String(files.length)} files`}`}
           </button>
         )}
         {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); setReview(null); }}>Clear</button>}
         {sent !== null && <span className="muted">Sent {sent} of {files.length}…</span>}
-      </div>
+      </div>}
       {review && review.skipped.length > 0 && (
         <div className="dup-ask" role="status" aria-label="Skipped files">
           <p><strong>Skipped {review.skipped.length === 1 ? "1 file" : `${String(review.skipped.length)} files`}</strong>: exactly the same file is already in HiringPlug.</p>

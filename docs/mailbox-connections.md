@@ -115,7 +115,12 @@ data. API responses expose only connection metadata; audit entries contain the
 provider and action, never passwords, tokens or message contents.
 
 Authorization uses an expiring signed state, PKCE S256 and a one-use database
-claim. A later disconnect, new authorization or SMTP replacement invalidates an
+claim. The provider's redirect (`/v1/mailbox/callback`) connects nothing: it
+parks the sign-in code, sealed, on the state and sends the browser back to
+Settings > Email connection with a one-time ticket. The person who started the
+connection finishes it there, signed in (`POST /v1/mailbox/complete`); the
+state is theirs alone (row-level security), so a sign-in link passed to someone
+else cannot connect that person's mailbox to another account. A later disconnect, new authorization or SMTP replacement invalidates an
 in-flight callback before it can save credentials. An advisory lock serializes
 connection changes for one tenant/user, including initial concurrent creates.
 

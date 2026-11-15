@@ -12,6 +12,7 @@ import { emailFieldErrors } from "./emailFieldErrors";
 import { api, ApiError, type Permission, type Schemas, unwrap } from "../../api/client";
 import { candidateEmailsKey, emailTemplatesKey } from "../../api/keys";
 import { addresses } from "../EmailComposer";
+import { filledIn } from "../../requiredFields";
 import { ErrorMessage } from "../ErrorMessage";
 
 import { Attachments, type CvChoice } from "./Attachments";
@@ -42,6 +43,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
   const { banners, urls, upload: uploadBanner } = useBanners();
   const [picked, setPicked] = useState("");
   const [name, setName] = useState("");
+  const nameField = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ cc: "", bcc: "", subject: "" });
   const [typedTo, setTypedTo] = useState<string | null>(null); // null: the job's hiring contact
   const [html, setHtml] = useState("");
@@ -150,9 +152,9 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
       </div>
       {canManage && (
         <details><summary>Manage template</summary><div className="row">
-          <label className="row grow">Template name <input value={name} onChange={(e) => { setName(e.target.value); }} /></label>
-          <button type="button" disabled={!selected || !name.trim() || saveTemplate.isPending} onClick={() => { saveTemplate.mutate(false); }}>Save changes</button>
-          <button type="button" disabled={!name.trim() || saveTemplate.isPending} onClick={() => { saveTemplate.mutate(true); }}>Save as new</button>
+          <label className="row grow">Template name <input ref={nameField} required value={name} onChange={(e) => { setName(e.target.value); }} /></label>
+          <button type="button" disabled={!selected || saveTemplate.isPending} onClick={() => { if (filledIn(nameField.current)) saveTemplate.mutate(false); }}>Save changes</button>
+          <button type="button" disabled={saveTemplate.isPending} onClick={() => { if (filledIn(nameField.current)) saveTemplate.mutate(true); }}>Save as new</button>
           <button type="button" disabled={!selected || deleteTemplate.isPending}
             onClick={() => { if (selected && window.confirm(`Delete the template "${selected.name}"?`)) deleteTemplate.mutate(selected.id); }}>Delete template</button>
         </div></details>

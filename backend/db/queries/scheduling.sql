@@ -84,3 +84,19 @@ SELECT tenant_id::text AS tenant_id, tenant_name::text AS tenant_name FROM app_b
 -- already sent still works.
 -- name: MoveBookingLinks :exec
 UPDATE booking_link SET candidate_id = @to_id WHERE candidate_id = @from_id;
+
+-- Each host's booking links: open (sent, not booked or expired) and booked meetings to come.
+-- name: HostLinkCounts :many
+SELECT host_user_id,
+  count(*) FILTER (WHERE status = 'open' AND expires_at > now())::int AS open_links,
+  count(*) FILTER (WHERE status = 'booked' AND starts_at > now())::int AS upcoming,
+  -- now() when none is booked (upcoming = 0): never shown
+  coalesce(min(starts_at) FILTER (WHERE status = 'booked' AND starts_at > now()), now())::timestamptz AS next_at
+FROM booking_link GROUP BY host_user_id;
+
+-- Everyone's saved hours and calendar status (the owner's view).
+-- name: ListSchedules :many
+SELECT * FROM schedule ORDER BY user_id LIMIT 1000;
+
+-- name: BusyCounts :many
+SELECT user_id, count(*)::int AS busy FROM calendar_busy WHERE ends_at > now() GROUP BY user_id;

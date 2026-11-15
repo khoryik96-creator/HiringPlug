@@ -96,7 +96,7 @@ func NewModules(d Deps) *Modules {
 	m.Documents = documents.New(d.Pool, d.Files, documentCandidates{m.Candidates}, d.Config.MaxUploadBytes)
 	m.Candidates.SearchCVsWith(m.Documents) // advanced search looks in their CVs
 	m.Companies = companies.New(d.Pool, d.Config.AllowPrivateNetworks, d.Files, d.Config.MaxUploadBytes, m.Identity)
-	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Files, d.Config.MaxUploadBytes)
+	m.Contacts = contacts.New(d.Pool, m.Companies, m.Settings, d.MailServers, d.Mailboxes, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs = jobs.New(d.Pool, m.Companies, jobContacts{m.Contacts}, m.Identity, m.Settings, d.Files, d.Config.MaxUploadBytes)
 	m.Jobs.UseTimeZone(d.Config.TimeZone) // intake dates and ad closing days are the agency's
 	m.Pipeline = pipeline.New(d.Pool, pipelineCandidates{m.Candidates}, pipelineJobs{m.Jobs}, m.Companies)
@@ -116,6 +116,7 @@ func NewModules(d Deps) *Modules {
 		Candidates: emailCandidates{m.Candidates, m.Industries, m.Settings}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
+		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts,
 	}, d.Mail, d.Files)
 	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
 	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
@@ -365,7 +366,7 @@ func (a pipelineJobs) OpenJobs(ctx context.Context, tx pgx.Tx, limit int) ([]pip
 	open, err := a.Open(ctx, tx, limit)
 	out := make([]pipeline.OpenJob, len(open))
 	for i, j := range open {
-		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID}
+		out[i] = pipeline.OpenJob{ID: j.ID, Title: j.Title, CompanyID: j.CompanyID, CreatedAt: j.CreatedAt}
 	}
 	return out, err
 }

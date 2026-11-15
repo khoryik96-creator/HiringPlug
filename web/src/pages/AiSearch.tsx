@@ -52,7 +52,7 @@ export function AiSearch({ canSeeSalary, canReadJd }: { canSeeSalary: boolean; c
           {canReadJd && <JdDrop readText="Check it, then find candidates." onRead={(d) => { setJd([d.title, d.description].filter(Boolean).join("\n\n")); }} />}
           <label className="adv-field">
             <span className="adv-label">Job description <span className="muted small">{canReadJd ? "or paste it" : "paste it"} · optional with a boolean</span></span>
-            <textarea rows={8} value={jd} maxLength={20000} placeholder="Responsibilities, requirements, tech stack…" onChange={(e) => { setJd(e.target.value); }} />
+            <textarea rows={8} required={!ready} value={jd} maxLength={20000} placeholder="Responsibilities, requirements, tech stack…" onChange={(e) => { setJd(e.target.value); }} />
             <span className="muted small">{jd.length.toLocaleString("en-MY")} characters. The AI looks at responsibilities, requirements, tech stack and nice-to-haves, not the company blurb or benefits.</span>
           </label>
           <BooleanField label="Boolean rules / keywords" note="who to consider" value={draft.boolean} onChange={(boolean) => { setDraft((d) => ({ ...d, boolean })); }} />
@@ -71,7 +71,7 @@ export function AiSearch({ canSeeSalary, canReadJd }: { canSeeSalary: boolean; c
             </label>
           </div>
           <div className="adv-actions">
-            <button type="submit" disabled={!ready || start.isPending}>{start.isPending ? "Finding…" : "Find candidates"}</button>
+            <button type="submit" disabled={start.isPending}>{start.isPending ? "Finding…" : "Find candidates"}</button>
             <button type="button" className="link" onClick={() => { setJd(""); setDraft(EMPTY); setStrict(false); }}>Clear</button>
           </div>
           {!ready && <p className="muted small">Give a job description or a boolean to start.</p>}

@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptr(s string) *string { return &s }
-
 func TestCheckEmail(t *testing.T) {
 	tests := []struct {
 		email, mailServer, status string
@@ -53,4 +51,12 @@ func TestNormalize(t *testing.T) {
 		fields = append(fields, e.Field)
 	}
 	assert.ElementsMatch(t, []string{"firstName", "email", "linkedinUrl"}, fields)
+}
+
+func TestPersonalAddressesAreAtFreeMailServices(t *testing.T) {
+	assert.True(t, PersonalAddress("ana.lim@gmail.com"))
+	assert.True(t, PersonalAddress("Ana@Yahoo.com.my"))
+	assert.False(t, PersonalAddress("ana@maju.com.my"))
+	assert.False(t, PersonalAddress("ana@gmail.com.attacker.test"))
+	assert.False(t, PersonalAddress("not an address"))
 }

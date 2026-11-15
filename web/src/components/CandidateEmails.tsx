@@ -57,10 +57,12 @@ export function SentEmails({ emails }: { emails: Schemas["Email"][] | undefined 
         <details key={e.id} className="email">
           <summary>
             <strong>{e.subject}</strong> <span className={`badge ${e.status}`}>{e.status==="sent" && e.deliveryMode==="test" ? "Captured in test inbox" : e.status==="sent" && e.deliveryMode ? "Accepted by mail server" : EMAIL_STATUS[e.status]}</span>{" "}
+            {e.bouncedTo.length > 0 && <><span className="badge failed">Bounced</span>{" "}</>}
             <span className="muted">to {e.to.join(", ")} · {e.sentByName} · {formatWhen(e.sentAt ?? e.createdAt)}</span>
           </summary>
           {e.deliveryMode==="test" && <p className="warning small">Local test email; not delivered to a real mailbox.</p>}
           {e.error && <p className="warning">Why: {e.error}</p>}
+          {e.bouncedTo.length > 0 && <p className="warning">Bounced back from {e.bouncedTo.join(", ")}: the mailbox does not exist.</p>}
           {e.cc.length > 0 && <p className="muted">Cc {e.cc.join(", ")}</p>}
           {e.bcc.length > 0 && <p className="muted">Bcc {e.bcc.join(", ")}</p>}
           {e.attachments.length > 0 && <p className="muted">Attached: {e.attachments.map((a) => a.fileName).join(", ")}</p>}

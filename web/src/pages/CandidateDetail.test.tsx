@@ -65,6 +65,24 @@ describe("candidate page", () => {
     expect(buttons()).toContain("Add salary");
   });
 
+  it("opens the salary form from the card's + Add (the profile's form has no salary)", async () => {
+    await show(testCandidate({ compensation: null }), RECRUITER);
+    const current = screen.getAllByText("Current salary").map((el) => el.closest(".fact")).find(Boolean) as HTMLElement;
+    fireEvent.click(within(current).getByRole("button", { name: "+ Add" }));
+    expect(screen.getByRole("tab", { name: "Salary" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByLabelText(/Current salary|Amount/)).toBeTruthy();
+    expect(buttons()).not.toContain("Save profile");
+  });
+
+  it("changes a salary already recorded from the card", async () => {
+    await show(testCandidate({ compensation: {
+      version: 1, currentSalary: { amount: "9500.00", currency: "MYR", period: "month" }, expectedSalary: null, salaryNotes: null, updatedAt: "2026-11-01T00:00:00Z",
+    } as never }), RECRUITER);
+    fireEvent.click(screen.getByRole("button", { name: "Change current salary" }));
+    expect(screen.getByRole("tab", { name: "Salary" }).getAttribute("aria-selected")).toBe("true");
+    expect(buttons()).not.toContain("Edit salary"); // the form is open
+  });
+
   it("lets sourcers edit the profile, but not see or edit salary", async () => {
     await show(testCandidate({ restrictedFields: ["compensation"] }), ["candidates:read", "candidates:update", "documents:read"]);
     expect(buttons()).toContain("Edit profile");
@@ -112,6 +130,9 @@ describe("possible duplicates", () => {
     }));
     renderWithClient(<CandidateDetail id={testCandidate().id} permissions={RECRUITER} />);
     const warning = await screen.findByRole("region", { name: "Possible duplicates" });
+    expect(warning.textContent).toContain("1 possible duplicate · similar name");
+    expect(warning.textContent).not.toContain("Siti Aishah"); // one line until opened
+    fireEvent.click(within(warning).getByRole("button", { name: "Review" }));
     expect(warning.textContent).toContain("Siti Aishah");
     expect(warning.textContent).toContain("similar name; Accountant");
   });
@@ -127,7 +148,8 @@ describe("possible duplicates", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(testCandidate({ version: 4 })));
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithClient(<CandidateDetail id={testCandidate().id} permissions={[...RECRUITER, "candidates:merge"]} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Merge into this one" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Review and merge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge into this one" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ duplicateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", version: 3 });
   });

@@ -31,12 +31,19 @@ x-module:
     EMAIL_DO_NOT_CONTACT:
       status: 409
       description: The candidate withdrew consent to be contacted (see their data protection panel), so no email is sent to them.
+    EMAIL_UNDELIVERABLE:
+      status: 409
+      description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
   jobs:
     email.send:
       queue: core
       payload: EmailSendJob
       priority: high
       description: Send one queued email through the mail server (Go worker).
+    email.bounce_scan:
+      queue: core
+      payload: EmailBounceScanJob
+      description: Look in the sending Microsoft 365 mailbox's inbox for bounce notices about a sent email (Go worker).
 
 paths:
   /v1/mailbox:
@@ -926,9 +933,14 @@ components:
       enum: [queued, sent, failed]
     Email:
       type: object
-      required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt]
+      required: [id, candidateId, applicationId, contactId, to, cc, bcc, subject, body, bodyHtml, attachments, salary, status, error, sentBy, sentByName, createdAt, sentAt, bouncedTo, bouncedAt]
       properties:
         deliveryMode: { type: string, enum: [test, live, unknown], description: 'Local test inbox, live provider acceptance, or unknown historical delivery.' }
+        bouncedTo:
+          type: array
+          description: Recipients whose mail server returned it (a bounce notice in the sending Microsoft 365 mailbox).
+          items: { type: string }
+        bouncedAt: { type: string, format: date-time, nullable: true }
         id: { $ref: '#/components/schemas/EmailId' }
         candidateId:
           allOf: [{ $ref: '#/components/schemas/CandidateId' }]
@@ -1021,6 +1033,12 @@ components:
           items: { $ref: '#/components/schemas/EmailCvAttachment' }
 
     # --- Job payloads (messages on the job queue, not HTTP bodies) ---
+    EmailBounceScanJob:
+      type: object
+      additionalProperties: false
+      required: [emailId]
+      properties:
+        emailId: { $ref: '#/components/schemas/EmailId' }
     EmailSendJob:
       type: object
       additionalProperties: false

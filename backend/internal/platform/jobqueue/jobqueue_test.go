@@ -215,3 +215,39 @@ func TestRetriesWaitLongerEachTime(t *testing.T) {
 	assert.InDelta(t, 2560, waitAfterAttempt(9).Seconds(), 2)
 	assert.InDelta(t, 3600, waitAfterAttempt(12).Seconds(), 2, "capped at one hour")
 }
+
+func TestAJobThatCannotStartYetWaitsWithoutCountingAnAttemptOrQueuingAnother(t *testing.T) {
+	tenant := testutil.Current.NewTenant(t)
+	id, err := enqueue(t, tenant.ID, validPayload())
+	require.NoError(t, err)
+	_, err = testutil.Current.Admin.Exec(context.Background(), `UPDATE job SET max_attempts = 1 WHERE id = $1`, id)
+	require.NoError(t, err)
+	tries := 0
+	w := worker(func(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+		if job.ID != id {
+			return nil
+		}
+		tries++
+		if _, err := tx.Exec(ctx, `UPDATE job SET last_error = 'written by the handler' WHERE id = $1`, id); err != nil {
+			return err
+		}
+		if tries < 4 {
+			return jobqueue.Later(time.Now().Add(time.Hour))
+		}
+		return nil
+	})
+	for range 3 {
+		runUntil(t, w, id, "pending")
+		var runAfter time.Time
+		require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT run_after FROM job WHERE id = $1`, id).Scan(&runAfter))
+		assert.WithinDuration(t, time.Now().Add(time.Hour), runAfter, time.Minute)
+	}
+	s := state(t, id)
+	assert.Zero(t, s.Attempts, "waiting is not a failed attempt (one attempt allowed)")
+	assert.Nil(t, s.LastError, "what the handler did is not kept")
+	var jobs int
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT count(*) FROM job WHERE tenant_id = $1`, tenant.ID).Scan(&jobs))
+	assert.Equal(t, 1, jobs, "the same job waits: none is added")
+	runUntil(t, w, id, "done")
+	assert.Equal(t, 4, tries)
+}

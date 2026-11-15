@@ -100,13 +100,13 @@ function SaveAd() {
   return (
     <form className="form-grid" aria-label="Save an ad" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <h4 className="full">Save an ad you found</h4>
-      <label className="field">Company<input value={form.companyName} onChange={set("companyName")} /></label>
-      <label className="field">Job<input value={form.title} onChange={set("title")} /></label>
+      <label className="field">Company<input required value={form.companyName} onChange={set("companyName")} /></label>
+      <label className="field">Job<input required value={form.title} onChange={set("title")} /></label>
       <label className="field">Where<input value={form.location} onChange={set("location")} /></label>
       <label className="field">Ad address<input value={form.url} onChange={set("url")} /></label>
       <label className="field full">Notes<input value={form.notes} onChange={set("notes")} /></label>
       <SaveError error={save.error} shown={[]} onReload={() => undefined} />
-      <div className="row full"><button type="submit" disabled={save.isPending || !form.companyName.trim() || !form.title.trim()}>Save lead</button></div>
+      <div className="row full"><button type="submit" disabled={save.isPending}>Save lead</button></div>
     </form>
   );
 }

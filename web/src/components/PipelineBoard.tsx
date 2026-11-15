@@ -4,7 +4,7 @@ import { type ReactNode, useState } from "react";
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
-import { ApplicationCard, MoveChosen, MoveMenu } from "./ApplicationCard";
+import { ApplicationCard, MoveChosen, MoveMenu, type Upcoming } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
 import { type Person, SeparateEmail } from "./SeparateEmail";
@@ -33,7 +33,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const [dragging, setDragging] = useState<Application | null>(null);
   const [over, setOver] = useState<Schemas["Stage"] | null>(null);
   const apps = list.data?.items ?? [];
+  const [now] = useState(() => Date.now());
+  const upcoming = useUpcoming(permissions, now);
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
+  const active = apps.filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn");
   const matches = useJobMatches(jobId, permissions.includes("matching:read"));
   const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
   const [bestFirst, setBestFirst] = useState(false);
@@ -80,8 +83,22 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   return (
     <section className="panel" aria-label="Pipeline">
       <div className="row spread">
-        <h3>Pipeline ({String(apps.length - closed.length)} active)</h3>
-        {canUpdate && <AddCandidate jobId={jobId} />}
+        <h3>Pipeline <span className="count-chip">{String(apps.length - closed.length)} active</span></h3>
+        <div className="row">
+          {canPick && apps.length - closed.length > 0 && (
+            <span className="choose" role="group" aria-label="Choose">
+              <span className="choose-label" aria-hidden="true">Choose</span>
+              <span className="segmented">
+                <button type="button" className={active.length > 0 && active.every((a) => picked.includes(a.id)) ? "on" : undefined}
+                  aria-pressed={active.length > 0 && active.every((a) => picked.includes(a.id))}
+                  onClick={() => { setPicked(active.map((a) => a.id)); }}>All {String(active.length)}</button>
+                <button type="button" className={picked.length === 0 ? "on" : undefined} aria-pressed={picked.length === 0}
+                  onClick={() => { setPicked([]); }}>None</button>
+              </span>
+            </span>
+          )}
+          {canUpdate && <AddCandidate jobId={jobId} />}
+        </div>
       </div>
       {matches.data && permissions.includes("matching:create") && (
         <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} anyScored={fit.size > 0} />
@@ -145,7 +162,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               key={stage}
               role="list"
               aria-label={STAGE[stage]}
-              className={over === stage ? "column drop" : "column"}
+              className={over === stage ? `column stage-${stage} drop` : `column stage-${stage}`}
               onDragOver={(e) => { if (dragging && dragging.stage !== stage) { e.preventDefault(); setOver(stage); } }}
               onDragLeave={() => { setOver(null); }}
               onDrop={(e) => {
@@ -155,15 +172,25 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                 setDragging(null);
               }}
             >
-              <h4>{STAGE[stage]} ({String(cards.length)})</h4>
-              {canPick && cards.length>0 && <div className="row">
-                <button type="button" className="link small" aria-label={`Select all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>[...new Set([...ids,...cards.map((a)=>a.id)])]);}}>Select all</button>
-                <button type="button" className="link small" aria-label={`Unselect all ${STAGE[stage]} candidates`} onClick={()=>{setPicked((ids)=>ids.filter((id)=>!cards.some((a)=>a.id===id)));}}>Unselect all</button>
-              </div>}
+              <div className="column-head">
+                <h4>{STAGE[stage]}</h4>
+                {canPick && cards.length > 0 ? (
+                  // The count chooses the column's candidates (again: unchooses them).
+                  <button type="button" className="count-chip column-count" title={`Choose all in ${STAGE[stage]}`}
+                    aria-label={`Choose all ${String(cards.length)} in ${STAGE[stage]}`}
+                    aria-pressed={cards.every((a) => picked.includes(a.id))}
+                    onClick={() => {
+                      const all = cards.every((a) => picked.includes(a.id));
+                      setPicked((ids) => (all ? ids.filter((id) => !cards.some((a) => a.id === id)) : [...new Set([...ids, ...cards.map((a) => a.id)])]));
+                    }}>{String(cards.length)}</button>
+                ) : <span className="count-chip">{String(cards.length)}</span>}
+              </div>
+              {cards.length === 0 && <p className="column-empty">{stage === "placed" ? "Drag here when they accept" : "Nobody here"}</p>}
               {cards.map((a) => (
                 <div role="listitem" key={a.id}>
                   <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}
-                    picked={picked.includes(a.id)} onPick={canPick ? pick : undefined} canMove={canUpdate} onDragStart={setDragging} />
+                    picked={picked.includes(a.id)} onPick={canPick ? pick : undefined} canMove={canUpdate} onDragStart={setDragging}
+                    upcoming={upcoming.get(a.id)} now={now} />
                 </div>
               ))}
             </div>
@@ -217,4 +244,36 @@ function AddCandidate({ jobId }: { jobId: string }) {
       <ErrorMessage error={add.error} />
     </div>
   );
+}
+
+/**
+ * What is coming up for candidates, by application: the next scheduled
+ * interview (8 weeks ahead) and a sent offer's last day to answer. Read with
+ * the user's own permissions: without one, that part is simply not shown.
+ */
+function useUpcoming(permissions: Permission[], now: number): Map<string, Upcoming> {
+  const interviews = useQuery({
+    queryKey: ["interviews", "upcoming", Math.floor(now / 3_600_000)],
+    queryFn: async () => unwrap(await api.GET("/v1/interviews", { params: { query: {
+      from: new Date(now).toISOString(), to: new Date(now + 56 * 86_400_000).toISOString(),
+    } } })).items,
+    enabled: permissions.includes("interviews:read"),
+    retry: false,
+  });
+  const offers = useQuery({
+    queryKey: ["offers", "sent"],
+    queryFn: async () => unwrap(await api.GET("/v1/offers", { params: { query: { status: "sent" } } })).items,
+    enabled: permissions.includes("offers:read"),
+    retry: false,
+  });
+  const out = new Map<string, Upcoming>();
+  for (const i of interviews.data ?? []) {
+    if (i.status !== "scheduled" || Date.parse(i.startsAt) < now) continue;
+    const had = out.get(i.applicationId);
+    if (!had?.interviewAt || i.startsAt < had.interviewAt) out.set(i.applicationId, { ...had, interviewAt: i.startsAt });
+  }
+  for (const o of offers.data ?? []) {
+    if (o.expiresOn) out.set(o.applicationId, { ...out.get(o.applicationId), offerExpiresOn: o.expiresOn });
+  }
+  return out;
 }

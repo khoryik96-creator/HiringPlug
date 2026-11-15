@@ -65,12 +65,12 @@ function AppForm({ provider, app, ready }: { provider: Provider; app: Schemas["M
     <form className="mail-app" aria-label={`${NAMES[provider]} app`} onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
       <strong>{NAMES[provider]}</strong>
       <span className={app.source === "none" ? "muted small" : "small"}>{state}</span>
-      <input aria-label={`${NAMES[provider]} client ID`} placeholder="Client ID" value={clientId} disabled={!ready} autoComplete="off" spellCheck={false}
+      <input required aria-label={`${NAMES[provider]} client ID`} placeholder="Client ID" value={clientId} disabled={!ready} autoComplete="off" spellCheck={false}
         onChange={(e) => { setClientId(e.target.value); }} />
       <input aria-label={`${NAMES[provider]} client secret`} type="password" autoComplete="new-password" disabled={!ready} value={secret}
         placeholder={app.source === "agency" ? `•••• ${app.secretEnding ?? ""} (leave blank to keep)` : "Client secret"}
         onChange={(e) => { setSecret(e.target.value); }} />
-      <button type="submit" disabled={!ready || save.isPending || !clientId.trim()}>Save</button>
+      <button type="submit" disabled={!ready || save.isPending}>Save</button>
       {app.source === "agency" && (
         <button type="button" className="link" disabled={remove.isPending}
           onClick={() => { if (window.confirm(`Remove the ${NAMES[provider]} app? People connected through it must connect again.`)) remove.mutate(); }}>Remove</button>

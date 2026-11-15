@@ -358,7 +358,7 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 	q := store.New(tx)
 	row, err := q.InsertEmail(ctx, store.InsertEmailParams{
 		ApplicationID: n.ApplicationID, CandidateID: n.CandidateID, ToAddresses: o.To, CcAddresses: []string{}, BccAddresses: []string{},
-		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees,
+		Subject: o.Subject, Body: o.Body, SenderName: sender, ReplyTo: "", FeesRestricted: n.ShowsFees, SentBy: n.SentBy,
 	})
 	if err != nil {
 		return err

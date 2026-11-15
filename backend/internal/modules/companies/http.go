@@ -23,7 +23,7 @@ func (h *HTTP) ListCompanies(ctx context.Context, req api.ListCompaniesRequestOb
 	if req.Params.Limit != nil {
 		limit = *req.Params.Limit
 	}
-	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, c.Convert[string](req.Params.Type), req.Params.Category, req.Params.Cursor, limit)
+	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), req.Params.Q, c.Convert[string](req.Params.Type), req.Params.Category, req.Params.LinkedinCompany, req.Params.Cursor, limit)
 	if err != nil {
 		return nil, err
 	}

@@ -50,13 +50,13 @@ export function LeadSources({ canManage }: { canManage: boolean }) {
             </select>
           </label>
           <label className="field">{form.kind === "careers_page" ? "Address" : "Board"}
-            <input value={form.identifier} placeholder={HINT[form.kind]} onChange={(e) => { setForm({ ...form, identifier: e.target.value }); }} />
+            <input required value={form.identifier} placeholder={HINT[form.kind]} onChange={(e) => { setForm({ ...form, identifier: e.target.value }); }} />
           </label>
           <label className="field">Company name{form.kind === "careers_page" && " (optional)"}
             <input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); }} />
           </label>
           <SaveError error={add.error} shown={[]} onReload={() => undefined} />
-          <div className="row full"><button type="submit" disabled={add.isPending || !form.identifier.trim()}>Add source</button></div>
+          <div className="row full"><button type="submit" disabled={add.isPending}>Add source</button></div>
         </form>
       )}
     </section>

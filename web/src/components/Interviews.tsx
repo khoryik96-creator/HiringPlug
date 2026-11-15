@@ -120,11 +120,11 @@ function FeedbackForm({ interview, current, onSaved }: { interview: Interview; c
       <fieldset className="row">
         <legend>Your recommendation</legend>
         {(Object.keys(RECOMMENDATION) as Schemas["Recommendation"][]).map((r) => (
-          <label key={r}><input type="radio" name={`rec-${interview.id}`} checked={recommendation === r} onChange={() => { setRecommendation(r); }} /> {RECOMMENDATION[r]}</label>
+          <label key={r}><input type="radio" required name={`rec-${interview.id}`} checked={recommendation === r} onChange={() => { setRecommendation(r); }} /> {RECOMMENDATION[r]}</label>
         ))}
       </fieldset>
       <textarea aria-label="Comments" rows={3} placeholder="Comments" value={comments} onChange={(e) => { setComments(e.target.value); }} />
-      <button type="submit" disabled={!recommendation || save.isPending}>Save feedback</button>
+      <button type="submit" disabled={save.isPending}>Save feedback</button>
       <ErrorMessage error={save.error} />
     </form>
   );

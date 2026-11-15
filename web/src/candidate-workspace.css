@@ -6,8 +6,8 @@
 .candidate-banner .banner-status { width: auto; min-height: 30px; font-size: 14px; background: transparent; color: inherit; padding: 3px 8px; }
 .candidate-banner .banner-skills { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13px; }
 .candidate-banner .banner-skills button { font-size: 12px; color: inherit; padding: 0; }
-.candidate-banner .banner-strip { margin-top: 0; border-radius: 7px; box-shadow: none; background: #ffffffdb; grid-template-columns: .85fr 1fr 1.35fr; }
-.candidate-banner .banner-strip > div { padding: 8px 13px; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 5px; }
+.candidate-banner .banner-strip { margin-top: 0; border-radius: 7px; box-shadow: none; background: transparent; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.candidate-banner .banner-strip > div { padding: 8px 13px; flex-direction: column; align-items: flex-start; gap: 2px; }
 .candidate-banner .banner-strip .label { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .candidate-banner .banner-strip .figure { font-size: 20px; }
 .candidate-banner .banner-strip .figure small, .candidate-banner .banner-strip .note { font: 10px Inter, sans-serif; }
@@ -50,7 +50,7 @@
   .candidate-banner .banner-name { font-size: 36px; }
   .candidate-banner .banner-job { font-size: 18px; }
   .candidate-banner .banner-top { gap: 12px; }
-  .candidate-banner .banner-strip { grid-template-columns: 1fr; }
+  .candidate-banner .banner-strip { grid-template-columns: 1fr 1fr; }
   .candidate-banner .banner-strip > div { padding: 6px 10px; }
   .candidate-tablist { gap: 18px; }
   .candidate-profile dl { grid-template-columns: 1fr; gap: 8px; }

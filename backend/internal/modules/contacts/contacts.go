@@ -22,12 +22,14 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mailcheck"
 )
 
 // Companies is what this module needs from the companies module.
 type Companies interface {
 	Exists(ctx context.Context, tx pgx.Tx, companyID string) (bool, error)
 	Names(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
+	LinkedinURL(ctx context.Context, tx pgx.Tx, companyID string) (string, error)
 }
 
 // Roles checks a role against Settings' contact roles (settings module).
@@ -42,6 +44,12 @@ type MailServers interface {
 	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
+// Mailboxes asks mail servers whether a mailbox exists (platform/mailcheck;
+// tests pass a fake that needs no network).
+type Mailboxes interface {
+	Check(ctx context.Context, email, mode, controlID string) (mailcheck.Result, error)
+}
+
 // Module is the contacts module.
 type Module struct {
 	service *Service
@@ -49,14 +57,14 @@ type Module struct {
 }
 
 // New wires the module. files keeps LinkedIn PDFs until they are read.
-func New(pool *pgxpool.Pool, companies Companies, roles Roles, mail MailServers, files *blob.Store, maxUploadBytes int64) *Module {
-	svc := &Service{pool: pool, companies: companies, roles: roles, mail: mail, files: files}
+func New(pool *pgxpool.Pool, companies Companies, roles Roles, mail MailServers, mailboxes Mailboxes, files *blob.Store, maxUploadBytes int64) *Module {
+	svc := &Service{pool: pool, companies: companies, roles: roles, mail: mail, mailboxes: mailboxes, files: files}
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindContactLinkedinRead: m.service.saveLinkedinRead}
+	return jobqueue.Handlers{api.JobKindContactLinkedinRead: m.service.saveLinkedinRead, api.JobKindContactCheckMailbox: m.service.runMailboxCheck}
 }
 
 // Exists reports whether a contact exists in tx's tenant.

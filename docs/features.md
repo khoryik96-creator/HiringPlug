@@ -63,7 +63,8 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
-**The candidate's page** opens with a banner coloured by their status: their
+**The candidate's page** opens with a banner coloured by their status (the
+colour shading to white, like the company and contact cards): their
 name and status, job title and company, and in the top-right corner their
 nationality, where they live and the source; the status buttons; their skills;
 then notice period, current and expected salary (with "+26% on current" when
@@ -449,11 +450,67 @@ for each of their jobs, with **Score fit** / **Score again**.
   MX records, looked up with a 3-second limit outside any database
   transaction), and shared (`hr@`) or disposable addresses. The result is
   **valid**, **risky**, **invalid** or **unknown** (lookup failed: "Check
-  again"), with the reasons in words. Next: optionally the mailbox itself. Each result is
-  stored with its evidence and date: valid, risky (catch-all, role, disposable),
-  invalid or unknown. Mailbox checks need outbound port 25, which home ISPs and
-  cloud providers often block, so a paid verification service can be plugged
-  in instead. CV Studio's email verifier notes will be reused.
+  again"), with the reasons in words.
+- **Email verifier** ✅ (CV Studio's, in Go: `platform/mailcheck`): **Verify
+  email** on a contact, **Verify emails** on a company's contacts. In the
+  background (`contact.check_mailbox`) it asks the contact's mail server, on
+  port 25, whether it takes mail for the address and for a made-up one beside
+  it; no email is sent (never DATA, AUTH, VRFY or EXPN). Only public addresses
+  are contacted, with verified TLS when offered, bounded replies and 25
+  seconds per check, two at a time and one per domain. Results: **mailbox
+  exists** (and a made-up one is refused: delivery is still not guaranteed),
+  **accepts any address** (catch-all: a caution, not a verdict), **bounces**
+  (the server says the mailbox does not exist, 5.1.1, or Microsoft 365's
+  directory rejection on a Microsoft 365 server; or the domain takes no mail)
+  and **not confirmed** (the server restricts checks, greylists, is full or
+  unreachable: never counted as invalid). A busy server is asked again once,
+  two minutes later, comparing the domain's servers, about the same made-up
+  mailbox (kept 4 hours). Contacts whose email bounces are marked in red in the
+  company's contacts, with a count. Servers often block port 25 from homes
+  and clouds: then every answer is "not confirmed", never a wrong "bounces".
+- **Employment check on LinkedIn** ✅ (CV Studio's, with the **HiringPlug
+  LinkedIn companion**, `extension/linkedin-companion`): **Check employment on
+  LinkedIn** on a company's contacts (or **Check on LinkedIn now** on one
+  contact). The companion, a browser extension connected to this HiringPlug
+  only, reads each contact's LinkedIn profile in the recruiter's own browser
+  (with their LinkedIn sign-in; the server never reads LinkedIn), in a
+  background tab it closes afterwards, unless the recruiter looked at it. It
+  takes the dates of their time at the company's exact LinkedIn page (by its
+  link and LinkedIn's number for the company, never by a similar name or job
+  title), as precise as shown: still there since 2021-06, left in 2025-08, or
+  unclear (collapsed, missing or ambiguous roles). The server makes each check
+  (bound to the contact, their profile and the company's page; answered only
+  by whoever asked, within 15 minutes) and checks the dates make sense. A
+  contact whose time there ended, with no current role there, becomes **has
+  left** (audited; change it back with Edit); unclear changes nothing. The
+  company's contacts show what LinkedIn showed under each status.
+- **Follow leavers** ✅: when LinkedIn shows a contact has left, the companion
+  also reads their current roles elsewhere (up to three: company, LinkedIn
+  page, title, since when). The contact shows **Now at ...** with **Add at
+  ...**: it finds that company by its LinkedIn page (or creates it), adds the
+  person there as a new contact and writes a lead note. The old company's open
+  jobs that had them as contact are listed as needing a new contact.
+- **Fresh contact data** ✅: a new or changed email is verified at once; a
+  verified address is checked again every month while the contact works
+  there (not if nothing changed it sooner, nor for someone who left). The
+  company's LinkedIn check only checks contacts due (never checked, or 90 days
+  since), with "Check them again too". Contact lists show how long ago each
+  address was checked.
+- **Emails that would not arrive** ✅: the composer warns about recipients who
+  left or whose mailbox is gone (`POST /v1/contacts/address-check`).
+  Automations do not send to them (`EMAIL_UNDELIVERABLE`): the run is skipped
+  and the recruiter gets a task to update the company's contact for the job.
+- **Email suggestion** ✅: for a contact without an email, the address their
+  colleagues' addresses suggest (first.last@, flast@, first@ ... at the
+  company's main domain; at least two colleagues agreeing, no tie), with
+  **Use and verify**. A guess, until verified.
+- **Real bounces** ✅: after an email goes through a connected **Microsoft
+  365** mailbox, its inbox is read 15 minutes and 2 hours later
+  (`email.bounce_scan`) for bounce notices ("Undeliverable: ...") naming one
+  of the recipients exactly. The email shows **Bounced** and from whom; that
+  contact's mailbox is marked as gone (and stays so through monthly
+  re-checks). Notices are not kept. Gmail (connected to send only: reading
+  needs Google's restricted scope and review) and SMTP mailboxes are not read.
 - **Employment check** ✅: whether a contact still works at their company.
   LinkedIn cannot be read automatically (it refuses automated access), so a
   person drops the contact's LinkedIn profile saved as PDF (More > Save to PDF)
@@ -500,7 +557,8 @@ lead's company (with the built-in email check).
   company, hiring contact (must work at that company), title, status (open,
   on hold, filled, closed), location and country, work type, on site / hybrid /
   remote, openings, description and the **official intake date** (today
-  unless chosen), listed on the company's page. The **salary
+  unless chosen), listed on the company's page. The status is a coloured
+  dropdown next to the job's title, for those who may edit jobs. The **salary
   budget** follows the salary pattern: its own permissions (hiring managers
   may see it, sourcers and viewers may not), its own table that the database
   refuses to others, and no amounts in the audit log. Job ads (the advertised
@@ -673,9 +731,31 @@ lead's company (with the built-in email check).
   job's, its client's and the sender's, never one candidate's. The email is
   kept on each candidate's emails, and the job's activity says "emailed the
   client about N candidates".
+- **Dashboard** ✅: search; the week's numbers with their change (open jobs
+  added, candidates added, moved this week against last week); **Needs you
+  today** (an offer about to lapse in red, today's interviews, jobs where
+  someone waits over 7 days in amber, one line per job), the 5 most urgent
+  with "Show all"; importing on one line; the open jobs as a heat map
+  (stronger purple for more people, an amber ring where someone waits over
+  7 days) with each job's last activity. Everything below search can be
+  dragged by its handle (or moved with the arrow keys) into each person's
+  own order, kept with their settings (`dashboardBlocks`); "Reset order"
+  restores the default.
+- **Copy** ✅: one click copies a candidate's email or phone number.
+- **Jobs list** ✅: each job with a bar of where its candidates are (and the
+  counts), how many days it has been open and its owner's initials
+  (`GET /v1/pipeline/jobs`). An open job needs attention (amber edge, and
+  why) when it has had no candidates for 2 weeks, someone has waited over 7
+  days in one stage, or nothing has moved for 7 days. **All open / Mine /
+  Needs attention** pick which jobs show.
+- **A job's board** ✅: each card shows initials, the candidate's current
+  title, days in the stage (amber after 7, red after 14), their next
+  interview and a sent offer's last day to answer. **Choose: All | None**
+  picks the whole board; a column's count picks that column.
 - **One email to many, each their own copy** ✅: tick candidates (the
   candidates list, or a job's board), or contacts (the contacts list, or a
-  company's contacts), and **Email each separately**. Up to 50 people get
+  company's contacts), and **Email each separately**. Above each list,
+  **Choose: All N | None** picks every row shown, or none. Up to 50 people get
   the same email, each their own: to them alone (nobody sees the others; no
   cc or bcc), with fields such as [First name] filled from them, and kept on
   their emails. Pick a template, write with the toolbar, attach files (each
@@ -753,7 +833,15 @@ lead's company (with the built-in email check).
   Mail recognise, plus `invite.ics`), which they add to the calendar. The
   candidate can move the time with the same link (the invitation is updated:
   same UID, next SEQUENCE) until the minimum notice; you can cancel from the
-  candidate's page (a `METHOD:CANCEL` takes it off both calendars).
+  candidate's page (a `METHOD:CANCEL` takes it off both calendars). The
+  invitations go from your connected mailbox, in your name (Settings > Email
+  connection), else from the server's address (`HP_SMTP_FROM`). In the Docker
+  set-up for development, the server's email is caught by Mailpit
+  (http://localhost:8025), not delivered.
+- **Booking calendars** (Settings, owners: `scheduling.team:read`): everyone
+  who takes bookings, their hours, whether their calendar is connected and
+  read (its host only: the address stays private to them) and their booking
+  links waiting and booked.
 - **Later**: connecting Google or Microsoft accounts directly (OAuth), to
   write the event straight into the calendar and read busy times live.
 
@@ -972,7 +1060,7 @@ timeline, each answer after its question. One referee per note.
 
 ✅ **CVs and LinkedIn PDFs** (menu: Import; permission `intake:create`): pick
 one file or many (PDF, .docx, .doc; on LinkedIn: *More → Save to PDF*) and
-their source (LinkedIn to start). Each file becomes a candidate named after
+their source (**Preset the source**, a dropdown: LinkedIn to start). Each file becomes a candidate named after
 the file, owned by whoever imported it, and is read like any CV; when the
 reading is done the candidate is filled in from it: name, email, phone,
 location, nationality, country of residence, LinkedIn link, current title and
@@ -1096,6 +1184,16 @@ decide otherwise**: it shows you what needs deciding and records what you did.
   sensitive notes). Each download is in the audit log.
 - Merging duplicates keeps both candidates' requests, and withdrawn consent
   wins.
+
+## Filling in forms ✅
+
+Save buttons stay usable while a form is incomplete. Pressing one with a
+required field empty (or a value out of range) saves nothing: every such
+field is outlined in red and the first one gets the focus; the outline goes
+as soon as it is filled. Fields that hold a number (amounts, percentages,
+days) take only digits (and "." or "," for amounts): letters and symbols
+typed are ignored, and pasting "RM 12,000" keeps "12,000". Both apply to
+every form in the app (`web/src/requiredFields.ts`, `web/src/numericInput.ts`).
 
 ## Main settings ✅
 

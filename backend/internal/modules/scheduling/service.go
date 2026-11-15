@@ -61,20 +61,27 @@ func (s *Service) schedule(ctx context.Context, q *store.Queries, userID string)
 	if err != nil {
 		return Schedule{}, err
 	}
+	busy := int32(0)
+	if row.CalendarUrl != nil {
+		if busy, err = q.CountBusy(ctx, userID); err != nil {
+			return Schedule{}, err
+		}
+	}
+	return scheduleFrom(row, int(busy))
+}
+
+// scheduleFrom is a saved schedule, with the busy times found in its calendar.
+func scheduleFrom(row store.Schedule, busy int) (Schedule, error) {
 	out := Schedule{Set: true}
+	var err error
 	if out.Settings, err = settingsFrom(row); err != nil {
 		return Schedule{}, err
 	}
 	if row.CalendarUrl != nil {
-		c := &Calendar{Host: Host(*row.CalendarUrl), Status: "pending", Error: row.CalendarError, ReadAt: row.CalendarReadAt}
+		c := &Calendar{Host: Host(*row.CalendarUrl), Status: "pending", Error: row.CalendarError, ReadAt: row.CalendarReadAt, BusyCount: busy}
 		if row.CalendarStatus != nil {
 			c.Status = *row.CalendarStatus
 		}
-		n, err := q.CountBusy(ctx, userID)
-		if err != nil {
-			return Schedule{}, err
-		}
-		c.BusyCount = int(n)
 		out.Calendar = c
 	}
 	return out, nil

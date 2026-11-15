@@ -850,23 +850,27 @@ func (q *Queries) ListJobJdFiles(ctx context.Context, jobID *string) ([]ListJobJ
 }
 
 const listJobOrders = `-- name: ListJobOrders :many
-SELECT id, title, company_id, status, location, openings, updated_at
+SELECT id, title, company_id, status, location, openings, owner_id, created_at, updated_at
 FROM job_order
 WHERE ($1::text IS NULL OR id < $1::text)
-  AND ($2::text IS NULL OR status = $2::text)
-  AND ($3::text IS NULL OR company_id = $3::text)
-  AND ($4::text IS NULL OR NOT EXISTS (
+  AND ($2::text IS NULL OR owner_id = $2::text)
+  AND ($3::text IS NULL OR status = $3::text)
+  AND ($4::text IS NULL OR company_id = $4::text)
+  AND ($5::text IS NULL OR contact_id = $5::text)
+  AND ($6::text IS NULL OR NOT EXISTS (
          -- every word in the title or location, or in the client's name (@company_hits: "n:companyId")
-         SELECT 1 FROM app_search_words($4::text) w
-         WHERE NOT (strpos(search_text, w.word) > 0 OR (w.n::text || ':' || company_id) = ANY(coalesce($5::text[], ARRAY[]::text[])))))
+         SELECT 1 FROM app_search_words($6::text) w
+         WHERE NOT (strpos(search_text, w.word) > 0 OR (w.n::text || ':' || company_id) = ANY(coalesce($7::text[], ARRAY[]::text[])))))
 ORDER BY id DESC
-LIMIT $6
+LIMIT $8
 `
 
 type ListJobOrdersParams struct {
 	Cursor      *string
+	OwnerID     *string
 	Status      *string
 	CompanyID   *string
+	ContactID   *string
 	Query       *string
 	CompanyHits []string
 	RowLimit    int32
@@ -879,6 +883,8 @@ type ListJobOrdersRow struct {
 	Status    string
 	Location  *string
 	Openings  int32
+	OwnerID   *string
+	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
@@ -886,8 +892,10 @@ type ListJobOrdersRow struct {
 func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([]ListJobOrdersRow, error) {
 	rows, err := q.db.Query(ctx, listJobOrders,
 		arg.Cursor,
+		arg.OwnerID,
 		arg.Status,
 		arg.CompanyID,
+		arg.ContactID,
 		arg.Query,
 		arg.CompanyHits,
 		arg.RowLimit,
@@ -906,6 +914,8 @@ func (q *Queries) ListJobOrders(ctx context.Context, arg ListJobOrdersParams) ([
 			&i.Status,
 			&i.Location,
 			&i.Openings,
+			&i.OwnerID,
+			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -982,13 +992,14 @@ func (q *Queries) NewJdFileID(ctx context.Context) (string, error) {
 }
 
 const openJobOrders = `-- name: OpenJobOrders :many
-SELECT id, title, company_id FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
+SELECT id, title, company_id, created_at FROM job_order WHERE status = 'open' ORDER BY id DESC LIMIT $1
 `
 
 type OpenJobOrdersRow struct {
 	ID        string
 	Title     string
 	CompanyID string
+	CreatedAt time.Time
 }
 
 func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobOrdersRow, error) {
@@ -1000,7 +1011,12 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 	var items []OpenJobOrdersRow
 	for rows.Next() {
 		var i OpenJobOrdersRow
-		if err := rows.Scan(&i.ID, &i.Title, &i.CompanyID); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.CompanyID,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
