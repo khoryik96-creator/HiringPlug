@@ -77,6 +77,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
 ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), c.name_text) END DESC, c.id DESC
 LIMIT @row_limit;
 
@@ -126,6 +127,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
              <= (sqlc.narg(salary_max)::text)::numeric))
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
 ORDER BY c.id DESC
 LIMIT @row_limit;
@@ -372,6 +374,7 @@ WHERE (sqlc.narg(query)::text IS NULL
   AND (sqlc.narg(tag)::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower(sqlc.narg(tag)::text)])
   AND (sqlc.narg(skill)::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower(sqlc.narg(skill)::text)])
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
 ORDER BY
   CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
   CASE WHEN @sort::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
@@ -431,6 +434,7 @@ WHERE (sqlc.narg(query)::text IS NULL
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
              <= (sqlc.narg(salary_max)::text)::numeric))
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
+  AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
 ORDER BY
   CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,

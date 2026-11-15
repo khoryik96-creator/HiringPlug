@@ -994,6 +994,33 @@ stage, a cancelled interview, a placement that fell through, a paid invoice or
 a switched-off automation skip it. A moved interview or start date moves it.
 The **Log** shows what each did, or why not.
 
+## Folders ✅
+
+The **Candidates**, **Contacts** and **Companies** lists each have their own
+folders down the left: **All**, **My folders**, **Shared with me** and
+**+ New folder**. Opening a folder shows only what is in it, and the search,
+Advanced search, "Mine only" and the other filters still work inside it. The
+folder last opened on each list opens again next time (on that device).
+
+- **Put records in a folder**: choose rows (click them), then **Add to
+  folder ▾**: a ticked folder holds all the chosen (untick to take them out),
+  a half-ticked one some of them; typing a name not used yet makes a new folder
+  with them in it. Or drag a row by its name onto a folder (the chosen rows go
+  together when it is one of them). Inside a folder, **Remove from this folder**
+  takes the chosen out. At most 500 at a time.
+- An **In folders** column shows the folders each row is in.
+- **Share** (the folder's owner): add anyone of the agency, or remove them.
+  Those it is shared with see it under *Shared with me* and may add and remove
+  records; only the owner renames, deletes or shares it. Someone may **leave**
+  a folder shared with them.
+- **Rename** and **Delete folder** (the owner). Deleting a folder, or taking a
+  record out of one, never touches the records themselves.
+- A folder shows only records the person may see (e.g. a role that sees only
+  its own candidates sees only those in a shared folder). Merging duplicate
+  candidates keeps the one kept in the duplicate's folders.
+- Everyone may use folders by default (`folders:use`); the **Roles and
+  access** page can take it away from a role. Every change is in the audit log.
+
 ## 5. Notes and activity
 
 ✅ Notes (general, screening, interview, call) on candidates, jobs, companies

@@ -50,6 +50,10 @@ paths:
           in: query
           description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
           schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,100}$' }
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: { type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }

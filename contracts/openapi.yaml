@@ -121,6 +121,10 @@ x-error-codes:
     module: emails
     status: 409
     description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
+  FOLDER_OWNER_ONLY:
+    module: folders
+    status: 403
+    description: Only the folder's owner may rename, delete or share it.
   FORBIDDEN:
     module: shared
     status: 403
@@ -632,6 +636,10 @@ paths:
           in: query
           description: Only candidates owned by this user ("me" for your own).
           schema: {type: string, minLength: 1, maxLength: 40}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -1069,6 +1077,10 @@ paths:
           in: query
           description: "Only the company with this LinkedIn page: the name after linkedin.com/company/ (any letter case)."
           schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -1420,6 +1432,10 @@ paths:
           in: query
           description: Only contacts who still work there (active) or have left.
           schema: {$ref: '#/components/schemas/ContactStatus'}
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'}
         - name: limit
           in: query
           schema: {type: integer, minimum: 1, maximum: 100, default: 25}
@@ -2511,6 +2527,181 @@ paths:
               schema: {$ref: '#/components/schemas/MailApps'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/folders:
+    get:
+      operationId: listFolders
+      tags: ["folders"]
+      summary: The folders of one kind this person owns or that are shared with them, by name
+      x-permission: folders:use
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: {$ref: '#/components/schemas/FolderKind'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FolderList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createFolder
+      tags: ["folders"]
+      summary: Make a folder (yours, shared with no one yet)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FolderCreate'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Folder'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/folders/memberships:
+    post:
+      operationId: folderMemberships
+      tags: ["folders"]
+      summary: Which of your folders (owned or shared) hold each of these records
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FolderMembershipQuery'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FolderMemberships'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/folders/{folderId}:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    patch:
+      operationId: renameFolder
+      tags: ["folders"]
+      summary: Rename a folder (its owner)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FolderRename'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Folder'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteFolder
+      tags: ["folders"]
+      summary: Delete a folder (its owner); the records in it are not touched
+      x-permission: folders:use
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/folders/{folderId}/shares/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+      - name: userId
+        in: path
+        required: true
+        schema: {type: string, pattern: '^usr_[0-9a-hjkmnp-tv-z]{26}$'}
+    put:
+      operationId: shareFolder
+      tags: ["folders"]
+      summary: Share a folder with someone of the same agency (its owner)
+      x-permission: folders:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Folder'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      operationId: unshareFolder
+      tags: ["folders"]
+      summary: Stop sharing a folder with someone (its owner), or leave a folder shared with you
+      x-permission: folders:use
+      responses:
+        '200':
+          description: The folder (null once you have left it)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FolderOrGone'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/folders/{folderId}/items:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    post:
+      operationId: addFolderItems
+      tags: ["folders"]
+      summary: Put records in a folder (its owner, or those it is shared with); those already in it stay once
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FolderItemIds'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Folder'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/folders/{folderId}/items/remove:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    post:
+      operationId: removeFolderItems
+      tags: ["folders"]
+      summary: Take records out of a folder (the records themselves are not touched)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FolderItemIds'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Folder'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/me:
     get:
       operationId: getMe
@@ -5545,6 +5736,7 @@ components:
         - emails.templates:manage
         - emails:read
         - emails:send
+        - folders:use
         - identity.roles:manage
         - identity.team:manage
         - intake:create
@@ -5613,6 +5805,7 @@ components:
         - DOCUMENT_NOT_DELETABLE
         - EMAIL_DO_NOT_CONTACT
         - EMAIL_UNDELIVERABLE
+        - FOLDER_OWNER_ONLY
         - FORBIDDEN
         - INTERNAL
         - INTERVIEW_CLASH
@@ -6470,6 +6663,7 @@ components:
       additionalProperties: false
       properties:
         q: {type: string, maxLength: 200, description: "Name, email, phone, title or company, as the quick search."}
+        folderId: {type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$', description: "Only the candidates in this folder (yours, or shared with you)."}
         boolean: {type: string, maxLength: 1000, description: "AND, OR, NOT (or -word), ( ), \"phrases\", word*; words side by side must all appear."}
         availability: {type: array, maxItems: 4, items: {$ref: '#/components/schemas/CandidateAvailability'}}
         workAuthorization: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/WorkAuthorizationKind'}}
@@ -8363,6 +8557,94 @@ components:
       required: [emailId]
       properties:
         emailId: {$ref: '#/components/schemas/EmailId'}
+    FolderId:
+      type: string
+      pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'
+    FolderKind:
+      type: string
+      enum: [candidate, contact, company]
+    Folder:
+      type: object
+      required: [id, kind, name, ownerId, mine, sharedWith, itemCount, version, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/FolderId'}
+        kind: {$ref: '#/components/schemas/FolderKind'}
+        name: {type: string}
+        ownerId: {type: string, description: The user who made it (names come from /v1/users).}
+        mine: {type: boolean, description: "The signed-in person owns it (and may rename, delete and share it)."}
+        sharedWith:
+          type: array
+          description: The users it is shared with, in the order they were added.
+          items: {type: string}
+        itemCount: {type: integer, description: How many records are in it.}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time, description: "When it was renamed, shared or had records added or taken out."}
+    FolderOrGone:
+      type: object
+      required: [folder]
+      properties:
+        folder:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/Folder'}]
+    FolderCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, name]
+      properties:
+        kind: {$ref: '#/components/schemas/FolderKind'}
+        name: {type: string, minLength: 1, maxLength: 100}
+    FolderRename:
+      type: object
+      additionalProperties: false
+      required: [name, version]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100}
+        version: {type: integer, description: The version you loaded.}
+    FolderItemIds:
+      type: object
+      additionalProperties: false
+      required: [itemIds]
+      properties:
+        itemIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Candidate, contact or company ids, as the folder's kind.
+          items: {type: string, maxLength: 40}
+    FolderList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Folder'}
+    FolderMembershipQuery:
+      type: object
+      additionalProperties: false
+      required: [kind, itemIds]
+      properties:
+        kind: {$ref: '#/components/schemas/FolderKind'}
+        itemIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: {type: string, maxLength: 40}
+    FolderMemberships:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Each of your folders holding any of the records, with which of them.
+          items:
+            type: object
+            required: [folderId, itemIds]
+            properties:
+              folderId: {$ref: '#/components/schemas/FolderId'}
+              itemIds:
+                type: array
+                items: {type: string}
     CandidateScope:
       type: string
       description: all = every candidate; team = those owned by the user's team (their own without a team); own = their own.
@@ -11237,6 +11519,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/EmailTemplateId'}
+    FolderIdPath:
+      name: folderId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/FolderId'}
     CvImportIdPath:
       name: cvImportId
       in: path
@@ -11453,6 +11740,11 @@ x-permissions:
     description: Send email from the app.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  folders:use:
+    module: folders
+    description: Make folders, put records in them and share them.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   identity.roles:manage:
     module: identity
     description: Choose what each role may do and which candidates it sees (Roles and access). Only owners have it.
@@ -11895,6 +12187,8 @@ x-modules:
     description: 'Files attached to candidates: JobStreet/LinkedIn CVs, the original CV and formatted CVs. Uploading a CV queues text extraction in the Python AI worker.'
   - name: emails
     description: 'Email from the app: formatted templates with fields ([First name], [Expected salary], ...) filled from the candidate, job, interview and sender; cc and bcc; image banners; attachments (the candidate''s CVs or files from the computer); messages sent through the company''s mail server in the background; a record of each one on the candidate''s timeline. Replies go to the person who sent it. Salary fields fill only for senders who may see salaries, and by default an email with salary in it is hidden from roles that may not (Settings can show it to all).'
+  - name: folders
+    description: 'Folders of candidates, contacts or companies: each person makes their own, puts records in and takes them out, and may share a folder with others of the same agency, who can then add and remove records too. Only its owner renames, deletes or shares it.'
   - name: identity
     description: Tenants (companies using HiringPlug), their users, and who is signed in.
   - name: industries

@@ -73,7 +73,7 @@ func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
 		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
 		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
 		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
-		Owner: blankNil(b.Owner), Order: Order{Offset: deref(b.Offset)},
+		Owner: blankNil(b.Owner), Folder: b.FolderId, Order: Order{Offset: deref(b.Offset)},
 	}
 	if f.Owner != nil && *f.Owner == "me" {
 		f.Owner = &p.UserID

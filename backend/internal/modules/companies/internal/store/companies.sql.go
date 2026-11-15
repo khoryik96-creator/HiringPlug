@@ -577,20 +577,22 @@ FROM company
 WHERE ($1::text IS NULL OR id < $1::text)
   AND ($2::text IS NULL OR type = $2::text)
   AND ($3::text IS NULL OR category = $3::text)
+  AND ($4::text[] IS NULL OR id = ANY ($4::text[])) -- a folder's
   -- The page's name is letters, digits, _ and - only (the contract), so it is safe in the pattern.
-  AND ($4::text IS NULL
-       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || $4::text || '(/|$)'))
   AND ($5::text IS NULL
-       OR search_text LIKE ALL (app_search_patterns($5::text))
-       OR phone_digits LIKE '%' || app_phone_key($5::text) || '%')
+       OR linkedin_url ~* ('^https://www\.linkedin\.com/company/' || $5::text || '(/|$)'))
+  AND ($6::text IS NULL
+       OR search_text LIKE ALL (app_search_patterns($6::text))
+       OR phone_digits LIKE '%' || app_phone_key($6::text) || '%')
 ORDER BY id DESC
-LIMIT $6
+LIMIT $7
 `
 
 type ListCompaniesParams struct {
 	Cursor          *string
 	Type            *string
 	Category        *string
+	InIds           []string
 	LinkedinCompany *string
 	Query           *string
 	RowLimit        int32
@@ -614,6 +616,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 		arg.Cursor,
 		arg.Type,
 		arg.Category,
+		arg.InIds,
 		arg.LinkedinCompany,
 		arg.Query,
 		arg.RowLimit,

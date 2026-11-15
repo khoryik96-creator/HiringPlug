@@ -24,6 +24,7 @@ type Service struct {
 	allowPrivate bool        // company websites on private networks (local testing only)
 	files        *blob.Store // documents kept with terms and benefits
 	users        Users
+	folders      Folders // a folder's companies (UseFolders)
 }
 
 // Create adds a company.
@@ -194,9 +195,9 @@ type Page struct {
 	NextCursor *string
 }
 
-// List returns up to limit companies, optionally matching query and type,
-// starting after cursor (the last ID of the previous page).
-func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, category, linkedinCompany, cursor *string, limit int) (Page, error) {
+// List returns up to limit companies, optionally matching query and type, or
+// only those in a folder, starting after cursor (the last ID of the previous page).
+func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
 	var page Page
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if s.industries != nil {
@@ -204,8 +205,12 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, companyTyp
 				return err
 			}
 		}
+		inIDs, err := s.folderIDs(ctx, tx, p, folder)
+		if err != nil {
+			return err
+		}
 		rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
-			Cursor: cursor, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Query: query, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Query: query, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err

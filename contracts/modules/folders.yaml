@@ -1,0 +1,291 @@
+# Module contract: folders. See contracts/README.md for the format.
+x-module:
+  name: folders
+  description: >
+    Folders of candidates, contacts or companies: each person makes their own,
+    puts records in and takes them out, and may share a folder with others of
+    the same agency, who can then add and remove records too. Only its owner
+    renames, deletes or shares it.
+  permissions:
+    folders:use:
+      description: Make folders, put records in them and share them.
+      roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  errorCodes:
+    FOLDER_OWNER_ONLY:
+      status: 403
+      description: Only the folder's owner may rename, delete or share it.
+  jobs: {}
+
+paths:
+  /v1/folders:
+    get:
+      operationId: listFolders
+      tags: ["folders"]
+      summary: The folders of one kind this person owns or that are shared with them, by name
+      x-permission: folders:use
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/FolderKind' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FolderList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createFolder
+      tags: ["folders"]
+      summary: Make a folder (yours, shared with no one yet)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FolderCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Folder' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/folders/memberships:
+    post:
+      operationId: folderMemberships
+      tags: ["folders"]
+      summary: Which of your folders (owned or shared) hold each of these records
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FolderMembershipQuery' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FolderMemberships' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/folders/{folderId}:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    patch:
+      operationId: renameFolder
+      tags: ["folders"]
+      summary: Rename a folder (its owner)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FolderRename' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Folder' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: deleteFolder
+      tags: ["folders"]
+      summary: Delete a folder (its owner); the records in it are not touched
+      x-permission: folders:use
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/folders/{folderId}/shares/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^usr_[0-9a-hjkmnp-tv-z]{26}$' }
+    put:
+      operationId: shareFolder
+      tags: ["folders"]
+      summary: Share a folder with someone of the same agency (its owner)
+      x-permission: folders:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Folder' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: unshareFolder
+      tags: ["folders"]
+      summary: Stop sharing a folder with someone (its owner), or leave a folder shared with you
+      x-permission: folders:use
+      responses:
+        '200':
+          description: The folder (null once you have left it)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FolderOrGone' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/folders/{folderId}/items:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    post:
+      operationId: addFolderItems
+      tags: ["folders"]
+      summary: Put records in a folder (its owner, or those it is shared with); those already in it stay once
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FolderItemIds' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Folder' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/folders/{folderId}/items/remove:
+    parameters:
+      - $ref: '#/components/parameters/FolderIdPath'
+    post:
+      operationId: removeFolderItems
+      tags: ["folders"]
+      summary: Take records out of a folder (the records themselves are not touched)
+      x-permission: folders:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FolderItemIds' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Folder' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    FolderIdPath:
+      name: folderId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/FolderId' }
+  schemas:
+    FolderId:
+      type: string
+      pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'
+    FolderKind:
+      type: string
+      enum: [candidate, contact, company]
+    Folder:
+      type: object
+      required: [id, kind, name, ownerId, mine, sharedWith, itemCount, version, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/FolderId' }
+        kind: { $ref: '#/components/schemas/FolderKind' }
+        name: { type: string }
+        ownerId: { type: string, description: The user who made it (names come from /v1/users). }
+        mine: { type: boolean, description: "The signed-in person owns it (and may rename, delete and share it)." }
+        sharedWith:
+          type: array
+          description: The users it is shared with, in the order they were added.
+          items: { type: string }
+        itemCount: { type: integer, description: How many records are in it. }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: "When it was renamed, shared or had records added or taken out." }
+    FolderOrGone:
+      type: object
+      required: [folder]
+      properties:
+        folder:
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/Folder' }]
+    FolderCreate:
+      type: object
+      additionalProperties: false
+      required: [kind, name]
+      properties:
+        kind: { $ref: '#/components/schemas/FolderKind' }
+        name: { type: string, minLength: 1, maxLength: 100 }
+    FolderRename:
+      type: object
+      additionalProperties: false
+      required: [name, version]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        version: { type: integer, description: The version you loaded. }
+    FolderItemIds:
+      type: object
+      additionalProperties: false
+      required: [itemIds]
+      properties:
+        itemIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          description: Candidate, contact or company ids, as the folder's kind.
+          items: { type: string, maxLength: 40 }
+    FolderList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Folder' }
+    FolderMembershipQuery:
+      type: object
+      additionalProperties: false
+      required: [kind, itemIds]
+      properties:
+        kind: { $ref: '#/components/schemas/FolderKind' }
+        itemIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { type: string, maxLength: 40 }
+    FolderMemberships:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: Each of your folders holding any of the records, with which of them.
+          items:
+            type: object
+            required: [folderId, itemIds]
+            properties:
+              folderId: { $ref: '#/components/schemas/FolderId' }
+              itemIds:
+                type: array
+                items: { type: string }

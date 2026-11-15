@@ -12,6 +12,7 @@ import "./theme.css";
 import "./styles.css";
 import "./candidate-workspace.css";
 import "./search-reader.css";
+import "./folders.css";
 
 guardNumberFields();
 guardRequiredFields();

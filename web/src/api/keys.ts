@@ -41,6 +41,7 @@ export const accessKey = ["access"] as const;
 export const teamsKey = ["teams"] as const;
 export const jobSuggestionsKey = (jobId: string) => ["suggestions", jobId] as const;
 export const fieldSettingsKey = ["settings", "fields"] as const;
+export const foldersKey = ["folders"] as const;
 export const cvImportsKey = ["cv-imports"] as const;
 // Under applicationsKey: every add or move of an application refreshes the timeline
 // (so it caches { items }, like every list there: useMoveApplication updates them in place).

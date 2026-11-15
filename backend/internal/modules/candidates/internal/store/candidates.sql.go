@@ -603,8 +603,9 @@ WHERE ($1::text IS NULL OR c.id < $1::text)
   AND ($5::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($5::text)])
   AND ($6::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($6::text)])
   AND ($7::text IS NULL OR c.owner_id = $7::text)
+  AND ($8::text[] IS NULL OR c.id = ANY ($8::text[])) -- a folder's
 ORDER BY CASE WHEN $3::boolean THEN word_similarity(app_normalize_text(coalesce($2::text, '')), c.name_text) END DESC, c.id DESC
-LIMIT $8
+LIMIT $9
 `
 
 type ListCandidatesParams struct {
@@ -615,6 +616,7 @@ type ListCandidatesParams struct {
 	Tag          *string
 	Skill        *string
 	Owner        *string
+	InIds        []string
 	RowLimit     int32
 }
 
@@ -653,6 +655,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 		arg.Tag,
 		arg.Skill,
 		arg.Owner,
+		arg.InIds,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -710,20 +713,21 @@ WHERE ($1::text IS NULL
   AND ($4::text IS NULL OR app_lower_array(c.tags) @> ARRAY[lower($4::text)])
   AND ($5::text IS NULL OR app_lower_array(c.skills) @> ARRAY[lower($5::text)])
   AND ($6::text IS NULL OR c.owner_id = $6::text)
+  AND ($7::text[] IS NULL OR c.id = ANY ($7::text[])) -- a folder's
 ORDER BY
-  CASE WHEN $7::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $7::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
-  CASE WHEN $7::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $7::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  CASE WHEN $8::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $8::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $8::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $8::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN $7::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN $7::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN $7::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $7::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN $7::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $7::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $8::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN $8::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN $8::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $8::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $8::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $8::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
   c.id DESC
-LIMIT $9 OFFSET $8
+LIMIT $10 OFFSET $9
 `
 
 type ListCandidatesSortedParams struct {
@@ -733,6 +737,7 @@ type ListCandidatesSortedParams struct {
 	Tag          *string
 	Skill        *string
 	Owner        *string
+	InIds        []string
 	Sort         string
 	RowOffset    int32
 	RowLimit     int32
@@ -773,6 +778,7 @@ func (q *Queries) ListCandidatesSorted(ctx context.Context, arg ListCandidatesSo
 		arg.Tag,
 		arg.Skill,
 		arg.Owner,
+		arg.InIds,
 		arg.Sort,
 		arg.RowOffset,
 		arg.RowLimit,
@@ -1230,9 +1236,10 @@ WHERE ($2::text IS NULL OR c.id < $2::text)
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
              <= ($19::text)::numeric))
   AND ($21::text IS NULL OR c.owner_id = $21::text)
-  AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
+  AND ($22::text[] IS NULL OR c.id = ANY ($22::text[])) -- a folder's
+  AND ($23::int IS NULL OR c.updated_at >= now() - make_interval(days => $23::int))
 ORDER BY c.id DESC
-LIMIT $23
+LIMIT $24
 `
 
 type SearchCandidatesParams struct {
@@ -1257,6 +1264,7 @@ type SearchCandidatesParams struct {
 	SalaryMax            *string
 	SalaryCurrency       *string
 	Owner                *string
+	InIds                []string
 	UpdatedWithinDays    *int32
 	RowLimit             int32
 }
@@ -1314,6 +1322,7 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.SalaryMax,
 		arg.SalaryCurrency,
 		arg.Owner,
+		arg.InIds,
 		arg.UpdatedWithinDays,
 		arg.RowLimit,
 	)
@@ -1397,21 +1406,22 @@ WHERE ($2::text IS NULL
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
              <= ($18::text)::numeric))
   AND ($20::text IS NULL OR c.owner_id = $20::text)
-  AND ($21::int IS NULL OR c.updated_at >= now() - make_interval(days => $21::int))
+  AND ($21::text[] IS NULL OR c.id = ANY ($21::text[])) -- a folder's
+  AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
 ORDER BY
-  CASE WHEN $22::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $22::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
-  CASE WHEN $22::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $22::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  CASE WHEN $23::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $23::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $23::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $23::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN $22::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN $22::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN $22::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $22::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN $22::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $22::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $23::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN $23::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN $23::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $23::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $23::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $23::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
   c.id DESC
-LIMIT $24 OFFSET $23
+LIMIT $25 OFFSET $24
 `
 
 type SearchCandidatesSortedParams struct {
@@ -1435,6 +1445,7 @@ type SearchCandidatesSortedParams struct {
 	SalaryMax            *string
 	SalaryCurrency       *string
 	Owner                *string
+	InIds                []string
 	UpdatedWithinDays    *int32
 	Sort                 string
 	RowOffset            int32
@@ -1491,6 +1502,7 @@ func (q *Queries) SearchCandidatesSorted(ctx context.Context, arg SearchCandidat
 		arg.SalaryMax,
 		arg.SalaryCurrency,
 		arg.Owner,
+		arg.InIds,
 		arg.UpdatedWithinDays,
 		arg.Sort,
 		arg.RowOffset,

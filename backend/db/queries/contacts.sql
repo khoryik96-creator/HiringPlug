@@ -71,6 +71,7 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR contact.id < sqlc.narg(cursor)::text)
   AND (sqlc.narg(status)::text IS NULL OR contact.status = sqlc.narg(status)::text)
   AND (sqlc.narg(role)::text IS NULL OR contact.role = sqlc.narg(role)::text)
   AND (NOT sqlc.arg(role_not_set)::boolean OR contact.role IS NULL)
+  AND (sqlc.narg(in_ids)::text[] IS NULL OR contact.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(query)::text IS NULL
        OR CASE WHEN sqlc.arg(similar_names)::boolean
             THEN app_normalize_text(sqlc.narg(query)::text) <% contact.name_text

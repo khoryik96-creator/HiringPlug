@@ -68,6 +68,10 @@ paths:
           in: query
           description: Only contacts who still work there (active) or have left.
           schema: { $ref: '#/components/schemas/ContactStatus' }
+        - name: folder
+          in: query
+          description: Only the records in this folder (yours, or shared with you).
+          schema: { type: string, pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$' }
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 25 }

@@ -1,8 +1,11 @@
+import type React from "react";
+
 import type { ContactSummary } from "../api/client";
 import { formatWhen, linkedinDates, timeAgo } from "../labels";
 import { chipStyle } from "./companyCategory";
 import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
+import { InFolders } from "./folders/FolderView";
 import { MailboxBadge } from "./MailboxBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
@@ -15,13 +18,17 @@ function LinkedinNote({ e }: { e: NonNullable<ContactSummary["linkedinEmployment
 }
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
-export function ContactTable({ contacts, showCompany = false, empty, picked, onPick }: {
+export function ContactTable({ contacts, showCompany = false, empty, picked, onPick, dragName, inFolders }: {
   contacts: ContactSummary[];
   showCompany?: boolean;
   empty: string;
   /** Chosen, to email each separately (with onPick, clicking a row chooses it). */
   picked?: Set<string>;
   onPick?: (contacts: ContactSummary[], on: boolean) => void;
+  /** Lets a contact's name be dragged onto a folder. */
+  dragName?: (id: string) => React.HTMLAttributes<HTMLElement> | undefined;
+  /** With it, an "In folders" column. */
+  inFolders?: (id: string) => string[];
 }) {
   const fs = useFieldSettings();
   return (
@@ -37,6 +44,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
           {showCompany && <th>Company</th>}
           <th>Email</th>
           <th>Phone</th>
+          {inFolders && <th>In folders</th>}
         </tr>
       </thead>
       <tbody>
@@ -45,7 +53,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
           const bounces = c.mailboxStatus === "invalid";
           return (
           <tr key={c.id} {...pickProps} className={[pickProps?.className, bounces ? "bounces" : ""].filter(Boolean).join(" ") || undefined}>
-            <td>
+            <td {...dragName?.(c.id)}>
               <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
             </td>
@@ -67,11 +75,12 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
               )}
             </td>
             <td>{c.mobile ?? c.phone}</td>
+            {inFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
           </tr>
           );
         })}
         {contacts.length === 0 && (
-          <tr><td colSpan={showCompany ? 7 : 6} className="muted">{empty}</td></tr>
+          <tr><td colSpan={(showCompany ? 7 : 6) + (inFolders ? 1 : 0)} className="muted">{empty}</td></tr>
         )}
       </tbody>
     </table>

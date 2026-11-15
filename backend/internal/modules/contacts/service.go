@@ -31,6 +31,7 @@ type Service struct {
 	mail      MailServers
 	files     *blob.Store
 	mailboxes Mailboxes
+	folders   Folders // a folder's contacts (UseFolders)
 }
 
 // Create adds a contact. The email is checked before the transaction starts
@@ -214,6 +215,7 @@ type Filter struct {
 	Status           *string // active or left
 	Role             *string // a key of the contact_role list
 	RoleNotSet       bool    // only contacts without a role (ignored with Role)
+	Folder           *string // only the contacts in this folder
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
 }
@@ -226,8 +228,12 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		cursor = nil // ordered by likeness, not by id: one page
 	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+		if err != nil {
+			return err
+		}
 		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet,
+			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs,
 			SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {

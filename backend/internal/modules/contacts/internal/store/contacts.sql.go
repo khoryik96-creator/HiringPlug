@@ -584,14 +584,15 @@ WHERE ($1::text IS NULL OR contact.id < $1::text)
   AND ($3::text IS NULL OR contact.status = $3::text)
   AND ($4::text IS NULL OR contact.role = $4::text)
   AND (NOT $5::boolean OR contact.role IS NULL)
-  AND ($6::text IS NULL
-       OR CASE WHEN $7::boolean
-            THEN app_normalize_text($6::text) <% contact.name_text
-            ELSE contact.search_text LIKE ALL (app_search_patterns($6::text))
-              OR contact.phone_digits LIKE '%' || app_phone_key($6::text) || '%'
+  AND ($6::text[] IS NULL OR contact.id = ANY ($6::text[])) -- a folder's
+  AND ($7::text IS NULL
+       OR CASE WHEN $8::boolean
+            THEN app_normalize_text($7::text) <% contact.name_text
+            ELSE contact.search_text LIKE ALL (app_search_patterns($7::text))
+              OR contact.phone_digits LIKE '%' || app_phone_key($7::text) || '%'
           END)
-ORDER BY CASE WHEN $7::boolean THEN word_similarity(app_normalize_text(coalesce($6::text, '')), contact.name_text) END DESC, contact.id DESC
-LIMIT $8
+ORDER BY CASE WHEN $8::boolean THEN word_similarity(app_normalize_text(coalesce($7::text, '')), contact.name_text) END DESC, contact.id DESC
+LIMIT $9
 `
 
 type ListContactsParams struct {
@@ -600,6 +601,7 @@ type ListContactsParams struct {
 	Status       *string
 	Role         *string
 	RoleNotSet   bool
+	InIds        []string
 	Query        *string
 	SimilarNames bool
 	RowLimit     int32
@@ -636,6 +638,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		arg.Status,
 		arg.Role,
 		arg.RoleNotSet,
+		arg.InIds,
 		arg.Query,
 		arg.SimilarNames,
 		arg.RowLimit,

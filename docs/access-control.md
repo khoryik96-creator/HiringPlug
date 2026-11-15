@@ -109,6 +109,7 @@ details get their own permissions.
 | `privacy:read`, `privacy:record` (a candidate's consent and data protection requests; record them) | ✓ | ✓ | ✓ | ✓ | | |
 | `privacy:manage` (the Data protection page, decide requests, download a copy of a candidate's data) | ✓ | ✓ | | | | |
 | `identity.roles:manage` (Roles and access: what each role may do and which candidates it sees) | ✓ | | | | | |
+| `folders:use` (folders of candidates, contacts and companies; a folder shows only the records you may see) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 
 The table above is the default. **Each company can change it** on the

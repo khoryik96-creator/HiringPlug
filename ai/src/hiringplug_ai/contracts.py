@@ -48,6 +48,7 @@ class Permission(StrEnum):
     emails_templates_manage = "emails.templates:manage"
     emails_read = "emails:read"
     emails_send = "emails:send"
+    folders_use = "folders:use"
     identity_roles_manage = "identity.roles:manage"
     identity_team_manage = "identity.team:manage"
     intake_create = "intake:create"
@@ -116,6 +117,7 @@ class ErrorCode(StrEnum):
     DOCUMENT_NOT_DELETABLE = "DOCUMENT_NOT_DELETABLE"
     EMAIL_DO_NOT_CONTACT = "EMAIL_DO_NOT_CONTACT"
     EMAIL_UNDELIVERABLE = "EMAIL_UNDELIVERABLE"
+    FOLDER_OWNER_ONLY = "FOLDER_OWNER_ONLY"
     FORBIDDEN = "FORBIDDEN"
     INTERNAL = "INTERNAL"
     INTERVIEW_CLASH = "INTERVIEW_CLASH"
@@ -2130,6 +2132,96 @@ class EmailSendJob(BaseModel):
         extra="forbid",
     )
     emailId: EmailId
+
+
+class FolderId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^fld_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class FolderKind(StrEnum):
+    candidate = "candidate"
+    contact = "contact"
+    company = "company"
+
+
+class Folder(BaseModel):
+    id: FolderId
+    kind: FolderKind
+    name: str
+    ownerId: Annotated[str, Field(description="The user who made it (names come from /v1/users).")]
+    mine: Annotated[
+        bool, Field(description="The signed-in person owns it (and may rename, delete and share it).")
+    ]
+    sharedWith: Annotated[
+        list[str], Field(description="The users it is shared with, in the order they were added.")
+    ]
+    itemCount: Annotated[int, Field(description="How many records are in it.")]
+    version: int
+    createdAt: AwareDatetime
+    updatedAt: Annotated[
+        AwareDatetime, Field(description="When it was renamed, shared or had records added or taken out.")
+    ]
+
+
+class FolderOrGone(BaseModel):
+    folder: Annotated[Folder | None, Field(...)]
+
+
+class FolderCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: FolderKind
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+
+
+class FolderRename(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=100, min_length=1)]
+    version: Annotated[int, Field(description="The version you loaded.")]
+
+
+class ItemId(RootModel[str]):
+    root: Annotated[str, Field(max_length=40)]
+
+
+class FolderItemIds(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    itemIds: Annotated[
+        list[ItemId],
+        Field(
+            description="Candidate, contact or company ids, as the folder's kind.",
+            max_length=500,
+            min_length=1,
+        ),
+    ]
+
+
+class FolderList(BaseModel):
+    items: list[Folder]
+
+
+class FolderMembershipQuery(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: FolderKind
+    itemIds: Annotated[list[ItemId], Field(max_length=500, min_length=1)]
+
+
+class Item(BaseModel):
+    folderId: FolderId
+    itemIds: list[str]
+
+
+class FolderMemberships(BaseModel):
+    items: Annotated[
+        list[Item], Field(description="Each of your folders holding any of the records, with which of them.")
+    ]
 
 
 class CandidateScope(StrEnum):
@@ -4739,6 +4831,13 @@ class CandidateSearch(BaseModel):
     q: Annotated[
         str | None,
         Field(description="Name, email, phone, title or company, as the quick search.", max_length=200),
+    ] = None
+    folderId: Annotated[
+        str | None,
+        Field(
+            description="Only the candidates in this folder (yours, or shared with you).",
+            pattern="^fld_[0-9a-hjkmnp-tv-z]{26}$",
+        ),
     ] = None
     boolean: Annotated[
         str | None,

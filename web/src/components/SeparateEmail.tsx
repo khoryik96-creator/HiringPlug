@@ -158,12 +158,17 @@ export interface Shown { count: number; more?: boolean; all: boolean; onAll: () 
  * are chosen, "3 chosen · Email each separately · Clear".
  */
 export function PickBar({ count, shown, onEmail, onClear, children }: {
-  count: number; shown?: Shown; onEmail: () => void; onClear: () => void; children?: React.ReactNode;
+  count: number; shown?: Shown;
+  /** Emails the chosen (left out where the person may not email). */
+  onEmail?: () => void;
+  onClear: () => void;
+  /** More to do with the chosen (such as putting them in a folder). */
+  children?: React.ReactNode;
 }) {
   const choose = shown && shown.count > 0;
   if (count === 0 && !choose) return null;
   return (
-    <div className="choose-row">
+    <div className={count > 0 ? "choose-row has-chosen" : "choose-row"}>
       {choose && (
         <span className="choose" role="group" aria-label="Choose">
           <span className="choose-label" aria-hidden="true">Choose</span>
@@ -177,9 +182,9 @@ export function PickBar({ count, shown, onEmail, onClear, children }: {
         <div className="pick-bar" role="status">
           <strong>{count} chosen</strong>
           {children}
-          <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>
+          {onEmail && <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>}
           <button type="button" className="link" onClick={onClear}>Clear</button>
-          {count > 50 && <span className="warning small">At most 50 at a time.</span>}
+          {onEmail && count > 50 && <span className="warning small">At most 50 at a time to email.</span>}
         </div>
       )}
     </div>

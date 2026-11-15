@@ -87,16 +87,16 @@ func (o Order) nextPage(sort string, more bool, lastID string, limit int) (*stri
 
 // listRows runs the newest-first query (which keeps its index plan) or the
 // sorted one; both give the same columns.
-func (s *Service) listRows(ctx context.Context, tx pgx.Tx, f Filter, similar bool, sort string, cursor *string, offset int32, limit int) ([]store.ListCandidatesRow, error) {
+func (s *Service) listRows(ctx context.Context, tx pgx.Tx, f Filter, inIDs []string, similar bool, sort string, cursor *string, offset int32, limit int) ([]store.ListCandidatesRow, error) {
 	q := store.New(tx)
 	if sort == "newest" {
 		return q.ListCandidates(ctx, store.ListCandidatesParams{
-			Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: similar,
+			Cursor: cursor, Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, InIds: inIDs, SimilarNames: similar,
 			RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 	}
 	sorted, err := q.ListCandidatesSorted(ctx, store.ListCandidatesSortedParams{
-		Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, SimilarNames: false,
+		Query: f.Query, Phones: s.queryPhones(f.Query), Tag: f.Tag, Skill: f.Skill, Owner: f.Owner, InIds: inIDs, SimilarNames: false,
 		Sort: sort, RowOffset: offset, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	})
 	rows := make([]store.ListCandidatesRow, len(sorted))
@@ -110,6 +110,7 @@ func (s *Service) listRows(ctx context.Context, tx pgx.Tx, f Filter, similar boo
 type Filter struct {
 	Query, Tag, Skill *string
 	Owner             *string // a user id
+	Folder            *string // only the candidates in this folder
 	// Similar: names like Query (typos), the closest first, one page only.
 	Similar bool
 	Order   Order
@@ -125,7 +126,11 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		if similar {
 			cur, sort, offset = nil, "newest", 0 // ordered by likeness: one page
 		}
-		rows, err := s.listRows(ctx, tx, f, similar, sort, cur, offset, limit)
+		inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+		if err != nil {
+			return err
+		}
+		rows, err := s.listRows(ctx, tx, f, inIDs, similar, sort, cur, offset, limit)
 		if err != nil {
 			return err
 		}

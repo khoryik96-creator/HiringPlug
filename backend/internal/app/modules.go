@@ -28,6 +28,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/folders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/intake"
@@ -78,6 +79,7 @@ type Modules struct {
 	Scheduling   *scheduling.Module
 	Industries   *industries.Module
 	Automations  *automations.Module
+	Folders      *folders.Module
 	// scaffold:fields
 }
 
@@ -183,9 +185,14 @@ func NewModules(d Deps) *Modules {
 		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
 		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
 	})
+	m.Folders = folders.New(d.Pool, folderUsers{m.Identity})
+	// The lists show a folder's records.
+	m.Candidates.UseFolders(m.Folders)
+	m.Contacts.UseFolders(m.Folders)
+	m.Companies.UseFolders(m.Folders)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
-	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake)
+	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders)
 	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
@@ -230,6 +237,7 @@ type (
 	schedulingHTTP   = scheduling.HTTP
 	industriesHTTP   = industries.HTTP
 	automationsHTTP  = automations.HTTP
+	foldersHTTP      = folders.HTTP
 	// scaffold:aliases
 )
 
@@ -264,6 +272,7 @@ type Server struct {
 	*schedulingHTTP
 	*industriesHTTP
 	*automationsHTTP
+	*foldersHTTP
 	// scaffold:embeds
 }
 
@@ -299,6 +308,7 @@ func (m *Modules) Server() *Server {
 		schedulingHTTP:   m.Scheduling.HTTP,
 		industriesHTTP:   m.Industries.HTTP,
 		automationsHTTP:  m.Automations.HTTP,
+		foldersHTTP:      m.Folders.HTTP,
 		// scaffold:server-fields
 	}
 }

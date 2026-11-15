@@ -39,6 +39,7 @@ type SearchFilter struct {
 	NoticeMaxDays, UpdatedWithinDays                *int
 	SalaryMax, SalaryCurrency                       *string // per month
 	Owner                                           *string // a user id
+	Folder                                          *string // only the candidates in this folder
 	Order                                           Order
 }
 
@@ -116,6 +117,10 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 			return page, err
 		}
 	}
+	inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+	if err != nil {
+		return page, err
+	}
 	notice, updated := int32Ptr(f.NoticeMaxDays), int32Ptr(f.UpdatedWithinDays)
 	sort, cur, offset := f.Order.paging(p, cursor)
 	in := store.SearchCandidatesParams{
@@ -123,7 +128,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
-		NoticeMaxDays: notice, SalaryMax: f.SalaryMax, SalaryCurrency: f.SalaryCurrency, Owner: f.Owner,
+		NoticeMaxDays: notice, SalaryMax: f.SalaryMax, SalaryCurrency: f.SalaryCurrency, Owner: f.Owner, InIds: inIDs,
 		UpdatedWithinDays: updated, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	}
 	rows, err := searchRows(ctx, store.New(tx), in, sort, offset)
@@ -194,7 +199,7 @@ func searchRows(ctx context.Context, q *store.Queries, in store.SearchCandidates
 		CvIds: in.CvIds, ExcludedIds: in.ExcludedIds, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
 		Residence: in.Residence, Sources: in.Sources, Industries: in.Industries, Skills: in.Skills, AllSkills: in.AllSkills,
 		Tags: in.Tags, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
-		Owner: in.Owner, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,
+		Owner: in.Owner, InIds: in.InIds, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,
 	})
 	rows := make([]store.SearchCandidatesRow, len(sorted))
 	for i, r := range sorted {

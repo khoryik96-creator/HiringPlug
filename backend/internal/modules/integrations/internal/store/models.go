@@ -663,6 +663,32 @@ type FieldRule struct {
 	Mandatory bool
 }
 
+type Folder struct {
+	ID        string
+	TenantID  string
+	Kind      string
+	Name      string
+	OwnerID   string
+	Version   int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type FolderItem struct {
+	FolderID string
+	TenantID string
+	ItemID   string
+	AddedBy  string
+	AddedAt  time.Time
+}
+
+type FolderShare struct {
+	FolderID  string
+	TenantID  string
+	UserID    string
+	CreatedAt time.Time
+}
+
 type Industry struct {
 	ID        string
 	TenantID  string

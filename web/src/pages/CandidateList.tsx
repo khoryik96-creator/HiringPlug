@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
 import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
 import { DuplicateEmail } from "../components/DuplicateEmail";
+import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { categoryLabel, useIndustries } from "../components/IndustryPicker";
@@ -20,7 +21,9 @@ import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false }: { canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean }) {
+export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, meId = "" }: {
+  canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean; meId?: string;
+}) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
@@ -28,6 +31,9 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const [adding, setAdding] = useState(false);
   const cols = useCandidateColumns();
   const pick = usePicked();
+  const folders = useFolderView("candidate", canFolders, meId);
+  const folder = folders.filter;
+  const canPick = canEmail || canFolders; // rows are chosen to email or to put in a folder
   const [emailing, setEmailing] = useState(false);
   const [openAs, setOpenAs] = useOpenAs();
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set()); // resumes read, while on this page
@@ -41,12 +47,13 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   });
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
   const list = useInfiniteQuery({
-    queryKey: [...candidatesKey, q, mine, sortBy],
-    enabled: !advanced,
+    queryKey: [...candidatesKey, q, mine, sortBy, folder],
+    enabled: !advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => {
-      const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number } = {};
+      const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number; folder?: string } = {};
       if (q.trim()) query.q = q.trim();
+      if (folder) query.folder = folder;
       if (mine) query.owner = "me";
       if (sortBy !== "newest") query.sort = sortBy;
       if (pageParam?.cursor) query.cursor = pageParam.cursor;
@@ -56,10 +63,10 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     getNextPageParam: nextPage,
   });
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", q, mine, adv, sortBy],
-    enabled: advanced,
+    queryKey: [...candidatesKey, "search", q, mine, adv, sortBy, folder],
+    enabled: advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
-    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(adv, q, mine, pageParam, sortBy) })),
+    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(adv, q, mine, pageParam, sortBy, folder) })),
     getNextPageParam: nextPage,
   });
   const shownList = advanced ? found : list;
@@ -68,15 +75,16 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     : (list.data?.pages.flatMap((pg) => pg.items.map((c) => ({ candidate: c, matchedIn: [], cvSnippet: null }))) ?? []);
   // A sorted list pages by position: if a record moved between pages, it is shown once.
   const hits = allHits.filter((h, i) => allHits.findIndex((x) => x.candidate.id === h.candidate.id) === i);
+  const inFolders = useInFolders(folders, hits.map((h) => h.candidate.id));
   const terms = found.data?.pages[0]?.terms ?? [];
   const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
-  const width = cols.columns.length + 1;
+  const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
   // With email, clicking a row chooses the candidate (the name still opens them).
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
-    if (!canEmail) return { className: snippet ? "has-snippet" : undefined };
+    if (!canPick) return { className: snippet ? "has-snippet" : undefined };
     const chosen = pick.ids.has(c.id);
     const row = pickRowProps(chosen, () => { pick.pick([personOf(c)], !chosen); });
     return { ...row, className: `${row.className}${snippet ? " has-snippet" : ""}` };
@@ -120,16 +128,19 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         </div>
       )}
       <ErrorMessage error={shownList.error ?? cols.save.error} />
+      <WithFolders view={folders}>
       <div className="list-meta">
         <span role="status">
-          {shownList.data && (hits.length === 0 ? "No candidates match."
+          {shownList.data && (hits.length === 0 ? (folder && !q.trim() && !advanced && !mine ? "Nothing in this folder yet: choose candidates under All candidates, then Add to folder (or drag them onto it)." : "No candidates match.")
             : `${String(hits.length)}${shownList.hasNextPage ? "+" : ""} candidate${hits.length === 1 ? "" : "s"}`)}
           {advanced && terms.length > 0 && hits.length > 0 && <> · <mark>marked</mark>: where their CV has {terms.join(", ")}</>}
           {sortBy !== "newest" && <> · <button type="button" className="link small" onClick={() => { sortList("newest"); }}>Back to newest first</button></>}
         </span>
-        {canEmail && !emailing && (
-          <PickBar count={pick.picked.size} onEmail={() => { setEmailing(true); }} onClear={pick.clear}
-            shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }} />
+        {canPick && !emailing && (
+          <PickBar count={pick.picked.size} onEmail={canEmail ? () => { setEmailing(true); } : undefined} onClear={pick.clear}
+            shown={{ count: hits.length, more: shownList.hasNextPage, all: allShown, onAll: () => { pick.pick(hits.map((h) => personOf(h.candidate)), true); } }}>
+            {folders.actions([...pick.ids])}
+          </PickBar>
         )}
         <span className="list-meta-end">
           {openAs === "profile" && <WaLegend />}
@@ -138,31 +149,33 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {openAs === "resume" && (
-        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
+        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
           chosen={canEmail ? pick.ids : undefined} onChoose={canEmail ? (c, on) => { pick.pick([personOf(c)], on); } : undefined}
           canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
       {openAs === "profile" && <PinnedScroll>
-        <table className={canEmail ? "candidates-table pick-table" : "candidates-table"}>
+        <table className={canPick ? "candidates-table pick-table" : "candidates-table"}>
           <thead>
             <tr>
               <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />
               {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />)}
+              {folders.hasFolders && <th>In folders</th>}
             </tr>
           </thead>
           <tbody>
             {hits.map(({ candidate: c, matchedIn, cvSnippet }) => (
               <Fragment key={c.id}>
                 <tr {...rowProps(c, cvSnippet)}>
-                  <td className="name-cell">
+                  <td className="name-cell" {...folders.drag(c.id, pick.ids)}>
                     <WaName c={c} href={`#/candidates/${c.id}${hl}`}>
                       {" "}
                       {!cols.columns.includes("tags") && c.tags.length > 0 && <Chips labels={c.tags} />}
                       {matchedIn.length > 0 && <span className="found-in">{matchedIn.includes("cv") ? "in CV" : "in profile"}</span>}
-                      {canEmail && pick.ids.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
+                      {canPick && pick.ids.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
                     </WaName>
                   </td>
                   {cols.columns.map((col) => <td key={col} className={`col-${col}`}>{COLUMNS[col].cell(c, cols.look)}</td>)}
+                  {folders.hasFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
                 </tr>
                 {cvSnippet && (
                   <tr className="snippet-row">
@@ -178,6 +191,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         </table>
       </PinnedScroll>}
       {openAs === "profile" && more}
+      </WithFolders>
     </main>
   );
 }

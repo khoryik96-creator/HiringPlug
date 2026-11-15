@@ -78,7 +78,7 @@ export function sortOf(current: CandidateSort, column: string): "ascending" | "d
 }
 
 /** The request for a page of the search (q and "mine" come from the page's own boxes). */
-export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, sort: CandidateSort = "newest"): Schemas["CandidateSearch"] {
+export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, sort: CandidateSort = "newest", folderId?: string): Schemas["CandidateSearch"] {
   const body: Schemas["CandidateSearch"] = { limit: 25, skillsMatch: s.skillsMatch };
   const list = <T extends string>(v: T[]) => (v.length > 0 ? v : undefined);
   if (q.trim()) body.q = q.trim();
@@ -97,6 +97,7 @@ export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, 
   if (salary) body.expectedSalaryMax = { amount: salary, currency: "MYR" };
   if (s.updatedWithinDays !== null) body.updatedWithinDays = s.updatedWithinDays;
   if (mine) body.owner = "me";
+  if (folderId) body.folderId = folderId;
   if (page?.cursor) body.cursor = page.cursor;
   if (page?.offset) body.offset = page.offset;
   if (sort !== "newest") body.sort = sort;
