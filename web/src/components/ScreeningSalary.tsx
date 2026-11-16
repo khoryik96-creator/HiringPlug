@@ -2,7 +2,7 @@
 // the call, the server calculates a fixed monthly figure with the company's
 // saved rules, and the recruiter applies it (or enters reviewed figures).
 import { useMutation } from "@tanstack/react-query";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
@@ -15,6 +15,9 @@ type Calculation = Schemas["SalaryCalculation"];
 const amount = (v: string) => Number(v).toLocaleString("en-MY", { maximumFractionDigits: 2 });
 const currency = (code: string) => (code.toUpperCase() === "MYR" ? "RM" : code.toUpperCase());
 
+/** How long a used button stays outlined in green: 5 minutes. */
+export const USED_GLOW_MS = 5 * 60 * 1000;
+
 export function ScreeningSalary({ form, patch, set, errors }: {
   form: SalaryFormState;
   patch: (value: Partial<SalaryFormState>) => void;
@@ -25,6 +28,14 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   const blockedId = useId();
   const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
   const [applied, setApplied] = useState(false);
+  // The button last used stays outlined in green for a while, so it is plain
+  // the figures went in.
+  const [used, setUsed] = useState<"calculated" | "entered" | null>(null);
+  useEffect(() => {
+    if (!used) return;
+    const t = window.setTimeout(() => { setUsed(null); }, USED_GLOW_MS);
+    return () => { window.clearTimeout(t); };
+  }, [used]);
   const [unusedWording, setUnusedWording] = useState<string[]>([]);
   const current = form.currentDescription ?? describeCurrent(form);
   const expected = form.expectedDescription ?? describeExpected(form);
@@ -80,6 +91,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     });
     setApplied(true);
     setUnusedWording(unread);
+    setUsed("calculated");
   };
 
   const useManualFigures = () => {
@@ -95,6 +107,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     patch({ calculationPending: false, currentNeedsReview: false, expectedNeedsReview: false });
     calculate.reset();
     setApplied(true);
+    setUsed("entered");
   };
 
   const openManual = () => {
@@ -174,7 +187,8 @@ export function ScreeningSalary({ form, patch, set, errors }: {
             </p>
           )}
           <div className="row">
-            <button type="button" disabled={!!nothingToUse} aria-describedby={needsReview ? blockedId : undefined} onClick={useFigures}>
+            <button type="button" className={used === "calculated" ? "used" : undefined} disabled={!!nothingToUse}
+              aria-describedby={needsReview ? blockedId : undefined} onClick={useFigures}>
               Use these figures
             </button>
             {(needsReview || nothingToUse) && <button type="button" onClick={openManual}>Enter figures manually</button>}
@@ -187,7 +201,9 @@ export function ScreeningSalary({ form, patch, set, errors }: {
         <div className="form-grid">
           <SalaryFields form={form} set={manual} errors={{ ...errors, ...manualErrors }} />
         </div>
-        <button type="button" onClick={useManualFigures}>Use entered figures</button>
+        <button type="button" className={used === "entered" ? "used" : undefined} onClick={useManualFigures}>
+          Use entered figures
+        </button>
       </details>
       {applied && <p className="small" role="status">Figures applied. Save the call.</p>}
       {applied && unusedWording.length > 0 && (

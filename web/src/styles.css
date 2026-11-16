@@ -1155,3 +1155,13 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .contacts-table td:first-child, .contacts-table td:last-child { white-space: nowrap; }
 .contacts-table td:nth-child(2), .contacts-table td:nth-child(3) { white-space: nowrap; }
 .contacts-table td { overflow-wrap: break-word; }
+
+/* A button whose action just went through: outlined in green for a while (e.g. "Use these figures"). */
+button.used, button.used:hover:not(:disabled) { border-color: #16a34a; color: #15803d; box-shadow: 0 0 0 3px #16a34a33; background: #f0fdf4; }
+
+/* A dashboard number opens its job's board with that stage marked for a moment. */
+.board .column.spotlight { outline: 3px solid var(--accent); outline-offset: 2px; transition: outline-color 1s; }
+a.heat { text-decoration: none; cursor: pointer; }
+a.heat:hover { outline: 2px solid var(--accent-dark); outline-offset: 1px; }
+a.kpi { text-decoration: none; color: inherit; }
+a.kpi:hover { border-color: var(--accent); }

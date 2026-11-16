@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
-import { ScreeningSalary } from "./ScreeningSalary";
+import { ScreeningSalary, USED_GLOW_MS } from "./ScreeningSalary";
 import { formFromCompensation, salaryProblems, type SalaryFormState, toCompensationBody } from "./salaryFormState";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -196,4 +196,26 @@ it("keeps reviewed manual entry available when the calculation fails", async () 
   fireEvent.click(screen.getByRole("button",{name:"Use entered figures"}));
   expect(screen.getByTestId("problems").textContent).toBe("{}");
   expect(screen.getByText("Figures applied. Save the call.")).toBeTruthy();
+});
+
+it("outlines the button used in green for 5 minutes", async () => {
+  vi.spyOn(api,"GET").mockResolvedValue(ok({allowances:true,bonus:true,bonusOnAllowances:false,cents:false}));
+  vi.spyOn(api,"POST").mockResolvedValue(ok({base:"9000",allowances:"0",bonus:"0",monthly:"9000.00",annualMonths:12,hasCurrent:true,reviewRequired:false,warnings:[],excluded:[]}));
+  renderWithClient(<Harness />);
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"),{target:{value:"9k"}});
+  await waitFor(() => {expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false);});
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  const use = await screen.findByRole("button",{name:"Use these figures"});
+  expect(use.className).not.toContain("used");
+  vi.useFakeTimers();
+  try {
+    fireEvent.click(use);
+    expect(screen.getByRole("button",{name:"Use these figures"}).className).toContain("used");
+    act(() => { vi.advanceTimersByTime(USED_GLOW_MS - 1000); });
+    expect(screen.getByRole("button",{name:"Use these figures"}).className, "still green after 4 minutes 59").toContain("used");
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByRole("button",{name:"Use these figures"}).className).not.toContain("used");
+  } finally {
+    vi.useRealTimers();
+  }
 });

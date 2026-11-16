@@ -30,4 +30,16 @@ describe("dashboard", () => {
     await screen.findByRole("region", { name: "Open jobs" });
     expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
   });
+
+  it("opens a job at its stage from a number in the open jobs, and the jobs from Open jobs", async () => {
+    const job = { jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", title: "Finance Manager", companyName: "Maju", status: "open",
+      stageCounts: { applied: 0, screening: 3, submitted: 1, interview: 0, offer: 0, placed: 0 } };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/pipeline/summary"
+      ? { ...summary, openJobs: 1, jobs: [job] } : path === "/v1/settings/fields" ? testFieldSettings() : { items: [] }))) as never);
+    renderWithClient(<Dashboard permissions={["pipeline:read"]} />);
+    const three = await screen.findByRole("link", { name: "3 in Screening for Finance Manager" });
+    expect(three.getAttribute("href")).toBe("#/jobs/jo_01jbz6w0m0k8q9x2r3s4t5v6w7?stage=screening");
+    expect(screen.getByRole("link", { name: "1 in Submitted for Finance Manager" }).getAttribute("href")).toBe("#/jobs/jo_01jbz6w0m0k8q9x2r3s4t5v6w7?stage=submitted");
+    expect(screen.getByRole("link", { name: /^Open jobs/ }).getAttribute("href")).toBe("#/jobs");
+  });
 });

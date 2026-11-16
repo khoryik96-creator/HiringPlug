@@ -24,11 +24,17 @@ function Change({ by, text }: { by: number; text: string }) {
   return <span className={`change ${by > 0 ? "up" : "down"}`}>{by > 0 ? "▲" : "▼"} {text.replace("{n}", String(Math.abs(by)))}</span>;
 }
 
-/** Heat: stronger purple for more people; an amber ring when someone there waits over 7 days. */
-function Heat({ n, waiting }: { n: number; waiting: boolean }) {
+/**
+ * Heat: stronger purple for more people; an amber ring when someone there
+ * waits over 7 days. A number opens the job's board at that stage.
+ */
+function Heat({ n, waiting, href, label }: { n: number; waiting: boolean; href: string; label: string }) {
   if (n === 0) return <span className="heat h0" aria-label="none">·</span>;
   const level = n >= 4 ? "h3" : n >= 2 ? "h2" : "h1";
-  return <span className={`heat ${level}${waiting ? " stall" : ""}`} title={waiting ? "Someone here has waited over 7 days" : undefined}>{n}</span>;
+  return (
+    <a href={href} className={`heat ${level}${waiting ? " stall" : ""}`} aria-label={label}
+      title={waiting ? "Someone here has waited over 7 days · open the job" : "Open the job"}>{n}</a>
+  );
 }
 
 function lastActivity(iso: string | null | undefined, now: number): { text: string; old: boolean } {
@@ -55,7 +61,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
       <DashboardBlocks blocks={[
         { id: "numbers", label: "the numbers", node: (
       <div className="kpis">
-        <div className="kpi"><span className="kpi-label">Open jobs</span><strong>{s.openJobs}</strong><Change by={s.openedLast7Days} text="{n} new this week" /></div>
+        <a className="kpi" href="#/jobs"><span className="kpi-label">Open jobs</span><strong>{s.openJobs}</strong><Change by={s.openedLast7Days} text="{n} new this week" /></a>
         <div className="kpi"><span className="kpi-label">In progress</span><strong>{active(s.stageCounts)}</strong><Change by={s.addedLast7Days} text="{n} added this week" /></div>
         <div className="kpi"><span className="kpi-label">Moved this week</span><strong>{s.movedLast7Days}</strong><Change by={s.movedLast7Days - s.movedPrev7Days} text="{n} vs last week" /></div>
         <div className="kpi"><span className="kpi-label">Placed in 30 days</span><strong>{s.placedLast30Days}</strong></div>
@@ -88,7 +94,12 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
               return (
                 <tr key={j.jobId}>
                   <td><a href={`#/jobs/${j.jobId}`}><strong>{j.title}</strong></a> <span className="muted">{j.companyName}</span></td>
-                  {OPEN_STAGES.map((st) => <td key={st}><Heat n={j.stageCounts[st]} waiting={(p?.waitingCounts[st] ?? 0) > 0} /></td>)}
+                  {OPEN_STAGES.map((st) => (
+                    <td key={st}>
+                      <Heat n={j.stageCounts[st]} waiting={(p?.waitingCounts[st] ?? 0) > 0} href={`#/jobs/${j.jobId}?stage=${st}`}
+                        label={`${String(j.stageCounts[st])} in ${STAGE[st]} for ${j.title}`} />
+                    </td>
+                  ))}
                   <td className={last.old ? "last old" : "last"}>{p ? last.text : ""}</td>
                 </tr>
               );

@@ -31,6 +31,18 @@ async function showBoard(canUpdate = true) {
 }
 
 describe("pipeline board", () => {
+  it("marks the stage it was opened at from the dashboard, for a moment", async () => {
+    window.location.hash = `#/jobs/${base.jobId}?stage=screening`;
+    try {
+      await showBoard();
+      expect(screen.getByRole("list", { name: "Screening" }).className).toContain("spotlight");
+      expect(screen.getByRole("list", { name: "Applied" }).className).not.toContain("spotlight");
+      await waitFor(() => { expect(screen.getByRole("list", { name: "Screening" }).className).not.toContain("spotlight"); }, { timeout: 5000 });
+    } finally {
+      window.location.hash = "";
+    }
+  });
+
   it("shows each candidate in their stage, and closed ones with the reason", async () => {
     await showBoard();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByRole("link", { name: "Siti Aisyah" })).toBeTruthy();

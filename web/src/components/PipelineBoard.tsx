@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
@@ -9,6 +9,7 @@ import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
 import { type Person, SeparateEmail } from "./SeparateEmail";
 import { ErrorMessage } from "./ErrorMessage";
+import { hashParam } from "../hashQuery";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
 import { needsDetails, StagePrompt } from "./StagePrompt";
@@ -33,6 +34,21 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const [dragging, setDragging] = useState<Application | null>(null);
   const [over, setOver] = useState<Schemas["Stage"] | null>(null);
   const apps = list.data?.items ?? [];
+  // Opened from a dashboard number ("?stage=screening"): that stage is shown
+  // and marked for a few seconds.
+  const [spotlight, setSpotlight] = useState(() => {
+    const st = hashParam("stage");
+    return (OPEN_STAGES as readonly string[]).includes(st) ? (st as Schemas["Stage"]) : null;
+  });
+  const board = useRef<HTMLDivElement>(null);
+  const loaded = list.data !== undefined;
+  useEffect(() => {
+    if (!spotlight || !loaded) return;
+    const col = board.current?.querySelector<HTMLElement>(`.stage-${spotlight}`);
+    if (col && typeof col.scrollIntoView === "function") col.scrollIntoView({ block: "nearest", inline: "center" });
+    const t = window.setTimeout(() => { setSpotlight(null); }, 4000);
+    return () => { window.clearTimeout(t); };
+  }, [spotlight, loaded]);
   const [now] = useState(() => Date.now());
   const upcoming = useUpcoming(permissions, now);
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
@@ -153,7 +169,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
           </button>
         )}
       </ErrorMessage>
-      <div className="board">
+      <div className="board" ref={board}>
         {OPEN_STAGES.map((stage) => {
           const inStage = apps.filter((a) => a.stage === stage);
           const cards = bestFirst ? inStage.sort((a, b) => scoreOf(b) - scoreOf(a)) : inStage;
@@ -162,7 +178,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               key={stage}
               role="list"
               aria-label={STAGE[stage]}
-              className={over === stage ? `column stage-${stage} drop` : `column stage-${stage}`}
+              className={`column stage-${stage}${over === stage ? " drop" : ""}${spotlight === stage ? " spotlight" : ""}`}
               onDragOver={(e) => { if (dragging && dragging.stage !== stage) { e.preventDefault(); setOver(stage); } }}
               onDragLeave={() => { setOver(null); }}
               onDrop={(e) => {
