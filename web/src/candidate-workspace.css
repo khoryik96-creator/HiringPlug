@@ -22,7 +22,7 @@
 .candidate-tablist [role=tab] { flex-shrink: 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 10px 0; color: #6d657f; box-shadow: none; font-size: 12px; }
 .candidate-tablist [aria-selected=true] { border-bottom-color: #7653ed; color: #7653ed; }
 .candidate-tabs [role=tabpanel] > .panel:first-child { margin-top: 0; }
-.candidate-profile dl { display: grid; grid-template-columns: 100px minmax(0, 1fr) 100px minmax(0, 1fr); gap: 14px 16px; font-size: 13px; align-items: baseline; }
+.candidate-profile dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 14px 16px; font-size: 13px; align-items: baseline; }
 .candidate-profile dd { margin: 0; overflow-wrap: anywhere; }
 .work-authorization-options { display: flex; flex-wrap: wrap; gap: 3px; }
 .work-authorization-options button { border: 0; border-radius: 4px; background: transparent; box-shadow: none; padding: 6px 8px; font-size: 11px; min-height: 30px; }
@@ -64,7 +64,6 @@
 .email-candidates { grid-column: 1 / -1; font-size: 12px; margin: 4px 0; }
 .email-candidates > summary { cursor: pointer; color: #7450e5; padding: 6px 0; }
 .candidate-tabs .email { margin-top: 12px; }
-@media (max-width: 1300px) { .candidate-profile dl { grid-template-columns: 120px minmax(0, 1fr); } }
 @media (max-width: 760px) { .candidate-profile dl { grid-template-columns: minmax(0, 1fr); } }
 
 /* A company's and a contact's card and page use the candidate's layout. */

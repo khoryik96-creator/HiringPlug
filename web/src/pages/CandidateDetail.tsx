@@ -60,8 +60,9 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           <dl>
             <dt>Work authorization</dt>
             <dd><WorkAuthorizationPicker candidate={c} canEdit={permissions.includes("candidates:update")} /></dd>
-            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
+            {/* One column: industries and tags under the specialization. */}
             <dt>Specialization</dt><dd>{c.specialization ?? "—"}</dd>
+            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
           </dl>
