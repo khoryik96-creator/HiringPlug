@@ -107,8 +107,8 @@ While an import is open, more CVs go on its own drop box. Typing boolean rules i
 "Johnson and Johnson" stays a name search, and brackets alone do not count,
 so "(03) 2345 6789" stays a phone search) shows them in blue with a BOOLEAN
 badge and, once typing pauses, runs a boolean search: of CVs and profiles for
-candidates (their certifications too), of the name, website, main industry
-(and LinkedIn's), city and about for companies,
+candidates (their certifications too), of the name, website, industries and
+subindustries (and LinkedIn's industry), city and about for companies,
 of the full name, job title and email for contacts (an email's or website's
 words count on their own: `majubank`; fields stay apart, so a NEAR never
 runs from one into the next). A boolean that cannot be read
@@ -288,6 +288,9 @@ amounts. Before saving, the finished file (every part, headers and footers
 too) is checked for the name, email or phone: if one is still there, usually
 written in a template's own text, nothing is saved and you are told what
 kind of detail it was. The file name carries the reference, not the name.
+Employers, clients and their branded products are masked as whole names
+(Digi, Digi Prepaid, DigiPrepaid, Maybank2u), never inside an ordinary word:
+"Digital" stays "Digital" (CV Studio masked it as "[Company]tal").
 
 ## 3.5 AI assistant sidebar ✅ (off until an AI provider is set up)
 

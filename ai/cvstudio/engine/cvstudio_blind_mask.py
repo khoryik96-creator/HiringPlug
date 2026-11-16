@@ -109,6 +109,12 @@ _BLIND_ORG_TECH_ALLOWLIST = {
 }
 
 
+# What may follow an organisation name glued to a product to count as its brand
+# (HiringPlug): a new capitalised word or a digit - DigiPrepaid, GrabFood, Maybank2u -
+# not more letters of the same word (Digital, Digitalisation, DIGITAL).
+_BLIND_BRAND_JOIN = r"(?=(?-i:[A-Z][a-z]|[0-9]))"
+
+
 _BLIND_CURATED_ORG_NAMES = {
     "Maxis", "Celcom", "Digi", "CelcomDigi", "U Mobile", "Telekom Malaysia", "TM",
     "Axiata", "Time dotCom", "YTL", "Yes", "Astro", "Unifi",
@@ -1396,7 +1402,10 @@ def _blind_collect_org_mask_terms(original_cv):
         if not name or name.lower() in _BLIND_ORG_TECH_ALLOWLIST:
             continue
         exact_pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?![A-Za-z0-9])", re.I)
-        prefix_pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?=[A-Z0-9][A-Za-z0-9]{1,30})", re.I)
+        # HiringPlug: a glued brand form needs a new capitalised word or a digit after
+        # the name (DigiPrepaid, Maybank2u), never more of the same word - under re.I a
+        # bare [A-Z0-9] also matched "Digital", collecting Digi from "digital marketing".
+        prefix_pat = re.compile(r"(?<![A-Za-z0-9])" + re.escape(name) + _BLIND_BRAND_JOIN, re.I)
         if _blind_curated_name_present(name, compact_text, exact_pat, prefix_pat):
             _blind_add_mask_term(terms, name)
 
@@ -1449,7 +1458,10 @@ def _blind_org_term_specs(terms, employer_terms=()):
             # is deliberately left alone.
             lookahead = r"(?=(?-i:[A-Z][a-z]|[0-9]))"
         else:
-            lookahead = r"(?=[A-Z0-9][A-Za-z0-9]{1,30})"
+            # HiringPlug: the same rule for every name. A bare [A-Z0-9] under re.I let
+            # "Digi" eat the start of "Digital", "Digitalisation" and "DIGITAL", leaving
+            # "[Company]tal"; a brand written onto a product is CamelCase or a number.
+            lookahead = _BLIND_BRAND_JOIN
         specs.append((
             re.compile(r"(?<![A-Za-z0-9])(" + prefix + r")" + lookahead, re.I),
             ambiguous,

@@ -21,6 +21,10 @@ type Records interface {
 	LegacyIndustries(context.Context, pgx.Tx) ([]LegacyIndustry, error)
 	SetIndustrySummary(context.Context, pgx.Tx, string, string, *string) error
 	SetIndustrySummaries(ctx context.Context, tx pgx.Tx, kind string, ids, labels []string) error
+	// SetIndustryTerms keeps the words of every industry and subindustry a
+	// record has (for its text search); with all, ids are every record that
+	// has some, and the others' are cleared.
+	SetIndustryTerms(ctx context.Context, tx pgx.Tx, kind string, ids, terms []string, all bool) error
 	EmployerEvidence(context.Context, pgx.Tx, string) (Evidence, error)
 	VerifiedEmployer(context.Context, pgx.Tx, string) (string, error)
 }

@@ -57,9 +57,9 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
        OR search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
   -- A boolean search (boolsearch's query for to_tsquery).
-  -- The expression of company_search_doc_idx (00115), so the index answers.
+  -- The expression of company_search_doc_idx (00116), so the index answers.
   AND (sqlc.narg(tsquery)::text IS NULL
-       OR app_search_doc(name, website, industry, industry_hint, city, about) @@ to_tsquery('english', sqlc.narg(tsquery)::text))
+       OR app_search_doc(name, website, industry, industry_terms, industry_hint, city, about) @@ to_tsquery('english', sqlc.narg(tsquery)::text))
 ORDER BY id DESC
 LIMIT @row_limit;
 
@@ -162,6 +162,13 @@ DELETE FROM company_document WHERE id = @id AND company_id = @company_id RETURNI
 
 -- name: LegacyIndustries :many
 SELECT id, industry::text FROM company WHERE industry IS NOT NULL;
+-- The words of a company's industries and subindustries, for its search.
+-- name: SetIndustryTerms :exec
+UPDATE company c SET industry_terms = nullif(v.terms, '')
+FROM (SELECT unnest(@ids::text[]) AS id, unnest(@terms::text[]) AS terms) v
+WHERE c.id = v.id AND c.industry_terms IS DISTINCT FROM nullif(v.terms, '');
+-- name: ClearIndustryTermsExcept :exec
+UPDATE company SET industry_terms = NULL WHERE industry_terms IS NOT NULL AND id <> ALL(@ids::text[]);
 -- name: SetIndustrySummary :exec
 UPDATE company SET industry = sqlc.narg(industry), version = version + 1, updated_at = now()
 WHERE id = @id AND industry IS DISTINCT FROM sqlc.narg(industry);

@@ -1112,7 +1112,7 @@ paths:
         - name: boolean
           in: query
           description: >-
-            A boolean search of the name, website, main industry (and the one LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks).
+            A boolean search of the name, website, industries and subindustries (and the industry LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks).
           schema: {type: string, minLength: 1, maxLength: 1000}
         - name: type
           in: query

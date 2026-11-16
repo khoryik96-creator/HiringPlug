@@ -141,6 +141,9 @@ func (s *Service) saveIn(ctx context.Context, tx pgx.Tx, kind, id string, in *ap
 		if err := s.records.SetIndustrySummary(ctx, tx, kind, id, summary); err != nil {
 			return before, err
 		}
+		if err := s.records.SetIndustryTerms(ctx, tx, kind, []string{id}, []string{termsOf(in.Ids, items)}, false); err != nil {
+			return before, err
+		}
 	}
 	if err := audit.Record(ctx, tx, audit.Entry{Action: kind + ".industries_saved", EntityType: kind, EntityID: id, Changes: map[string]any{"categoryCount": len(in.Ids)}}); err != nil {
 		return before, err
@@ -217,7 +220,57 @@ func (s *Service) refreshSummaries(ctx context.Context, tx pgx.Tx) error {
 			return err
 		}
 	}
+	return s.refreshTerms(ctx, tx, items)
+}
+
+// refreshTerms rewrites every record's industry words (after a rename, move
+// or replacement): every industry and subindustry it has, current or not.
+func (s *Service) refreshTerms(ctx context.Context, tx pgx.Tx, items map[string]api.Industry) error {
+	rows, err := store.New(tx).AllIndustryAssignments(ctx)
+	if err != nil {
+		return err
+	}
+	chosen := map[string]map[string][]string{"candidate": {}, "company": {}}
+	for _, r := range rows {
+		kind, id := "candidate", r.CandidateID
+		if id == nil {
+			kind, id = "company", r.CompanyID
+		}
+		chosen[kind][*id] = append(chosen[kind][*id], r.CategoryID)
+	}
+	for kind, byID := range chosen {
+		ids, terms := make([]string, 0, len(byID)), make([]string, 0, len(byID))
+		for id, cats := range byID {
+			ids = append(ids, id)
+			terms = append(terms, termsOf(cats, items))
+		}
+		if err := s.records.SetIndustryTerms(ctx, tx, kind, ids, terms, true); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// termsOf is the words of the chosen categories: each one's, and its
+// industry's for a subindustry ("Financial Services Insurance Healthcare").
+func termsOf(ids []string, items map[string]api.Industry) string {
+	seen := map[string]bool{}
+	var words []string
+	add := func(label string) {
+		if label != "" && !seen[label] {
+			seen[label] = true
+			words = append(words, label)
+		}
+	}
+	for _, id := range ids {
+		item, ok := items[id]
+		if !ok {
+			continue
+		}
+		add(root(item, items).Label)
+		add(item.Label)
+	}
+	return strings.Join(words, " ")
 }
 
 func deref(s *string) string {

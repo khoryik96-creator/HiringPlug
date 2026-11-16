@@ -53,6 +53,19 @@ func (m *Module) SetIndustrySummary(ctx context.Context, tx pgx.Tx, id string, l
 	return store.New(tx).SetIndustrySummary(ctx, store.SetIndustrySummaryParams{ID: id, Industry: label})
 }
 
+// SetIndustryTerms keeps the words of all the companies' industries and
+// subindustries for their text search (all: ids are every company that has
+// some; the others' are cleared). Not a change of the company: no version.
+func (m *Module) SetIndustryTerms(ctx context.Context, tx pgx.Tx, ids, terms []string, all bool) error {
+	q := store.New(tx)
+	if all {
+		if err := q.ClearIndustryTermsExcept(ctx, ids); err != nil {
+			return err
+		}
+	}
+	return q.SetIndustryTerms(ctx, store.SetIndustryTermsParams{Ids: ids, Terms: terms})
+}
+
 // SetIndustrySummaries sets many summaries in one statement (labels[i] is ids[i]'s).
 func (m *Module) SetIndustrySummaries(ctx context.Context, tx pgx.Tx, ids, labels []string) error {
 	return store.New(tx).SetIndustrySummaries(ctx, store.SetIndustrySummariesParams{Ids: ids, Industries: labels})

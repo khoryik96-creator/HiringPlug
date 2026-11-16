@@ -39,6 +39,12 @@ func (a industryRecords) SetIndustrySummaries(ctx context.Context, tx pgx.Tx, ki
 	}
 	return a.m.Companies.SetIndustrySummaries(ctx, tx, ids, labels)
 }
+func (a industryRecords) SetIndustryTerms(ctx context.Context, tx pgx.Tx, kind string, ids, terms []string, all bool) error {
+	if kind == "candidate" {
+		return nil // a candidate's search reads the industry summary (profile_terms)
+	}
+	return a.m.Companies.SetIndustryTerms(ctx, tx, ids, terms, all)
+}
 func (a industryRecords) EmployerEvidence(ctx context.Context, tx pgx.Tx, id string) (industries.Evidence, error) {
 	c, e := a.m.Candidates.ViewIn(ctx, tx, authz.MustFromContext(ctx), id)
 	if e != nil {

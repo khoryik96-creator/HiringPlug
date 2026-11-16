@@ -351,6 +351,7 @@ type Company struct {
 	AutofillNameGuessed bool
 	IndustryHint        *string
 	IndustryPickSince   *time.Time
+	IndustryTerms       *string
 }
 
 type CompanyBenefit struct {

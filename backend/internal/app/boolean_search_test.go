@@ -91,3 +91,35 @@ func TestNoAIPickIsShownWhenTheAIIsOff(t *testing.T) {
 	c := a.createCompany(token, map[string]any{"name": "Kedai Runcit Ali"})
 	assert.False(t, *c.IndustryPending, "nothing will pick it, so nothing is said to be picking it")
 }
+
+func TestABooleanFindsACompanyByAnyOfItsIndustries(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	c := industryCatalogue(t, a, owner)
+	banking, education := industryNamed(t, c, "FSI – Banking"), industryNamed(t, c, "Education")
+	co := a.createCompany(owner, map[string]any{"name": "Sekolah Wang", "industrySelections": map[string]any{
+		"catalogueVersion": c.Version, "ids": []string{education.Id, banking.Id}, "primaryId": education.Id,
+	}})
+	find := func(boolean string) []string {
+		res := a.request(http.MethodGet, "/v1/companies?boolean="+url.QueryEscape(boolean), owner, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var page api.CompanyPage
+		res.JSON(&page)
+		var ids []string
+		for _, x := range page.Items {
+			ids = append(ids, x.Id)
+		}
+		return ids
+	}
+	assert.Equal(t, []string{co.Id}, find(`banking AND "financial services"`), "a second industry's subindustry, and its industry")
+	assert.Equal(t, []string{co.Id}, find(`education`), "the main one")
+
+	// Renamed in the catalogue: the company is found by the new words.
+	res := a.request(http.MethodPatch, "/v1/industries/"+banking.Id, owner, map[string]any{
+		"catalogueVersion": c.Version, "label": "FSI – Islamic Banking", "aliases": banking.Aliases, "retired": false, "parentId": banking.ParentId,
+	})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	assert.Equal(t, []string{co.Id}, find(`islamic`))
+}
