@@ -8946,6 +8946,34 @@ components:
           uniqueItems: true
           description: "The candidate list's columns, in order, after the name (null: the default ones)."
           items: {$ref: '#/components/schemas/CandidateColumn'}
+        favourites: {$ref: '#/components/schemas/Favourites'}
+    Favourites:
+      type: object
+      additionalProperties: false
+      description: >-
+        Your favourites in the dropdowns, shown first for you only (saving sends them all; a kind left out has none). Nothing is removed from the lists themselves, and every item can still be chosen.
+      properties:
+        specialization: {$ref: '#/components/schemas/FavouriteWords'}
+        itSkill: {$ref: '#/components/schemas/FavouriteWords'}
+        certification: {$ref: '#/components/schemas/FavouriteWords'}
+        industry:
+          type: array
+          maxItems: 300
+          uniqueItems: true
+          description: Industries and subindustries (catalogue IDs), in the order you chose them.
+          items: {type: string, minLength: 1, maxLength: 64}
+        country:
+          type: array
+          maxItems: 300
+          uniqueItems: true
+          description: Countries (2-letter codes), always at the top of country dropdowns.
+          items: {type: string, pattern: '^[A-Z]{2}$'}
+    FavouriteWords:
+      type: array
+      maxItems: 300
+      uniqueItems: true
+      description: Words of a Settings list, in the order you chose them.
+      items: {type: string, minLength: 1, maxLength: 200}
     DashboardBlock:
       type: string
       description: A block of the dashboard that can be moved.

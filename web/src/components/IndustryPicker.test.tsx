@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { api } from "../api/client";
@@ -12,7 +12,7 @@ function Picker({ candidate }: { candidate?: { id: string; version: number; curr
 describe("industry hierarchy", () => {
   it("supports broad-only selections, subindustries and search aliases while preserving earlier tags", () => {
     renderWithClient(<Picker />);
-    fireEvent.click(screen.getByRole("button", { name: /Financial Services/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Industries" })).getByRole("button", { name: /Financial Services/ }));
     fireEvent.click(screen.getByLabelText("FSI – Banking"));
     expect(screen.getByLabelText("Selection").textContent).toContain("industry_banking");
     expect(screen.getByLabelText("Selection").textContent).toContain("industry_education");
@@ -25,7 +25,7 @@ describe("industry hierarchy", () => {
     vi.spyOn(api, "GET").mockRejectedValue(new Error("Recognition unavailable"));
     renderWithClient(<Picker candidate={{ id: "candidate", version: 3, currentCompany: "Unknown" }} />);
     expect(await screen.findByText("Recognition unavailable")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Financial Services/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Industries" })).getByRole("button", { name: /Financial Services/ }));
     fireEvent.click(screen.getByLabelText("FSI – Banking"));
     expect(screen.getByLabelText("Selection").textContent).toContain("industry_banking");
   });

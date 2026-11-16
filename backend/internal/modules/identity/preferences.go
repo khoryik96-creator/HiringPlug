@@ -5,6 +5,7 @@ package identity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -85,6 +86,17 @@ func (m *Module) SetPreferences(ctx context.Context, p authz.Principal, in api.P
 			}
 			changes["dashboardBlocks"] = blocks
 		}
+		if in.Favourites != nil {
+			fav := cleanFavourites(*in.Favourites)
+			raw, err := json.Marshal(fav)
+			if err != nil {
+				return err
+			}
+			if err := q.SetFavourites(ctx, raw); err != nil {
+				return err
+			}
+			changes["favourites"] = fav
+		}
 		row, err := q.GetPreferences(ctx)
 		if err != nil && !database.IsNoRows(err) {
 			return err
@@ -103,6 +115,8 @@ func preferencesOf(row store.GetPreferencesRow) api.Preferences {
 		CandidateColumns: nullable.NewNullNullable[[]api.CandidateColumn](),
 		DashboardBlocks:  nullable.NewNullNullable[[]api.DashboardBlock](),
 	}
+	fav := favouritesOf(row.Favourites)
+	out.Favourites = &fav
 	if row.CandidateColumns != nil {
 		cols := make([]api.CandidateColumn, 0, len(row.CandidateColumns))
 		for _, c := range row.CandidateColumns {

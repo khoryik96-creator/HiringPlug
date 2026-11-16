@@ -4,7 +4,6 @@
 // notice and expected salary.
 import { useState } from "react";
 
-import { COUNTRIES } from "../forms";
 import { countryName } from "../../labels";
 import { AVAILABILITY } from "../candidateLook";
 import { useFieldSettings } from "../useFieldSettings";
@@ -12,8 +11,7 @@ import { useUsedValues } from "../useUsedValues";
 import { booleanTokens, EMPTY, NOTICE_CHOICES, type SearchState, UPDATED_CHOICES, WORK_KINDS } from "./candidateSearch";
 import { type Category, categoryLabel, useIndustries } from "../IndustryPicker";
 import { MultiSelect } from "./MultiSelect";
-
-const COUNTRY_CHOICES = COUNTRIES.map((c) => ({ value: c, label: countryName(c) }));
+import { countryGroups, type Fav, useFavourites } from "../favourites";
 
 export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose }: {
   value: SearchState;
@@ -75,6 +73,12 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
   const used = useUsedValues();
   const industries = useIndustries();
   const fs = useFieldSettings();
+  const favs = useFavourites();
+  // Every country: the person's favourites (or the usual ones) first, then the rest by name.
+  const countries = (chosen: string[]) => {
+    const g = countryGroups(undefined);
+    return [...new Set([...g.top, ...g.rest, ...chosen])].map((c) => ({ value: c, label: countryName(c) }));
+  };
   const set = <K extends keyof SearchState>(k: K) => (v: SearchState[K]) => { setDraft((d) => ({ ...d, [k]: v })); };
   const plain = (vs: string[]) => vs.map((v) => ({ value: v, label: v }));
   // Values already in use, plus any chosen before that are no longer used.
@@ -91,14 +95,14 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
         value={draft.availability} onChange={(v) => { set("availability")(v as SearchState["availability"]); }} />
       <MultiSelect label="Work authorization" choices={WORK_KINDS} value={draft.workAuthorization}
         onChange={(v) => { set("workAuthorization")(v as SearchState["workAuthorization"]); }} />
-      <MultiSelect label="Nationality" choices={COUNTRY_CHOICES} value={draft.nationality} onChange={set("nationality")} />
-      <MultiSelect label="Lives in" choices={COUNTRY_CHOICES} value={draft.residence} onChange={set("residence")} />
+      <MultiSelect label="Nationality" choices={countries(draft.nationality)} value={draft.nationality} onChange={set("nationality")} fav={favs.of("country")} />
+      <MultiSelect label="Lives in" choices={countries(draft.residence)} value={draft.residence} onChange={set("residence")} fav={favs.of("country")} />
       <MultiSelect label="Source" choices={fs.options("candidate_source").map((o) => ({ value: o.key, label: o.label }))}
         value={draft.source} onChange={set("source")} />
-      {industries.data ? <IndustryFilters items={industries.data.items} value={draft.industry} onChange={set("industry")} />
+      {industries.data ? <IndustryFilters items={industries.data.items} value={draft.industry} onChange={set("industry")} fav={favs.of("industry")} />
         : <MultiSelect label="Industry" align="end" choices={withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />}
       <div className="adv-skills">
-        <MultiSelect label="IT skills" choices={fromList("it_skill", used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} />
+        <MultiSelect label="IT skills" choices={fromList("it_skill", used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} fav={favs.of("itSkill")} />
         {draft.skills.length > 1 && (
           <div className="seg" role="group" aria-label="Skills needed">
             <button type="button" aria-pressed={draft.skillsMatch === "all"} onClick={() => { set("skillsMatch")("all"); }}>All</button>
@@ -107,9 +111,9 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
         )}
       </div>
       <MultiSelect label="Specialization" choices={fromList("specialization", used.specializations, draft.specialization)}
-        value={draft.specialization} onChange={set("specialization")} />
+        value={draft.specialization} onChange={set("specialization")} fav={favs.of("specialization")} />
       <MultiSelect label="Certifications" choices={fromList("certification", used.certifications, draft.certifications)}
-        value={draft.certifications} onChange={set("certifications")} />
+        value={draft.certifications} onChange={set("certifications")} fav={favs.of("certification")} />
       <MultiSelect label="Tags" choices={withChosen(used.tags, draft.tags)} value={draft.tags} onChange={set("tags")} />
       <label className="adv-field"><span className="multi-label">Location</span>
         <input value={draft.location} placeholder="e.g. Petaling Jaya" onChange={(e) => { set("location")(e.target.value); }} />
@@ -141,7 +145,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
  * subindustry list narrows to the industries chosen. Retired entries are
  * offered only while chosen.
  */
-function IndustryFilters({ items, value, onChange }: { items: Category[]; value: string[]; onChange: (v: string[]) => void }) {
+function IndustryFilters({ items, value, onChange, fav }: { items: Category[]; value: string[]; onChange: (v: string[]) => void; fav: Fav }) {
   const offered = (i: Category) => !i.retired || value.includes(i.id);
   const label = (i: Category, text: string) => text + (i.retired ? " · Retired" : "");
   const roots = items.filter((i) => !i.parentId && offered(i));
@@ -154,10 +158,10 @@ function IndustryFilters({ items, value, onChange }: { items: Category[]; value:
   return (
     <>
       <MultiSelect label="Industry" choices={roots.map((i) => ({ value: i.id, label: label(i, i.label) }))}
-        value={chosenRoots} onChange={(v) => { onChange([...v, ...chosenSubs]); }} />
+        value={chosenRoots} onChange={(v) => { onChange([...v, ...chosenSubs]); }} fav={fav} />
       <MultiSelect label="Subindustry" align="end"
         choices={subs.map((i) => ({ value: i.id, label: label(i, chosenRoots.length === 1 ? i.label : categoryLabel(i, items)) }))}
-        value={chosenSubs} onChange={(v) => { onChange([...chosenRoots, ...v]); }} />
+        value={chosenSubs} onChange={(v) => { onChange([...chosenRoots, ...v]); }} fav={fav} />
     </>
   );
 }

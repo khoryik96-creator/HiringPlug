@@ -144,7 +144,7 @@ SELECT EXISTS (SELECT 1 FROM revoked_session WHERE id = @id);
 
 -- The signed-in person's own settings (none until they change one).
 -- name: GetPreferences :one
-SELECT candidate_columns, dashboard_blocks FROM user_preference WHERE user_id = app_current_user();
+SELECT candidate_columns, dashboard_blocks, favourites FROM user_preference WHERE user_id = app_current_user();
 
 -- name: SetCandidateColumns :exec
 INSERT INTO user_preference (tenant_id, user_id, candidate_columns)
@@ -156,6 +156,11 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET candidate_columns = EXCLUDED.cand
 INSERT INTO user_preference (tenant_id, user_id, dashboard_blocks)
 VALUES (app_current_tenant(), app_current_user(), sqlc.narg(dashboard_blocks)::text[])
 ON CONFLICT (tenant_id, user_id) DO UPDATE SET dashboard_blocks = EXCLUDED.dashboard_blocks, updated_at = now();
+
+-- name: SetFavourites :exec
+INSERT INTO user_preference (tenant_id, user_id, favourites)
+VALUES (app_current_tenant(), app_current_user(), @favourites::jsonb)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET favourites = EXCLUDED.favourites, updated_at = now();
 
 -- name: ResetCandidateColumns :exec
 UPDATE user_preference SET candidate_columns = NULL, updated_at = now() WHERE user_id = app_current_user();

@@ -114,22 +114,54 @@ describe("candidate form", () => {
 
   it("picks the specialization, IT skills and certifications from the Settings lists, and removes them", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
-      ? ok(testFieldSettings()) : ok({ tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
+      ? ok(testFieldSettings()) : path === "/v1/me/preferences" ? ok({ favourites: {} })
+        : ok({ tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
     const onDone = vi.fn();
     renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP", "Excel"] })} onDone={onDone} />);
-    const skills = await screen.findByLabelText<HTMLSelectElement>("IT skills");
-    await waitFor(() => { expect(skills.options.length).toBe(3); });
-    expect([...skills.options].map((o) => o.text), "the list, less those chosen").toEqual(["Add an IT skill…", "Java", "Python"]);
-    fireEvent.change(skills, { target: { value: "Python" } });
+    const skills = await screen.findByLabelText<HTMLButtonElement>("IT skills");
+    await waitFor(() => { expect(skills.disabled, "once the lists load").toBe(false); });
+    fireEvent.click(skills);
+    await waitFor(() => { expect(optionsIn("All IT skills"), "the list, less those chosen").toEqual(["Java", "Python"]); });
+    fireEvent.click(screen.getByRole("button", { name: "Python" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove SAP" }));
     expect(screen.getByText("Excel"), "a word not in the list stays until removed").toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Professional certifications"), { target: { value: "ACCA" } });
-    const spec = screen.getByLabelText<HTMLSelectElement>("Specialization");
-    expect([...spec.options].map((o) => o.text)).toEqual(["—", "Cybersecurity", "Accounting & Finance"]);
-    fireEvent.change(spec, { target: { value: "Cybersecurity" } });
+    fireEvent.click(screen.getByLabelText("Professional certifications"));
+    fireEvent.click(screen.getByRole("button", { name: "ACCA" }));
+    fireEvent.click(screen.getByLabelText("Specialization"));
+    expect(optionsIn("All specializations")).toEqual(["Cybersecurity", "Accounting & Finance"]);
+    fireEvent.click(screen.getByRole("button", { name: "Cybersecurity" }));
+    expect(screen.getByLabelText("Specialization").textContent).toContain("Cybersecurity");
     save();
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     expect(sentBody(patch)).toMatchObject({ skills: ["Excel", "Python"], certifications: ["ACCA"], specialization: "Cybersecurity" });
   });
+
+  it("puts the person's favourite IT skills on top, and a star makes one a favourite", async () => {
+    let saved: unknown = { favourites: { itSkill: ["Python"], country: ["SG"] } }; // as the server keeps them
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
+      ? ok(testFieldSettings()) : path === "/v1/me/preferences" ? ok(saved)
+        : ok({ tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
+    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: unknown }) => { saved = init.body; return Promise.resolve(ok(init.body)); }) as never);
+    renderWithClient(<CandidateForm candidate={testCandidate({ skills: [] })} onDone={vi.fn()} />);
+    const skills = await screen.findByLabelText<HTMLButtonElement>("IT skills");
+    await waitFor(() => { expect(skills.disabled).toBe(false); });
+    fireEvent.click(skills);
+    await waitFor(() => { expect(optionsIn("Your favourites")).toEqual(["Python"]); });
+    expect(optionsIn("All IT skills"), "every other skill is still there").toEqual(["Java", "SAP"]);
+    fireEvent.click(screen.getByRole("button", { name: "Keep Java at the top (favourite)" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    expect(sentBody(put)).toEqual({ favourites: { itSkill: ["Python", "Java"], country: ["SG"] } });
+    expect(screen.getByRole("button", { name: "Remove Java from your favourites" }), "starred at once").toBeTruthy();
+    expect(optionsIn("All IT skills"), "but nothing moves under the mouse while open").toEqual(["Java", "SAP"]);
+    fireEvent.click(skills);
+    fireEvent.click(skills);
+    await waitFor(() => { expect(optionsIn("Your favourites"), "on top the next time").toEqual(["Python", "Java"]); });
+    const residence = screen.getByLabelText<HTMLSelectElement>("Country of residence");
+    expect(residence.querySelector("optgroup")?.label, "a favourite country is on top").toBe("★ Your favourites");
+    expect([...residence.querySelectorAll("optgroup")[0]?.querySelectorAll("option") ?? []].map((o) => o.value)).toEqual(["SG"]);
+  });
+
+  /** The items of a dropdown group, by its name. */
+  const optionsIn = (group: string) => [...screen.getByRole("list", { name: group }).querySelectorAll(".fav-pick")].map((b) => b.textContent);
 });

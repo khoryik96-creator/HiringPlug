@@ -31,6 +31,7 @@ const AiSearch = page(() => import("./pages/AiSearch"), "AiSearch");
 const CompareCvs = page(() => import("./pages/CompareCvs"), "CompareCvs");
 const ContactDetail = page(() => import("./pages/ContactDetail"), "ContactDetail");
 const ContactList = page(() => import("./pages/ContactList"), "ContactList");
+const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
@@ -155,6 +156,8 @@ export const ROUTES: Route[] = [
     render: () => <TeamBookings /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
     render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
+  { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
+    render: () => <MyDropdowns /> },
 ];
 
 const allowed = (r: Route, permissions: readonly Permission[]) =>

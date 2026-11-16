@@ -2,18 +2,23 @@
 // are chosen. Long lists get a box to narrow them.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { type Fav, splitFavourites, Star } from "../favourites";
+
 export type Choice = { value: string; label: string };
 
-export function MultiSelect({ label, choices, value, onChange, searchable = choices.length > 8, align = "start" }: {
+export function MultiSelect({ label, choices, value, onChange, searchable = choices.length > 8, align = "start", fav }: {
   label: string;
   choices: Choice[];
   value: string[];
   onChange: (v: string[]) => void;
   searchable?: boolean;
   align?: "start" | "end";
+  /** The person's favourites of this list: starred, and first. */
+  fav?: Fav;
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [order, setOrder] = useState<readonly string[]>([]); // favourites when opened: nothing jumps while open
   const box = useRef<HTMLDivElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState(align);
@@ -34,6 +39,19 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
     return () => { document.removeEventListener("mousedown", away); };
   }, [open]);
   const shown = choices.filter((c) => !filter.trim() || c.label.toLowerCase().includes(filter.trim().toLowerCase()));
+  const { top, rest } = splitFavourites(shown, (c) => c.value, fav && { ...fav, list: order, has: (v) => order.includes(v) });
+  const option = (c: Choice) => {
+    const on = value.includes(c.value);
+    return (
+      <div key={c.value} className="multi-row" role="presentation">
+        <label className={on ? "on" : undefined} role="option" aria-selected={on}>
+          <input type="checkbox" checked={on} onChange={() => { onChange(on ? value.filter((v) => v !== c.value) : [...value, c.value]); }} />
+          {c.label}
+        </label>
+        {fav && <Star fav={fav} value={c.value} label={c.label} />}
+      </div>
+    );
+  };
   const summary = value.length === 0 ? "Any"
     : value.length === 1 ? (choices.find((c) => c.value === value[0])?.label ?? value[0])
       : `${String(value.length)} chosen`;
@@ -41,7 +59,7 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
     <div className="multi" ref={box}>
       <span className="multi-label" id={id}>{label}</span>
       <button type="button" className={`multi-button${value.length > 0 ? " set" : ""}`} aria-haspopup="listbox" aria-expanded={open}
-        aria-labelledby={id} aria-describedby={`${id}-v`} onClick={() => { setSide(align); setOpen(!open); }}>
+        aria-labelledby={id} aria-describedby={`${id}-v`} onClick={() => { setSide(align); setOrder(fav?.list ?? []); setOpen(!open); }}>
         <span id={`${id}-v`}>{summary}</span><span aria-hidden="true" className="multi-caret">▾</span>
       </button>
       {open && (
@@ -52,15 +70,10 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
           )}
           <div className="multi-options">
             {shown.length === 0 && <p className="muted small">None match.</p>}
-            {shown.map((c) => {
-              const on = value.includes(c.value);
-              return (
-                <label key={c.value} className={on ? "on" : undefined} role="option" aria-selected={on}>
-                  <input type="checkbox" checked={on} onChange={() => { onChange(on ? value.filter((v) => v !== c.value) : [...value, c.value]); }} />
-                  {c.label}
-                </label>
-              );
-            })}
+            {top.length > 0 && <p className="fav-group">★ Your favourites</p>}
+            {top.map(option)}
+            {top.length > 0 && rest.length > 0 && <p className="fav-group">All</p>}
+            {rest.map(option)}
           </div>
           {value.length > 0 && <button type="button" className="link small" onClick={() => { onChange([]); }}>Clear</button>}
         </div>

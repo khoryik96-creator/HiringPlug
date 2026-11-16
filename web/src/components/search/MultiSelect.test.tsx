@@ -18,4 +18,17 @@ describe("MultiSelect", () => {
     fireEvent.click(screen.getByRole("button", { name: /Subindustry/ }));
     expect(screen.getByRole("listbox", { name: "Subindustry" }).className).toContain("align-end");
   });
+
+  it("lists the person's favourites first, starred, and a star adds or removes one", () => {
+    const toggle = vi.fn();
+    const fav = { list: ["SAP"], has: (v: string) => v === "SAP", toggle };
+    render(<MultiSelect label="IT skills" choices={["Java", "Python", "SAP"].map((v) => ({ value: v, label: v }))} value={[]} onChange={() => undefined} fav={fav} />);
+    fireEvent.click(screen.getByRole("button", { name: /IT skills/ }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent), "favourites first, then all the rest").toEqual(["SAP", "Java", "Python"]);
+    expect(screen.getByText("★ Your favourites")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove SAP from your favourites" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Keep Java at the top (favourite)" }));
+    expect(toggle).toHaveBeenCalledWith("Java");
+    expect((screen.getByRole("option", { name: "Java" }).querySelector("input") as HTMLInputElement).checked, "a star does not tick the item").toBe(false);
+  });
 });

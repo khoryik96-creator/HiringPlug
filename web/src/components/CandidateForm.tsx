@@ -3,7 +3,6 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type Candidate, unwrap } from "../api/client";
 import { candidateKey, candidatesKey } from "../api/keys";
-import { regionName } from "../labels";
 import {
   type CandidateFormState,
   candidateProblems,
@@ -14,10 +13,12 @@ import {
 import { Field } from "./Field";
 import { LabelInput } from "./LabelInput";
 import { ListPicker } from "./ListPicker";
+import { FavDropdown } from "./FavDropdown";
+import { CountryList, CountryOptions, useFavourites } from "./favourites";
 import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { NoticeField, WorkAuthFields } from "./ProfileFields";
 import { useUsedValues } from "./useUsedValues";
-import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { DuplicateEmail } from "./DuplicateEmail";
 import { SaveError } from "./SaveError";
 import { IndustryPicker } from "./IndustryPicker";
@@ -52,6 +53,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
   });
   const used = useUsedValues();
   const fs = useFieldSettings();
+  const favs = useFavourites();
   const req = (label: string, field: string) => labelFor(label, fs.mandatory("candidate", field));
   const errors = fieldErrors(save.error);
   const errorFor = (key: keyof CandidateFormState) => errors[FIELD_PATHS[key]];
@@ -81,16 +83,12 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       {text("phone", req("Phone", "phone"), { placeholder: "+60 12 345 6789" })}
       {text("linkedinUrl", req("LinkedIn profile", "linkedinUrl"), { placeholder: "linkedin.com/in/…", inputMode: "url", spellCheck: false })}
       {text("nationality", req("Nationality (2-letter code)", "nationality"), { list: "countries", placeholder: "e.g. MY", className: "code" })}
-      <datalist id="countries">
-        {COUNTRIES.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
-      </datalist>
+      <CountryList id="countries" fav={favs.of("country")} />
 
       <Field label={req("Country of residence", "residenceCountry")} error={errorFor("residenceCountry")}>
         <select value={form.residenceCountry} onChange={(e) => { set("residenceCountry", e.target.value); }}>
           <option value="">NA (not known)</option>
-          {[...new Set([...COUNTRIES, ...(form.residenceCountry ? [form.residenceCountry] : [])])].map((c) => (
-            <option key={c} value={c}>{regionName(c) ?? c}</option>
-          ))}
+          <CountryOptions fav={favs.of("country")} keep={form.residenceCountry} />
         </select>
       </Field>
       <WorkAuthFields form={form} onChange={change} label={req("Work authorization", "workAuthorization")}
@@ -102,10 +100,9 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
         sourceChanged={form.currentCompany !== opened.form.currentCompany || form.currentTitle !== opened.form.currentTitle}
         onChange={(industrySelections, industry) => { change({ industrySelections, industry }); }} />
       <Field label="Specialization" error={errorFor("specialization")}>
-        <select value={form.specialization} onChange={(e) => { set("specialization", e.target.value); }}>
-          <option value="">—</option>
-          {fs.options("specialization", form.specialization || null).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
+        <FavDropdown text={form.specialization || "—"} clear="—" noun="specializations" fav={favs.of("specialization")}
+          choices={fs.options("specialization", form.specialization || null).map((o) => ({ value: o.key, label: o.label }))}
+          onPick={(v) => { set("specialization", v); }} />
       </Field>
       {text("currentTitle", req("Current title", "currentTitle"))}
       {text("currentCompany", req("Current company", "currentCompany"))}
@@ -118,13 +115,14 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
 
       <div className="full">
         <Field label="IT skills" error={errorFor("skills")}>
-          <ListPicker value={form.skills} onChange={(v) => { set("skills", v); }} options={fs.options("it_skill").map((o) => o.label)} addLabel="Add an IT skill…" />
+          <ListPicker value={form.skills} onChange={(v) => { set("skills", v); }} options={fs.options("it_skill").map((o) => o.label)}
+            addLabel="Add an IT skill…" noun="IT skills" fav={favs.of("itSkill")} />
         </Field>
       </div>
       <div className="full">
         <Field label="Professional certifications" error={errorFor("certifications")}>
           <ListPicker value={form.certifications} onChange={(v) => { set("certifications", v); }}
-            options={fs.options("certification").map((o) => o.label)} addLabel="Add a certification…" />
+            options={fs.options("certification").map((o) => o.label)} addLabel="Add a certification…" noun="certifications" fav={favs.of("certification")} />
         </Field>
       </div>
       <div className="full">

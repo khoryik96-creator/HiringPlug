@@ -3,14 +3,15 @@ import { type InputHTMLAttributes, useRef, useState } from "react";
 
 import { api, type Company, unwrap } from "../api/client";
 import { companiesKey, companyKey } from "../api/keys";
-import { COMPANY_SIZE, COMPANY_TYPE, keysOf, regionName } from "../labels";
+import { COMPANY_SIZE, COMPANY_TYPE, keysOf } from "../labels";
 import { COMPANY_PATHS, companyFields, type CompanyFormState, companyProblems, formFromCompany } from "./companyFormState";
 import { companionCall, operationId, useCompanion } from "../companion";
 import { guessCompanyName } from "./companyNameGuess";
 import { companionCan, companyPage, type LinkedinAbout, sizeFromLinkedin } from "./linkedinCompany";
 import { IndustryPicker } from "./IndustryPicker";
 import { Field } from "./Field";
-import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { CountryList, useFavourites } from "./favourites";
+import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { SaveError } from "./SaveError";
 
 type TextKey = "name" | "website" | "linkedinUrl" | "industry" | "phone" | "city" | "country" | "registrationNumber";
@@ -34,6 +35,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
   const [nameGuessed, setNameGuessed] = useState(false);
   // Or from its LinkedIn page, read by the LinkedIn companion in this browser.
   const companion = useCompanion();
+  const favs = useFavourites();
   const linkedinPage = companyPage(form.linkedinUrl);
   const [fromLinkedin, setFromLinkedin] = useState<{ filled: string[]; industry: string } | null>(null);
   const [industryHint, setIndustryHint] = useState("");
@@ -184,9 +186,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
       {text("phone", "Phone")}
       {text("city", "City")}
       {text("country", "Country (2-letter code)", { list: "company-countries", placeholder: "e.g. MY", className: "code" })}
-      <datalist id="company-countries">
-        {COUNTRIES.map((c) => <option key={c} value={c}>{regionName(c)}</option>)}
-      </datalist>
+      <CountryList id="company-countries" fav={favs.of("country")} />
       {text("registrationNumber", "Registration no. (e.g. SSM)")}
       {area("address", "Address")}
       {area("about", "About")}

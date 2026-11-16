@@ -1,21 +1,25 @@
 // Choices from one of the company's lists (Settings > Dropdowns), such as IT
 // skills or certifications: those chosen as chips with a remove button, and a
-// dropdown to add more. Words already on the record that are not (or no
-// longer) in the list stay until removed.
-import { useId } from "react";
+// dropdown to add more (the person's favourites on top, starred with ☆).
+// Words already on the record that are not (or no longer) in the list stay
+// until removed.
+import { FavDropdown } from "./FavDropdown";
+import type { Fav } from "./favourites";
 
-export function ListPicker({ value, onChange, options, addLabel, ...aria }: {
+export function ListPicker({ value, onChange, options, addLabel, noun, fav, ...aria }: {
   value: string[];
   onChange: (labels: string[]) => void;
   /** The list's words, in its order. */
   options: string[];
-  /** The dropdown's first line, e.g. "Add an IT skill…". */
+  /** The dropdown's text, e.g. "Add an IT skill…". */
   addLabel: string;
+  /** The list's name, plural: "IT skills". */
+  noun: string;
+  fav?: Fav;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
   id?: string;
 }) {
-  const fallback = useId();
   const has = (o: string) => value.some((v) => v.toLowerCase() === o.toLowerCase());
   const left = options.filter((o) => !has(o));
   return (
@@ -30,11 +34,9 @@ export function ListPicker({ value, onChange, options, addLabel, ...aria }: {
           ))}
         </div>
       )}
-      <select id={aria.id ?? fallback} aria-invalid={aria["aria-invalid"]} aria-describedby={aria["aria-describedby"]} value=""
-        disabled={left.length === 0} onChange={(e) => { if (e.target.value) onChange([...value, e.target.value]); }}>
-        <option value="">{left.length === 0 ? "All chosen" : addLabel}</option>
-        {left.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <FavDropdown id={aria.id} aria-invalid={aria["aria-invalid"]} aria-describedby={aria["aria-describedby"]}
+        text={left.length === 0 && options.length > 0 ? "All chosen" : addLabel} disabled={left.length === 0}
+        noun={noun} fav={fav} choices={left.map((o) => ({ value: o, label: o }))} onPick={(v) => { if (v) onChange([...value, v]); }} />
     </div>
   );
 }

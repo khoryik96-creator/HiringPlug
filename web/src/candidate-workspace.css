@@ -10,6 +10,8 @@
 .candidate-banner .banner-strip > div { padding: 8px 13px; flex-direction: column; align-items: flex-start; gap: 2px; }
 .candidate-banner .banner-strip .label { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .candidate-banner .banner-strip .figure { font-size: 20px; }
+/* Salary and notice period read at a glance: larger than the job title. */
+.candidate-banner .banner-strip > div:not(:first-child) .figure { font-size: 24px; }
 .candidate-banner .banner-strip .figure small, .candidate-banner .banner-strip .note { font: 10px Inter, sans-serif; }
 .candidate-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
 .candidate-contact { margin-top: 0; padding: 18px; font-size: 12px; overflow-wrap: anywhere; }

@@ -2438,6 +2438,25 @@ class UserSummary(BaseModel):
     role: Role
 
 
+class IndustryItem1(RootModel[str]):
+    root: Annotated[str, Field(max_length=64, min_length=1)]
+
+
+class CountryItem(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[A-Z]{2}$")]
+
+
+class FavouriteWord(RootModel[str]):
+    root: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class FavouriteWords(RootModel[list[FavouriteWord]]):
+    root: Annotated[
+        list[FavouriteWord],
+        Field(description="Words of a Settings list, in the order you chose them.", max_length=300),
+    ]
+
+
 class DashboardBlock(StrEnum):
     numbers = "numbers"
     needsYou = "needsYou"
@@ -5738,22 +5757,24 @@ class UserList(BaseModel):
     items: list[UserSummary]
 
 
-class Preferences(BaseModel):
+class Favourites(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    dashboardBlocks: Annotated[
-        list[DashboardBlock] | None,
+    specialization: FavouriteWords | None = None
+    itSkill: FavouriteWords | None = None
+    certification: FavouriteWords | None = None
+    industry: Annotated[
+        list[IndustryItem1] | None,
         Field(
-            description="The dashboard's blocks below search, in the order you dragged them (null: the default order).",
-            max_length=20,
+            description="Industries and subindustries (catalogue IDs), in the order you chose them.",
+            max_length=300,
         ),
     ] = None
-    candidateColumns: Annotated[
-        list[CandidateColumn] | None,
+    country: Annotated[
+        list[CountryItem] | None,
         Field(
-            description="The candidate list's columns, in order, after the name (null: the default ones).",
-            max_length=20,
+            description="Countries (2-letter codes), always at the top of country dropdowns.", max_length=300
         ),
     ] = None
 
@@ -6513,6 +6534,27 @@ class EmailPreviewRequest(BaseModel):
         ),
     ] = None
     timeZone: Annotated[str, Field(examples=["Asia/Kuala_Lumpur"], max_length=64)]
+
+
+class Preferences(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    dashboardBlocks: Annotated[
+        list[DashboardBlock] | None,
+        Field(
+            description="The dashboard's blocks below search, in the order you dragged them (null: the default order).",
+            max_length=20,
+        ),
+    ] = None
+    candidateColumns: Annotated[
+        list[CandidateColumn] | None,
+        Field(
+            description="The candidate list's columns, in order, after the name (null: the default ones).",
+            max_length=20,
+        ),
+    ] = None
+    favourites: Favourites | None = None
 
 
 class JdFile(BaseModel):

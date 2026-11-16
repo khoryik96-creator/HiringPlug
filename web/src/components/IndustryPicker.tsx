@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "./ErrorMessage";
+import { Star, useFavourites } from "./favourites";
 import "./industries.css";
 
 export type Category = Schemas["Industry"];
@@ -24,6 +25,7 @@ export function IndustryPicker({ value, legacy, onChange, candidate, sourceChang
   const [parent, setParent] = useState("");
   const [search, setSearch] = useState("");
   const [employer, setEmployer] = useState<number | undefined>();
+  const fav = useFavourites().of("industry");
   const suggestion = useQuery({ queryKey: ["industry-suggestion", candidate?.id, candidate?.version, employer], enabled: !!candidate && (!!candidate.currentCompany || !!candidate.experience?.length) && !sourceChanged,
     queryFn: async () => unwrap(await api.GET("/v1/candidates/{candidateId}/industry-suggestion", {
       params: { path: { candidateId: candidate?.id ?? "" }, query: employer === undefined ? {} : { employerIndex: employer } },
@@ -69,10 +71,14 @@ export function IndustryPicker({ value, legacy, onChange, candidate, sourceChang
         <button type="button" className="link" aria-label={`Remove ${item?.label ?? "category"}`} onClick={() => { toggle(id); }}>×</button></div>;
     })}</div>
     {choices.catalogueVersion !== data.version && <p role="status" className="muted">The industry catalogue changed. Review your selections. <button type="button" className="link" onClick={() => { change(choices.ids, choices.primaryId); }}>Use updated catalogue</button></p>}
+    {fav.list.length > 0 && <div className="industry-favourites" role="group" aria-label="Your favourite industries"><small>★ Your favourites</small>
+      {fav.list.map((id) => items.find((i) => i.id === id)).filter((i): i is Category => !!i && active.includes(i)).map((i) => <label key={i.id} className="chip">
+        <input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} />{categoryLabel(i, items)}</label>)}</div>}
     <label className="field"><span>Search industries</span><input type="search" aria-label="Search industries" value={search} onChange={(e) => { setSearch(e.target.value); }} /></label>
     <div className="industry-browser"><div className="industry-parents" role="group" aria-label="Industries">{roots.map((i) => <button key={i.id} type="button" className={i.id === current?.id ? "selected" : ""} onClick={() => { setParent(i.id); }}>{i.label}<small>{active.filter((c) => c.parentId === i.id).length}</small></button>)}</div>
       <div className="industry-children">{current ? <><strong>{current.label}</strong>{[current, ...active.filter((i) => i.parentId === current.id && (categoryMatches(current, search) || categoryMatches(i, search)))].map((i) => <label className="row" key={i.id}>
-        <input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} /><span>{i.id === current.id ? "Industry only" : i.label}</span></label>)}</> : <p className="muted">No matching industries.</p>}</div>
+        <input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} /><span>{i.id === current.id ? "Industry only" : i.label}</span>
+        <Star fav={fav} value={i.id} label={categoryLabel(i, items)} /></label>)}</> : <p className="muted">No matching industries.</p>}</div>
     </div>
   </section>;
 }

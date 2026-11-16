@@ -1270,6 +1270,7 @@ type UserPreference struct {
 	CandidateColumns []string
 	UpdatedAt        time.Time
 	DashboardBlocks  []string
+	Favourites       []byte
 }
 
 type Webhook struct {

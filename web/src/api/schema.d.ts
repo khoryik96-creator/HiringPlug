@@ -6067,7 +6067,20 @@ export interface components {
             dashboardBlocks?: components["schemas"]["DashboardBlock"][] | null;
             /** @description The candidate list's columns, in order, after the name (null: the default ones). */
             candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
+            favourites?: components["schemas"]["Favourites"];
         };
+        /** @description Your favourites in the dropdowns, shown first for you only (saving sends them all; a kind left out has none). Nothing is removed from the lists themselves, and every item can still be chosen. */
+        Favourites: {
+            specialization?: components["schemas"]["FavouriteWords"];
+            itSkill?: components["schemas"]["FavouriteWords"];
+            certification?: components["schemas"]["FavouriteWords"];
+            /** @description Industries and subindustries (catalogue IDs), in the order you chose them. */
+            industry?: string[];
+            /** @description Countries (2-letter codes), always at the top of country dropdowns. */
+            country?: string[];
+        };
+        /** @description Words of a Settings list, in the order you chose them. */
+        FavouriteWords: string[];
         /**
          * @description A block of the dashboard that can be moved.
          * @enum {string}

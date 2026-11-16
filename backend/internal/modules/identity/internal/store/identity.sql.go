@@ -196,19 +196,20 @@ func (q *Queries) EndLinks(ctx context.Context, arg EndLinksParams) error {
 }
 
 const getPreferences = `-- name: GetPreferences :one
-SELECT candidate_columns, dashboard_blocks FROM user_preference WHERE user_id = app_current_user()
+SELECT candidate_columns, dashboard_blocks, favourites FROM user_preference WHERE user_id = app_current_user()
 `
 
 type GetPreferencesRow struct {
 	CandidateColumns []string
 	DashboardBlocks  []string
+	Favourites       []byte
 }
 
 // The signed-in person's own settings (none until they change one).
 func (q *Queries) GetPreferences(ctx context.Context) (GetPreferencesRow, error) {
 	row := q.db.QueryRow(ctx, getPreferences)
 	var i GetPreferencesRow
-	err := row.Scan(&i.CandidateColumns, &i.DashboardBlocks)
+	err := row.Scan(&i.CandidateColumns, &i.DashboardBlocks, &i.Favourites)
 	return i, err
 }
 
@@ -699,6 +700,17 @@ ON CONFLICT (tenant_id, user_id) DO UPDATE SET dashboard_blocks = EXCLUDED.dashb
 // NULL: back to the default order.
 func (q *Queries) SetDashboardBlocks(ctx context.Context, dashboardBlocks []string) error {
 	_, err := q.db.Exec(ctx, setDashboardBlocks, dashboardBlocks)
+	return err
+}
+
+const setFavourites = `-- name: SetFavourites :exec
+INSERT INTO user_preference (tenant_id, user_id, favourites)
+VALUES (app_current_tenant(), app_current_user(), $1::jsonb)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET favourites = EXCLUDED.favourites, updated_at = now()
+`
+
+func (q *Queries) SetFavourites(ctx context.Context, favourites []byte) error {
+	_, err := q.db.Exec(ctx, setFavourites, favourites)
 	return err
 }
 

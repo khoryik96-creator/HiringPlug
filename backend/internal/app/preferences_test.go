@@ -73,3 +73,45 @@ func TestEachPersonArrangesTheirOwnDashboard(t *testing.T) {
 	assert.True(t, prefs(me).DashboardBlocks.IsNull(), "back to the default order")
 	assert.Equal(t, []api.CandidateColumn{"status", "email"}, prefs(me).CandidateColumns.MustGet())
 }
+
+func TestEachPersonKeepsTheirOwnDropdownFavourites(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleSourcer)
+	me, other := tenant.Users[api.RoleRecruiter].Token, tenant.Users[api.RoleSourcer].Token
+	favs := func(token string) api.Favourites {
+		var p api.Preferences
+		res := a.request(http.MethodGet, "/v1/me/preferences", token, nil)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		res.JSON(&p)
+		require.NotNil(t, p.Favourites)
+		return *p.Favourites
+	}
+	none := favs(me)
+	assert.Empty(t, *none.ItSkill, "none until chosen")
+	assert.Empty(t, *none.Country)
+
+	res := a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"favourites": map[string]any{
+		"itSkill":        []string{"Java", " Python ", "java"}, // a repeat in another case counts once
+		"specialization": []string{"Finance"},
+		"country":        []string{"SG", "MY"},
+		"industry":       []string{"0b7c0d2e-1111-4a4a-9c9c-000000000001"},
+	}})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	got := favs(me)
+	assert.Equal(t, []string{"Java", "Python"}, *got.ItSkill, "in the order chosen")
+	assert.Equal(t, []string{"SG", "MY"}, *got.Country)
+	assert.Equal(t, []string{"Finance"}, *got.Specialization)
+	assert.Len(t, *got.Industry, 1)
+	assert.Empty(t, *got.Certification, "a kind left out has none")
+	assert.Empty(t, *favs(other).ItSkill, "someone else's favourites are theirs alone")
+
+	// Changing the columns leaves the favourites as they are.
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"candidateColumns": []string{"status"}}).Status)
+	assert.Equal(t, []string{"Java", "Python"}, *favs(me).ItSkill)
+
+	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodPut, "/v1/me/preferences", me,
+		map[string]any{"favourites": map[string]any{"country": []string{"Malaysia"}}}).Status, "countries are 2-letter codes")
+	assert.Equal(t, http.StatusBadRequest, a.request(http.MethodPut, "/v1/me/preferences", me,
+		map[string]any{"favourites": map[string]any{"colour": []string{"red"}}}).Status, "only the dropdowns that have favourites")
+}

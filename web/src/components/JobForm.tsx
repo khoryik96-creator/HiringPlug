@@ -3,11 +3,12 @@ import { type InputHTMLAttributes, useState } from "react";
 
 import { api, type JobOrder, unwrap } from "../api/client";
 import { contactsKey, jobKey, jobsKey } from "../api/keys";
-import { JOB_STATUS, keysOf, regionName } from "../labels";
+import { JOB_STATUS, keysOf } from "../labels";
 import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { Field } from "./Field";
-import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
+import { CountryOptions, useFavourites } from "./favourites";
+import { fieldErrors, FormInvalid, sameBody } from "./forms";
 import { JdDrop } from "./JdDrop";
 import { fillFromJd, formFromJob, JOB_PATHS, jobFields, type JobFormState, jobProblems, todayLocal } from "./jobFormState";
 import { SaveError } from "./SaveError";
@@ -55,6 +56,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
   });
   const errors = fieldErrors(save.error);
   const fs = useFieldSettings();
+  const favs = useFavourites();
   const req = (label: string, field: string) => labelFor(label, fs.mandatory("job", field));
   const set = <K extends keyof JobFormState>(key: K, value: JobFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -98,7 +100,7 @@ export function JobForm({ job, company = null, onDone, onSaved }: {
       <Field label="Country" error={errors[JOB_PATHS.country]}>
         <select value={form.country} onChange={(e) => { set("country", e.target.value); }}>
           <option value="">—</option>
-          {[...new Set([...COUNTRIES, ...(form.country ? [form.country] : [])])].map((c) => <option key={c} value={c}>{regionName(c) ?? c}</option>)}
+          <CountryOptions fav={favs.of("country")} keep={form.country} />
         </select>
       </Field>
       <Field label="Official intake date" error={errors[JOB_PATHS.intakeDate]}>
