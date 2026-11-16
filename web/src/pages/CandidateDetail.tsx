@@ -65,6 +65,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
+            <dt>Certifications</dt>
+            <dd><Chips labels={c.certifications} /></dd>
           </dl>
         </section>
       )}

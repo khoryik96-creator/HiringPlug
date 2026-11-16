@@ -111,6 +111,7 @@ func (h *HTTP) CreateCandidate(ctx context.Context, req api.CreateCandidateReque
 		CurrentCompany:     valueOrNil(b.CurrentCompany),
 		Tags:               deref(b.Tags),
 		Skills:             deref(b.Skills),
+		Certifications:     deref(b.Certifications),
 		Location:           valueOrNil(b.Location),
 		Source:             convertPtr[string](valueOrNil(b.Source)),
 	}
@@ -153,6 +154,7 @@ func (h *HTTP) UpdateCandidate(ctx context.Context, req api.UpdateCandidateReque
 		Source:             change(b.Source, func(s api.CandidateSource) string { return s }),
 		Tags:               Change[[]string]{Set: b.Tags != nil, Value: deref(b.Tags)},
 		Skills:             Change[[]string]{Set: b.Skills != nil, Value: deref(b.Skills)},
+		Certifications:     Change[[]string]{Set: b.Certifications != nil, Value: deref(b.Certifications)},
 	}
 	view, err := h.svc.Update(ctx, authz.MustFromContext(ctx), req.CandidateId, b.Version, patch)
 	if err != nil {
@@ -209,6 +211,7 @@ func candidateToAPI(v View) api.Candidate {
 		Source:             orNull(convertPtr[api.CandidateSource](p.Source)),
 		Tags:               nonNil(p.Tags),
 		Skills:             nonNil(p.Skills),
+		Certifications:     nonNil(p.Certifications),
 		RestrictedFields:   []api.RestrictedField{},
 		OwnerId:            orNull(v.OwnerID),
 		OwnerName:          orNull(v.OwnerName),

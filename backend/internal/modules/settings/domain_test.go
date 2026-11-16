@@ -34,7 +34,7 @@ func builtIns(name string) []OptionInput {
 
 func TestDefaultsUntilACompanySaves(t *testing.T) {
 	all := Lists(map[string][]Option{"candidate_source": {{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true}}})
-	require.Len(t, all, 11)
+	require.Len(t, all, 14)
 	assert.Equal(t, []string{"RFL", "LF"}, labelsOf(all[5].Options), "a screening call's items, ready to change")
 	assert.Equal(t, "candidate_source", all[0].Name)
 	assert.Equal(t, []Option{{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true, BuiltIn: true}}, all[0].Options)
@@ -148,7 +148,7 @@ func TestBenefitItemsCarryHints(t *testing.T) {
 
 func TestCompanyCategoriesCarryAColour(t *testing.T) {
 	all := Lists(nil)
-	cats := all[len(all)-2]
+	cats := all[9]
 	require.Equal(t, "company_category", cats.Name)
 	assert.True(t, cats.Colors)
 	assert.Equal(t, []string{"Signed client", "Prospective client", "Unknown", "VIP client"}, labelsOf(cats.Options))
@@ -169,7 +169,7 @@ func TestCompanyCategoriesCarryAColour(t *testing.T) {
 
 func TestContactRolesCarryAColour(t *testing.T) {
 	all := Lists(nil)
-	roles := all[len(all)-1]
+	roles := all[10]
 	require.Equal(t, "contact_role", roles.Name)
 	assert.True(t, roles.Colors)
 	assert.Equal(t, []string{"Hiring manager", "HR"}, labelsOf(roles.Options))
@@ -178,4 +178,21 @@ func TestContactRolesCarryAColour(t *testing.T) {
 	assert.Equal(t, Option{Key: "talent_acquisition", Label: "Talent acquisition", Color: "#0d9488"}, got[2])
 	_, err = CheckList("contact_role", []OptionInput{{Key: "hr", Label: "HR"}})
 	require.Error(t, err, "the built-in roles can be hidden, not removed")
+}
+
+func TestSpecializationsSkillsAndCertificationsAreWords(t *testing.T) {
+	all := Lists(nil)
+	names := []string{all[11].Name, all[12].Name, all[13].Name}
+	assert.Equal(t, []string{"specialization", "it_skill", "certification"}, names)
+	for _, name := range names {
+		got, err := CheckList(name, []OptionInput{{Label: "  Site  Reliability "}, {Label: "PMP"}})
+		require.NoError(t, err, name)
+		assert.Equal(t, "Site Reliability", got[0].Key, "%s: stored as its words", name)
+		assert.Equal(t, "PMP", got[1].Key)
+		_, err = CheckList(name, []OptionInput{{Label: "Only this one"}})
+		require.NoError(t, err, "%s: the starting ones may be removed", name)
+	}
+	assert.False(t, all[12].Options[0].BuiltIn, "so none is marked as coming with the app")
+	assert.Equal(t, ".NET", all[12].Options[0].Label)
+	assert.Equal(t, "Fortinet", all[13].Options[len(all[13].Options)-1].Label)
 }

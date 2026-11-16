@@ -37,6 +37,8 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
   },
   company_category: { signed_client: "Signed client", prospective_client: "Prospective client", unknown: "Unknown", vip_client: "VIP client" },
   contact_role: { hiring_manager: "Hiring manager", hr: "HR" },
+  // Words lists: their choices come from Settings (nothing to fall back on).
+  specialization: {}, it_skill: {}, certification: {},
 };
 
 /** The built-in categories' and contact roles' colours, used until the company's load. */

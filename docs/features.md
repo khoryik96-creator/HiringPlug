@@ -59,7 +59,8 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Work authorization | `local`; `expat_eligible` with basis `rp_t` (Residence Pass-Talent), `permanent_resident`, `spouse_visa` or `other`; `requires_visa`. The basis is required exactly when the status is `expat_eligible` (checked in Go and again by the database). |
 | Notice period | Value and unit (days, weeks, months); 0 means immediate |
 | Industry, specialization | Shared industries/subindustries catalogue in Settings, applied to both candidates and companies. Select multiple current/historical categories in profile editing or during a screening call. Go suggests the employer’s business using saved company selections and explicit employer-name rules; ambiguous employers are chosen manually. Specialization stays a separate job-function field. See [industries.md](industries.md). |
-| Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. The form suggests labels already in use; the candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
+| Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. IT skills are picked from the company's IT skills list (Settings › Dropdowns); tags are typed, with labels already in use suggested. The candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
+| Specialization, certifications | Picked from the company's Specialization and Professional certifications lists (Settings › Dropdowns: add, rename, reorder, hide or remove any item; candidates keep the words they have). Up to 50 certifications of 100 characters, shown under Details. Advanced search narrows by specialization (any chosen) and certifications (every one chosen). |
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
@@ -94,7 +95,7 @@ their CVs leaves them out, even when their profile matches). The box shows
 how it is read (operators, phrases and words left out in their colours).
 Dropdowns narrow it: status, work authorization (local, PR, spousal / RP-T
 / other pass, needs pass, not known), nationality, where they live, source,
-industry, skills (all or any of them), tags, location, notice period (at
+industry, IT skills (all or any of them), specialization, certifications, tags, location, notice period (at
 most), expected salary (at most, RM a month; only for roles that may see
 salaries, and the database enforces it), and when the profile was last
 updated. What is set shows as chips to remove one by one; the search is

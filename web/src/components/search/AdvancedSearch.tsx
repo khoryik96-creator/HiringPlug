@@ -1,6 +1,7 @@
 // The advanced candidate search: a boolean search of their CVs and profiles,
 // and dropdowns to narrow by status, work authorization, where they are
-// from and live, source, industry, skills, notice and expected salary.
+// from and live, source, industry, IT skills, specialization, certifications,
+// notice and expected salary.
 import { useState } from "react";
 
 import { COUNTRIES } from "../forms";
@@ -78,6 +79,12 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
   const plain = (vs: string[]) => vs.map((v) => ({ value: v, label: v }));
   // Values already in use, plus any chosen before that are no longer used.
   const withChosen = (vs: string[], chosen: string[]) => plain([...new Set([...vs, ...chosen])]);
+  // A Settings list first (its order), then words candidates already have, then any chosen before.
+  const fromList = (name: "it_skill" | "specialization" | "certification", vs: string[], chosen: string[]) => {
+    const listed = fs.options(name).map((o) => o.label);
+    const seen = new Set(listed.map((l) => l.toLowerCase()));
+    return plain([...listed, ...[...new Set([...vs, ...chosen])].filter((v) => !seen.has(v.toLowerCase()))]);
+  };
   return (
     <div className="adv-grid">
       <MultiSelect label="Status" choices={Object.entries(AVAILABILITY).map(([v, a]) => ({ value: v, label: a.label }))}
@@ -91,7 +98,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       {industries.data ? <IndustryFilters items={industries.data.items} value={draft.industry} onChange={set("industry")} />
         : <MultiSelect label="Industry" align="end" choices={withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />}
       <div className="adv-skills">
-        <MultiSelect label="Skills" choices={withChosen(used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} />
+        <MultiSelect label="IT skills" choices={fromList("it_skill", used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} />
         {draft.skills.length > 1 && (
           <div className="seg" role="group" aria-label="Skills needed">
             <button type="button" aria-pressed={draft.skillsMatch === "all"} onClick={() => { set("skillsMatch")("all"); }}>All</button>
@@ -99,6 +106,10 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
           </div>
         )}
       </div>
+      <MultiSelect label="Specialization" choices={fromList("specialization", used.specializations, draft.specialization)}
+        value={draft.specialization} onChange={set("specialization")} />
+      <MultiSelect label="Certifications" choices={fromList("certification", [], draft.certifications)}
+        value={draft.certifications} onChange={set("certifications")} />
       <MultiSelect label="Tags" choices={withChosen(used.tags, draft.tags)} value={draft.tags} onChange={set("tags")} />
       <label className="adv-field"><span className="multi-label">Location</span>
         <input value={draft.location} placeholder="e.g. Petaling Jaya" onChange={(e) => { set("location")(e.target.value); }} />

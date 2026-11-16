@@ -4403,6 +4403,8 @@ export interface components {
             source: components["schemas"]["CandidateSource"] | null;
             tags: string[];
             skills: string[];
+            /** @description e.g. AWS Solutions Architect, PMP, ACCA (chosen from the company's certifications list). */
+            certifications: string[];
             /** @description Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded. */
             compensation?: components["schemas"]["Compensation"] | null;
             restrictedFields: components["schemas"]["RestrictedField"][];
@@ -4437,6 +4439,7 @@ export interface components {
             /** @description Your own labels, e.g. relocate (duplicates ignoring case are removed). */
             tags?: string[];
             skills?: string[];
+            certifications?: string[];
         };
         CandidateUpdate: {
             /** @description The version you loaded. */
@@ -4465,6 +4468,7 @@ export interface components {
             /** @description Your own labels, e.g. relocate (duplicates ignoring case are removed). */
             tags?: string[];
             skills?: string[];
+            certifications?: string[];
         };
         CandidateSummary: {
             /** @description ISO country code. */
@@ -4520,6 +4524,10 @@ export interface components {
              * @enum {string}
              */
             skillsMatch: "all" | "any";
+            /** @description Any one of these specializations (ignoring case). */
+            specialization?: string[];
+            /** @description Every one of these certifications (ignoring case). */
+            certifications?: string[];
             tags?: string[];
             /** @description Part of where they are (ignoring case). */
             location?: string;
@@ -8189,10 +8197,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour), specialization, it_skill and certification (the choices for a candidate's specialization, skills and certifications; stored as their words, like industries).
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category" | "contact_role";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category" | "contact_role" | "specialization" | "it_skill" | "certification";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}

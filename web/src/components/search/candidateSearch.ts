@@ -16,6 +16,8 @@ export type SearchState = {
   industry: string[];
   skills: string[];
   skillsMatch: "all" | "any";
+  specialization: string[];
+  certifications: string[];
   tags: string[];
   location: string;
   noticeMaxDays: number | null;
@@ -25,7 +27,7 @@ export type SearchState = {
 
 export const EMPTY: SearchState = {
   boolean: "", availability: [], workAuthorization: [], nationality: [], residence: [], source: [], industry: [], skills: [],
-  skillsMatch: "all", tags: [], location: "", noticeMaxDays: null, salaryMax: "", updatedWithinDays: null,
+  skillsMatch: "all", specialization: [], certifications: [], tags: [], location: "", noticeMaxDays: null, salaryMax: "", updatedWithinDays: null,
 };
 
 export const WORK_KINDS: { value: Kind; label: string }[] = [
@@ -90,6 +92,8 @@ export function toBody(s: SearchState, q: string, mine: boolean, page?: PageAt, 
   body.source = list(s.source);
   body.industry = list(s.industry);
   body.skills = list(s.skills);
+  body.specialization = list(s.specialization);
+  body.certifications = list(s.certifications);
   body.tags = list(s.tags);
   if (s.location.trim()) body.location = s.location.trim();
   if (s.noticeMaxDays !== null) body.noticeMaxDays = s.noticeMaxDays;
@@ -117,7 +121,9 @@ export function activeChips(s: SearchState, sourceLabel: (key: string) => string
   many("Lives in", s.residence, countryName, (x) => ({ ...x, residence: [] }));
   many("Source", s.source, sourceLabel, (x) => ({ ...x, source: [] }));
   many("Industry", s.industry, industryLabel, (x) => ({ ...x, industry: [] }));
-  many(s.skillsMatch === "any" && s.skills.length > 1 ? "Any skill of" : "Skills", s.skills, (v) => v, (x) => ({ ...x, skills: [] }));
+  many(s.skillsMatch === "any" && s.skills.length > 1 ? "Any IT skill of" : "IT skills", s.skills, (v) => v, (x) => ({ ...x, skills: [] }));
+  many("Specialization", s.specialization, (v) => v, (x) => ({ ...x, specialization: [] }));
+  many("Certifications", s.certifications, (v) => v, (x) => ({ ...x, certifications: [] }));
   many("Tags", s.tags, (v) => v, (x) => ({ ...x, tags: [] }));
   if (s.location.trim()) out.push({ label: `Location: ${s.location.trim()}`, clear: (x) => ({ ...x, location: "" }) });
   if (s.noticeMaxDays !== null) {

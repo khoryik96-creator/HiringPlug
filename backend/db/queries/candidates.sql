@@ -6,12 +6,12 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, owner_id, created_by, availability_since
+  current_title, current_company, location, source, tags, skills, certifications, owner_id, created_by, availability_since
 ) VALUES (
   app_current_tenant(), @first_name, @last_name, sqlc.narg(email), sqlc.narg(phone), sqlc.narg(nationality), sqlc.narg(residence_country), sqlc.narg(linkedin_url), sqlc.narg(availability),
   sqlc.narg(work_authorization), sqlc.narg(work_authorization_basis), sqlc.narg(work_authorization_note),
   sqlc.narg(notice_period_value), sqlc.narg(notice_period_unit), sqlc.narg(industry), sqlc.narg(specialization),
-  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills,
+  sqlc.narg(current_title), sqlc.narg(current_company), sqlc.narg(location), sqlc.narg(source), @tags, @skills, @certifications,
   sqlc.narg(owner_id), app_current_user(), CASE WHEN sqlc.narg(availability)::text IS NULL THEN NULL ELSE now() END
 )
 RETURNING *;
@@ -53,6 +53,7 @@ UPDATE candidate SET
   source = sqlc.narg(source),
   tags = @tags,
   skills = @skills,
+  certifications = @certifications,
   version = version + 1,
   updated_at = now()
 WHERE id = @id AND version = @expected_version
@@ -116,6 +117,8 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR c.id < sqlc.narg(cursor)::text)
        OR (@all_skills::boolean AND app_lower_array(c.skills) @> app_lower_array(@skills::text[]))
        OR (NOT @all_skills::boolean AND app_lower_array(c.skills) && app_lower_array(@skills::text[])))
   AND (cardinality(@tags::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array(@tags::text[]))
+  AND (cardinality(@specializations::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array(@specializations::text[])))
+  AND (cardinality(@certifications::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array(@certifications::text[]))
   AND (sqlc.narg(location)::text IS NULL
        OR c.location ILIKE '%' || replace(replace(replace(sqlc.narg(location)::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
   AND (sqlc.narg(notice_max_days)::int IS NULL OR (c.notice_period_value IS NOT NULL AND
@@ -423,6 +426,8 @@ WHERE (sqlc.narg(query)::text IS NULL
        OR (@all_skills::boolean AND app_lower_array(c.skills) @> app_lower_array(@skills::text[]))
        OR (NOT @all_skills::boolean AND app_lower_array(c.skills) && app_lower_array(@skills::text[])))
   AND (cardinality(@tags::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array(@tags::text[]))
+  AND (cardinality(@specializations::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array(@specializations::text[])))
+  AND (cardinality(@certifications::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array(@certifications::text[]))
   AND (sqlc.narg(location)::text IS NULL
        OR c.location ILIKE '%' || replace(replace(replace(sqlc.narg(location)::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
   AND (sqlc.narg(notice_max_days)::int IS NULL OR (c.notice_period_value IS NOT NULL AND

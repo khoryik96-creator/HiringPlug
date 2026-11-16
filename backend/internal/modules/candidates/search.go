@@ -34,6 +34,7 @@ type SearchFilter struct {
 	Query, Boolean                                  *string
 	Availability, WorkKinds, Nationality, Residence []string
 	Sources, Industries, Skills, Tags               []string
+	Specializations, Certifications                 []string
 	AllSkills                                       bool
 	Location                                        *string
 	NoticeMaxDays, UpdatedWithinDays                *int
@@ -128,6 +129,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 		Availability: orEmpty(f.Availability), WaKinds: orEmpty(f.WorkKinds), Nationality: orEmpty(f.Nationality),
 		Residence: orEmpty(f.Residence), Sources: orEmpty(f.Sources), Industries: orEmpty(f.Industries),
 		Skills: orEmpty(f.Skills), AllSkills: f.AllSkills, Tags: orEmpty(f.Tags), Location: f.Location,
+		Specializations: orEmpty(f.Specializations), Certifications: orEmpty(f.Certifications),
 		NoticeMaxDays: notice, SalaryMax: f.SalaryMax, SalaryCurrency: f.SalaryCurrency, Owner: f.Owner, InIds: inIDs,
 		UpdatedWithinDays: updated, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 	}
@@ -198,7 +200,7 @@ func searchRows(ctx context.Context, q *store.Queries, in store.SearchCandidates
 		Sort: sort, RowOffset: offset, IndustryCandidateIds: in.IndustryCandidateIds, Ts: in.Ts, Query: in.Query, Phones: in.Phones,
 		CvIds: in.CvIds, ExcludedIds: in.ExcludedIds, Availability: in.Availability, WaKinds: in.WaKinds, Nationality: in.Nationality,
 		Residence: in.Residence, Sources: in.Sources, Industries: in.Industries, Skills: in.Skills, AllSkills: in.AllSkills,
-		Tags: in.Tags, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
+		Tags: in.Tags, Specializations: in.Specializations, Certifications: in.Certifications, Location: in.Location, NoticeMaxDays: in.NoticeMaxDays, SalaryMax: in.SalaryMax, SalaryCurrency: in.SalaryCurrency,
 		Owner: in.Owner, InIds: in.InIds, UpdatedWithinDays: in.UpdatedWithinDays, RowLimit: in.RowLimit,
 	})
 	rows := make([]store.SearchCandidatesRow, len(sorted))

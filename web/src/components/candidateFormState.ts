@@ -24,6 +24,7 @@ export interface CandidateFormState {
   source: string;
   tags: string[];
   skills: string[];
+  certifications: string[];
 }
 
 /** Where the API reports a problem with each input (the VALIDATION_FAILED field path). */
@@ -49,6 +50,7 @@ export const FIELD_PATHS: Record<keyof CandidateFormState, string> = {
   source: "source",
   tags: "tags",
   skills: "skills",
+  certifications: "certifications",
 };
 
 export function formFromCandidate(c: Candidate): CandidateFormState {
@@ -74,6 +76,7 @@ export function formFromCandidate(c: Candidate): CandidateFormState {
     source: c.source ?? "",
     tags: c.tags,
     skills: c.skills,
+    certifications: c.certifications,
   };
 }
 
@@ -118,5 +121,6 @@ export function toUpdateBody(f: CandidateFormState, version: number): Schemas["C
     source: f.source === "" ? null : f.source,
     tags: f.tags,
     skills: f.skills,
+    certifications: f.certifications,
   };
 }

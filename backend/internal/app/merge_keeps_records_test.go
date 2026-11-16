@@ -20,8 +20,10 @@ func TestMergingKeepsThePlacementOnASharedJob(t *testing.T) {
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleAdmin)
 	token := tenant.Users[api.RoleAdmin].Token
-	keep := a.createCandidate(token, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "tags": []string{"relocate"}, "skills": []string{"Audit"}})
-	dup := a.createCandidate(token, map[string]any{"firstName": "Siti", "lastName": "Aishah", "tags": []string{"Relocate", "shortlist"}, "skills": []string{"SAP", "audit"}})
+	keep := a.createCandidate(token, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "tags": []string{"relocate"}, "skills": []string{"Audit"},
+		"certifications": []string{"ACCA"}})
+	dup := a.createCandidate(token, map[string]any{"firstName": "Siti", "lastName": "Aishah", "tags": []string{"Relocate", "shortlist"}, "skills": []string{"SAP", "audit"},
+		"certifications": []string{"acca", "CIA"}})
 	company := a.createCompany(token, map[string]any{"name": "Maybank"})
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Auditor"})
 	a.addToJob(token, job.Id, keep.Id) // the kept record: only applied
@@ -45,6 +47,7 @@ func TestMergingKeepsThePlacementOnASharedJob(t *testing.T) {
 	merged := a.request(http.MethodGet, "/v1/candidates/"+keep.Id, token, nil).Map()
 	assert.Equal(t, []any{"relocate", "shortlist"}, merged["tags"], "tags joined, the kept spelling first")
 	assert.Equal(t, []any{"Audit", "SAP"}, merged["skills"])
+	assert.Equal(t, []any{"ACCA", "CIA"}, merged["certifications"], "certifications joined too")
 }
 
 func TestMergingIsRefusedWhenBothApplicationsCarryRecords(t *testing.T) {

@@ -76,13 +76,7 @@ var lists = []listDef{
 		"direct", "Direct", "other", "Other")},
 	{name: "notice_period", label: "Notice period", defaults: opts(
 		"0_day", "Immediately", "1_week", "1 week", "2_week", "2 weeks", "1_month", "1 month", "2_month", "2 months", "3_month", "3 months")},
-	{name: "industry", label: "Industry", defaults: func() []Option {
-		var pairs []string
-		for _, i := range industries {
-			pairs = append(pairs, i, i)
-		}
-		return opts(pairs...)
-	}()},
+	{name: "industry", label: "Industry", defaults: words(industries...)},
 	{name: "work_type", label: "Work type", fixed: true, defaults: opts(
 		"full_time", "Full time", "part_time", "Part time", "contract", "Contract", "temporary", "Temporary", "internship", "Internship")},
 	{name: "work_arrangement", label: "Work arrangement", fixed: true, defaults: opts(
@@ -131,7 +125,31 @@ var lists = []listDef{
 		{Key: "hiring_manager", Label: "Hiring manager", Color: "#2563eb", BuiltIn: true},
 		{Key: "hr", Label: "HR", Color: "#db2777", BuiltIn: true},
 	}},
+	// A candidate's specialization and skills, chosen from these.
+	{name: "specialization", label: "Specialization", defaults: words(
+		"Software Engineering", "Data & Analytics", "Infrastructure & Cloud", "Cybersecurity", "IT Project & Delivery",
+		"ERP & Business Applications", "Accounting & Finance", "Sales & Business Development", "Marketing",
+		"Human Resources", "Supply Chain & Logistics", "Engineering", "Operations", "Legal & Compliance")},
+	{name: "it_skill", label: "IT skills", defaults: words(
+		".NET", "Android Java", "Angular js", "C#", "C/ C++", "CMS", "FICO", "Flutter", "Golang", "HCM", "Java",
+		"Javascript", "Kotlin", "MM", "Nodejs", "Objective C", "PHP", "Python", "React js", "React Native",
+		"Ruby on Rails", "SD", "Solidity/Blockchain Tech", "Swift", "Vuejs")},
+	{name: "certification", label: "Professional certifications", defaults: words(
+		"ACCA", "CFA", "CIA", "CIMA", "CPA", "MIA", "ICAEW", "CISCO", "CompTIA", "Palo Alto", "Fortinet")},
 }
+
+// words makes a list stored as its words (key and label alike).
+func words(ws ...string) []Option {
+	pairs := make([]string, 0, 2*len(ws))
+	for _, w := range ws {
+		pairs = append(pairs, w, w)
+	}
+	return opts(pairs...)
+}
+
+// wordLists are stored on records as their words: renaming one makes a new
+// one, and records keep the words they have.
+var wordLists = []string{"industry", "specialization", "it_skill", "certification"}
 
 // UnknownCategory is the category of a company without one.
 const UnknownCategory = "unknown"
@@ -157,7 +175,9 @@ func Lists(saved map[string][]Option) []List {
 			options = slices.Clone(d.defaults)
 		}
 		for i := range options {
-			options[i].BuiltIn = slices.ContainsFunc(d.defaults, func(o Option) bool { return o.Key == options[i].Key })
+			// Words a company may remove too (records keep their words); industries have their own page.
+			removable := slices.Contains(wordLists, d.name) && d.name != "industry"
+			options[i].BuiltIn = !removable && slices.ContainsFunc(d.defaults, func(o Option) bool { return o.Key == options[i].Key })
 		}
 		out = append(out, List{Name: d.name, Label: d.label, Fixed: d.fixed, Hints: d.hints, Colors: d.colors, Options: options})
 	}
@@ -196,8 +216,8 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 		label := strings.Join(strings.Fields(o.Label), " ")
 		key := strings.TrimSpace(o.Key)
 		switch {
-		case name == "industry":
-			key = label // an industry is stored as its words
+		case slices.Contains(wordLists, name):
+			key = label // stored as its words
 		case name == "notice_period":
 			m := noticeKey.FindStringSubmatch(key)
 			if n, err := strconv.Atoi(firstOf(m)); m == nil || err != nil || n > 365 {
@@ -258,7 +278,7 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 		seenLabel[strings.ToLower(label)], seenKey[key] = true, true
 		out = append(out, Option{Key: key, Label: label, Hint: hint, Color: color, Hidden: o.Hidden})
 	}
-	if name != "industry" { // industries are words: renaming one makes a new one
+	if !slices.Contains(wordLists, name) { // words: renaming one makes a new one
 		for _, b := range d.defaults {
 			if !seenKey[b.Key] {
 				errs.Add("options", fmt.Sprintf("%q comes with the app: hide it instead of removing it", b.Label))

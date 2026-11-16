@@ -12,7 +12,7 @@ export function testCandidate(overrides: Partial<Candidate> = {}): Candidate {
     id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 3, firstName: "Siti", lastName: "Aisyah", fullName: "Siti Aisyah",
     email: "siti@example.com", phone: null, linkedinUrl: null, availability: null, availabilitySince: null, nationality: "MY", residenceCountry: null, workAuthorization: null,
     noticePeriod: { value: 1, unit: "month" }, industry: null, specialization: null, currentTitle: "Accountant",
-    currentCompany: null, location: null, source: "jobstreet", tags: [], skills: [], experience: [], education: [], restrictedFields: [],
+    currentCompany: null, location: null, source: "jobstreet", tags: [], skills: [], certifications: [], experience: [], education: [], restrictedFields: [],
     ownerId: null, ownerName: null,
     createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
     ...overrides,
@@ -88,6 +88,9 @@ export function testFieldSettings(mandatory: { form: "candidate" | "job"; field:
       { ...list("contact_role", "Contact roles", "open", [["hiring_manager", "Hiring manager"], ["hr", "HR"], ["director", "Director"]]), colors: true,
         options: [["hiring_manager", "Hiring manager", "#2563eb"], ["hr", "HR", "#db2777"], ["director", "Director", "#0d9488"]]
           .map(([key, l, color]) => ({ key, label: l, hint: null, color, hidden: false, builtIn: key !== "director" })) },
+      list("specialization", "Specialization", "open", [["Cybersecurity", "Cybersecurity"], ["Accounting & Finance", "Accounting & Finance"]]),
+      list("it_skill", "IT skills", "open", [["Java", "Java"], ["Python", "Python"], ["SAP", "SAP"]]),
+      list("certification", "Professional certifications", "open", [["ACCA", "ACCA"], ["CISCO", "CISCO"]]),
     ],
     mandatory: mandatory.map((m) => ({ ...m, label: m.field, mandatory: true, alwaysRequired: false })),
   } as never;

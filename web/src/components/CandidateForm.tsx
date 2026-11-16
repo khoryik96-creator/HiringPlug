@@ -13,6 +13,7 @@ import {
 } from "./candidateFormState";
 import { Field } from "./Field";
 import { LabelInput } from "./LabelInput";
+import { ListPicker } from "./ListPicker";
 import { labelFor, useFieldSettings } from "./useFieldSettings";
 import { NoticeField, WorkAuthFields } from "./ProfileFields";
 import { useUsedValues } from "./useUsedValues";
@@ -100,8 +101,12 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       <IndustryPicker value={form.industrySelections} legacy={form.industry} candidate={candidate}
         sourceChanged={form.currentCompany !== opened.form.currentCompany || form.currentTitle !== opened.form.currentTitle}
         onChange={(industrySelections, industry) => { change({ industrySelections, industry }); }} />
-      {text("specialization", "Specialization", { list: "specializations" })}
-      <datalist id="specializations">{used.specializations.map((v) => <option key={v} value={v} />)}</datalist>
+      <Field label="Specialization" error={errorFor("specialization")}>
+        <select value={form.specialization} onChange={(e) => { set("specialization", e.target.value); }}>
+          <option value="">—</option>
+          {fs.options("specialization", form.specialization || null).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </Field>
       {text("currentTitle", req("Current title", "currentTitle"))}
       {text("currentCompany", req("Current company", "currentCompany"))}
       {text("location", req("Location", "location"))}
@@ -112,8 +117,14 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
       </div>
 
       <div className="full">
-        <Field label="Skills" error={errorFor("skills")}>
-          <LabelInput value={form.skills} onChange={(v) => { set("skills", v); }} suggestions={used.skills} placeholder="Add a skill" />
+        <Field label="IT skills" error={errorFor("skills")}>
+          <ListPicker value={form.skills} onChange={(v) => { set("skills", v); }} options={fs.options("it_skill").map((o) => o.label)} addLabel="Add an IT skill…" />
+        </Field>
+      </div>
+      <div className="full">
+        <Field label="Professional certifications" error={errorFor("certifications")}>
+          <ListPicker value={form.certifications} onChange={(v) => { set("certifications", v); }}
+            options={fs.options("certification").map((o) => o.label)} addLabel="Add a certification…" />
         </Field>
       </div>
       <div className="full">

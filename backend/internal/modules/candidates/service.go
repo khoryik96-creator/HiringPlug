@@ -372,7 +372,7 @@ func fromRow(r store.Candidate) Candidate {
 		Email: r.Email, Phone: r.Phone, Nationality: r.Nationality, ResidenceCountry: r.ResidenceCountry, LinkedinURL: r.LinkedinUrl, Availability: r.Availability,
 		Industry: r.Industry, Specialization: r.Specialization,
 		CurrentTitle: r.CurrentTitle, CurrentCompany: r.CurrentCompany,
-		Location: r.Location, Source: r.Source, Tags: r.Tags, Skills: r.Skills,
+		Location: r.Location, Source: r.Source, Tags: r.Tags, Skills: r.Skills, Certifications: r.Certifications,
 	}
 	if r.WorkAuthorization != nil {
 		p.WorkAuthorization = &WorkAuthorization{Status: *r.WorkAuthorization, Basis: r.WorkAuthorizationBasis, Note: r.WorkAuthorizationNote}
@@ -395,7 +395,7 @@ func insertParams(p Profile, owner *string) store.InsertCandidateParams {
 		WorkAuthorizationNote: u.WorkAuthorizationNote, NoticePeriodValue: u.NoticePeriodValue,
 		NoticePeriodUnit: u.NoticePeriodUnit, Industry: u.Industry, Specialization: u.Specialization,
 		CurrentTitle: u.CurrentTitle, CurrentCompany: u.CurrentCompany, Location: u.Location, Source: u.Source,
-		Tags: u.Tags, Skills: u.Skills, OwnerID: owner,
+		Tags: u.Tags, Skills: u.Skills, Certifications: u.Certifications, OwnerID: owner,
 	}
 }
 
@@ -406,7 +406,7 @@ func updateParams(id string, expectedVersion int, p Profile) store.UpdateCandida
 		ResidenceCountry: p.ResidenceCountry, LinkedinUrl: p.LinkedinURL, Availability: p.Availability,
 		Industry: p.Industry, Specialization: p.Specialization, CurrentTitle: p.CurrentTitle,
 		CurrentCompany: p.CurrentCompany, Location: p.Location, Source: p.Source,
-		Tags: CleanLabels(p.Tags), Skills: CleanLabels(p.Skills),
+		Tags: CleanLabels(p.Tags), Skills: CleanLabels(p.Skills), Certifications: CleanLabels(p.Certifications),
 	}
 	if wa := p.WorkAuthorization; wa != nil {
 		u.WorkAuthorization, u.WorkAuthorizationBasis, u.WorkAuthorizationNote = &wa.Status, wa.Basis, wa.Note
@@ -425,7 +425,7 @@ func profileFields(p Profile) map[string]any {
 		"nationality": p.Nationality, "residenceCountry": p.ResidenceCountry, "linkedinUrl": p.LinkedinURL, "availability": p.Availability, "industry": p.Industry, "specialization": p.Specialization,
 		"currentTitle": p.CurrentTitle, "currentCompany": p.CurrentCompany, "location": p.Location,
 		"source": p.Source, "workAuthorization": nil, "noticePeriod": nil,
-		"tags": CleanLabels(p.Tags), "skills": CleanLabels(p.Skills),
+		"tags": CleanLabels(p.Tags), "skills": CleanLabels(p.Skills), "certifications": CleanLabels(p.Certifications),
 	}
 	if wa := p.WorkAuthorization; wa != nil {
 		m["workAuthorization"] = map[string]any{"status": wa.Status, "basis": wa.Basis, "note": wa.Note}

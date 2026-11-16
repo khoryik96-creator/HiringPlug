@@ -72,6 +72,7 @@ func FilterOf(b api.CandidateSearch, p authz.Principal) SearchFilter {
 		Query: blankNil(b.Q), Boolean: blankNil(b.Boolean), Location: blankNil(b.Location),
 		Availability: strs(b.Availability), WorkKinds: strs(b.WorkAuthorization), Nationality: strs(b.Nationality),
 		Residence: strs(b.Residence), Sources: strs(b.Source), Industries: strs(b.Industry), Skills: strs(b.Skills), Tags: strs(b.Tags),
+		Specializations: strs(b.Specialization), Certifications: strs(b.Certifications),
 		AllSkills: b.SkillsMatch == nil || *b.SkillsMatch == "all", NoticeMaxDays: b.NoticeMaxDays, UpdatedWithinDays: b.UpdatedWithinDays,
 		Owner: blankNil(b.Owner), Folder: b.FolderId, Order: Order{Offset: deref(b.Offset)},
 	}

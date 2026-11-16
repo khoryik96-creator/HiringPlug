@@ -51,13 +51,16 @@ func FillFrom(keep, dup Profile) (Profile, []string) {
 	if keep.NoticePeriod == nil && dup.NoticePeriod != nil {
 		keep.NoticePeriod, filled = dup.NoticePeriod, append(filled, "noticePeriod")
 	}
-	// Tags and skills are joined, the kept candidate's first (up to what a
+	// Tags, skills and certifications are joined, the kept candidate's first (up to what a
 	// profile may hold): the duplicate's are not lost.
 	if joined := joinLabels(keep.Tags, dup.Tags, maxTags); len(joined) > len(CleanLabels(keep.Tags)) {
 		keep.Tags, filled = joined, append(filled, "tags")
 	}
 	if joined := joinLabels(keep.Skills, dup.Skills, maxSkills); len(joined) > len(CleanLabels(keep.Skills)) {
 		keep.Skills, filled = joined, append(filled, "skills")
+	}
+	if joined := joinLabels(keep.Certifications, dup.Certifications, maxCertifications); len(joined) > len(CleanLabels(keep.Certifications)) {
+		keep.Certifications, filled = joined, append(filled, "certifications")
 	}
 	return keep, filled
 }

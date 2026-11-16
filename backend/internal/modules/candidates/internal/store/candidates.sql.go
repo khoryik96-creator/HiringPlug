@@ -198,7 +198,7 @@ func (q *Queries) FindCandidates(ctx context.Context, arg FindCandidatesParams) 
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -238,6 +238,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
 		&i.ProfileTerms,
+		&i.Certifications,
 	)
 	return i, err
 }
@@ -275,15 +276,15 @@ INSERT INTO candidate (
   tenant_id, first_name, last_name, email, phone, nationality, residence_country, linkedin_url, availability,
   work_authorization, work_authorization_basis, work_authorization_note,
   notice_period_value, notice_period_unit, industry, specialization,
-  current_title, current_company, location, source, tags, skills, owner_id, created_by, availability_since
+  current_title, current_company, location, source, tags, skills, certifications, owner_id, created_by, availability_since
 ) VALUES (
   app_current_tenant(), $1, $2, $3, $4, $5, $6, $7, $8,
   $9, $10, $11,
   $12, $13, $14, $15,
-  $16, $17, $18, $19, $20, $21,
-  $22, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
+  $16, $17, $18, $19, $20, $21, $22,
+  $23, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
 `
 
 type InsertCandidateParams struct {
@@ -308,6 +309,7 @@ type InsertCandidateParams struct {
 	Source                 *string
 	Tags                   []string
 	Skills                 []string
+	Certifications         []string
 	OwnerID                *string
 }
 
@@ -336,6 +338,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		arg.Source,
 		arg.Tags,
 		arg.Skills,
+		arg.Certifications,
 		arg.OwnerID,
 	)
 	var i Candidate
@@ -373,6 +376,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
 		&i.ProfileTerms,
+		&i.Certifications,
 	)
 	return i, err
 }
@@ -1225,21 +1229,23 @@ WHERE ($2::text IS NULL OR c.id < $2::text)
        OR ($15::boolean AND app_lower_array(c.skills) @> app_lower_array($14::text[]))
        OR (NOT $15::boolean AND app_lower_array(c.skills) && app_lower_array($14::text[])))
   AND (cardinality($16::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($16::text[]))
-  AND ($17::text IS NULL
-       OR c.location ILIKE '%' || replace(replace(replace($17::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-  AND ($18::int IS NULL OR (c.notice_period_value IS NOT NULL AND
-       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $18::int))
+  AND (cardinality($17::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array($17::text[])))
+  AND (cardinality($18::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array($18::text[]))
+  AND ($19::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($19::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($20::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $20::int))
   -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
-  AND ($19::text IS NULL OR EXISTS (
+  AND ($21::text IS NULL OR EXISTS (
        SELECT 1 FROM candidate_compensation cc
-       WHERE cc.candidate_id = c.id AND cc.expected_currency = $20::text
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $22::text
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
-             <= ($19::text)::numeric))
-  AND ($21::text IS NULL OR c.owner_id = $21::text)
-  AND ($22::text[] IS NULL OR c.id = ANY ($22::text[])) -- a folder's
-  AND ($23::int IS NULL OR c.updated_at >= now() - make_interval(days => $23::int))
+             <= ($21::text)::numeric))
+  AND ($23::text IS NULL OR c.owner_id = $23::text)
+  AND ($24::text[] IS NULL OR c.id = ANY ($24::text[])) -- a folder's
+  AND ($25::int IS NULL OR c.updated_at >= now() - make_interval(days => $25::int))
 ORDER BY c.id DESC
-LIMIT $24
+LIMIT $26
 `
 
 type SearchCandidatesParams struct {
@@ -1259,6 +1265,8 @@ type SearchCandidatesParams struct {
 	Skills               []string
 	AllSkills            bool
 	Tags                 []string
+	Specializations      []string
+	Certifications       []string
 	Location             *string
 	NoticeMaxDays        *int32
 	SalaryMax            *string
@@ -1317,6 +1325,8 @@ func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesPara
 		arg.Skills,
 		arg.AllSkills,
 		arg.Tags,
+		arg.Specializations,
+		arg.Certifications,
 		arg.Location,
 		arg.NoticeMaxDays,
 		arg.SalaryMax,
@@ -1395,33 +1405,35 @@ WHERE ($2::text IS NULL
        OR ($14::boolean AND app_lower_array(c.skills) @> app_lower_array($13::text[]))
        OR (NOT $14::boolean AND app_lower_array(c.skills) && app_lower_array($13::text[])))
   AND (cardinality($15::text[]) = 0 OR app_lower_array(c.tags) @> app_lower_array($15::text[]))
-  AND ($16::text IS NULL
-       OR c.location ILIKE '%' || replace(replace(replace($16::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
-  AND ($17::int IS NULL OR (c.notice_period_value IS NOT NULL AND
-       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $17::int))
+  AND (cardinality($16::text[]) = 0 OR lower(c.specialization) = ANY (app_lower_array($16::text[])))
+  AND (cardinality($17::text[]) = 0 OR app_lower_array(c.certifications) @> app_lower_array($17::text[]))
+  AND ($18::text IS NULL
+       OR c.location ILIKE '%' || replace(replace(replace($18::text, '\', '\\'), '%', '\%'), '_', '\_') || '%')
+  AND ($19::int IS NULL OR (c.notice_period_value IS NOT NULL AND
+       c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END <= $19::int))
   -- Row-level security shows salaries only to roles that may see them (the service refuses this filter to others).
-  AND ($18::text IS NULL OR EXISTS (
+  AND ($20::text IS NULL OR EXISTS (
        SELECT 1 FROM candidate_compensation cc
-       WHERE cc.candidate_id = c.id AND cc.expected_currency = $19::text
+       WHERE cc.candidate_id = c.id AND cc.expected_currency = $21::text
          AND cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END
-             <= ($18::text)::numeric))
-  AND ($20::text IS NULL OR c.owner_id = $20::text)
-  AND ($21::text[] IS NULL OR c.id = ANY ($21::text[])) -- a folder's
-  AND ($22::int IS NULL OR c.updated_at >= now() - make_interval(days => $22::int))
+             <= ($20::text)::numeric))
+  AND ($22::text IS NULL OR c.owner_id = $22::text)
+  AND ($23::text[] IS NULL OR c.id = ANY ($23::text[])) -- a folder's
+  AND ($24::int IS NULL OR c.updated_at >= now() - make_interval(days => $24::int))
 ORDER BY
-  CASE WHEN $23::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $23::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
-  CASE WHEN $23::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
-  CASE WHEN $23::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
+  CASE WHEN $25::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
+  CASE WHEN $25::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $25::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
+  CASE WHEN $25::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
-  CASE WHEN $23::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
-  CASE WHEN $23::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
-  CASE WHEN $23::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $23::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
-  CASE WHEN $23::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
-  CASE WHEN $23::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $25::text LIKE 'current_salary%' THEN CASE cc.current_currency WHEN 'MYR' THEN '' ELSE cc.current_currency END END ASC NULLS LAST,
+  CASE WHEN $25::text LIKE 'expected_salary%' THEN CASE cc.expected_currency WHEN 'MYR' THEN '' ELSE cc.expected_currency END END ASC NULLS LAST,
+  CASE WHEN $25::text = 'current_salary_asc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $25::text = 'current_salary_desc' THEN cc.current_amount * CASE cc.current_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
+  CASE WHEN $25::text = 'expected_salary_asc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END ASC NULLS LAST,
+  CASE WHEN $25::text = 'expected_salary_desc' THEN cc.expected_min * CASE cc.expected_period WHEN 'year' THEN 1.0 / 12 WHEN 'day' THEN 22 WHEN 'hour' THEN 176 ELSE 1 END END DESC NULLS LAST,
   c.id DESC
-LIMIT $25 OFFSET $24
+LIMIT $27 OFFSET $26
 `
 
 type SearchCandidatesSortedParams struct {
@@ -1440,6 +1452,8 @@ type SearchCandidatesSortedParams struct {
 	Skills               []string
 	AllSkills            bool
 	Tags                 []string
+	Specializations      []string
+	Certifications       []string
 	Location             *string
 	NoticeMaxDays        *int32
 	SalaryMax            *string
@@ -1497,6 +1511,8 @@ func (q *Queries) SearchCandidatesSorted(ctx context.Context, arg SearchCandidat
 		arg.Skills,
 		arg.AllSkills,
 		arg.Tags,
+		arg.Specializations,
+		arg.Certifications,
 		arg.Location,
 		arg.NoticeMaxDays,
 		arg.SalaryMax,
@@ -1672,7 +1688,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
 `
 
 type TouchCandidateParams struct {
@@ -1719,6 +1735,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
 		&i.ProfileTerms,
+		&i.Certifications,
 	)
 	return i, err
 }
@@ -1749,10 +1766,11 @@ UPDATE candidate SET
   source = $19,
   tags = $20,
   skills = $21,
+  certifications = $22,
   version = version + 1,
   updated_at = now()
-WHERE id = $22 AND version = $23
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms
+WHERE id = $23 AND version = $24
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
 `
 
 type UpdateCandidateParams struct {
@@ -1777,6 +1795,7 @@ type UpdateCandidateParams struct {
 	Source                 *string
 	Tags                   []string
 	Skills                 []string
+	Certifications         []string
 	ID                     string
 	ExpectedVersion        int32
 }
@@ -1806,6 +1825,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		arg.Source,
 		arg.Tags,
 		arg.Skills,
+		arg.Certifications,
 		arg.ID,
 		arg.ExpectedVersion,
 	)
@@ -1844,6 +1864,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
 		&i.ProfileTerms,
+		&i.Certifications,
 	)
 	return i, err
 }

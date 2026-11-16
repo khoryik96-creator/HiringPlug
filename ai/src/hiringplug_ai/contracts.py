@@ -844,6 +844,10 @@ class Skill(RootModel[str]):
     root: Annotated[str, Field(max_length=60, min_length=1)]
 
 
+class Certification(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, min_length=1)]
+
+
 class CandidateSummary(BaseModel):
     nationality: Annotated[str | None, Field(description="ISO country code.")]
     residenceCountry: Annotated[str | None, Field(description="ISO country code.")]
@@ -888,6 +892,10 @@ class IndustryItem(RootModel[str]):
 class SkillsMatch(StrEnum):
     all = "all"
     any = "any"
+
+
+class SpecializationItem(RootModel[str]):
+    root: Annotated[str, Field(max_length=100, min_length=1)]
 
 
 class SalaryCap(BaseModel):
@@ -4615,6 +4623,9 @@ class FieldListName(StrEnum):
     pre_offer_process = "pre_offer_process"
     company_category = "company_category"
     contact_role = "contact_role"
+    specialization = "specialization"
+    it_skill = "it_skill"
+    certification = "certification"
 
 
 class FieldListKind(StrEnum):
@@ -4827,6 +4838,12 @@ class Candidate(BaseModel):
     source: Annotated[CandidateSource | None, Field(...)]
     tags: list[str]
     skills: list[str]
+    certifications: Annotated[
+        list[str],
+        Field(
+            description="e.g. AWS Solutions Architect, PMP, ACCA (chosen from the company's certifications list)."
+        ),
+    ]
     compensation: Annotated[
         Compensation | None,
         Field(
@@ -4881,6 +4898,7 @@ class CandidateCreate(BaseModel):
         ),
     ] = None
     skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
+    certifications: Annotated[list[Certification] | None, Field(max_length=50)] = None
 
 
 class CandidateUpdate(BaseModel):
@@ -4925,6 +4943,7 @@ class CandidateUpdate(BaseModel):
         ),
     ] = None
     skills: Annotated[list[Skill] | None, Field(max_length=100)] = None
+    certifications: Annotated[list[Certification] | None, Field(max_length=50)] = None
 
 
 class CandidateSearch(BaseModel):
@@ -4959,6 +4978,14 @@ class CandidateSearch(BaseModel):
     skillsMatch: Annotated[
         SkillsMatch, Field(description="Whether a candidate needs every skill listed, or any one of them.")
     ] = "all"
+    specialization: Annotated[
+        list[SpecializationItem] | None,
+        Field(description="Any one of these specializations (ignoring case).", max_length=30),
+    ] = None
+    certifications: Annotated[
+        list[Certification] | None,
+        Field(description="Every one of these certifications (ignoring case).", max_length=20),
+    ] = None
     tags: Annotated[list[Tag] | None, Field(max_length=20)] = None
     location: Annotated[
         str | None, Field(description="Part of where they are (ignoring case).", max_length=100)

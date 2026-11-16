@@ -46,6 +46,7 @@ type Profile struct {
 	Source             *string
 	Tags               []string // your own labels, e.g. relocate
 	Skills             []string
+	Certifications     []string // e.g. PMP, ACCA
 }
 
 // WorkAuthorization says whether the candidate can work here, and why.
@@ -139,6 +140,7 @@ type ProfilePatch struct {
 	Source             Change[*string]
 	Tags               Change[[]string]
 	Skills             Change[[]string]
+	Certifications     Change[[]string]
 }
 
 // Apply returns p with the patch's fields replaced.
@@ -162,6 +164,7 @@ func (pp ProfilePatch) Apply(p Profile) Profile {
 	apply(&p.Source, pp.Source)
 	apply(&p.Tags, pp.Tags)
 	apply(&p.Skills, pp.Skills)
+	apply(&p.Certifications, pp.Certifications)
 	return p
 }
 
@@ -232,6 +235,7 @@ func NormalizeProfile(p Profile, phoneRegion string) (Profile, apperr.FieldError
 	}
 	p.Tags = CleanLabels(p.Tags)
 	p.Skills = CleanLabels(p.Skills)
+	p.Certifications = CleanLabels(p.Certifications)
 	checkLengths(p, &errs)
 	return p, errs
 }
@@ -264,6 +268,12 @@ func checkLengths(p Profile, errs *apperr.FieldErrors) {
 	}
 	for i, t := range p.Tags {
 		long(fmt.Sprintf("tags[%d]", i), &t, 60)
+	}
+	if len(p.Certifications) > maxCertifications {
+		errs.Add("certifications", "must be at most 50")
+	}
+	for i, c := range p.Certifications {
+		long(fmt.Sprintf("certifications[%d]", i), &c, 100)
 	}
 }
 
@@ -363,10 +373,11 @@ func trimmedOrNil(s *string) *string {
 	return &t
 }
 
-// How many skills and tags a profile may hold.
+// How many skills, tags and certifications a profile may hold.
 const (
-	maxSkills = 100
-	maxTags   = 50
+	maxSkills         = 100
+	maxTags           = 50
+	maxCertifications = 50
 )
 
 // CleanLabels tidies tags or skills: spaces squeezed, empty ones dropped, and

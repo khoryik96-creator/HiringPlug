@@ -598,6 +598,7 @@ components:
         - id
         - tags
         - skills
+        - certifications
         - experience
         - education
         - version
@@ -681,6 +682,7 @@ components:
           nullable: true
         tags: { type: array, items: { type: string } }
         skills: { type: array, items: { type: string } }
+        certifications: { type: array, items: { type: string }, description: "e.g. AWS Solutions Architect, PMP, ACCA (chosen from the company's certifications list)." }
         compensation:
           description: Left out (and listed in restrictedFields) without candidates.compensation:read. null means none recorded.
           allOf: [{ $ref: '#/components/schemas/Compensation' }]
@@ -740,6 +742,10 @@ components:
           type: array
           maxItems: 100
           items: { type: string, minLength: 1, maxLength: 60 }
+        certifications:
+          type: array
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 100 }
 
     CandidateUpdate:
       type: object
@@ -790,6 +796,10 @@ components:
           type: array
           maxItems: 100
           items: { type: string, minLength: 1, maxLength: 60 }
+        certifications:
+          type: array
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 100 }
 
     CandidateSummary:
       type: object
@@ -852,6 +862,8 @@ components:
           enum: [all, any]
           default: all
           description: Whether a candidate needs every skill listed, or any one of them.
+        specialization: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 100 }, description: Any one of these specializations (ignoring case). }
+        certifications: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 100 }, description: Every one of these certifications (ignoring case). }
         tags: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 60 } }
         location: { type: string, maxLength: 100, description: Part of where they are (ignoring case). }
         noticeMaxDays: { type: integer, minimum: 0, maximum: 365, description: "Notice period at most this long (a month counts as 30 days); those without one are left out." }

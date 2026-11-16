@@ -112,20 +112,24 @@ describe("candidate form", () => {
     expect(screen.getByText("Pass held")).toBeTruthy();
   });
 
-  it("adds skills with Enter or a comma, ignores the same skill in other case, and removes them", async () => {
+  it("picks the specialization, IT skills and certifications from the Settings lists, and removes them", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
-      ? ok(testFieldSettings()) : ok({ tags: [], skills: ["Excel"], industries: [], specializations: [] }))) as never);
+      ? ok(testFieldSettings()) : ok({ tags: [], skills: [], industries: [], specializations: [] }))) as never);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
     const onDone = vi.fn();
-    renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP"] })} onDone={onDone} />);
-    const skills = screen.getByLabelText("Skills");
-    fireEvent.change(skills, { target: { value: "  Power   BI " } });
-    fireEvent.keyDown(skills, { key: "Enter" });
-    fireEvent.change(skills, { target: { value: "sap," } });
-    fireEvent.change(skills, { target: { value: "Excel," } });
+    renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP", "Excel"] })} onDone={onDone} />);
+    const skills = await screen.findByLabelText<HTMLSelectElement>("IT skills");
+    await waitFor(() => { expect(skills.options.length).toBe(3); });
+    expect([...skills.options].map((o) => o.text), "the list, less those chosen").toEqual(["Add an IT skill…", "Java", "Python"]);
+    fireEvent.change(skills, { target: { value: "Python" } });
     fireEvent.click(screen.getByRole("button", { name: "Remove SAP" }));
+    expect(screen.getByText("Excel"), "a word not in the list stays until removed").toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Professional certifications"), { target: { value: "ACCA" } });
+    const spec = screen.getByLabelText<HTMLSelectElement>("Specialization");
+    expect([...spec.options].map((o) => o.text)).toEqual(["—", "Cybersecurity", "Accounting & Finance"]);
+    fireEvent.change(spec, { target: { value: "Cybersecurity" } });
     save();
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
-    expect(sentBody(patch)).toMatchObject({ skills: ["Power BI", "Excel"], tags: [] });
+    expect(sentBody(patch)).toMatchObject({ skills: ["Excel", "Python"], certifications: ["ACCA"], specialization: "Cybersecurity" });
   });
 });

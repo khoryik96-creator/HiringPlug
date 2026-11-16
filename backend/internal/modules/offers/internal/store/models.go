@@ -267,6 +267,7 @@ type Candidate struct {
 	PhoneDigits            *string
 	AvailabilitySince      *time.Time
 	ProfileTerms           interface{}
+	Certifications         []string
 }
 
 type CandidateCompensation struct {

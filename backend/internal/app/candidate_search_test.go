@@ -117,3 +117,40 @@ func TestAdvancedSearchFindsByFiltersAndABooleanOfTheirCVs(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, "/v1/documents/"+ainaCV+"/highlights?boolean=SAP", other, nil).Status)
 	})
 }
+
+// Certifications are kept on a candidate like skills; a search narrows by
+// specialization (any of those chosen) and certifications (every one chosen).
+func TestAdvancedSearchBySpecializationAndCertifications(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aina := a.createCandidate(token, map[string]any{"firstName": "Aina", "specialization": "Cybersecurity",
+		"certifications": []string{"CISSP", " CISM ", "cissp"}})
+	assert.Equal(t, []string{"CISSP", "CISM"}, aina.Certifications, "tidied, a repeat dropped")
+	ben := a.createCandidate(token, map[string]any{"firstName": "Ben", "specialization": "Infrastructure & Cloud",
+		"certifications": []string{"CISSP", "AWS Certified Solutions Architect"}})
+	a.createCandidate(token, map[string]any{"firstName": "Chris", "specialization": "Accounting & Finance", "certifications": []string{"ACCA"}})
+
+	found := func(body map[string]any) []string {
+		res := a.request(http.MethodPost, "/v1/candidates/search", token, body)
+		require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+		var page api.CandidateSearchPage
+		res.JSON(&page)
+		var out []string
+		for _, h := range page.Items {
+			out = append(out, strings.Fields(h.Candidate.FullName)[0])
+		}
+		return out
+	}
+	assert.ElementsMatch(t, []string{"Aina", "Ben"}, found(map[string]any{"specialization": []string{"cybersecurity", "Infrastructure & Cloud"}}))
+	assert.ElementsMatch(t, []string{"Aina", "Ben"}, found(map[string]any{"certifications": []string{"cissp"}}))
+	assert.Equal(t, []string{"Aina"}, found(map[string]any{"certifications": []string{"CISSP", "CISM"}}), "every one chosen")
+
+	var got api.Candidate
+	res := a.request(http.MethodPatch, "/v1/candidates/"+ben.Id, token, map[string]any{"version": ben.Version, "certifications": []string{}})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	res.JSON(&got)
+	assert.Empty(t, got.Certifications)
+	assert.Equal(t, []string{"Aina"}, found(map[string]any{"certifications": []string{"CISSP"}}))
+}

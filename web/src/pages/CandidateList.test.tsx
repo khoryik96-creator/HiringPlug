@@ -131,7 +131,7 @@ describe("candidate list", () => {
     fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
     fireEvent.change(screen.getByPlaceholderText(/SAP AND/), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
     expect(screen.getByText("internship").className).toBe("bool-not"); // read as left out
-    fireEvent.click(screen.getByRole("button", { name: /^Skills/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^IT skills/ }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "SAP" }));
     fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Looking out" }));
