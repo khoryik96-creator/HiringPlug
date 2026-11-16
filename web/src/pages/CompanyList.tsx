@@ -5,7 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
 import { CompanyForm } from "../components/CompanyForm";
 import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
-import { ErrorMessage } from "../components/ErrorMessage";
+import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar } from "../components/SeparateEmail";
@@ -59,10 +59,10 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
     enabled: folders.ready,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
-      const query: { q?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string; limit: number; cursor?: string } = { limit: 100 };
+      const query: { q?: string; boolean?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string; limit: number; cursor?: string } = { limit: 100 };
       if (pageParam) query.cursor = pageParam;
       if (folder) query.folder = folder;
-      if (q.trim()) query.q = q.trim();
+      if (q.trim()) query[looksBoolean(q) ? "boolean" : "q"] = q.trim(); // AND, OR, NOT…: a boolean search
       if (type) query.type = type;
       if (category) query.category = category;
       return unwrap(await api.GET("/v1/companies", { params: { query } }));
@@ -80,20 +80,19 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
 
   return (
     <main className="list-page">
-      <div className="row spread">
-        <h2>Companies</h2>
-        <div className="row">
-          <input aria-label="Search companies" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
-          <select aria-label="Type" value={type} onChange={(e) => { setType(e.target.value as TypeFilter); }}>
+      <h2 className="visually-hidden">Companies</h2>
+      <div className="list-top">
+        <BooleanSearchBox value={q} onChange={setQ} label="Search companies" placeholder="Search by name, website or phone, or AND, OR, NOT…">
+          <select aria-label="Type" className={`search-pill${type ? " on" : ""}`} value={type} onChange={(e) => { setType(e.target.value as TypeFilter); }}>
             <option value="">All types</option>
             {keysOf(COMPANY_TYPE).map((t) => <option key={t} value={t}>{COMPANY_TYPE[t]}</option>)}
           </select>
-          <select aria-label="Category" value={category} onChange={(e) => { setCategory(e.target.value); }}>
+          <select aria-label="Category" className={`search-pill${category ? " on" : ""}`} value={category} onChange={(e) => { setCategory(e.target.value); }}>
             <option value="">All categories</option>
             {fs.options("company_category").filter((o) => o.key !== UNKNOWN_CATEGORY).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
-          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add company</button>}
-        </div>
+        </BooleanSearchBox>
+        {canCreate && !adding && <button type="button" className="pill-btn primary" onClick={() => { setAdding(true); }}>+ Add company</button>}
       </div>
       {adding && (
         <CompanyForm
@@ -102,7 +101,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
           onSaved={(c) => { window.location.hash = `#/companies/${c.id}`; }}
         />
       )}
-      <ErrorMessage error={list.error} />
+      <ListSearchError error={list.error} />
       <WithFolders view={folders}>
       {canFolders && items && (
         <div className="list-meta">

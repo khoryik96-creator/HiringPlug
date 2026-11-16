@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import { Owner } from "../components/Owner";
-import { ok, renderWithClient, sentBody } from "../test-utils";
+import { ok, renderWithClient, sentBody, testFieldSettings } from "../test-utils";
 import { Access, scopeText } from "./Access";
 import { CandidateList } from "./CandidateList";
 
@@ -79,8 +79,10 @@ describe("owners of candidates and jobs", () => {
   });
 
   it("filter the candidate list to your own", async () => {
-    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null, tags: [], skills: [], industries: [], specializations: [], certifications: [] }));
+    const get = vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings())
+      : ok({ items: [], nextCursor: null, tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
     renderWithClient(<CandidateList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Filters" })); // Mine only is under Filters
     fireEvent.click(await screen.findByLabelText("Mine only"));
     await waitFor(() => {
       const calls = get.mock.calls as unknown as [string, { params?: { query?: { owner?: string } } }][];

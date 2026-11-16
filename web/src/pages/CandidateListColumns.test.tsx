@@ -45,7 +45,7 @@ describe("candidate list columns", () => {
     expect(siti?.textContent).toContain("Malaysia");
     expect(siti?.textContent).toContain("Spouse visa");
 
-    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     fireEvent.click(screen.getByLabelText("Industry"));
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith("/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] } });
@@ -72,7 +72,7 @@ describe("candidate list columns", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("columnheader").map((h) => h.getAttribute("aria-label"))).toEqual(["Name", "Work authorization", "Nationality", "Residence"]);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     expect(screen.queryByRole("button", { name: /^Move / }), "no arrows: headings are dragged").toBeNull();
   });
 
@@ -82,7 +82,7 @@ describe("candidate list columns", () => {
     const put = vi.spyOn(api, "PUT").mockImplementation((() => new Promise((resolve) => { pending.push(resolve); })) as never);
     renderWithClient(<CandidateList />);
     await screen.findByRole("columnheader", { name: /^Nationality/ });
-    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Residence" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "Industry" }));
     expect(await screen.findByRole("columnheader", { name: /^Industry/ })).toBeTruthy(); // shown at once

@@ -2,18 +2,20 @@
 // folders, those shared with them, and making a new one. A tab opens its
 // folder (the list then shows what is in it) and takes rows dragged onto it.
 // A long row of tabs scrolls sideways.
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { ErrorMessage } from "../ErrorMessage";
 import { carriesRows, droppedRows, MAX_AT_ONCE, type Folder, type FolderKind, plural, useFolderChanges, useUsers } from "./useFolders";
 
-export function FolderPanel({ kind, folders, open, onOpen, error }: {
+export function FolderPanel({ kind, folders, open, onOpen, error, tools }: {
   kind: FolderKind;
   folders: Folder[] | undefined;
   /** The open folder's id (null: everything). */
   open: string | null;
   onOpen: (id: string | null) => void;
   error?: unknown;
+  /** The list's view tools, at the end of the tabs' row. */
+  tools?: ReactNode;
 }) {
   const users = useUsers();
   const change = useFolderChanges(kind);
@@ -55,6 +57,7 @@ export function FolderPanel({ kind, folders, open, onOpen, error }: {
 
   return (
     <nav className="folder-tabs" aria-label="Folders">
+      <div className="folder-row">
       <div className="folder-strip">
         <button type="button" className={`folder-tab all${open === null ? " on" : ""}`} aria-current={open === null ? "true" : undefined}
           onClick={() => { onOpen(null); }}>
@@ -76,6 +79,8 @@ export function FolderPanel({ kind, folders, open, onOpen, error }: {
         {folders && mine.length === 0 && shared.length === 0 && !naming && (
           <span className="muted small folder-hint">Keep {plural(kind)} together: make a folder, then drag rows onto it.</span>
         )}
+      </div>
+      {tools && <span className="list-tools">{tools}</span>}
       </div>
       {tooMany && <p role="alert" className="warning small folder-done">At most {MAX_AT_ONCE} at a time: choose fewer.</p>}
       {dropped && <p role="status" className="small folder-done">✓ {dropped.n} {plural(kind, dropped.n)} put in {dropped.folder}</p>}

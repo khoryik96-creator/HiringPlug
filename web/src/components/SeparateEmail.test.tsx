@@ -99,14 +99,15 @@ describe("ticking contacts", () => {
 });
 
 describe("choosing all or none", () => {
-  it("says 'shown' when the list has more than is loaded", () => {
+  it("shows nothing until a row is chosen, then offers all of them, saying 'shown' when more are not loaded", () => {
     const onAll = vi.fn();
     const { rerender } = renderWithClient(<PickBar count={0} shown={{ count: 25, more: true, all: false, onAll }} onEmail={vi.fn()} onClear={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "All 25 shown" }));
+    expect(document.body.textContent).toBe("");
+    rerender(<PickBar count={1} shown={{ count: 25, more: true, all: false, onAll }} onEmail={vi.fn()} onClear={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select all 25 shown" }));
     expect(onAll).toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "None" }).getAttribute("aria-pressed")).toBe("true");
     rerender(<PickBar count={3} shown={{ count: 3, all: true, onAll }} onEmail={vi.fn()} onClear={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "All 3" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: /Select all/ }), "all chosen already").toBeNull();
     expect(screen.getByRole("status").textContent).toContain("3 chosen");
   });
 });

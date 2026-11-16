@@ -53,15 +53,16 @@ describe("candidate list", () => {
     fireEvent.click(cell);
     expect(screen.queryByText("1 chosen")).toBeNull();
     window.getSelection()?.removeAllRanges();
-    const none = screen.getByRole("button", { name: "None" });
-    expect(none.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "All 2" }));
+    expect(screen.queryByRole("button", { name: /Select all/ }), "nothing chosen: no bar").toBeNull();
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole("button", { name: "Select all 2" }));
     expect(screen.getByText("2 chosen")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "All 2" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(none);
+    expect(screen.queryByRole("button", { name: "Select all 2" }), "all are chosen").toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "✕ Clear" }));
     expect(screen.queryByText("2 chosen")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "All 2" }));
-    fireEvent.click(screen.getByRole("button", { name: "Email each separately" }));
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole("button", { name: "Select all 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "✉ Email each separately" }));
     const panel = await screen.findByRole("region", { name: "Email each separately" });
     expect(panel.querySelectorAll(".person-chip")).toHaveLength(2);
     expect(panel.textContent).toContain("Siti Aisyah · no email");
@@ -71,19 +72,29 @@ describe("candidate list", () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList />);
     await screen.findByText("Siti Aisyah");
-    expect(screen.queryByRole("group", { name: "Choose" })).toBeNull();
+    expect(screen.queryByText(/chosen/)).toBeNull();
     fireEvent.click((screen.getByText("Siti Aisyah").closest("tr") as HTMLElement).querySelector("td:last-child") as Element);
     expect(screen.queryByText("1 chosen")).toBeNull();
   });
 
-  it("has AI search beside Advanced search, and Columns beside Choose", async () => {
+  it("keeps Filters and AI inside the search bar, Mine only under Filters, and the view tools together", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canAiSearch canEmail />);
     await screen.findByText("Siti Aisyah");
-    const ai = screen.getByRole("link", { name: "✦ AI search" });
-    expect(ai.closest(".list-toolbar")).toBe(screen.getByRole("button", { name: /Advanced search/ }).closest(".list-toolbar"));
-    const columns = screen.getByRole("button", { name: "Columns ▾" });
-    expect(columns.closest(".list-meta")).toBe(screen.getByRole("group", { name: "Choose" }).closest(".list-meta"));
+    const bar = screen.getByLabelText("Search candidates").closest(".bool-box");
+    expect(screen.getByRole("link", { name: "✦ AI" }).closest(".bool-box")).toBe(bar);
+    const filters = screen.getByRole("button", { name: "Filters" });
+    expect(filters.closest(".bool-box")).toBe(bar);
+    expect(filters.textContent, "just the funnel").toBe("");
+    fireEvent.click(filters);
+    fireEvent.click(screen.getByLabelText("Mine only"));
+    expect(screen.getByRole("button", { name: "Filters, 1 on" }).textContent).toBe("1");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Mine only" }));
+    expect(screen.getByRole("button", { name: "Filters" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Candidates" })?.className, "no title on show").toContain("visually-hidden");
+    const tools = screen.getByRole("button", { name: "Columns" }).closest(".list-tools");
+    expect(screen.getByRole("group", { name: "Clicking a candidate opens" }).closest(".list-tools")).toBe(tools);
   });
 
   it("adds candidates from CVs dropped on the page", async () => {
@@ -91,9 +102,13 @@ describe("candidate list", () => {
     renderWithClient(<CandidateList canImport />);
     await screen.findByText("Siti Aisyah");
     expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Add candidate/ }), "CVs are dropped instead").toBeNull();
+    expect(screen.queryByRole("button", { name: /Add candidate|Import CVs/ }), "CVs are dropped instead").toBeNull();
+    expect(screen.getByText(/Drop CVs anywhere to upload/).textContent, "no choose-files link").not.toContain("choose files");
     const cv = new File(["%PDF-1.7"], "nurul-cv.pdf", { type: "application/pdf" });
-    fireEvent.drop(screen.getByText("Drop CVs here to add candidates").closest(".drop-zone") as Element, { dataTransfer: { files: [cv] } });
+    // Dropped anywhere on the page, here on a row of the list.
+    const anywhere = screen.getByText("Siti Aisyah");
+    fireEvent.dragEnter(anywhere, { dataTransfer: { types: ["Files"], files: [cv] } });
+    fireEvent.drop(anywhere, { dataTransfer: { types: ["Files"], files: [cv] } });
     const panel = await screen.findByRole("region", { name: "CV import" });
     expect(panel.textContent).toContain("nurul-cv.pdf");
     const source = screen.getByLabelText<HTMLSelectElement>("Preset the source");
@@ -110,7 +125,7 @@ describe("candidate list", () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList />);
     await screen.findByText("Siti Aisyah");
-    expect(screen.queryByText("Drop CVs here to add candidates")).toBeNull();
+    expect(screen.queryByText(/Drop CVs anywhere/)).toBeNull();
   });
 
   it("shows tags by the name", async () => {
@@ -128,7 +143,7 @@ describe("candidate list", () => {
     }));
     renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
-    fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.change(screen.getByPlaceholderText(/SAP AND/), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
     expect(screen.getByText("internship").className).toBe("bool-not"); // read as left out
     fireEvent.click(screen.getByRole("button", { name: /^IT skills/ }));
@@ -189,7 +204,7 @@ describe("candidate list", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [], nextCursor: null, terms: [] }));
     renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
-    fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(await screen.findByRole("button", { name: /^Industry/ }));
     expect(screen.queryByRole("checkbox", { name: "FSI – Banking" })).toBeNull(); // main industries only
     fireEvent.click(screen.getByRole("checkbox", { name: "Financial Services" }));
@@ -262,7 +277,7 @@ describe("candidate list", () => {
     renderWithClient(<CandidateList />);
     fireEvent.click(await screen.findByRole("button", { name: /Wei Tan/ }));
     expect(screen.getByRole("region", { name: "Resume of Wei Tan" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Columns ▾" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Search candidates" }), { target: { value: "a" } });
     expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
   });

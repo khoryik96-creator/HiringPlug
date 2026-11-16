@@ -54,6 +54,13 @@ paths:
           in: query
           description: "Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written."
           schema: { type: string, minLength: 1, maxLength: 200 }
+        - name: boolean
+          in: query
+          description: >-
+            A boolean search of the name, website, industry, city and about:
+            SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*,
+            word NEAR/3 word. Words match their other forms (bank, banks).
+          schema: { type: string, minLength: 1, maxLength: 1000 }
         - name: type
           in: query
           schema: { $ref: '#/components/schemas/CompanyType' }

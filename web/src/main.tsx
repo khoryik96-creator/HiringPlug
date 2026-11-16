@@ -13,6 +13,7 @@ import "./styles.css";
 import "./candidate-workspace.css";
 import "./search-reader.css";
 import "./folders.css";
+import "./listTop.css";
 
 guardNumberFields();
 guardRequiredFields();

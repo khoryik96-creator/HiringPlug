@@ -9722,6 +9722,8 @@ export interface operations {
             query?: {
                 /** @description Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written. */
                 q?: string;
+                /** @description A boolean search of the name, website, industry, city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks). */
+                boolean?: string;
                 type?: components["schemas"]["CompanyType"];
                 /** @description Only companies in this category (a key of the company_category list). */
                 category?: string;
@@ -10179,6 +10181,8 @@ export interface operations {
             query?: {
                 /** @description Every word must appear in the name, email or job title (ignoring case and accents); or a phone or mobile number, however it is written. */
                 q?: string;
+                /** @description A boolean search of the name, job title and email: (HR OR "talent acquisition") AND manager NOT intern*, word NEAR/3 word. Words match their other forms (manager, managers). */
+                boolean?: string;
                 /** @description With q: names like q (for typos), the closest first; no further pages. */
                 similar?: boolean;
                 /** @description Only this company's contacts. */

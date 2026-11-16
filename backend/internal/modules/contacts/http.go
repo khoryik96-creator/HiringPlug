@@ -24,7 +24,7 @@ func (h *HTTP) ListContacts(ctx context.Context, req api.ListContactsRequestObje
 	}
 	params := req.Params
 	page, err := h.svc.List(ctx, authz.MustFromContext(ctx), Filter{
-		Query: params.Q, CompanyID: params.CompanyId, Status: c.Convert[string](params.Status), Role: params.Role,
+		Query: params.Q, Boolean: params.Boolean, CompanyID: params.CompanyId, Status: c.Convert[string](params.Status), Role: params.Role,
 		RoleNotSet: params.RoleNotSet != nil && *params.RoleNotSet, Similar: params.Similar != nil && *params.Similar, Folder: params.Folder,
 	}, params.Cursor, limit)
 	if err != nil {

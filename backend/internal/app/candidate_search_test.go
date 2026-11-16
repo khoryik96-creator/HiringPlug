@@ -73,6 +73,14 @@ func TestAdvancedSearchFindsByFiltersAndABooleanOfTheirCVs(t *testing.T) {
 	page, _ = search(token, map[string]any{"boolean": `"team of five" OR manag*`})
 	assert.Equal(t, []string{aina.Id}, ids(page), "a phrase, and managed for manag*")
 
+	// NEAR: "BPC planning" are next to each other; SAP is five words before planning.
+	page, _ = search(token, map[string]any{"boolean": "planning NEAR/1 bpc"})
+	assert.Equal(t, []string{aina.Id}, ids(page), "either way round")
+	page, _ = search(token, map[string]any{"boolean": "sap NEAR/2 planning"})
+	assert.Empty(t, ids(page), "too far apart")
+	page, _ = search(token, map[string]any{"boolean": "(sap NEAR planning) AND NOT intern*"})
+	assert.Equal(t, []string{aina.Id}, ids(page), "NEAR alone is within 5 words")
+
 	page, _ = search(token, map[string]any{"workAuthorization": []string{"expat", "needs_pass"}})
 	assert.ElementsMatch(t, []string{ben.Id, chris.Id}, ids(page))
 	page, _ = search(token, map[string]any{"residence": []string{"MY"}, "nationality": []string{"IN", "MY"}, "availability": []string{"looking"}})

@@ -1,0 +1,59 @@
+/* The top of the candidate, company and contact lists (option A): one search
+   bar holding its filters, the folder tabs with the view tools at their end,
+   and a dark bar for the rows chosen. */
+.list-top { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0.25rem 0 0.4rem; }
+.list-top .bool-box { flex: 1; min-width: min(100%, 22rem); display: flex; align-items: center; gap: 0.35rem; background: #fff; border: 1px solid var(--line-strong, #d6c8fa); border-radius: 12px; padding: 0.3rem 0.35rem 0.3rem 0.85rem; box-shadow: 0 1px 2px rgba(40, 20, 90, 0.05); }
+.list-top .bool-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.list-top .bool-box > svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
+.list-top .bool-field input { border: 0; outline: none; width: 100%; padding: 0.45rem 0.2rem; background: transparent; box-shadow: none; font-size: 0.95rem; }
+.list-top-end { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.drop-hint { font-size: 0.82rem; color: var(--muted); }
+
+/* Boolean rules in blue, drawn under the (transparent) typed text. */
+.bool-field { position: relative; flex: 1; min-width: 0; display: flex; }
+.bool-mirror { position: absolute; inset: 0; white-space: pre; overflow: hidden; pointer-events: none; color: var(--ink, #1d1a2e); display: flex; align-items: center; border: 0 solid transparent; }
+.bool-box.is-boolean .bool-field input { color: transparent; caret-color: var(--ink, #1d1a2e); position: relative; z-index: 1; }
+.bool-box.is-boolean .bool-field input::selection { background: rgba(37, 99, 235, 0.22); }
+.bool-rule { color: #2563eb; }
+.bool-error { margin: 0.2rem 0.2rem 0.4rem; color: #b91c1c; font-size: 0.85rem; }
+.view-switch { display: inline-flex; gap: 0.15rem; }
+.bool-badge { flex: none; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #2563eb; background: #e8f0fe; border-radius: 999px; padding: 0.15rem 0.5rem; }
+
+/* Small buttons and selects inside the search bar. */
+.search-pill { all: unset; box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.65rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.search-pill:hover { background: var(--soft); color: var(--ink, #1d1a2e); }
+.search-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-pill.on { background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); }
+.search-pill .badge { background: var(--accent); color: #fff; border-radius: 999px; font-size: 0.68rem; padding: 0.05rem 0.4rem; }
+.search-pill input[type="checkbox"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+select.search-pill { appearance: auto; min-height: 0; width: auto; border: 0; background: transparent; padding-right: 0.3rem; }
+select.search-pill.on { background: var(--accent-soft); }
+
+/* The folder tabs' row ends with the view tools (or they stand alone). */
+.list-tools { display: flex; align-items: center; gap: 0.15rem; margin-left: auto; padding: 0 0 0.3rem 0.5rem; flex: none; }
+.folder-row { display: flex; align-items: flex-end; border-bottom: 1px solid var(--line); }
+.folder-row > .folder-strip { flex: 1; min-width: 0; border-bottom: 0; }
+.list-tools-row { display: flex; justify-content: flex-end; border-bottom: 1px solid var(--line); margin-bottom: 0.4rem; }
+.tool-btn { all: unset; box-sizing: border-box; width: 32px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); cursor: pointer; }
+.tool-btn:hover { background: var(--soft); color: var(--ink, #1d1a2e); }
+.tool-btn.on, .tool-btn[aria-pressed="true"], .tool-btn[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); }
+.tool-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tool-btn svg { width: 17px; height: 17px; }
+.list-tools .column-picker { position: relative; }
+.list-tools .column-menu { position: absolute; right: 0; left: auto; top: calc(100% + 6px); z-index: 25; width: 16rem; }
+
+/* The count line, and the dark bar once rows are chosen. */
+.pick-bar.dark { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0; padding: 0.45rem 0.6rem 0.45rem 0.9rem; border: 0; border-radius: 12px; background: #1d1a2e; color: #fff; font-size: 0.85rem; }
+.pick-bar.dark strong { margin-right: 0.25rem; }
+.pick-bar.dark button, .pick-bar.dark .add-to-folder > button { background: transparent; color: #fff; border: 1px solid #4a4560; border-radius: 999px; min-height: 30px; padding: 0.2rem 0.8rem; font-size: 0.82rem; font-weight: 600; box-shadow: none; }
+.pick-bar.dark button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); border-color: #6b6684; }
+.pick-bar.dark button:disabled { opacity: 0.5; }
+.pick-bar.dark .pick-end { margin-left: auto; display: flex; align-items: center; gap: 0.4rem; }
+.pick-bar.dark .pick-all { border-color: transparent; color: #d9d3f0; }
+.pick-bar.dark .pick-warning, .pick-bar.dark .warning { color: #fcd34d; }
+.pick-bar.dark .error { color: #fecaca; }
+.list-meta:has(.pick-bar.dark) > span[role="status"] { display: none; }
+
+/* Dropping CVs anywhere on the candidates page. */
+.page-drop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(109, 74, 230, 0.12); border: 3px dashed var(--accent); pointer-events: none; }
+.page-drop span { background: #fff; color: var(--accent-dark, #5b3fd0); font-weight: 700; padding: 1rem 1.5rem; border-radius: 14px; box-shadow: 0 12px 30px rgba(40, 20, 90, 0.18); }

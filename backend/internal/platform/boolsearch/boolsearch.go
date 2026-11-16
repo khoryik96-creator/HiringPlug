@@ -4,9 +4,11 @@
 //   - words next to each other must all appear (AND is implied);
 //   - OR between alternatives; NOT (or -word) leaves out;
 //   - ( ) groups; "quoted words" must appear together, in that order;
-//   - word* is any word starting so (manag* finds manager, managing).
+//   - word* is any word starting so (manag* finds manager, managing);
+//   - NEAR (or NEAR/n, W/n) between two words or "phrases": within n words
+//     of each other, either way round (NEAR alone: within 5).
 //
-// NOT binds tightest, then AND, then OR. The operators are read in any case
+// NEAR binds tightest, then NOT, then AND, then OR. The operators are read in any case
 // (and, or, not). The query becomes a PostgreSQL text search query
 // (to_tsquery('english', ...)), so words match their other forms
 // (manager, managers) as CV text is indexed.
@@ -23,6 +25,9 @@ import (
 const (
 	MaxTerms = 50
 	MaxDepth = 10
+	// MaxNear is the widest NEAR/n; NEAR alone is DefaultNear.
+	MaxNear     = 20
+	DefaultNear = 5
 )
 
 // Query is a parsed boolean search.
@@ -107,6 +112,10 @@ func (q Query) Excluded() string {
 			walk(v.r, negated)
 		case notNode:
 			walk(v.n, !negated)
+		case nearNode:
+			if negated {
+				parts = append(parts, v.ts())
+			}
 		}
 	}
 	walk(q.root, false)
@@ -125,12 +134,45 @@ const (
 	tokAnd
 	tokOr
 	tokNot
+	tokNear
 )
 
 type token struct {
 	kind   tokKind
 	text   string
 	prefix bool
+	near   int // NEAR's distance
+}
+
+// nearWord reads NEAR, NEAR/n or W/n: the distance, or 0 when it is not one.
+func nearWord(raw string) (int, error) {
+	up := strings.ToUpper(raw)
+	if up == "NEAR" {
+		return DefaultNear, nil
+	}
+	var n string
+	switch {
+	case strings.HasPrefix(up, "NEAR/"):
+		n = up[len("NEAR/"):]
+	case strings.HasPrefix(up, "W/"):
+		n = up[len("W/"):]
+	default:
+		return 0, nil
+	}
+	d := 0
+	for _, r := range n {
+		if r < '0' || r > '9' {
+			return 0, nil // not NEAR/n: an ordinary word
+		}
+		d = d*10 + int(r-'0')
+		if d > MaxNear {
+			return 0, fmt.Errorf("has %s: NEAR goes up to %d words", raw, MaxNear)
+		}
+	}
+	if n == "" || d == 0 {
+		return 0, fmt.Errorf("has %s: write NEAR/1 to NEAR/%d", raw, MaxNear)
+	}
+	return d, nil
 }
 
 func lex(s string) ([]token, error) {
@@ -180,6 +222,12 @@ func lex(s string) ([]token, error) {
 				continue
 			case "NOT", "!":
 				out = append(out, token{kind: tokNot, text: raw})
+				continue
+			}
+			if d, err := nearWord(raw); err != nil {
+				return nil, err
+			} else if d > 0 {
+				out = append(out, token{kind: tokNear, text: raw, near: d})
 				continue
 			}
 			prefix := strings.HasSuffix(raw, "*")
@@ -234,7 +282,7 @@ func (p *parser) or(depth int) (node, error) {
 }
 
 func (p *parser) and(depth int) (node, error) {
-	left, err := p.unary(depth)
+	left, err := p.near(depth)
 	if err != nil {
 		return nil, err
 	}
@@ -246,11 +294,36 @@ func (p *parser) and(depth int) (node, error) {
 		if t.kind == tokAnd {
 			p.pos++
 		}
-		right, err := p.unary(depth)
+		right, err := p.near(depth)
 		if err != nil {
 			return nil, err
 		}
 		left = andNode{left, right}
+	}
+}
+
+// near reads a NEAR b: two words or phrases within a few words of each other.
+func (p *parser) near(depth int) (node, error) {
+	left, err := p.unary(depth)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		t, ok := p.peek()
+		if !ok || t.kind != tokNear {
+			return left, nil
+		}
+		p.pos++
+		right, err := p.unary(depth)
+		if err != nil {
+			return nil, err
+		}
+		l, lok := left.(termNode)
+		r, rok := right.(termNode)
+		if !lok || !rok {
+			return nil, fmt.Errorf("has %s between something other than two words or \"phrases\"", strings.ToUpper(t.text))
+		}
+		left = nearNode{l, r, t.near}
 	}
 }
 
@@ -262,7 +335,7 @@ func (p *parser) unary(depth int) (node, error) {
 	switch t.kind {
 	case tokNot:
 		p.pos++
-		inner, err := p.unary(depth)
+		inner, err := p.near(depth) // NOT a NEAR b leaves out the pair
 		if err != nil {
 			return nil, err
 		}
@@ -291,6 +364,8 @@ func (p *parser) unary(depth int) (node, error) {
 		return termNode{Term{Words: strings.Fields(t.text)}}, nil
 	case tokClose:
 		return nil, errors.New("has a ) without its (, or empty brackets")
+	case tokNear:
+		return nil, fmt.Errorf("has %s with nothing before it", strings.ToUpper(t.text))
 	default: // AND / OR with nothing before it
 		return nil, fmt.Errorf("has %s with nothing before it", strings.ToUpper(t.text))
 	}
@@ -307,6 +382,10 @@ type termNode struct{ t Term }
 type andNode struct{ l, r node }
 type orNode struct{ l, r node }
 type notNode struct{ n node }
+type nearNode struct {
+	l, r termNode
+	d    int
+}
 
 func lexeme(w string) string { return "'" + w + "'" } // words hold only letters, digits and marks
 
@@ -327,11 +406,21 @@ func (n andNode) ts() string { return "(" + n.l.ts() + " & " + n.r.ts() + ")" }
 func (n orNode) ts() string  { return "(" + n.l.ts() + " | " + n.r.ts() + ")" }
 func (n notNode) ts() string { return "!" + n.n.ts() }
 
+// ts: l then r, or r then l, 1 to d words apart.
+func (n nearNode) ts() string {
+	parts := make([]string, 0, 2*n.d)
+	for i := 1; i <= n.d; i++ {
+		parts = append(parts, fmt.Sprintf("(%s <%d> %s)", n.l.ts(), i, n.r.ts()), fmt.Sprintf("(%s <%d> %s)", n.r.ts(), i, n.l.ts()))
+	}
+	return "(" + strings.Join(parts, " | ") + ")"
+}
+
 func (n termNode) collect(negated bool, add func(Term)) {
 	if !negated {
 		add(n.t)
 	}
 }
-func (n andNode) collect(neg bool, add func(Term)) { n.l.collect(neg, add); n.r.collect(neg, add) }
-func (n orNode) collect(neg bool, add func(Term))  { n.l.collect(neg, add); n.r.collect(neg, add) }
-func (n notNode) collect(neg bool, add func(Term)) { n.n.collect(!neg, add) }
+func (n andNode) collect(neg bool, add func(Term))  { n.l.collect(neg, add); n.r.collect(neg, add) }
+func (n orNode) collect(neg bool, add func(Term))   { n.l.collect(neg, add); n.r.collect(neg, add) }
+func (n notNode) collect(neg bool, add func(Term))  { n.n.collect(!neg, add) }
+func (n nearNode) collect(neg bool, add func(Term)) { n.l.collect(neg, add); n.r.collect(neg, add) }

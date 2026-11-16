@@ -159,8 +159,8 @@ function RecipientTable({ rows, title }: { rows: Schemas["EmailBatchRecipient"][
 export interface Shown { count: number; more?: boolean; all: boolean; onAll: () => void }
 
 /**
- * Over a list whose rows can be chosen: "Choose: All 24 | None", and once any
- * are chosen, "3 chosen · Email each separately · Clear".
+ * Over a list whose rows can be chosen, once any are chosen: a dark bar,
+ * "3 chosen · Email each separately · … · Select all 24 · Clear".
  */
 export function PickBar({ count, shown, onEmail, onClear, children }: {
   count: number; shown?: Shown;
@@ -170,28 +170,20 @@ export function PickBar({ count, shown, onEmail, onClear, children }: {
   /** More to do with the chosen (such as putting them in a folder). */
   children?: React.ReactNode;
 }) {
-  const choose = shown && shown.count > 0;
-  if (count === 0 && !choose) return null;
+  // Nothing chosen: nothing shown. Some chosen: a dark bar of what can be done with them.
+  if (count === 0) return null;
   return (
-    <div className={count > 0 ? "choose-row has-chosen" : "choose-row"}>
-      {choose && (
-        <span className="choose" role="group" aria-label="Choose">
-          <span className="choose-label" aria-hidden="true">Choose</span>
-          <span className="segmented">
-            <button type="button" className={shown.all ? "on" : undefined} aria-pressed={shown.all} onClick={shown.onAll}>All {shown.count}{shown.more ? " shown" : ""}</button>
-            <button type="button" className={count === 0 ? "on" : undefined} aria-pressed={count === 0} onClick={onClear}>None</button>
-          </span>
-        </span>
-      )}
-      {count > 0 && (
-        <div className="pick-bar" role="status">
-          <strong>{count} chosen</strong>
-          {children}
-          {onEmail && <button type="button" className={children ? undefined : "primary"} disabled={count > 50} onClick={onEmail}>Email each separately</button>}
-          <button type="button" className="link" onClick={onClear}>Clear</button>
-          {onEmail && count > 50 && <span className="warning small">At most 50 at a time to email.</span>}
-        </div>
-      )}
+    <div className="pick-bar dark" role="status">
+      <strong>{count} chosen</strong>
+      {onEmail && <button type="button" disabled={count > 50} onClick={onEmail}>✉ Email each separately</button>}
+      {children}
+      {onEmail && count > 50 && <span className="pick-warning small">At most 50 at a time to email.</span>}
+      <span className="pick-end">
+        {shown && !shown.all && shown.count > 0 && (
+          <button type="button" className="pick-all" onClick={shown.onAll}>Select all {shown.count}{shown.more ? " shown" : ""}</button>
+        )}
+        <button type="button" onClick={onClear}>✕ Clear</button>
+      </span>
     </div>
   );
 }

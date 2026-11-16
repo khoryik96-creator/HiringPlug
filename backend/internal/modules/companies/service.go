@@ -229,9 +229,13 @@ type Page struct {
 
 // List returns up to limit companies, optionally matching query and type, or
 // only those in a folder, starting after cursor (the last ID of the previous page).
-func (s *Service) List(ctx context.Context, p authz.Principal, query, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
+func (s *Service) List(ctx context.Context, p authz.Principal, query, boolean, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
+	tsquery, err := booleanQuery(boolean)
+	if err != nil {
+		return Page{}, err
+	}
 	var page Page
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if s.industries != nil {
 			if err := s.industries.LockIn(ctx, tx); err != nil {
 				return err
@@ -242,7 +246,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, companyTyp
 			return err
 		}
 		rows, err := store.New(tx).ListCompanies(ctx, store.ListCompaniesParams{
-			Cursor: cursor, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Query: query, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
+			Cursor: cursor, Type: companyType, Category: category, LinkedinCompany: linkedinCompany, Query: query, Tsquery: tsquery, InIds: inIDs, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {
 			return err

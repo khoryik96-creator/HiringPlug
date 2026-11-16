@@ -112,12 +112,14 @@ export function WaDisc({ c, label, big = false }: { c: Summary; label?: string; 
 
 /** Choose and reset the columns (they are put in order by dragging their headings). */
 export function ColumnPicker({ columns, chosen, onSave }: { columns: Column[]; chosen: boolean; onSave: (c: Column[] | null) => void }) {
-  // A pill beside the list's "Choose All | None" (search-reader.css).
+  // A small icon at the end of the folder tabs (listTop.css).
   const [open, setOpen] = useState(false);
   const toggle = (col: Column, on: boolean) => { onSave(on ? [...columns, col] : columns.filter((c) => c !== col)); };
   return (
     <div className="column-picker">
-      <button type="button" className="columns-pill" aria-expanded={open} onClick={() => { setOpen(!open); }}>Columns ▾</button>
+      <button type="button" className="tool-btn" aria-label="Columns" title="Choose the columns" aria-expanded={open} onClick={() => { setOpen(!open); }}>
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M6.2 2.5v11M9.8 2.5v11" /></svg>
+      </button>
       {open && (
         <div className="panel column-menu" role="group" aria-label="Columns">
           <p className="small muted">Shown after the name. To change the order, drag a column&rsquo;s heading in the list.</p>

@@ -13,17 +13,24 @@ import { type Category, categoryLabel, useIndustries } from "../IndustryPicker";
 import { MultiSelect } from "./MultiSelect";
 import { countryGroups, type Fav, useFavourites } from "../favourites";
 
-export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose }: {
+export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose, mine }: {
   value: SearchState;
   canSeeSalary: boolean;
   onSearch: (s: SearchState) => void;
   onClose: () => void;
+  /** "Mine only": the person's own candidates (changed at once). */
+  mine?: { on: boolean; set: (on: boolean) => void };
 }) {
   const [draft, setDraft] = useState(value);
   return (
     <form className="panel adv-search" aria-label="Advanced search" onSubmit={(e) => { e.preventDefault(); onSearch(draft); }}>
       <div className="adv-head">
         <h3>Advanced search</h3>
+        {mine && (
+          <label className={`toggle-chip${mine.on ? " on" : ""}`}>
+            <input type="checkbox" checked={mine.on} onChange={(e) => { mine.set(e.target.checked); }} /> Mine only
+          </label>
+        )}
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
       <BooleanField value={draft.boolean} onChange={(boolean) => { setDraft((d) => ({ ...d, boolean })); }} />

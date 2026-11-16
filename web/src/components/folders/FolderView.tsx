@@ -23,7 +23,7 @@ export interface FolderView {
   hasFolders: boolean;
   /** Lets a row be dragged onto a folder: the chosen rows when it is one, else that row. */
   drag: (id: string, chosen: ReadonlySet<string>) => ReturnType<typeof dragRows> | undefined;
-  panel: ReactNode;
+  panel: (tools?: ReactNode) => ReactNode;
   head: ReactNode;
   /** The PickBar's folder buttons for the chosen rows. */
   actions: (chosen: string[]) => ReactNode;
@@ -57,7 +57,7 @@ export function useFolderView(kind: FolderKind, on: boolean, meId: string, uncho
     ready: !on || open === null || list.data !== undefined || list.isError,
     names,
     drag: (id, chosen) => (on ? dragRows(() => (chosen.has(id) ? [...chosen] : [id])) : undefined),
-    panel: on && <FolderPanel kind={kind} folders={list.data} open={folder?.id ?? null} onOpen={setOpen} error={list.error} />,
+    panel: (tools) => on && <FolderPanel kind={kind} folders={list.data} open={folder?.id ?? null} onOpen={setOpen} error={list.error} tools={tools} />,
     head: on && folder && <FolderHead key={folder.id} kind={kind} folder={folder} meId={meId} onGone={() => { setOpen(null); }} />,
     actions: (chosen) => on && (chosen.length > MAX_AT_ONCE ? <span className="warning small">At most {MAX_AT_ONCE} at a time for folders.</span> : (
       <>
@@ -83,12 +83,12 @@ export function InFolders({ names }: { names: string[] }) {
   return <span className="in-folders">{names.join(", ")}</span>;
 }
 
-/** The list beside the folder panel (or the list alone, without folders). */
-export function WithFolders({ view, children }: { view: FolderView; children: ReactNode }) {
-  if (!view.on) return <>{children}</>;
+/** The list under its folder tabs (or the list alone, without folders); `tools` end the tabs' row. */
+export function WithFolders({ view, tools, children }: { view: FolderView; tools?: ReactNode; children: ReactNode }) {
+  if (!view.on) return <>{tools && <div className="list-tools-row"><span className="list-tools">{tools}</span></div>}{children}</>;
   return (
     <div className="with-folders">
-      {view.panel}
+      {view.panel(tools)}
       <div className="folder-main">
         {view.head}
         {children}

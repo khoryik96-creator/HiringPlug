@@ -591,8 +591,12 @@ WHERE ($1::text IS NULL OR contact.id < $1::text)
             ELSE contact.search_text LIKE ALL (app_search_patterns($7::text))
               OR contact.phone_digits LIKE '%' || app_phone_key($7::text) || '%'
           END)
+  -- A boolean search (boolsearch's query for to_tsquery).
+  AND ($9::text IS NULL
+       OR to_tsvector('english', contact.first_name || ' ' || coalesce(contact.last_name, '') || ' ' || coalesce(contact.title, '') || ' ' || coalesce(contact.email, ''))
+          @@ to_tsquery('english', $9::text))
 ORDER BY CASE WHEN $8::boolean THEN word_similarity(app_normalize_text(coalesce($7::text, '')), contact.name_text) END DESC, contact.id DESC
-LIMIT $9
+LIMIT $10
 `
 
 type ListContactsParams struct {
@@ -604,6 +608,7 @@ type ListContactsParams struct {
 	InIds        []string
 	Query        *string
 	SimilarNames bool
+	Tsquery      *string
 	RowLimit     int32
 }
 
@@ -641,6 +646,7 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 		arg.InIds,
 		arg.Query,
 		arg.SimilarNames,
+		arg.Tsquery,
 		arg.RowLimit,
 	)
 	if err != nil {

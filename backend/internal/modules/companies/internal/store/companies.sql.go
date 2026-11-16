@@ -616,8 +616,12 @@ WHERE ($1::text IS NULL OR id < $1::text)
   AND ($6::text IS NULL
        OR search_text LIKE ALL (app_search_patterns($6::text))
        OR phone_digits LIKE '%' || app_phone_key($6::text) || '%')
+  -- A boolean search (boolsearch's query for to_tsquery).
+  AND ($7::text IS NULL
+       OR to_tsvector('english', name || ' ' || coalesce(website, '') || ' ' || coalesce(industry, '') || ' ' || coalesce(city, '') || ' ' || coalesce(about, ''))
+          @@ to_tsquery('english', $7::text))
 ORDER BY id DESC
-LIMIT $7
+LIMIT $8
 `
 
 type ListCompaniesParams struct {
@@ -627,6 +631,7 @@ type ListCompaniesParams struct {
 	InIds           []string
 	LinkedinCompany *string
 	Query           *string
+	Tsquery         *string
 	RowLimit        int32
 }
 
@@ -651,6 +656,7 @@ func (q *Queries) ListCompanies(ctx context.Context, arg ListCompaniesParams) ([
 		arg.InIds,
 		arg.LinkedinCompany,
 		arg.Query,
+		arg.Tsquery,
 		arg.RowLimit,
 	)
 	if err != nil {

@@ -172,7 +172,7 @@ export function booleanTokens(input: string): { text: string; kind: "op" | "not"
     if (space) { out.push({ text: tok, kind: "space" }); continue; }
     if (group) { out.push({ text: tok, kind: "group" }); negate = false; continue; }
     const upper = tok.toUpperCase();
-    if (upper === "AND" || upper === "OR") { out.push({ text: tok, kind: "op" }); continue; }
+    if (upper === "AND" || upper === "OR" || /^(NEAR(\/\d+)?|W\/\d+|&&?|\|\|?)$/.test(upper)) { out.push({ text: tok, kind: "op" }); continue; }
     if (upper === "NOT") { out.push({ text: tok, kind: "not" }); negate = true; continue; }
     if (tok.startsWith("-") && tok.length > 1) { out.push({ text: tok, kind: "not" }); continue; }
     out.push({ text: tok, kind: negate ? "not" : phrase ? "phrase" : "word" });

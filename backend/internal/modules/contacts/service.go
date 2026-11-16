@@ -213,6 +213,7 @@ type Page struct {
 // Filter narrows a list of contacts; every part given must hold.
 type Filter struct {
 	Query, CompanyID *string
+	Boolean          *string // a boolean search of the name, title and email
 	Status           *string // active or left
 	Role             *string // a key of the contact_role list
 	RoleNotSet       bool    // only contacts without a role (ignored with Role)
@@ -224,17 +225,21 @@ type Filter struct {
 // List returns up to limit contacts matching f, newest first.
 func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
 	var page Page
+	tsquery, err := booleanQuery(f.Boolean)
+	if err != nil {
+		return page, err
+	}
 	similar := f.Similar && f.Query != nil
 	if similar {
 		cursor = nil // ordered by likeness, not by id: one page
 	}
-	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
 		if err != nil {
 			return err
 		}
 		rows, err := store.New(tx).ListContacts(ctx, store.ListContactsParams{
-			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs,
+			Cursor: cursor, CompanyID: f.CompanyID, Query: f.Query, Tsquery: tsquery, Status: f.Status, Role: f.Role, RoleNotSet: f.Role == nil && f.RoleNotSet, InIds: inIDs,
 			SimilarNames: similar, RowLimit: int32(limit + 1), //nolint:gosec // limit is 1..100 per the contract
 		})
 		if err != nil {

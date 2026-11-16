@@ -1,6 +1,6 @@
 /* Folders beside the candidate, contact and company lists (components/folders). */
 /* Folders as tabs above the candidate, contact and company lists (components/folders). */
-.with-folders { margin-top: 0.75rem; }
+.with-folders { margin-top: 0.4rem; }
 .folder-main { min-width: 0; }
 .folder-main > .list-meta:first-child, .folder-main > .folder-head + .list-meta { margin-top: 0; }
 

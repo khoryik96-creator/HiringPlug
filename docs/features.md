@@ -89,10 +89,26 @@ source, industry, tags, phone and last updated; the choice is saved for them
 (`/v1/me/preferences`, readable only by them) and "Back to the default"
 undoes it.
 
-**Advanced search** (Candidates, "Advanced search"): a boolean search of
+**The list tops** (Candidates, Companies, Contacts): no page title, one
+search bar holding its filters (Candidates: **Mine**, **Filters**, **✦ AI**;
+Companies: type and category; Contacts: role and status), the folder tabs
+with the view tools at their end (Candidates: columns, table or full
+resume), a count line with "Click a row to choose it", and once rows are
+chosen a dark bar: Email each separately, Add to folder, Select all, Clear.
+CVs dropped anywhere on the Candidates page are imported (or "choose
+files"). Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
+`NEAR/n`, brackets, quotes, `word*`, `-word`; the operators in capitals, so
+"Johnson and Johnson" stays a name search) shows them in blue with a
+BOOLEAN badge and runs a boolean search: of CVs and profiles for
+candidates, of the name, website, industry, city and about for companies,
+of the name, job title and email for contacts. A boolean that cannot be read
+says what is wrong with it.
+
+**Advanced search** (Candidates, "Filters"): a boolean search of
 their CVs and profiles, as on job boards: `SAP AND (BW OR BPC) NOT
-internship`, `"project manager"`, `manag*` (any ending); words side by side
-must all appear; NOT or -word leaves out (a word left out found in any of
+internship`, `"project manager"`, `manag*` (any ending), `SAP NEAR/3
+planning` (within 3 words, either way round; NEAR alone is 5; it binds
+before NOT); words side by side must all appear; NOT or -word leaves out (a word left out found in any of
 their CVs leaves them out, even when their profile matches). The box shows
 how it is read (operators, phrases and words left out in their colours).
 Dropdowns narrow it: status, work authorization (local, PR, spousal / RP-T

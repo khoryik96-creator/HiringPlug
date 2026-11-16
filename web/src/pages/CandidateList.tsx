@@ -4,9 +4,10 @@ import { Fragment, useCallback, useRef, useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
 import { CvImports } from "../components/CvImports";
-import { CV_TYPES, DropZone } from "../components/DropZone";
+import { CV_TYPES } from "../components/DropZone";
+import { DropHint, usePageDrop } from "../components/PageDrop";
+import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
-import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
 import { categoryLabel, useIndustries } from "../components/IndustryPicker";
 import { AdvancedSearch } from "../components/search/AdvancedSearch";
@@ -33,7 +34,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
-  const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page's box
+  const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page
+  const drop = usePageDrop(CV_TYPES, (files) => { setDropped({ files, at: Date.now() }); }, canImport);
   const cols = useCandidateColumns();
   const pick = usePicked();
   const folders = useFolderView("candidate", canFolders, meId, pick.clear);
@@ -44,7 +46,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set()); // resumes read, while on this page
   const markSeen = useCallback((id: string) => { setSeen((s) => (s.has(id) ? s : new Set(s).add(id))); }, []);
   const personOf = (c: Schemas["CandidateSummary"]) => ({ id: c.id, person: { candidateId: c.id, name: c.fullName, email: c.email } });
-  const advanced = !isEmpty(adv);
+  // Boolean rules typed in the search box (AND, OR, NOT, "…", word*) run the boolean search of CVs and profiles.
+  const boolQ = looksBoolean(q);
+  const effective: SearchState = boolQ ? { ...adv, boolean: adv.boolean.trim() ? `(${adv.boolean.trim()}) AND (${q.trim()})` : q.trim() } : adv;
+  const plainQ = boolQ ? "" : q;
+  const advanced = !isEmpty(effective);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
   const [sortBy, setSortBy] = useState<CandidateSort>(() => {
     const kept = readSort();
@@ -52,12 +58,12 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   });
   const sortList = (v: CandidateSort) => { setSortBy(v); keepSort(v); };
   const list = useInfiniteQuery({
-    queryKey: [...candidatesKey, q, mine, sortBy, folder],
+    queryKey: [...candidatesKey, plainQ, mine, sortBy, folder],
     enabled: !advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
     queryFn: async ({ pageParam }) => {
       const query: { q?: string; owner?: string; sort?: CandidateSort; cursor?: string; offset?: number; folder?: string } = {};
-      if (q.trim()) query.q = q.trim();
+      if (plainQ.trim()) query.q = plainQ.trim();
       if (folder) query.folder = folder;
       if (mine) query.owner = "me";
       if (sortBy !== "newest") query.sort = sortBy;
@@ -68,10 +74,10 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
     getNextPageParam: nextPage,
   });
   const found = useInfiniteQuery({
-    queryKey: [...candidatesKey, "search", q, mine, adv, sortBy, folder],
+    queryKey: [...candidatesKey, "search", plainQ, mine, effective, sortBy, folder],
     enabled: advanced && folders.ready,
     initialPageParam: undefined as PageAt | undefined,
-    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(adv, q, mine, pageParam, sortBy, folder) })),
+    queryFn: async ({ pageParam }) => unwrap(await api.POST("/v1/candidates/search", { body: toBody(effective, plainQ, mine, pageParam, sortBy, folder) })),
     getNextPageParam: nextPage,
   });
   const shownList = advanced ? found : list;
@@ -82,9 +88,10 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const hits = allHits.filter((h, i) => allHits.findIndex((x) => x.candidate.id === h.candidate.id) === i);
   const inFolders = useInFolders(folders, hits.map((h) => h.candidate.id));
   const terms = found.data?.pages[0]?.terms ?? [];
-  const hl = advanced && adv.boolean.trim() ? `?hl=${encodeURIComponent(adv.boolean.trim())}` : "";
+  const hl = advanced && effective.boolean.trim() ? `?hl=${encodeURIComponent(effective.boolean.trim())}` : "";
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
+  const filtersOn = chips.length + (mine ? 1 : 0); // on the Filters button
   const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
   const tableRef = useRef<HTMLTableElement>(null);
   const widths = useColumnWidths("candidates", ["name", ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
@@ -104,47 +111,48 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   );
 
   return (
-    <main className="candidates-page wide">
-      <div className="page-head">
-        <h2>Candidates</h2>
-        <div className="row add-candidates">
-          {canImport && (
-            <DropZone accept={CV_TYPES} multiple compact label="Drop CVs here to add candidates"
-              onFiles={(files) => { setDropped({ files, at: Date.now() }); }} />
-          )}
-        </div>
-      </div>
+    <main className="candidates-page wide" {...drop.props}>
+      {drop.overlay}
+      <h2 className="visually-hidden">Candidates</h2>
       {canImport && dropped && (
         <div className="dropped-cvs">
           <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" />
           <button type="button" className="link small" onClick={() => { setDropped(null); }}>Close</button>
         </div>
       )}
-      <div className="list-toolbar">
-        <div className="search-box">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-          <input aria-label="Search candidates" placeholder="Search by name, email, phone, title or company" value={q} onChange={(e) => { setQ(e.target.value); }} />
-        </div>
-        <label className={`toggle-chip${mine ? " on" : ""}`}><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); }} /> Mine only</label>
-        <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
-          Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
-        </button>
-        {canAiSearch && <a className="doc-btn ai-link" href="#/candidates/ai-search">✦ AI search</a>}
+      <div className="list-top">
+        <BooleanSearchBox value={q} onChange={setQ} label="Search candidates" placeholder="Search by name, email, phone, title or company, or AND, OR, NOT…">
+          <button type="button" className={`search-pill${filtersOn > 0 ? " on" : ""}`} aria-expanded={panel} title="Filters (and Mine only)"
+            aria-label={`Filters${filtersOn > 0 ? `, ${String(filtersOn)} on` : ""}`} onClick={() => { setPanel(!panel); }}>
+            <FunnelIcon />{filtersOn > 0 && <span className="badge">{filtersOn}</span>}
+          </button>
+          {canAiSearch && <a className="search-pill" href="#/candidates/ai-search">✦ AI</a>}
+        </BooleanSearchBox>
+        {canImport && <DropHint label="Drop CVs anywhere to upload" skipped={drop.skipped} />}
       </div>
-      {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
-      {!panel && chips.length > 0 && (
+      {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
+      {!panel && filtersOn > 0 && (
         <div className="active-filters" aria-label="Search filters">
+          {mine && (
+            <span className="filter-chip">
+              Mine only
+              <button type="button" aria-label="Remove Mine only" onClick={() => { setMine(false); }}>×</button>
+            </span>
+          )}
           {chips.map((c) => (
             <span key={c.label} className="filter-chip">
               {c.label}
               <button type="button" aria-label={`Remove ${c.label}`} onClick={() => { apply(c.clear(adv)); }}>×</button>
             </span>
           ))}
-          <button type="button" className="link small" onClick={() => { apply(EMPTY); }}>Clear all</button>
+          <button type="button" className="link small" onClick={() => { apply(EMPTY); setMine(false); }}>Clear all</button>
         </div>
       )}
-      <ErrorMessage error={shownList.error ?? cols.save.error} />
-      <WithFolders view={folders}>
+      <ListSearchError error={shownList.error ?? cols.save.error} />
+      <WithFolders view={folders} tools={<>
+        {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
+        <OpenAsSwitch compact value={openAs} onChange={setOpenAs} />
+      </>}>
       <div className="list-meta">
         <span role="status">
           {shownList.data && (hits.length === 0 ? (folder && !q.trim() && !advanced && !mine ? "Nothing in this folder yet: choose candidates under All candidates, then Add to folder (or drag them onto it)." : "No candidates match.")
@@ -158,14 +166,10 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
             {folders.actions([...pick.ids])}
           </PickBar>
         )}
-        {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
-        <span className="list-meta-end">
-          <OpenAsSwitch value={openAs} onChange={setOpenAs} />
-        </span>
       </div>
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       {openAs === "resume" && (
-        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? adv.boolean.trim() : ""} seen={seen} onSeen={markSeen}
+        <ResumeReader key={JSON.stringify([q, mine, adv, sortBy, folder])} hits={hits} highlight={advanced ? effective.boolean.trim() : ""} seen={seen} onSeen={markSeen}
           chosen={canPick ? pick.ids : undefined} onChoose={canPick ? (c, on) => { pick.pick([personOf(c)], on); } : undefined} chooseToEmail={canEmail}
           canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
@@ -246,3 +250,7 @@ function SortHeader({ column, label, sort, onSort, canSeeSalary, widths, move }:
     </th>
   );
 }
+
+const FunnelIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M2 3h12l-4.6 5.6v4.2l-2.8 1.4V8.6z" /></svg>
+);

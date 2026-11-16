@@ -5,7 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
-import { ErrorMessage } from "../components/ErrorMessage";
+import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { contactPerson, usePicked } from "../components/usePicked";
@@ -32,7 +32,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
     enabled: folders.ready,
     queryFn: async ({ pageParam }) => unwrap(await api.GET("/v1/contacts", { params: { query: {
       limit: 100,
-      ...(q.trim() ? { q: q.trim() } : {}),
+      ...(q.trim() ? { [looksBoolean(q) ? "boolean" : "q"]: q.trim() } : {}), // AND, OR, NOT…: a boolean search
       ...(role === NOT_SET ? { roleNotSet: true } : role ? { role } : {}),
       ...(status ? { status } : {}),
       ...(folder ? { folder } : {}),
@@ -47,22 +47,21 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
 
   return (
     <main className="list-page">
-      <div className="row spread">
-        <h2>Contacts</h2>
-        <div className="row">
-          <input aria-label="Search contacts" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
-          <select aria-label="Role" value={role} onChange={(e) => { setRole(e.target.value); }}>
+      <h2 className="visually-hidden">Contacts</h2>
+      <div className="list-top">
+        <BooleanSearchBox value={q} onChange={setQ} label="Search contacts" placeholder="Search by name, email, title or phone, or AND, OR, NOT…">
+          <select aria-label="Role" className={`search-pill${role ? " on" : ""}`} value={role} onChange={(e) => { setRole(e.target.value); }}>
             <option value="">All roles</option>
             {fs.options("contact_role").map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
             <option value={NOT_SET}>Role not set</option>
           </select>
-          <select aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value as Schemas["ContactStatus"] | ""); }}>
+          <select aria-label="Status" className={`search-pill${status ? " on" : ""}`} value={status} onChange={(e) => { setStatus(e.target.value as Schemas["ContactStatus"] | ""); }}>
             <option value="">Everyone</option>
             <option value="active">Still there</option>
             <option value="left">Has left</option>
           </select>
-          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add contact</button>}
-        </div>
+        </BooleanSearchBox>
+        {canCreate && !adding && <button type="button" className="pill-btn primary" onClick={() => { setAdding(true); }}>+ Add contact</button>}
       </div>
       {adding && (
         <ContactForm
@@ -71,7 +70,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
           onSaved={(c) => { window.location.hash = `#/contacts/${c.id}`; }}
         />
       )}
-      <ErrorMessage error={list.error} />
+      <ListSearchError error={list.error} />
       {emailing && <SeparateEmail people={pick.people} onClose={() => { setEmailing(false); pick.clear(); }} />}
       <WithFolders view={folders}>
       {contacts && (

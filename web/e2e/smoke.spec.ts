@@ -108,7 +108,7 @@ test("industry search stays inside the viewport and shows names in applied filte
   await page.setViewportSize({ width: 1440, height: 1000 });
   const errors = await signIn(page, "recruiter");
   await opens(page, "#/candidates", "Candidates");
-  await page.getByRole("button", { name: /Advanced search/ }).click();
+  await page.getByRole("button", { name: /^Filters/ }).click();
   const form = page.getByRole("form", { name: "Advanced search" });
   // Main industries in one dropdown, their subindustries in the next.
   await form.getByRole("button", { name: "Industry", exact: true }).click();
