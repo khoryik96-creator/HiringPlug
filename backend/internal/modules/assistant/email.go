@@ -93,7 +93,9 @@ func (s *Service) DraftEmail(ctx context.Context, p authz.Principal, a EmailAsk)
 			if err != nil {
 				return err
 			}
-			job.JobTitle, job.ClientCompany = apiconv.OrNull(&title), apiconv.OrNull(&company)
+			if title != "" {
+				job.JobTitle, job.ClientCompany = apiconv.OrNull(&title), apiconv.OrNull(&company)
+			}
 		}
 		if s.deps.Agency != nil {
 			if job.Agency, err = s.deps.Agency.TenantName(ctx, tx, p.TenantID); err != nil {
@@ -134,10 +136,12 @@ func (s *Service) ready(ctx context.Context, tx pgx.Tx) (*api.AiAccess, error) {
 	return ai, nil
 }
 
-// aboutJob is the title and client of an application's job, as the user may see them.
+// aboutJob is the title and client of an application's job, as the user may
+// see them. Someone who may not see jobs or pipelines still gets help with the
+// email: the AI is just not told the job.
 func (s *Service) aboutJob(ctx context.Context, tx pgx.Tx, p authz.Principal, applicationID string) (string, string, error) {
 	if !p.Can(api.PermissionPipelineRead) || !p.Can(api.PermissionJobsRead) {
-		return "", "", apperr.NotFound("application")
+		return "", "", nil
 	}
 	app, err := s.deps.Applications.ForAssistant(ctx, tx, applicationID)
 	if err != nil {

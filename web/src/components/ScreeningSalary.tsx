@@ -29,8 +29,9 @@ export function ScreeningSalary({ form, patch, set, errors }: {
   const [manualErrors, setManualErrors] = useState<Record<string, string>>({});
   const [applied, setApplied] = useState(false);
   // The button last used stays outlined in green for a while, so it is plain
-  // the figures went in.
-  const [used, setUsed] = useState<"calculated" | "entered" | null>(null);
+  // the figures went in. Using it again starts the time again; a new
+  // calculation (new figures, not used yet) ends it.
+  const [used, setUsed] = useState<{ button: "calculated" | "entered"; at: number } | null>(null);
   useEffect(() => {
     if (!used) return;
     const t = window.setTimeout(() => { setUsed(null); }, USED_GLOW_MS);
@@ -45,6 +46,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
 
   const calculate = useMutation({
     mutationFn: async (body: Schemas["SalaryCalculationInput"]) => unwrap(await api.POST("/v1/salary-calculations", { body })),
+    onMutate: () => { setUsed(null); },
   });
   const result = calculate.data;
   const asked = calculate.variables;
@@ -91,7 +93,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     });
     setApplied(true);
     setUnusedWording(unread);
-    setUsed("calculated");
+    setUsed({ button: "calculated", at: Date.now() });
   };
 
   const useManualFigures = () => {
@@ -107,7 +109,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
     patch({ calculationPending: false, currentNeedsReview: false, expectedNeedsReview: false });
     calculate.reset();
     setApplied(true);
-    setUsed("entered");
+    setUsed({ button: "entered", at: Date.now() });
   };
 
   const openManual = () => {
@@ -187,7 +189,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
             </p>
           )}
           <div className="row">
-            <button type="button" className={used === "calculated" ? "used" : undefined} disabled={!!nothingToUse}
+            <button type="button" className={used?.button === "calculated" ? "used" : undefined} disabled={!!nothingToUse}
               aria-describedby={needsReview ? blockedId : undefined} onClick={useFigures}>
               Use these figures
             </button>
@@ -201,7 +203,7 @@ export function ScreeningSalary({ form, patch, set, errors }: {
         <div className="form-grid">
           <SalaryFields form={form} set={manual} errors={{ ...errors, ...manualErrors }} />
         </div>
-        <button type="button" className={used === "entered" ? "used" : undefined} onClick={useManualFigures}>
+        <button type="button" className={used?.button === "entered" ? "used" : undefined} onClick={useManualFigures}>
           Use entered figures
         </button>
       </details>

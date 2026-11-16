@@ -181,7 +181,8 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
         </>
       )}
       <AiEmailHelp recipient="client" subject={subject} html={html}
-        onApply={(sub, h) => { if (sub) setForm((f) => ({ ...f, subject: sub })); setHtml(h); setReset((n) => n + 1); }} names={{}} />
+        onApply={(sub, h) => { if (sub) setForm((f) => ({ ...f, subject: sub })); setHtml(h); setReset((n) => n + 1); }}
+        names={{ them: values?.["[Client contact]"], others: [...people.map((p) => p.name), values?.["[Full name]"] ?? ""] }} />
       <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
         values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}

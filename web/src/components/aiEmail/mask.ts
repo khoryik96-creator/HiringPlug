@@ -10,6 +10,8 @@ export interface Names {
   them?: string;
   /** The person sending. */
   me?: string;
+  /** Other people the email names (candidates in a shortlist, those it goes to). */
+  others?: string[];
 }
 
 /** What each ⟦n⟧ stands for, as HTML. */
@@ -35,13 +37,28 @@ export function maskText(text: string, held: Held, names: Names = {}): string {
     return key;
   };
   for (const re of PATTERNS) out = out.replace(re, (m) => hold(m));
-  const person = (name: string | undefined, token: string) => {
-    if (!name?.trim()) return;
-    const words = [name.trim(), ...name.trim().split(/\s+/).filter((w) => w.length > 2)];
-    for (const w of words) out = out.replace(new RegExp(`(?<![\\p{L}])${escapeRe(w)}(?![\\p{L}])`, "giu"), token);
+  // A name comes back exactly as it was written: the whole name (in any
+  // case) and each word of it where it starts with a capital, as names do
+  // ("Will", not "will"; "Owner" of "Demo owner", not "the owner").
+  // ⟦NAME⟧ is only the first name of the person it is to, ⟦ME⟧ only the
+  // sender's whole name: the AI uses them for the greeting and sign-off.
+  const swap = (text: string, flags: string, to: (m: string) => string) => {
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(text)}(?![\\p{L}\\p{N}])`, `g${flags}u`), to);
   };
-  person(names.them, "⟦NAME⟧");
-  person(names.me, "⟦ME⟧");
+  const people: [string, "them" | "me" | "other"][] = [
+    ...(names.them?.trim() ? [[names.them.trim(), "them"] as [string, "them"]] : []),
+    ...(names.me?.trim() ? [[names.me.trim(), "me"] as [string, "me"]] : []),
+    ...(names.others ?? []).filter((n) => n.trim()).map((n) => [n.trim(), "other"] as [string, "other"]),
+  ];
+  // Longest first, so a whole name goes before its words.
+  people.sort((a, b) => b[0].length - a[0].length);
+  for (const [name, who] of people) swap(name, "i", (m) => (who === "me" && m === name ? "⟦ME⟧" : hold(m)));
+  const first = names.them?.trim().split(/\s+/)[0];
+  for (const [name] of people) {
+    for (const word of name.split(/\s+/).filter((w) => w.length > 1)) {
+      swap(word, "i", (m) => (m === first ? "⟦NAME⟧" : m[0] === m[0]?.toLowerCase() ? m : hold(m)));
+    }
+  }
   return out;
 }
 

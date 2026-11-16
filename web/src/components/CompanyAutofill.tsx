@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey, companyAutofillKey, companyKey } from "../api/keys";
@@ -26,6 +27,18 @@ export function CompanyAutofill({ companyId, website }: { companyId: string; web
     refetchInterval: (q) => (q.state.data?.status === "queued" ? 2000 : false),
     enabled: website !== null,
   });
+  // A reading that ends may have filled in empty details (a new company's):
+  // the company is shown again from the server.
+  const was = useRef(state.data?.status);
+  const now = state.data?.status;
+  useEffect(() => {
+    const before = was.current;
+    was.current = now;
+    if (before === "queued" && now !== "queued") {
+      void queryClient.invalidateQueries({ queryKey: companyKey(companyId), exact: true });
+      void queryClient.invalidateQueries({ queryKey: companiesKey });
+    }
+  }, [now, companyId, queryClient]);
   const show = (data: Schemas["CompanyAutofill"]) => { queryClient.setQueryData(companyAutofillKey(companyId), data); };
   const start = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/companies/{companyId}/autofill", { params: { path: { companyId } } })),

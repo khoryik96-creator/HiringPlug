@@ -31,6 +31,11 @@ export interface ColumnWidths {
   set: boolean;
   /** A header's style (its width, once set). */
   style: (column: string) => CSSProperties | undefined;
+  /**
+   * What a header (the column's <th>) needs: its column, width, and its name
+   * (just the label, not the drag edge's instructions).
+   */
+  head: (column: string, label: string) => { "data-column": string; style: CSSProperties | undefined; "aria-label": string };
   /** The table's style: as wide as its columns, once set. */
   tableStyle: CSSProperties | undefined;
   /** The drag edge, inside a header (which must be the column's <th>). */
@@ -85,9 +90,11 @@ export function useColumnWidths(table: string, columns: string[], ref: RefObject
     resize(column, widest);
   };
 
+  const style = (column: string) => (widths[column] !== undefined && set ? { width: widths[column], minWidth: widths[column], maxWidth: widths[column] } : undefined);
   return {
     set,
-    style: (column) => (widths[column] !== undefined && set ? { width: widths[column], minWidth: widths[column], maxWidth: widths[column] } : undefined),
+    style,
+    head: (column, label) => ({ "data-column": column, style: style(column), "aria-label": label }),
     tableStyle: set ? { width: columns.reduce((sum, c) => sum + (widths[c] ?? 120), 0) } : undefined,
     reset: () => { save({}); },
     handle: (column, label) => (
@@ -112,15 +119,23 @@ export function useColumnWidths(table: string, columns: string[], ref: RefObject
           const handle = e.currentTarget;
           handle.setPointerCapture(e.pointerId);
           document.body.classList.add("resizing-columns");
-          const move = (ev: PointerEvent) => { setWidths({ ...base, [column]: Math.max(MIN, Math.round(from + ev.clientX - start)) }); };
-          const up = (ev: PointerEvent) => {
+          let width = Math.max(MIN, Math.round(from));
+          const move = (ev: PointerEvent) => {
+            width = Math.max(MIN, Math.round(from + ev.clientX - start));
+            setWidths({ ...base, [column]: width });
+          };
+          // The drag ends when the button is let go, and also when the browser
+          // takes the pointer away (a touch turned into a scroll, the window
+          // lost focus): either way the width reached is kept.
+          const end = (ev: PointerEvent) => {
+            if (ev.type === "pointerup") width = Math.max(MIN, Math.round(from + ev.clientX - start));
             handle.removeEventListener("pointermove", move);
-            handle.removeEventListener("pointerup", up);
+            for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) handle.removeEventListener(type, end);
             document.body.classList.remove("resizing-columns");
-            save({ ...base, [column]: Math.max(MIN, Math.round(from + ev.clientX - start)) });
+            save({ ...base, [column]: width });
           };
           handle.addEventListener("pointermove", move);
-          handle.addEventListener("pointerup", up);
+          for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) handle.addEventListener(type, end);
         }} />
     ),
   };

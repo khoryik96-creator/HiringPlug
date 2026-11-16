@@ -95,7 +95,12 @@ describe("candidate list", () => {
     fireEvent.drop(screen.getByText("Drop CVs here to add candidates").closest(".drop-zone") as Element, { dataTransfer: { files: [cv] } });
     const panel = await screen.findByRole("region", { name: "CV import" });
     expect(panel.textContent).toContain("nurul-cv.pdf");
-    expect(screen.getByRole("button", { name: "Import 1 file" })).toBeTruthy();
+    const source = screen.getByLabelText<HTMLSelectElement>("Preset the source");
+    expect(source.value, "dropped without seeing the source: it must be picked").toBe("");
+    const post = vi.spyOn(api, "POST");
+    fireEvent.click(screen.getByRole("button", { name: "Import 1 file" }));
+    expect(source.getAttribute("aria-invalid")).toBe("true");
+    expect(post).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
   });

@@ -47,7 +47,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
     <table ref={tableRef} className={`contacts-table${onPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
       <thead>
         <tr>
-          {heads.map(([k, label]) => <th key={k} data-column={k} style={widths.style(k)}>{label}{widths.handle(k, label)}</th>)}
+          {heads.map(([k, label]) => <th key={k} {...widths.head(k, label)}>{label}{widths.handle(k, label)}</th>)}
         </tr>
       </thead>
       <tbody>

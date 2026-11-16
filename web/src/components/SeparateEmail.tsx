@@ -102,7 +102,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
         }}>Use selected template</button>
       </div>
       <label className="field">Subject<input ref={subjectField} required value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
-      <AiEmailHelp recipient={people.some((p) => p.candidateId) ? "candidate" : "client"} subject={subject} html={html} names={{}}
+      <AiEmailHelp recipient={people.some((p) => p.candidateId) ? "candidate" : "client"} subject={subject} html={html} names={{ others: people.map((p) => p.name) }}
         onApply={(sub, h) => { if (sub) setSubject(sub); setHtml(h); setReset((n) => n + 1); }} />
       <RichEditor compact html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
       <Attachments candidateId="" canSeeCvs={false} cvs={[]} onCvs={() => undefined} uploads={uploads} onUploads={setUploads} />

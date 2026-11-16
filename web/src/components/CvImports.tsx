@@ -46,12 +46,16 @@ async function sendFile(importId: string, file: File): Promise<void> {
 /**
  * foldedHistory (the dashboard): past imports load only when opened, or once
  * an import starts here. initialFiles: files already dropped elsewhere (the
- * candidates page), ready to import.
+ * candidates page), ready to import. initialSource: the source chosen at
+ * first ("" when it must be picked: files dropped elsewhere were dropped
+ * without seeing it).
  */
-export function CvImports({ foldedHistory = false, initialFiles }: { foldedHistory?: boolean; initialFiles?: File[] } = {}) {
+export function CvImports({ foldedHistory = false, initialFiles, initialSource = "linkedin" }: {
+  foldedHistory?: boolean; initialFiles?: File[]; initialSource?: string;
+} = {}) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
-  const [source, setSource] = useState("linkedin");
+  const [source, setSource] = useState(initialSource);
   const [tried, setTried] = useState(false); // Import was pressed: a missing source is outlined
   const [files, setFiles] = useState<File[]>(initialFiles ?? []);
   const [sent, setSent] = useState<number | null>(null);

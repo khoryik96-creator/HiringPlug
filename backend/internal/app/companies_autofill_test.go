@@ -208,3 +208,30 @@ func TestANewCompanysTypedNameStays(t *testing.T) {
 	assert.Equal(t, "Contoh Teknologi Sdn Bhd", suggestionFor(t, a.autofill(token, c.Id), api.CompanySuggestionFieldName).Value)
 	assert.Equal(t, "+60 3-1234 5678", got.Phone.MustGet())
 }
+
+// The fill on adding a company happens on its first reading only, even when
+// that reading fails: a reading asked for later only suggests.
+func TestANewCompanyIsFilledOnlyByItsFirstReading(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	closed, open := companySite(t, true), companySite(t, false)
+	c := a.createCompany(token, map[string]any{"name": "Contoh Guess", "website": closed.URL,
+		"fillFromWebsite": true, "nameGuessed": true})
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	require.Equal(t, api.CompanyAutofillStatusFailed, a.autofill(token, c.Id).Status, "robots.txt said no")
+
+	var got api.Company
+	a.request(http.MethodGet, "/v1/companies/"+c.Id, token, nil).JSON(&got)
+	res := a.request(http.MethodPatch, "/v1/companies/"+c.Id, token, map[string]any{"version": got.Version, "website": open.URL})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/companies/"+c.Id+"/autofill", token, nil).Status)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	a.request(http.MethodGet, "/v1/companies/"+c.Id, token, nil).JSON(&got)
+	assert.Equal(t, "Contoh Guess", got.Name, "not replaced by a later reading")
+	assert.True(t, got.Phone.IsNull(), "not filled by a later reading")
+	left := a.autofill(token, c.Id)
+	assert.Equal(t, "Contoh Teknologi Sdn Bhd", suggestionFor(t, left, api.CompanySuggestionFieldName).Value)
+	assert.Equal(t, "+60 3-1234 5678", suggestionFor(t, left, api.CompanySuggestionFieldPhone).Value)
+}

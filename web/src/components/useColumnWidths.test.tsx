@@ -1,12 +1,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useColumnWidths } from "./useColumnWidths";
 
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 function Table({ name = "people" }: { name?: string }) {
@@ -17,8 +18,8 @@ function Table({ name = "people" }: { name?: string }) {
       {w.set && <button type="button" onClick={w.reset}>Reset column widths</button>}
       <table ref={ref} className={w.set ? "sized" : undefined} style={w.tableStyle}>
         <thead><tr>
-          <th data-column="name" style={w.style("name")}>Name{w.handle("name", "Name")}</th>
-          <th data-column="email" style={w.style("email")}>Email{w.handle("email", "Email")}</th>
+          <th {...w.head("name", "Name")}>Name{w.handle("name", "Name")}</th>
+          <th {...w.head("email", "Email")}>Email{w.handle("email", "Email")}</th>
         </tr></thead>
         <tbody><tr><td>Nurul Aisyah</td><td>nurul@example.com</td></tr></tbody>
       </table>
@@ -26,7 +27,7 @@ function Table({ name = "people" }: { name?: string }) {
   );
 }
 
-const header = (name: string) => screen.getByRole("columnheader", { name: new RegExp(`^${name}`) });
+const header = (name: string) => screen.getByRole("columnheader", { name });
 
 describe("column widths, like a spreadsheet", () => {
   it("are left to the table until one is set, then every column keeps its width", () => {
@@ -71,5 +72,30 @@ describe("column widths, like a spreadsheet", () => {
     render(<Clickable />);
     fireEvent.click(screen.getByRole("separator"));
     expect(clicks).toBe(0);
+  });
+
+  it("are named by their label alone, not the drag edge's instructions", () => {
+    render(<Table />);
+    expect(screen.getAllByRole("columnheader").map((h) => h.getAttribute("aria-label"))).toEqual(["Name", "Email"]);
+    expect(screen.getByRole("columnheader", { name: "Name" })).toBeTruthy();
+  });
+
+  it("keep the width reached when the browser takes the pointer away mid-drag", () => {
+    // jsdom has no pointer capture: a stand-in records the call.
+    const capture = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", { value: capture, configurable: true });
+    render(<Table />);
+    const edge = screen.getByRole("separator", { name: /Width of Name/ });
+    fireEvent.pointerDown(edge, { button: 0, clientX: 100, pointerId: 1 });
+    expect(capture).toHaveBeenCalled();
+    expect(document.body.classList.contains("resizing-columns")).toBe(true);
+    fireEvent.pointerMove(edge, { clientX: 180, pointerId: 1 }); // jsdom draws the column 0 wide: 0 + 80
+    fireEvent.pointerCancel(edge, { pointerId: 1 });
+    expect(document.body.classList.contains("resizing-columns"), "the drag is over").toBe(false);
+    expect(header("Name").style.width).toBe("80px");
+    fireEvent.pointerMove(edge, { clientX: 400, pointerId: 1 });
+    expect(header("Name").style.width, "moving no longer resizes").toBe("80px");
+    expect(window.localStorage.getItem("hiringplug.columnWidths.people"), "and it is kept").toContain("\"name\":80");
+    delete (HTMLElement.prototype as { setPointerCapture?: unknown }).setPointerCapture;
   });
 });

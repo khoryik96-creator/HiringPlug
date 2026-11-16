@@ -5,7 +5,7 @@ import { type Held, maskHtml, maskText, unmask, unmaskSubject } from "./mask";
 describe("what the AI sees of an email", () => {
   it("holds back pay, contact details, links and fields, and puts them back as they were", () => {
     const held: Held = new Map();
-    const html = '<p>Hi Siti Aisyah,</p><p>The offer is RM 9,500 a month (12,000 with bonus). Call me on +60 12-345 6789 or nurul@hyppies.my.</p>'
+    const html = '<p>Hi Siti,</p><p>The offer is RM 9,500 a month (12,000 with bonus). Call me on +60 12-345 6789 or nurul@hyppies.my.</p>'
       + '<p>Book here: <a href="https://ats.example/book/abc">pick a time</a>. Notice: <span data-field="candidate.noticePeriod">1 month</span>.</p><p>Nurul</p>';
     const text = maskHtml(html, held, { them: "Siti Aisyah", me: "Nurul Huda" });
     for (const leak of ["Siti", "Aisyah", "9,500", "12,000", "345 6789", "nurul@hyppies.my", "ats.example", "1 month", "Nurul"]) {
@@ -13,7 +13,7 @@ describe("what the AI sees of an email", () => {
     }
     expect(text).toContain("Hi ⟦NAME⟧,");
     expect(text).toContain("\n\n"); // paragraphs kept apart
-    expect(text.trim().endsWith("⟦ME⟧")).toBe(true);
+    expect(text).not.toContain("⟦ME⟧"); // only the first name signs it: it comes back as written
 
     const written = text.replace("Hi ⟦NAME⟧,", "Dear ⟦NAME⟧,");
     const back = unmask(written, held, { them: "Siti Aisyah", me: "Nurul Huda" });
@@ -23,7 +23,25 @@ describe("what the AI sees of an email", () => {
     expect(back).toContain("+60 12-345 6789");
     expect(back).toContain('<a href="https://ats.example/book/abc">pick a time</a>');
     expect(back).toContain('<span data-field="candidate.noticePeriod">1 month</span>');
-    expect(back).toContain("<p>Nurul Huda</p>");
+    expect(back).toContain("<p>Nurul</p>");
+  });
+
+  it("puts names back exactly as they were written, not just the first name", () => {
+    const held: Held = new Map();
+    const names = { them: "Siti Aisyah", me: "Demo owner", others: ["Wei Tan"] };
+    const text = maskText("Dear Ms Aisyah, as the owner said, Siti Aisyah and Wei Tan fit. Demo owner", held, names);
+    for (const leak of ["Aisyah", "Siti", "Wei", "Tan", "Demo"]) expect(text, leak).not.toContain(leak);
+    expect(text).toContain("the owner said"); // a word that is also part of a name, not written as the name
+    expect(text.endsWith("⟦ME⟧")).toBe(true);
+    expect(unmask(text, held, names)).toBe("<p>Dear Ms Aisyah, as the owner said, Siti Aisyah and Wei Tan fit. Demo owner</p>");
+  });
+
+  it("leaves ordinary words that are also someone's name", () => {
+    const held: Held = new Map();
+    const names = { them: "Will Tan" };
+    const text = maskText("I will call you. Will, does Thursday suit?", held, names);
+    expect(text).toBe("I will call you. ⟦NAME⟧, does Thursday suit?");
+    expect(unmask(text, held, names)).toBe("<p>I will call you. Will, does Thursday suit?</p>");
   });
 
   it("keeps years, and gives the same thing the same placeholder", () => {

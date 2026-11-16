@@ -219,3 +219,28 @@ it("outlines the button used in green for 5 minutes", async () => {
     vi.useRealTimers();
   }
 });
+
+it("starts the 5 minutes again on a second click, and stops on a new calculation", async () => {
+  vi.spyOn(api,"GET").mockResolvedValue(ok({allowances:true,bonus:true,bonusOnAllowances:false,cents:false}));
+  const post = vi.spyOn(api,"POST").mockResolvedValue(ok({base:"9000",allowances:"0",bonus:"0",monthly:"9000.00",annualMonths:12,hasCurrent:true,reviewRequired:false,warnings:[],excluded:[]}));
+  renderWithClient(<Harness />);
+  fireEvent.change(screen.getByLabelText("Current salary breakdown"),{target:{value:"9k"}});
+  await waitFor(() => {expect(screen.getByRole<HTMLButtonElement>("button",{name:"Calculate"}).disabled).toBe(false);});
+  fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+  const figures = () => screen.getByRole("button",{name:"Use these figures"});
+  await screen.findByRole("button",{name:"Use these figures"});
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    fireEvent.click(figures());
+    act(() => { vi.advanceTimersByTime(USED_GLOW_MS - 60_000); });
+    fireEvent.click(figures());
+    act(() => { vi.advanceTimersByTime(USED_GLOW_MS - 1000); });
+    expect(figures().className, "the second click started the 5 minutes again").toContain("used");
+
+    fireEvent.click(screen.getByRole("button",{name:"Calculate"}));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    await waitFor(() => { expect(figures().className, "new figures, not used yet").not.toContain("used"); });
+  } finally {
+    vi.useRealTimers();
+  }
+});

@@ -4,14 +4,18 @@
 // email. Names, contact details, pay, links and fields never reach the AI
 // (mask.ts). Shown only to those who may use the assistant, when it is on.
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
+import { assistantKey } from "../../api/keys";
 import { ErrorMessage } from "../ErrorMessage";
 import { type Held, maskHtml, maskText, type Names, unmask, unmaskSubject } from "./mask";
 
 type Mode = Schemas["AssistantEmailMode"];
 type Style = Schemas["AssistantEmailStyle"];
+
+/** How long to wait for the AI before saying it is taking too long. */
+export const AI_WAIT_MS = 3 * 60 * 1000;
 
 const STYLES: [Style, string][] = [
   ["grammar", "Check grammar"], ["rewrite", "Rewrite"], ["friendlier", "Friendlier"], ["formal", "More formal"], ["shorter", "Shorter"],
@@ -29,7 +33,7 @@ export function AiEmailHelp({ recipient, subject, html, applicationId, names, on
   onApply: (subject: string | null, html: string) => void;
 }) {
   const status = useQuery({
-    queryKey: ["assistant", "status"],
+    queryKey: assistantKey,
     queryFn: async () => unwrap(await api.GET("/v1/assistant")),
     staleTime: 60_000,
     retry: false,
@@ -44,6 +48,8 @@ export function AiEmailHelp({ recipient, subject, html, applicationId, names, on
   const [held, setHeld] = useState<Held>(() => new Map());
   const myName = (me.data as { user?: { name?: string } } | undefined)?.user?.name;
   const who: Names = { ...names, me: names.me ?? myName };
+  // The sender's name is held back too: nothing goes before it is known.
+  const meKnown = names.me !== undefined || myName !== undefined || me.isError;
   const start = useMutation({
     mutationFn: async (style?: Style) => {
       const hold: Held = new Map();
@@ -60,16 +66,24 @@ export function AiEmailHelp({ recipient, subject, html, applicationId, names, on
     },
   });
   const draftId = start.data?.id;
+  // A draft the AI did not write in time (its worker is down, say): asking stops.
+  const [late, setLate] = useState<string | null>(null);
+  useEffect(() => {
+    if (!draftId) return;
+    const t = window.setTimeout(() => { setLate(draftId); }, AI_WAIT_MS);
+    return () => { window.clearTimeout(t); };
+  }, [draftId]);
   const written = useQuery({
-    queryKey: ["assistant", "email", draftId],
+    queryKey: [...assistantKey, "email", draftId],
     enabled: !!draftId,
     queryFn: async () => unwrap(await api.GET("/v1/assistant/email-drafts/{draftId}", { params: { path: { draftId: draftId ?? "" } } })),
-    refetchInterval: (q) => (q.state.data?.status === "done" || q.state.data?.status === "failed" ? false : 1500),
+    refetchInterval: (q) => (q.state.data?.status === "done" || q.state.data?.status === "failed" || late === draftId ? false : 1500),
   });
+  const tooLong = !!draftId && late === draftId && written.data?.status !== "done" && written.data?.status !== "failed";
 
   if (!status.data?.enabled) return null;
   const result = written.data?.status === "done" ? written.data : null;
-  const busy = start.isPending || (!!draftId && !written.data) || written.data?.status === "queued";
+  const busy = !meKnown || start.isPending || (!tooLong && ((!!draftId && !written.data) || written.data?.status === "queued"));
   const shownSubject = result?.subject ? unmaskSubject(result.subject, held, who) : null;
   const shownHtml = result?.body ? unmask(result.body, held, who) : "";
   const draftEmpty = !html.replace(/<[^>]*>/g, "").trim();
@@ -109,11 +123,16 @@ export function AiEmailHelp({ recipient, subject, html, applicationId, names, on
                   onClick={() => { start.mutate(undefined); }}>{mode === "write" ? "Write" : "Draft the reply"}</button>
               )}
             {mode === "improve" && draftEmpty && <span className="muted small">Write a draft first.</span>}
-            {busy && <span className="muted small" role="status">The AI is writing…</span>}
+            {busy && meKnown && <span className="muted small" role="status">The AI is writing…</span>}
           </div>
           <p className="muted small">Names, contact details, pay, links and fields are kept from the AI and put back after.</p>
           <ErrorMessage error={start.error ?? written.error} />
           {written.data?.status === "failed" && <p className="warning small" role="alert">The AI could not write it: {written.data.error}</p>}
+          {tooLong && (
+            <p className="warning small" role="alert">
+              The AI is taking too long (it may be down): try again in a few minutes, or ask whoever runs HiringPlug to check the AI worker.
+            </p>
+          )}
           {result && (
             <section className="ai-email-result" aria-label="What the AI wrote">
               {shownSubject && <p className="small"><strong>Subject:</strong> {shownSubject}</p>}

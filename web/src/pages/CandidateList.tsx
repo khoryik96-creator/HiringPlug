@@ -118,7 +118,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
       {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
       {canImport && dropped && (
         <div className="dropped-cvs">
-          <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} />
+          <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" />
           <button type="button" className="link small" onClick={() => { setDropped(null); }}>Close</button>
         </div>
       )}
@@ -181,7 +181,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             <tr>
               <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
               {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />)}
-              {folders.hasFolders && <th data-column="folders" style={widths.style("folders")}>In folders{widths.handle("folders", "In folders")}</th>}
+              {folders.hasFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -292,10 +292,10 @@ function SortHeader({ column, label, sort, onSort, canSeeSalary, widths }: {
 }) {
   const sortable = SORTABLE[column];
   const edge = widths.handle(column, label);
-  if (!sortable || (sortable.salary && !canSeeSalary)) return <th data-column={column} style={widths.style(column)}>{label}{edge}</th>;
+  if (!sortable || (sortable.salary && !canSeeSalary)) return <th {...widths.head(column, label)}>{label}{edge}</th>;
   const way = sortOf(sort, column);
   return (
-    <th data-column={column} style={widths.style(column)} aria-sort={way ?? "none"}>
+    <th {...widths.head(column, label)} aria-sort={way ?? "none"}>
       <button type="button" className={`sort-header${way ? " on" : ""}`} onClick={() => { onSort(flipSort(sort, column)); }}>
         {label}<span aria-hidden="true" className="sort-arrow">{way === "ascending" ? "▲" : way === "descending" ? "▼" : "↕"}</span>
       </button>

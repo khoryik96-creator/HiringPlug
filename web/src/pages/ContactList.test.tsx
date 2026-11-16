@@ -36,11 +36,11 @@ it("shows each contact's role and whether they still work there, and filters by 
   expect(within(ali).getByText("Has left")).toBeTruthy();
 
   await screen.findByRole("option", { name: "Director" });
-  fireEvent.change(screen.getByLabelText("Role"), { target: { value: "hiring_manager" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Role" }), { target: { value: "hiring_manager" } });
   await waitFor(() => { expect(asked.at(-1)).toEqual({ limit: 100, role: "hiring_manager" }); });
-  fireEvent.change(screen.getByLabelText("Status"), { target: { value: "left" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "left" } });
   await waitFor(() => { expect(asked.at(-1)).toEqual({ limit: 100, role: "hiring_manager", status: "left" }); });
-  fireEvent.change(screen.getByLabelText("Role"), { target: { value: "-" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Role" }), { target: { value: "-" } });
   await waitFor(() => { expect(asked.at(-1)).toEqual({ limit: 100, roleNotSet: true, status: "left" }); });
 });
 

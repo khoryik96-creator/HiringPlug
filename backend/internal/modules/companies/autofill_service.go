@@ -199,6 +199,14 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	if err != nil {
 		return err
 	}
+	// A company just added with its website: this first reading (and only
+	// it, whatever comes of it) fills what was left empty.
+	fillEmpty, nameGuessed := row.AutofillFillEmpty, row.AutofillNameGuessed
+	if fillEmpty {
+		if err := q.SetFillEmpty(ctx, store.SetFillEmptyParams{ID: row.ID}); err != nil {
+			return err
+		}
+	}
 	details := fromRow(row).Details
 	if details.Website == nil {
 		return q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "idle"})
@@ -214,17 +222,14 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	if err := q.ClearSuggestions(ctx, row.ID); err != nil {
 		return err
 	}
-	// A company just added with its website: what the website says fills what
-	// was left empty (the name too, when it was only guessed), once.
+	// What the website says fills what was left empty (the name too, when it
+	// was only guessed).
 	filled := []string{}
-	if row.AutofillFillEmpty {
-		if err := q.SetFillEmpty(ctx, store.SetFillEmptyParams{ID: row.ID}); err != nil {
-			return err
-		}
+	if fillEmpty {
 		for _, sug := range found {
 			now := current(details, sug.Field)
 			empty := now == nil || strings.TrimSpace(*now) == ""
-			if !empty && (sug.Field != "name" || !row.AutofillNameGuessed) {
+			if !empty && (sug.Field != "name" || !nameGuessed) {
 				continue
 			}
 			latest, err := q.GetCompany(ctx, row.ID)

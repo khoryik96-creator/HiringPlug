@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
+import { companiesKey, companyKey } from "../api/keys";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { CompanyAutofill, shownValue } from "./CompanyAutofill";
 
@@ -60,6 +61,20 @@ describe("company auto-fill", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ ...idle, status: "failed", error: "the website's robots.txt asks robots not to read it" }));
     renderWithClient(<CompanyAutofill companyId="comp_1" website={site} />);
     expect((await screen.findByRole("status")).textContent).toContain("robots.txt");
+  });
+
+  it("shows the company again once a reading ends (it may have filled in details)", async () => {
+    let status: Schemas["CompanyAutofill"]["status"] = "queued";
+    vi.spyOn(api, "GET").mockImplementation(async () => Promise.resolve(ok({ ...idle, status })));
+    const { client } = renderWithClient(<CompanyAutofill companyId="comp_1" website={site} />);
+    const refresh = vi.spyOn(client, "invalidateQueries");
+    expect(await screen.findByText("Reading the website…")).toBeTruthy();
+    expect(refresh).not.toHaveBeenCalled();
+    status = "done";
+    await waitFor(() => { expect(screen.queryByText("Reading the website…")).toBeNull(); }, { timeout: 4000 });
+    const keys = refresh.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(keys).toContain(JSON.stringify(companyKey("comp_1")));
+    expect(keys).toContain(JSON.stringify(companiesKey));
   });
 
   it("shows sizes and countries in words", () => {

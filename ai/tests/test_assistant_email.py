@@ -125,3 +125,18 @@ def test_why_nothing_was_written_goes_back() -> None:
         )
     )
     assert (r.error, r.inputTokens) == ("the AI wrote nothing", 5)
+
+
+def test_the_subject_line_is_found_however_the_ai_writes_it() -> None:
+    for text in (
+        "Subject: Interview on Thursday\n\nHi ⟦NAME⟧,",
+        "**Subject:** Interview on Thursday\n\nHi ⟦NAME⟧,",
+        "Subject - Interview on Thursday\n\nHi ⟦NAME⟧,",
+        "\n\n# Subject: Interview on Thursday\nHi ⟦NAME⟧,",
+        "**Subject: Interview on Thursday**\n\nHi ⟦NAME⟧,",
+    ):
+        assert assistant_email.split(text) == ("Interview on Thursday", "Hi ⟦NAME⟧,"), text
+    assert assistant_email.split("Hi ⟦NAME⟧,\n\nThe subject: your notice period.") == (
+        None,
+        "Hi ⟦NAME⟧,\n\nThe subject: your notice period.",
+    )

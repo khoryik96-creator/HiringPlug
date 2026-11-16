@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -119,4 +120,36 @@ func TestTheAIEmailHelpIsOffUntilAProviderIsSetUp(t *testing.T) {
 	res = a.request(http.MethodPost, "/v1/assistant/email-drafts", tenant.Users[api.RoleViewer].Token,
 		map[string]any{"mode": "write", "recipient": "candidate", "instruction": "say hello"})
 	assert.Equal(t, http.StatusForbidden, res.Status, "viewers may not use the assistant")
+}
+
+// Someone who may email a candidate but not see jobs still gets the AI's
+// help: it is just not told the job.
+func TestTheAIHelpsWithEmailsWithoutJobsAccess(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t, assistantOn)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleRecruiter)
+	owner, token := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	c := a.createCandidate(owner, map[string]any{"firstName": "Siti", "lastName": "Aisyah"})
+	company := a.createCompany(owner, map[string]any{"name": "Maju Bhd"})
+	job := a.createJob(owner, map[string]any{"companyId": company.Id, "title": "Finance Manager"})
+	appl := a.addToJob(owner, job.Id, c.Id)
+	a.setRole(owner, "recruiter", map[string]any{"version": 0, "candidateScope": "all", "jobCandidates": true,
+		"permissions": without(authz.PermissionsForRole(api.RoleRecruiter), api.PermissionPipelineRead, api.PermissionJobsRead)}, http.StatusOK)
+
+	res := a.request(http.MethodPost, "/v1/assistant/email-drafts", token, map[string]any{
+		"mode": "write", "recipient": "candidate", "applicationId": appl.Id, "instruction": "Ask ⟦NAME⟧ for her notice period.",
+	})
+	require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+	var queued api.AssistantEmailDraft
+	res.JSON(&queued)
+	asked := aiWritesEmail(t, a, aiConn, queued.Id, api.AssistantEmailedJob{
+		Subject: nullable.NewNullableWithValue("Notice period"), Body: nullable.NewNullableWithValue("Hi ⟦NAME⟧"),
+		Error: nullable.NewNullNullable[string](), Model: nullable.NewNullableWithValue("deepseek-chat"),
+	})
+	assert.False(t, asked.JobTitle.IsSpecified() && !asked.JobTitle.IsNull(), "the job is not told")
+	assert.False(t, asked.ClientCompany.IsSpecified() && !asked.ClientCompany.IsNull(), "nor the client")
 }

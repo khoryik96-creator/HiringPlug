@@ -98,7 +98,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
       <table ref={tableRef} className={[canFolders ? "pick-table" : "", widths.set ? "sized" : ""].filter(Boolean).join(" ") || undefined} style={widths.tableStyle}>
         <thead>
           <tr>
-            {heads.map(([k, label]) => <th key={k} data-column={k} style={widths.style(k)}>{label}{widths.handle(k, label)}</th>)}
+            {heads.map(([k, label]) => <th key={k} {...widths.head(k, label)}>{label}{widths.handle(k, label)}</th>)}
           </tr>
         </thead>
         <tbody>

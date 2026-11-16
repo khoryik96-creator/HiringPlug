@@ -93,16 +93,23 @@ def prompt(p: AssistantEmailJob) -> str:
     return "\n\n".join(parts)
 
 
-_SUBJECT = re.compile(r"^\s*subject\s*:\s*(.*)$", re.IGNORECASE)
+# "Subject: …", also as the AI may dress it: "**Subject:** …", "Subject - …",
+# "# Subject: …".
+_SUBJECT = re.compile(r"^[\s#>*_]*subject[\s*_]*[:\-\u2013\u2014][\s*_]*(.*?)[\s*_]*$", re.IGNORECASE)
 
 
 def split(text: str) -> tuple[str | None, str]:
     """The subject line and the body of what the AI wrote."""
     lines = text.strip().splitlines()
     subject = None
-    if lines and (m := _SUBJECT.match(lines[0])):
-        subject = m.group(1).strip() or None
-        lines = lines[1:]
+    # The subject is the first line written, after any blank ones.
+    for i, line in enumerate(lines[:3]):
+        if not line.strip():
+            continue
+        if m := _SUBJECT.match(line):
+            subject = m.group(1).strip() or None
+            lines = lines[i + 1 :]
+        break
     body = "\n".join(lines).strip()
     # Paragraphs: at most one blank line between them.
     return subject, re.sub(r"\n{3,}", "\n\n", body)
