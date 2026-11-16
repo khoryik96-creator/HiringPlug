@@ -11,7 +11,12 @@ DRAFT_ID = "aem_01jbz6w0m0k8q9x2r3s4t5v6w7"
 
 
 def job(**over: object) -> AssistantEmailJob:
-    base: dict[str, object] = {"draftId": DRAFT_ID, "mode": "write", "recipient": "candidate", "agency": "Hyppies"}
+    base: dict[str, object] = {
+        "draftId": DRAFT_ID,
+        "mode": "write",
+        "recipient": "candidate",
+        "agency": "Hyppies",
+    }
     base.update(over)
     return AssistantEmailJob.model_validate(base)
 
@@ -40,11 +45,24 @@ def result(follow_ups: list) -> AssistantEmailedJob:  # type: ignore[type-arg]
 
 
 def test_a_written_email_comes_back_as_subject_and_body() -> None:
-    ai = FakeProvider(Completion(
-        text="Subject: Interview for ⟦1⟧\n\nHi ⟦NAME⟧,\n\n\n\nCould we talk on Thursday?\n\nBest,\n⟦ME⟧",
-        model="deepseek-chat", input_tokens=300, output_tokens=60))
-    r = result(assistant_email.run(job(instruction="invite her to interview Thursday", jobTitle="Finance Manager",
-                                       clientCompany="Maju Foods"), deps(ai)))
+    ai = FakeProvider(
+        Completion(
+            text="Subject: Interview for ⟦1⟧\n\nHi ⟦NAME⟧,\n\n\n\nCould we talk on Thursday?\n\nBest,\n⟦ME⟧",
+            model="deepseek-chat",
+            input_tokens=300,
+            output_tokens=60,
+        )
+    )
+    r = result(
+        assistant_email.run(
+            job(
+                instruction="invite her to interview Thursday",
+                jobTitle="Finance Manager",
+                clientCompany="Maju Foods",
+            ),
+            deps(ai),
+        )
+    )
     assert r.subject == "Interview for ⟦1⟧"
     assert r.body == "Hi ⟦NAME⟧,\n\nCould we talk on Thursday?\n\nBest,\n⟦ME⟧"
     assert (r.model, r.inputTokens, r.outputTokens, r.error) == ("deepseek-chat", 300, 60, None)
@@ -57,8 +75,16 @@ def test_a_written_email_comes_back_as_subject_and_body() -> None:
 
 
 def test_a_draft_is_improved_in_the_style_chosen() -> None:
-    ai = FakeProvider(Completion(text="Subject: Update\n\nDear ⟦NAME⟧, thank you.", model="m", input_tokens=1, output_tokens=1))
-    result(assistant_email.run(job(mode="improve", style="grammar", draft="dear ⟦NAME⟧ thank you", recipient="client"), deps(ai)))
+    ai = FakeProvider(
+        Completion(
+            text="Subject: Update\n\nDear ⟦NAME⟧, thank you.", model="m", input_tokens=1, output_tokens=1
+        )
+    )
+    result(
+        assistant_email.run(
+            job(mode="improve", style="grammar", draft="dear ⟦NAME⟧ thank you", recipient="client"), deps(ai)
+        )
+    )
     _, user = ai.calls[0]
     assert "Correct the spelling, grammar and punctuation only" in user
     assert "draft email to a client" in user
@@ -66,9 +92,15 @@ def test_a_draft_is_improved_in_the_style_chosen() -> None:
 
 
 def test_a_reply_answers_their_email() -> None:
-    ai = FakeProvider(Completion(text="Hi ⟦NAME⟧,\n\nThanks, noted.", model="m", input_tokens=1, output_tokens=1))
-    r = result(assistant_email.run(job(mode="reply", theirMessage="Can we move the call to 3pm?",
-                                       instruction="yes, 3pm works"), deps(ai)))
+    ai = FakeProvider(
+        Completion(text="Hi ⟦NAME⟧,\n\nThanks, noted.", model="m", input_tokens=1, output_tokens=1)
+    )
+    r = result(
+        assistant_email.run(
+            job(mode="reply", theirMessage="Can we move the call to 3pm?", instruction="yes, 3pm works"),
+            deps(ai),
+        )
+    )
     assert r.subject is None, "no subject line: the email's own stays"
     assert r.body == "Hi ⟦NAME⟧,\n\nThanks, noted."
     _, user = ai.calls[0]
@@ -77,9 +109,19 @@ def test_a_reply_answers_their_email() -> None:
 
 
 def test_why_nothing_was_written_goes_back() -> None:
-    r = result(assistant_email.run(job(instruction="x"), deps(FakeProvider(ProviderError("the AI provider timed out")))))
+    r = result(
+        assistant_email.run(
+            job(instruction="x"), deps(FakeProvider(ProviderError("the AI provider timed out")))
+        )
+    )
     assert (r.body, r.error) == (None, "the AI provider timed out")
     r = result(assistant_email.run(job(instruction="x"), deps(None)))
-    assert r.error is not None and "switched off" in r.error
-    r = result(assistant_email.run(job(instruction="x"), deps(FakeProvider(Completion(text="  ", model="m", input_tokens=5, output_tokens=0)))))
+    assert r.error is not None
+    assert "switched off" in r.error
+    r = result(
+        assistant_email.run(
+            job(instruction="x"),
+            deps(FakeProvider(Completion(text="  ", model="m", input_tokens=5, output_tokens=0))),
+        )
+    )
     assert (r.error, r.inputTokens) == ("the AI wrote nothing", 5)

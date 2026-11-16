@@ -57,7 +57,9 @@ STYLE = {
         "Correct the spelling, grammar and punctuation only. Keep the wording, tone, order and length; "
         "change as little as possible."
     ),
-    AssistantEmailStyle.rewrite: "Rewrite it to read clearly and naturally, keeping every point and the tone.",
+    AssistantEmailStyle.rewrite: (
+        "Rewrite it to read clearly and naturally, keeping every point and the tone."
+    ),
     AssistantEmailStyle.friendlier: "Make it warmer and friendlier, keeping every point and it professional.",
     AssistantEmailStyle.formal: "Make it more formal and polished, keeping every point.",
     AssistantEmailStyle.shorter: "Make it shorter and easier to read, keeping every point that matters.",
@@ -125,8 +127,12 @@ def run(payload: AssistantEmailJob, deps: Deps) -> list[FollowUp]:
     # Never what was asked or written: it is about people.
     log.info(
         "assistant email",
-        extra={"draft_id": payload.draftId.root, "mode": payload.mode.value, "ok": error is None,
-               "tokens": input_tokens + output_tokens},
+        extra={
+            "draft_id": payload.draftId.root,
+            "mode": payload.mode.value,
+            "ok": error is None,
+            "tokens": input_tokens + output_tokens,
+        },
     )
     return [
         FollowUp(
