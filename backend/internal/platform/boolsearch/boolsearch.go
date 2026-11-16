@@ -105,7 +105,7 @@ func ParseField(field, input string) (Query, error) {
 // field (nil when none is).
 func TSQueryOf(field string, input *string) (*string, error) {
 	if input == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil: no boolean search was asked for
 	}
 	q, err := ParseField(field, *input)
 	if err != nil {
