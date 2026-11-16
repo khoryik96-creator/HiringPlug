@@ -9722,7 +9722,7 @@ export interface operations {
             query?: {
                 /** @description Every word must appear in the name or website (ignoring case and accents); or a phone number, however it is written. */
                 q?: string;
-                /** @description A boolean search of the name, website, industry, city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks). */
+                /** @description A boolean search of the name, website, main industry (and the one LinkedIn gives), city and about: SAP AND (bank OR insurance) NOT agency, "exact phrase", manag*, word NEAR/3 word. Words match their other forms (bank, banks). */
                 boolean?: string;
                 type?: components["schemas"]["CompanyType"];
                 /** @description Only companies in this category (a key of the company_category list). */

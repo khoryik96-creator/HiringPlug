@@ -107,8 +107,9 @@ While an import is open, more CVs go on its own drop box. Typing boolean rules i
 "Johnson and Johnson" stays a name search, and brackets alone do not count,
 so "(03) 2345 6789" stays a phone search) shows them in blue with a BOOLEAN
 badge and, once typing pauses, runs a boolean search: of CVs and profiles for
-candidates, of the name, website, industry, city and about for companies,
-of the name, job title and email for contacts (an email's or website's
+candidates (their certifications too), of the name, website, main industry
+(and LinkedIn's), city and about for companies,
+of the full name, job title and email for contacts (an email's or website's
 words count on their own: `majubank`; fields stay apart, so a NEAR never
 runs from one into the next). A boolean that cannot be read
 says what is wrong with it.

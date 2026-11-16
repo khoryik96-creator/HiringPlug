@@ -79,7 +79,9 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR contact.id < sqlc.narg(cursor)::text)
               OR contact.phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%'
           END)
   -- A boolean search (boolsearch's query for to_tsquery).
-  AND (sqlc.narg(tsquery)::text IS NULL OR contact.search_doc @@ to_tsquery('english', sqlc.narg(tsquery)::text))
+  -- The expression of contact_search_doc_idx (00115), so the index answers.
+  AND (sqlc.narg(tsquery)::text IS NULL
+       OR app_search_doc(contact.first_name || ' ' || contact.last_name, contact.title, contact.email) @@ to_tsquery('english', sqlc.narg(tsquery)::text))
 ORDER BY CASE WHEN sqlc.arg(similar_names)::boolean THEN word_similarity(app_normalize_text(coalesce(sqlc.narg(query)::text, '')), contact.name_text) END DESC, contact.id DESC
 LIMIT @row_limit;
 

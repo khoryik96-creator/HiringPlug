@@ -92,6 +92,35 @@ describe("company form", () => {
     expect(sentBody(patch)).toMatchObject({ version: 2, city: "Petaling Jaya" });
   });
 
+  it("saves over the industry the AI picked meanwhile, keeping both", async () => {
+    const fresh = { ...company, industry: null, industrySelections: { catalogueVersion: 1, ids: [] }, industryPending: true };
+    const picked = { ...fresh, version: 3, industry: "Financial Services", industrySelections: { catalogueVersion: 1, ids: ["industry_banking"], primaryId: "industry_banking" }, industryPending: false };
+    const patch = vi.spyOn(api, "PATCH")
+      .mockResolvedValueOnce(failure("CONFLICT_STALE_VERSION", "Changed by someone else.", undefined, 409))
+      .mockResolvedValueOnce(ok({ ...picked, version: 4, city: "Petaling Jaya" }));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/companies/{companyId}" ? ok(picked) : ok({ lists: [], mandatory: [] }))) as never);
+    const onDone = vi.fn();
+    renderWithClient(<CompanyForm company={fresh} onDone={onDone} />);
+    change("City", "Petaling Jaya");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
+    expect(patch).toHaveBeenCalledTimes(2);
+    const retry = sentBody(patch, 1) as Record<string, unknown>;
+    expect(retry).toMatchObject({ version: 3, city: "Petaling Jaya" });
+    expect(retry.industrySelections, "the AI's pick stays").toBeUndefined();
+    expect("industry" in retry).toBe(false);
+  });
+
+  it("still says so when someone else changed more than the industry", async () => {
+    const fresh = { ...company, industrySelections: { catalogueVersion: 1, ids: [] } };
+    vi.spyOn(api, "PATCH").mockResolvedValue(failure("CONFLICT_STALE_VERSION", "Changed by someone else.", undefined, 409));
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/companies/{companyId}" ? ok({ ...fresh, version: 3, phone: "+60 3-1111 2222" }) : ok({ lists: [], mandatory: [] }))) as never);
+    renderWithClient(<CompanyForm company={fresh} onDone={vi.fn()} />);
+    change("City", "Petaling Jaya");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/Reload their version/)).toBeTruthy();
+  });
+
   it("closes without saving when nothing changed", async () => {
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(company));
     const onDone = vi.fn();

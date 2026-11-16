@@ -41,6 +41,10 @@ func (s *Service) queueIndustryAsk(ctx context.Context, tx pgx.Tx, tenantID, com
 	if s.ai == nil || s.industries == nil || (d.IndustrySelections != nil && len(d.IndustrySelections.Ids) > 0) {
 		return nil
 	}
+	// No "the AI is picking" when no AI will: off, or none set up for the agency.
+	if _, on, err := s.ai.Allowed(ctx, tx); err != nil || !on {
+		return err
+	}
 	now := time.Now()
 	if err := store.New(tx).SetIndustryPickSince(ctx, store.SetIndustryPickSinceParams{ID: companyID, Since: &now}); err != nil {
 		return err
@@ -147,10 +151,8 @@ func (s *Service) industried(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 	if err := s.industries.LockIn(ctx, tx); err != nil {
 		return err
 	}
-	if _, err := store.New(tx).GetCompany(ctx, companyID); database.IsNoRows(err) {
-		return nil // deleted meanwhile
-	} else if err != nil {
-		return err
+	if exists, err := store.New(tx).CompanyExists(ctx, companyID); err != nil || !exists {
+		return err // nil when deleted meanwhile
 	}
 	chosen, err := s.industries.ReadIn(ctx, tx, "company", companyID)
 	if err != nil || len(chosen.Ids) > 0 {

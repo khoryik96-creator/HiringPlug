@@ -10,7 +10,7 @@ describe("the boolean search box", () => {
     for (const q of ['SAP AND (BW OR BPC) NOT intern', '"project manager"', "manag*", "finance -intern", "sap NEAR/3 bw", "java W/2 spring", "a && b", "finance !intern", "(sap OR bw)"]) {
       expect(looksBoolean(q), q).toBe(true);
     }
-    for (const q of ["Tan - Maju Foods", "Johnson and Johnson", "+60 12 345 6789", "siti@example.com", "Ali", "near the office", "SAP-BW", "-5", "(03) 2345 6789", "Tan (Kelvin)", "(sap)"]) {
+    for (const q of ["Tan - Maju Foods", "Johnson and Johnson", "+60 12 345 6789", "siti@example.com", "Ali", "near the office", "SAP-BW", "-5", "(03) 2345 6789", "Tan (Kelvin)", "(sap)", "AND Digital", "NEAR Protocol", "OR Mall"]) {
       expect(looksBoolean(q), q).toBe(false);
     }
   });

@@ -198,7 +198,7 @@ func (q *Queries) FindCandidates(ctx context.Context, arg FindCandidatesParams) 
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -237,8 +237,8 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
-		&i.ProfileTerms,
 		&i.Certifications,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -284,7 +284,7 @@ INSERT INTO candidate (
   $16, $17, $18, $19, $20, $21, $22,
   $23, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
 `
 
 type InsertCandidateParams struct {
@@ -375,8 +375,8 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
-		&i.ProfileTerms,
 		&i.Certifications,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -1688,7 +1688,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
 `
 
 type TouchCandidateParams struct {
@@ -1734,8 +1734,8 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
-		&i.ProfileTerms,
 		&i.Certifications,
+		&i.ProfileTerms,
 	)
 	return i, err
 }
@@ -1770,7 +1770,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $23 AND version = $24
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, profile_terms, certifications
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
 `
 
 type UpdateCandidateParams struct {
@@ -1863,8 +1863,8 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.AvailabilitySince,
-		&i.ProfileTerms,
 		&i.Certifications,
+		&i.ProfileTerms,
 	)
 	return i, err
 }

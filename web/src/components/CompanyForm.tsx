@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type InputHTMLAttributes, useRef, useState } from "react";
 
-import { api, type Company, unwrap } from "../api/client";
+import { api, ApiError, type Company, unwrap } from "../api/client";
 import { companiesKey, companyKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, keysOf } from "../labels";
 import { COMPANY_PATHS, companyFields, type CompanyFormState, companyProblems, formFromCompany } from "./companyFormState";
@@ -21,6 +21,14 @@ type TextKey = "name" | "website" | "linkedinUrl" | "industry" | "phone" | "city
  * onSaved with it; an edit saves with the version it was opened with, so a
  * newer change by someone else comes back as a conflict.
  */
+/** A company's fields but its industry (left as saved). */
+function withoutIndustry(fields: ReturnType<typeof companyFields>): ReturnType<typeof companyFields> {
+  const out = { ...fields };
+  delete out.industry;
+  delete out.industrySelections;
+  return out;
+}
+
 export function CompanyForm({ company, onDone, onSaved }: {
   company: Company | null;
   onDone: () => void;
@@ -86,9 +94,21 @@ export function CompanyForm({ company, onDone, onSaved }: {
         return unwrap(await api.POST("/v1/companies", { body: { ...fields, ...fill } }));
       }
       if (sameBody(fields, companyFields(opened.form))) return null; // nothing changed
-      return unwrap(await api.PATCH("/v1/companies/{companyId}", {
-        params: { path: { companyId: opened.id } }, body: { ...fields, version: opened.version },
-      }));
+      const id = opened.id;
+      const patch = async (body: typeof fields, version: number) =>
+        unwrap(await api.PATCH("/v1/companies/{companyId}", { params: { path: { companyId: id } }, body: { ...body, version } }));
+      try {
+        return await patch(fields, opened.version);
+      } catch (err) {
+        // The AI may have picked the industry since this form opened (a new
+        // company): when that is all that changed, and this form leaves the
+        // industry as it was, save over it, keeping both.
+        if (!(err instanceof ApiError) || err.code !== "CONFLICT_STALE_VERSION") throw err;
+        const latest = unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: id } } }));
+        const industryUntouched = form.industry === opened.form.industry && sameBody(form.industrySelections ?? null, opened.form.industrySelections ?? null);
+        if (!industryUntouched || !sameBody(withoutIndustry(companyFields(opened.form)), withoutIndustry(companyFields(formFromCompany(latest))))) throw err;
+        return await patch(withoutIndustry(fields), latest.version);
+      }
     },
     onSuccess: (saved) => {
       if (saved) {

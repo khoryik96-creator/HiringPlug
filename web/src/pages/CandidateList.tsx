@@ -36,8 +36,13 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
   const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page
-  // While an import is open, its own box takes more files (a drop elsewhere would replace it).
-  const drop = usePageDrop(CV_TYPES, (files) => { setDropped({ files, at: Date.now() }); }, canImport && !dropped);
+  // While an import is open, its own box takes more files: a drop elsewhere
+  // says so (it never replaces the import, nor lets the browser open the file).
+  const [dropElsewhere, setDropElsewhere] = useState(false);
+  const drop = usePageDrop(CV_TYPES, (files) => {
+    if (dropped) setDropElsewhere(true);
+    else setDropped({ files, at: Date.now() });
+  }, canImport);
   const cols = useCandidateColumns();
   const pick = usePicked();
   const folders = useFolderView("candidate", canFolders, meId, pick.clear);
@@ -124,8 +129,9 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
       <h2 className="visually-hidden">Candidates</h2>
       {canImport && dropped && (
         <div className="dropped-cvs">
+          {dropElsewhere && <p className="warning small" role="status">To add more CVs to this import, drop them on its box below.</p>}
           <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" />
-          <button type="button" className="link small" onClick={() => { setDropped(null); }}>Close</button>
+          <button type="button" className="link small" onClick={() => { setDropped(null); setDropElsewhere(false); }}>Close</button>
         </div>
       )}
       <div className="list-top">
@@ -136,7 +142,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
           </button>
           {canAiSearch && <a className="search-pill" href="#/candidates/ai-search">✦ AI</a>}
         </BooleanSearchBox>
-        {canImport && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
+        {canImport && !dropped && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && filtersOn > 0 && (

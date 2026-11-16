@@ -14,7 +14,8 @@ import { BOOL_OPERATOR, BOOL_TOKEN } from "./candidateSearch";
  * Brackets alone do not count: "(03) 2345 6789" is a phone number.
  */
 export function looksBoolean(q: string): boolean {
-  return /(^|[\s(])(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&|\|\|)(?=[\s)]|$)/.test(q)
+  // An operator between two terms ("AND Digital" or "NEAR Protocol" alone is a name).
+  return /\S\s+(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&|\|\|)\s+\S/.test(q)
     || /["“”]/.test(q)
     || /(^|[\s(])[-!][^\s\d-]/.test(q) // -intern, !sales (not "Tan - Maju" or -5)
     || /[^\s*]\*(\s|$|\))/.test(q); // manag*

@@ -57,7 +57,9 @@ WHERE (sqlc.narg(cursor)::text IS NULL OR id < sqlc.narg(cursor)::text)
        OR search_text LIKE ALL (app_search_patterns(sqlc.narg(query)::text))
        OR phone_digits LIKE '%' || app_phone_key(sqlc.narg(query)::text) || '%')
   -- A boolean search (boolsearch's query for to_tsquery).
-  AND (sqlc.narg(tsquery)::text IS NULL OR search_doc @@ to_tsquery('english', sqlc.narg(tsquery)::text))
+  -- The expression of company_search_doc_idx (00115), so the index answers.
+  AND (sqlc.narg(tsquery)::text IS NULL
+       OR app_search_doc(name, website, industry, industry_hint, city, about) @@ to_tsquery('english', sqlc.narg(tsquery)::text))
 ORDER BY id DESC
 LIMIT @row_limit;
 
