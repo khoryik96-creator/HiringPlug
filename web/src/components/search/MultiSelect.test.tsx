@@ -21,7 +21,7 @@ describe("MultiSelect", () => {
 
   it("lists the person's favourites first, starred, and a star adds or removes one", () => {
     const toggle = vi.fn();
-    const fav = { list: ["SAP"], has: (v: string) => v === "SAP", toggle };
+    const fav = { list: ["SAP"], has: (v: string) => v === "SAP", toggle, ready: true, failed: false };
     render(<MultiSelect label="IT skills" choices={["Java", "Python", "SAP"].map((v) => ({ value: v, label: v }))} value={[]} onChange={() => undefined} fav={fav} />);
     fireEvent.click(screen.getByRole("button", { name: /IT skills/ }));
     expect(screen.getAllByRole("option").map((o) => o.textContent), "favourites first, then all the rest").toEqual(["SAP", "Java", "Python"]);

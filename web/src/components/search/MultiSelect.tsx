@@ -2,7 +2,7 @@
 // are chosen. Long lists get a box to narrow them.
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
-import { type Fav, splitFavourites, Star } from "../favourites";
+import { type Fav, frozen, splitFavourites, Star, StarFailed } from "../favourites";
 
 export type Choice = { value: string; label: string };
 
@@ -39,7 +39,7 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
     return () => { document.removeEventListener("mousedown", away); };
   }, [open]);
   const shown = choices.filter((c) => !filter.trim() || c.label.toLowerCase().includes(filter.trim().toLowerCase()));
-  const { top, rest } = splitFavourites(shown, (c) => c.value, fav && { ...fav, list: order, has: (v) => order.includes(v) });
+  const { top, rest } = splitFavourites(shown, (c) => c.value, frozen(fav, order));
   const option = (c: Choice) => {
     const on = value.includes(c.value);
     return (
@@ -75,6 +75,7 @@ export function MultiSelect({ label, choices, value, onChange, searchable = choi
             {top.length > 0 && rest.length > 0 && <p className="fav-group">All</p>}
             {rest.map(option)}
           </div>
+          <StarFailed fav={fav} />
           {value.length > 0 && <button type="button" className="link small" onClick={() => { onChange([]); }}>Clear</button>}
         </div>
       )}

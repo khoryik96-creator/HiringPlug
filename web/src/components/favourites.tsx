@@ -2,14 +2,14 @@
 // skills, certifications, countries): kept in their own settings and shown
 // first, for them only. The lists themselves never change, and every item
 // can still be found below the favourites or by typing.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { countryName } from "../labels";
 import { preferencesKey } from "./candidateColumns";
 import { ALL_COUNTRIES } from "./countries";
 import { COUNTRIES } from "./forms";
-import "./favourites.css";
+import "./favouriteStars.css";
 
 export type FavKind = keyof Schemas["Favourites"];
 type Prefs = Schemas["Preferences"];
@@ -22,43 +22,72 @@ export interface Fav {
   list: readonly string[];
   has: (value: string) => boolean;
   toggle: (value: string) => void;
+  /** Loaded, so a star can be changed (no star until then). */
+  ready: boolean;
+  /** The last change could not be saved. */
+  failed: boolean;
 }
+
+/**
+ * Changes sent but not yet saved, by kind, for each query client: a second
+ * star builds on the first even if a refetch brings back the older list
+ * meanwhile.
+ */
+const unsaved = new WeakMap<QueryClient, Map<FavKind, string[]>>();
 
 /** The signed-in person's favourites, and changing them (the screen changes at once). */
 export function useFavourites() {
   const queryClient = useQueryClient();
   const prefs = useQuery({ queryKey: preferencesKey, queryFn: async () => unwrap(await api.GET("/v1/me/preferences")), staleTime: 60_000 });
+  const pending = unsaved.get(queryClient) ?? new Map<FavKind, string[]>();
+  unsaved.set(queryClient, pending);
   const save = useMutation({
     mutationKey: saveKey,
-    // Saves run one after another, so the last change is the one kept.
+    // Saves run one after another; each sends one kind (the server keeps the others).
     scope: { id: "favourites" },
-    mutationFn: async (favourites: Schemas["Favourites"]) => unwrap(await api.PUT("/v1/me/preferences", { body: { favourites } })),
-    onMutate: async (favourites) => {
+    mutationFn: async (change: Partial<Record<FavKind, string[]>>) => unwrap(await api.PUT("/v1/me/preferences", { body: { favourites: change } })),
+    onMutate: async (change) => {
       await queryClient.cancelQueries({ queryKey: preferencesKey });
-      queryClient.setQueryData(preferencesKey, (old: Prefs | undefined) => ({ ...old, favourites }));
+      queryClient.setQueryData(preferencesKey, (old: Prefs | undefined) => ({ ...old, favourites: { ...old?.favourites, ...change } }));
     },
-    onSettled: async () => {
+    onSettled: async (_data, _error, change) => {
+      for (const [kind, values] of Object.entries(change) as [FavKind, string[]][]) {
+        if (pending.get(kind) === values) pending.delete(kind); // a later change of that kind stays
+      }
       if (queryClient.isMutating({ mutationKey: saveKey }) <= 1) await queryClient.invalidateQueries({ queryKey: preferencesKey });
     },
   });
-  // What is saved (or about to be): a quick second star builds on the first.
-  const current = () => queryClient.getQueryData<Prefs>(preferencesKey)?.favourites ?? {};
   const loaded = prefs.data !== undefined;
+  const listOf = (kind: FavKind): string[] => pending.get(kind) ?? prefs.data?.favourites?.[kind] ?? [];
   const set = (kind: FavKind, values: string[]) => {
-    if (loaded) save.mutate({ ...current(), [kind]: values }); // never over what has not loaded
+    if (!loaded) return; // never over what has not loaded
+    pending.set(kind, values);
+    save.mutate({ [kind]: values });
   };
   const of = (kind: FavKind): Fav => {
-    const list = prefs.data?.favourites?.[kind] ?? [];
+    const list = listOf(kind);
     return {
       list,
       has: (v) => list.some((x) => same(x, v)),
       toggle: (v) => {
-        const now = current()[kind] ?? [];
+        const now = listOf(kind);
         set(kind, now.some((x) => same(x, v)) ? now.filter((x) => !same(x, v)) : [...now, v]);
       },
+      ready: loaded,
+      failed: save.isError,
     };
   };
   return { of, set, loaded, error: save.error ?? prefs.error };
+}
+
+/** The favourites as they were when a menu opened: starring then shows at once, but nothing moves under the mouse. */
+export function frozen(fav: Fav | undefined, order: readonly string[]): Fav | undefined {
+  return fav && { ...fav, list: order, has: (v) => order.some((o) => same(o, v)) };
+}
+
+/** A line under a menu's items when a star could not be saved. */
+export function StarFailed({ fav }: { fav?: Fav }) {
+  return fav?.failed ? <p className="warning small fav-failed" role="alert">That favourite could not be saved: try again.</p> : null;
 }
 
 /** The favourites among `items` (in the order starred), and the rest (in the list's order). */
@@ -76,11 +105,19 @@ export function splitFavourites<T>(items: readonly T[], value: (t: T) => string,
 export function countryGroups(fav?: Fav, keep?: string | null): { top: string[]; topLabel: string; rest: string[] } {
   const mine = fav && fav.list.length > 0;
   const top = mine ? [...fav.list] : [...COUNTRIES];
-  const known = new Set([...ALL_COUNTRIES, ...top]);
-  const rest = [...ALL_COUNTRIES, ...(keep && !known.has(keep) ? [keep] : [])]
-    .filter((c) => !top.includes(c))
-    .sort((a, b) => countryName(a).localeCompare(countryName(b)));
+  const unknown = keep && !ALL_COUNTRIES.includes(keep) && !top.includes(keep) ? [keep] : [];
+  const rest = [...byName().filter((c) => !top.includes(c)), ...unknown];
   return { top, topLabel: mine ? "★ Your favourites" : "Usual countries", rest };
+}
+
+/** Every country by its name, sorted once (names come from the browser, so not at load). */
+let sorted: readonly string[] | undefined;
+function byName(): readonly string[] {
+  if (!sorted) {
+    const names = new Map(ALL_COUNTRIES.map((c) => [c, countryName(c)]));
+    sorted = [...ALL_COUNTRIES].sort((a, b) => (names.get(a) ?? a).localeCompare(names.get(b) ?? b));
+  }
+  return sorted;
 }
 
 /** A native country <select>'s options: favourites on top, then all the others. */
@@ -102,6 +139,7 @@ export function CountryList({ id, fav }: { id: string; fav?: Fav }) {
 
 /** The star beside an item: on, it is a favourite. */
 export function Star({ fav, value, label }: { fav: Fav; value: string; label: string }) {
+  if (!fav.ready) return null;
   const on = fav.has(value);
   return (
     <button type="button" className={`fav-star${on ? " on" : ""}`} aria-pressed={on}

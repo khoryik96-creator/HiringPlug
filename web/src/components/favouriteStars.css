@@ -29,7 +29,8 @@
 .industry-favourites { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.4rem 0; }
 .industry-favourites > small { color: var(--muted); font-weight: 600; margin-right: 0.2rem; }
 .industry-favourites .chip { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
-.industry-children .row .fav-star { margin-left: auto; }
+.industry-option > label { display: flex; gap: 0.5rem; align-items: flex-start; flex: 1; min-width: 0; cursor: pointer; font-weight: 400; }
+.industry-option .fav-star { margin-left: auto; }
 
 /* My settings › My dropdowns. */
 .my-dropdowns { max-width: 980px; }
@@ -69,3 +70,4 @@
 .quick-edit .chip small { color: var(--accent-dark, #5b3fd0); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
 .quick-saved { color: #15803d; font-size: 12px; font-weight: 600; animation: quick-saved 2.4s ease forwards; }
 @keyframes quick-saved { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.fav-failed { margin: 0.2rem 0.5rem; }

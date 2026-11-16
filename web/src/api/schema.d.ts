@@ -6069,7 +6069,7 @@ export interface components {
             candidateColumns?: components["schemas"]["CandidateColumn"][] | null;
             favourites?: components["schemas"]["Favourites"];
         };
-        /** @description Your favourites in the dropdowns, shown first for you only (saving sends them all; a kind left out has none). Nothing is removed from the lists themselves, and every item can still be chosen. */
+        /** @description Your favourites in the dropdowns, shown first for you only. Saving sends the kinds it changes; a kind left out keeps its favourites. Nothing is removed from the lists themselves, and every item can still be chosen. */
         Favourites: {
             specialization?: components["schemas"]["FavouriteWords"];
             itSkill?: components["schemas"]["FavouriteWords"];

@@ -76,9 +76,9 @@ export function IndustryPicker({ value, legacy, onChange, candidate, sourceChang
         <input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} />{categoryLabel(i, items)}</label>)}</div>}
     <label className="field"><span>Search industries</span><input type="search" aria-label="Search industries" value={search} onChange={(e) => { setSearch(e.target.value); }} /></label>
     <div className="industry-browser"><div className="industry-parents" role="group" aria-label="Industries">{roots.map((i) => <button key={i.id} type="button" className={i.id === current?.id ? "selected" : ""} onClick={() => { setParent(i.id); }}>{i.label}<small>{active.filter((c) => c.parentId === i.id).length}</small></button>)}</div>
-      <div className="industry-children">{current ? <><strong>{current.label}</strong>{[current, ...active.filter((i) => i.parentId === current.id && (categoryMatches(current, search) || categoryMatches(i, search)))].map((i) => <label className="row" key={i.id}>
-        <input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} /><span>{i.id === current.id ? "Industry only" : i.label}</span>
-        <Star fav={fav} value={i.id} label={categoryLabel(i, items)} /></label>)}</> : <p className="muted">No matching industries.</p>}</div>
+      <div className="industry-children">{current ? <><strong>{current.label}</strong>{[current, ...active.filter((i) => i.parentId === current.id && (categoryMatches(current, search) || categoryMatches(i, search)))].map((i) => <div className="row industry-option" key={i.id}>
+        <label><input type="checkbox" checked={choices.ids.includes(i.id)} onChange={() => { toggle(i.id); }} /><span>{i.id === current.id ? "Industry only" : i.label}</span></label>
+        <Star fav={fav} value={i.id} label={categoryLabel(i, items)} /></div>)}</> : <p className="muted">No matching industries.</p>}</div>
     </div>
   </section>;
 }

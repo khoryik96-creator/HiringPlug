@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { ErrorMessage } from "../components/ErrorMessage";
 import { type Fav, countryGroups, useFavourites } from "../components/favourites";
-import { type Category, categoryLabel, categoryMatches, useIndustries } from "../components/IndustryPicker";
+import { type Category, categoryMatches, useIndustries } from "../components/IndustryPicker";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { countryName, regionName } from "../labels";
 
@@ -72,22 +72,28 @@ function WordList({ list, title, fav, clear }: {
 }) {
   const fs = useFieldSettings();
   const words = fs.options(list).map((o) => o.label);
+  const listed = (w: string) => words.some((x) => x.toLowerCase() === w.toLowerCase());
+  // Favourites since taken off the list: shown so they can be switched off one by one.
+  const gone = fs.loaded ? fav.list.filter((w) => !listed(w)) : [];
   return (
     <section className="panel fav-section" aria-label={title}>
-      <SectionHead title={title} fav={fav} clear={clear} />
+      <SectionHead title={title} count={fav.list.filter(listed).length} clear={fav.list.length > 0 ? clear : undefined} />
       {words.length === 0 ? <p className="muted small">The list is empty (Settings › Dropdowns &amp; categories).</p> : (
-        <div className="fav-switches">{words.map((w) => <FavSwitch key={w} fav={fav} value={w} label={w} />)}</div>
+        <div className="fav-switches">
+          {words.map((w) => <FavSwitch key={w} fav={fav} value={w} label={w} />)}
+          {gone.map((w) => <FavSwitch key={w} fav={fav} value={w} label={`${w} (no longer in the list)`} />)}
+        </div>
       )}
     </section>
   );
 }
 
-function SectionHead({ title, fav, clear }: { title: string; fav: Fav; clear: () => void }) {
+function SectionHead({ title, count, clear }: { title: string; count: number; clear?: () => void }) {
   return (
     <div className="fav-head">
       <h3>{title}</h3>
-      <span className="muted small">{fav.list.length === 0 ? "No favourites: the whole list shows, in its order" : `${String(fav.list.length)} favourite${fav.list.length === 1 ? "" : "s"} on top`}</span>
-      {fav.list.length > 0 && <button type="button" className="link small" onClick={clear}>Clear</button>}
+      <span className="muted small">{count === 0 ? "No favourites: the whole list shows, in its order" : `${String(count)} favourite${count === 1 ? "" : "s"} on top`}</span>
+      {clear && <button type="button" className="link small" onClick={clear}>Clear</button>}
     </div>
   );
 }
@@ -112,7 +118,7 @@ function Industries({ fav, clear }: { fav: Fav; clear: () => void }) {
   const roots = active.filter((i) => !i.parentId && (!search || categoryMatches(i, search) || subsOf(i).length > 0));
   return (
     <section className="panel fav-section" aria-label="Industries">
-      <SectionHead title="Industries" fav={fav} clear={clear} />
+      <SectionHead title="Industries" count={fav.list.filter((id) => active.some((i) => i.id === id)).length} clear={fav.list.length > 0 ? clear : undefined} />
       <ErrorMessage error={industries.error} />
       <input type="search" className="fav-search" placeholder="Find an industry…" aria-label="Find an industry" value={search}
         onChange={(e) => { setSearch(e.target.value); }} />
@@ -124,7 +130,7 @@ function Industries({ fav, clear }: { fav: Fav; clear: () => void }) {
             <summary>{root.label}{starred > 0 && <small className="muted"> · {starred} starred</small>}</summary>
             <div className="fav-switches">
               <FavSwitch fav={fav} value={root.id} label={`${root.label} (all of it)`} />
-              {subs.map((s) => <FavSwitch key={s.id} fav={fav} value={s.id} label={categoryLabel(s, items).replace(`${root.label} / `, "")} />)}
+              {subs.map((s) => <FavSwitch key={s.id} fav={fav} value={s.id} label={s.label} />)}
             </div>
           </details>
         );

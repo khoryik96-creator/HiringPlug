@@ -1,4 +1,4 @@
-/* Settings › LinkedIn companion. */
+/* Settings › LinkedIn companion (pages/Companion.tsx). */
 .companion-page { max-width: 860px; }
 .companion-card { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
 .companion-status { flex-basis: 100%; margin: 0; font-weight: 600; }

@@ -10,7 +10,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function server() {
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
     ? ok(testFieldSettings()) : ok({ favourites: { itSkill: ["SAP"] } }))) as never);
-  return vi.spyOn(api, "PATCH").mockImplementation(((_: string, init: { body: object }) => Promise.resolve(ok(testCandidate({ version: 5, ...init.body })))));
+  // As the server does: the change saved, one version on.
+  return vi.spyOn(api, "PATCH").mockImplementation(((_: string, init: { body: { version: number } }) =>
+    Promise.resolve(ok(testCandidate({ ...init.body, version: init.body.version + 1 })))));
 }
 const open = async (name: string) => {
   const b = await screen.findByRole<HTMLButtonElement>("button", { name });
@@ -57,5 +59,20 @@ describe("editing a profile's lists in place", () => {
     renderWithClient(<QuickWords candidate={testCandidate({ certifications: ["ACCA"] })} canEdit={false} field="certifications" />);
     expect(screen.getByText("ACCA")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("two quick changes in a row", () => {
+  it("sends the second from the version the first made, not a stale one", async () => {
+    const patch = server();
+    const c = testCandidate({ id: "cand_01jbz6w0m0k8q9x2r3s4t5v6q1", version: 4, specialization: null, skills: [] });
+    renderWithClient(<><QuickSpecialization candidate={c} canEdit /><QuickWords candidate={c} canEdit field="skills" /></>);
+    await open("Specialization: not set. Change");
+    fireEvent.click(await screen.findByRole("button", { name: "Cybersecurity" }));
+    await open("Add an IT skill");
+    fireEvent.click(screen.getByRole("button", { name: "Python" }));
+    await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
+    expect(sentBody(patch, 0)).toEqual({ version: 4, specialization: "Cybersecurity" });
+    expect(sentBody(patch, 1), "both made before the page showed version 5").toEqual({ version: 5, skills: ["Python"] });
   });
 });

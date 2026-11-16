@@ -87,7 +87,11 @@ func (m *Module) SetPreferences(ctx context.Context, p authz.Principal, in api.P
 			changes["dashboardBlocks"] = blocks
 		}
 		if in.Favourites != nil {
-			fav := cleanFavourites(*in.Favourites)
+			saved, err := q.GetPreferences(ctx)
+			if err != nil && !database.IsNoRows(err) {
+				return err
+			}
+			fav := mergeFavourites(favouritesOf(saved.Favourites), *in.Favourites)
 			raw, err := json.Marshal(fav)
 			if err != nil {
 				return err

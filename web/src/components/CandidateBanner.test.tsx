@@ -95,7 +95,7 @@ describe("candidate banner", () => {
     await waitFor(() => { expect((status as HTMLSelectElement).disabled).toBe(false); });
     fireEvent.change(status, { target: { value: "" } });
     await waitFor(() => { expect(patch).toHaveBeenCalledTimes(2); });
-    expect(sentBody(patch, 1)).toEqual({ version: 3, availability: null });
+    expect(sentBody(patch, 1), "builds on its own save (version 4), even before the page shows it").toEqual({ version: 4, availability: null });
   });
 
   it("asks which pass for Spousal / RP-T, and keeps the note", async () => {

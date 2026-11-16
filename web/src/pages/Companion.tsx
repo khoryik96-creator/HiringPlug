@@ -2,7 +2,7 @@
 // LinkedIn in the recruiter's own browser, and how to install and connect it.
 import { useCompanion } from "../companion";
 import { companionCan } from "../components/linkedinCompany";
-import "./companion.css";
+import "./companionPage.css";
 
 export const COMPANION_DOWNLOAD = "/linkedin-companion.zip";
 

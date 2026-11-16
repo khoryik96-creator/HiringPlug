@@ -12,9 +12,13 @@ const last = (put: { mock: { calls: unknown[][] } }) => sentBody(put, put.mock.c
 
 /** A server that keeps what is saved; returns the PUT spy. */
 function server(favourites: object) {
-  let saved: unknown = { favourites };
+  // As the server does: the kinds sent replace those saved; the others stay.
+  let saved = { favourites };
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok(saved))) as never);
-  return vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: unknown }) => { saved = init.body; return Promise.resolve(ok(init.body)); }) as never);
+  return vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { favourites: object } }) => {
+    saved = { favourites: { ...saved.favourites, ...init.body.favourites } };
+    return Promise.resolve(ok(saved));
+  }) as never);
 }
 
 describe("My dropdowns", () => {
@@ -35,16 +39,20 @@ describe("My dropdowns", () => {
   });
 
   it("switches a list's words on and off, and clears them, without touching the list", async () => {
-    const put = server({ itSkill: ["Python"], certification: ["ACCA"] });
+    const put = server({ itSkill: ["Python", "Golang"], certification: ["ACCA"] });
     renderWithClient(<MyDropdowns />);
     const skills = await screen.findByRole("region", { name: "IT skills" });
-    await waitFor(() => { expect(within(skills).getAllByRole("switch").map((s) => s.textContent)).toEqual(["Java", "Python", "SAP"]); });
+    await waitFor(() => { expect(within(skills).getAllByRole("switch").map((s) => s.textContent)).toEqual(["Java", "Python", "SAP", "Golang (no longer in the list)"]); });
     expect(within(skills).getByRole("switch", { name: "Python" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(skills).getByText("1 favourite on top"), "Golang is no longer in the list").toBeTruthy();
+    const gone = within(skills).getByRole("switch", { name: "Golang (no longer in the list)" });
+    fireEvent.click(gone);
+    await waitFor(() => { expect(last(put), "it can still be switched off").toEqual({ favourites: { itSkill: ["Python"] } }); });
     fireEvent.click(within(skills).getByRole("switch", { name: "Java" }));
-    await waitFor(() => { expect(last(put)).toEqual({ favourites: { itSkill: ["Python", "Java"], certification: ["ACCA"] } }); });
+    await waitFor(() => { expect(last(put), "only the kind changed").toEqual({ favourites: { itSkill: ["Python", "Java"] } }); });
     await waitFor(() => { expect(within(skills).getByRole("switch", { name: "Java" }).getAttribute("aria-checked")).toBe("true"); });
     fireEvent.click(within(screen.getByRole("region", { name: "Professional certifications" })).getByRole("button", { name: "Clear" }));
-    await waitFor(() => { expect(last(put)).toEqual({ favourites: { itSkill: ["Python", "Java"], certification: [] } }); });
+    await waitFor(() => { expect(last(put)).toEqual({ favourites: { certification: [] } }); });
   });
 
   it("stars an industry or one of its subindustries, found by a search", async () => {

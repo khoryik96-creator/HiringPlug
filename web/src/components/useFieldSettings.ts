@@ -84,7 +84,7 @@ export function fieldHelpers(data: Settings | undefined) {
   /** An option's colour (lists with colours), grey when it has none. */
   const color = (name: ListName, key: string): string =>
     list(name)?.options.find((o) => o.key === key)?.color ?? BUILT_IN_COLOR[key] ?? "#6b7280";
-  return { options, label, mandatory, color };
+  return { options, label, mandatory, color, loaded: data !== undefined };
 }
 
 /** A label with " *" when the field is mandatory. */

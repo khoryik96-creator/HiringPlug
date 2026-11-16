@@ -103,8 +103,15 @@ func TestEachPersonKeepsTheirOwnDropdownFavourites(t *testing.T) {
 	assert.Equal(t, []string{"SG", "MY"}, *got.Country)
 	assert.Equal(t, []string{"Finance"}, *got.Specialization)
 	assert.Len(t, *got.Industry, 1)
-	assert.Empty(t, *got.Certification, "a kind left out has none")
+	assert.Empty(t, *got.Certification, "none chosen")
 	assert.Empty(t, *favs(other).ItSkill, "someone else's favourites are theirs alone")
+
+	// Saving one kind keeps the others.
+	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"favourites": map[string]any{"country": []string{"ID"}}}).Status)
+	got = favs(me)
+	assert.Equal(t, []string{"ID"}, *got.Country)
+	assert.Equal(t, []string{"Java", "Python"}, *got.ItSkill, "a kind left out keeps its favourites")
+	assert.Equal(t, []string{"Finance"}, *got.Specialization)
 
 	// Changing the columns leaves the favourites as they are.
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/me/preferences", me, map[string]any{"candidateColumns": []string{"status"}}).Status)

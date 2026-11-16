@@ -61,6 +61,8 @@ Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
 | Industry, specialization | Shared industries/subindustries catalogue in Settings, applied to both candidates and companies. Select multiple current/historical categories in profile editing or during a screening call. Go suggests the employer’s business using saved company selections and explicit employer-name rules; ambiguous employers are chosen manually. Specialization stays a separate job-function field. See [industries.md](industries.md). |
 | Skills, tags | Short labels (up to 100 skills and 50 tags, 60 characters each); spaces tidied and the same label in another case kept once. IT skills are picked from the company's IT skills list (Settings › Dropdowns); tags are typed, with labels already in use suggested. The candidate list filters by one skill and one tag (ignoring case) and shows tags next to names. |
 | Specialization, certifications | Picked from the company's Specialization and Professional certifications lists (Settings › Dropdowns: add, rename, reorder, hide or remove any item; candidates keep the words they have). Up to 50 certifications of 100 characters, shown under Details. Advanced search narrows by specialization (any chosen) and certifications (every one chosen). |
+| Editing in Details | Specialization, industries, IT skills and certifications are changed right in a candidate's Details (no Edit profile): a small dropdown beside each (type to find any item), × on a chip to remove, saved at once with a short "Saved". Quick changes one after another build on each other; a change by someone else meanwhile comes back as a conflict. |
+| Favourites in dropdowns | Each person stars their own favourite specializations, industries, IT skills, certifications and countries (☆ in a dropdown, or **Settings › My dropdowns**). Favourites come first in that person's dropdowns only; the rest stay below and typing finds any item, so nothing is hidden or removed. Countries keep the order chosen (until some are chosen, the agency's usual countries come first; every country can be picked). |
 | Current title and company, location, source | Source: the company's list (Settings), picked as **icons side by side**: JobStreet, LinkedIn, referral, careers page, direct, other, and the company's own (shown by initials) |
 | **Current salary**, **expected salary** | Amount, currency (`MYR`, `SGD`, ...) and period (hour/day/month/year) per figure; expected can be a range. **Sensitive:** see [access control](access-control.md). |
 
@@ -520,7 +522,10 @@ for each of their jobs, with **Score fit** / **Score again**.
   company's contacts, with a count. Servers often block port 25 from homes
   and clouds: then every answer is "not confirmed", never a wrong "bounces".
 - **Employment check on LinkedIn** ✅ (CV Studio's, with the **HiringPlug
-  LinkedIn companion**, `extension/linkedin-companion`): **Check employment on
+  LinkedIn companion**, `extension/linkedin-companion`; each person downloads
+  it from **Settings › LinkedIn companion**, which shows the install steps and
+  whether this browser is connected; the zip is built with the web app, so it
+  always matches it): **Check employment on
   LinkedIn** on a company's contacts (or **Check on LinkedIn now** on one
   contact). The companion, a browser extension connected to this HiringPlug
   only, reads each contact's LinkedIn profile in the recruiter's own browser
@@ -1037,8 +1042,10 @@ The **Log** shows what each did, or why not.
 ## Folders ✅
 
 The **Candidates**, **Contacts** and **Companies** lists each have their own
-folders down the left: **All**, **My folders**, **Shared with me** and
-**+ New folder**. Opening a folder shows only what is in it, and the search,
+folders, as tabs above the list: **All**, the person's folders, those shared
+with them (with a people icon) and **+ New folder**; a long row of tabs
+scrolls sideways. The open folder's name, who sees it and its Share, Rename
+and Delete sit on one quiet line under the tabs. Opening a folder shows only what is in it, and the search,
 Advanced search, "Mine only" and the other filters still work inside it. The
 folder last opened on each list opens again next time (on that device).
 

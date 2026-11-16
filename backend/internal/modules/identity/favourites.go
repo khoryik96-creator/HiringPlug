@@ -38,6 +38,24 @@ func cleanFavourites(in api.Favourites) api.Favourites {
 	}
 }
 
+// mergeFavourites puts the kinds sent over those saved (a kind left out keeps
+// its favourites), so saving one kind never touches another.
+func mergeFavourites(saved, sent api.Favourites) api.Favourites {
+	pick := func(s, n *[]string) *[]string {
+		if n != nil {
+			return n
+		}
+		return s
+	}
+	return cleanFavourites(api.Favourites{
+		Specialization: pick(saved.Specialization, sent.Specialization),
+		ItSkill:        pick(saved.ItSkill, sent.ItSkill),
+		Certification:  pick(saved.Certification, sent.Certification),
+		Industry:       pick(saved.Industry, sent.Industry),
+		Country:        pick(saved.Country, sent.Country),
+	})
+}
+
 // favouritesOf reads the saved favourites; anything unreadable is none.
 func favouritesOf(raw []byte) api.Favourites {
 	var f api.Favourites

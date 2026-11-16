@@ -3,7 +3,7 @@
 // adding an IT skill or certification and choosing a specialization.
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { type Fav, splitFavourites, Star } from "./favourites";
+import { type Fav, frozen, splitFavourites, Star, StarFailed } from "./favourites";
 
 export type FavChoice = { value: string; label: string };
 
@@ -31,19 +31,21 @@ export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled 
   // moves to the top only the next time (so nothing jumps under the mouse).
   const [order, setOrder] = useState<readonly string[]>([]);
   const box = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const fallback = useId();
   const menuId = `${aria.id ?? fallback}-menu`;
+  // Closed (by a pick, Escape or a click elsewhere), it starts afresh next time.
+  const close = () => { setOpen(false); setFilter(""); };
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const away = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) { setOpen(false); setFilter(""); } };
     document.addEventListener("mousedown", away);
     return () => { document.removeEventListener("mousedown", away); };
   }, [open]);
-  const close = () => { setOpen(false); setFilter(""); };
   const pick = (v: string) => { onPick(v); close(); };
   const words = filter.trim().toLowerCase();
   const shown = choices.filter((c) => !words || c.label.toLowerCase().includes(words));
-  const { top, rest } = splitFavourites(shown, (c) => c.value, fav && { ...fav, list: order, has: (v) => order.some((o) => o.toLowerCase() === v.toLowerCase()) });
+  const { top, rest } = splitFavourites(shown, (c) => c.value, frozen(fav, order));
   const row = (c: FavChoice) => (
     <li key={c.value} className="fav-row">
       <button type="button" className="fav-pick" onClick={() => { pick(c.value); }}>{c.label}</button>
@@ -51,8 +53,8 @@ export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled 
     </li>
   );
   return (
-    <div className={`fav-dropdown${inline ? " inline" : ""}`} ref={box} onKeyDown={(e) => { if (e.key === "Escape" && open) { e.stopPropagation(); close(); } }}>
-      <button type="button" id={aria.id ?? fallback} className="fav-button" disabled={disabled} aria-haspopup="true" aria-expanded={open}
+    <div className={`fav-dropdown${inline ? " inline" : ""}`} ref={box} onKeyDown={(e) => { if (e.key === "Escape" && open) { e.stopPropagation(); close(); button.current?.focus(); } }}>
+      <button ref={button} type="button" id={aria.id ?? fallback} className="fav-button" disabled={disabled} aria-haspopup="true" aria-expanded={open}
         aria-controls={open ? menuId : undefined} aria-invalid={aria["aria-invalid"]} aria-describedby={aria["aria-describedby"]} aria-label={aria["aria-label"]}
         onClick={() => { if (open) close(); else { setOrder(fav?.list ?? []); setOpen(true); } }}>
         <span>{text}</span><span aria-hidden="true" className="multi-caret">▾</span>
@@ -67,7 +69,8 @@ export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled 
             {rest.length > 0 && <>{top.length > 0 && <p className="fav-group">All {noun}</p>}<ul aria-label={`All ${noun}`}>{rest.map(row)}</ul></>}
             {shown.length === 0 && <p className="muted small fav-none">{choices.length === 0 ? `No ${noun} to add.` : "None match."}</p>}
           </div>
-          {fav && fav.list.length === 0 && choices.length > 3 && <p className="muted small fav-tip">Tip: click ☆ to keep one at the top, just for you.</p>}
+          <StarFailed fav={fav} />
+          {fav?.ready && fav.list.length === 0 && choices.length > 3 && <p className="muted small fav-tip">Tip: click ☆ to keep one at the top, just for you.</p>}
         </div>
       )}
     </div>

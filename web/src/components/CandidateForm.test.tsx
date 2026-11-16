@@ -142,7 +142,10 @@ describe("candidate form", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
       ? ok(testFieldSettings()) : path === "/v1/me/preferences" ? ok(saved)
         : ok({ tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
-    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: unknown }) => { saved = init.body; return Promise.resolve(ok(init.body)); }) as never);
+    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { favourites: object } }) => {
+      saved = { favourites: { ...(saved as { favourites: object }).favourites, ...init.body.favourites } };
+      return Promise.resolve(ok(saved));
+    }) as never);
     renderWithClient(<CandidateForm candidate={testCandidate({ skills: [] })} onDone={vi.fn()} />);
     const skills = await screen.findByLabelText<HTMLButtonElement>("IT skills");
     await waitFor(() => { expect(skills.disabled).toBe(false); });
@@ -151,7 +154,7 @@ describe("candidate form", () => {
     expect(optionsIn("All IT skills"), "every other skill is still there").toEqual(["Java", "SAP"]);
     fireEvent.click(screen.getByRole("button", { name: "Keep Java at the top (favourite)" }));
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
-    expect(sentBody(put)).toEqual({ favourites: { itSkill: ["Python", "Java"], country: ["SG"] } });
+    expect(sentBody(put), "only IT skills: the countries stay as saved").toEqual({ favourites: { itSkill: ["Python", "Java"] } });
     expect(screen.getByRole("button", { name: "Remove Java from your favourites" }), "starred at once").toBeTruthy();
     expect(optionsIn("All IT skills"), "but nothing moves under the mouse while open").toEqual(["Java", "SAP"]);
     fireEvent.click(skills);
