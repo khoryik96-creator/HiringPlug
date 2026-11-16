@@ -78,3 +78,17 @@
   .folder-panel .folder-done, .folder-panel .error { flex: none; white-space: nowrap; margin: 0; }
   .folder-head .sp { display: none; }
 }
+
+/* Column widths set by the person (components/useColumnWidths.tsx). */
+th:has(> .col-resize), th[data-column] { position: relative; }
+.col-resize { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; z-index: 2; touch-action: none; }
+.col-resize::after { content: ""; position: absolute; top: 20%; bottom: 20%; left: 4px; width: 2px; border-radius: 2px; background: transparent; }
+th:hover > .col-resize::after { background: var(--line-strong); }
+.col-resize:hover::after, .col-resize:focus-visible::after { background: var(--accent); }
+.col-resize:focus-visible { outline: none; }
+body.resizing-columns, body.resizing-columns * { cursor: col-resize !important; user-select: none; }
+table.sized { table-layout: fixed; }
+table.sized th { box-sizing: border-box; }
+table.sized td { overflow: hidden; text-overflow: ellipsis; }
+table.sized th { overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
+.widths-reset { display: flex; justify-content: flex-end; margin: -0.3rem 0 0.3rem; }

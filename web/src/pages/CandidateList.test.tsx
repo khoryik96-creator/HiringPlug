@@ -240,7 +240,7 @@ describe("candidate list", () => {
       return Promise.resolve(ok({ candidateColumns: saved }));
     }) as never);
     renderWithClient(<CandidateList canCreate={false} />);
-    await screen.findByRole("columnheader", { name: "Nationality" });
+    await screen.findByRole("columnheader", { name: /^Nationality/ });
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""))).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
     const siti = screen.getByText("Siti Aisyah").closest("tr");
     expect(siti?.textContent).toContain("Singapore");
@@ -252,7 +252,7 @@ describe("candidate list", () => {
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith("/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] } });
     });
-    expect(await screen.findByRole("columnheader", { name: "Industry" })).toBeTruthy();
+    expect(await screen.findByRole("columnheader", { name: /^Industry/ })).toBeTruthy();
   });
 
   it("saves quick changes of columns one after another, so the last one is kept", async () => {
@@ -260,11 +260,11 @@ describe("candidate list", () => {
     const pending: ((v: unknown) => void)[] = [];
     const put = vi.spyOn(api, "PUT").mockImplementation((() => new Promise((resolve) => { pending.push(resolve); })) as never);
     renderWithClient(<CandidateList canCreate={false} />);
-    await screen.findByRole("columnheader", { name: "Nationality" });
+    await screen.findByRole("columnheader", { name: /^Nationality/ });
     fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Residence" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "Industry" }));
-    expect(await screen.findByRole("columnheader", { name: "Industry" })).toBeTruthy(); // shown at once
+    expect(await screen.findByRole("columnheader", { name: /^Industry/ })).toBeTruthy(); // shown at once
     await new Promise((r) => { setTimeout(r, 50); });
     expect(put).toHaveBeenCalledTimes(1); // the second waits for the first
     pending[0]?.(ok({ candidateColumns: ["nationality", "residence"] }));

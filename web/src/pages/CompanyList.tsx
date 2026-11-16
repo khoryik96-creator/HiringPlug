@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
@@ -13,6 +13,7 @@ import { useFieldSettings } from "../components/useFieldSettings";
 import { COMPANY_TYPE, keysOf } from "../labels";
 import { hashParam } from "../hashQuery";
 import { PinnedScroll } from "../components/StickyScrollbar";
+import { useColumnWidths } from "../components/useColumnWidths";
 
 type TypeFilter = "" | Schemas["CompanyType"];
 
@@ -50,6 +51,12 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
   });
   const items = list.data?.pages.flatMap((page) => page.items);
   const inFolders = useInFolders(folders, items?.map((c) => c.id) ?? []);
+  const heads: [string, string][] = [
+    ["name", "Name"], ["category", "Category"], ["type", "Type"], ["industry", "Industry"], ["city", "City"], ["website", "Website"], ["linkedin", "LinkedIn"],
+    ...(folders.hasFolders ? [["folders", "In folders"] as [string, string]] : []),
+  ];
+  const tableRef = useRef<HTMLTableElement>(null);
+  const widths = useColumnWidths("companies", heads.map(([k]) => k), tableRef);
 
   return (
     <main className="list-page">
@@ -86,18 +93,12 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
           </PickBar>
         </div>
       )}
+      {widths.set && <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>}
       <PinnedScroll>
-      <table className={canFolders ? "pick-table" : undefined}>
+      <table ref={tableRef} className={[canFolders ? "pick-table" : "", widths.set ? "sized" : ""].filter(Boolean).join(" ") || undefined} style={widths.tableStyle}>
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Category</th>
-            <th>Type</th>
-            <th>Industry</th>
-            <th>City</th>
-            <th>Website</th>
-            <th>LinkedIn</th>
-            {folders.hasFolders && <th>In folders</th>}
+            {heads.map(([k, label]) => <th key={k} data-column={k} style={widths.style(k)}>{label}{widths.handle(k, label)}</th>)}
           </tr>
         </thead>
         <tbody>

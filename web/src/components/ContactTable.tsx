@@ -1,4 +1,5 @@
 import type React from "react";
+import { useRef } from "react";
 
 import type { ContactSummary } from "../api/client";
 import { formatWhen, linkedinDates, timeAgo } from "../labels";
@@ -9,6 +10,7 @@ import { InFolders } from "./folders/FolderView";
 import { MailboxBadge } from "./MailboxBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
+import { useColumnWidths } from "./useColumnWidths";
 import { useFieldSettings } from "./useFieldSettings";
 
 /** What LinkedIn showed of a contact's time at the company, under their status. */
@@ -31,20 +33,21 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   inFolders?: (id: string) => string[];
 }) {
   const fs = useFieldSettings();
+  const heads: [string, string][] = [
+    ["name", "Name"], ["role", "Role"], ["status", "Status"], ["title", "Job title"],
+    ...(showCompany ? [["company", "Company"] as [string, string]] : []), ["email", "Email"], ["phone", "Phone"],
+    ...(inFolders ? [["folders", "In folders"] as [string, string]] : []),
+  ];
+  const tableRef = useRef<HTMLTableElement>(null);
+  const widths = useColumnWidths(showCompany ? "contacts" : "company-contacts", heads.map(([k]) => k), tableRef);
   return (
     <>
+    {widths.set && <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>}
     <PinnedScroll>
-    <table className={onPick ? "contacts-table pick-table" : "contacts-table"}>
+    <table ref={tableRef} className={`contacts-table${onPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Role</th>
-          <th>Status</th>
-          <th>Job title</th>
-          {showCompany && <th>Company</th>}
-          <th>Email</th>
-          <th>Phone</th>
-          {inFolders && <th>In folders</th>}
+          {heads.map(([k, label]) => <th key={k} data-column={k} style={widths.style(k)}>{label}{widths.handle(k, label)}</th>)}
         </tr>
       </thead>
       <tbody>

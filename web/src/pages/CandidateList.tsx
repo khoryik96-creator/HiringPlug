@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
@@ -20,6 +20,7 @@ import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
+import { type ColumnWidths, useColumnWidths } from "../components/useColumnWidths";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
@@ -87,6 +88,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const industries = useIndustries();
   const chips = activeChips(adv, (k) => cols.look.label("candidate_source", k), (k) => { const item = industries.data?.items.find((i) => i.id === k); return item && industries.data ? categoryLabel(item, industries.data.items) : k.startsWith("industry_") ? "Unavailable category" : k; });
   const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const widths = useColumnWidths("candidates", ["name", ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
   // With email, clicking a row chooses the candidate (the name still opens them).
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
@@ -169,13 +172,16 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           chosen={canPick ? pick.ids : undefined} onChoose={canPick ? (c, on) => { pick.pick([personOf(c)], on); } : undefined} chooseToEmail={canEmail}
           canAddToJob={canAddToJob} more={more} onMore={shownList.hasNextPage ? () => { void shownList.fetchNextPage(); } : undefined} />
       )}
+      {openAs === "profile" && widths.set && (
+        <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>
+      )}
       {openAs === "profile" && <PinnedScroll>
-        <table className={canPick ? "candidates-table pick-table" : "candidates-table"}>
+        <table ref={tableRef} className={`candidates-table${canPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
           <thead>
             <tr>
-              <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />
-              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} />)}
-              {folders.hasFolders && <th>In folders</th>}
+              <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
+              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />)}
+              {folders.hasFolders && <th data-column="folders" style={widths.style("folders")}>In folders{widths.handle("folders", "In folders")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -281,17 +287,19 @@ function keepSort(v: CandidateSort) {
 }
 
 /** A column header; for sortable columns, a button that sorts (and flips) the list, like a spreadsheet. */
-function SortHeader({ column, label, sort, onSort, canSeeSalary }: {
-  column: string; label: string; sort: CandidateSort; onSort: (s: CandidateSort) => void; canSeeSalary: boolean;
+function SortHeader({ column, label, sort, onSort, canSeeSalary, widths }: {
+  column: string; label: string; sort: CandidateSort; onSort: (s: CandidateSort) => void; canSeeSalary: boolean; widths: ColumnWidths;
 }) {
   const sortable = SORTABLE[column];
-  if (!sortable || (sortable.salary && !canSeeSalary)) return <th>{label}</th>;
+  const edge = widths.handle(column, label);
+  if (!sortable || (sortable.salary && !canSeeSalary)) return <th data-column={column} style={widths.style(column)}>{label}{edge}</th>;
   const way = sortOf(sort, column);
   return (
-    <th aria-sort={way ?? "none"}>
+    <th data-column={column} style={widths.style(column)} aria-sort={way ?? "none"}>
       <button type="button" className={`sort-header${way ? " on" : ""}`} onClick={() => { onSort(flipSort(sort, column)); }}>
         {label}<span aria-hidden="true" className="sort-arrow">{way === "ascending" ? "▲" : way === "descending" ? "▼" : "↕"}</span>
       </button>
+      {edge}
     </th>
   );
 }
