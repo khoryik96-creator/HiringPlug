@@ -35,6 +35,18 @@ describe("boolean rules in a list's search box", () => {
     expect([...document.querySelectorAll(".bool-rule")].map((e) => e.textContent)).toEqual(["AND", "(", "OR", ")", "NOT", "*"]);
   });
 
+  it("searches once typing pauses, not on every key", async () => {
+    reads({ items: [], nextCursor: null });
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [], nextCursor: null, terms: [] }));
+    renderWithClient(<CandidateList />);
+    const box = await screen.findByLabelText("Search candidates");
+    for (const typed of ["SAP AND", "SAP AND (", "SAP AND (BW", "SAP AND (BW)"]) fireEvent.change(box, { target: { value: typed } });
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    await new Promise((r) => setTimeout(r, 450));
+    expect(post, "half-typed ones are never sent").toHaveBeenCalledTimes(1);
+    expect(sentBody(post)).toMatchObject({ boolean: "SAP AND (BW)" });
+  });
+
   it("keeps a plain search a name search", async () => {
     const get = reads({ items: [], nextCursor: null });
     const post = vi.spyOn(api, "POST");

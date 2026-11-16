@@ -90,22 +90,27 @@ source, industry, tags, phone and last updated; the choice is saved for them
 undoes it.
 
 **The list tops** (Candidates, Companies, Contacts): no page title, one
-search bar holding its filters (Candidates: **Mine**, **Filters**, **✦ AI**;
-Companies: type and category; Contacts: role and status), the folder tabs
-with the view tools at their end (Candidates: columns, table or full
-resume), a count line with "Click a row to choose it", and once rows are
-chosen a dark bar: Email each separately, Add to folder, Select all, Clear.
+search bar holding its filters (Candidates: a funnel for **Filters**, with
+**Mine only** inside them, and **✦ AI**; Companies: type and category;
+Contacts: role and status), the folder tabs with the view tools at their
+end (Candidates: columns, table or full resume), a count line, and once
+rows are chosen a dark bar: Email each separately, Add to folder, Select
+all, Clear.
 Rows are chosen as in a file list: click (or Ctrl/⌘+click) one, Shift+click
 for every row from the last one clicked, Ctrl/⌘+A for all shown, Esc for
 none, ↑/↓ to move between rows (Shift+↑/↓ chooses while moving), Space to
 choose the row you are on.
-CVs dropped anywhere on the Candidates page are imported (or "choose
-files"). Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
-`NEAR/n`, brackets, quotes, `word*`, `-word`; the operators in capitals, so
-"Johnson and Johnson" stays a name search) shows them in blue with a
-BOOLEAN badge and runs a boolean search: of CVs and profiles for
+CVs dropped anywhere on the Candidates page are imported; clicking "Drop
+CVs anywhere to upload" picks files instead (keyboards, touch screens).
+While an import is open, more CVs go on its own drop box. Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
+`NEAR/n`, quotes, `word*`, `-word` or `!word`; the operators in capitals, so
+"Johnson and Johnson" stays a name search, and brackets alone do not count,
+so "(03) 2345 6789" stays a phone search) shows them in blue with a BOOLEAN
+badge and, once typing pauses, runs a boolean search: of CVs and profiles for
 candidates, of the name, website, industry, city and about for companies,
-of the name, job title and email for contacts. A boolean that cannot be read
+of the name, job title and email for contacts (an email's or website's
+words count on their own: `majubank`; fields stay apart, so a NEAR never
+runs from one into the next). A boolean that cannot be read
 says what is wrong with it.
 
 **Advanced search** (Candidates, "Filters"): a boolean search of

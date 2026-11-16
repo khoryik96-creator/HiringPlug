@@ -1,7 +1,7 @@
 // Files dropped anywhere on a page (the candidates page takes CVs this way):
 // a full-page outline while files are dragged over. Rows dragged onto
 // folders are not files, so they are left alone.
-import { type DragEvent, useRef, useState } from "react";
+import { type DragEvent, useId, useRef, useState } from "react";
 
 import { acceptable } from "./DropZone";
 
@@ -26,6 +26,7 @@ export function usePageDrop(accept: string, onFiles: (files: File[]) => void, en
       onDragLeave: (e: DragEvent) => { if (carriesFiles(e)) { depth.current = Math.max(0, depth.current - 1); if (depth.current === 0) setOver(false); } },
       onDrop: (e: DragEvent) => {
         if (!carriesFiles(e)) return;
+        if (e.defaultPrevented) { depth.current = 0; setOver(false); return; } // a drop box on the page took them
         e.preventDefault();
         depth.current = 0;
         setOver(false);
@@ -36,11 +37,15 @@ export function usePageDrop(accept: string, onFiles: (files: File[]) => void, en
   };
 }
 
-/** "Drop CVs anywhere to upload", and any files that could not be taken. */
-export function DropHint({ label, skipped }: { label: string; skipped: string[] }) {
+/** "Drop CVs anywhere to upload" (clicking it picks files, for keyboards and touch screens), and any files that could not be taken. */
+export function DropHint({ accept, label, onPick, skipped }: { accept: string; label: string; onPick: (files: File[]) => void; skipped: string[] }) {
+  const id = useId();
+  const [picker, setPicker] = useState(0); // a new input after each pick, so the same file can be picked again
   return (
     <span className="list-top-end drop-hint">
-      <span aria-hidden="true">⬆</span> {label}
+      <label htmlFor={id} className="drop-hint-label" title="Or click to choose the files"><span aria-hidden="true">⬆</span> {label}</label>
+      <input key={picker} id={id} type="file" accept={accept} multiple className="visually-hidden"
+        onChange={(e) => { onPick([...(e.target.files ?? [])]); setPicker((n) => n + 1); }} />
       {skipped.length > 0 && <span className="warning small" role="alert"> Not a CV file: {skipped.join(", ")}</span>}
     </span>
   );

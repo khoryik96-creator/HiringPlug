@@ -39,6 +39,8 @@ func TestCompaniesAndContactsTakeABooleanSearch(t *testing.T) {
 	assert.ElementsMatch(t, []string{bank.Id, agency.Id}, got)
 	got, _ = companies(`islamic NEAR/1 banking`)
 	assert.Equal(t, []string{bank.Id}, got)
+	got, _ = companies(`lumpur NEAR/1 retail`)
+	assert.Empty(t, got, "the city's last word is not next to the about's first: fields stay apart")
 	_, res = companies(`bank AND (insurance`)
 	assert.Equal(t, http.StatusBadRequest, res.Status)
 	assert.Contains(t, string(res.Body), "( without its )")
@@ -59,4 +61,7 @@ func TestCompaniesAndContactsTakeABooleanSearch(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{hr.Id, ta.Id}, contacts(`(HR OR "talent acquisition") NOT intern*`))
 	assert.Equal(t, []string{hr.Id}, contacts(`aisha AND manager`), "name and title together")
+	assert.Equal(t, []string{hr.Id}, contacts(`majubank AND HR`), "an email's words count")
+	assert.Equal(t, []string{hr.Id}, contacts(`"majubank.example"`), "and the address as typed")
+	assert.Equal(t, []string{ta.Id}, contacts(`(talent OR HR) !aisha !intern`), "!word leaves out")
 }

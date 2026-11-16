@@ -17,6 +17,8 @@ function List() {
   return (
     <>
       <input aria-label="Search" />
+      <button type="button">More ▾</button>
+      <button type="button" onClick={() => { setChosen(new Set()); }}>Clear</button>
       <table {...picking.tableProps}><tbody>
         {NAMES.map((n) => <tr key={n} {...picking.rowProps(n)}><td><a href={`#/${n}`}>{n}</a></td><td>{n} details</td></tr>)}
       </tbody></table>
@@ -65,6 +67,23 @@ describe("choosing rows with the usual shortcuts", () => {
     expect(chosen()).toBe("Chris,Dina");
     fireEvent.keyDown(document.activeElement as Element, { key: " " });
     expect(chosen(), "Space on Dina unchooses her").toBe("Chris");
+  });
+
+  it("starts a Shift+click afresh after the rows were cleared some other way", () => {
+    render(<List />);
+    fireEvent.click(cell("Ben"));
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    fireEvent.click(cell("Dina"), { shiftKey: true });
+    expect(chosen(), "chooses Dina, not 'unchoose Ben to Dina'").toBe("Dina");
+  });
+
+  it("keeps the rows when Esc only closes a menu elsewhere", () => {
+    render(<List />);
+    fireEvent.click(cell("Ben"));
+    fireEvent.keyDown(screen.getByRole("button", { name: "More ▾" }), { key: "Escape" });
+    expect(chosen()).toBe("Ben");
+    fireEvent.keyDown(screen.getByRole("link", { name: "Ben" }), { key: "Escape" });
+    expect(chosen(), "Esc from the list clears").toBe("");
   });
 
   it("leaves the name link and copied text alone", () => {

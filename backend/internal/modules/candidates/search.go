@@ -81,9 +81,9 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 	var ts *string
 	excluded := ""
 	if f.Boolean != nil {
-		q, err := boolsearch.Parse(*f.Boolean)
+		q, err := boolsearch.ParseField("boolean", *f.Boolean)
 		if err != nil {
-			return page, apperr.Validation(apperr.FieldErrors{{Field: "boolean", Message: err.Error()}})
+			return page, err
 		}
 		t := q.TSQuery()
 		ts, excluded = &t, q.Excluded()

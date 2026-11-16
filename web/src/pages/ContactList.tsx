@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
+import { useDebounced } from "../components/useDebounced";
 import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
@@ -27,12 +28,13 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
   const folder = folders.filter;
   const canPick = canEmail || canFolders; // rows are chosen to email or to put in a folder
   const [emailing, setEmailing] = useState(false);
+  const typed = useDebounced(q, 350); // one search once typing pauses
   const list = useInfiniteQuery({
-    queryKey: [...contactsKey, q, role, status, folder],
+    queryKey: [...contactsKey, typed, role, status, folder],
     enabled: folders.ready,
     queryFn: async ({ pageParam }) => unwrap(await api.GET("/v1/contacts", { params: { query: {
       limit: 100,
-      ...(q.trim() ? { [looksBoolean(q) ? "boolean" : "q"]: q.trim() } : {}), // AND, OR, NOT…: a boolean search
+      ...(typed.trim() ? { [looksBoolean(typed) ? "boolean" : "q"]: typed.trim() } : {}), // AND, OR, NOT…: a boolean search
       ...(role === NOT_SET ? { roleNotSet: true } : role ? { role } : {}),
       ...(status ? { status } : {}),
       ...(folder ? { folder } : {}),
@@ -89,7 +91,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
           </div>
           <ContactTable contacts={contacts} showCompany
             empty={filtered ? "No contacts match." : folder ? "Nothing in this folder yet: choose contacts under All contacts, then Add to folder (or drag them onto it)." : "No contacts yet."}
-            picked={pick.ids} onPick={canPick ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined}
+            picked={pick.ids} onPick={canPick ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} onClearPicked={pick.clear}
             dragName={(id) => folders.drag(id, pick.ids)} inFolders={folders.hasFolders ? inFolders : undefined} />
           {list.hasNextPage && (
             <button type="button" className="doc-btn" disabled={list.isFetchingNextPage} onClick={() => { void list.fetchNextPage(); }}>Show more</button>

@@ -16,6 +16,7 @@ import { ResumeReader } from "../components/search/ResumeReader";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { useRowPicking } from "../components/useRowPicking";
+import { useDebounced } from "../components/useDebounced";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
@@ -35,7 +36,8 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
   const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page
-  const drop = usePageDrop(CV_TYPES, (files) => { setDropped({ files, at: Date.now() }); }, canImport);
+  // While an import is open, its own box takes more files (a drop elsewhere would replace it).
+  const drop = usePageDrop(CV_TYPES, (files) => { setDropped({ files, at: Date.now() }); }, canImport && !dropped);
   const cols = useCandidateColumns();
   const pick = usePicked();
   const folders = useFolderView("candidate", canFolders, meId, pick.clear);
@@ -47,9 +49,11 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const markSeen = useCallback((id: string) => { setSeen((s) => (s.has(id) ? s : new Set(s).add(id))); }, []);
   const personOf = (c: Schemas["CandidateSummary"]) => ({ id: c.id, person: { candidateId: c.id, name: c.fullName, email: c.email } });
   // Boolean rules typed in the search box (AND, OR, NOT, "…", word*) run the boolean search of CVs and profiles.
-  const boolQ = looksBoolean(q);
-  const effective: SearchState = boolQ ? { ...adv, boolean: adv.boolean.trim() ? `(${adv.boolean.trim()}) AND (${q.trim()})` : q.trim() } : adv;
-  const plainQ = boolQ ? "" : q;
+  // One search once typing pauses (not one per key, nor errors for a half-typed boolean).
+  const typed = useDebounced(q, 350);
+  const boolQ = looksBoolean(typed);
+  const effective: SearchState = boolQ ? { ...adv, boolean: adv.boolean.trim() ? `(${adv.boolean.trim()}) AND (${typed.trim()})` : typed.trim() } : adv;
+  const plainQ = boolQ ? "" : typed;
   const advanced = !isEmpty(effective);
   const apply = (s: SearchState) => { setAdv(s); saveSearch(s); };
   const [sortBy, setSortBy] = useState<CandidateSort>(() => {
@@ -132,7 +136,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
           </button>
           {canAiSearch && <a className="search-pill" href="#/candidates/ai-search">✦ AI</a>}
         </BooleanSearchBox>
-        {canImport && <DropHint label="Drop CVs anywhere to upload" skipped={drop.skipped} />}
+        {canImport && <DropHint accept={CV_TYPES} label="Drop CVs anywhere to upload" onPick={drop.take} skipped={drop.skipped} />}
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} mine={{ on: mine, set: setMine }} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && filtersOn > 0 && (

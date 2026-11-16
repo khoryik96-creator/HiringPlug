@@ -7,10 +7,10 @@ afterEach(() => { cleanup(); });
 
 describe("the boolean search box", () => {
   it("knows a boolean search from a name, email or phone search", () => {
-    for (const q of ['SAP AND (BW OR BPC) NOT intern', '"project manager"', "manag*", "finance -intern", "sap NEAR/3 bw", "java W/2 spring", "a && b", "(sap)"]) {
+    for (const q of ['SAP AND (BW OR BPC) NOT intern', '"project manager"', "manag*", "finance -intern", "sap NEAR/3 bw", "java W/2 spring", "a && b", "finance !intern", "(sap OR bw)"]) {
       expect(looksBoolean(q), q).toBe(true);
     }
-    for (const q of ["Tan - Maju Foods", "Johnson and Johnson", "+60 12 345 6789", "siti@example.com", "Ali", "near the office", "SAP-BW", "-5"]) {
+    for (const q of ["Tan - Maju Foods", "Johnson and Johnson", "+60 12 345 6789", "siti@example.com", "Ali", "near the office", "SAP-BW", "-5", "(03) 2345 6789", "Tan (Kelvin)", "(sap)"]) {
       expect(looksBoolean(q), q).toBe(false);
     }
   });
@@ -19,6 +19,8 @@ describe("the boolean search box", () => {
     const rules = (q: string) => booleanParts(q).filter((p) => p.rule).map((p) => p.text);
     expect(rules('SAP AND (BW OR "planning") NOT intern* -sales NEAR/2 x')).toEqual(["AND", "(", "OR", '"planning"', ")", "NOT", "*", "-", "NEAR/2"]);
     expect(booleanParts("manag* AND x").map((p) => p.text).join(""), "nothing lost").toBe("manag* AND x");
+    expect(booleanParts("sap ”bw").map((p) => p.text).join(""), "a stray quote is kept, so the colours sit under the right letters").toBe("sap ”bw");
+    expect(rules("finance !intern"), "!word is read as leaving out, as the server reads it").toEqual(["!"]);
   });
 
   it("shows the rules in blue under the typed text, with a Boolean badge", () => {

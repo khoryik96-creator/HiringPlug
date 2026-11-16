@@ -74,7 +74,7 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
       )}
       {list.data && (
         <ContactTable contacts={list.data} empty="No contacts at this company yet." picked={pick.ids}
-          onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} />
+          onPick={canEmail ? (cs, on) => { pick.pick(cs.map(contactPerson), on); } : undefined} onClearPicked={pick.clear} />
       )}
     </section>
   );

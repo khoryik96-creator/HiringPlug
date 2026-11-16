@@ -6,36 +6,38 @@ import { type ReactNode, useId, useLayoutEffect, useRef } from "react";
 
 import { ErrorMessage } from "../ErrorMessage";
 import { fieldErrors } from "../forms";
+import { BOOL_OPERATOR, BOOL_TOKEN } from "./candidateSearch";
 
-const OPERATOR = /^(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&?|\|\|?|!)$/;
-
-/** Whether a search holds boolean rules (operators in capitals, so "Johnson and Johnson" stays a name search). */
+/**
+ * Whether a search holds boolean rules: operators in capitals (so "Johnson
+ * and Johnson" stays a name search), "quotes", word*, -word or !word.
+ * Brackets alone do not count: "(03) 2345 6789" is a phone number.
+ */
 export function looksBoolean(q: string): boolean {
-  return /(^|\s)(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&|\|\|)(?=\s|$)/.test(q)
-    || /["()“”]/.test(q)
+  return /(^|[\s(])(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&|\|\|)(?=[\s)]|$)/.test(q)
+    || /["“”]/.test(q)
     || /(^|[\s(])[-!][^\s\d-]/.test(q) // -intern, !sales (not "Tan - Maju" or -5)
     || /[^\s*]\*(\s|$|\))/.test(q); // manag*
 }
 
 export type BoolPart = { text: string; rule: boolean };
 
-/** A search split into its boolean rules (shown in blue) and the words looked for. */
+/** A search split into its boolean rules (shown in blue) and the words looked for, as candidateSearch's booleanTokens splits it. */
 export function booleanParts(q: string): BoolPart[] {
   const out: BoolPart[] = [];
-  const re = /(\s+)|(["“][^"”]*["”]?)|([()])|([^\s()"“”]+)/g;
+  const re = new RegExp(BOOL_TOKEN.source, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(q)) !== null) {
     const [tok, space, phrase, group, word] = m;
     if (space) { out.push({ text: tok, rule: false }); continue; }
-    if (group) { out.push({ text: tok, rule: true }); continue; }
-    if (phrase) { out.push({ text: tok, rule: true }); continue; }
-    const w = word ?? tok;
-    if (OPERATOR.test(w.toUpperCase())) { out.push({ text: w, rule: true }); continue; }
+    if (group || phrase) { out.push({ text: tok, rule: true }); continue; }
+    if (!word) { out.push({ text: tok, rule: false }); continue; } // a stray character, kept as typed
+    if (BOOL_OPERATOR.test(word)) { out.push({ text: word, rule: true }); continue; } // as the server reads it, in any case
     // -word or !word: the sign is the rule; word*: the star is.
-    const sign = /^[-!+](?=\S)/.exec(w)?.[0] ?? "";
-    const star = w.length > sign.length + 1 && w.endsWith("*") ? "*" : "";
+    const sign = /^[-!+](?=\S)/.exec(word)?.[0] ?? "";
+    const star = word.length > sign.length + 1 && word.endsWith("*") ? "*" : "";
     if (sign) out.push({ text: sign, rule: true });
-    out.push({ text: w.slice(sign.length, w.length - star.length), rule: false });
+    out.push({ text: word.slice(sign.length, word.length - star.length), rule: false });
     if (star) out.push({ text: star, rule: true });
   }
   return out;

@@ -28,11 +28,18 @@ export function useRowPicking({ ids, chosen, set, clear, enabled = true }: {
   enabled?: boolean;
 }) {
   const anchor = useRef<string | null>(null); // the last row clicked: where Shift+click ranges from
-  // Esc clears the chosen rows (not while typing, nor inside a dialog).
+  // Cleared by any means (Clear, another folder…): Shift+click starts afresh.
+  useEffect(() => { if (chosen.size === 0) anchor.current = null; }, [chosen.size]);
+  // Esc clears the chosen rows, when it is meant for the list: from a row,
+  // the bar over it, or nowhere in particular (not while typing, nor when it
+  // closes a menu or a dialog).
   useEffect(() => {
     if (!enabled || chosen.size === 0) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || typing(e.target) || document.querySelector("dialog[open]")) return;
+      if (e.key !== "Escape" || e.defaultPrevented || typing(e.target) || document.querySelector("dialog[open]")) return;
+      const at = e.target as HTMLElement | null;
+      const forList = !at || at === document.body || at === document.documentElement || at.closest("tr[data-pick-id], .pick-bar, table") !== null;
+      if (!forList) return;
       clear();
       anchor.current = null;
     };

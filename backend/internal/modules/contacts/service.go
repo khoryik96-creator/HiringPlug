@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/boolsearch"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 )
@@ -225,7 +226,7 @@ type Filter struct {
 // List returns up to limit contacts matching f, newest first.
 func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor *string, limit int) (Page, error) {
 	var page Page
-	tsquery, err := booleanQuery(f.Boolean)
+	tsquery, err := boolsearch.TSQueryOf("boolean", f.Boolean)
 	if err != nil {
 		return page, err
 	}

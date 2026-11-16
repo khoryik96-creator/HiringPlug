@@ -351,6 +351,7 @@ type Company struct {
 	AutofillNameGuessed bool
 	IndustryHint        *string
 	IndustryPickSince   *time.Time
+	SearchDoc           interface{}
 }
 
 type CompanyBenefit struct {
@@ -436,6 +437,7 @@ type Contact struct {
 	NameText          *string
 	PhoneDigits       *string
 	Role              *string
+	SearchDoc         interface{}
 }
 
 type ContactEmploymentCheck struct {

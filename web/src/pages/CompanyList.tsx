@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
 import { CompanyForm } from "../components/CompanyForm";
 import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
+import { useDebounced } from "../components/useDebounced";
 import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { useRowPicking } from "../components/useRowPicking";
@@ -54,15 +55,16 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
       return next;
     });
   };
+  const typed = useDebounced(q, 350); // one search once typing pauses
   const list = useInfiniteQuery({
-    queryKey: [...companiesKey, q, type, category, folder],
+    queryKey: [...companiesKey, typed, type, category, folder],
     enabled: folders.ready,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const query: { q?: string; boolean?: string; type?: Schemas["CompanyType"]; category?: string; folder?: string; limit: number; cursor?: string } = { limit: 100 };
       if (pageParam) query.cursor = pageParam;
       if (folder) query.folder = folder;
-      if (q.trim()) query[looksBoolean(q) ? "boolean" : "q"] = q.trim(); // AND, OR, NOT…: a boolean search
+      if (typed.trim()) query[looksBoolean(typed) ? "boolean" : "q"] = typed.trim(); // AND, OR, NOT…: a boolean search
       if (type) query.type = type;
       if (category) query.category = category;
       return unwrap(await api.GET("/v1/companies", { params: { query } }));

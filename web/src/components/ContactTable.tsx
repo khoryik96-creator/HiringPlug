@@ -50,13 +50,15 @@ const CELLS = {
 type Cell = keyof typeof CELLS;
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
-export function ContactTable({ contacts, showCompany = false, empty, picked, onPick, dragName, inFolders }: {
+export function ContactTable({ contacts, showCompany = false, empty, picked, onPick, onClearPicked, dragName, inFolders }: {
   contacts: ContactSummary[];
   showCompany?: boolean;
   empty: string;
   /** Chosen, to email each separately (with onPick, clicking a row chooses it). */
   picked?: Set<string>;
   onPick?: (contacts: ContactSummary[], on: boolean) => void;
+  /** Unchooses every contact chosen (Esc), also those not shown now. */
+  onClearPicked?: () => void;
   /** Lets a contact's name be dragged onto a folder. */
   dragName?: (id: string) => React.HTMLAttributes<HTMLElement> | undefined;
   /** With it, an "In folders" column. */
@@ -65,7 +67,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   const picking = useRowPicking({
     ids: contacts.map((c) => c.id), chosen: picked ?? new Set<string>(), enabled: !!onPick,
     set: (ids, on) => { onPick?.(contacts.filter((c) => ids.includes(c.id)), on); },
-    clear: () => { onPick?.(contacts.filter((c) => picked?.has(c.id)), false); },
+    clear: () => { if (onClearPicked) onClearPicked(); else onPick?.(contacts.filter((c) => picked?.has(c.id)), false); },
   });
   const fs = useFieldSettings();
   const table = showCompany ? "contacts" : "company-contacts";

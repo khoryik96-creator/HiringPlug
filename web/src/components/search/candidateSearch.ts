@@ -161,10 +161,19 @@ export function snippetParts(snippet: string): { text: string; match: boolean }[
     .map((p) => (p.startsWith("[[") && p.endsWith("]]") ? { text: p.slice(2, -2), match: true } : { text: p, match: false }));
 }
 
+/**
+ * How a boolean is split, as the server reads it (backend boolsearch):
+ * spaces, "phrases" (straight or curly quotes), brackets, words, and any
+ * stray character on its own (so nothing typed is lost).
+ */
+export const BOOL_TOKEN = /(\s+)|(["“][^"”]*["”]?)|([()])|([^\s()"“”]+)|([\s\S])/g;
+/** The operators (in capitals for the list search boxes; any case in Filters). */
+export const BOOL_OPERATOR = /^(AND|OR|NOT|NEAR(\/\d+)?|W\/\d+|&&?|\|\|?|!)$/i;
+
 /** A boolean as coloured tokens, as it will be read: operators, phrases, words left out. */
 export function booleanTokens(input: string): { text: string; kind: "op" | "not" | "phrase" | "group" | "word" | "space" }[] {
   const out: { text: string; kind: "op" | "not" | "phrase" | "group" | "word" | "space" }[] = [];
-  const re = /(\s+)|("[^"]*"?)|([()])|([^\s()"]+)/g;
+  const re = new RegExp(BOOL_TOKEN.source, "g");
   let m: RegExpExecArray | null;
   let negate = false;
   while ((m = re.exec(input)) !== null) {
@@ -172,9 +181,9 @@ export function booleanTokens(input: string): { text: string; kind: "op" | "not"
     if (space) { out.push({ text: tok, kind: "space" }); continue; }
     if (group) { out.push({ text: tok, kind: "group" }); negate = false; continue; }
     const upper = tok.toUpperCase();
-    if (upper === "AND" || upper === "OR" || /^(NEAR(\/\d+)?|W\/\d+|&&?|\|\|?)$/.test(upper)) { out.push({ text: tok, kind: "op" }); continue; }
-    if (upper === "NOT") { out.push({ text: tok, kind: "not" }); negate = true; continue; }
-    if (tok.startsWith("-") && tok.length > 1) { out.push({ text: tok, kind: "not" }); continue; }
+    if (upper === "NOT" || upper === "!") { out.push({ text: tok, kind: "not" }); negate = true; continue; }
+    if (BOOL_OPERATOR.test(upper)) { out.push({ text: tok, kind: "op" }); continue; }
+    if (/^[-!]\S/.test(tok)) { out.push({ text: tok, kind: "not" }); continue; }
     out.push({ text: tok, kind: negate ? "not" : phrase ? "phrase" : "word" });
     negate = false;
   }

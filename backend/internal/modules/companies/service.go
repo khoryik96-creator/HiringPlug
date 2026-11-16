@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/boolsearch"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
@@ -230,7 +231,7 @@ type Page struct {
 // List returns up to limit companies, optionally matching query and type, or
 // only those in a folder, starting after cursor (the last ID of the previous page).
 func (s *Service) List(ctx context.Context, p authz.Principal, query, boolean, companyType, category, linkedinCompany, folder, cursor *string, limit int) (Page, error) {
-	tsquery, err := booleanQuery(boolean)
+	tsquery, err := boolsearch.TSQueryOf("boolean", boolean)
 	if err != nil {
 		return Page{}, err
 	}

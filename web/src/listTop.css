@@ -8,6 +8,9 @@
 .list-top .bool-field input { border: 0; outline: none; width: 100%; padding: 0.45rem 0.2rem; background: transparent; box-shadow: none; font-size: 0.95rem; }
 .list-top-end { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .drop-hint { font-size: 0.82rem; color: var(--muted); }
+.drop-hint-label { cursor: pointer; font-weight: 400; }
+.drop-hint-label:hover { color: var(--accent-dark, #5b3fd0); }
+.drop-hint input:focus-visible + *, .drop-hint:focus-within .drop-hint-label { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
 /* Boolean rules in blue, drawn under the (transparent) typed text. */
 .bool-field { position: relative; flex: 1; min-width: 0; display: flex; }

@@ -83,9 +83,9 @@ func Highlights(marked string) ([]api.DocumentHighlightPart, int) {
 
 // HighlightDocument handles GET /v1/documents/{documentId}/highlights.
 func (h *HTTP) HighlightDocument(ctx context.Context, req api.HighlightDocumentRequestObject) (api.HighlightDocumentResponseObject, error) {
-	q, err := boolsearch.Parse(req.Params.Boolean)
+	q, err := boolsearch.ParseField("boolean", req.Params.Boolean)
 	if err != nil {
-		return nil, apperr.Validation(apperr.FieldErrors{{Field: "boolean", Message: err.Error()}})
+		return nil, err
 	}
 	var marked string
 	err = database.InTx(ctx, h.svc.pool, authz.MustFromContext(ctx), func(tx pgx.Tx) error {

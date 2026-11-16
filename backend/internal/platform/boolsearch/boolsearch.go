@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
 
 // Limits on a query (the contract allows 1000 characters).
@@ -87,6 +89,30 @@ func Parse(input string) (Query, error) {
 		}
 	})
 	return q, nil
+}
+
+// ParseField reads the boolean search sent in an API field: what is wrong
+// with a mistyped one is that field's validation error.
+func ParseField(field, input string) (Query, error) {
+	q, err := Parse(input)
+	if err != nil {
+		return Query{}, apperr.Validation(apperr.FieldErrors{{Field: field, Message: err.Error()}})
+	}
+	return q, nil
+}
+
+// TSQueryOf is the to_tsquery text of an optional boolean search sent in a
+// field (nil when none is).
+func TSQueryOf(field string, input *string) (*string, error) {
+	if input == nil {
+		return nil, nil
+	}
+	q, err := ParseField(field, *input)
+	if err != nil {
+		return nil, err
+	}
+	ts := q.TSQuery()
+	return &ts, nil
 }
 
 // TSQuery is the query for to_tsquery('english', ...).
@@ -169,6 +195,9 @@ func nearWord(raw string) (int, error) {
 			return 0, fmt.Errorf("has %s: NEAR goes up to %d words", raw, MaxNear)
 		}
 	}
+	if n == "" && strings.HasPrefix(up, "W/") {
+		return 0, nil // "manager w/ SAP": w/ for "with", an ordinary word
+	}
 	if n == "" || d == 0 {
 		return 0, fmt.Errorf("has %s: write NEAR/1 to NEAR/%d", raw, MaxNear)
 	}
@@ -201,8 +230,8 @@ func lex(s string) ([]token, error) {
 				out = append(out, token{kind: tokPhrase, text: strings.Join(words, " ")})
 			}
 			i = j + 1
-		case r == '-' && (i == 0 || unicode.IsSpace(rs[i-1]) || rs[i-1] == '(') && i+1 < len(rs) && !unicode.IsSpace(rs[i+1]):
-			out = append(out, token{kind: tokNot, text: "-"}) // -internship
+		case (r == '-' || r == '!') && (i == 0 || unicode.IsSpace(rs[i-1]) || rs[i-1] == '(') && i+1 < len(rs) && !unicode.IsSpace(rs[i+1]):
+			out = append(out, token{kind: tokNot, text: string(r)}) // -internship, !internship
 			i++
 		case r == '+' && (i == 0 || unicode.IsSpace(rs[i-1]) || rs[i-1] == '('):
 			i++ // +word: the word must appear, as any word does
