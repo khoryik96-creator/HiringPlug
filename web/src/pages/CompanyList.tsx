@@ -7,7 +7,7 @@ import { CompanyForm } from "../components/CompanyForm";
 import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
 import { BooleanSearchBox, ListSearchError, looksBoolean } from "../components/search/BooleanSearchBox";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
-import { pickRowProps } from "../components/pickRow";
+import { useRowPicking } from "../components/useRowPicking";
 import { PickBar } from "../components/SeparateEmail";
 import { useFieldSettings } from "../components/useFieldSettings";
 import { COMPANY_TYPE, keysOf } from "../labels";
@@ -70,6 +70,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
     getNextPageParam: (last) => last.nextCursor,
   });
   const items = list.data?.pages.flatMap((page) => page.items);
+  const picking = useRowPicking({ ids: items?.map((c) => c.id) ?? [], chosen, set: choose, clear: () => { setChosen(new Set()); }, enabled: canFolders });
   const inFolders = useInFolders(folders, items?.map((c) => c.id) ?? []);
   // After the name, the columns are in the order the person dragged them into.
   const columns = useStoredOrder("companies", Object.keys(CELLS) as (keyof typeof CELLS)[]);
@@ -119,7 +120,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
         </div>
       )}
       <PinnedScroll>
-      <table ref={tableRef} className={[canFolders ? "pick-table" : "", widths.set ? "sized" : ""].filter(Boolean).join(" ") || undefined} style={widths.tableStyle}>
+      <table ref={tableRef} {...picking.tableProps} className={[canFolders ? "pick-table" : "", widths.set ? "sized" : ""].filter(Boolean).join(" ") || undefined} style={widths.tableStyle}>
         <thead>
           <tr>
             <th {...widths.head("name", "Name")}>Name{widths.handle("name", "Name")}</th>
@@ -132,7 +133,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
         </thead>
         <tbody>
           {items?.map((c) => (
-            <tr key={c.id} {...(canFolders ? pickRowProps(chosen.has(c.id), () => { choose([c.id], !chosen.has(c.id)); }) : {})}>
+            <tr key={c.id} {...picking.rowProps(c.id)}>
               <td {...folders.drag(c.id, chosen)}>
                 <a href={`#/companies/${c.id}`}>{c.name}</a>
                 {chosen.has(c.id) && <span className="visually-hidden"> (chosen)</span>}

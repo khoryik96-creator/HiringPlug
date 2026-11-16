@@ -95,6 +95,10 @@ Companies: type and category; Contacts: role and status), the folder tabs
 with the view tools at their end (Candidates: columns, table or full
 resume), a count line with "Click a row to choose it", and once rows are
 chosen a dark bar: Email each separately, Add to folder, Select all, Clear.
+Rows are chosen as in a file list: click (or Ctrl/⌘+click) one, Shift+click
+for every row from the last one clicked, Ctrl/⌘+A for all shown, Esc for
+none, ↑/↓ to move between rows (Shift+↑/↓ chooses while moving), Space to
+choose the row you are on.
 CVs dropped anywhere on the Candidates page are imported (or "choose
 files"). Typing boolean rules in the search bar (`AND`, `OR`, `NOT`,
 `NEAR/n`, brackets, quotes, `word*`, `-word`; the operators in capitals, so

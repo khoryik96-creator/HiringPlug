@@ -15,7 +15,7 @@ import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
 import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
-import { pickRowProps } from "../components/pickRow";
+import { useRowPicking } from "../components/useRowPicking";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
@@ -99,11 +99,15 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
   const moveColumn = useColumnMove(tableRef, cols.columns, (next) => { cols.save.mutate(next); });
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
   // With email, clicking a row chooses the candidate (the name still opens them).
+  // Shift+click, Ctrl/⌘+click, Ctrl/⌘+A, Esc, ↑↓ (components/useRowPicking.ts).
+  const picking = useRowPicking({
+    ids: hits.map((h) => h.candidate.id), chosen: pick.ids, enabled: canPick, clear: pick.clear,
+    set: (ids, on) => { pick.pick(hits.filter((h) => ids.includes(h.candidate.id)).map((h) => personOf(h.candidate)), on); },
+  });
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
     if (!canPick) return { className: snippet ? "has-snippet" : undefined };
-    const chosen = pick.ids.has(c.id);
-    const row = pickRowProps(chosen, () => { pick.pick([personOf(c)], !chosen); });
-    return { ...row, className: `${row.className}${snippet ? " has-snippet" : ""}` };
+    const row = picking.rowProps(c.id);
+    return { ...row, className: `${row.className ?? ""}${snippet ? " has-snippet" : ""}` };
   };
 
   const more = shownList.hasNextPage && (
@@ -177,7 +181,7 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>
       )}
       {openAs === "profile" && <PinnedScroll>
-        <table ref={tableRef} className={`candidates-table${canPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
+        <table ref={tableRef} {...picking.tableProps} className={`candidates-table${canPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
           <thead>
             <tr>
               <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />

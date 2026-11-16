@@ -1,6 +1,7 @@
 // One email to several candidates or contacts, each their own copy: to them
 // alone, fields such as [First name] filled from them, kept on their emails.
 // A check says who gets it and who does not (and why) before sending.
+import { PICK_SHORTCUTS } from "./useRowPicking";
 import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -174,7 +175,7 @@ export function PickBar({ count, shown, onEmail, onClear, children }: {
   if (count === 0) return null;
   return (
     <div className="pick-bar dark" role="status">
-      <strong>{count} chosen</strong>
+      <strong title={PICK_SHORTCUTS}>{count} chosen</strong>
       {onEmail && <button type="button" disabled={count > 50} onClick={onEmail}>✉ Email each separately</button>}
       {children}
       {onEmail && count > 50 && <span className="pick-warning small">At most 50 at a time to email.</span>}

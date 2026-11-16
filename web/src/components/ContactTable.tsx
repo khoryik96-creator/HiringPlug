@@ -8,7 +8,7 @@ import { roleColor, roleLabel } from "./contactRole";
 import { EmailCheckBadge } from "./EmailCheckBadge";
 import { InFolders } from "./folders/FolderView";
 import { MailboxBadge } from "./MailboxBadge";
-import { pickRowProps } from "./pickRow";
+import { useRowPicking } from "./useRowPicking";
 import { PinnedScroll } from "./StickyScrollbar";
 import { useColumnMove, useStoredOrder } from "./useColumnMove";
 import { useColumnWidths } from "./useColumnWidths";
@@ -62,6 +62,11 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   /** With it, an "In folders" column. */
   inFolders?: (id: string) => string[];
 }) {
+  const picking = useRowPicking({
+    ids: contacts.map((c) => c.id), chosen: picked ?? new Set<string>(), enabled: !!onPick,
+    set: (ids, on) => { onPick?.(contacts.filter((c) => ids.includes(c.id)), on); },
+    clear: () => { onPick?.(contacts.filter((c) => picked?.has(c.id)), false); },
+  });
   const fs = useFieldSettings();
   const table = showCompany ? "contacts" : "company-contacts";
   // After the name, the columns are in the order the person dragged them into.
@@ -78,7 +83,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
       </div>
     )}
     <PinnedScroll>
-    <table ref={tableRef} className={`contacts-table${onPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
+    <table ref={tableRef} {...picking.tableProps} className={`contacts-table${onPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
       <thead>
         <tr>
           <th {...widths.head("name", "Name")}>Name{widths.handle("name", "Name")}</th>
@@ -88,7 +93,7 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
       </thead>
       <tbody>
         {contacts.map((c) => {
-          const pickProps = onPick ? pickRowProps(picked?.has(c.id) ?? false, () => { onPick([c], !(picked?.has(c.id) ?? false)); }) : undefined;
+          const pickProps = onPick ? picking.rowProps(c.id) : undefined;
           const bounces = c.mailboxStatus === "invalid";
           return (
           <tr key={c.id} {...pickProps} className={[pickProps?.className, bounces ? "bounces" : ""].filter(Boolean).join(" ") || undefined}>
