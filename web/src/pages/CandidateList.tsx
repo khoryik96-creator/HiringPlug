@@ -1,12 +1,10 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Fragment, useCallback, useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
-import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
 import { CvImports } from "../components/CvImports";
 import { CV_TYPES, DropZone } from "../components/DropZone";
-import { DuplicateEmail } from "../components/DuplicateEmail";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Chips } from "../components/LabelInput";
@@ -15,17 +13,18 @@ import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
-import { COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
+import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
 import { usePicked } from "../components/usePicked";
+import { type ColumnMove, useColumnMove } from "../components/useColumnMove";
 import { type ColumnWidths, useColumnWidths } from "../components/useColumnWidths";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, meId = "" }: {
-  canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean;
+export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, meId = "" }: {
+  canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean;
   /** May add candidates from CVs (the drop box). */
   canImport?: boolean;
   meId?: string;
@@ -34,7 +33,6 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
-  const [adding, setAdding] = useState(false);
   const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page's box
   const cols = useCandidateColumns();
   const pick = usePicked();
@@ -90,6 +88,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
   const width = cols.columns.length + (folders.hasFolders ? 2 : 1);
   const tableRef = useRef<HTMLTableElement>(null);
   const widths = useColumnWidths("candidates", ["name", ...cols.columns, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
+  // The columns after the name move by dragging their headings; the order is kept with the choice of columns.
+  const moveColumn = useColumnMove(tableRef, cols.columns, (next) => { cols.save.mutate(next); });
   const allShown = hits.length > 0 && hits.every((h) => pick.ids.has(h.candidate.id));
   // With email, clicking a row chooses the candidate (the name still opens them).
   const rowProps = (c: (typeof hits)[number]["candidate"], snippet: unknown) => {
@@ -112,10 +112,8 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             <DropZone accept={CV_TYPES} multiple compact label="Drop CVs here to add candidates"
               onFiles={(files) => { setDropped({ files, at: Date.now() }); }} />
           )}
-          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
         </div>
       </div>
-      {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
       {canImport && dropped && (
         <div className="dropped-cvs">
           <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} initialSource="" />
@@ -180,7 +178,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
           <thead>
             <tr>
               <SortHeader column="name" label="Name" sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />
-              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} />)}
+              {cols.columns.map((col) => <SortHeader key={col} column={col} label={COLUMNS[col].header} sort={sortBy} onSort={sortList} canSeeSalary={canSeeSalary} widths={widths} move={moveColumn} />)}
               {folders.hasFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
             </tr>
           </thead>
@@ -220,63 +218,6 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
 
 type Hit = Schemas["CandidateSearchHit"];
 
-function AddCandidate({ onCancel }: { onCancel: () => void }) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
-  const [extras, setExtras] = useState<Record<string, string>>({});
-  const create = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.POST("/v1/candidates", {
-          body: {
-            firstName: form.firstName,
-            lastName: form.lastName,
-            email: form.email || null,
-            phone: form.phone || null,
-            ...extrasBody(extras),
-          },
-        }),
-      ),
-    onSuccess: (c) => {
-      void queryClient.invalidateQueries({ queryKey: candidatesKey });
-      window.location.hash = `#/candidates/${c.id}`;
-    },
-  });
-  const field = (name: keyof typeof form, label: string, required = false) => (
-    <input
-      required={required}
-      aria-label={label}
-      placeholder={label}
-      value={form[name]}
-      onChange={(e) => { setForm({ ...form, [name]: e.target.value }); }}
-    />
-  );
-  return (
-    <form
-      className="panel add-candidate"
-      aria-label="Add a candidate"
-      onSubmit={(e) => {
-        e.preventDefault();
-        create.mutate();
-      }}
-    >
-      <h3>Add a candidate</h3>
-      <div className="add-fields">
-        {field("firstName", "First name", true)}
-        {field("lastName", "Last name")}
-        {field("email", "Email")}
-        {field("phone", "Phone")}
-        <CandidateExtras values={extras} onChange={setExtras} />
-      </div>
-      <div className="row">
-        <button type="submit" disabled={create.isPending}>Add candidate</button>
-        <button type="button" className="link" onClick={onCancel}>Cancel</button>
-      </div>
-      <ErrorMessage error={create.error}><DuplicateEmail error={create.error} /></ErrorMessage>
-    </form>
-  );
-}
-
 // The chosen order is kept on this device (a convenience only).
 const SORT_KEY = "hiringplug.candidates.sort";
 function readSort(): CandidateSort {
@@ -287,15 +228,18 @@ function keepSort(v: CandidateSort) {
 }
 
 /** A column header; for sortable columns, a button that sorts (and flips) the list, like a spreadsheet. */
-function SortHeader({ column, label, sort, onSort, canSeeSalary, widths }: {
+function SortHeader({ column, label, sort, onSort, canSeeSalary, widths, move }: {
   column: string; label: string; sort: CandidateSort; onSort: (s: CandidateSort) => void; canSeeSalary: boolean; widths: ColumnWidths;
+  /** Given, the heading can be dragged to move the column. */
+  move?: ColumnMove<Column>;
 }) {
   const sortable = SORTABLE[column];
   const edge = widths.handle(column, label);
-  if (!sortable || (sortable.salary && !canSeeSalary)) return <th {...widths.head(column, label)}>{label}{edge}</th>;
+  const moving = move?.props(column as Column); // only given for the chosen columns
+  if (!sortable || (sortable.salary && !canSeeSalary)) return <th {...widths.head(column, label)} {...moving}>{label}{edge}</th>;
   const way = sortOf(sort, column);
   return (
-    <th {...widths.head(column, label)} aria-sort={way ?? "none"}>
+    <th {...widths.head(column, label)} {...moving} aria-sort={way ?? "none"}>
       <button type="button" className={`sort-header${way ? " on" : ""}`} onClick={() => { onSort(flipSort(sort, column)); }}>
         {label}<span aria-hidden="true" className="sort-arrow">{way === "ascending" ? "▲" : way === "descending" ? "▼" : "↕"}</span>
       </button>

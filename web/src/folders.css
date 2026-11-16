@@ -92,3 +92,12 @@ table.sized th { box-sizing: border-box; }
 table.sized td { overflow: hidden; text-overflow: ellipsis; }
 table.sized th { overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
 .widths-reset { display: flex; justify-content: flex-end; margin: -0.3rem 0 0.3rem; }
+.widths-reset { gap: 1rem; }
+
+/* Columns moved by dragging their heading (components/useColumnMove.tsx). */
+th.movable { cursor: grab; user-select: none; }
+th.movable .sort-header { cursor: inherit; }
+th.movable.moving { opacity: 0.45; }
+th.movable.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
+th.movable.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
+body.moving-column, body.moving-column * { cursor: grabbing !important; user-select: none; }

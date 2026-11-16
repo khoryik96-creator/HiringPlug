@@ -43,6 +43,17 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(screen.getByText("Your role cannot add records.")).toBeTruthy();
   });
 
+  it("on the dashboard, puts the full-size drop box under the source", async () => {
+    reads([]);
+    renderWithClient(<CvImports foldedHistory />);
+    const panel = await screen.findByRole("region", { name: "CV import" });
+    const source = within(panel).getByLabelText("Preset the source").closest(".source-select");
+    const drop = panel.querySelector(".drop-zone");
+    expect(drop?.className, "not the small one-line box").not.toContain("compact");
+    expect(source?.parentElement?.className).toBe("import-line");
+    expect(drop?.previousElementSibling, "the line with the title and source comes first").toBe(source?.parentElement);
+  });
+
   it("starts an import with the chosen source and sends each file, saying which ones failed", async () => {
     reads([]);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(anImport([])));

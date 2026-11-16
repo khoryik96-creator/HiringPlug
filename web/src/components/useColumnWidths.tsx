@@ -103,7 +103,7 @@ export function useColumnWidths(table: string, columns: string[], ref: RefObject
         onClick={(e) => { e.stopPropagation(); }}
         onDoubleClick={(e) => { e.stopPropagation(); fit(column); }}
         onKeyDown={(e) => {
-          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          if ((e.key !== "ArrowLeft" && e.key !== "ArrowRight") || e.altKey || e.ctrlKey || e.metaKey) return; // Alt+Shift moves the column
           e.preventDefault();
           const th = e.currentTarget.parentElement;
           resize(column, (widths[column] ?? th?.getBoundingClientRect().width ?? 120) + (e.key === "ArrowRight" ? 16 : -16));

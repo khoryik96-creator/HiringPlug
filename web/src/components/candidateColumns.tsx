@@ -120,38 +120,22 @@ export function WaLegend() {
   );
 }
 
-/** Choose, order and reset the columns. */
+/** Choose and reset the columns (they are put in order by dragging their headings). */
 export function ColumnPicker({ columns, chosen, onSave }: { columns: Column[]; chosen: boolean; onSave: (c: Column[] | null) => void }) {
   // A pill beside the list's "Choose All | None" (search-reader.css).
   const [open, setOpen] = useState(false);
-  const move = (col: Column, by: number) => {
-    const next = columns.filter((c) => c !== col);
-    const at = columns.indexOf(col) + by;
-    if (at < 0 || at > next.length) return;
-    next.splice(at, 0, col);
-    onSave(next);
-  };
   const toggle = (col: Column, on: boolean) => { onSave(on ? [...columns, col] : columns.filter((c) => c !== col)); };
   return (
     <div className="column-picker">
       <button type="button" className="columns-pill" aria-expanded={open} onClick={() => { setOpen(!open); }}>Columns ▾</button>
       {open && (
         <div className="panel column-menu" role="group" aria-label="Columns">
-          <p className="small muted">Shown after the name, in this order</p>
-          {[...columns, ...ALL.filter((c) => !columns.includes(c))].map((col) => {
-            const on = columns.includes(col);
-            return (
-              <div key={col} className="column-choice">
-                <label><input type="checkbox" checked={on} onChange={(e) => { toggle(col, e.target.checked); }} /> {COLUMNS[col].header}</label>
-                {on && (
-                  <>
-                    <button type="button" className="tool" aria-label={`Move ${COLUMNS[col].header} up`} disabled={columns.indexOf(col) === 0} onClick={() => { move(col, -1); }}>↑</button>
-                    <button type="button" className="tool" aria-label={`Move ${COLUMNS[col].header} down`} disabled={columns.indexOf(col) === columns.length - 1} onClick={() => { move(col, 1); }}>↓</button>
-                  </>
-                )}
-              </div>
-            );
-          })}
+          <p className="small muted">Shown after the name. To change the order, drag a column&rsquo;s heading in the list.</p>
+          {[...columns, ...ALL.filter((c) => !columns.includes(c))].map((col) => (
+            <div key={col} className="column-choice">
+              <label><input type="checkbox" checked={columns.includes(col)} onChange={(e) => { toggle(col, e.target.checked); }} /> {COLUMNS[col].header}</label>
+            </div>
+          ))}
           <div className="row">
             <button type="button" className="link" disabled={!chosen} onClick={() => { onSave(null); }}>Back to the default</button>
             <button type="button" className="link" onClick={() => { setOpen(false); }}>Done</button>

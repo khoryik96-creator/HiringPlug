@@ -41,5 +41,8 @@ describe("dashboard", () => {
     expect(three.getAttribute("href")).toBe("#/jobs/jo_01jbz6w0m0k8q9x2r3s4t5v6w7?stage=screening");
     expect(screen.getByRole("link", { name: "1 in Submitted for Finance Manager" }).getAttribute("href")).toBe("#/jobs/jo_01jbz6w0m0k8q9x2r3s4t5v6w7?stage=submitted");
     expect(screen.getByRole("link", { name: /^Open jobs/ }).getAttribute("href")).toBe("#/jobs");
+    const company = screen.getByText("Maju");
+    expect(company.className, "the company sits on its own line under the job title").toContain("job-company");
+    expect(company.previousElementSibling?.textContent).toBe("Finance Manager");
   });
 });

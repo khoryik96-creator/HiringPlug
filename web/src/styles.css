@@ -464,9 +464,6 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .list-toolbar .column-picker > button { border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.85rem; }
 .list-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin: 0.25rem 0 0.5rem; }
 .list-meta .wa-legend { margin: 0; }
-.add-candidate { display: grid; gap: 0.75rem; margin-bottom: 0.9rem; }
-.add-candidate h3 { margin: 0; }
-.add-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.6rem; }
 .candidates-page .candidates-table td { vertical-align: middle; }
 .candidates-page .candidates-table .col-currentRole { min-width: 11rem; }
 .candidates-page .candidates-table .col-email { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1111,8 +1108,8 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .import-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
 .import-line h3 { margin: 0; }
 .import-line .source-select { margin: 0; }
-.import-line .drop-zone { flex: 1; min-width: 16rem; margin: 0; }
 .heat-table th:not(:first-child), .heat-table td:not(:first-child) { text-align: center; }
+.heat-table .job-company { display: block; font-size: 0.85rem; margin-top: 0.1rem; }
 .heat-table .last { text-align: right; white-space: nowrap; font-size: 0.82rem; color: var(--muted); }
 .heat-table .last.old { color: #b54708; font-weight: 600; }
 .heat { display: inline-grid; place-items: center; min-width: 30px; height: 26px; border-radius: 8px; font-weight: 700; font-size: 0.88rem; position: relative; font-variant-numeric: tabular-nums; }

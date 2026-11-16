@@ -93,7 +93,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
               const last = lastActivity(p?.lastMovedAt, now);
               return (
                 <tr key={j.jobId}>
-                  <td><a href={`#/jobs/${j.jobId}`}><strong>{j.title}</strong></a> <span className="muted">{j.companyName}</span></td>
+                  <td><a href={`#/jobs/${j.jobId}`}><strong>{j.title}</strong></a><span className="muted job-company">{j.companyName}</span></td>
                   {OPEN_STAGES.map((st) => (
                     <td key={st}>
                       <Heat n={j.stageCounts[st]} waiting={(p?.waitingCounts[st] ?? 0) > 0} href={`#/jobs/${j.jobId}?stage=${st}`}

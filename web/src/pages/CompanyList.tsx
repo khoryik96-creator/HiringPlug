@@ -13,11 +13,31 @@ import { useFieldSettings } from "../components/useFieldSettings";
 import { COMPANY_TYPE, keysOf } from "../labels";
 import { hashParam } from "../hashQuery";
 import { PinnedScroll } from "../components/StickyScrollbar";
+import { useColumnMove, useStoredOrder } from "../components/useColumnMove";
 import { useColumnWidths } from "../components/useColumnWidths";
 
 type TypeFilter = "" | Schemas["CompanyType"];
 
 /** Search, filter and add companies. */
+type Company = Schemas["CompanySummary"];
+type FieldSettings = ReturnType<typeof useFieldSettings>;
+
+/** The columns after the name, in the order they come: their heading and cell. */
+const CELLS = {
+  category: { label: "Category", cell: (c: Company, fs: FieldSettings) => (
+    <span className="category-chip" style={chipStyle(fs.color("company_category", c.category ?? UNKNOWN_CATEGORY))}>
+      {fs.label("company_category", c.category ?? UNKNOWN_CATEGORY)}
+    </span>
+  ) },
+  type: { label: "Type", cell: (c: Company) => COMPANY_TYPE[c.type] },
+  industry: { label: "Industry", cell: (c: Company) => c.industry },
+  city: { label: "City", cell: (c: Company) => c.city },
+  website: { label: "Website", cell: (c: Company) => c.website && <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\//, "")}</a> },
+  linkedin: { label: "LinkedIn", cell: (c: Company) => c.linkedinUrl && (
+    <a href={c.linkedinUrl} target="_blank" rel="noreferrer" aria-label={`${c.name} on LinkedIn`}>{c.linkedinUrl.replace(/^https:\/\/www\.linkedin\.com\/(company\/)?/, "")}</a>
+  ) },
+};
+
 export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canCreate: boolean; canFolders?: boolean; meId?: string }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [type, setType] = useState<TypeFilter>("");
@@ -51,12 +71,12 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
   });
   const items = list.data?.pages.flatMap((page) => page.items);
   const inFolders = useInFolders(folders, items?.map((c) => c.id) ?? []);
-  const heads: [string, string][] = [
-    ["name", "Name"], ["category", "Category"], ["type", "Type"], ["industry", "Industry"], ["city", "City"], ["website", "Website"], ["linkedin", "LinkedIn"],
-    ...(folders.hasFolders ? [["folders", "In folders"] as [string, string]] : []),
-  ];
+  // After the name, the columns are in the order the person dragged them into.
+  const columns = useStoredOrder("companies", Object.keys(CELLS) as (keyof typeof CELLS)[]);
   const tableRef = useRef<HTMLTableElement>(null);
-  const widths = useColumnWidths("companies", heads.map(([k]) => k), tableRef);
+  const moveColumn = useColumnMove(tableRef, columns.order, columns.save);
+  const widths = useColumnWidths("companies", ["name", ...columns.order, ...(folders.hasFolders ? ["folders"] : [])], tableRef);
+
 
   return (
     <main className="list-page">
@@ -93,12 +113,22 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
           </PickBar>
         </div>
       )}
-      {widths.set && <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>}
+      {(widths.set || columns.changed) && (
+        <div className="widths-reset">
+          {columns.changed && <button type="button" className="link small" onClick={columns.reset}>Reset column order</button>}
+          {widths.set && <button type="button" className="link small" onClick={widths.reset}>Reset column widths</button>}
+        </div>
+      )}
       <PinnedScroll>
       <table ref={tableRef} className={[canFolders ? "pick-table" : "", widths.set ? "sized" : ""].filter(Boolean).join(" ") || undefined} style={widths.tableStyle}>
         <thead>
           <tr>
-            {heads.map(([k, label]) => <th key={k} {...widths.head(k, label)}>{label}{widths.handle(k, label)}</th>)}
+            <th {...widths.head("name", "Name")}>Name{widths.handle("name", "Name")}</th>
+            {columns.order.map((k) => {
+              const label = CELLS[k].label;
+              return <th key={k} {...widths.head(k, label)} {...moveColumn.props(k)}>{label}{widths.handle(k, label)}</th>;
+            })}
+            {folders.hasFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
           </tr>
         </thead>
         <tbody>
@@ -108,21 +138,12 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
                 <a href={`#/companies/${c.id}`}>{c.name}</a>
                 {chosen.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
               </td>
-              <td>
-                <span className="category-chip" style={chipStyle(fs.color("company_category", c.category ?? UNKNOWN_CATEGORY))}>
-                  {fs.label("company_category", c.category ?? UNKNOWN_CATEGORY)}
-                </span>
-              </td>
-              <td>{COMPANY_TYPE[c.type]}</td>
-              <td>{c.industry}</td>
-              <td>{c.city}</td>
-              <td>{c.website && <a href={c.website} target="_blank" rel="noreferrer">{c.website.replace(/^https?:\/\//, "")}</a>}</td>
-              <td>{c.linkedinUrl && <a href={c.linkedinUrl} target="_blank" rel="noreferrer" aria-label={`${c.name} on LinkedIn`}>{c.linkedinUrl.replace(/^https:\/\/www\.linkedin\.com\/(company\/)?/, "")}</a>}</td>
+              {columns.order.map((k) => <td key={k}>{CELLS[k].cell(c, fs)}</td>)}
               {folders.hasFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
             </tr>
           ))}
           {items?.length === 0 && (
-            <tr><td colSpan={folders.hasFolders ? 8 : 7} className="muted">
+            <tr><td colSpan={columns.order.length + (folders.hasFolders ? 2 : 1)} className="muted">
               {q || type || category ? "No companies match." : folder ? "Nothing in this folder yet: choose companies under All companies, then Add to folder (or drag them onto it)." : "No companies yet."}
             </td></tr>
           )}

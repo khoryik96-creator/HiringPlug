@@ -33,7 +33,7 @@ describe("candidate list", () => {
   it("chooses candidates by clicking their rows (one, or all shown) to email each separately", async () => {
     const wei = { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Wei Tan", email: "wei@example.com" };
     vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
-    renderWithClient(<CandidateList canCreate={false} canEmail />);
+    renderWithClient(<CandidateList canEmail />);
     expect(screen.queryByRole("checkbox", { name: /Choose/ })).toBeNull(); // no tick boxes
     const row = (await screen.findByText("Wei Tan")).closest("tr") as HTMLElement;
     fireEvent.click(row.querySelector("td:last-child") as Element);
@@ -69,7 +69,7 @@ describe("candidate list", () => {
 
   it("does not choose rows for those who may not send email", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     await screen.findByText("Siti Aisyah");
     expect(screen.queryByRole("group", { name: "Choose" })).toBeNull();
     fireEvent.click((screen.getByText("Siti Aisyah").closest("tr") as HTMLElement).querySelector("td:last-child") as Element);
@@ -78,7 +78,7 @@ describe("candidate list", () => {
 
   it("has AI search beside Advanced search, and Columns beside Choose", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate canAiSearch canEmail />);
+    renderWithClient(<CandidateList canAiSearch canEmail />);
     await screen.findByText("Siti Aisyah");
     const ai = screen.getByRole("link", { name: "✦ AI search" });
     expect(ai.closest(".list-toolbar")).toBe(screen.getByRole("button", { name: /Advanced search/ }).closest(".list-toolbar"));
@@ -88,9 +88,10 @@ describe("candidate list", () => {
 
   it("adds candidates from CVs dropped on the page", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate canImport />);
+    renderWithClient(<CandidateList canImport />);
     await screen.findByText("Siti Aisyah");
     expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add candidate/ }), "CVs are dropped instead").toBeNull();
     const cv = new File(["%PDF-1.7"], "nurul-cv.pdf", { type: "application/pdf" });
     fireEvent.drop(screen.getByText("Drop CVs here to add candidates").closest(".drop-zone") as Element, { dataTransfer: { files: [cv] } });
     const panel = await screen.findByRole("region", { name: "CV import" });
@@ -107,14 +108,14 @@ describe("candidate list", () => {
 
   it("has no CV drop box for those who may not import", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate />);
+    renderWithClient(<CandidateList />);
     await screen.findByText("Siti Aisyah");
     expect(screen.queryByText("Drop CVs here to add candidates")).toBeNull();
   });
 
   it("shows tags by the name", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     expect(await screen.findByText("Siti Aisyah")).toBeTruthy();
     expect(screen.getAllByText("relocate").some((el) => el.classList.contains("chip"))).toBe(true);
   });
@@ -125,7 +126,7 @@ describe("candidate list", () => {
       items: [{ candidate: { ...summary, fullName: "Aina" }, matchedIn: ["cv"], cvSnippet: "Led [[SAP]] [[BW]] upgrades" }],
       nextCursor: null, terms: ["sap", "bw"],
     }));
-    renderWithClient(<CandidateList canCreate canSeeSalary />);
+    renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
     fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
     fireEvent.change(screen.getByPlaceholderText(/SAP AND/), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
@@ -159,7 +160,7 @@ describe("candidate list", () => {
       }
       return (answer([summary]) as (p: string) => unknown)(path);
     }) as never);
-    renderWithClient(<CandidateList canCreate={false} canSeeSalary />);
+    renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
     // Click a header to sort by it, like a spreadsheet; click again to flip.
     fireEvent.click(screen.getByRole("button", { name: /^Expected salary/ }));
@@ -177,7 +178,7 @@ describe("candidate list", () => {
     cleanup();
 
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     await screen.findByText("Siti Aisyah");
     expect(screen.getByRole("button", { name: /^Name/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /^Expected salary/ })).toBeNull(); // no salary sorting without salary access
@@ -186,7 +187,7 @@ describe("candidate list", () => {
   it("narrows by industry, then subindustry, from two dropdowns", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary])); // the test catalogue: Financial Services > FSI – Banking, IT > ERP
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [], nextCursor: null, terms: [] }));
-    renderWithClient(<CandidateList canCreate canSeeSalary />);
+    renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
     fireEvent.click(screen.getByRole("button", { name: "Advanced search" }));
     fireEvent.click(await screen.findByRole("button", { name: /^Industry/ }));
@@ -209,7 +210,7 @@ describe("candidate list", () => {
       { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Ali", salaryRestricted: true },
     ];
     vi.spyOn(api, "GET").mockImplementation(answer(rows));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     const siti = (await screen.findByText("Siti Aisyah")).closest("tr");
     expect(siti?.textContent).toContain("Not looking");
     expect(siti?.textContent).toContain("· 5 days");
@@ -226,7 +227,7 @@ describe("candidate list", () => {
       { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w9", fullName: "Mei", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "permanent_resident" },
     ];
     vi.spyOn(api, "GET").mockImplementation(answer(rows));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     await screen.findByText("Mei");
     expect(screen.getByRole("img", { name: "Work authorization: Local" }).closest("tr")?.textContent).toContain("Siti Aisyah");
     expect(screen.getByRole("img", { name: "Work authorization: RP-T" }).closest("tr")?.textContent).toContain("Ali");
@@ -236,50 +237,9 @@ describe("candidate list", () => {
     expect(local.closest("td")?.textContent).toContain("Local"); // its name under theirs
   });
 
-  it("shows the columns the person chose, and saves a new choice for them", async () => {
-    const row = { ...summary, nationality: "SG", residenceCountry: "MY", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "spouse_visa" };
-    let saved = ["nationality", "residence", "workAuthorization"];
-    vi.spyOn(api, "GET").mockImplementation(answer([row], () => saved));
-    const put = vi.spyOn(api, "PUT").mockImplementation(((_: string, init: { body: { candidateColumns: string[] } }) => {
-      saved = init.body.candidateColumns;
-      return Promise.resolve(ok({ candidateColumns: saved }));
-    }) as never);
-    renderWithClient(<CandidateList canCreate={false} />);
-    await screen.findByRole("columnheader", { name: /^Nationality/ });
-    expect(screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""))).toEqual(["Name", "Nationality", "Residence", "Work authorization"]);
-    const siti = screen.getByText("Siti Aisyah").closest("tr");
-    expect(siti?.textContent).toContain("Singapore");
-    expect(siti?.textContent).toContain("Malaysia");
-    expect(siti?.textContent).toContain("Spouse visa");
-
-    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
-    fireEvent.click(screen.getByLabelText("Industry"));
-    await waitFor(() => {
-      expect(put).toHaveBeenCalledWith("/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] } });
-    });
-    expect(await screen.findByRole("columnheader", { name: /^Industry/ })).toBeTruthy();
-  });
-
-  it("saves quick changes of columns one after another, so the last one is kept", async () => {
-    vi.spyOn(api, "GET").mockImplementation(answer([summary], ["nationality"]));
-    const pending: ((v: unknown) => void)[] = [];
-    const put = vi.spyOn(api, "PUT").mockImplementation((() => new Promise((resolve) => { pending.push(resolve); })) as never);
-    renderWithClient(<CandidateList canCreate={false} />);
-    await screen.findByRole("columnheader", { name: /^Nationality/ });
-    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Residence" }));
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Industry" }));
-    expect(await screen.findByRole("columnheader", { name: /^Industry/ })).toBeTruthy(); // shown at once
-    await new Promise((r) => { setTimeout(r, 50); });
-    expect(put).toHaveBeenCalledTimes(1); // the second waits for the first
-    pending[0]?.(ok({ candidateColumns: ["nationality", "residence"] }));
-    await waitFor(() => { expect(put).toHaveBeenCalledTimes(2); });
-    expect(put.mock.calls[1]).toEqual(["/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "industry"] } }]);
-  });
-
   it("switches clicks between opening the profile and reading the full resume, and remembers it", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     const resume = await screen.findByRole("button", { name: "Full resume" });
     expect(screen.getByRole("button", { name: "Profile" }).getAttribute("aria-pressed")).toBe("true");
     await screen.findByRole("link", { name: "Siti Aisyah" }); // the usual table
@@ -288,7 +248,7 @@ describe("candidate list", () => {
     expect(screen.getByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
     expect(document.querySelector("table.candidates-table")).toBeNull();
     cleanup();
-    renderWithClient(<CandidateList canCreate={false} />); // later, on this computer
+    renderWithClient(<CandidateList />); // later, on this computer
     expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
     expect(screen.getByRole("link", { name: "Siti Aisyah" }).closest("table")).toBeTruthy();
@@ -299,7 +259,7 @@ describe("candidate list", () => {
     const wei = { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Wei Tan" };
     vi.spyOn(api, "GET").mockImplementation(answer([summary, wei]));
     localStorage.setItem("hiringplug.candidates.openAs", "resume");
-    renderWithClient(<CandidateList canCreate={false} />);
+    renderWithClient(<CandidateList />);
     fireEvent.click(await screen.findByRole("button", { name: /Wei Tan/ }));
     expect(screen.getByRole("region", { name: "Resume of Wei Tan" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Columns ▾" })).toBeNull();
@@ -309,7 +269,7 @@ describe("candidate list", () => {
 
   it("by default leaves out a Work authorization column: it shows in colour under each name", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
-    renderWithClient(<CandidateList canCreate={false} canSeeSalary />);
+    renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByRole("link", { name: "Siti Aisyah" });
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent.replace(/[↕▲▼]/g, ""));
     expect(headers).toEqual(["Name", "Current role", "Status", "Notice period", "Current salary", "Expected salary", "Email"]);

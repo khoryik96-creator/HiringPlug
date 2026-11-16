@@ -10,6 +10,7 @@ import { InFolders } from "./folders/FolderView";
 import { MailboxBadge } from "./MailboxBadge";
 import { pickRowProps } from "./pickRow";
 import { PinnedScroll } from "./StickyScrollbar";
+import { useColumnMove, useStoredOrder } from "./useColumnMove";
 import { useColumnWidths } from "./useColumnWidths";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -18,6 +19,35 @@ function LinkedinNote({ e }: { e: NonNullable<ContactSummary["linkedinEmployment
   const text = e.current === null ? "LinkedIn: unclear" : e.current ? `LinkedIn: since ${linkedinDates(e.joined)}` : `LinkedIn: left ${linkedinDates(e.left)}`;
   return <span className="muted small linkedin-note" title={`Checked ${formatWhen(e.checkedAt)}`}>{text} · {timeAgo(e.checkedAt)}</span>;
 }
+
+type FieldSettings = ReturnType<typeof useFieldSettings>;
+
+/** The columns after the name, in the order they come: their heading and cell. */
+const CELLS = {
+  role: { label: "Role", cell: (c: ContactSummary, fs: FieldSettings) => (
+    <span className="category-chip" style={chipStyle(roleColor(fs, c.role))}>{roleLabel(fs, c.role)}</span>
+  ) },
+  status: { label: "Status", cell: (c: ContactSummary) => (
+    <>
+      {c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}
+      {c.linkedinEmployment && <LinkedinNote e={c.linkedinEmployment} />}
+    </>
+  ) },
+  title: { label: "Job title", cell: (c: ContactSummary) => c.title },
+  company: { label: "Company", cell: (c: ContactSummary) => <a href={`#/companies/${c.companyId}`}>{c.companyName}</a> },
+  email: { label: "Email", cell: (c: ContactSummary) => (
+    <>
+      {c.email}{" "}
+      {/* A mailbox answer says more than the quick check of the address. */}
+      {c.mailboxStatus ? <MailboxBadge check={c.mailboxStatus} /> : <EmailCheckBadge check={c.emailCheckStatus} />}
+      {c.mailboxCheckedAt && c.mailboxStatus !== "checking" && (
+        <span className="muted small freshness" title={`Mail server asked ${formatWhen(c.mailboxCheckedAt)}`}> {timeAgo(c.mailboxCheckedAt)}</span>
+      )}
+    </>
+  ) },
+  phone: { label: "Phone", cell: (c: ContactSummary) => c.mobile ?? c.phone },
+};
+type Cell = keyof typeof CELLS;
 
 /** Contacts in a table, linking to each contact (and their company, if shown). */
 export function ContactTable({ contacts, showCompany = false, empty, picked, onPick, dragName, inFolders }: {
@@ -33,21 +63,27 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
   inFolders?: (id: string) => string[];
 }) {
   const fs = useFieldSettings();
-  const heads: [string, string][] = [
-    ["name", "Name"], ["role", "Role"], ["status", "Status"], ["title", "Job title"],
-    ...(showCompany ? [["company", "Company"] as [string, string]] : []), ["email", "Email"], ["phone", "Phone"],
-    ...(inFolders ? [["folders", "In folders"] as [string, string]] : []),
-  ];
+  const table = showCompany ? "contacts" : "company-contacts";
+  // After the name, the columns are in the order the person dragged them into.
+  const columns = useStoredOrder<Cell>(table, (Object.keys(CELLS) as Cell[]).filter((k) => showCompany || k !== "company"));
   const tableRef = useRef<HTMLTableElement>(null);
-  const widths = useColumnWidths(showCompany ? "contacts" : "company-contacts", heads.map(([k]) => k), tableRef);
+  const moveColumn = useColumnMove(tableRef, columns.order, columns.save);
+  const widths = useColumnWidths(table, ["name", ...columns.order, ...(inFolders ? ["folders"] : [])], tableRef);
   return (
     <>
-    {widths.set && <div className="widths-reset"><button type="button" className="link small" onClick={widths.reset}>Reset column widths</button></div>}
+    {(widths.set || columns.changed) && (
+      <div className="widths-reset">
+        {columns.changed && <button type="button" className="link small" onClick={columns.reset}>Reset column order</button>}
+        {widths.set && <button type="button" className="link small" onClick={widths.reset}>Reset column widths</button>}
+      </div>
+    )}
     <PinnedScroll>
     <table ref={tableRef} className={`contacts-table${onPick ? " pick-table" : ""}${widths.set ? " sized" : ""}`} style={widths.tableStyle}>
       <thead>
         <tr>
-          {heads.map(([k, label]) => <th key={k} {...widths.head(k, label)}>{label}{widths.handle(k, label)}</th>)}
+          <th {...widths.head("name", "Name")}>Name{widths.handle("name", "Name")}</th>
+          {columns.order.map((k) => <th key={k} {...widths.head(k, CELLS[k].label)} {...moveColumn.props(k)}>{CELLS[k].label}{widths.handle(k, CELLS[k].label)}</th>)}
+          {inFolders && <th {...widths.head("folders", "In folders")}>In folders{widths.handle("folders", "In folders")}</th>}
         </tr>
       </thead>
       <tbody>
@@ -60,30 +96,13 @@ export function ContactTable({ contacts, showCompany = false, empty, picked, onP
               <a href={`#/contacts/${c.id}`}>{c.fullName}</a>
               {onPick && picked?.has(c.id) && <span className="visually-hidden"> (chosen)</span>}
             </td>
-            <td>
-              <span className="category-chip" style={chipStyle(roleColor(fs, c.role))}>{roleLabel(fs, c.role)}</span>
-            </td>
-            <td>
-              {c.status === "left" ? <span className="status-chip left">Has left</span> : <span className="status-chip">Works there</span>}
-              {c.linkedinEmployment && <LinkedinNote e={c.linkedinEmployment} />}
-            </td>
-            <td>{c.title}</td>
-            {showCompany && <td><a href={`#/companies/${c.companyId}`}>{c.companyName}</a></td>}
-            <td>
-              {c.email}{" "}
-              {/* A mailbox answer says more than the quick check of the address. */}
-              {c.mailboxStatus ? <MailboxBadge check={c.mailboxStatus} /> : <EmailCheckBadge check={c.emailCheckStatus} />}
-              {c.mailboxCheckedAt && c.mailboxStatus !== "checking" && (
-                <span className="muted small freshness" title={`Mail server asked ${formatWhen(c.mailboxCheckedAt)}`}> {timeAgo(c.mailboxCheckedAt)}</span>
-              )}
-            </td>
-            <td>{c.mobile ?? c.phone}</td>
+            {columns.order.map((k) => <td key={k}>{CELLS[k].cell(c, fs)}</td>)}
             {inFolders && <td className="col-folders"><InFolders names={inFolders(c.id)} /></td>}
           </tr>
           );
         })}
         {contacts.length === 0 && (
-          <tr><td colSpan={(showCompany ? 7 : 6) + (inFolders ? 1 : 0)} className="muted">{empty}</td></tr>
+          <tr><td colSpan={columns.order.length + (inFolders ? 2 : 1)} className="muted">{empty}</td></tr>
         )}
       </tbody>
     </table>

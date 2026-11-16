@@ -125,14 +125,15 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
       <div className={foldedHistory ? "import-line" : undefined}>
       <h3>Import profiles {!foldedHistory && <span className="muted small">CVs and LinkedIn PDFs</span>}</h3>
       <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} />
-      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here" compact={foldedHistory}
+      </div>
+      {/* Under the source, roomy enough to aim at. */}
+      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
           setReview(null);
           setFiles((had) => [...had, ...dropped.filter((d) => !had.some((h) => h.name === d.name && h.size === d.size))]);
         }} />
-      </div>
       {files.length > 0 && (
         <ul className="drop-files" aria-label="Files to import">
           {files.map((f) => (

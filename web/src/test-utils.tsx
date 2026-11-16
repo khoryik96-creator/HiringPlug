@@ -2,6 +2,7 @@
 // the result shapes the API client (openapi-fetch) resolves to, for mocks.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
+import { vi } from "vitest";
 import type { ReactElement } from "react";
 
 import type { Candidate, ErrorBody, Me, Permission } from "./api/client";
@@ -101,4 +102,12 @@ export function testIndustryCatalogue() {
     { id: "industry_erp", parentId: "industry_it", label: "Tech – ERP/CRM/HCM/Application", aliases: ["SAP"], retired: false, candidateCount: 0, companyCount: 0 },
     { id: "industry_education", label: "Education", aliases: [], retired: false, candidateCount: 0, companyCount: 0 },
   ] };
+}
+
+/** jsdom lays nothing out: draws each table heading 100 pixels wide, in the order shown. */
+export function drawHeadings() {
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function rect(this: Element) {
+    const i = [...document.querySelectorAll("thead th")].indexOf(this);
+    return { left: i * 100, right: i * 100 + 100, width: 100, top: 0, bottom: 30, height: 30, x: i * 100, y: 0, toJSON: () => ({}) };
+  });
 }
