@@ -5,6 +5,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { summaryKey } from "../api/keys";
 import { CvImports } from "../components/CvImports";
 import { DashboardBlocks } from "../components/DashboardBlocks";
+import { Change, Heat, HeatLegend, lastActivity } from "../components/heat";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { MyInterviews } from "../components/Interviews";
 import { useJobProgress } from "../components/JobProgressTable";
@@ -17,31 +18,6 @@ import { OPEN_STAGES, STAGE } from "../labels";
 type Counts = Schemas["StageCounts"];
 
 const active = (c: Counts) => c.applied + c.screening + c.submitted + c.interview + c.offer;
-
-/** "▲ 3 this week", "▼ 5 vs last week": a change, coloured by direction. */
-function Change({ by, text }: { by: number; text: string }) {
-  if (by === 0) return <span className="change flat">{text.replace("{n}", "no change")}</span>;
-  return <span className={`change ${by > 0 ? "up" : "down"}`}>{by > 0 ? "▲" : "▼"} {text.replace("{n}", String(Math.abs(by)))}</span>;
-}
-
-/**
- * Heat: stronger purple for more people; an amber ring when someone there
- * waits over 7 days. A number opens the job's board at that stage.
- */
-function Heat({ n, waiting, href, label }: { n: number; waiting: boolean; href: string; label: string }) {
-  if (n === 0) return <span className="heat h0" aria-label="none">·</span>;
-  const level = n >= 4 ? "h3" : n >= 2 ? "h2" : "h1";
-  return (
-    <a href={href} className={`heat ${level}${waiting ? " stall" : ""}`} aria-label={label}
-      title={waiting ? "Someone here has waited over 7 days · open the job" : "Open the job"}>{n}</a>
-  );
-}
-
-function lastActivity(iso: string | null | undefined, now: number): { text: string; old: boolean } {
-  if (!iso) return { text: "no candidates", old: true };
-  const days = Math.floor((now - Date.parse(iso)) / 86_400_000);
-  return { text: days < 1 ? "today" : days === 1 ? "yesterday" : `${String(days)} days ago`, old: days >= 7 };
-}
 
 /** The home page: search, what needs you today, importing CVs, open jobs and their pipelines. */
 export function Dashboard({ permissions }: { permissions: Permission[] }) {
@@ -113,10 +89,7 @@ export function Dashboard({ permissions }: { permissions: Permission[] }) {
           </tbody>
         </table>
         </div>
-        <p className="heat-legend muted small">
-          <span><i className="heat-key h1" />1</span><span><i className="heat-key h2" />2–3</span><span><i className="heat-key h3" />4+</span>
-          <span><i className="heat-key ring" />someone waiting over 7 days</span>
-        </p>
+        <HeatLegend />
       </section>
         ) },
       ]} />

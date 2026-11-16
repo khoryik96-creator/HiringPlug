@@ -5,14 +5,43 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { jobsKey } from "../api/keys";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { JobForm } from "../components/JobForm";
+import { Change } from "../components/heat";
 import { attention, JobProgressTable, useJobProgress } from "../components/JobProgressTable";
-import { JOB_STATUS, keysOf } from "../labels";
+import { JOB_STATUS, keysOf, OPEN_STAGES } from "../labels";
 import { hashParam } from "../hashQuery";
 
 type StatusFilter = "" | Schemas["JobStatus"];
 type View = "all" | "mine" | "attention";
 
-/** Search, filter and add jobs. Shows open jobs first by default. */
+type Progress = Schemas["JobProgress"];
+const DAY = 86_400_000;
+
+/** The numbers over the jobs shown: like the dashboard's, for these jobs only. */
+function JobNumbers({ jobs, progress }: { jobs: Schemas["JobOrderSummary"][]; progress: Map<string, Progress> }) {
+  const [now] = useState(() => Date.now());
+  const open = jobs.filter((j) => j.status === "open");
+  const ps = jobs.map((j) => progress.get(j.id)).filter((p): p is Progress => !!p);
+  const add = (f: (p: Progress) => number) => ps.reduce((n, p) => n + f(p), 0);
+  const inPlay = add((p) => OPEN_STAGES.filter((s) => s !== "placed").reduce((n, s) => n + p.stageCounts[s], 0));
+  const waiting = add((p) => p.waiting);
+  const offers = add((p) => p.stageCounts.offer);
+  const placed = add((p) => p.stageCounts.placed);
+  const newThisWeek = open.filter((j) => now - Date.parse(j.createdAt) < 7 * DAY).length;
+  const avgOpen = open.length ? Math.round(open.reduce((n, j) => n + (now - Date.parse(j.createdAt)) / DAY, 0) / open.length) : 0;
+  return (
+    <div className="kpis five" role="group" aria-label="Job numbers">
+      <div className="kpi"><span className="kpi-label">Open jobs</span><strong>{open.length}</strong><Change by={newThisWeek} text="{n} new this week" /></div>
+      <div className="kpi"><span className="kpi-label">Candidates in play</span><strong>{inPlay}</strong><span className="kpi-note">applied to offer</span></div>
+      <div className="kpi"><span className="kpi-label">Waiting over 7 days</span><strong>{waiting}</strong>
+        <span className={waiting > 0 ? "kpi-note warn" : "kpi-note"}>{waiting > 0 ? "look at these first" : "nobody waiting"}</span></div>
+      <div className="kpi"><span className="kpi-label">Offers out</span><strong>{offers}</strong><span className="kpi-note">{placed} placed</span></div>
+      <div className="kpi"><span className="kpi-label">Average time open</span><strong>{avgOpen === 1 ? "1 day" : `${String(avgOpen)} days`}</strong>
+        <span className="kpi-note">of the open jobs</span></div>
+    </div>
+  );
+}
+
+/** Search, filter and add jobs. Shows open jobs first by default, with their numbers on top. */
 export function JobList({ canCreate }: { canCreate: boolean }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [status, setStatus] = useState<StatusFilter>(() => (hashParam("q") ? "" : "open")); // a search looks at every job
@@ -57,6 +86,7 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
         ))}
       </div>
       <ErrorMessage error={list.error} />
+      {list.data && progress.data && <JobNumbers jobs={jobs} progress={progress.data} />}
       {list.data && (
         <JobProgressTable jobs={shown} progress={progress.data}
           empty={view === "attention" ? "Nothing needs attention." : q || status || mine ? "No jobs match." : "No jobs yet."} />
