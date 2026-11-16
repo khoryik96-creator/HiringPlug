@@ -13,7 +13,7 @@ import { AdvancedSearch } from "../components/search/AdvancedSearch";
 import { OpenAsSwitch, useOpenAs } from "../components/search/OpenAs";
 import { ResumeReader } from "../components/search/ResumeReader";
 import { activeChips, type CandidateSort, EMPTY, isEmpty, loadSearch, nextPage, type PageAt, saveSearch, type SearchState, snippetParts, flipSort, SORTABLE, sortOf, toBody } from "../components/search/candidateSearch";
-import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaLegend, WaName } from "../components/candidateColumns";
+import { type Column, COLUMNS, ColumnPicker, useCandidateColumns, WaName } from "../components/candidateColumns";
 import { pickRowProps } from "../components/pickRow";
 import { PickBar, SeparateEmail } from "../components/SeparateEmail";
 import { PinnedScroll } from "../components/StickyScrollbar";
@@ -160,7 +160,6 @@ export function CandidateList({ canSeeSalary = false, canAiSearch = false, canEm
         )}
         {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
         <span className="list-meta-end">
-          {openAs === "profile" && <WaLegend />}
           <OpenAsSwitch value={openAs} onChange={setOpenAs} />
         </span>
       </div>

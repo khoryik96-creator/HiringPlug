@@ -6,7 +6,7 @@ import { candidateKey, candidatesKey } from "../api/keys";
 export function useCandidateUpdate(candidate: Candidate) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (change: Pick<Schemas["CandidateUpdate"], "availability" | "workAuthorization">) =>
+    mutationFn: async (change: Pick<Schemas["CandidateUpdate"], "availability" | "workAuthorization" | "specialization" | "skills" | "certifications" | "industrySelections" | "industry">) =>
       unwrap(await api.PATCH("/v1/candidates/{candidateId}", { params: { path: { candidateId: candidate.id } }, body: { version: candidate.version, ...change } })),
     onSuccess: (updated) => {
       client.setQueryData(candidateKey(candidate.id), updated);

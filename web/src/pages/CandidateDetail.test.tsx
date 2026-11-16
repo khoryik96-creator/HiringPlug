@@ -49,7 +49,7 @@ describe("candidate page", () => {
   it("lists industries and tags in one column, under the specialization", async () => {
     await show(testCandidate(), ["candidates:read"]);
     const profile = screen.getByRole("region", { name: "Profile" });
-    expect([...profile.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Work authorization", "Specialization", "Industries", "Tags", "Certifications"]);
+    expect([...profile.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Work authorization", "Specialization", "Industries", "IT skills", "Certifications", "Tags"]);
     expect(profile.className, "one column on the candidate's page only (companies and contacts keep theirs)").toContain("one-column");
   });
   it("opens the CV workspace for a search highlight link", async () => {

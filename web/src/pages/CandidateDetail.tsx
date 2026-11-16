@@ -16,7 +16,7 @@ import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
 import { ErrorMessage } from "../components/ErrorMessage";
-import { IndustrySummary } from "../components/IndustryPicker";
+import { QuickIndustries, QuickSpecialization, QuickWords } from "../components/ProfileQuickEdit";
 import { History } from "../components/History";
 import { Owner } from "../components/Owner";
 import { Timeline } from "../components/Timeline";
@@ -49,6 +49,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
     );
   }
 
+  const canUpdate = permissions.includes("candidates:update");
   const sections: CandidateSection[] = [
     { id: "details", label: "Details", content: <>
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
@@ -59,14 +60,15 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           {/* Email, phone and LinkedIn are in the Contact box beside the tabs. */}
           <dl>
             <dt>Work authorization</dt>
-            <dd><WorkAuthorizationPicker candidate={c} canEdit={permissions.includes("candidates:update")} /></dd>
+            <dd><WorkAuthorizationPicker candidate={c} canEdit={canUpdate} /></dd>
             {/* One column: industries and tags under the specialization. */}
-            <dt>Specialization</dt><dd>{c.specialization ?? "—"}</dd>
-            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
+            {/* Changed right here, saved at once (no Edit profile). */}
+            <dt>Specialization</dt><dd><QuickSpecialization candidate={c} canEdit={canUpdate} /></dd>
+            <dt>Industries</dt><dd><QuickIndustries candidate={c} canEdit={canUpdate} /></dd>
+            <dt>IT skills</dt><dd><QuickWords candidate={c} canEdit={canUpdate} field="skills" /></dd>
+            <dt>Certifications</dt><dd><QuickWords candidate={c} canEdit={canUpdate} field="certifications" /></dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
-            <dt>Certifications</dt>
-            <dd><Chips labels={c.certifications} /></dd>
           </dl>
         </section>
       )}

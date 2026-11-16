@@ -7,7 +7,7 @@ import { type Fav, splitFavourites, Star } from "./favourites";
 
 export type FavChoice = { value: string; label: string };
 
-export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled = false, ...aria }: {
+export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled = false, inline = false, ...aria }: {
   /** What the closed dropdown shows: the choice made, or e.g. "Add an IT skill…". */
   text: ReactNode;
   choices: FavChoice[];
@@ -18,6 +18,8 @@ export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled 
   /** A first line that clears the choice (for a single choice), e.g. "—". */
   clear?: string;
   disabled?: boolean;
+  /** Small and borderless, for editing in place (a profile's Details). */
+  inline?: boolean;
   id?: string;
   "aria-invalid"?: boolean;
   "aria-describedby"?: string;
@@ -49,7 +51,7 @@ export function FavDropdown({ text, choices, onPick, fav, noun, clear, disabled 
     </li>
   );
   return (
-    <div className="fav-dropdown" ref={box} onKeyDown={(e) => { if (e.key === "Escape" && open) { e.stopPropagation(); close(); } }}>
+    <div className={`fav-dropdown${inline ? " inline" : ""}`} ref={box} onKeyDown={(e) => { if (e.key === "Escape" && open) { e.stopPropagation(); close(); } }}>
       <button type="button" id={aria.id ?? fallback} className="fav-button" disabled={disabled} aria-haspopup="true" aria-expanded={open}
         aria-controls={open ? menuId : undefined} aria-invalid={aria["aria-invalid"]} aria-describedby={aria["aria-describedby"]} aria-label={aria["aria-label"]}
         onClick={() => { if (open) close(); else { setOrder(fav?.list ?? []); setOpen(true); } }}>

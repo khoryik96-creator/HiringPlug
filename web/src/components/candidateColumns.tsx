@@ -110,16 +110,6 @@ export function WaDisc({ c, label, big = false }: { c: Summary; label?: string; 
   );
 }
 
-export function WaLegend() {
-  return (
-    <p className="wa-legend small muted" aria-label="Work authorization colours">
-      {(Object.keys(WA_KIND) as (keyof typeof WA_KIND)[]).map((k) => (
-        <span key={k}><span className="wa-dot" style={{ background: WA_KIND[k].color }} />{WA_KIND[k].label}</span>
-      ))}
-    </p>
-  );
-}
-
 /** Choose and reset the columns (they are put in order by dragging their headings). */
 export function ColumnPicker({ columns, chosen, onSave }: { columns: Column[]; chosen: boolean; onSave: (c: Column[] | null) => void }) {
   // A pill beside the list's "Choose All | None" (search-reader.css).

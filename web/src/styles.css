@@ -356,7 +356,6 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .candidates-table .small { display: block; }
 /* The candidate list: a bar beside each name coloured by work authorization, and the column picker. */
 .candidates-table .name-cell { white-space: nowrap; }
-.wa-legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin: 0.4rem 0; }
 .column-picker { position: relative; }
 .column-menu { position: absolute; right: 0; top: 2.6rem; z-index: 5; min-width: 17rem; margin: 0; padding-top: 0.6rem; }
 .column-menu > p { margin: 0 0 0.4rem; }
@@ -463,7 +462,6 @@ mark { background: #fde68a; color: inherit; border-radius: 3px; padding: 0 0.1re
 .toggle-chip input { margin: 0; }
 .list-toolbar .column-picker > button { border-radius: 999px; padding: 0.3rem 0.75rem; font-size: 0.85rem; }
 .list-meta { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); margin: 0.25rem 0 0.5rem; }
-.list-meta .wa-legend { margin: 0; }
 .candidates-page .candidates-table td { vertical-align: middle; }
 .candidates-page .candidates-table .col-currentRole { min-width: 11rem; }
 .candidates-page .candidates-table .col-email { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
