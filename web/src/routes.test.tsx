@@ -44,9 +44,9 @@ describe("the route table", () => {
 
   it("lists only what the user may open, in order", () => {
     expect(menu("main", RECRUITER).map((r) => r.menu?.label)).toEqual(["Jobs", "Candidates", "Companies", "Contacts", "Import"]);
-    expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account", "My dropdowns"]);
+    expect(menu("settings", RECRUITER).map((r) => r.menu?.label)).toEqual(["AI provider", "Your account", "My dropdowns", "LinkedIn companion"]);
     expect(menu("main", OWNERISH).map((r) => r.menu?.label)).toEqual(["Dashboard", "Jobs", "Candidates", "Companies", "Contacts", "Reports", "Import"]);
-    expect(menu("settings", OWNERISH).map((r) => r.menu?.label)).toEqual(["General", "Salary", "Dropdowns & categories", "Industries", "AI provider", "Email connection", "Email templates", "System", "Your account", "My dropdowns"]);
+    expect(menu("settings", OWNERISH).map((r) => r.menu?.label)).toEqual(["General", "Salary", "Dropdowns & categories", "Industries", "AI provider", "Email connection", "Email templates", "System", "Your account", "My dropdowns", "LinkedIn companion"]);
   });
 
   it("gives every menu entry an address it answers", () => {

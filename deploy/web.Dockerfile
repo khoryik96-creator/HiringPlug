@@ -7,6 +7,8 @@ RUN pnpm install --frozen-lockfile
 COPY web/ ./
 # vite.config.ts reads the security headers (for `vite preview`).
 COPY deploy/security-headers.conf /deploy/security-headers.conf
+# The LinkedIn companion, zipped into the app for its download button.
+COPY extension/linkedin-companion /extension/linkedin-companion
 RUN pnpm run build
 
 FROM nginx:1.29-alpine

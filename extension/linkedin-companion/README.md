@@ -7,8 +7,10 @@ LinkedIn sign-in**: HiringPlug's server never reads LinkedIn.
 
 ## Install and connect
 
-1. Open the browser's Extensions page, turn on **Developer mode** and choose
-   **Load unpacked**: this folder.
+1. In HiringPlug, **Settings › LinkedIn companion › Download the companion**
+   (a zip of this folder, built with the web app) and unzip it. Open the
+   browser's Extensions page, turn on **Developer mode** and choose **Load
+   unpacked**: the unzipped folder (or this folder, from a checkout).
 2. Sign in to LinkedIn in that browser.
 3. Open HiringPlug, click the companion's toolbar icon and **Connect this
    HiringPlug**. The browser asks to allow that one address; the companion

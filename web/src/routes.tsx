@@ -31,6 +31,7 @@ const AiSearch = page(() => import("./pages/AiSearch"), "AiSearch");
 const CompareCvs = page(() => import("./pages/CompareCvs"), "CompareCvs");
 const ContactDetail = page(() => import("./pages/ContactDetail"), "ContactDetail");
 const ContactList = page(() => import("./pages/ContactList"), "ContactList");
+const Companion = page(() => import("./pages/Companion"), "Companion");
 const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
@@ -158,6 +159,8 @@ export const ROUTES: Route[] = [
     render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
   { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
     render: () => <MyDropdowns /> },
+  { section: "companion", path: /^#\/companion/, menu: { in: "settings", label: "LinkedIn companion", href: "#/companion" },
+    render: () => <Companion /> },
 ];
 
 const allowed = (r: Route, permissions: readonly Permission[]) =>

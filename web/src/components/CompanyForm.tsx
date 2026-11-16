@@ -144,7 +144,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
       {isNew && linkedinPage && (
         <div className="full row company-linkedin-fill">
           {companion.ready && !companionCan(companion.version) ? (
-            <span className="muted small">Update the HiringPlug LinkedIn companion (version 1.1 or later) to fill this in from LinkedIn.</span>
+            <span className="muted small">Update the HiringPlug LinkedIn companion (version 1.1 or later) to fill this in from LinkedIn: <a href="#/companion">download it again</a>.</span>
           ) : companion.ready ? (
             <>
               <button type="button" className="pill-btn" disabled={readLinkedin.isPending} onClick={() => { readLinkedin.mutate(); }}>
@@ -160,7 +160,7 @@ export function CompanyForm({ company, onDone, onSaved }: {
               )}
             </>
           ) : companion.ready === false && (
-            <span className="muted small">With the HiringPlug LinkedIn companion in this browser, the name, size and industry fill in from LinkedIn.</span>
+            <span className="muted small">With the HiringPlug LinkedIn companion in this browser, the name, size and industry fill in from LinkedIn. <a href="#/companion">Set it up</a></span>
           )}
           {readLinkedin.error && <span className="warning small" role="alert">{readLinkedin.error.message}</span>}
           {fromLinkedin && (

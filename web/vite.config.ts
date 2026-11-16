@@ -2,12 +2,14 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { configDefaults } from "vitest/config";
 
+import { companionZip } from "./companionZip.ts";
 import { securityHeaders } from "./securityHeaders.ts";
 
 // In development the API runs on :8080 (`task dev`); Vite proxies to it so
 // the browser sees one origin.
 export default defineConfig({
-  plugins: [react()],
+  // The LinkedIn companion, zipped for its download button (Settings › LinkedIn companion).
+  plugins: [react(), companionZip(new URL("../extension/linkedin-companion/", import.meta.url).pathname)],
   server: {
     port: 5173,
     proxy: {

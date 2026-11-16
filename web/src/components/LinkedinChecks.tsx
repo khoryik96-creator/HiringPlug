@@ -117,7 +117,7 @@ export function useLinkedinChecks({ companyId, contactId, label = "Check employm
         <div className="info companion-help" role="status">
           <p><strong>Install the HiringPlug LinkedIn Companion first.</strong> It reads LinkedIn in this browser, with your LinkedIn sign-in; HiringPlug&apos;s server never does.</p>
           <ol>
-            <li>In Chrome or Edge, open Extensions, turn on Developer mode and choose <em>Load unpacked</em>: the <code>extension/linkedin-companion</code> folder of HiringPlug.</li>
+            <li><a href="#/companion">Download it and install it</a> in Chrome or Edge (Settings › LinkedIn companion shows how, step by step).</li>
             <li>Sign in to LinkedIn in this browser.</li>
             <li>On this tab, click the companion&apos;s icon and <em>Connect this HiringPlug</em>, then try again.</li>
           </ol>
