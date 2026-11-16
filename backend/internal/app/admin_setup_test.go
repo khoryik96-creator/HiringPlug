@@ -53,3 +53,28 @@ func TestLoginRolesCanBeSetUpByManyAtOnce(t *testing.T) {
 	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, role).Scan(&exists))
 	assert.True(t, exists)
 }
+
+// Companies with the same name made at the same moment each get a careers
+// address of their own.
+func TestCompaniesWithOneNameCanBeMadeAtOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	name := "Same name for a careers address race " + t.Name()
+	ids := make([]string, 8)
+	errs := make([]error, len(ids))
+	var wg sync.WaitGroup
+	for i := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ids[i], errs[i] = app.CreateTenant(ctx, testutil.Current.Admin, name)
+		}()
+	}
+	wg.Wait()
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
+	var slugs int
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(DISTINCT careers_slug) FROM tenant WHERE id = ANY($1)`, ids).Scan(&slugs))
+	assert.Equal(t, len(ids), slugs)
+}

@@ -100,7 +100,17 @@ func execFormatted(ctx context.Context, admin *pgxpool.Pool, formatSQL string, a
 // CreateTenant adds a tenant and returns its ID.
 func CreateTenant(ctx context.Context, admin *pgxpool.Pool, name string) (string, error) {
 	var id string
-	err := admin.QueryRow(ctx, `INSERT INTO tenant (name) VALUES ($1) RETURNING id`, strings.TrimSpace(name)).Scan(&id)
+	var err error
+	for range 10 {
+		err = admin.QueryRow(ctx, `INSERT INTO tenant (name) VALUES ($1) RETURNING id`, strings.TrimSpace(name)).Scan(&id)
+		// Its careers address comes from its name ("-2", "-3" when taken): two
+		// made at the same moment with the same name may pick the same one. The
+		// next try takes the next free one.
+		var pg *pgconn.PgError
+		if !errors.As(err, &pg) || pg.ConstraintName != "tenant_careers_slug_key" {
+			return id, err
+		}
+	}
 	return id, err
 }
 
