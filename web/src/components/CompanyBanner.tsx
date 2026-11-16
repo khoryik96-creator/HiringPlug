@@ -90,7 +90,7 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
                 {o.label}
               </button>
             ))}
-            <a className="small" href="#/settings/lists#company-categories">Change the categories</a>
+            {permissions.includes("settings:manage") && <a className="small" href="#/settings/lists#company-categories">Change the categories</a>}
           </div>
         )}
         <ErrorMessage error={save.error} />

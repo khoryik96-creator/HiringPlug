@@ -25,10 +25,20 @@ WHERE f.id = @id
   AND (f.owner_id = app_current_user()
        OR EXISTS (SELECT 1 FROM folder_share s WHERE s.folder_id = f.id AND s.user_id = app_current_user()));
 
--- Holds a folder while records or people are added to it, so a delete waits
--- (and the addition then finds no folder) instead of failing halfway.
+-- Holds a folder while it changes (records, people, deletion): changes to one
+-- folder take turns, so a delete never cuts an addition off halfway and two
+-- additions never wait on each other's lock (a deadlock with FOR SHARE, as
+-- each then updates the row).
 -- name: LockFolder :one
-SELECT id FROM folder WHERE id = @id FOR SHARE;
+SELECT id FROM folder WHERE id = @id FOR NO KEY UPDATE;
+
+-- The kind of a folder the signed-in person may see (owner or shared), for a
+-- list's filter: cheaper than VisibleFolder, which counts its records.
+-- name: VisibleFolderKind :one
+SELECT f.kind FROM folder f
+WHERE f.id = @id
+  AND (f.owner_id = app_current_user()
+       OR EXISTS (SELECT 1 FROM folder_share s WHERE s.folder_id = f.id AND s.user_id = app_current_user()));
 
 -- name: RenameFolder :execrows
 UPDATE folder SET name = @name, version = version + 1, updated_at = now()

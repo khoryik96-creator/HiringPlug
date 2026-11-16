@@ -123,6 +123,24 @@ func TestABackupThatFailedOrStoppedIsAProblem(t *testing.T) {
 	assert.Contains(t, joined, "pg_dump: disk full")
 	assert.Contains(t, joined, "backup-service: The backup service has not checked in")
 
+	// A backup that hangs is a problem too, though the service still checks in.
+	_, err = admin.Exec(ctx, `UPDATE backup_run SET status = 'running', error = NULL, started_at = now() - interval '7 hours' WHERE id = $1`, run)
+	require.NoError(t, err)
+	_, err = admin.Exec(ctx, `UPDATE backup_control SET service_seen_at = now()`)
+	require.NoError(t, err)
+	ps, err = checks.Problems(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, ps)
+	assert.Equal(t, "backup-stuck", ps[0].Key)
+	assert.Contains(t, ps[0].Text, "has not finished")
+	_, err = admin.Exec(ctx, `UPDATE backup_run SET started_at = now() - interval '1 hour' WHERE id = $1`, run)
+	require.NoError(t, err)
+	ps, err = checks.Problems(ctx)
+	require.NoError(t, err)
+	for _, p := range ps {
+		assert.NotEqual(t, "backup-stuck", p.Key, "one running for an hour is just running")
+	}
+
 	// A laptop without the backup service: nothing to say about it.
 	_, err = admin.Exec(ctx, `UPDATE backup_control SET service_seen_at = NULL`)
 	require.NoError(t, err)

@@ -77,17 +77,25 @@ func TestProductionRefusesTheLaptopsAddressAndMailCatcher(t *testing.T) {
 		_, err := Load(env(m))
 		return err
 	}
-	for _, address := range []string{"", "http://app.example.com", "https://localhost:3000"} {
+	for _, address := range []string{"", "https://localhost:3000", "http://127.0.0.1:3000"} {
 		err := with(map[string]string{"HP_PUBLIC_URL": address})
 		require.Error(t, err, address)
-		assert.Contains(t, err.Error(), "HP_PUBLIC_URL must be the app's https:// address", address)
+		assert.Contains(t, err.Error(), "HP_PUBLIC_URL must be the address others open the app at", address)
 	}
-	err := with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"})
+	err := with(map[string]string{"HP_PUBLIC_URL": "http://app.example.com"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HP_PUBLIC_URL must be the app's https:// address", "on the internet: https")
+	err = with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "HP_SMTP_HOST must be your mail server in production")
 	err = with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "smtp.example.com:587", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"})
 	require.Error(t, err, "real mail is sent encrypted")
 	require.NoError(t, with(map[string]string{"HP_PUBLIC_URL": "https://app.example.com", "HP_SMTP_HOST": "smtp.example.com:587", "HP_SMTP_FROM": "no-reply@example.com"}))
+	// A server in the office, reached by its network address, keeps working as
+	// it did: plain http, and whatever email it used.
+	for _, address := range []string{"http://192.168.1.10:3000", "http://10.0.0.5", "http://hiring-server:3000", "http://hp.office.lan"} {
+		require.NoError(t, with(map[string]string{"HP_PUBLIC_URL": address, "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"}), address)
+	}
 	// Outside production the laptop's settings stay fine.
 	_, err = Load(env(map[string]string{"HP_DATABASE_URL": "postgres://u:p@localhost:5432/hp", "HP_SMTP_HOST": "mailpit:1025", "HP_SMTP_FROM": "no-reply@example.com", "HP_SMTP_TLS": "none"}))
 	require.NoError(t, err)

@@ -34,8 +34,8 @@ type Service struct {
 	records Records
 }
 
-// held is load for a change to the folder's records or people: the folder is
-// held (FOR SHARE) until the change is done, so it cannot be deleted halfway.
+// held is load for a change to the folder: the folder is held until the change
+// is done (FOR NO KEY UPDATE), so changes to one folder take turns.
 func held(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Folder, error) {
 	if _, err := store.New(tx).LockFolder(ctx, id); errors.Is(err, pgx.ErrNoRows) {
 		return Folder{}, apperr.NotFound("folder")
@@ -144,12 +144,17 @@ func (s *Service) Rename(ctx context.Context, p authz.Principal, id, name string
 // Delete deletes a folder (its owner); the records in it stay as they are.
 func (s *Service) Delete(ctx context.Context, p authz.Principal, id string) error {
 	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		f, err := owned(ctx, tx, p, id)
+		f, err := held(ctx, tx, p, id) // a second delete waits, then finds none
+		if err == nil && !f.Mine {
+			err = OwnerOnly()
+		}
 		if err != nil {
 			return err
 		}
-		if _, err := store.New(tx).DeleteFolder(ctx, id); err != nil {
+		if n, err := store.New(tx).DeleteFolder(ctx, id); err != nil {
 			return err
+		} else if n == 0 {
+			return apperr.NotFound("folder")
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "folder.deleted", EntityType: "folder", EntityID: id,
 			Changes: map[string]any{"name": map[string]any{"from": f.Name}, "items": map[string]any{"from": f.ItemCount}}})

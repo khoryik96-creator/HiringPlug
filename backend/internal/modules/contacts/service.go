@@ -16,6 +16,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 )
 
 const (
@@ -31,7 +32,7 @@ type Service struct {
 	mail        MailServers
 	files       *blob.Store
 	mailboxes   Mailboxes
-	folderItems FolderItems // a folder's contacts (UseFolders)
+	folderItems folderfilter.Items // a folder's contacts (UseFolders)
 }
 
 // Create adds a contact. The email is checked before the transaction starts
@@ -228,7 +229,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		cursor = nil // ordered by likeness, not by id: one page
 	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+		inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
 		if err != nil {
 			return err
 		}

@@ -163,6 +163,13 @@ server and check a few candidates and their CVs, then delete the test server.
 If the live server is ever lost, the same four commands on a new server bring
 everything back.
 
+Sharing the storage is safe: each server deletes there only its own oldest
+backups (as many as it keeps), never another server's, and uploaded files
+that are gone from a server are set aside there, not deleted, while any backup
+kept there may need them. `hp fetch` picks the newest whole backup made by
+another server (on a new server, its own first backups hold only an empty
+database); name one to fetch it instead (`hp fetch hiringplug-YYYYMMDD-HHMMSS`).
+
 ## 9. Keeping it up to date
 
 ```bash

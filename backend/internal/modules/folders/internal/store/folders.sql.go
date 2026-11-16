@@ -129,11 +129,13 @@ func (q *Queries) InsertFolder(ctx context.Context, arg InsertFolderParams) (str
 }
 
 const lockFolder = `-- name: LockFolder :one
-SELECT id FROM folder WHERE id = $1 FOR SHARE
+SELECT id FROM folder WHERE id = $1 FOR NO KEY UPDATE
 `
 
-// Holds a folder while records or people are added to it, so a delete waits
-// (and the addition then finds no folder) instead of failing halfway.
+// Holds a folder while it changes (records, people, deletion): changes to one
+// folder take turns, so a delete never cuts an addition off halfway and two
+// additions never wait on each other's lock (a deadlock with FOR SHARE, as
+// each then updates the row).
 func (q *Queries) LockFolder(ctx context.Context, id string) (string, error) {
 	row := q.db.QueryRow(ctx, lockFolder, id)
 	var id_2 string
@@ -313,6 +315,22 @@ func (q *Queries) VisibleFolder(ctx context.Context, id string) (VisibleFolderRo
 		&i.SharedWith,
 	)
 	return i, err
+}
+
+const visibleFolderKind = `-- name: VisibleFolderKind :one
+SELECT f.kind FROM folder f
+WHERE f.id = $1
+  AND (f.owner_id = app_current_user()
+       OR EXISTS (SELECT 1 FROM folder_share s WHERE s.folder_id = f.id AND s.user_id = app_current_user()))
+`
+
+// The kind of a folder the signed-in person may see (owner or shared), for a
+// list's filter: cheaper than VisibleFolder, which counts its records.
+func (q *Queries) VisibleFolderKind(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, visibleFolderKind, id)
+	var kind string
+	err := row.Scan(&kind)
+	return kind, err
 }
 
 const visibleFolders = `-- name: VisibleFolders :many

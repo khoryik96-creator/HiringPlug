@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,7 +73,7 @@ func TestEachBackupIsCopiedOffTheServerAndComesBackWhole(t *testing.T) {
 
 	// The server is lost: a new one fetches the newest backup and puts it back.
 	fresh := t.TempDir()
-	got, err := backup.Fetch(ctx, o.Offsite, fresh, "latest")
+	got, err := backup.Fetch(ctx, o.Offsite, fresh, "latest", "another-server")
 	require.NoError(t, err)
 	assert.Equal(t, made[2], got)
 	target, restored := freshDatabase(t), t.TempDir()
@@ -87,9 +88,9 @@ func TestEachBackupIsCopiedOffTheServerAndComesBackWhole(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "%PDF-1.7 new cv", string(data))
 
-	_, err = backup.Fetch(ctx, o.Offsite, fresh, got)
+	_, err = backup.Fetch(ctx, o.Offsite, fresh, got, "")
 	assert.ErrorContains(t, err, "already here")
-	_, err = backup.Fetch(ctx, o.Offsite, t.TempDir(), "hiringplug-20200101-000000")
+	_, err = backup.Fetch(ctx, o.Offsite, t.TempDir(), "hiringplug-20200101-000000", "")
 	assert.ErrorContains(t, err, "no backup")
 }
 
@@ -121,4 +122,88 @@ func TestAFailedOffsiteCopyIsRecordedAndTheBackupKept(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, last.OffsiteStatus)
 	assert.Equal(t, "off", *last.OffsiteStatus)
+}
+
+// A test server, or a new one after a loss, may share the storage: it never
+// deletes the live server's backups or files there, and fetching on it brings
+// back the live server's newest, not its own empty one.
+func TestAnotherServerNeverDeletesTheLiveServersBackups(t *testing.T) {
+	requireRclone(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t)
+	files, away := t.TempDir(), t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(files, tenant.ID), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(files, tenant.ID, "doc_1"), []byte("%PDF-1.7 cv"), 0o600))
+	clock := time.Date(2026, 12, 1, 2, 0, 0, 0, time.UTC)
+	live := backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: files, Dir: t.TempDir(), Keep: 2, Server: "live",
+		Now: func() time.Time { return clock }, Offsite: backup.Offsite{Remote: away}}
+	var made []string
+	for range 3 {
+		d, err := backup.Run(ctx, testutil.Current.Admin, live)
+		require.NoError(t, err)
+		made = append(made, filepath.Base(d))
+		clock = clock.Add(24 * time.Hour)
+	}
+	assert.Equal(t, []string{"files", made[1], made[2]}, names(t, away), "each server keeps as many of its own as it keeps here")
+
+	// A new server, with no files and its own backups folder, backs up twice.
+	fresh := backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: t.TempDir(), Keep: 1, Server: "new",
+		Now: func() time.Time { return clock }, Offsite: backup.Offsite{Remote: away}}
+	var own []string
+	for range 2 {
+		d, err := backup.Run(ctx, testutil.Current.Admin, fresh)
+		require.NoError(t, err)
+		own = append(own, filepath.Base(d))
+		clock = clock.Add(time.Hour)
+	}
+	there := names(t, away)
+	assert.Contains(t, there, made[1], "the live server's backups stay")
+	assert.Contains(t, there, made[2])
+	assert.NotContains(t, there, own[0], "the new server keeps one of its own")
+	assert.Contains(t, there, own[1])
+	assert.Empty(t, names(t, filepath.Join(away, "files")), "its empty files folder is mirrored…")
+	assert.Contains(t, there, "files-removed", "…but the live server's files are set aside, not deleted")
+
+	// Fetching there brings the live server's newest back, files and all.
+	dir := t.TempDir()
+	got, err := backup.Fetch(ctx, fresh.Offsite, dir, "latest", "new")
+	require.NoError(t, err)
+	assert.Equal(t, made[2], got)
+	data, err := os.ReadFile(filepath.Join(dir, got, "files", tenant.ID, "doc_1"))
+	require.NoError(t, err)
+	assert.Equal(t, "%PDF-1.7 cv", string(data))
+	assert.False(t, strings.HasPrefix(names(t, dir)[0], "."), "nothing half-fetched is left")
+}
+
+func TestFetchSkipsABackupWhoseCopyWasCutOff(t *testing.T) {
+	requireRclone(t)
+	ctx := context.Background()
+	away := t.TempDir()
+	o := backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: t.TempDir(), Keep: 3, Server: "live",
+		Now: func() time.Time { return time.Date(2026, 12, 5, 2, 0, 0, 0, time.UTC) }, Offsite: backup.Offsite{Remote: away}}
+	d, err := backup.Run(ctx, testutil.Current.Admin, o)
+	require.NoError(t, err)
+	// The server died during the next night's upload: no manifest.
+	cut := filepath.Join(away, "hiringplug-20261206-020000")
+	require.NoError(t, os.MkdirAll(cut, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(cut, "database.dump"), []byte("half"), 0o600))
+	got, err := backup.Fetch(ctx, o.Offsite, t.TempDir(), "latest", "new")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Base(d), got, "the newest whole one")
+}
+
+// A backup made while `hp fetch` downloads (into the same folder) leaves the
+// download alone.
+func TestABackupLeavesAFetchInProgressAlone(t *testing.T) {
+	requireTools(t)
+	ctx := context.Background()
+	dir := t.TempDir()
+	fetching := filepath.Join(dir, ".fetching-hiringplug-20261101-020000")
+	require.NoError(t, os.MkdirAll(fetching, 0o700))
+	o := backup.Options{AdminURL: testutil.Current.AdminURL, FilesDir: t.TempDir(), Dir: dir, Keep: 1, Server: "live",
+		Now: func() time.Time { return time.Date(2026, 12, 7, 2, 0, 0, 0, time.UTC) }}
+	_, err := backup.Run(ctx, testutil.Current.Admin, o)
+	require.NoError(t, err)
+	_, err = os.Stat(fetching)
+	assert.NoError(t, err)
 }

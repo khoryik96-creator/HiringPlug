@@ -61,7 +61,7 @@ export function useFolderView(kind: FolderKind, on: boolean, meId: string, uncho
     head: on && folder && <FolderHead key={folder.id} kind={kind} folder={folder} meId={meId} onGone={() => { setOpen(null); }} />,
     actions: (chosen) => on && (chosen.length > MAX_AT_ONCE ? <span className="warning small">At most {MAX_AT_ONCE} at a time for folders.</span> : (
       <>
-        <AddToFolder kind={kind} ids={chosen} />
+        <AddToFolder kind={kind} ids={chosen} onTakenOut={(id) => { if (id === folder?.id) unchoose(); }} />
         {folder && (
           <button type="button" disabled={change.take.isPending} title={`Takes them out of this folder only: the ${plural(kind)} themselves stay as they are`}
             onClick={() => { change.take.mutate({ folderId: folder.id, itemIds: chosen }, { onSuccess: unchoose }); }}>Remove from this folder</button>
@@ -75,7 +75,7 @@ export function useFolderView(kind: FolderKind, on: boolean, meId: string, uncho
 /** For the rows shown: the names of the folders each is in (for an "In folders" column). */
 export function useInFolders(view: FolderView, ids: string[]): (id: string) => string[] {
   const member = useMemberships(view.kind, ids, view.on && view.hasFolders);
-  return (id) => (member.data?.get(id) ?? []).map((f) => view.names.get(f) ?? "").filter(Boolean);
+  return (id) => (member.data.get(id) ?? []).map((f) => view.names.get(f) ?? "").filter(Boolean);
 }
 
 /** The folders a record is in, in a list's "In folders" column. */

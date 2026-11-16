@@ -1,7 +1,7 @@
 // Folders of candidates, contacts or companies: the signed-in person's own and
 // those shared with them, and the changes made to them. Changing what is in a
 // folder refreshes the list it filters.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type Query, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import type React from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
@@ -31,12 +31,25 @@ export function useUsers() {
   return useQuery({ queryKey: usersKey, queryFn: async () => unwrap(await api.GET("/v1/users")).items, staleTime: 60_000 });
 }
 
-/** Everything one can do to folders; each refreshes the folders (and the list, when records move). */
+/**
+ * Everything one can do to folders; each refreshes the folders. Records put in
+ * or taken out refresh only what they change: which folders those records are
+ * in, and the list while that folder is open in it (its id is in the list's key).
+ */
 export function useFolderChanges(kind: FolderKind) {
   const queryClient = useQueryClient();
-  const refresh = (items = false) => {
-    void queryClient.invalidateQueries({ queryKey: foldersKey });
-    if (items) void queryClient.invalidateQueries({ queryKey: listKey[kind] });
+  const refresh = (moved?: { folderId: string; itemIds: string[] }) => {
+    void queryClient.invalidateQueries({ queryKey: [...foldersKey, kind], exact: true });
+    if (!moved) {
+      void queryClient.invalidateQueries({ queryKey: foldersKey });
+      return;
+    }
+    const some = new Set(moved.itemIds);
+    void queryClient.invalidateQueries({
+      queryKey: [...foldersKey, "memberships", kind],
+      predicate: (q: Query) => (q.queryKey[3] as string[] | undefined)?.some((id) => some.has(id)) ?? false,
+    });
+    void queryClient.invalidateQueries({ queryKey: listKey[kind], predicate: (q: Query) => q.queryKey.includes(moved.folderId) });
   };
   return {
     create: useMutation({
@@ -65,33 +78,41 @@ export function useFolderChanges(kind: FolderKind) {
     add: useMutation({
       mutationFn: async ({ folderId, itemIds }: { folderId: string; itemIds: string[] }) =>
         unwrap(await api.POST("/v1/folders/{folderId}/items", { params: { path: { folderId } }, body: { itemIds } })),
-      onSuccess: () => { refresh(true); },
+      onSuccess: (_, moved) => { refresh(moved); },
     }),
     take: useMutation({
       mutationFn: async ({ folderId, itemIds }: { folderId: string; itemIds: string[] }) =>
         unwrap(await api.POST("/v1/folders/{folderId}/items/remove", { params: { path: { folderId } }, body: { itemIds } })),
-      onSuccess: () => { refresh(true); },
+      onSuccess: (_, moved) => { refresh(moved); },
     }),
   };
 }
 
+// Rows are asked about in groups, in the order shown: as more pages load,
+// the groups already answered are not asked again.
+const GROUP = 50;
+
 /** Which of the person's folders hold each record: record id → folder ids. */
 export function useMemberships(kind: FolderKind, ids: string[], enabled = true) {
-  const sorted = [...new Set(ids)].sort();
-  return useQuery({
-    queryKey: [...foldersKey, "memberships", kind, sorted],
-    enabled: enabled && sorted.length > 0,
-    queryFn: async () => {
-      const out = new Map<string, string[]>();
-      for (let i = 0; i < sorted.length; i += MAX_AT_ONCE) { // the most one call takes
-        const got = unwrap(await api.POST("/v1/folders/memberships", { body: { kind, itemIds: sorted.slice(i, i + MAX_AT_ONCE) } }));
-        for (const { folderId, itemIds } of got.items) {
-          for (const id of itemIds) out.set(id, [...(out.get(id) ?? []), folderId]);
+  const unique = [...new Set(ids)];
+  const groups: string[][] = [];
+  for (let i = 0; i < unique.length; i += GROUP) groups.push(unique.slice(i, i + GROUP).sort());
+  return useQueries({
+    queries: groups.map((group) => ({
+      queryKey: [...foldersKey, "memberships", kind, group],
+      enabled,
+      queryFn: async () => unwrap(await api.POST("/v1/folders/memberships", { body: { kind, itemIds: group } })).items,
+      placeholderData: (before: Schemas["FolderMemberships"]["items"] | undefined) => before, // no flicker
+    })),
+    combine: (results) => {
+      const data = new Map<string, string[]>();
+      for (const r of results) {
+        for (const { folderId, itemIds } of r.data ?? []) {
+          for (const id of itemIds) data.set(id, [...(data.get(id) ?? []), folderId]);
         }
       }
-      return out;
+      return { data, isPending: results.some((r) => r.isPending), error: results.find((r) => r.error)?.error ?? null };
     },
-    placeholderData: (before) => before, // no flicker while more rows load
   });
 }
 

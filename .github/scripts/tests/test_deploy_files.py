@@ -3,6 +3,8 @@ pin a published secret (deploy/docker-compose.yml, deploy/nginx.conf)."""
 
 import pathlib
 import re
+import subprocess
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -66,6 +68,49 @@ class ProductionFiles(unittest.TestCase):
         for service in ("bootstrap", "api", "worker", "backup"):
             self.assertRegex(PROD, rf"  {service}:\n    environment: \*production", f"{service} runs in production mode")
         self.assertRegex(PROD, r"mailpit:\n    profiles: \[laptop-only\]", "the mail catcher is not started on a server")
+
+
+    def test_every_setting_the_server_files_read_is_in_the_env_example(self):
+        example = (ROOT / ".env.example").read_text(encoding="utf-8")
+        listed = set(re.findall(r"^(HP_[A-Z0-9_]+)=", example, re.M))
+        for name, text in (("docker-compose.yml", COMPOSE), ("docker-compose.prod.yml", PROD), ("Caddyfile", CADDY),
+                           ("update-server.sh", (ROOT / "deploy" / "update-server.sh").read_text(encoding="utf-8"))):
+            for setting in set(re.findall(r"\$\{?(HP_[A-Z0-9_]+)|env-value\.sh (HP_[A-Z0-9_]+)", text)):
+                setting = setting[0] or setting[1]
+                with self.subTest(file=name, setting=setting):
+                    self.assertIn(setting, listed, f"{name} reads {setting}: add it to .env.example")
+
+
+class EnvValues(unittest.TestCase):
+    """deploy/env-value.sh reads deploy/.env the way Docker Compose does, so the
+    update script asks the right address whatever editor wrote the file."""
+
+    def value(self, text):
+        with tempfile.NamedTemporaryFile("w", suffix=".env", delete=False, newline="") as f:
+            f.write(text)
+        out = subprocess.run(["sh", str(ROOT / "deploy" / "env-value.sh"), "HP_DOMAIN", f.name],
+                             check=True, capture_output=True, text=True)
+        pathlib.Path(f.name).unlink()
+        return out.stdout.strip("\n")
+
+    def test_every_way_of_writing_the_setting(self):
+        for text in (
+            "HP_DOMAIN=app.example.com\n",
+            'HP_DOMAIN="app.example.com"\n',
+            "HP_DOMAIN='app.example.com'\n",
+            "HP_DOMAIN=app.example.com\r\n",
+            "export HP_DOMAIN=app.example.com\n",
+            "HP_DOMAIN = app.example.com   \n",
+            "HP_DOMAIN=app.example.com # the address\n",
+            "HP_DOMAIN=old.example.com\nHP_DOMAIN=app.example.com\n",
+            "# HP_DOMAIN=commented.example.com\nHP_DOMAIN_OTHER=x\nHP_DOMAIN=app.example.com\n",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.value(text), "app.example.com")
+
+    def test_the_update_script_asks_it(self):
+        script = (ROOT / "deploy" / "update-server.sh").read_text(encoding="utf-8")
+        self.assertIn("sh deploy/env-value.sh HP_DOMAIN deploy/.env", script)
 
 
 if __name__ == "__main__":

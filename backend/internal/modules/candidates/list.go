@@ -126,7 +126,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, f Filter, cursor 
 		if similar {
 			cur, sort, offset = nil, "newest", 0 // ordered by likeness: one page
 		}
-		inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+		inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
 		if err != nil {
 			return err
 		}

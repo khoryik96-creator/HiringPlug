@@ -6,7 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { ErrorMessage } from "../ErrorMessage";
 import { type FolderKind, useFolderChanges, useFolderList, useMemberships, useUsers } from "./useFolders";
 
-export function AddToFolder({ kind, ids }: { kind: FolderKind; ids: string[] }) {
+export function AddToFolder({ kind, ids, onTakenOut }: {
+  kind: FolderKind;
+  ids: string[];
+  /** The chosen were taken out of a folder (the open one: they are no longer shown). */
+  onTakenOut?: (folderId: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [find, setFind] = useState("");
   const box = useRef<HTMLDivElement>(null);
@@ -21,7 +26,7 @@ export function AddToFolder({ kind, ids }: { kind: FolderKind; ids: string[] }) 
     return () => { document.removeEventListener("mousedown", away); };
   }, [open]);
 
-  const held = (folderId: string) => ids.filter((id) => member.data?.get(id)?.includes(folderId)).length;
+  const held = (folderId: string) => ids.filter((id) => member.data.get(id)?.includes(folderId)).length;
   const typed = find.trim();
   const shown = (folders.data ?? []).filter((f) => f.name.toLowerCase().includes(typed.toLowerCase()));
   const exact = folders.data?.some((f) => f.mine && f.name.toLowerCase() === typed.toLowerCase());
@@ -56,7 +61,7 @@ export function AddToFolder({ kind, ids }: { kind: FolderKind; ids: string[] }) 
                     <input type="checkbox" checked={all} disabled={busy || member.isPending}
                       ref={(el) => { if (el) el.indeterminate = n > 0 && !all; }}
                       onChange={() => {
-                        if (all) change.take.mutate({ folderId: f.id, itemIds: ids });
+                        if (all) change.take.mutate({ folderId: f.id, itemIds: ids }, { onSuccess: () => { onTakenOut?.(f.id); } });
                         else change.add.mutate({ folderId: f.id, itemIds: ids });
                       }} />
                     <span className="folder-name">{f.name}{!f.mine && <small> · {ownerName(f.ownerId) ?? "shared"}</small>}</span>

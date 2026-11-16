@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -30,31 +31,22 @@ type folderRecords struct {
 
 func (r folderRecords) Visible(ctx context.Context, tx pgx.Tx, kind string, ids []string) ([]string, error) {
 	var found func(id string) bool
+	var err error
 	switch kind {
 	case folders.Candidates:
-		got, err := r.candidates.Briefs(ctx, tx, ids)
-		if err != nil {
-			return nil, err
-		}
-		found = func(id string) bool { _, ok := got[id]; return ok }
+		found, err = has(r.candidates.Briefs(ctx, tx, ids))
 	case folders.Contacts:
-		got, err := r.contacts.Briefs(ctx, tx, ids)
-		if err != nil {
-			return nil, err
-		}
-		found = func(id string) bool { _, ok := got[id]; return ok }
+		found, err = has(r.contacts.Briefs(ctx, tx, ids))
 	default:
-		got, err := r.companies.Names(ctx, tx, ids)
-		if err != nil {
-			return nil, err
-		}
-		found = func(id string) bool { _, ok := got[id]; return ok }
+		found, err = has(r.companies.Names(ctx, tx, ids))
 	}
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if found(id) {
-			out = append(out, id)
-		}
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return !found(id) }), nil
+}
+
+// has turns what a module found (by id) into a lookup.
+func has[V any](got map[string]V, err error) (func(id string) bool, error) {
+	return func(id string) bool { _, ok := got[id]; return ok }, err
 }

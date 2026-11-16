@@ -234,13 +234,22 @@ func Load(getenv func(string) string) (Config, error) {
 		if strings.Contains(c.DatabaseURL, ":hp_api_dev@") {
 			r.fail("HP_DATABASE_URL must not use the published development password in production")
 		}
-		// Links in emails (bookings, profiles, password set-up) use this address.
-		if u, err := url.Parse(c.PublicURL); err != nil || u.Scheme != "https" || u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" {
-			r.fail("HP_PUBLIC_URL must be the app's https:// address in production, e.g. https://app.youragency.com")
-		}
-		// The mail catcher keeps every email: none would reach a real inbox.
-		if host, _, _ := net.SplitHostPort(c.SMTP.Addr); host == "mailpit" || (c.SMTP.Addr != "" && c.SMTP.TLS == "none") {
-			r.fail("HP_SMTP_HOST must be your mail server in production, with HP_SMTP_TLS starttls or tls (the mail catcher only holds email)")
+		// Links in emails (bookings, profiles, password set-up) use this
+		// address. On the internet it must be https, with real email; a server
+		// in the office, reached by its network address, may be plain http
+		// and keep using what it used before.
+		u, err := url.Parse(c.PublicURL)
+		switch {
+		case err != nil || u.Hostname() == "" || u.Hostname() == "localhost" || isLoopback(u.Hostname()):
+			r.fail("HP_PUBLIC_URL must be the address others open the app at in production: https://app.youragency.com, or on an office network e.g. http://192.168.1.10:3000")
+		case !onOfficeNetwork(u.Hostname()):
+			if u.Scheme != "https" {
+				r.fail("HP_PUBLIC_URL must be the app's https:// address in production, e.g. https://app.youragency.com")
+			}
+			// The mail catcher keeps every email: none would reach a real inbox.
+			if host, _, _ := net.SplitHostPort(c.SMTP.Addr); host == "mailpit" || (c.SMTP.Addr != "" && c.SMTP.TLS == "none") {
+				r.fail("HP_SMTP_HOST must be your mail server in production, with HP_SMTP_TLS starttls or tls (the mail catcher only holds email)")
+			}
 		}
 	}
 	if len(r.problems) > 0 {
@@ -336,4 +345,28 @@ func redact(raw string) string {
 		u.User = url.User(u.User.Username())
 	}
 	return u.String()
+}
+
+func isLoopback(host string) bool {
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// onOfficeNetwork says whether host is reached only inside a private network:
+// a private or link-local address, or a local name (no dot, or .local, .lan,
+// .internal, .home.arpa).
+func onOfficeNetwork(host string) bool {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsPrivate() || ip.IsLinkLocalUnicast()
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if !strings.Contains(host, ".") {
+		return true
+	}
+	for _, suffix := range []string{".local", ".lan", ".internal", ".home.arpa"} {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+	return false
 }

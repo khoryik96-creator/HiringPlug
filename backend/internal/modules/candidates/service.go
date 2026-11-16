@@ -17,6 +17,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 )
 
 const emailUniqueIndex = "candidate_tenant_email_uq"
@@ -30,11 +31,11 @@ type Service struct {
 	rules       FieldRules // the company's mandatory fields and sources
 	salaryRules SalaryRules
 	movers      []RecordMover
-	notes       Notes          // screening calls' notes
-	cvs         CVs            // CV text, for advanced search
-	used        usedCache      // the suggestions of values already used
-	zone        *time.Location // the agency's time zone: what day it is (UseTimeZone)
-	folderItems FolderItems    // a folder's candidates (UseFolders)
+	notes       Notes              // screening calls' notes
+	cvs         CVs                // CV text, for advanced search
+	used        usedCache          // the suggestions of values already used
+	zone        *time.Location     // the agency's time zone: what day it is (UseTimeZone)
+	folderItems folderfilter.Items // a folder's candidates (UseFolders)
 }
 
 // Create adds a candidate.

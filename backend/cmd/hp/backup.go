@@ -197,7 +197,12 @@ func runFetch(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	name, err := backup.Fetch(ctx, o.Offsite, o.Dir, fs.Arg(0))
+	// Not this server's own backups (on a new server: only its empty database).
+	server, err := backup.ServerID(ctx, o.AdminURL)
+	if err != nil {
+		return err
+	}
+	name, err := backup.Fetch(ctx, o.Offsite, o.Dir, fs.Arg(0), server)
 	if err != nil {
 		return err
 	}

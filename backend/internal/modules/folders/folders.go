@@ -15,6 +15,7 @@ package folders
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,14 +41,15 @@ func New(pool *pgxpool.Pool, users Users, records Records) *Module {
 // (owner or shared), newest first, inside the caller's transaction: a list
 // shows only those. A folder they may not see, or of another kind, is not found.
 func (m *Module) Items(ctx context.Context, tx pgx.Tx, p authz.Principal, folderID, kind string) ([]string, error) {
-	f, err := load(ctx, tx, p, folderID)
+	q := store.New(tx)
+	got, err := q.VisibleFolderKind(ctx, folderID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && got != kind) {
+		return nil, apperr.NotFound("folder")
+	}
 	if err != nil {
 		return nil, err
 	}
-	if f.Kind != kind {
-		return nil, apperr.NotFound("folder")
-	}
-	ids, err := store.New(tx).FolderItemIDs(ctx, folderID)
+	ids, err := q.FolderItemIDs(ctx, folderID)
 	if ids == nil {
 		ids = []string{}
 	}

@@ -117,7 +117,7 @@ func (s *Service) searchTx(ctx context.Context, tx pgx.Tx, p authz.Principal, f 
 			return page, err
 		}
 	}
-	inIDs, err := s.folderIDs(ctx, tx, p, f.Folder)
+	inIDs, err := s.folderItems.IDs(ctx, tx, p, f.Folder)
 	if err != nil {
 		return page, err
 	}

@@ -10,6 +10,8 @@
 # running this anywhere others can reach (an office server, the cloud), put
 # your own in deploy/.env, next to this file (never commit it):
 #   HP_ENV=production            refuses to start with a published secret
+#   HP_PUBLIC_URL=...            the address others open, e.g. http://192.168.1.10:3000
+#                                (on the internet: https, see deploy-to-a-server.md)
 #   HP_AUTH_JWT_SECRET=...       32+ random characters (signs sign-ins)
 #   HP_FILES_URL_SECRET=...      32+ random characters (signs file links)
 #   HP_MAIL_KEYS_SECRET=...      32+ random characters (seals mailbox sign-ins)
@@ -117,7 +119,7 @@ services:
   # A backup of the database and the uploaded files every night (only files
   # new since the night before are copied; unchanged ones are shared), the newest
   # 14 kept, in the backups folder next to this repository, and each copied
-  # off this server when HP_OFFSITE_S3_* are set (deploy/.env). Settings > Backups turns the nightly
+  # off this server when HP_OFFSITE_S3_* or HP_OFFSITE_DIR are set (deploy/.env). Settings > Backups turns the nightly
   # backup off or on, makes one now, and downloads one. Restore one with:
   #   docker compose -f deploy/docker-compose.yml stop api worker ai-worker
   #   docker compose -f deploy/docker-compose.yml run --rm backup /app/hp restore hiringplug-YYYYMMDD-HHMMSS -yes
@@ -141,7 +143,10 @@ services:
       HP_OFFSITE_S3_REGION: ${HP_OFFSITE_S3_REGION:-}
       HP_OFFSITE_S3_ACCESS_KEY: ${HP_OFFSITE_S3_ACCESS_KEY:-}
       HP_OFFSITE_S3_SECRET_KEY: ${HP_OFFSITE_S3_SECRET_KEY:-}
-    volumes: [files:/data/files, ../backups:/backups]
+      # Or a folder on another disk of this computer (a USB drive, a network
+      # share): HP_OFFSITE_DIR in deploy/.env is that folder, seen here as /offsite.
+      HP_OFFSITE_DIR: ${HP_OFFSITE_DIR:+/offsite}
+    volumes: [files:/data/files, ../backups:/backups, "${HP_OFFSITE_DIR:-/dev/null}:/offsite"]
     depends_on:
       bootstrap: { condition: service_completed_successfully }
 

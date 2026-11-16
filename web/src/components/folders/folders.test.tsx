@@ -98,6 +98,47 @@ describe("folders on a list", () => {
     await waitFor(() => { expect(screen.queryByText("1 chosen")).toBeNull(); });
   });
 
+  it("unchooses rows unticked from the open folder in Add to folder", async () => {
+    window.localStorage.setItem("hiringplug.folder.contact", "fld_01jbz6w0m0k8q9x2r3s4t5v6f1");
+    serve([folder({})]);
+    const post = vi.spyOn(api, "POST").mockImplementation(((path: string) => Promise.resolve(path === "/v1/folders/memberships"
+      ? ok({ items: [{ folderId: "fld_01jbz6w0m0k8q9x2r3s4t5v6f1", itemIds: [MEI.id] }] })
+      : ok(folder({ itemCount: 0 })))) as never);
+    renderWithClient(<ContactList canCreate={false} canFolders meId={ME} />);
+    const row = (await screen.findByRole("link", { name: "Mei Tan" })).closest("tr");
+    if (!row) throw new Error("row");
+    fireEvent.click(within(row).getByText("HR Manager"));
+    fireEvent.click(await screen.findByRole("button", { name: "Add to folder ▾" }));
+    const open = await screen.findByRole<HTMLInputElement>("checkbox", { name: /HR in KL/ });
+    await waitFor(() => { expect(open.checked).toBe(true); });
+    fireEvent.click(open);
+    await waitFor(() => {
+      expect(post).toHaveBeenCalledWith("/v1/folders/{folderId}/items/remove", { params: { path: { folderId: "fld_01jbz6w0m0k8q9x2r3s4t5v6f1" } }, body: { itemIds: [MEI.id] } });
+    });
+    await waitFor(() => { expect(screen.queryByText("1 chosen")).toBeNull(); });
+  });
+
+  it("asks which folders hold the rows shown in groups, not again for rows already asked about", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => contact(`cont_${String(i).padStart(26, "0")}`, `Person ${String(i)}`));
+    vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { query?: Record<string, unknown> } }) => {
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+      if (path === "/v1/folders") return Promise.resolve(ok({ items: [folder({})] }));
+      if (path === "/v1/users") return Promise.resolve(ok(users));
+      return Promise.resolve(ok(init?.params?.query?.cursor
+        ? { nextCursor: null, items: many.slice(50) }
+        : { nextCursor: "cont_00000000000000000000000049", items: many.slice(0, 50) }));
+    }) as never);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [] }));
+    renderWithClient(<ContactList canCreate={false} canFolders meId={ME} />);
+    await screen.findByRole("link", { name: "Person 0" });
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+    await screen.findByRole("link", { name: "Person 59" });
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    const asked = post.mock.calls.map((c) => (c[1] as { body: { itemIds: string[] } }).body.itemIds.length);
+    expect(asked).toEqual([50, 10]); // the second page only
+  });
+
   it("refuses more than 500 dropped on a folder at once", async () => {
     serve([folder({})]);
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ items: [] }));

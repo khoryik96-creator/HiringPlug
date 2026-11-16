@@ -41,45 +41,54 @@ func EnsureLoginRole(ctx context.Context, admin *pgxpool.Pool, loginURL, group s
 	if user == "" || password == "" {
 		return fmt.Errorf("login URL must include a user and password")
 	}
-	// Several processes (test packages run in parallel) may set up the same
-	// role at once, and PostgreSQL refuses concurrent changes to one role
-	// ("tuple concurrently updated"): they take turns under an advisory lock.
-	conn, err := admin.Acquire(ctx)
-	if err != nil {
-		return err
+	// Several processes (test packages run in parallel, each with its own
+	// database in one PostgreSQL) may set up the same role at once:
+	// PostgreSQL then refuses one ("tuple concurrently updated", or the role
+	// made meanwhile), so it tries again.
+	for attempt := range 20 {
+		if err = setLoginRole(ctx, admin, user, password, group); !retryable(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Duration(attempt+1) * 20 * time.Millisecond):
+		}
 	}
-	defer conn.Release()
-	if _, err := conn.Exec(ctx, `SELECT pg_advisory_lock(hashtext('hiringplug.login_roles'))`); err != nil {
-		return err
-	}
-	defer func() {
-		_, _ = conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(hashtext('hiringplug.login_roles'))`)
-	}()
+	return err
+}
+
+func setLoginRole(ctx context.Context, admin *pgxpool.Pool, user, password, group string) error {
 	// format() quotes the identifier and literal safely on the server side.
 	var exists bool
-	if err := conn.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, user).Scan(&exists); err != nil {
+	if err := admin.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)`, user).Scan(&exists); err != nil {
 		return err
 	}
 	stmt := `SELECT format('ALTER ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOBYPASSRLS', $1::text, $2::text)`
 	if !exists {
 		stmt = `SELECT format('CREATE ROLE %I LOGIN PASSWORD %L NOSUPERUSER NOBYPASSRLS', $1::text, $2::text)`
 	}
-	if err := execFormatted(ctx, conn, stmt, user, password); err != nil {
+	if err := execFormatted(ctx, admin, stmt, user, password); err != nil {
 		return fmt.Errorf("creating login role %s: %w", user, err)
 	}
-	if err := execFormatted(ctx, conn, `SELECT format('GRANT %I TO %I', $1::text, $2::text)`, group, user); err != nil {
+	if err := execFormatted(ctx, admin, `SELECT format('GRANT %I TO %I', $1::text, $2::text)`, group, user); err != nil {
 		return fmt.Errorf("granting %s to %s: %w", group, user, err)
 	}
 	return nil
 }
 
-// querier is a pool or one of its connections.
-type querier interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+// retryable: another process changed the same role at the same moment.
+func retryable(err error) bool {
+	var pg *pgconn.PgError
+	if !errors.As(err, &pg) {
+		return false
+	}
+	return pg.Code == "42710" || // made meanwhile (duplicate_object)
+		(pg.Code == "23505" && pg.ConstraintName == "pg_authid_rolname_index") || // the same, caught later
+		(pg.Code == "XX000" && strings.Contains(pg.Message, "concurrently updated"))
 }
 
-func execFormatted(ctx context.Context, admin querier, formatSQL string, args ...any) error {
+func execFormatted(ctx context.Context, admin *pgxpool.Pool, formatSQL string, args ...any) error {
 	var stmt string
 	if err := admin.QueryRow(ctx, formatSQL, args...).Scan(&stmt); err != nil {
 		return err

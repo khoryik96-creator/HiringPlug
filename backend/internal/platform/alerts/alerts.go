@@ -63,6 +63,9 @@ func (c Checks) Problems(ctx context.Context) ([]Problem, error) {
 	switch {
 	case ok && last.Status == "failed":
 		out = append(out, Problem{"backup-failed", fmt.Sprintf("The last backup failed (%s): %s", last.StartedAt.Format(time.RFC1123), deref(last.Error))})
+	case ok && last.Status == "running" && now().Sub(last.StartedAt) > 6*time.Hour:
+		// Hung (pg_dump waiting on a lock, say): the service still checks in.
+		out = append(out, Problem{"backup-stuck", fmt.Sprintf("A backup started at %s has not finished: no backups are being made.", last.StartedAt.Format(time.RFC1123))})
 	case ok && control.Auto && last.Status == "done" && now().Sub(last.StartedAt) > 50*time.Hour:
 		out = append(out, Problem{"backup-old", fmt.Sprintf("No backup since %s, though the nightly backup is on.", last.StartedAt.Format(time.RFC1123))})
 	}

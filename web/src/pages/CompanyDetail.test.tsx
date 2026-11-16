@@ -46,6 +46,7 @@ describe("company pages", () => {
     expect(screen.getAllByText("201–1,000 people").length).toBeGreaterThan(0);
     expect(within(card).getByRole("link", { name: "company/grab" }).getAttribute("href")).toBe("https://www.linkedin.com/company/grab");
     expect(screen.getByRole("button", { name: "Edit company" })).toBeTruthy();
+    expect(within(card).queryByRole("link", { name: "Change the categories" }), "Settings needs settings:manage").toBeNull();
 
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...company, category: "signed_client", version: 2 }));
     fireEvent.click(within(card).getByRole("button", { name: "Signed client" }));

@@ -36,8 +36,10 @@ type Options struct {
 	Dir      string  // where backups go (HP_BACKUP_DIR)
 	Keep     int     // how many backups to keep (older ones are deleted)
 	Offsite  Offsite // where each backup is also copied, off this server (zero: not set up)
-	Now      func() time.Time
-	finder   *toolFinder // tests
+	// Server names the database server (ServerID); "" asks the database.
+	Server string
+	Now    func() time.Time
+	finder *toolFinder // tests
 }
 
 func (o Options) tools() toolFinder {
@@ -91,7 +93,15 @@ func Run(ctx context.Context, admin *pgxpool.Pool, o Options) (string, error) {
 		name).Scan(&runID); err != nil {
 		return "", fmt.Errorf("recording the backup: %w", err)
 	}
-	dir, size, err := write(ctx, o, name)
+	var dir string
+	var size int64
+	var err error
+	if o.Server == "" { // a failure here is recorded like any other
+		o.Server, err = ServerID(ctx, o.AdminURL)
+	}
+	if err == nil {
+		dir, size, err = write(ctx, o, name)
+	}
 	finish := `UPDATE backup_run SET finished_at = now(), status = 'done', size_bytes = $2 WHERE id = $1`
 	args := []any{runID, size}
 	if err != nil {
@@ -119,7 +129,7 @@ func offsite(ctx context.Context, admin *pgxpool.Pool, o Options, runID int64, n
 	var err error
 	if o.Offsite.On() {
 		status = "done"
-		if err = copyOffsite(ctx, o.Offsite, o.Dir, name, kept(o.Dir)); err != nil {
+		if err = copyOffsite(ctx, o.Offsite, o.Dir, name, o.Server, o.Keep); err != nil {
 			status, msg = "failed", clip(err.Error(), 2000)
 		}
 	}
@@ -133,18 +143,6 @@ func offsite(ctx context.Context, admin *pgxpool.Pool, o Options, runID int64, n
 		return fmt.Errorf("the backup %s is made, but its copy off the server failed: %w", name, err)
 	}
 	return nil
-}
-
-// kept lists the backups in dir.
-func kept(dir string) []string {
-	entries, _ := os.ReadDir(dir)
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() && nameRe.MatchString(e.Name()) {
-			names = append(names, e.Name())
-		}
-	}
-	return names
 }
 
 func write(ctx context.Context, o Options, name string) (string, int64, error) {
@@ -188,7 +186,7 @@ func write(ctx context.Context, o Options, name string) (string, int64, error) {
 		return "", 0, err
 	}
 	manifest, _ := json.MarshalIndent(map[string]any{
-		"name": name, "createdAt": o.Now().UTC(), "files": files, "sizeBytes": size,
+		"name": name, "server": o.Server, "createdAt": o.Now().UTC(), "files": files, "sizeBytes": size,
 		"newFileBytes": copied, "filesTarBytes": filesTar,
 		"restore": "hp restore " + name + " --yes (stop the API and workers first)",
 	}, "", "  ")

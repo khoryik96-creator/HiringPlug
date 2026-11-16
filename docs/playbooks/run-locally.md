@@ -53,6 +53,7 @@ Put your own in `deploy/.env` (next to `docker-compose.yml`; never commit it):
 
 ```
 HP_ENV=production
+HP_PUBLIC_URL=http://<this server's address on the office network>:3000
 HP_AUTH_JWT_SECRET=<32+ random characters>
 HP_FILES_URL_SECRET=<32+ random characters>
 HP_MAIL_KEYS_SECRET=<32+ random characters>
@@ -64,7 +65,10 @@ HP_DB_AI_PASSWORD=<letters and digits>
 ```
 
 With `HP_ENV=production` HiringPlug refuses to start while any of them is
-still a published default. Set the database passwords before the first start
+still a published default. `HP_PUBLIC_URL` is the address others type to open
+the app (links in emails use it), e.g. `http://192.168.1.10:3000`: on an
+office network plain http is accepted; an address on the internet must be
+https, with a real mail server (see deploy-to-a-server.md). Set the database passwords before the first start
 (the admin password is fixed when the database is first created; if you set
 HP_DB_ADMIN_PASSWORD later, HiringPlug stops with a message saying so: change
 it inside the database first, with

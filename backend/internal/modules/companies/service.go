@@ -13,6 +13,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
 )
 
 const nameUniqueIndex = "company_tenant_name_uq"
@@ -24,7 +25,7 @@ type Service struct {
 	allowPrivate bool        // company websites on private networks (local testing only)
 	files        *blob.Store // documents kept with terms and benefits
 	users        Users
-	folderItems  FolderItems // a folder's companies (UseFolders)
+	folderItems  folderfilter.Items // a folder's companies (UseFolders)
 }
 
 // Create adds a company.
@@ -205,7 +206,7 @@ func (s *Service) List(ctx context.Context, p authz.Principal, query, companyTyp
 				return err
 			}
 		}
-		inIDs, err := s.folderIDs(ctx, tx, p, folder)
+		inIDs, err := s.folderItems.IDs(ctx, tx, p, folder)
 		if err != nil {
 			return err
 		}

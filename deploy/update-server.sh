@@ -19,7 +19,7 @@ echo "Building and restarting (a few minutes)..."
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build --remove-orphans
 
 echo "Waiting for the app..."
-domain=$(sed -n 's/^HP_DOMAIN=//p' deploy/.env | tr -d '"' | tail -n 1)
+domain=$(sh deploy/env-value.sh HP_DOMAIN deploy/.env)
 i=0
 while [ "$i" -lt 60 ]; do
   if curl -sf -o /dev/null "https://$domain/health/ready"; then
