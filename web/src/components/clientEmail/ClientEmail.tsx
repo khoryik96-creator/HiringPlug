@@ -7,6 +7,7 @@ import { MailDeliveryNotice, useMailbox } from "../MailDeliveryNotice";
 import { EmailRecipients } from "../EmailRecipients";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { LocalLinkWarning } from "../LocalLinkWarning";
 
 import { emailFieldErrors } from "./emailFieldErrors";
 import { api, ApiError, type Permission, type Schemas, unwrap } from "../../api/client";
@@ -193,6 +194,7 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
 
       <div className="row">
         <button type="button" disabled={show.isPending} onClick={() => { show.mutate(); }}>Preview</button>
+        <LocalLinkWarning html={html} />
         <button type="button" className="primary" disabled={uploading || send.isPending || (multi && (list.loading || !!list.error))} onClick={() => { send.mutate(); }}>Send email</button>
       </div>
       <ErrorMessage error={show.error ?? send.error} />

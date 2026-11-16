@@ -4,6 +4,7 @@
 import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { LocalLinkWarning } from "./LocalLinkWarning";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
@@ -111,6 +112,7 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
         </label>
         <button type="button" disabled={preview.isPending} onClick={() => { if (filledIn(subjectField.current)) preview.mutate(); }}>Preview</button>
         <button type="button" disabled={check.isPending} onClick={() => { if (filledIn(subjectField.current)) check.mutate(); }}>Check who gets it</button>
+        <LocalLinkWarning html={html} />
         <button type="button" className="primary" disabled={send.isPending} onClick={() => { if (filledIn(subjectField.current)) send.mutate(); }}>
           Send to each separately
         </button>

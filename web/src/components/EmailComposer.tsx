@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
 import { BookingLinkForm } from "./CandidateBookings";
+import { LocalLinkWarning } from "./LocalLinkWarning";
 import { Attachments } from "./clientEmail/Attachments";
 import { ShortlistPanel, useShortlist } from "./clientEmail/Shortlist";
 import { useCandidatePackages } from "./clientEmail/useCandidatePackages";
@@ -200,6 +201,7 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
       <SaveError error={send.error} shown={[]} onReload={()=>{packages.clear();void list.refresh();send.reset();}} reloadLabel="Refresh candidate details (your message is kept)" />
       <div className="row full">
         <button type="button" disabled={show.isPending || list.loading} onClick={()=>{show.mutate();}}>Preview email</button>
+        <LocalLinkWarning html={html} />
         <button type="submit" disabled={uploading || (packages.people.length>0 && (list.loading || !!list.error)) || send.isPending || draft.isPending}>
           Send
         </button>
