@@ -455,8 +455,19 @@ for each of their jobs, with **Score fit** / **Score again**.
   over). Saving with a website reads it at once (below): what it says fills
   the details left empty (phone, address, city, country, size, registration
   number, description) and replaces a guessed name with the company's own;
-  what was typed stays, and differences are suggestions. LinkedIn itself
-  does not allow its pages to be read, so only the name comes from it.
+  what was typed stays, and differences are suggestions. The server never
+  reads LinkedIn; with the HiringPlug LinkedIn companion in the recruiter's
+  browser, **Fill in from LinkedIn** reads the company's About page there
+  (name, size, website, overview; CV Studio's access rules stop it at any
+  sign-in, check or restriction). LinkedIn's industry is kept only as a hint.
+- **AI industry pick** ✅: a new company without an industry is given the
+  closest of the agency's industries or subindustries (Settings, Industries),
+  picked by the AI from its name, website, what it says of itself (its
+  website or LinkedIn overview, read first when there is a website) and
+  LinkedIn's industry as a hint. The AI answers with a number from the
+  list, so it never invents an industry; a company whose industry was chosen
+  keeps it, and anyone may change the one picked. Its tokens count towards
+  the monthly AI allowance.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
   page queues a job that reads its home page and its contact page (a link
   with "contact" or "hubungi"), only where robots.txt allows, through the

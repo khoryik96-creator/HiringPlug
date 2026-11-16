@@ -349,6 +349,7 @@ type Company struct {
 	LinkedinUrl         *string
 	AutofillFillEmpty   bool
 	AutofillNameGuessed bool
+	IndustryHint        *string
 }
 
 type CompanyBenefit struct {
@@ -372,6 +373,19 @@ type CompanyDocument struct {
 	StorageKey  string
 	CreatedBy   string
 	CreatedAt   time.Time
+}
+
+type CompanyIndustryPick struct {
+	ID           string
+	TenantID     string
+	CompanyID    string
+	Status       string
+	ChoiceID     *string
+	Error        *string
+	Model        *string
+	InputTokens  int32
+	OutputTokens int32
+	CreatedAt    time.Time
 }
 
 type CompanySuggestion struct {

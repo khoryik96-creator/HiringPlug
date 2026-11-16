@@ -129,6 +129,37 @@ func (m *Module) MoveCandidate(ctx context.Context, tx pgx.Tx, fromID, toID stri
 	return nil
 }
 
+// Choice is an industry or subindustry in use: its id, its words
+// ("Financial Services > Banking") and its industry's words.
+type Choice struct{ ID, Label, Root string }
+
+// ChoicesIn returns the catalogue's version and its industries and
+// subindustries in use (not retired), industries first, each followed by its
+// subindustries, in the caller's transaction.
+func (m *Module) ChoicesIn(ctx context.Context, tx pgx.Tx) (int, []Choice, error) {
+	if err := m.service.ensureIn(ctx, tx); err != nil {
+		return 0, nil, err
+	}
+	c, err := catalogueIn(ctx, tx)
+	if err != nil {
+		return 0, nil, err
+	}
+	items := catalogueMap(c.Items)
+	var out []Choice
+	for _, top := range c.Items {
+		if top.ParentId != nil || !active(top, items) {
+			continue
+		}
+		out = append(out, Choice{ID: top.Id, Label: top.Label, Root: top.Label})
+		for _, sub := range c.Items {
+			if sub.ParentId != nil && *sub.ParentId == top.Id && active(sub, items) {
+				out = append(out, Choice{ID: sub.Id, Label: top.Label + " > " + sub.Label, Root: top.Label})
+			}
+		}
+	}
+	return c.Version, out, nil
+}
+
 // DisplayLabelsIn gives other modules readable labels without sharing SQL ownership.
 func (m *Module) DisplayLabelsIn(ctx context.Context, tx pgx.Tx, ids []string) ([]string, error) {
 	if err := m.service.ensureIn(ctx, tx); err != nil {

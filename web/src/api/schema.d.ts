@@ -3858,7 +3858,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "company.autofill" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "company.autofill" | "company.industried" | "company.industry" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -4888,6 +4888,8 @@ export interface components {
             fillFromWebsite?: boolean;
             /** @description The name was guessed from the website or LinkedIn address: the website's own name replaces it (with fillFromWebsite). */
             nameGuessed?: boolean;
+            /** @description An industry named elsewhere (LinkedIn's, say): the AI picks the closest of the agency's industries with it. Never saved as an industry itself. */
+            industryHint?: string;
             industry?: string | null;
             industrySelections?: components["schemas"]["IndustrySelections"];
             size?: components["schemas"]["CompanySize"] | null;
@@ -4967,6 +4969,34 @@ export interface components {
         };
         CompanyAutofillJob: {
             companyId: components["schemas"]["CompanyId"];
+        };
+        /** @example cip_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        CompanyIndustryPickId: string;
+        CompanyIndustryChoice: {
+            id: components["schemas"]["IndustryId"];
+            /** @description An industry ("Financial Services") or a subindustry under it ("Financial Services > Banking"). */
+            label: string;
+        };
+        CompanyIndustryJob: {
+            pickId: components["schemas"]["CompanyIndustryPickId"];
+            companyName: string;
+            website?: string | null;
+            /** @description What the company says of itself (its website or LinkedIn overview). */
+            about?: string | null;
+            /** @description An industry named elsewhere, e.g. on its LinkedIn page (not one of the choices). */
+            hint?: string | null;
+            choices: components["schemas"]["CompanyIndustryChoice"][];
+            /** @description The provider the company chose; left out = the server's own (HP_AI_*). */
+            ai?: components["schemas"]["AiAccess"];
+        };
+        CompanyIndustriedJob: {
+            pickId: components["schemas"]["CompanyIndustryPickId"];
+            /** @description The choice picked; null when none fits or the AI failed. */
+            choiceId: components["schemas"]["IndustryId"] | null;
+            error: string | null;
+            model: string | null;
+            inputTokens: number;
+            outputTokens: number;
         };
         /** @example cont_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactId: string;

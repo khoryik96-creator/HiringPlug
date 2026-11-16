@@ -164,3 +164,26 @@ test("finds LinkedIn's number for the company on its People page", async () => {
   assert.deepEqual({...reply.result}, {company_url: company, company_id: '123456'});
   assert.equal(url, company + 'people/');
 });
+
+test("reads a company's About page for a new company, in a background tab it then closes", async () => {
+  let opened = null;
+  const about = {name: '  Maju Logistik Sdn Bhd ', industry: 'Truck Transportation', size: '51-200 employees', website: 'https://maju.example.my',
+    headquarters: 'Shah Alam, Selangor', about: 'Trucks across the peninsula.'};
+  const b = browser({page: tab => { opened = {url: tab.url, active: tab.active}; return about; }});
+  const reply = await b.send({action: 'companyAbout', args: {operation_id: op, company_url: company}});
+  assert.deepEqual({...reply.result}, {company_url: company, ...about, name: 'Maju Logistik Sdn Bhd'});
+  assert.deepEqual(opened, {url: company + 'about/', active: false});
+  assert.equal(b.tabs.size, 1, 'its tab is closed');
+
+  const odd = browser({page: () => ({...about, website: 'javascript:alert(1)'})});
+  assert.equal((await odd.send({action: 'companyAbout', args: {operation_id: op, company_url: company}})).result.website, '', 'only a web address');
+  assert.match((await browser().send({action: 'companyAbout', args: {operation_id: op, company_url: profile}})).error, /LinkedIn page/);
+  assert.match((await browser({page: () => ({failed: true})}).send({action: 'companyAbout', args: {operation_id: op, company_url: company}})).error,
+    /sign in/, 'a sign-in page or another company stops the read');
+  assert.match((await browser({page: () => ({...about, name: ''})}).send({action: 'companyAbout', args: {operation_id: op, company_url: company}})).error,
+    /no name/);
+  const blocked = browser({page: () => ({blocked: 'LinkedIn needs a verification check. Nothing was read.'})});
+  assert.match((await blocked.send({action: 'companyAbout', args: {operation_id: op, company_url: company}})).error, /verification check/,
+    'the reason it stopped, as the reader says it');
+  assert.equal(blocked.tabs.size, 1, 'and its tab is closed');
+});

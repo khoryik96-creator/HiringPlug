@@ -2,10 +2,13 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Company } from "../api/client";
-import { failure, ok, renderWithClient, sentBody } from "../test-utils";
+import { failure, fakeCompanion, ok, renderWithClient, sentBody } from "../test-utils";
 import { CompanyForm } from "./CompanyForm";
+import { companyPage, sizeFromLinkedin } from "./linkedinCompany";
 
+let stopCompanion = () => {};
 afterEach(() => {
+  stopCompanion();
   cleanup();
   vi.restoreAllMocks();
 });
@@ -96,5 +99,79 @@ describe("company form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => { expect(onDone).toHaveBeenCalled(); });
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  it("fills a new company in from its LinkedIn page with the companion, leaving what was typed", async () => {
+    const fake = fakeCompanion(() => ({ result: {
+      company_url: "https://www.linkedin.com/company/maju-logistik/", name: "Maju Logistik Sdn Bhd", industry: "Truck Transportation",
+      size: "51-200 employees", website: "https://maju.example.my", headquarters: "Shah Alam", about: "Trucks across the peninsula.",
+    } }));
+    stopCompanion = fake.stop;
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(company));
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} onSaved={vi.fn()} />);
+    change("LinkedIn page", "my.linkedin.com/company/maju-logistik/about");
+    change("City", "Klang");
+    fireEvent.click(await screen.findByRole("button", { name: "Fill in from LinkedIn" }));
+    expect((await screen.findByRole("status")).textContent).toContain("From LinkedIn: name, size, website, about.");
+    expect(fake.asked[0]).toMatchObject({ action: "companyAbout", args: { company_url: "https://www.linkedin.com/company/maju-logistik/" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value, "LinkedIn's name replaces the one guessed from the address").toBe("Maju Logistik Sdn Bhd");
+    fireEvent.click(screen.getByRole("button", { name: "Add company" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ name: "Maju Logistik Sdn Bhd", size: "medium", website: "https://maju.example.my", city: "Klang",
+      industryHint: "Truck Transportation", about: "Trucks across the peninsula.", fillFromWebsite: true, nameGuessed: false });
+    expect((sentBody(post) as { industry?: string }).industry, "LinkedIn's industry is a hint, never one of ours").toBeFalsy();
+  });
+
+  it("says why LinkedIn could not be read, and offers the companion when it is not installed", async () => {
+    const fake = fakeCompanion(() => ({ error: "LinkedIn needs a verification check. Nothing was read." }));
+    stopCompanion = fake.stop;
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-logistik");
+    fireEvent.click(await screen.findByRole("button", { name: "Fill in from LinkedIn" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("verification check");
+    fake.stop();
+    cleanup();
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-logistik");
+    expect(await screen.findByText(/With the HiringPlug LinkedIn companion/, {}, { timeout: 3000 })).toBeTruthy();
+  });
+});
+
+describe("Fill in from LinkedIn, by CV Studio's companion rules", () => {
+  it("stops the companion's own read, and ignores its late answer", async () => {
+    const fake = fakeCompanion((action) => (action === "cancel" ? { result: true } : null)); // the read answers late
+    stopCompanion = fake.stop;
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-logistik");
+    change("Name", "Typed Co");
+    fireEvent.click(await screen.findByRole("button", { name: "Fill in from LinkedIn" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop" }));
+    await waitFor(() => { expect(fake.asked.map((a) => a.action)).toContain("cancel"); });
+    const read = fake.asked.find((a) => a.action === "companyAbout");
+    expect(fake.asked.find((a) => a.action === "cancel")?.args.operation_id, "this read, not another").toBe(read?.args.operation_id);
+    fake.reply(read?.id ?? "", { result: { company_url: "https://www.linkedin.com/company/maju-logistik/", name: "Maju Logistik Sdn Bhd",
+      industry: "", size: "51-200 employees", website: "", headquarters: "", about: "" } });
+    await new Promise((r) => { setTimeout(r, 20); });
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value, "nothing filled after Stop").toBe("Typed Co");
+    expect(screen.getByLabelText<HTMLSelectElement>("Size").value).toBe("");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("asks for an update when the companion is older than company reading", async () => {
+    const fake = fakeCompanion(() => ({ result: null }), "1.0.0");
+    stopCompanion = fake.stop;
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-logistik");
+    expect(await screen.findByText(/Update the HiringPlug LinkedIn companion/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Fill in from LinkedIn" })).toBeNull();
+  });
+});
+
+describe("LinkedIn company sizes", () => {
+  it("are put in our size bands by their lower figure", () => {
+    expect(["1 employee", "2-10 employees", "11-50 employees", "51-200 employees", "501-1,000 employees", "1,001-5,000 employees", "10,001+ employees", "big"]
+      .map(sizeFromLinkedin)).toEqual(["micro", "micro", "small", "medium", "large", "enterprise", "enterprise", null]);
+    expect(companyPage("my.linkedin.com/company/maju-logistik/about")).toBe("https://www.linkedin.com/company/maju-logistik/");
+    expect(companyPage("linkedin.com/in/someone")).toBe("");
   });
 });

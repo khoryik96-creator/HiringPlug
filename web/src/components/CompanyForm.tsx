@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type InputHTMLAttributes, useState } from "react";
+import { type InputHTMLAttributes, useRef, useState } from "react";
 
 import { api, type Company, unwrap } from "../api/client";
 import { companiesKey, companyKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, keysOf, regionName } from "../labels";
 import { COMPANY_PATHS, companyFields, type CompanyFormState, companyProblems, formFromCompany } from "./companyFormState";
+import { companionCall, operationId, useCompanion } from "../companion";
 import { guessCompanyName } from "./companyNameGuess";
+import { companionCan, companyPage, type LinkedinAbout, sizeFromLinkedin } from "./linkedinCompany";
 import { IndustryPicker } from "./IndustryPicker";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
@@ -30,13 +32,52 @@ export function CompanyForm({ company, onDone, onSaved }: {
   // saving reads its website (filling what is left empty).
   const isNew = !opened.id;
   const [nameGuessed, setNameGuessed] = useState(false);
+  // Or from its LinkedIn page, read by the LinkedIn companion in this browser.
+  const companion = useCompanion();
+  const linkedinPage = companyPage(form.linkedinUrl);
+  const [fromLinkedin, setFromLinkedin] = useState<{ filled: string[]; industry: string } | null>(null);
+  const [industryHint, setIndustryHint] = useState("");
+  // Its own read only: Stop cancels this operation in the companion (a page
+  // timeout alone does not stop it), and a late answer is then ignored.
+  const [reading, setReading] = useState<string | null>(null);
+  const current = useRef<string | null>(null);
+  const readLinkedin = useMutation({
+    mutationFn: async () => {
+      const op = operationId();
+      current.current = op;
+      setReading(op);
+      try {
+        return { op, about: await companionCall<LinkedinAbout>("companyAbout", { company_url: linkedinPage, operation_id: op }) };
+      } finally {
+        setReading((r) => (r === op ? null : r));
+      }
+    },
+    onSuccess: ({ op, about: a }) => {
+      if (current.current !== op) return; // stopped: a late answer is ignored
+      const filled: string[] = [];
+      const next = { ...form };
+      if (a.name && (!form.name.trim() || nameGuessed)) { next.name = a.name; filled.push("name"); }
+      const size = sizeFromLinkedin(a.size);
+      if (size && !form.size) { next.size = size; filled.push("size"); }
+      if (a.website && !form.website.trim()) { next.website = a.website; filled.push("website"); }
+      if (a.about && !form.about.trim()) { next.about = a.about; filled.push("about"); }
+      setForm(next);
+      // LinkedIn's industry is only a hint: the AI picks the closest of yours once the company is saved.
+      setIndustryHint(a.industry);
+      if (filled.includes("name")) setNameGuessed(false);
+      setFromLinkedin({ filled, industry: a.industry });
+    },
+  });
   const save = useMutation({
     mutationFn: async () => {
       const problems = companyProblems(form);
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
       const fields = companyFields(form);
       if (!opened.id) {
-        const fill = form.website.trim() ? { fillFromWebsite: true, nameGuessed } : {};
+        const fill = {
+          ...(form.website.trim() ? { fillFromWebsite: true, nameGuessed } : {}),
+          ...(industryHint && !form.industrySelections?.ids.length ? { industryHint } : {}),
+        };
         return unwrap(await api.POST("/v1/companies", { body: { ...fields, ...fill } }));
       }
       if (sameBody(fields, companyFields(opened.form))) return null; // nothing changed
@@ -95,6 +136,36 @@ export function CompanyForm({ company, onDone, onSaved }: {
       </Field>
       {text("website", "Website", { placeholder: "example.com", inputMode: "url" })}
       {text("linkedinUrl", "LinkedIn page", { placeholder: "linkedin.com/company/…", inputMode: "url" })}
+      {isNew && linkedinPage && (
+        <div className="full row company-linkedin-fill">
+          {companion.ready && !companionCan(companion.version) ? (
+            <span className="muted small">Update the HiringPlug LinkedIn companion (version 1.1 or later) to fill this in from LinkedIn.</span>
+          ) : companion.ready ? (
+            <>
+              <button type="button" className="pill-btn" disabled={readLinkedin.isPending} onClick={() => { readLinkedin.mutate(); }}>
+                {readLinkedin.isPending ? "Reading LinkedIn…" : "Fill in from LinkedIn"}
+              </button>
+              {reading && (
+                <button type="button" className="link small" onClick={() => {
+                  void companionCall("cancel", { operation_id: reading }, 10_000).catch(() => undefined);
+                  current.current = null;
+                  setReading(null);
+                  readLinkedin.reset();
+                }}>Stop</button>
+              )}
+            </>
+          ) : companion.ready === false && (
+            <span className="muted small">With the HiringPlug LinkedIn companion in this browser, the name, size and industry fill in from LinkedIn.</span>
+          )}
+          {readLinkedin.error && <span className="warning small" role="alert">{readLinkedin.error.message}</span>}
+          {fromLinkedin && (
+            <span className="muted small" role="status">
+              {fromLinkedin.filled.length ? `From LinkedIn: ${fromLinkedin.filled.join(", ")}.` : "LinkedIn had nothing to add."}
+              {fromLinkedin.industry && !form.industrySelections?.ids.length && ` LinkedIn says “${fromLinkedin.industry}”: once saved, the AI picks the closest of your industries (change it if it is wrong).`}
+            </span>
+          )}
+        </div>
+      )}
       {isNew && form.website.trim() && (
         <p className="muted small full company-fill-hint">
           Saving reads the website and fills in what is left empty (phone, address, size…){nameGuessed ? ", and the company’s own name" : ""}.

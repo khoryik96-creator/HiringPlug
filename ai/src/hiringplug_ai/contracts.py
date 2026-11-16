@@ -162,6 +162,8 @@ class JobKind(StrEnum):
     automation_event = "automation.event"
     automation_run = "automation.run"
     company_autofill = "company.autofill"
+    company_industried = "company.industried"
+    company_industry = "company.industry"
     contact_check_mailbox = "contact.check_mailbox"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
@@ -1273,6 +1275,12 @@ class CompanyAutofillJob(BaseModel):
         extra="forbid",
     )
     companyId: CompanyId
+
+
+class CompanyIndustryPickId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["cip_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^cip_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
 
 
 class ContactId(RootModel[str]):
@@ -5156,6 +5164,13 @@ class CompanyCreate(BaseModel):
             description="The name was guessed from the website or LinkedIn address: the website's own name replaces it (with fillFromWebsite)."
         ),
     ] = None
+    industryHint: Annotated[
+        str | None,
+        Field(
+            description="An industry named elsewhere (LinkedIn's, say): the AI picks the closest of the agency's industries with it. Never saved as an industry itself.",
+            max_length=200,
+        ),
+    ] = None
     industry: Annotated[str | None, Field(max_length=100)] = None
     industrySelections: IndustrySelections | None = None
     size: CompanySize | None = None
@@ -5194,6 +5209,54 @@ class CompanyUpdate(BaseModel):
     country: CountryCode | None = None
     registrationNumber: Annotated[str | None, Field(max_length=50)] = None
     about: Annotated[str | None, Field(max_length=4000)] = None
+
+
+class CompanyIndustryChoice(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: IndustryId
+    label: Annotated[
+        str,
+        Field(
+            description='An industry ("Financial Services") or a subindustry under it ("Financial Services > Banking").'
+        ),
+    ]
+
+
+class CompanyIndustryJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    pickId: CompanyIndustryPickId
+    companyName: str
+    website: str | None = None
+    about: Annotated[
+        str | None, Field(description="What the company says of itself (its website or LinkedIn overview).")
+    ] = None
+    hint: Annotated[
+        str | None,
+        Field(description="An industry named elsewhere, e.g. on its LinkedIn page (not one of the choices)."),
+    ] = None
+    choices: Annotated[list[CompanyIndustryChoice], Field(min_length=1)]
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class CompanyIndustriedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    pickId: CompanyIndustryPickId
+    choiceId: Annotated[
+        IndustryId | None, Field(description="The choice picked; null when none fits or the AI failed.")
+    ]
+    error: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class ContactSummary(BaseModel):

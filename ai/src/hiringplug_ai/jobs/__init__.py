@@ -24,6 +24,7 @@ from ..contracts import (
     AiProviderReportedJob,
     AssistantAskJob,
     AssistantEmailJob,
+    CompanyIndustryJob,
     ContactReadLinkedinJob,
     CvFormatStudioJob,
     DocumentExtractTextJob,
@@ -43,6 +44,7 @@ from . import (
     assistant_ask,
     assistant_email,
     blind_jd,
+    company_industry,
     extract_text,
     format_studio,
     match_score,
@@ -197,4 +199,5 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.aiprovider_check: Handler(AiProviderCheckJob, ai_check.run),
     JobKind.contact_read_linkedin: Handler(ContactReadLinkedinJob, read_linkedin.run),
     JobKind.cv_format_studio: Handler(CvFormatStudioJob, format_studio.run),
+    JobKind.company_industry: Handler(CompanyIndustryJob, company_industry.run),
 }

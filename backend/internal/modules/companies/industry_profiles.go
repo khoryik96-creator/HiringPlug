@@ -16,6 +16,8 @@ type IndustryCatalogue interface {
 	LockIn(context.Context, pgx.Tx) error
 	ReadIn(context.Context, pgx.Tx, string, string) (classification.Selections, error)
 	SaveIn(context.Context, pgx.Tx, string, string, *classification.Selections, *string) (classification.Selections, error)
+	// ChoicesIn is the catalogue's version and its industries and subindustries in use (not retired).
+	ChoicesIn(context.Context, pgx.Tx) (int, []IndustryChoice, error)
 }
 
 // UseIndustries wires the catalogue.

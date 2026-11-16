@@ -144,8 +144,10 @@ func NewModules(d Deps) *Modules {
 		Candidates: cvCandidates{m.Candidates}, Applications: cvApplications{m.Pipeline}, Documents: m.Documents,
 		Tenants: m.Identity, Users: m.Identity, SourceCVs: cvSources{m.Documents},
 		AI: cvReadingAI{
-			all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
-			ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+			all: aiUse{func() []tokensSince {
+				return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+			}},
+			ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 		},
 	}, d.Files, d.Config.MaxUploadBytes)
 	m.Assistant = assistant.New(d.Pool, assistant.Deps{
@@ -154,12 +156,12 @@ func NewModules(d Deps) *Modules {
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
 		Agency:       m.Identity,
-		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
+		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies} }},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{
 		Applications: matchingApplications{m.Pipeline}, Candidates: matchingCandidates{m.Candidates}, CVs: matchingCVs{m.Documents},
 		Jobs: matchingJobs{m.Jobs}, Consent: m.Privacy, AI: m.AIProviders,
-		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs} }},
+		OtherAIUse: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Documents, m.Cvformats, m.Jobs, m.Companies} }},
 	}, matching.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Intake = intake.New(d.Pool, intake.Deps{
 		Candidates: intakeCandidates{m.Candidates}, Documents: intakeDocuments{m.Documents}, Sources: m.Settings,
@@ -177,7 +179,7 @@ func NewModules(d Deps) *Modules {
 	})
 	m.Industries.UseRecords(industryRecords{m}, m.Settings)
 	m.Candidates.UseIndustries(m.Industries)
-	m.Companies.UseIndustries(m.Industries)
+	m.Companies.UseIndustries(companyIndustries{m.Industries})
 	m.Documents.UseIndustryRecognition(m.Industries.EnrichParsed)
 	m.Settings.UseIndustries(m.Industries)
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies})
@@ -198,12 +200,22 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
 	m.Documents.UseAI(cvReadingAI{
-		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
-		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+		all: aiUse{func() []tokensSince {
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+		}},
+		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	m.Jobs.UseAI(cvReadingAI{ // blind ad rewrites, in the same monthly allowance
-		all: aiUse{func() []tokensSince { return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
-		ai:  m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+		all: aiUse{func() []tokensSince {
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+		}},
+		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
+	})
+	m.Companies.UseAI(cvReadingAI{ // a new company's industry, in the same monthly allowance
+		all: aiUse{func() []tokensSince {
+			return []tokensSince{m.Assistant, m.Matching, m.Documents, m.Cvformats, m.Jobs, m.Companies}
+		}},
+		ai: m.AIProviders, cfg: d.Config.AI, tz: d.Config.TimeZone, now: time.Now,
 	})
 	return m
 }

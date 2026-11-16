@@ -174,3 +174,22 @@ UPDATE company SET version = version + 1, updated_at = now() WHERE id = @id AND 
 -- How many companies are in a category (Settings refuses to remove one in use).
 -- name: CountCompaniesInCategory :one
 SELECT count(*) FROM company WHERE category = @category;
+
+-- name: SetIndustryHint :exec
+UPDATE company SET industry_hint = sqlc.narg(industry_hint) WHERE id = @id;
+
+-- name: InsertIndustryPick :one
+INSERT INTO company_industry_pick (tenant_id, company_id)
+VALUES (app_current_tenant(), @company_id)
+RETURNING id;
+
+-- The AI's answer, once (a repeated delivery changes nothing).
+-- name: SaveIndustryPick :one
+UPDATE company_industry_pick
+SET status = @status, choice_id = sqlc.narg(choice_id), error = sqlc.narg(error), model = sqlc.narg(model),
+    input_tokens = @input_tokens, output_tokens = @output_tokens
+WHERE id = @id AND status = 'queued'
+RETURNING company_id;
+
+-- name: IndustryPickTokensSince :one
+SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM company_industry_pick WHERE created_at >= @since::timestamptz;

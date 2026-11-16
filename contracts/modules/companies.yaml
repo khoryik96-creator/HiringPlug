@@ -26,6 +26,16 @@ x-module:
       payload: CompanyAutofillJob
       priority: high
       description: Read a company's own website for details to suggest (Go worker).
+    company.industry:
+      queue: ai
+      payload: CompanyIndustryJob
+      priority: low
+      description: Pick the closest of the agency's industries for a company, from what is known of it (Python AI worker).
+    company.industried:
+      queue: core
+      payload: CompanyIndustriedJob
+      priority: low
+      description: Give a company without an industry the one the AI picked, and count the tokens used (Go worker).
 
 paths:
   /v1/companies:
@@ -559,6 +569,7 @@ components:
         linkedinUrl: { type: string, maxLength: 300, nullable: true, description: 'linkedin.com/company/... (https://www. is added).' }
         fillFromWebsite: { type: boolean, description: "Read the website at once (with a website): what it says fills the details left empty; the rest are suggestions, as usual." }
         nameGuessed: { type: boolean, description: "The name was guessed from the website or LinkedIn address: the website's own name replaces it (with fillFromWebsite)." }
+        industryHint: { type: string, maxLength: 200, description: "An industry named elsewhere (LinkedIn's, say): the AI picks the closest of the agency's industries with it. Never saved as an industry itself." }
         industry: { type: string, maxLength: 100, nullable: true }
         industrySelections: { $ref: '#/components/schemas/IndustrySelections' }
         size:
@@ -667,4 +678,43 @@ components:
       required: [companyId]
       properties:
         companyId: { $ref: '#/components/schemas/CompanyId' }
+    CompanyIndustryPickId:
+      type: string
+      pattern: '^cip_[0-9a-hjkmnp-tv-z]{26}$'
+      example: cip_01jbz6w0m0k8q9x2r3s4t5v6w7
+    CompanyIndustryChoice:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id: { $ref: '#/components/schemas/IndustryId' }
+        label: { type: string, description: 'An industry ("Financial Services") or a subindustry under it ("Financial Services > Banking").' }
+    CompanyIndustryJob:
+      type: object
+      additionalProperties: false
+      required: [pickId, companyName, choices]
+      properties:
+        pickId: { $ref: '#/components/schemas/CompanyIndustryPickId' }
+        companyName: { type: string }
+        website: { type: string, nullable: true }
+        about: { type: string, nullable: true, description: "What the company says of itself (its website or LinkedIn overview)." }
+        hint: { type: string, nullable: true, description: "An industry named elsewhere, e.g. on its LinkedIn page (not one of the choices)." }
+        choices: { type: array, minItems: 1, items: { $ref: '#/components/schemas/CompanyIndustryChoice' } }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    CompanyIndustriedJob:
+      type: object
+      additionalProperties: false
+      required: [pickId, choiceId, error, model, inputTokens, outputTokens]
+      properties:
+        pickId: { $ref: '#/components/schemas/CompanyIndustryPickId' }
+        choiceId:
+          allOf: [{ $ref: '#/components/schemas/IndustryId' }]
+          nullable: true
+          description: The choice picked; null when none fits or the AI failed.
+        error: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }
 

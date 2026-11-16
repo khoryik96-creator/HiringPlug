@@ -22,6 +22,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "automation.event": "Starting automations",
   "automation.run": "Running automations (emails and tasks)",
   "company.autofill": "Filling in companies from their websites",
+  "company.industry": "AI: picking new companies' industries",
+  "company.industried": "Giving new companies the industry the AI picked",
   "contact.read_linkedin": "Reading contacts' LinkedIn profiles",
   "contact.check_mailbox": "Verifying contacts' email addresses",
   "email.bounce_scan": "Looking for bounced emails in Outlook",

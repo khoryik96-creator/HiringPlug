@@ -1,6 +1,7 @@
 /*
  * HiringPlug LinkedIn companion: in the recruiter's own browser, reads from a
- * contact's LinkedIn profile the dates of their time at one company, for the
+ * contact's LinkedIn profile the dates of their time at one company, and from
+ * a company's About page its name, industry, size and website, for the
  * HiringPlug address the recruiter connected (and no other site). Adapted
  * from CV Studio's LinkedIn companion (its employment check); reader.js is
  * CV Studio's reader, unchanged.
@@ -130,6 +131,7 @@ async function withTab(op, url, read, prepare) {
       if (now.status === 'complete') {
         const value = await read(tab.id);
         if (op.cancelled) throw safeError('The check was stopped. Nothing more was saved.');
+        if (typeof value?.blocked === 'string') throw safeError(value.blocked.slice(0, 200));
         if (value?.failed) throw safeError('LinkedIn needs you to sign in, or the profile or company could not be confirmed.');
         if (value && !value.loading) return value;
         if (++reads >= 40) break;
@@ -193,6 +195,29 @@ async function employment(op, args) {
   return {url: args.url, company_url: args.company_url, company_id: args.company_id, joined, left, current: now, ...(now === false ? {moved_to: moves} : {})};
 }
 
+// What a company's About page says of it, for a new company in HiringPlug.
+async function companyAbout(op, args) {
+  if (!companyRe.test(args.company_url || '')) throw safeError("Enter the company's LinkedIn page (linkedin.com/company/…) first.");
+  const value = await withTab(op, args.company_url + 'about/', async tabId => {
+    try {
+      const [present] = await chrome.scripting.executeScript({target: {tabId}, func: () => !!globalThis.HiringplugCompany});
+      if (!present?.result) await chrome.scripting.executeScript({target: {tabId}, files: ['company.js']});
+      const [read] = await chrome.scripting.executeScript({target: {tabId}, func: u => {
+        try { return globalThis.HiringplugCompany.readAbout(u); } catch { return {failed: true}; }
+      }, args: [args.company_url]});
+      return read?.result;
+    } catch { throw safeError('The LinkedIn company page could not be read.'); }
+  });
+  const text = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+  const name = text(value.name, 200);
+  if (!name) throw safeError('LinkedIn showed no name for this company.');
+  return {
+    company_url: args.company_url, name, industry: text(value.industry, 200), size: text(value.size, 100),
+    website: /^https?:\/\/\S+$|^[a-z0-9.-]+\.[a-z]{2,}(\/\S*)?$/i.test(text(value.website, 300)) ? text(value.website, 300) : '',
+    headquarters: text(value.headquarters, 200), about: text(value.about, 4000),
+  };
+}
+
 async function handle(message, sender) {
   if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || !(await connectedOrigins()).includes(sender.origin)) {
     throw safeError('Connect this HiringPlug first: click the companion icon in its tab.');
@@ -203,12 +228,13 @@ async function handle(message, sender) {
     if (current && current.operation === args.operation_id) current.cancelled = true;
     return true;
   }
-  if (action !== 'companyId' && action !== 'employment') throw safeError('The companion does not know this action. Update it.');
+  if (!['companyId', 'employment', 'companyAbout'].includes(action)) throw safeError('The companion does not know this action. Update it.');
   if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HiringPlug.');
   if (current) throw safeError('The companion is busy with another check. Wait for it, or stop it.');
   const op = {operation: args.operation_id, cancelled: false, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
   current = op;
   try {
+    if (action === 'companyAbout') return await companyAbout(op, args);
     return action === 'companyId' ? await companyId(op, args) : await employment(op, args);
   } finally {
     if (current === op) current = null;

@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/industries"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
@@ -68,4 +69,17 @@ func plainString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// companyIndustries is the industry catalogue as the companies module uses
+// it: its choices in the companies module's own type (the AI's pick).
+type companyIndustries struct{ *industries.Module }
+
+func (c companyIndustries) ChoicesIn(ctx context.Context, tx pgx.Tx) (int, []companies.IndustryChoice, error) {
+	v, in, err := c.Module.ChoicesIn(ctx, tx)
+	out := make([]companies.IndustryChoice, 0, len(in))
+	for _, x := range in {
+		out = append(out, companies.IndustryChoice{ID: x.ID, Label: x.Label, Root: x.Root})
+	}
+	return v, out, err
 }

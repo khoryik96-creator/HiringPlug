@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { ok, renderWithClient } from "../test-utils";
+import { fakeCompanion, ok, renderWithClient } from "../test-utils";
 import { LinkedinChecks } from "./LinkedinChecks";
 
 let stopCompanion = () => {};
@@ -12,27 +12,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** A fake companion bridge: answers the page like the extension's bridge.js. */
+/** A fake companion bridge (test-utils), stopped after each test. */
 function companion(answer: (action: string, args: Record<string, unknown>) => { result?: unknown; error?: string }) {
-  const asked: { action: string; args: Record<string, unknown> }[] = [];
-  // As a browser delivers the bridge's window.postMessage (jsdom leaves origin and source empty).
-  const send = (m: object) => {
-    setTimeout(() => {
-      window.dispatchEvent(new MessageEvent("message", { data: { source: "hiringplug-companion", ...m }, origin: window.location.origin, source: window }));
-    }, 0);
-  };
-  const listen = (e: MessageEvent) => {
-    const m = e.data as { source?: string; type?: string; id?: string; action?: string; args?: Record<string, unknown> };
-    if (m.source !== "hiringplug-app") return;
-    if (m.type === "hello") send({ type: "ready", version: "1.0.0" });
-    if (m.type === "call" && m.action && m.args) {
-      asked.push({ action: m.action, args: m.args });
-      send({ type: "reply", id: m.id, ...answer(m.action, m.args) });
-    }
-  };
-  window.addEventListener("message", listen);
-  stopCompanion = () => { window.removeEventListener("message", listen); };
-  return asked;
+  const fake = fakeCompanion(answer);
+  stopCompanion = fake.stop;
+  return fake.asked;
 }
 
 const started = {

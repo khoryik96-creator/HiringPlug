@@ -2,6 +2,7 @@ package companies
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +23,7 @@ const nameUniqueIndex = "company_tenant_name_uq"
 // Service holds the companies use cases.
 type Service struct {
 	industries   IndustryCatalogue
+	ai           AI // the industry pick (UseAI)
 	pool         *pgxpool.Pool
 	allowPrivate bool        // company websites on private networks (local testing only)
 	files        *blob.Store // documents kept with terms and benefits
@@ -35,6 +37,7 @@ type Service struct {
 // it was only guessed from the address).
 type FillOnCreate struct {
 	FromWebsite, NameGuessed bool
+	IndustryHint             *string // an industry named elsewhere (LinkedIn's), for the AI's pick only
 }
 
 func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, fill FillOnCreate) (Company, error) {
@@ -74,6 +77,12 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, fil
 		if err := s.saveIndustries(ctx, tx, row.ID, d); err != nil {
 			return err
 		}
+		if h := fill.IndustryHint; h != nil && strings.TrimSpace(*h) != "" {
+			hint := clip(strings.TrimSpace(*h), 200)
+			if err := q.SetIndustryHint(ctx, store.SetIndustryHintParams{ID: row.ID, IndustryHint: &hint}); err != nil {
+				return err
+			}
+		}
 		if fill.FromWebsite && d.Website != nil {
 			if err := q.SetFillEmpty(ctx, store.SetFillEmptyParams{ID: row.ID, FillEmpty: true, NameGuessed: fill.NameGuessed}); err != nil {
 				return err
@@ -84,6 +93,8 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, fil
 			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCompanyAutofill, api.CompanyAutofillJob{CompanyId: row.ID}); err != nil {
 				return err
 			}
+		} else if err := s.askIndustry(ctx, tx, p.TenantID, row.ID); err != nil { // with a website, once it is read
+			return err
 		}
 		row, err = q.GetCompany(ctx, row.ID)
 		if err != nil {

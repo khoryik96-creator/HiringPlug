@@ -114,3 +114,34 @@ export function drawHeadings() {
     return { left: i * 100, right: i * 100 + 100, width: 100, top: 0, bottom: 30, height: 30, x: i * 100, y: 0, toJSON: () => ({}) };
   });
 }
+
+/**
+ * A fake LinkedIn companion bridge: answers the page like the extension's
+ * bridge.js. Returns what was asked, how to answer later, and how to stop it.
+ */
+export function fakeCompanion(answer: (action: string, args: Record<string, unknown>) => { result?: unknown; error?: string } | null, version = "1.1.0") {
+  const asked: { id: string; action: string; args: Record<string, unknown> }[] = [];
+  // As a browser delivers the bridge's window.postMessage (jsdom leaves origin and source empty).
+  const send = (m: object) => {
+    setTimeout(() => {
+      window.dispatchEvent(new MessageEvent("message", { data: { source: "hiringplug-companion", ...m }, origin: window.location.origin, source: window }));
+    }, 0);
+  };
+  const listen = (e: MessageEvent) => {
+    const m = e.data as { source?: string; type?: string; id?: string; action?: string; args?: Record<string, unknown> };
+    if (m.source !== "hiringplug-app") return;
+    if (m.type === "hello") send({ type: "ready", version });
+    if (m.type === "call" && m.action && m.args) {
+      asked.push({ id: m.id ?? "", action: m.action, args: m.args });
+      const reply = answer(m.action, m.args); // null: no answer yet (reply later)
+      if (reply) send({ type: "reply", id: m.id, ...reply });
+    }
+  };
+  window.addEventListener("message", listen);
+  return {
+    asked,
+    stop: () => { window.removeEventListener("message", listen); },
+    /** Answers a call later, as a slow read would. */
+    reply: (id: string, reply: { result?: unknown; error?: string }) => { send({ type: "reply", id, ...reply }); },
+  };
+}

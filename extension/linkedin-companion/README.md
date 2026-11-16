@@ -2,7 +2,7 @@
 
 A browser extension (Chrome, Edge and other Chromium browsers, version 116+)
 that lets HiringPlug check on LinkedIn whether contacts still work at their
-company. It reads LinkedIn **in the recruiter's own browser, with their own
+company, and fill a new company in from its LinkedIn page. It reads LinkedIn **in the recruiter's own browser, with their own
 LinkedIn sign-in**: HiringPlug's server never reads LinkedIn.
 
 ## Install and connect
@@ -16,6 +16,10 @@ LinkedIn sign-in**: HiringPlug's server never reads LinkedIn.
 
 On a company's contacts, **Check employment on LinkedIn** then checks each
 contact with a LinkedIn profile (the company needs its LinkedIn page set).
+Adding a company with its LinkedIn page, **Fill in from LinkedIn** reads that
+page's About tab: the name, industry, company size, website, headquarters and
+overview (what is already typed stays; the AI later picks the closest of the
+agency's industries).
 
 ## What it does, and does not
 
@@ -27,6 +31,11 @@ contact with a LinkedIn profile (the company needs its LinkedIn page set).
   together in a purple "HiringPlug" tab group (in that window only).
 - One read at a time, bounded (about 50 seconds at most), stoppable. It stops
   at a sign-in, check or restriction page; it never tries to get past one.
+  The company read follows CV Studio's access rules (its reader's issue()):
+  a checkpoint, sign-in or challenge address, a captcha the recruiter can
+  see (not an invisible one), a blocking heading such as "Security
+  verification", or a restriction notice within one sentence stops it, with
+  the reason; a page that names itself as another company is never read.
 - No AI, no LinkedIn messages, no browsing of its own; it sends the dates only
   back to the HiringPlug page that asked.
 - The dates are what the profile shows, not proof: a hidden or collapsed role
@@ -39,6 +48,8 @@ contact with a LinkedIn profile (the company needs its LinkedIn page set).
 - `roles.js`: HiringPlug's own small reader (in the same style): when a
   contact's time at the company ended, the roles shown as current at other
   companies, with each company's LinkedIn page: where they work now.
+- `company.js`: HiringPlug's reader of a company's About page (same style),
+  with CV Studio's access rules.
 - `worker.js`: the background worker: who may ask (connected HiringPlug pages
   only), the tabs it opens and closes, and the checks on what it returns.
 - `bridge.js`: runs on the connected HiringPlug page and passes messages.
