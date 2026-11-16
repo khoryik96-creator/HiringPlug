@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function server() {
   vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
     ? ok(testFieldSettings()) : ok({ favourites: { itSkill: ["SAP"] } }))) as never);
-  return vi.spyOn(api, "PATCH").mockImplementation(((_: string, init: { body: object }) => Promise.resolve(ok(testCandidate({ version: 5, ...init.body })))) as never);
+  return vi.spyOn(api, "PATCH").mockImplementation(((_: string, init: { body: object }) => Promise.resolve(ok(testCandidate({ version: 5, ...init.body })))));
 }
 const open = async (name: string) => {
   const b = await screen.findByRole<HTMLButtonElement>("button", { name });
