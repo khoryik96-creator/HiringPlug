@@ -1958,6 +1958,8 @@ SELECT kind::text AS kind, value::text AS value, n FROM (
   SELECT 'industry', industry, count(*)::integer FROM candidate WHERE industry IS NOT NULL GROUP BY industry
   UNION ALL
   SELECT 'specialization', specialization, count(*)::integer FROM candidate WHERE specialization IS NOT NULL GROUP BY specialization
+  UNION ALL
+  SELECT 'certification', c, count(*)::integer FROM candidate, unnest(certifications) AS c GROUP BY c
 ) used
 ORDER BY kind, n DESC, value
 LIMIT 2000

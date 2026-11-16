@@ -20,7 +20,7 @@ function Harness({ onState }: { onState: (s: SearchState) => void }) {
 describe("advanced search: IT skills, specialization and certifications", () => {
   it("offers the Settings lists (then words candidates already have) and sends what is chosen", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
-      ? ok(testFieldSettings()) : ok({ tags: [], skills: ["Excel", "java"], industries: [], specializations: ["Audit"] }))) as never);
+      ? ok(testFieldSettings()) : ok({ tags: [], skills: ["Excel", "java"], industries: [], specializations: ["Audit"], certifications: ["AWS Certified Solutions Architect", "cisco"] }))) as never);
     let state = EMPTY;
     renderWithClient(<Harness onState={(s) => { state = s; }} />);
     const pick = async (filter: RegExp, choice: string) => {
@@ -33,7 +33,9 @@ describe("advanced search: IT skills, specialization and certifications", () => 
     expect(within(skills).getAllByRole("checkbox").map((c) => c.getAttribute("aria-label") ?? c.closest("label")?.textContent.trim()),
       "the list first, then words in use (java is Java already)").toEqual(["Java", "Python", "SAP", "Excel"]);
     await pick(/^Specialization/, "Cybersecurity");
-    await pick(/^Certifications/, "CISCO");
+    const certs = await pick(/^Certifications/, "CISCO");
+    expect(within(certs).getAllByRole("checkbox").map((c) => c.getAttribute("aria-label") ?? c.closest("label")?.textContent.trim()),
+      "the list, then certifications candidates have (cisco is CISCO already)").toEqual(["ACCA", "CISCO", "AWS Certified Solutions Architect"]);
 
     expect(toBody(state, "", false)).toMatchObject({ skills: ["Python"], specialization: ["Cybersecurity"], certifications: ["CISCO"] });
     expect(activeChips(state, (k) => k).map((c) => c.label)).toEqual(["IT skills: Python", "Specialization: Cybersecurity", "Certifications: CISCO"]);

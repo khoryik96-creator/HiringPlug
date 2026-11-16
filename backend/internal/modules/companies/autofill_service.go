@@ -207,9 +207,20 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 			return err
 		}
 	}
+	// A new company's industry is asked of the AI once its website was read,
+	// whatever came of the reading (with what the website said, if anything).
+	askAfter := func() error {
+		if !fillEmpty {
+			return nil
+		}
+		return s.askIndustry(ctx, tx, job.TenantID, row.ID)
+	}
 	details := fromRow(row).Details
 	if details.Website == nil {
-		return q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "idle"})
+		if err := q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "idle"}); err != nil {
+			return err
+		}
+		return askAfter()
 	}
 	found, readErr := s.readSite(ctx, *details.Website)
 	if readErr != nil {
@@ -217,7 +228,10 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 		if len(msg) > 1000 {
 			msg = msg[:1000]
 		}
-		return q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "failed", AutofillError: &msg})
+		if err := q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "failed", AutofillError: &msg}); err != nil {
+			return err
+		}
+		return askAfter()
 	}
 	if err := q.ClearSuggestions(ctx, row.ID); err != nil {
 		return err
@@ -261,10 +275,8 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	if err := q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "done"}); err != nil {
 		return err
 	}
-	if fillEmpty { // a new company, now with what its website says of it: the AI picks its industry
-		if err := s.askIndustry(ctx, tx, job.TenantID, row.ID); err != nil {
-			return err
-		}
+	if err := askAfter(); err != nil { // a new company, now with what its website says of it
+		return err
 	}
 	return audit.Record(ctx, tx, audit.Entry{Action: "company.autofilled", EntityType: "company", EntityID: row.ID,
 		Changes: map[string]any{"suggestions": kept, "filled": filled}})

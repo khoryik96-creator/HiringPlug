@@ -15,14 +15,22 @@ const DAY = 86_400_000;
 const days = (iso: string, now: number) => Math.max(0, Math.floor((now - Date.parse(iso)) / DAY));
 const total = (p: Progress) => OPEN_STAGES.reduce((n, s) => n + p.stageCounts[s], 0);
 
-/** Why an open job needs attention, in words; null when it does not. */
-export function attention(job: JobOrderSummary, p: Progress | undefined, now = Date.now()): string | null {
+/** How much a job's problem matters: someone waiting (amber), or the job stalled (red). */
+export type AttentionLevel = "waiting" | "stalled";
+
+/** Why an open job needs attention, in words, and how much; null when it does not. */
+export function attentionOf(job: JobOrderSummary, p: Progress | undefined, now = Date.now()): { text: string; level: AttentionLevel } | null {
   if (job.status !== "open" || !p) return null;
   const open = days(job.createdAt, now);
-  if (total(p) === 0) return open >= 14 ? `No candidates in ${String(Math.floor(open / 7))} weeks` : null;
-  if (p.waiting > 0) return `${String(p.waiting)} waiting over 7 days`;
-  if (p.lastMovedAt && days(p.lastMovedAt, now) >= 7) return `Nothing moved in ${String(days(p.lastMovedAt, now))} days`;
+  if (total(p) === 0) return open >= 14 ? { text: `No candidates in ${String(Math.floor(open / 7))} weeks`, level: "stalled" } : null;
+  if (p.waiting > 0) return { text: `${String(p.waiting)} waiting over 7 days`, level: "waiting" };
+  if (p.lastMovedAt && days(p.lastMovedAt, now) >= 7) return { text: `Nothing moved in ${String(days(p.lastMovedAt, now))} days`, level: "stalled" };
   return null;
+}
+
+/** Why an open job needs attention, in words; null when it does not. */
+export function attention(job: JobOrderSummary, p: Progress | undefined, now = Date.now()): string | null {
+  return attentionOf(job, p, now)?.text ?? null;
 }
 
 /** The progress of these jobs (candidates per stage, last movement), by job. */
@@ -46,8 +54,8 @@ export function goodNews(p: Progress): string | null {
 }
 
 /** The next thing to know about a job: a problem (amber or red), or good news (green). */
-function Next({ why, p }: { why: string | null; p: Progress | undefined }) {
-  if (why) return <span className={`next-chip ${why.includes("waiting") ? "amber" : "red"}`}>{why}</span>;
+function Next({ why, p }: { why: { text: string; level: AttentionLevel } | null; p: Progress | undefined }) {
+  if (why) return <span className={`next-chip ${why.level === "waiting" ? "amber" : "red"}`}>{why.text}</span>;
   if (!p) return null;
   const good = goodNews(p);
   if (good) return <span className="next-chip green">{good}</span>;
@@ -78,7 +86,7 @@ export function JobProgressTable({ jobs, progress, empty }: {
           <tbody>
             {jobs.map((j) => {
               const p = progress?.get(j.id);
-              const why = attention(j, p, now);
+              const why = attentionOf(j, p, now);
               const last = lastActivity(p?.lastMovedAt, now);
               const open = days(j.createdAt, now);
               return (

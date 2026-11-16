@@ -778,7 +778,7 @@ paths:
     get:
       operationId: listCandidateUsedValues
       tags: [candidates]
-      summary: Tags, skills, industries and specializations already used, most used first
+      summary: Tags, skills, industries, specializations and certifications already used, most used first
       description: For suggestions while typing, so everyone spells them the same way.
       x-permission: candidates:read
       responses:
@@ -5895,6 +5895,7 @@ components:
         - company.autofill
         - company.industried
         - company.industry
+        - company.industry_ask
         - contact.check_mailbox
         - contact.linkedin_read
         - contact.read_linkedin
@@ -7015,12 +7016,13 @@ components:
         current: {type: boolean, description: "true: works there now; false: worked there."}
     UsedValues:
       type: object
-      required: [tags, skills, industries, specializations]
+      required: [tags, skills, industries, specializations, certifications]
       properties:
         tags: {type: array, items: {type: string}}
         skills: {type: array, items: {type: string}}
         industries: {type: array, items: {type: string}}
         specializations: {type: array, items: {type: string}}
+        certifications: {type: array, items: {type: string}}
     SalaryCalculationInput:
       type: object
       additionalProperties: false
@@ -7240,6 +7242,7 @@ components:
           nullable: true
         registrationNumber: {type: string, nullable: true, description: 'Business registration number, e.g. SSM in Malaysia or UEN in Singapore.'}
         about: {type: string, nullable: true}
+        industryPending: {type: boolean, description: "The AI is picking this new company's industry: read the company again shortly."}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
     CompanyCreate:
@@ -7356,6 +7359,12 @@ components:
       properties:
         accept: {type: boolean}
     CompanyAutofillJob:
+      type: object
+      additionalProperties: false
+      required: [companyId]
+      properties:
+        companyId: {$ref: '#/components/schemas/CompanyId'}
+    CompanyIndustryAskJob:
       type: object
       additionalProperties: false
       required: [companyId]
@@ -12208,6 +12217,12 @@ x-jobs:
     payload: CompanyIndustryJob
     priority: low
     description: Pick the closest of the agency's industries for a company, from what is known of it (Python AI worker).
+  company.industry_ask:
+    module: companies
+    queue: core
+    payload: CompanyIndustryAskJob
+    priority: low
+    description: Ask the AI to pick a new company's industry, if it still needs one and the AI is on (Go worker; keeps adding a company free of AI bookkeeping).
   contact.check_mailbox:
     module: contacts
     queue: core

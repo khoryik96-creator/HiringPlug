@@ -77,10 +77,12 @@ export function useColumnMove<T extends string>(ref: RefObject<HTMLTableElement 
       if (!dragging) return;
       document.body.classList.remove("moving-column");
       setDrag(null);
-      // Letting go ends the drag: that click does not also sort the list.
+      // Letting go ends the drag: that click does not also sort the list. A
+      // mouse's click follows at once; a finger's or pen's can come a few
+      // hundred milliseconds later.
       const swallow = (c: MouseEvent) => { c.stopPropagation(); c.preventDefault(); };
       window.addEventListener("click", swallow, { capture: true, once: true });
-      window.setTimeout(() => { window.removeEventListener("click", swallow, { capture: true }); }, 0);
+      window.setTimeout(() => { window.removeEventListener("click", swallow, { capture: true }); }, ev.pointerType === "mouse" ? 0 : 500);
       if (ev.type !== "pointerup" || !at) return;
       const next = moved(was, column, at.target, at.after);
       if (!same(next, was)) onMove(next);

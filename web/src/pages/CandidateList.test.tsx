@@ -25,7 +25,7 @@ function answer(items: unknown[], columns: string[] | null | (() => string[] | n
     if (path === "/v1/candidates") return Promise.resolve(ok({ items, nextCursor: null }));
     if (path === "/v1/me/preferences") return Promise.resolve(ok({ candidateColumns: typeof columns === "function" ? columns() : columns }));
     if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
-    return Promise.resolve(ok({ tags: ["relocate"], skills: ["SAP"], industries: [], specializations: [] }));
+    return Promise.resolve(ok({ tags: ["relocate"], skills: ["SAP"], industries: [], specializations: [], certifications: [] }));
   }) as never;
 }
 

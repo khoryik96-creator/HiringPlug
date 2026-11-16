@@ -25,7 +25,7 @@ function serve() {
     if (path === "/v1/talent-searches") return Promise.resolve(ok({ items: [] }));
     if (path === "/v1/talent-searches/{searchId}") return Promise.resolve(ok(done));
     if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
-    return Promise.resolve(ok({ tags: [], skills: ["SAP BW"], industries: [], specializations: [] }));
+    return Promise.resolve(ok({ tags: [], skills: ["SAP BW"], industries: [], specializations: [], certifications: [] }));
   }) as never);
 }
 

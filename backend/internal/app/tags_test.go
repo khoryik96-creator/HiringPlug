@@ -20,7 +20,8 @@ func TestCandidateTagsAndSkills(t *testing.T) {
 	})
 	assert.Equal(t, []string{"Relocate", "Hot"}, siti.Tags, "tidied: spaces trimmed, duplicates ignoring case removed")
 	assert.Equal(t, []string{"IFRS", "Excel"}, siti.Skills)
-	wei := a.createCandidate(token, map[string]any{"firstName": "Wei", "industry": "Banking", "skills": []string{"excel", "SQL"}})
+	wei := a.createCandidate(token, map[string]any{"firstName": "Wei", "industry": "Banking", "skills": []string{"excel", "SQL"},
+		"certifications": []string{"AWS Certified Solutions Architect"}})
 
 	res := a.request(http.MethodPatch, "/v1/candidates/"+wei.Id, token, map[string]any{"version": wei.Version, "tags": []string{"hot", "Relocate"}})
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
@@ -43,6 +44,7 @@ func TestCandidateTagsAndSkills(t *testing.T) {
 	res.JSON(&used)
 	assert.Equal(t, []string{"Banking"}, used.Industries)
 	assert.Contains(t, used.Skills, "IFRS")
+	assert.Equal(t, []string{"AWS Certified Solutions Architect"}, used.Certifications, "certifications candidates have, for the search filter")
 	// Equal counts are ordered by the database's collation, which differs
 	// between installations (C puts "Hot" first, en_US "hot"), so only the
 	// counts are asserted here.

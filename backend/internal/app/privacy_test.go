@@ -193,7 +193,8 @@ func TestACopyOfACandidatesDataHasEverythingHeld(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = aiConn.Close(ctx) }()
 
-	c := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "email": "siti@example.com", "currentTitle": "Accountant"})
+	c := a.createCandidate(recruiter, map[string]any{"firstName": "Siti", "lastName": "Aisyah", "email": "siti@example.com", "currentTitle": "Accountant",
+		"certifications": []string{"ACCA", "CIA"}})
 	require.Equal(t, http.StatusOK, a.request(http.MethodPut, "/v1/candidates/"+c.Id+"/compensation", recruiter, map[string]any{
 		"expectedVersion": 0, "currentSalary": map[string]any{"amount": "8500", "currency": "MYR", "period": "month"}, "expectedSalary": nil,
 	}).Status)
@@ -225,6 +226,7 @@ func TestACopyOfACandidatesDataHasEverythingHeld(t *testing.T) {
 		}
 	}
 	assert.Contains(t, values["Profile"], "Email: siti@example.com")
+	assert.Contains(t, values["Profile"], "Certifications: ACCA, CIA", "everything held about them")
 	assert.Contains(t, values["Salary"], "Current salary: MYR 8500.00 a month")
 	assert.Contains(t, values["CVs and documents"], "Text read from it: Accountant at Contoh Sdn Bhd, 2019-2023")
 	assert.Contains(t, values["Jobs they were put forward for"], "Job: Finance Manager")

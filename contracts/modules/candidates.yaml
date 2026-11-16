@@ -192,7 +192,7 @@ paths:
     get:
       operationId: listCandidateUsedValues
       tags: [candidates]
-      summary: Tags, skills, industries and specializations already used, most used first
+      summary: Tags, skills, industries, specializations and certifications already used, most used first
       description: For suggestions while typing, so everyone spells them the same way.
       x-permission: candidates:read
       responses:
@@ -1074,12 +1074,13 @@ components:
         current: { type: boolean, description: "true: works there now; false: worked there." }
     UsedValues:
       type: object
-      required: [tags, skills, industries, specializations]
+      required: [tags, skills, industries, specializations, certifications]
       properties:
         tags: { type: array, items: { type: string } }
         skills: { type: array, items: { type: string } }
         industries: { type: array, items: { type: string } }
         specializations: { type: array, items: { type: string } }
+        certifications: { type: array, items: { type: string } }
 
     SalaryCalculationInput:
       type: object

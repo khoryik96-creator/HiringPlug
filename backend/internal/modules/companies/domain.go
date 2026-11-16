@@ -38,6 +38,18 @@ type Company struct {
 	Details   Details
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// IndustryPending: the AI is picking its industry (asked within the last
+	// 10 minutes and not answered yet).
+	IndustryPending bool
+}
+
+// IndustryPickWait is how long a company counts as waiting for the AI's
+// industry pick; after that, a lost answer no longer keeps it waiting.
+const IndustryPickWait = 10 * time.Minute
+
+// pickPending says whether an industry pick asked at since is still awaited at now.
+func pickPending(since *time.Time, now time.Time) bool {
+	return since != nil && now.Sub(*since) < IndustryPickWait
 }
 
 // Summary is a company in a list.

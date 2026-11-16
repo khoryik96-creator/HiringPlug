@@ -86,7 +86,7 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
         ))}
       </div>
       <ErrorMessage error={list.error} />
-      {list.data && progress.data && <JobNumbers jobs={jobs} progress={progress.data} />}
+      {list.data && progress.data && <JobNumbers jobs={shown} progress={progress.data} />}
       {list.data && (
         <JobProgressTable jobs={shown} progress={progress.data}
           empty={view === "attention" ? "Nothing needs attention." : q || status || mine ? "No jobs match." : "No jobs yet."} />

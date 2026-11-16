@@ -13,10 +13,10 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
-// UsedValues are tags, skills, industries and specializations already used in
-// the company, most used first.
+// UsedValues are tags, skills, industries, specializations and
+// certifications already used in the company, most used first.
 type UsedValues struct {
-	Tags, Skills, Industries, Specializations []string
+	Tags, Skills, Industries, Specializations, Certifications []string
 }
 
 // usedFor is how long the suggestions are remembered. Counting them reads
@@ -60,7 +60,7 @@ func usedKey(kind, value string) string { return kind + "\x00" + strings.ToLower
 
 func (c *usedCache) put(tenantID, scope string, v UsedValues) {
 	known := map[string]bool{}
-	for kind, values := range map[string][]string{"tag": v.Tags, "skill": v.Skills, "industry": v.Industries, "specialization": v.Specializations} {
+	for kind, values := range map[string][]string{"tag": v.Tags, "skill": v.Skills, "industry": v.Industries, "specialization": v.Specializations, "certification": v.Certifications} {
 		for _, value := range values {
 			known[usedKey(kind, value)] = true
 		}
@@ -85,6 +85,9 @@ func (c *usedCache) learn(tenantID string, p Profile) {
 	}
 	for _, s := range p.Skills {
 		labels = append(labels, usedKey("skill", s))
+	}
+	for _, c := range p.Certifications {
+		labels = append(labels, usedKey("certification", c))
 	}
 	if p.Industry != nil {
 		labels = append(labels, usedKey("industry", *p.Industry))
@@ -126,7 +129,7 @@ func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, erro
 	if v, ok := s.used.get(p.TenantID, scope); ok {
 		return v, nil
 	}
-	out := UsedValues{Tags: []string{}, Skills: []string{}, Industries: []string{}, Specializations: []string{}}
+	out := UsedValues{Tags: []string{}, Skills: []string{}, Industries: []string{}, Specializations: []string{}, Certifications: []string{}}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		rows, err := store.New(tx).UsedValues(ctx)
 		for _, r := range rows {
@@ -139,6 +142,8 @@ func (s *Service) Used(ctx context.Context, p authz.Principal) (UsedValues, erro
 				out.Industries = append(out.Industries, r.Value)
 			case "specialization":
 				out.Specializations = append(out.Specializations, r.Value)
+			case "certification":
+				out.Certifications = append(out.Certifications, r.Value)
 			}
 		}
 		return err

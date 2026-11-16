@@ -108,7 +108,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       </div>
       <MultiSelect label="Specialization" choices={fromList("specialization", used.specializations, draft.specialization)}
         value={draft.specialization} onChange={set("specialization")} />
-      <MultiSelect label="Certifications" choices={fromList("certification", [], draft.certifications)}
+      <MultiSelect label="Certifications" choices={fromList("certification", used.certifications, draft.certifications)}
         value={draft.certifications} onChange={set("certifications")} />
       <MultiSelect label="Tags" choices={withChosen(used.tags, draft.tags)} value={draft.tags} onChange={set("tags")} />
       <label className="adv-field"><span className="multi-label">Location</span>

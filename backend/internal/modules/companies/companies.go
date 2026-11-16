@@ -91,7 +91,8 @@ func (m *Module) LinkedinURL(ctx context.Context, tx pgx.Tx, companyID string) (
 
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindCompanyAutofill: m.service.autofill, api.JobKindCompanyIndustried: m.service.industried}
+	return jobqueue.Handlers{api.JobKindCompanyAutofill: m.service.autofill, api.JobKindCompanyIndustried: m.service.industried,
+		api.JobKindCompanyIndustryAsk: m.service.industryAsk}
 }
 
 // Terms returns a client's terms of business (nothing set when none were

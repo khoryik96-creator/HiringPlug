@@ -28,6 +28,9 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
   const company = useQuery({
     queryKey: companyKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: id } } })),
+    // While the AI picks a new company's industry, it is read again: the
+    // industry shows, and an edit starts from the version with it.
+    refetchInterval: (q) => (q.state.data?.industryPending ? 3000 : false),
   });
   const c = company.data;
   if (!c) return company.error ? <ErrorMessage error={company.error} /> : <p className="muted">Loading…</p>;
@@ -40,7 +43,9 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       ) : (
         <section className="panel candidate-profile" aria-label="Company details">
           <dl>
-            <dt>Industries</dt><dd><IndustrySummary value={c.industrySelections} legacy={c.industry} /></dd>
+            <dt>Industries</dt><dd>{c.industryPending && !c.industrySelections?.ids.length
+              ? <span className="muted" role="status">The AI is picking the industry…</span>
+              : <IndustrySummary value={c.industrySelections} legacy={c.industry} />}</dd>
             <dt>Phone</dt><dd>{c.phone ? <a href={`tel:${c.phone}`}>{c.phone}</a> : "—"}</dd>
             <dt>Address</dt><dd className="pre">{c.address ?? "—"}</dd>
             <dt>Registration no.</dt><dd>{c.registrationNumber ?? "—"}</dd>

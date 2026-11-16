@@ -26,6 +26,11 @@ x-module:
       payload: CompanyAutofillJob
       priority: high
       description: Read a company's own website for details to suggest (Go worker).
+    company.industry_ask:
+      queue: core
+      payload: CompanyIndustryAskJob
+      priority: low
+      description: Ask the AI to pick a new company's industry, if it still needs one and the AI is on (Go worker; keeps adding a company free of AI bookkeeping).
     company.industry:
       queue: ai
       payload: CompanyIndustryJob
@@ -552,6 +557,7 @@ components:
           nullable: true
         registrationNumber: { type: string, nullable: true, description: 'Business registration number, e.g. SSM in Malaysia or UEN in Singapore.' }
         about: { type: string, nullable: true }
+        industryPending: { type: boolean, description: "The AI is picking this new company's industry: read the company again shortly." }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -673,6 +679,12 @@ components:
 
     # --- Job payloads (messages on the job queue, not HTTP bodies) ---
     CompanyAutofillJob:
+      type: object
+      additionalProperties: false
+      required: [companyId]
+      properties:
+        companyId: { $ref: '#/components/schemas/CompanyId' }
+    CompanyIndustryAskJob:
       type: object
       additionalProperties: false
       required: [companyId]

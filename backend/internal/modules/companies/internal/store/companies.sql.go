@@ -190,7 +190,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -225,6 +225,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.AutofillFillEmpty,
 		&i.AutofillNameGuessed,
 		&i.IndustryHint,
+		&i.IndustryPickSince,
 	)
 	return i, err
 }
@@ -366,7 +367,7 @@ INSERT INTO company (
   $8, $9, $10, $11,
   $12, $13, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since
 `
 
 type InsertCompanyParams struct {
@@ -433,6 +434,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.AutofillFillEmpty,
 		&i.AutofillNameGuessed,
 		&i.IndustryHint,
+		&i.IndustryPickSince,
 	)
 	return i, err
 }
@@ -829,6 +831,20 @@ func (q *Queries) SetIndustryHint(ctx context.Context, arg SetIndustryHintParams
 	return err
 }
 
+const setIndustryPickSince = `-- name: SetIndustryPickSince :exec
+UPDATE company SET industry_pick_since = $1 WHERE id = $2
+`
+
+type SetIndustryPickSinceParams struct {
+	Since *time.Time
+	ID    string
+}
+
+func (q *Queries) SetIndustryPickSince(ctx context.Context, arg SetIndustryPickSinceParams) error {
+	_, err := q.db.Exec(ctx, setIndustryPickSince, arg.Since, arg.ID)
+	return err
+}
+
 const setIndustrySummaries = `-- name: SetIndustrySummaries :exec
 UPDATE company r SET industry = v.industry, version = r.version + 1, updated_at = now()
 FROM (SELECT unnest($1::text[]) AS id, unnest($2::text[]) AS industry) v
@@ -862,7 +878,7 @@ func (q *Queries) SetIndustrySummary(ctx context.Context, arg SetIndustrySummary
 }
 
 const touchCompany = `-- name: TouchCompany :one
-UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint
+UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since
 `
 
 type TouchCompanyParams struct {
@@ -902,6 +918,7 @@ func (q *Queries) TouchCompany(ctx context.Context, arg TouchCompanyParams) (Com
 		&i.AutofillFillEmpty,
 		&i.AutofillNameGuessed,
 		&i.IndustryHint,
+		&i.IndustryPickSince,
 	)
 	return i, err
 }
@@ -924,7 +941,7 @@ UPDATE company SET
   version = version + 1,
   updated_at = now()
 WHERE id = $14 AND version = $15
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since
 `
 
 type UpdateCompanyParams struct {
@@ -994,6 +1011,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.AutofillFillEmpty,
 		&i.AutofillNameGuessed,
 		&i.IndustryHint,
+		&i.IndustryPickSince,
 	)
 	return i, err
 }

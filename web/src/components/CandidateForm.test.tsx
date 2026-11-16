@@ -114,7 +114,7 @@ describe("candidate form", () => {
 
   it("picks the specialization, IT skills and certifications from the Settings lists, and removes them", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields"
-      ? ok(testFieldSettings()) : ok({ tags: [], skills: [], industries: [], specializations: [] }))) as never);
+      ? ok(testFieldSettings()) : ok({ tags: [], skills: [], industries: [], specializations: [], certifications: [] }))) as never);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok(testCandidate({ version: 4 })));
     const onDone = vi.fn();
     renderWithClient(<CandidateForm candidate={testCandidate({ skills: ["SAP", "Excel"] })} onDone={onDone} />);

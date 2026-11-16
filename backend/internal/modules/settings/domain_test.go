@@ -192,6 +192,10 @@ func TestSpecializationsSkillsAndCertificationsAreWords(t *testing.T) {
 		_, err = CheckList(name, []OptionInput{{Label: "Only this one"}})
 		require.NoError(t, err, "%s: the starting ones may be removed", name)
 	}
+	_, err := CheckList("it_skill", []OptionInput{{Label: strings.Repeat("S", 61)}})
+	require.Error(t, err, "longer than a candidate's skill may be")
+	_, err = CheckList("certification", []OptionInput{{Label: strings.Repeat("C", 61)}})
+	require.NoError(t, err, "a certification may be up to 100")
 	assert.False(t, all[12].Options[0].BuiltIn, "so none is marked as coming with the app")
 	assert.Equal(t, ".NET", all[12].Options[0].Label)
 	assert.Equal(t, "Fortinet", all[13].Options[len(all[13].Options)-1].Label)

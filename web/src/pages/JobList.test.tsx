@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
-import { attention, goodNews } from "../components/JobProgressTable";
+import { attention, attentionOf, goodNews } from "../components/JobProgressTable";
 import { ok, renderWithClient } from "../test-utils";
 import { JobList } from "./JobList";
 
@@ -27,6 +27,8 @@ describe("the jobs list", () => {
     expect(attention(job("j", "A", 30), p(counts({ submitted: 3 }), ago(9), 3))).toBe("3 waiting over 7 days");
     expect(attention(job("j", "A", 30), p(counts({ placed: 1 }), ago(10)))).toBe("Nothing moved in 10 days");
     expect(attention(job("j", "A", 30), p(counts({ applied: 2 }), ago(1)))).toBeNull();
+    expect(attentionOf(job("j", "A", 30), p(counts({ submitted: 3 }), ago(9), 3))?.level, "amber: someone waiting").toBe("waiting");
+    expect(attentionOf(job("j", "A", 30), p(counts({ placed: 1 }), ago(10)))?.level, "red: stalled").toBe("stalled");
     expect(goodNews(p(counts({ submitted: 2, offer: 1 }), null))).toBe("1 offer out");
     expect(goodNews(p(counts({ submitted: 2 }), null))).toBe("2 with the client");
     expect(goodNews(p(counts({ applied: 2 }), null))).toBeNull();
@@ -67,6 +69,8 @@ describe("the jobs list", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Needs attention 1" }));
     expect(screen.queryByRole("link", { name: "Senior Accountant" })).toBeNull();
+    expect(kpi("Open jobs"), "the numbers follow the jobs shown").toBe("1");
+    expect(kpi("Candidates in play")).toBe("6");
     fireEvent.click(screen.getByRole("button", { name: "Mine" }));
     expect((get.mock.calls as unknown[][]).some((c) => c[0] === "/v1/jobs" && (c[1] as { params: { query: { mine?: boolean } } }).params.query.mine === true)).toBe(true);
   });

@@ -164,6 +164,7 @@ class JobKind(StrEnum):
     company_autofill = "company.autofill"
     company_industried = "company.industried"
     company_industry = "company.industry"
+    company_industry_ask = "company.industry_ask"
     contact_check_mailbox = "contact.check_mailbox"
     contact_linkedin_read = "contact.linkedin_read"
     contact_read_linkedin = "contact.read_linkedin"
@@ -1007,6 +1008,7 @@ class UsedValues(BaseModel):
     skills: list[str]
     industries: list[str]
     specializations: list[str]
+    certifications: list[str]
 
 
 class SalaryCalculationInput(BaseModel):
@@ -1271,6 +1273,13 @@ class SuggestionDecision(BaseModel):
 
 
 class CompanyAutofillJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    companyId: CompanyId
+
+
+class CompanyIndustryAskJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -5128,6 +5137,10 @@ class Company(BaseModel):
         Field(description="Business registration number, e.g. SSM in Malaysia or UEN in Singapore."),
     ]
     about: Annotated[str | None, Field(...)]
+    industryPending: Annotated[
+        bool | None,
+        Field(description="The AI is picking this new company's industry: read the company again shortly."),
+    ] = None
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
 

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 )
@@ -147,6 +148,9 @@ func words(ws ...string) []Option {
 	return opts(pairs...)
 }
 
+// maxSkill is the longest a candidate's skill may be (the candidates contract).
+const maxSkill = 60
+
 // wordLists are stored on records as their words: renaming one makes a new
 // one, and records keep the words they have.
 var wordLists = []string{"industry", "specialization", "it_skill", "certification"}
@@ -240,6 +244,11 @@ func CheckList(name string, in []OptionInput) ([]Option, error) {
 		}
 		if label == "" {
 			errs.Add(field+".label", "is required")
+			continue
+		}
+		// A candidate's skill is at most 60 characters: so is an IT skill to choose.
+		if name == "it_skill" && utf8.RuneCountInString(label) > maxSkill {
+			errs.Add(field+".label", fmt.Sprintf("at most %d characters (as a candidate's skill)", maxSkill))
 			continue
 		}
 		if seenLabel[strings.ToLower(label)] {

@@ -79,7 +79,7 @@ describe("owners of candidates and jobs", () => {
   });
 
   it("filter the candidate list to your own", async () => {
-    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null, tags: [], skills: [], industries: [], specializations: [] }));
+    const get = vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], nextCursor: null, tags: [], skills: [], industries: [], specializations: [], certifications: [] }));
     renderWithClient(<CandidateList />);
     fireEvent.click(await screen.findByLabelText("Mine only"));
     await waitFor(() => {

@@ -33,15 +33,18 @@
       if (frame && /[?&]size=invisible(?:&|$)/i.test(src)) return false;
       if (!visible(node)) return false;
       const box = node.getBoundingClientRect?.();
-      return !box || !box.width || (box.width >= 40 && box.height >= 40 && box.bottom > 0 && box.right > 0);
+      return !box || (box.width >= 40 && box.height >= 40 && box.bottom > 0 && box.right > 0);
     });
   }
-  function issue() {
+  // Notice text counts only while no About section was recognised: a
+  // company's own overview may well say "unusual activity" or "security
+  // verification" (CV Studio checks a job ad's page text the same way).
+  function issue(pageText) {
     if (/^\/(?:checkpoint|challenge|authwall|login|uas)(?:\/|$)/i.test(location.pathname)) return 'LinkedIn needs you to sign in or complete a check. Nothing was read.';
     if (challengeShown()) return 'LinkedIn needs a verification check. Nothing was read.';
     const blocking = [...document.querySelectorAll('h1,h2,[role="heading"]')].filter(visible)
       .some(node => /^(?:sign in(?: to linkedin)?|security verification|verify your identity|temporarily restricted)$/i.test(text(node)));
-    if (blocking || restrictionNotice.test(text(document.querySelector('main') || document.body).slice(0, 5000))) {
+    if (blocking || (pageText && restrictionNotice.test(text(document.querySelector('main') || document.body).slice(0, 5000)))) {
       return 'LinkedIn is showing a sign-in, access or usage restriction. Nothing was read.';
     }
     return '';
@@ -50,7 +53,7 @@
   function sameCompany(expected) {
     const named = [...document.querySelectorAll('link[rel="canonical"], meta[property="og:url"]')]
       .map(node => companyURL(node.getAttribute('href') || node.getAttribute('content') || '')).filter(Boolean);
-    return named.every(u => u === expected);
+    return named.every(u => u.toLowerCase() === expected.toLowerCase());
   }
 
   // The facts in the About section: "Industry" -> "Truck Transportation"
@@ -69,13 +72,15 @@
   }
 
   function readAbout(expectedURL) {
-    const problem = issue();
-    if (problem) return {blocked: problem};
-    // Another company (or a renamed page) is never read as this one.
-    if (companyURL(location.href) !== expectedURL || !/^\/company\/[^/]+\/about\/?$/.test(location.pathname) || !sameCompany(expectedURL)) return {failed: true};
     const main = document.querySelector('main') || document.body;
-    const heading = [...main.querySelectorAll('h1')].find(visible);
     const known = facts(main);
+    const problem = issue(!Object.keys(known).length);
+    if (problem) return {blocked: problem};
+    // Another company (or a renamed page) is never read as this one; LinkedIn's
+    // addresses ignore case, so neither does the comparison.
+    if (companyURL(location.href).toLowerCase() !== expectedURL.toLowerCase() || !/^\/company\/[^/]+\/about\/?$/.test(location.pathname) ||
+        !sameCompany(expectedURL)) return {failed: true};
+    const heading = [...main.querySelectorAll('h1')].find(visible);
     if (!heading || !Object.keys(known).length) return {loading: true};
     const overview = [...main.querySelectorAll('section')].find(s => /^overview$/i.test(text(s.querySelector('h2'))));
     const about = text(overview?.querySelector('p'));

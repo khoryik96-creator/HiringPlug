@@ -61,6 +61,9 @@ export function CompanyForm({ company, onDone, onSaved }: {
       if (size && !form.size) { next.size = size; filled.push("size"); }
       if (a.website && !form.website.trim()) { next.website = a.website; filled.push("website"); }
       if (a.about && !form.about.trim()) { next.about = a.about; filled.push("about"); }
+      // "Shah Alam, Selangor": its city is the first part.
+      const city = a.headquarters.split(",")[0]?.trim() ?? "";
+      if (city && !form.city.trim()) { next.city = city.slice(0, 100); filled.push("city"); }
       setForm(next);
       // LinkedIn's industry is only a hint: the AI picks the closest of yours once the company is saved.
       setIndustryHint(a.industry);

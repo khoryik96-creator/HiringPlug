@@ -120,6 +120,10 @@ func profileSection(v candidates.View) privacy.Section {
 		s := strings.Join(pr.Tags, ", ")
 		add("Tags", &s)
 	}
+	if len(pr.Certifications) > 0 {
+		s := strings.Join(pr.Certifications, ", ")
+		add("Certifications", &s)
+	}
 	added := v.CreatedAt.Format(time.DateOnly)
 	add("Added on", &added)
 	return privacy.Section{Title: "Profile", Items: []privacy.Item{item}}

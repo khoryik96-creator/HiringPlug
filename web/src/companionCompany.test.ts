@@ -52,12 +52,30 @@ describe("a company's LinkedIn About page", () => {
     const url = "https://www.linkedin.com/company/maju-logistik/";
     document.body.innerHTML = `<main><h1>Security verification</h1></main>`;
     expect(blocked(url)).toMatch(/restriction/);
-    document.body.innerHTML = page.replace("<main>", "<main><iframe src='https://www.linkedin.com/captcha?x=1'></iframe>");
+    // jsdom lays nothing out: a captcha frame is given the size a shown one has.
+    const sized = (w: number) => {
+      HTMLIFrameElement.prototype.getBoundingClientRect = () => ({ width: w, height: w, bottom: w, right: w, top: 0, left: 0, x: 0, y: 0, toJSON: () => ({}) });
+    };
+    sized(300);
+    document.body.innerHTML = `<main><h1>Maju</h1><iframe src='https://www.linkedin.com/captcha?x=1'></iframe></main>`;
     expect(blocked(url)).toMatch(/verification check/);
+    sized(0);
+    expect(blocked(url), "a parked, zero-size frame is not a check (CV Studio's rule)").toBeUndefined();
+    sized(300);
     document.body.innerHTML = page.replace("<main>", "<main><iframe src='https://www.google.com/recaptcha/api2/anchor?size=invisible'></iframe>");
     expect(globalThis.HiringplugCompany.readAbout(url), "an invisible captcha is not a check").toMatchObject({ name: "Maju Logistik Sdn Bhd" });
-    document.body.innerHTML = page.replace("<main>", "<main><p>We noticed unusual activity on your account.</p>");
+    document.body.innerHTML = "<main><h1>Maju</h1><p>We noticed unusual activity on your account.</p></main>";
     expect(blocked(url)).toMatch(/restriction/);
+    document.body.innerHTML = page.replace("Maju moves goods", "We detect unusual activity and run security verification. Maju moves goods");
+    expect(globalThis.HiringplugCompany.readAbout(url), "the company's own overview is not a LinkedIn notice")
+      .toMatchObject({ name: "Maju Logistik Sdn Bhd" });
+  });
+
+  it("reads the page however the address's letters were typed (LinkedIn ignores case)", () => {
+    document.head.innerHTML = '<link rel="canonical" href="https://www.linkedin.com/company/maju-logistik/">';
+    document.body.innerHTML = page;
+    expect(globalThis.HiringplugCompany.readAbout("https://www.linkedin.com/company/Maju-Logistik/")).toMatchObject({ name: "Maju Logistik Sdn Bhd" });
+    document.head.innerHTML = "";
   });
 
   it("never reads a page that names itself as another company", () => {

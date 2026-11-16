@@ -55,6 +55,17 @@ describe("company pages", () => {
     expect(await screen.findByRole("button", { name: "Fill in from website" })).toBeTruthy();
   });
 
+  it("reads the company again while the AI picks its industry, and shows the industry once picked", async () => {
+    let current: Company = { ...company, industry: null, industryPending: true, version: 1 };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies/{companyId}"
+      ? current : answers[path] ?? { items: [], nextCursor: null }))) as never);
+    renderWithClient(<CompanyDetail id={company.id} permissions={RECRUITER} />);
+    expect(await screen.findByText("The AI is picking the industry…")).toBeTruthy();
+    current = { ...company, industry: "Technology", industryPending: false, version: 2 };
+    await waitFor(() => { expect(screen.queryByText("The AI is picking the industry…")).toBeNull(); }, { timeout: 5000 });
+    expect(screen.getAllByText(/Technology/).length).toBeGreaterThan(0);
+  });
+
   it("lays its sections out as tabs, like a candidate's, and shows its billing to those who see fees", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/companies/{companyId}/billing"
       ? { year: 2026, thisYear: [{ currency: "MYR", total: "20000.00", notInvoiced: "20000.00", invoiced: "0.00", paid: "0.00" }],

@@ -55,7 +55,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       {editing ? (
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
       ) : (
-        <section className="panel candidate-profile" aria-label="Profile">
+        <section className="panel candidate-profile one-column" aria-label="Profile">
           {/* Email, phone and LinkedIn are in the Contact box beside the tabs. */}
           <dl>
             <dt>Work authorization</dt>

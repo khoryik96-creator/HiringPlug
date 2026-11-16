@@ -74,6 +74,28 @@ describe("moving columns by their headings, like a spreadsheet", () => {
     expect(headings()).toEqual(["Name", "Phone", "City", "Email"]);
   });
 
+  it("on a touch screen, the late click that ends a drag does not sort either", () => {
+    drawHeadings();
+    const sorted = vi.fn();
+    render(<Table onSort={sorted} />);
+    vi.useFakeTimers();
+    try {
+      const button = screen.getByRole("button", { name: "City" });
+      fireEvent.pointerDown(button, { button: 0, clientX: 350, pointerType: "touch" });
+      fireEvent.pointerMove(document, { clientX: 120, pointerType: "touch" });
+      fireEvent.pointerUp(document, { clientX: 120, pointerType: "touch" });
+      vi.advanceTimersByTime(300); // a finger's click comes later than a mouse's
+      fireEvent.click(screen.getByRole("button", { name: "City" }));
+      expect(sorted).not.toHaveBeenCalled();
+      expect(headings()).toEqual(["Name", "City", "Email", "Phone"]);
+      vi.advanceTimersByTime(600);
+      fireEvent.click(screen.getByRole("button", { name: "City" }));
+      expect(sorted, "a later tap sorts as usual").toHaveBeenCalledWith("city");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("still sorts on a click that does not move", () => {
     drawHeadings();
     const sorted = vi.fn();

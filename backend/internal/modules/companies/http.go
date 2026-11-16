@@ -102,7 +102,7 @@ func toAPI(co Company) api.Company {
 		Website: c.OrNull(d.Website), LinkedinUrl: c.OrNull(d.LinkedinURL), Industry: c.OrNull(d.Industry), Size: c.OrNull(c.Convert[api.CompanySize](d.Size)),
 		Phone: c.OrNull(d.Phone), Address: c.OrNull(d.Address), City: c.OrNull(d.City), Country: c.OrNull(d.Country),
 		RegistrationNumber: c.OrNull(d.RegistrationNumber), About: c.OrNull(d.About),
-		CreatedAt: co.CreatedAt, UpdatedAt: co.UpdatedAt,
+		CreatedAt: co.CreatedAt, UpdatedAt: co.UpdatedAt, IndustryPending: &co.IndustryPending,
 	}
 }
 

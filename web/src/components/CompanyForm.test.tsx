@@ -122,6 +122,19 @@ describe("company form", () => {
     expect((sentBody(post) as { industry?: string }).industry, "LinkedIn's industry is a hint, never one of ours").toBeFalsy();
   });
 
+  it("fills the city from LinkedIn's headquarters when it is empty", async () => {
+    const fake = fakeCompanion(() => ({ result: {
+      company_url: "https://www.linkedin.com/company/maju-logistik/", name: "Maju Logistik Sdn Bhd", industry: "", size: "",
+      website: "", headquarters: "Shah Alam, Selangor", about: "",
+    } }));
+    stopCompanion = fake.stop;
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-logistik");
+    fireEvent.click(await screen.findByRole("button", { name: "Fill in from LinkedIn" }));
+    expect((await screen.findByRole("status")).textContent).toContain("From LinkedIn: name, city.");
+    expect(screen.getByLabelText<HTMLInputElement>("City").value).toBe("Shah Alam");
+  });
+
   it("says why LinkedIn could not be read, and offers the companion when it is not installed", async () => {
     const fake = fakeCompanion(() => ({ error: "LinkedIn needs a verification check. Nothing was read." }));
     stopCompanion = fake.stop;

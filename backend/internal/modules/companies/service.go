@@ -3,6 +3,7 @@ package companies
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -93,7 +94,7 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, fil
 			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCompanyAutofill, api.CompanyAutofillJob{CompanyId: row.ID}); err != nil {
 				return err
 			}
-		} else if err := s.askIndustry(ctx, tx, p.TenantID, row.ID); err != nil { // with a website, once it is read
+		} else if err := s.queueIndustryAsk(ctx, tx, p.TenantID, row.ID, d); err != nil { // with a website, once it is read
 			return err
 		}
 		row, err = q.GetCompany(ctx, row.ID)
@@ -305,6 +306,7 @@ func fromRow(r store.Company) Company {
 			Phone: r.Phone, Address: r.Address, City: r.City, Country: r.Country,
 			RegistrationNumber: r.RegistrationNumber, About: r.About,
 		},
+		IndustryPending: pickPending(r.IndustryPickSince, time.Now()),
 	}
 }
 

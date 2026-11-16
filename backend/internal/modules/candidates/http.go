@@ -87,7 +87,7 @@ func (h *HTTP) ListCandidateUsedValues(ctx context.Context, _ api.ListCandidateU
 	if err != nil {
 		return nil, err
 	}
-	return api.ListCandidateUsedValues200JSONResponse{Tags: u.Tags, Skills: u.Skills, Industries: u.Industries, Specializations: u.Specializations}, nil
+	return api.ListCandidateUsedValues200JSONResponse{Tags: u.Tags, Skills: u.Skills, Industries: u.Industries, Specializations: u.Specializations, Certifications: u.Certifications}, nil
 }
 
 // CreateCandidate handles POST /v1/candidates.
