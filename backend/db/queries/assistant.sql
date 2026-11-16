@@ -13,11 +13,28 @@ ORDER BY created_at DESC, id DESC
 LIMIT 20;
 
 -- Tokens the company used since the start of the month.
+-- The assistant's answers and the emails it wrote.
 -- name: TokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM assistant_answer WHERE created_at >= @since;
+SELECT (coalesce((SELECT sum(a.input_tokens + a.output_tokens) FROM assistant_answer a WHERE a.created_at >= @since::timestamptz), 0)
+      + coalesce((SELECT sum(m.input_tokens + m.output_tokens) FROM assistant_email m WHERE m.created_at >= @since::timestamptz), 0))::bigint;
 
 -- name: SaveAnswer :execrows
 UPDATE assistant_answer
 SET status = @status, answer = sqlc.narg(answer), error = sqlc.narg(error), model = sqlc.narg(model),
     input_tokens = @input_tokens, output_tokens = @output_tokens, answered_at = now()
+WHERE id = @id AND status = 'queued';
+
+-- name: InsertEmail :one
+INSERT INTO assistant_email (tenant_id, user_id, mode)
+VALUES (app_current_tenant(), app_current_user(), @mode)
+RETURNING *;
+
+-- Only the person it was written for sees it.
+-- name: GetEmail :one
+SELECT * FROM assistant_email WHERE id = @id AND user_id = app_current_user();
+
+-- name: SaveEmail :execrows
+UPDATE assistant_email
+SET status = @status, subject = sqlc.narg(subject), body = sqlc.narg(body), error = sqlc.narg(error), model = sqlc.narg(model),
+    input_tokens = @input_tokens, output_tokens = @output_tokens, written_at = now()
 WHERE id = @id AND status = 'queued';

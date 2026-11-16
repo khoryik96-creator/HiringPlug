@@ -31,6 +31,16 @@ x-module:
       payload: AssistantAnsweredJob
       priority: high
       description: Save the provider's answer and the tokens used (Go worker).
+    assistant.email:
+      queue: ai
+      payload: AssistantEmailJob
+      priority: high
+      description: Write, improve or reply to an email with the AI (Python AI worker); names, contact details, amounts, links and fields come as placeholders.
+    assistant.emailed:
+      queue: core
+      payload: AssistantEmailedJob
+      priority: high
+      description: Save the AI's email and the tokens used (Go worker).
 
 paths:
   /v1/assistant:
@@ -47,6 +57,52 @@ paths:
               schema: { $ref: '#/components/schemas/AssistantStatus' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/assistant/email-drafts:
+    post:
+      operationId: draftEmailWithAi
+      tags: [assistant]
+      summary: Have the AI write an email, improve your draft, or reply to theirs (in the background)
+      description: >
+        The browser sends the texts with names, email addresses, phone numbers,
+        amounts, links and fields as placeholders (⟦1⟧, ⟦NAME⟧…), and puts them
+        back in what the AI writes; salary lines are also taken out here.
+      x-permission: assistant:use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssistantEmailRequest' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantEmailDraft' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/AssistantOff' }
+        '429': { $ref: '#/components/responses/AssistantLimitReached' }
+
+  /v1/assistant/email-drafts/{draftId}:
+    get:
+      operationId: getAiEmailDraft
+      tags: [assistant]
+      summary: An email the AI is writing for you, once written
+      x-permission: assistant:use
+      parameters:
+        - { name: draftId, in: path, required: true, schema: { $ref: '#/components/schemas/AssistantEmailDraftId' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssistantEmailDraft' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/assistant/answers:
     get:
@@ -187,6 +243,79 @@ components:
         ai:
           allOf: [{ $ref: '#/components/schemas/AiAccess' }]
           description: The provider the company chose; left out = the server's own (HP_AI_*).
+    AssistantEmailDraftId:
+      type: string
+      pattern: '^aem_[0-9a-hjkmnp-tv-z]{26}$'
+      example: aem_01jbz6w0m0k8q9x2r3s4t5v6w7
+    AssistantEmailMode:
+      type: string
+      description: write = from a short ask; improve = your draft, in a style; reply = to the email they sent.
+      enum: [write, improve, reply]
+    AssistantEmailStyle:
+      type: string
+      description: How to improve a draft.
+      enum: [grammar, rewrite, friendlier, formal, shorter]
+    AssistantEmailRecipient:
+      type: string
+      description: Who it is to.
+      enum: [candidate, client, colleague]
+    AssistantEmailRequest:
+      type: object
+      additionalProperties: false
+      required: [mode, recipient]
+      properties:
+        mode: { $ref: '#/components/schemas/AssistantEmailMode' }
+        style: { $ref: '#/components/schemas/AssistantEmailStyle' }
+        recipient: { $ref: '#/components/schemas/AssistantEmailRecipient' }
+        instruction: { type: string, maxLength: 1000, description: "What to say (write; optional for improve and reply)." }
+        subject: { type: string, maxLength: 300 }
+        draft: { type: string, maxLength: 20000, description: "Your draft as text (improve; optional for reply)." }
+        theirMessage: { type: string, maxLength: 20000, description: "The email they sent (reply)." }
+        applicationId: { type: string, maxLength: 40, description: "A candidate's application: its job's title and company are given to the AI." }
+    AssistantEmailStatus:
+      type: string
+      enum: [queued, done, failed]
+    AssistantEmailDraft:
+      type: object
+      required: [id, status, subject, body, error, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/AssistantEmailDraftId' }
+        status: { $ref: '#/components/schemas/AssistantEmailStatus' }
+        subject: { type: string, nullable: true, description: "With the placeholders sent." }
+        body: { type: string, nullable: true, description: "Plain text, with the placeholders sent." }
+        error: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    AssistantEmailJob:
+      type: object
+      additionalProperties: false
+      required: [draftId, mode, recipient, agency]
+      properties:
+        draftId: { $ref: '#/components/schemas/AssistantEmailDraftId' }
+        mode: { $ref: '#/components/schemas/AssistantEmailMode' }
+        style: { $ref: '#/components/schemas/AssistantEmailStyle' }
+        recipient: { $ref: '#/components/schemas/AssistantEmailRecipient' }
+        instruction: { type: string, nullable: true }
+        subject: { type: string, nullable: true }
+        draft: { type: string, nullable: true }
+        theirMessage: { type: string, nullable: true }
+        jobTitle: { type: string, nullable: true }
+        clientCompany: { type: string, nullable: true }
+        agency: { type: string, description: "The agency the sender works for." }
+        ai:
+          allOf: [{ $ref: '#/components/schemas/AiAccess' }]
+          description: The provider the company chose; left out = the server's own (HP_AI_*).
+    AssistantEmailedJob:
+      type: object
+      additionalProperties: false
+      required: [draftId, subject, body, error, model, inputTokens, outputTokens]
+      properties:
+        draftId: { $ref: '#/components/schemas/AssistantEmailDraftId' }
+        subject: { type: string, nullable: true }
+        body: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        inputTokens: { type: integer, minimum: 0 }
+        outputTokens: { type: integer, minimum: 0 }
     AssistantAnsweredJob:
       type: object
       additionalProperties: false

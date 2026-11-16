@@ -56,6 +56,11 @@ type Deps struct {
 	AI interface {
 		Access(ctx context.Context, tx pgx.Tx) (*api.AiAccess, bool, error)
 	}
+	// Agency names the company the sender works for, for emails the AI
+	// writes (identity). Nil: none.
+	Agency interface {
+		TenantName(ctx context.Context, tx pgx.Tx, tenantID string) (string, error)
+	}
 	// OtherAIUse is the company's other use of the AI (CV vs job matching):
 	// one monthly allowance covers both. Nil: none.
 	OtherAIUse interface {
@@ -93,7 +98,7 @@ func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (i
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindAssistantAnswered: m.service.answered}
+	return jobqueue.Handlers{api.JobKindAssistantAnswered: m.service.answered, api.JobKindAssistantEmailed: m.service.emailed}
 }
 
 // Insight is an answer for other modules (a job's market map).

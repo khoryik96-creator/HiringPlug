@@ -17,6 +17,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "aiprovider.reported": "Noting whether the AI answered",
   "assistant.ask": "AI assistant questions",
   "assistant.answered": "Saving AI assistant answers",
+  "assistant.email": "AI writing emails",
+  "assistant.emailed": "Saving emails the AI wrote",
   "automation.event": "Starting automations",
   "automation.run": "Running automations (emails and tasks)",
   "company.autofill": "Filling in companies from their websites",

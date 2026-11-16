@@ -8,6 +8,7 @@ import { EmailRecipients } from "../EmailRecipients";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { LocalLinkWarning } from "../LocalLinkWarning";
+import { AiEmailHelp } from "../aiEmail/AiEmailHelp";
 
 import { emailFieldErrors } from "./emailFieldErrors";
 import { api, ApiError, type Permission, type Schemas, unwrap } from "../../api/client";
@@ -179,6 +180,8 @@ export function ClientEmail({ candidateId = "", applicationId, shortlist, jobId,
           <ErrorMessage error={list.error} />
         </>
       )}
+      <AiEmailHelp recipient="client" subject={subject} html={html}
+        onApply={(sub, h) => { if (sub) setForm((f) => ({ ...f, subject: sub })); setHtml(h); setReset((n) => n + 1); }} names={{}} />
       <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || !!preview?.missing.length} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}
         bannerUrls={urls} onUploadBanner={canManage ? (f) => { uploadBanner.mutate(f); } : undefined}
         values={values} inserting={packages.inserting} onFocus={() => { inSubject.current = false; }}

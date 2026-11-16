@@ -153,6 +153,7 @@ func NewModules(d Deps) *Modules {
 		Applications: assistantApplications{m.Pipeline},
 		Market:       assistantMarket{m},
 		AI:           m.AIProviders,
+		Agency:       m.Identity,
 		OtherAIUse:   aiUse{func() []tokensSince { return []tokensSince{m.Matching, m.Documents, m.Cvformats, m.Jobs} }},
 	}, assistant.Settings{MonthlyTokens: d.Config.AI.MonthlyTokens, TimeZone: d.Config.TimeZone})
 	m.Matching = matching.New(d.Pool, matching.Deps{

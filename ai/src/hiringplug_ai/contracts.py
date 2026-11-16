@@ -157,6 +157,8 @@ class JobKind(StrEnum):
     aiprovider_reported = "aiprovider.reported"
     assistant_answered = "assistant.answered"
     assistant_ask = "assistant.ask"
+    assistant_email = "assistant.email"
+    assistant_emailed = "assistant.emailed"
     automation_event = "automation.event"
     automation_run = "automation.run"
     company_autofill = "company.autofill"
@@ -440,6 +442,107 @@ class AssistantAskJob(BaseModel):
         AiAccess | None,
         Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
     ] = None
+
+
+class AssistantEmailDraftId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["aem_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^aem_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class AssistantEmailMode(StrEnum):
+    write = "write"
+    improve = "improve"
+    reply = "reply"
+
+
+class AssistantEmailStyle(StrEnum):
+    grammar = "grammar"
+    rewrite = "rewrite"
+    friendlier = "friendlier"
+    formal = "formal"
+    shorter = "shorter"
+
+
+class AssistantEmailRecipient(StrEnum):
+    candidate = "candidate"
+    client = "client"
+    colleague = "colleague"
+
+
+class AssistantEmailRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    mode: AssistantEmailMode
+    style: AssistantEmailStyle | None = None
+    recipient: AssistantEmailRecipient
+    instruction: Annotated[
+        str | None, Field(description="What to say (write; optional for improve and reply).", max_length=1000)
+    ] = None
+    subject: Annotated[str | None, Field(max_length=300)] = None
+    draft: Annotated[
+        str | None, Field(description="Your draft as text (improve; optional for reply).", max_length=20000)
+    ] = None
+    theirMessage: Annotated[
+        str | None, Field(description="The email they sent (reply).", max_length=20000)
+    ] = None
+    applicationId: Annotated[
+        str | None,
+        Field(
+            description="A candidate's application: its job's title and company are given to the AI.",
+            max_length=40,
+        ),
+    ] = None
+
+
+class AssistantEmailStatus(StrEnum):
+    queued = "queued"
+    done = "done"
+    failed = "failed"
+
+
+class AssistantEmailDraft(BaseModel):
+    id: AssistantEmailDraftId
+    status: AssistantEmailStatus
+    subject: Annotated[str | None, Field(description="With the placeholders sent.")]
+    body: Annotated[str | None, Field(description="Plain text, with the placeholders sent.")]
+    error: Annotated[str | None, Field(...)]
+    createdAt: AwareDatetime
+
+
+class AssistantEmailJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    draftId: AssistantEmailDraftId
+    mode: AssistantEmailMode
+    style: AssistantEmailStyle | None = None
+    recipient: AssistantEmailRecipient
+    instruction: str | None = None
+    subject: str | None = None
+    draft: str | None = None
+    theirMessage: str | None = None
+    jobTitle: str | None = None
+    clientCompany: str | None = None
+    agency: Annotated[str, Field(description="The agency the sender works for.")]
+    ai: Annotated[
+        AiAccess | None,
+        Field(description="The provider the company chose; left out = the server's own (HP_AI_*)."),
+    ] = None
+
+
+class AssistantEmailedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    draftId: AssistantEmailDraftId
+    subject: Annotated[str | None, Field(...)]
+    body: Annotated[str | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    model: Annotated[str | None, Field(...)]
+    inputTokens: Annotated[int, Field(ge=0)]
+    outputTokens: Annotated[int, Field(ge=0)]
 
 
 class AssistantAnsweredJob(BaseModel):

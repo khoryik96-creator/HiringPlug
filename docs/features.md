@@ -315,6 +315,26 @@ the panel takes the whole width).
 - **Later:** streaming answers, notes in the context (with the sensitive-notes
   permission).
 
+### AI help in the email windows ✅
+
+Every email window (to a candidate, a client contact, or many at once) has
+**✦ AI**, while the assistant is on, for those who may use it:
+
+- **Write it for me**: say what the email should say ("invite her to a
+  second interview on Thursday afternoon"); the AI writes the subject and
+  message, told the job and client when the email is about one.
+- **Improve my draft**: check grammar, rewrite, friendlier, more formal, or
+  shorter, with an optional note ("keep it under 100 words").
+- **Reply to their email**: paste the email they sent (and, if you like, how
+  to answer); the AI drafts the reply.
+
+What it writes is shown first; **Use this** puts it in the email (to edit
+and send as usual), **Discard** drops it. Before anything goes to the AI, the
+browser swaps names, email addresses, phone numbers, amounts (pay included),
+links and fields for placeholders, and puts them back, exactly as they were,
+in what comes back; the server also takes out salary lines. What was sent is
+not kept. It uses the company's monthly AI allowance, like the assistant.
+
 ## 3.6 CV vs job match ✅ (off until an AI provider is set up)
 
 A fit score for a candidate on a job, with its reasons, so a recruiter can see

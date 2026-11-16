@@ -78,3 +78,14 @@ pre.extracted mark.cur { outline: 2px solid #f59e0b; background: #fbbf24; }
 .add-candidates .drop-zone { margin: 0; }
 .dropped-cvs { display: grid; gap: 0.3rem; margin-bottom: 0.9rem; }
 .dropped-cvs > .link { justify-self: end; }
+
+/* "✦ AI" in the email windows (components/aiEmail). */
+.ai-email { display: grid; gap: 0.5rem; justify-items: start; }
+.ai-email-toggle { color: #6d28d9; border-color: #c4b5fd; }
+.ai-email-panel { justify-self: stretch; display: grid; gap: 0.55rem; border: 1px solid #ddd6fe; background: #faf5ff; border-radius: 12px; padding: 0.8rem 0.9rem; }
+.ai-email-panel .segmented { justify-self: start; }
+.ai-email-panel textarea, .ai-email-panel input { width: 100%; }
+.ai-email-panel > p { margin: 0; }
+.ai-email-result { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.8rem; display: grid; gap: 0.4rem; }
+.ai-email-result p { margin: 0 0 0.5rem; }
+.ai-email-body { max-height: 18rem; overflow: auto; font-size: 0.92rem; }

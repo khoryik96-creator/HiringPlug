@@ -2,6 +2,7 @@ import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { EmailRecipients } from "./EmailRecipients";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { AiEmailHelp } from "./aiEmail/AiEmailHelp";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
@@ -176,6 +177,11 @@ export function EmailComposer({ candidateId, contactId, defaultTo = "", applicat
         {packages.notice && <p role="status" className="muted small">{packages.notice}</p>}
         <ErrorMessage error={list.error}/>
       </div>}
+      <div className="full">
+        <AiEmailHelp recipient={contactId ? "client" : "candidate"} subject={subject} html={html} applicationId={about || undefined}
+          names={{ them: values?.["[Full name]"] }}
+          onApply={(s, h) => { if (s) setForm((f) => ({ ...f, subject: s })); setHtml(h); setReset((n) => n + 1); }} />
+      </div>
       <div className="field full">
         <span>Message</span>
         <RichEditor compact invalid={!!(errors.body ?? errors.bodyHtml) || unfilled.length>0 || (tried && !textOf(html))} html={html} resetKey={reset} onChange={setHtml} fields={fields} banners={banners}

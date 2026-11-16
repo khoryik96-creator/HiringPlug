@@ -46,6 +46,36 @@ func (h *HTTP) AskAssistant(ctx context.Context, req api.AskAssistantRequestObje
 	return api.AskAssistant202JSONResponse(answerToAPI(a)), nil
 }
 
+// DraftEmailWithAi handles POST /v1/assistant/email-drafts.
+func (h *HTTP) DraftEmailWithAi(ctx context.Context, req api.DraftEmailWithAiRequestObject) (api.DraftEmailWithAiResponseObject, error) {
+	b := req.Body
+	ask := EmailAsk{Mode: string(b.Mode), Recipient: string(b.Recipient), Instruction: b.Instruction, Subject: b.Subject,
+		Draft: b.Draft, TheirText: b.TheirMessage, ApplicationID: b.ApplicationId}
+	if b.Style != nil {
+		st := string(*b.Style)
+		ask.Style = &st
+	}
+	d, err := h.svc.DraftEmail(ctx, authz.MustFromContext(ctx), ask)
+	if err != nil {
+		return nil, err
+	}
+	return api.DraftEmailWithAi202JSONResponse(emailToAPI(d)), nil
+}
+
+// GetAiEmailDraft handles GET /v1/assistant/email-drafts/{draftId}.
+func (h *HTTP) GetAiEmailDraft(ctx context.Context, req api.GetAiEmailDraftRequestObject) (api.GetAiEmailDraftResponseObject, error) {
+	d, err := h.svc.EmailDraft(ctx, authz.MustFromContext(ctx), req.DraftId)
+	if err != nil {
+		return nil, err
+	}
+	return api.GetAiEmailDraft200JSONResponse(emailToAPI(d)), nil
+}
+
+func emailToAPI(r store.AssistantEmail) api.AssistantEmailDraft {
+	return api.AssistantEmailDraft{Id: r.ID, Status: api.AssistantEmailStatus(r.Status), Subject: apiconv.OrNull(r.Subject),
+		Body: apiconv.OrNull(r.Body), Error: apiconv.OrNull(r.Error), CreatedAt: r.CreatedAt}
+}
+
 func answerToAPI(r store.AssistantAnswer) api.AssistantAnswer {
 	return api.AssistantAnswer{
 		Id: r.ID, SubjectType: api.AssistantSubjectType(r.SubjectType), SubjectId: r.SubjectID, Kind: api.AssistantKind(r.Kind),

@@ -112,6 +112,22 @@ type AssistantAnswer struct {
 	AnsweredAt   *time.Time
 }
 
+type AssistantEmail struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	Mode         string
+	Status       string
+	Subject      *string
+	Body         *string
+	Error        *string
+	Model        *string
+	InputTokens  int32
+	OutputTokens int32
+	CreatedAt    time.Time
+	WrittenAt    *time.Time
+}
+
 type AuditLog struct {
 	ID         string
 	TenantID   string

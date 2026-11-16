@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const getEmail = `-- name: GetEmail :one
+SELECT id, tenant_id, user_id, mode, status, subject, body, error, model, input_tokens, output_tokens, created_at, written_at FROM assistant_email WHERE id = $1 AND user_id = app_current_user()
+`
+
+// Only the person it was written for sees it.
+func (q *Queries) GetEmail(ctx context.Context, id string) (AssistantEmail, error) {
+	row := q.db.QueryRow(ctx, getEmail, id)
+	var i AssistantEmail
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Mode,
+		&i.Status,
+		&i.Subject,
+		&i.Body,
+		&i.Error,
+		&i.Model,
+		&i.InputTokens,
+		&i.OutputTokens,
+		&i.CreatedAt,
+		&i.WrittenAt,
+	)
+	return i, err
+}
+
 const insertAnswer = `-- name: InsertAnswer :one
 
 INSERT INTO assistant_answer (tenant_id, user_id, subject_type, subject_id, kind, question)
@@ -49,6 +75,33 @@ func (q *Queries) InsertAnswer(ctx context.Context, arg InsertAnswerParams) (Ass
 		&i.OutputTokens,
 		&i.CreatedAt,
 		&i.AnsweredAt,
+	)
+	return i, err
+}
+
+const insertEmail = `-- name: InsertEmail :one
+INSERT INTO assistant_email (tenant_id, user_id, mode)
+VALUES (app_current_tenant(), app_current_user(), $1)
+RETURNING id, tenant_id, user_id, mode, status, subject, body, error, model, input_tokens, output_tokens, created_at, written_at
+`
+
+func (q *Queries) InsertEmail(ctx context.Context, mode string) (AssistantEmail, error) {
+	row := q.db.QueryRow(ctx, insertEmail, mode)
+	var i AssistantEmail
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.Mode,
+		&i.Status,
+		&i.Subject,
+		&i.Body,
+		&i.Error,
+		&i.Model,
+		&i.InputTokens,
+		&i.OutputTokens,
+		&i.CreatedAt,
+		&i.WrittenAt,
 	)
 	return i, err
 }
@@ -135,11 +188,48 @@ func (q *Queries) SaveAnswer(ctx context.Context, arg SaveAnswerParams) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const saveEmail = `-- name: SaveEmail :execrows
+UPDATE assistant_email
+SET status = $1, subject = $2, body = $3, error = $4, model = $5,
+    input_tokens = $6, output_tokens = $7, written_at = now()
+WHERE id = $8 AND status = 'queued'
+`
+
+type SaveEmailParams struct {
+	Status       string
+	Subject      *string
+	Body         *string
+	Error        *string
+	Model        *string
+	InputTokens  int32
+	OutputTokens int32
+	ID           string
+}
+
+func (q *Queries) SaveEmail(ctx context.Context, arg SaveEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveEmail,
+		arg.Status,
+		arg.Subject,
+		arg.Body,
+		arg.Error,
+		arg.Model,
+		arg.InputTokens,
+		arg.OutputTokens,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const tokensSince = `-- name: TokensSince :one
-SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM assistant_answer WHERE created_at >= $1
+SELECT (coalesce((SELECT sum(a.input_tokens + a.output_tokens) FROM assistant_answer a WHERE a.created_at >= $1::timestamptz), 0)
+      + coalesce((SELECT sum(m.input_tokens + m.output_tokens) FROM assistant_email m WHERE m.created_at >= $1::timestamptz), 0))::bigint
 `
 
 // Tokens the company used since the start of the month.
+// The assistant's answers and the emails it wrote.
 func (q *Queries) TokensSince(ctx context.Context, since time.Time) (int64, error) {
 	row := q.db.QueryRow(ctx, tokensSince, since)
 	var column_1 int64

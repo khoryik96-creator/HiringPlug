@@ -5,6 +5,7 @@ import { MailDeliveryNotice } from "./MailDeliveryNotice";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { LocalLinkWarning } from "./LocalLinkWarning";
+import { AiEmailHelp } from "./aiEmail/AiEmailHelp";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidateEmailsKey, contactEmailsKey, emailTemplatesKey } from "../api/keys";
@@ -101,6 +102,8 @@ export function SeparateEmail({ people: chosen, onClose }: { people: Person[]; o
         }}>Use selected template</button>
       </div>
       <label className="field">Subject<input ref={subjectField} required value={subject} onChange={(e) => { setSubject(e.target.value); }} /></label>
+      <AiEmailHelp recipient={people.some((p) => p.candidateId) ? "candidate" : "client"} subject={subject} html={html} names={{}}
+        onApply={(sub, h) => { if (sub) setSubject(sub); setHtml(h); setReset((n) => n + 1); }} />
       <RichEditor compact html={html} resetKey={reset} onChange={setHtml} fields={templates.data?.fields ?? []} banners={banners} bannerUrls={urls} />
       <Attachments candidateId="" canSeeCvs={false} cvs={[]} onCvs={() => undefined} uploads={uploads} onUploads={setUploads} />
 

@@ -66,20 +66,9 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 	var out store.AssistantAnswer
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		qs := store.New(tx)
-		ai, on, err := s.deps.AI.Access(ctx, tx)
+		ai, err := s.ready(ctx, tx)
 		if err != nil {
 			return err
-		}
-		if !on {
-			return apperr.New(api.ErrorCodeASSISTANTOFF, "The AI assistant is switched off: no AI provider is set up yet.")
-		}
-		used, err := s.used(ctx, tx)
-		if err != nil {
-			return err
-		}
-		if used >= s.settings.MonthlyTokens {
-			return apperr.New(api.ErrorCodeASSISTANTLIMITREACHED,
-				"Your company has used this month's AI allowance; it starts again on the 1st.")
 		}
 		sections, err := s.sections(ctx, tx, p, q)
 		if err != nil {
