@@ -305,31 +305,33 @@ type CandidateWork struct {
 }
 
 type Company struct {
-	ID                 string
-	TenantID           string
-	Version            int32
-	Name               string
-	Type               string
-	Website            *string
-	Industry           *string
-	Size               *string
-	Phone              *string
-	Address            *string
-	City               *string
-	Country            *string
-	RegistrationNumber *string
-	About              *string
-	SearchText         *string
-	NameKey            *string
-	CreatedBy          string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	AutofillStatus     string
-	AutofillError      *string
-	AutofillCheckedAt  *time.Time
-	PhoneDigits        *string
-	Category           *string
-	LinkedinUrl        *string
+	ID                  string
+	TenantID            string
+	Version             int32
+	Name                string
+	Type                string
+	Website             *string
+	Industry            *string
+	Size                *string
+	Phone               *string
+	Address             *string
+	City                *string
+	Country             *string
+	RegistrationNumber  *string
+	About               *string
+	SearchText          *string
+	NameKey             *string
+	CreatedBy           string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	AutofillStatus      string
+	AutofillError       *string
+	AutofillCheckedAt   *time.Time
+	PhoneDigits         *string
+	Category            *string
+	LinkedinUrl         *string
+	AutofillFillEmpty   bool
+	AutofillNameGuessed bool
 }
 
 type CompanyBenefit struct {

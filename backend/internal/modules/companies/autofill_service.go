@@ -214,6 +214,35 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	if err := q.ClearSuggestions(ctx, row.ID); err != nil {
 		return err
 	}
+	// A company just added with its website: what the website says fills what
+	// was left empty (the name too, when it was only guessed), once.
+	filled := []string{}
+	if row.AutofillFillEmpty {
+		if err := q.SetFillEmpty(ctx, store.SetFillEmptyParams{ID: row.ID}); err != nil {
+			return err
+		}
+		for _, sug := range found {
+			now := current(details, sug.Field)
+			empty := now == nil || strings.TrimSpace(*now) == ""
+			if !empty && !(sug.Field == "name" && row.AutofillNameGuessed) {
+				continue
+			}
+			latest, err := q.GetCompany(ctx, row.ID)
+			if err != nil {
+				return err
+			}
+			updated, err := update(ctx, tx, q, latest, patchFor(sug.Field, sug.Value), map[string]any{"from": sug.Source})
+			if err != nil {
+				var ae *apperr.Error
+				if errors.As(err, &ae) { // e.g. another company has that name: left as a suggestion
+					continue
+				}
+				return err
+			}
+			details = updated.Details
+			filled = append(filled, sug.Field)
+		}
+	}
 	kept := 0
 	for _, sug := range found {
 		if now := current(details, sug.Field); now != nil && strings.EqualFold(strings.TrimSpace(*now), sug.Value) {
@@ -227,7 +256,8 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 	if err := q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "done"}); err != nil {
 		return err
 	}
-	return audit.Record(ctx, tx, audit.Entry{Action: "company.autofilled", EntityType: "company", EntityID: row.ID, Changes: map[string]any{"suggestions": kept}})
+	return audit.Record(ctx, tx, audit.Entry{Action: "company.autofilled", EntityType: "company", EntityID: row.ID,
+		Changes: map[string]any{"suggestions": kept, "filled": filled}})
 }
 
 // readSite reads the home page, then the contact page for what is missing.

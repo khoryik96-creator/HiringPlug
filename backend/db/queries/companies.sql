@@ -70,6 +70,10 @@ UPDATE company SET autofill_status = @autofill_status, autofill_error = sqlc.nar
   autofill_checked_at = CASE WHEN @autofill_status IN ('done', 'failed') THEN now() ELSE autofill_checked_at END
 WHERE id = @id;
 
+-- A company just added: its first reading fills its empty details.
+-- name: SetFillEmpty :exec
+UPDATE company SET autofill_fill_empty = @fill_empty, autofill_name_guessed = @name_guessed WHERE id = @id;
+
 -- A new reading replaces the suggestions still waiting.
 -- name: ClearSuggestions :exec
 DELETE FROM company_suggestion WHERE company_id = @company_id AND status = 'pending';

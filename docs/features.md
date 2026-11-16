@@ -428,6 +428,14 @@ for each of their jobs, with **Score fit** / **Score again**.
   read-only, so a click there never makes the form's save stale.
   The company list shows each one's category as a coloured chip and can be
   filtered by it.
+- **Adding a company from its addresses** ✅: on "Add company", typing its
+  LinkedIn page or website fills in a name guessed from the address (e.g.
+  "linkedin.com/company/maju-foods" → "Maju Foods"; typing a name takes
+  over). Saving with a website reads it at once (below): what it says fills
+  the details left empty (phone, address, city, country, size, registration
+  number, description) and replaces a guessed name with the company's own;
+  what was typed stays, and differences are suggestions. LinkedIn itself
+  does not allow its pages to be read, so only the name comes from it.
 - **Auto-fill from the website** ✅: "Fill in from website" on a company's
   page queues a job that reads its home page and its contact page (a link
   with "contact" or "hubungi"), only where robots.txt allows, through the

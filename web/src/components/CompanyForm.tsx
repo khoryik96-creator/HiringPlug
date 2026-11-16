@@ -5,6 +5,7 @@ import { api, type Company, unwrap } from "../api/client";
 import { companiesKey, companyKey } from "../api/keys";
 import { COMPANY_SIZE, COMPANY_TYPE, keysOf, regionName } from "../labels";
 import { COMPANY_PATHS, companyFields, type CompanyFormState, companyProblems, formFromCompany } from "./companyFormState";
+import { guessCompanyName } from "./companyNameGuess";
 import { IndustryPicker } from "./IndustryPicker";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
@@ -25,12 +26,19 @@ export function CompanyForm({ company, onDone, onSaved }: {
   const queryClient = useQueryClient();
   const [opened] = useState(() => ({ id: company?.id, version: company?.version ?? 0, form: formFromCompany(company) }));
   const [form, setForm] = useState(opened.form);
+  // A new company: its name is guessed from its addresses until typed, and
+  // saving reads its website (filling what is left empty).
+  const isNew = !opened.id;
+  const [nameGuessed, setNameGuessed] = useState(false);
   const save = useMutation({
     mutationFn: async () => {
       const problems = companyProblems(form);
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
       const fields = companyFields(form);
-      if (!opened.id) return unwrap(await api.POST("/v1/companies", { body: fields }));
+      if (!opened.id) {
+        const fill = form.website.trim() ? { fillFromWebsite: true, nameGuessed } : {};
+        return unwrap(await api.POST("/v1/companies", { body: { ...fields, ...fill } }));
+      }
       if (sameBody(fields, companyFields(opened.form))) return null; // nothing changed
       return unwrap(await api.PATCH("/v1/companies/{companyId}", {
         params: { path: { companyId: opened.id } }, body: { ...fields, version: opened.version },
@@ -47,7 +55,15 @@ export function CompanyForm({ company, onDone, onSaved }: {
   });
   const errors = fieldErrors(save.error);
   const set = <K extends keyof CompanyFormState>(key: K, value: CompanyFormState[K]) => {
+    if (isNew && (key === "website" || key === "linkedinUrl") && (!form.name.trim() || nameGuessed)) {
+      const next = { ...form, [key]: value };
+      const guess = guessCompanyName(next.website, next.linkedinUrl);
+      setForm({ ...next, name: guess });
+      setNameGuessed(guess !== "");
+      return;
+    }
     setForm((f) => ({ ...f, [key]: value }));
+    if (key === "name") setNameGuessed(false); // typed: theirs
   };
   const text = (key: TextKey, label: string, extra: InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Field label={label} error={errors[COMPANY_PATHS[key]]}>
@@ -79,6 +95,11 @@ export function CompanyForm({ company, onDone, onSaved }: {
       </Field>
       {text("website", "Website", { placeholder: "example.com", inputMode: "url" })}
       {text("linkedinUrl", "LinkedIn page", { placeholder: "linkedin.com/company/…", inputMode: "url" })}
+      {isNew && form.website.trim() && (
+        <p className="muted small full company-fill-hint">
+          Saving reads the website and fills in what is left empty (phone, address, size…){nameGuessed ? ", and the company’s own name" : ""}.
+        </p>
+      )}
       <IndustryPicker value={form.industrySelections} legacy={form.industry} onChange={(industrySelections, industry) => { setForm((f) => ({ ...f, industrySelections, industry })); }} />
       <Field label="Size" error={errors[COMPANY_PATHS.size]}>
         <select value={form.size} onChange={(e) => { set("size", e.target.value as CompanyFormState["size"]); }}>

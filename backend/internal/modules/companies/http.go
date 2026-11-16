@@ -50,7 +50,8 @@ func (h *HTTP) CreateCompany(ctx context.Context, req api.CreateCompanyRequestOb
 	if b.Type != nil {
 		in.Type = string(*b.Type)
 	}
-	company, err := h.svc.Create(ctx, authz.MustFromContext(ctx), in)
+	fill := FillOnCreate{FromWebsite: b.FillFromWebsite != nil && *b.FillFromWebsite, NameGuessed: b.NameGuessed != nil && *b.NameGuessed}
+	company, err := h.svc.Create(ctx, authz.MustFromContext(ctx), in, fill)
 	if err != nil {
 		return nil, err
 	}

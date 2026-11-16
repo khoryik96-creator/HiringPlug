@@ -159,3 +159,52 @@ func TestCompanyAutofillNeedsAWebsiteRobotsAllow(t *testing.T) {
 	assert.Contains(t, reason, "robots.txt")
 	assert.Empty(t, got.Suggestions)
 }
+
+// A company added with its website is read at once: what the website says
+// fills the details left empty (and the name guessed from the address); what
+// was typed stays, and differences are only suggested.
+func TestANewCompanyIsFilledInFromItsWebsite(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	site := companySite(t, false)
+	c := a.createCompany(token, map[string]any{"name": "127", "website": site.URL, "city": "Petaling Jaya",
+		"fillFromWebsite": true, "nameGuessed": true})
+	assert.Equal(t, api.CompanyAutofillStatusQueued, a.autofill(token, c.Id).Status, "read at once")
+
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	var got api.Company
+	a.request(http.MethodGet, "/v1/companies/"+c.Id, token, nil).JSON(&got)
+	assert.Equal(t, "Contoh Teknologi Sdn Bhd", got.Name, "the website's name replaces the guessed one")
+	assert.Equal(t, "+60 3-1234 5678", got.Phone.MustGet())
+	assert.Equal(t, "1234567-X", got.RegistrationNumber.MustGet())
+	assert.Equal(t, api.CompanySizeMedium, got.Size.MustGet(), "how many people work there")
+	assert.Equal(t, "Petaling Jaya", got.City.MustGet(), "what was typed stays")
+	left := a.autofill(token, c.Id)
+	assert.Equal(t, "Kuala Lumpur", suggestionFor(t, left, api.CompanySuggestionFieldCity).Value, "a difference is only suggested")
+
+	// Only the first reading fills: a later one suggests.
+	res := a.request(http.MethodPatch, "/v1/companies/"+c.Id, token, map[string]any{"version": got.Version, "phone": nil})
+	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
+	require.Equal(t, http.StatusAccepted, a.request(http.MethodPost, "/v1/companies/"+c.Id+"/autofill", token, nil).Status)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	a.request(http.MethodGet, "/v1/companies/"+c.Id, token, nil).JSON(&got)
+	assert.True(t, got.Phone.IsNull(), "not filled again")
+	assert.Equal(t, "+60 3-1234 5678", suggestionFor(t, a.autofill(token, c.Id), api.CompanySuggestionFieldPhone).Value)
+}
+
+func TestANewCompanysTypedNameStays(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	site := companySite(t, false)
+	c := a.createCompany(token, map[string]any{"name": "Contoh Tech", "website": site.URL, "fillFromWebsite": true})
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	var got api.Company
+	a.request(http.MethodGet, "/v1/companies/"+c.Id, token, nil).JSON(&got)
+	assert.Equal(t, "Contoh Tech", got.Name, "a name someone typed is theirs")
+	assert.Equal(t, "Contoh Teknologi Sdn Bhd", suggestionFor(t, a.autofill(token, c.Id), api.CompanySuggestionFieldName).Value)
+	assert.Equal(t, "+60 3-1234 5678", got.Phone.MustGet())
+}

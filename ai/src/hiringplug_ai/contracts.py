@@ -5014,6 +5014,18 @@ class CompanyCreate(BaseModel):
     linkedinUrl: Annotated[
         str | None, Field(description="linkedin.com/company/... (https://www. is added).", max_length=300)
     ] = None
+    fillFromWebsite: Annotated[
+        bool | None,
+        Field(
+            description="Read the website at once (with a website): what it says fills the details left empty; the rest are suggestions, as usual."
+        ),
+    ] = None
+    nameGuessed: Annotated[
+        bool | None,
+        Field(
+            description="The name was guessed from the website or LinkedIn address: the website's own name replaces it (with fillFromWebsite)."
+        ),
+    ] = None
     industry: Annotated[str | None, Field(max_length=100)] = None
     industrySelections: IndustrySelections | None = None
     size: CompanySize | None = None

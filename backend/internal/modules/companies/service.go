@@ -14,6 +14,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/blob"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/folderfilter"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 const nameUniqueIndex = "company_tenant_name_uq"
@@ -29,7 +30,14 @@ type Service struct {
 }
 
 // Create adds a company.
-func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Company, error) {
+// FillOnCreate is how a new company is filled from its website: read at
+// once, its empty details set from what the website says (and the name, when
+// it was only guessed from the address).
+type FillOnCreate struct {
+	FromWebsite, NameGuessed bool
+}
+
+func (s *Service) Create(ctx context.Context, p authz.Principal, in Details, fill FillOnCreate) (Company, error) {
 	d, errs := Normalize(in)
 	if err := errs.Err(); err != nil {
 		return Company{}, err
@@ -65,6 +73,17 @@ func (s *Service) Create(ctx context.Context, p authz.Principal, in Details) (Co
 		}
 		if err := s.saveIndustries(ctx, tx, row.ID, d); err != nil {
 			return err
+		}
+		if fill.FromWebsite && d.Website != nil {
+			if err := q.SetFillEmpty(ctx, store.SetFillEmptyParams{ID: row.ID, FillEmpty: true, NameGuessed: fill.NameGuessed}); err != nil {
+				return err
+			}
+			if err := q.SetAutofill(ctx, store.SetAutofillParams{ID: row.ID, AutofillStatus: "queued"}); err != nil {
+				return err
+			}
+			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCompanyAutofill, api.CompanyAutofillJob{CompanyId: row.ID}); err != nil {
+				return err
+			}
 		}
 		row, err = q.GetCompany(ctx, row.ID)
 		if err != nil {

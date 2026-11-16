@@ -4770,6 +4770,10 @@ export interface components {
             website?: string | null;
             /** @description linkedin.com/company/... (https://www. is added). */
             linkedinUrl?: string | null;
+            /** @description Read the website at once (with a website): what it says fills the details left empty; the rest are suggestions, as usual. */
+            fillFromWebsite?: boolean;
+            /** @description The name was guessed from the website or LinkedIn address: the website's own name replaces it (with fillFromWebsite). */
+            nameGuessed?: boolean;
             industry?: string | null;
             industrySelections?: components["schemas"]["IndustrySelections"];
             size?: components["schemas"]["CompanySize"] | null;

@@ -32,7 +32,34 @@ describe("company form", () => {
     change("Country (2-letter code)", "my");
     fireEvent.click(screen.getByRole("button", { name: "Add company" }));
     await waitFor(() => { expect(onSaved).toHaveBeenCalledWith(company); });
-    expect(sentBody(post)).toMatchObject({ name: "Maybank", type: "client", website: "maybank.com", size: "enterprise", country: "MY", city: null });
+    expect(sentBody(post)).toMatchObject({ name: "Maybank", type: "client", website: "maybank.com", size: "enterprise", country: "MY", city: null,
+      fillFromWebsite: true, nameGuessed: false }); // a typed name stays: the website only suggests
+  });
+
+  it("guesses a new company's name from its addresses, and reads its website once saved", async () => {
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(company));
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju-foods-berhad");
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe("Maju Foods Berhad");
+    change("Website", "majufoods.com.my");
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value, "LinkedIn keeps its words apart").toBe("Maju Foods Berhad");
+    expect(screen.getByText(/Saving reads the website and fills in what is left empty/).textContent).toContain("the company’s own name");
+    fireEvent.click(screen.getByRole("button", { name: "Add company" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toMatchObject({ name: "Maju Foods Berhad", website: "majufoods.com.my", fillFromWebsite: true, nameGuessed: true });
+  });
+
+  it("stops guessing once the name is typed, and reads nothing without a website", async () => {
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(company));
+    renderWithClient(<CompanyForm company={null} onDone={vi.fn()} />);
+    change("LinkedIn page", "linkedin.com/company/maju");
+    change("Name", "Maju Group");
+    change("LinkedIn page", "linkedin.com/company/maju-foods");
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe("Maju Group");
+    expect(screen.queryByText(/Saving reads the website/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add company" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).not.toHaveProperty("fillFromWebsite");
   });
 
   it("asks for a name before sending", async () => {
