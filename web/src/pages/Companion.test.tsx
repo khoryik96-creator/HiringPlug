@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeCompanion } from "../test-utils";
 import { Companion } from "./Companion";
 
-let stop = () => undefined as void;
+let stop: () => void = () => undefined;
 afterEach(() => { stop(); cleanup(); vi.useRealTimers(); });
 
 describe("LinkedIn companion page", () => {
