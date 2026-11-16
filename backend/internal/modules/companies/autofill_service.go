@@ -224,7 +224,7 @@ func (s *Service) autofill(ctx context.Context, tx pgx.Tx, job jobqueue.Job) err
 		for _, sug := range found {
 			now := current(details, sug.Field)
 			empty := now == nil || strings.TrimSpace(*now) == ""
-			if !empty && !(sug.Field == "name" && row.AutofillNameGuessed) {
+			if !empty && (sug.Field != "name" || !row.AutofillNameGuessed) {
 				continue
 			}
 			latest, err := q.GetCompany(ctx, row.ID)
