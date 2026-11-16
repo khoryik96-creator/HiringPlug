@@ -67,3 +67,14 @@ pre.extracted mark.cur { outline: 2px solid #f59e0b; background: #fbbf24; }
   .pane-bar .keys { display: none; }
   .reader-cv .cv-frame { height: 80vh; }
 }
+
+/* The candidates page: "Columns" beside "Choose All | None", as a pill like it. */
+.list-meta .column-picker { display: inline-flex; }
+.list-meta .columns-pill { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); padding: 0.15rem 0.75rem; min-height: 0; font-size: 0.78rem; font-weight: 600; color: var(--text); box-shadow: none; }
+.list-meta .columns-pill:hover, .list-meta .columns-pill[aria-expanded="true"] { border-color: var(--accent); color: var(--accent-dark); }
+.list-meta .column-menu { left: 0; right: auto; top: 2rem; }
+/* "Drop CVs here" beside "+ Add candidate"; what was dropped opens below. */
+.add-candidates { align-items: stretch; }
+.add-candidates .drop-zone { margin: 0; }
+.dropped-cvs { display: grid; gap: 0.3rem; margin-bottom: 0.9rem; }
+.dropped-cvs > .link { justify-self: end; }

@@ -4,6 +4,8 @@ import { Fragment, useCallback, useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { candidatesKey } from "../api/keys";
 import { CandidateExtras, extrasBody } from "../components/MandatoryExtras";
+import { CvImports } from "../components/CvImports";
+import { CV_TYPES, DropZone } from "../components/DropZone";
 import { DuplicateEmail } from "../components/DuplicateEmail";
 import { InFolders, useFolderView, useInFolders, WithFolders } from "../components/folders/FolderView";
 import { ErrorMessage } from "../components/ErrorMessage";
@@ -21,14 +23,18 @@ import { usePicked } from "../components/usePicked";
 import { hashParam } from "../hashQuery";
 
 /** Search and add candidates. */
-export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, meId = "" }: {
-  canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean; meId?: string;
+export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = false, canEmail = false, canAddToJob = false, canFolders = false, canImport = false, meId = "" }: {
+  canCreate: boolean; canSeeSalary?: boolean; canAiSearch?: boolean; canEmail?: boolean; canAddToJob?: boolean; canFolders?: boolean;
+  /** May add candidates from CVs (the drop box). */
+  canImport?: boolean;
+  meId?: string;
 }) {
   const [q, setQ] = useState(() => hashParam("q")); // a search from the dashboard
   const [mine, setMine] = useState(false);
   const [adv, setAdv] = useState<SearchState>(loadSearch);
   const [panel, setPanel] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [dropped, setDropped] = useState<{ files: File[]; at: number } | null>(null); // CVs dropped on the page's box
   const cols = useCandidateColumns();
   const pick = usePicked();
   const folders = useFolderView("candidate", canFolders, meId, pick.clear);
@@ -98,12 +104,21 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
     <main className="candidates-page wide">
       <div className="page-head">
         <h2>Candidates</h2>
-        <div className="row">
-          {canAiSearch && <a className="button ai-link" href="#/candidates/ai-search">✦ AI search</a>}
+        <div className="row add-candidates">
+          {canImport && (
+            <DropZone accept={CV_TYPES} multiple compact label="Drop CVs here to add candidates"
+              onFiles={(files) => { setDropped({ files, at: Date.now() }); }} />
+          )}
           {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>+ Add candidate</button>}
         </div>
       </div>
       {canCreate && adding && <AddCandidate onCancel={() => { setAdding(false); }} />}
+      {canImport && dropped && (
+        <div className="dropped-cvs">
+          <CvImports key={dropped.at} foldedHistory initialFiles={dropped.files} />
+          <button type="button" className="link small" onClick={() => { setDropped(null); }}>Close</button>
+        </div>
+      )}
       <div className="list-toolbar">
         <div className="search-box">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
@@ -113,7 +128,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
         <button type="button" className={`doc-btn${advanced ? " primary-soft" : ""}`} aria-expanded={panel} onClick={() => { setPanel(!panel); }}>
           Advanced search{chips.length > 0 ? ` · ${String(chips.length)}` : ""}
         </button>
-        {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
+        {canAiSearch && <a className="doc-btn ai-link" href="#/candidates/ai-search">✦ AI search</a>}
       </div>
       {panel && <AdvancedSearch value={adv} canSeeSalary={canSeeSalary} onSearch={(s) => { apply(s); setPanel(false); }} onClose={() => { setPanel(false); }} />}
       {!panel && chips.length > 0 && (
@@ -142,6 +157,7 @@ export function CandidateList({ canCreate, canSeeSalary = false, canAiSearch = f
             {folders.actions([...pick.ids])}
           </PickBar>
         )}
+        {openAs === "profile" && <ColumnPicker columns={cols.columns} chosen={cols.chosen} onSave={(c) => { cols.save.mutate(c); }} />}
         <span className="list-meta-end">
           {openAs === "profile" && <WaLegend />}
           <OpenAsSwitch value={openAs} onChange={setOpenAs} />

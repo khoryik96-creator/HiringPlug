@@ -76,6 +76,37 @@ describe("candidate list", () => {
     expect(screen.queryByText("1 chosen")).toBeNull();
   });
 
+  it("has AI search beside Advanced search, and Columns beside Choose", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate canAiSearch canEmail />);
+    await screen.findByText("Siti Aisyah");
+    const ai = screen.getByRole("link", { name: "✦ AI search" });
+    expect(ai.closest(".list-toolbar")).toBe(screen.getByRole("button", { name: /Advanced search/ }).closest(".list-toolbar"));
+    const columns = screen.getByRole("button", { name: "Columns ▾" });
+    expect(columns.closest(".list-meta")).toBe(screen.getByRole("group", { name: "Choose" }).closest(".list-meta"));
+  });
+
+  it("adds candidates from CVs dropped on the page", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate canImport />);
+    await screen.findByText("Siti Aisyah");
+    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
+    const cv = new File(["%PDF-1.7"], "nurul-cv.pdf", { type: "application/pdf" });
+    fireEvent.drop(screen.getByText("Drop CVs here to add candidates").closest(".drop-zone") as Element, { dataTransfer: { files: [cv] } });
+    const panel = await screen.findByRole("region", { name: "CV import" });
+    expect(panel.textContent).toContain("nurul-cv.pdf");
+    expect(screen.getByRole("button", { name: "Import 1 file" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("region", { name: "CV import" })).toBeNull();
+  });
+
+  it("has no CV drop box for those who may not import", async () => {
+    vi.spyOn(api, "GET").mockImplementation(answer([summary]));
+    renderWithClient(<CandidateList canCreate />);
+    await screen.findByText("Siti Aisyah");
+    expect(screen.queryByText("Drop CVs here to add candidates")).toBeNull();
+  });
+
   it("shows tags by the name", async () => {
     vi.spyOn(api, "GET").mockImplementation(answer([summary]));
     renderWithClient(<CandidateList canCreate={false} />);
@@ -216,7 +247,7 @@ describe("candidate list", () => {
     expect(siti?.textContent).toContain("Malaysia");
     expect(siti?.textContent).toContain("Spouse visa");
 
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
     fireEvent.click(screen.getByLabelText("Industry"));
     await waitFor(() => {
       expect(put).toHaveBeenCalledWith("/v1/me/preferences", { body: { candidateColumns: ["nationality", "residence", "workAuthorization", "industry"] } });
@@ -230,7 +261,7 @@ describe("candidate list", () => {
     const put = vi.spyOn(api, "PUT").mockImplementation((() => new Promise((resolve) => { pending.push(resolve); })) as never);
     renderWithClient(<CandidateList canCreate={false} />);
     await screen.findByRole("columnheader", { name: "Nationality" });
-    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    fireEvent.click(screen.getByRole("button", { name: "Columns ▾" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Residence" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "Industry" }));
     expect(await screen.findByRole("columnheader", { name: "Industry" })).toBeTruthy(); // shown at once
@@ -266,7 +297,7 @@ describe("candidate list", () => {
     renderWithClient(<CandidateList canCreate={false} />);
     fireEvent.click(await screen.findByRole("button", { name: /Wei Tan/ }));
     expect(screen.getByRole("region", { name: "Resume of Wei Tan" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Columns" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Columns ▾" })).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "Search candidates" }), { target: { value: "a" } });
     expect(await screen.findByRole("region", { name: "Resume of Siti Aisyah" })).toBeTruthy();
   });

@@ -122,6 +122,7 @@ export function WaLegend() {
 
 /** Choose, order and reset the columns. */
 export function ColumnPicker({ columns, chosen, onSave }: { columns: Column[]; chosen: boolean; onSave: (c: Column[] | null) => void }) {
+  // A pill beside the list's "Choose All | None" (search-reader.css).
   const [open, setOpen] = useState(false);
   const move = (col: Column, by: number) => {
     const next = columns.filter((c) => c !== col);
@@ -133,7 +134,7 @@ export function ColumnPicker({ columns, chosen, onSave }: { columns: Column[]; c
   const toggle = (col: Column, on: boolean) => { onSave(on ? [...columns, col] : columns.filter((c) => c !== col)); };
   return (
     <div className="column-picker">
-      <button type="button" aria-expanded={open} onClick={() => { setOpen(!open); }}>Columns</button>
+      <button type="button" className="columns-pill" aria-expanded={open} onClick={() => { setOpen(!open); }}>Columns ▾</button>
       {open && (
         <div className="panel column-menu" role="group" aria-label="Columns">
           <p className="small muted">Shown after the name, in this order</p>

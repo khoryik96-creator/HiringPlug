@@ -43,13 +43,17 @@ async function sendFile(importId: string, file: File): Promise<void> {
   if (!res.ok) unwrap({ error: await res.json(), response: res });
 }
 
-/** foldedHistory (the dashboard): past imports load only when opened, or once an import starts here. */
-export function CvImports({ foldedHistory = false }: { foldedHistory?: boolean } = {}) {
+/**
+ * foldedHistory (the dashboard): past imports load only when opened, or once
+ * an import starts here. initialFiles: files already dropped elsewhere (the
+ * candidates page), ready to import.
+ */
+export function CvImports({ foldedHistory = false, initialFiles }: { foldedHistory?: boolean; initialFiles?: File[] } = {}) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
   const [source, setSource] = useState("linkedin");
   const [tried, setTried] = useState(false); // Import was pressed: a missing source is outlined
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(initialFiles ?? []);
   const [sent, setSent] = useState<number | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [review, setReview] = useState<Review | null>(null);
