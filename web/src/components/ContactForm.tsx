@@ -1,10 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type InputHTMLAttributes, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type InputHTMLAttributes, useEffect, useState } from "react";
 
 import { api, type Contact, unwrap } from "../api/client";
 import { contactKey, contactsKey } from "../api/keys";
 import { CONTACT_STATUS, keysOf } from "../labels";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
+import { ContactFromLinkedin } from "./ContactFromLinkedin";
+import { afterContactAdded } from "./contactLinkedin";
 import { CONTACT_PATHS, contactFields, type ContactFormState, contactProblems, formFromContact } from "./contactFormState";
 import { Field } from "./Field";
 import { useFieldSettings } from "./useFieldSettings";
@@ -39,6 +41,14 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       }));
     },
     onSuccess: (saved) => {
+      // A new contact: an email guessed (then verified) and their time at the
+      // company checked on LinkedIn, while you go on working.
+      if (saved && !opened.id) {
+        void afterContactAdded(saved).catch(() => undefined).finally(() => {
+          void queryClient.invalidateQueries({ queryKey: contactsKey });
+          void queryClient.invalidateQueries({ queryKey: contactKey(saved.id) });
+        });
+      }
       if (saved) {
         queryClient.setQueryData(contactKey(saved.id), saved);
         void queryClient.invalidateQueries({ queryKey: contactsKey });
@@ -48,6 +58,7 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
     },
   });
   const errors = fieldErrors(save.error);
+  const taken = useEmailTaken(form.email, opened.id);
   const set = <K extends keyof ContactFormState>(key: K, value: ContactFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
@@ -69,14 +80,28 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       <Field label="Company" error={errors[CONTACT_PATHS.company]}>
         <CompanyPicker value={form.company} onChange={(c) => { set("company", c); }} />
       </Field>
+      {!opened.id && <>
+        {text("linkedinUrl", "LinkedIn profile", { placeholder: "linkedin.com/in/name" })}
+        <ContactFromLinkedin url={form.linkedinUrl} company={form.company}
+          onRead={(fill) => {
+            setForm((f) => ({ ...f, firstName: f.firstName || fill.firstName, lastName: f.lastName || fill.lastName,
+              title: f.title || fill.title, linkedinUrl: fill.linkedinUrl }));
+          }}
+          onCompany={(c) => { set("company", c); }} />
+      </>}
       {text("firstName", "First name")}
       {text("lastName", "Last name")}
       {text("title", "Job title", { placeholder: "e.g. HR Manager" })}
       {/* Not type="email": the browser's rule refuses addresses the API accepts. */}
       {text("email", "Email", { inputMode: "email", autoComplete: "off", spellCheck: false })}
+      {taken && (
+        <p className="warning small full" role="alert">
+          Already a contact: <a href={`#/contacts/${taken.id}`}>{taken.fullName}</a>{taken.companyName ? ` at ${taken.companyName}` : ""}.
+        </p>
+      )}
       {text("phone", "Office phone")}
       {text("mobile", "Mobile")}
-      {text("linkedinUrl", "LinkedIn", { placeholder: "linkedin.com/in/name" })}
+      {opened.id && text("linkedinUrl", "LinkedIn", { placeholder: "linkedin.com/in/name" })}
       <Field label="Role" error={errors[CONTACT_PATHS.role]}>
         <select value={form.role} onChange={(e) => { set("role", e.target.value); }}>
           <option value="">Not set</option>
@@ -108,4 +133,21 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       />
     </form>
   );
+}
+
+/** Another contact with this email, as soon as it is typed (one email, one contact). */
+function useEmailTaken(email: string, self: string | undefined) {
+  const typed = email.trim().toLowerCase();
+  const [settled, setSettled] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => { setSettled(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) ? typed : ""); }, 400);
+    return () => { clearTimeout(t); };
+  }, [typed]);
+  const found = useQuery({
+    queryKey: [...contactsKey, "email", settled],
+    queryFn: async () => unwrap(await api.GET("/v1/contacts", { params: { query: { q: settled, limit: 5 } } })).items,
+    enabled: settled !== "",
+    staleTime: 30_000,
+  });
+  return settled === typed ? found.data?.find((c) => c.email?.toLowerCase() === settled && c.id !== self) : undefined;
 }

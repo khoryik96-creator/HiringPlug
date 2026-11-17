@@ -214,3 +214,17 @@ test('Find HR says when LinkedIn does not show the country asked for', async () 
     query: '"HR"', keywords: 'HR', page: 1}});
   assert.match(reply.error, /location filter as Malaysia/);
 });
+
+test("reads a new contact's name and current roles from their profile", async () => {
+  const opened = [];
+  const b = browser({page: (tab, args) => {
+    opened.push(tab.url);
+    if (tab.url.endsWith('/details/experience/')) return [{company_url: company, company_name: 'Maju Logistik', title: 'HR Manager', since: '2023-03'}];
+    return {name: ' Ana  Lim ', text: 'x'.repeat(40), publicUrl: profile};
+  }});
+  const reply = await b.send({action: 'profile', args: {operation_id: op, url: profile}});
+  assert.deepEqual(JSON.parse(JSON.stringify(reply.result)), {url: profile, name: 'Ana Lim',
+    roles: [{company_url: company, company_name: 'Maju Logistik', title: 'HR Manager', since: '2023-03'}]});
+  assert.deepEqual(opened, [profile + '/', profile + '/details/experience/']);
+  assert.equal(b.tabs.size, 1, 'both tabs closed');
+});

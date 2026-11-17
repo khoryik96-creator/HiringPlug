@@ -21,7 +21,8 @@ contact with a LinkedIn profile (the company needs its LinkedIn page set).
 A company's **Find HR** tab reads pages of a LinkedIn people search at that
 company (one page per background tab, filtered to the country chosen; the
 filters LinkedIn shows must name the company and the country) and, for the
-people chosen, their joining dates.
+people chosen, their joining dates. On a new contact, **Fill in from
+LinkedIn** reads their name (profile page) and current roles (Experience page).
 Adding a company with its LinkedIn page, **Fill in from LinkedIn** reads that
 page's About tab: the name, industry, company size, website, headquarters and
 overview (what is already typed stays; the AI later picks the closest of the

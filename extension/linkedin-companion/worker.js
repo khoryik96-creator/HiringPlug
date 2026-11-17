@@ -2,7 +2,8 @@
  * HiringPlug LinkedIn companion: in the recruiter's own browser, reads from a
  * contact's LinkedIn profile the dates of their time at one company, from
  * a company's About page its name, industry, size and website, and pages of
- * a people search at a company (Find HR), for the
+ * a people search at a company (Find HR), and a person's name and current
+ * roles (a new contact), for the
  * HiringPlug address the recruiter connected (and no other site). Adapted
  * from CV Studio's LinkedIn companion (its employment check); reader.js is
  * CV Studio's reader, unchanged.
@@ -186,6 +187,27 @@ async function companyId(op, args) {
   return {company_url: args.company_url, company_id: value.company_id, company_name: name};
 }
 
+// A person's profile, for a new contact: their name (profile page) and the
+// roles shown as current, each with its company's exact LinkedIn page and
+// since when (Experience page). Two background tabs, one after the other.
+async function profile(op, args) {
+  if (!profileRe.test(args.url || '')) throw safeError('Enter their LinkedIn profile (linkedin.com/in/…) first.');
+  const top = await withTab(op, args.url + '/', tabId => inject(tabId, url => {
+    try { return globalThis.SourcerReader.readProfile(url); } catch { return {failed: true}; }
+  }, [args.url], 'The LinkedIn profile could not be read.'));
+  const clip = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+  const name = clip(top.name, 150);
+  if (!name) throw safeError('LinkedIn showed no name on this profile.');
+  if (op.cancelled) throw safeError('The check was stopped. Nothing more was saved.');
+  let roles = [];
+  await withTab(op, args.url + '/details/experience/', async tabId => {
+    roles = await currentRoles(tabId, args.url, '');
+    // The Experience page can draw its roles after the page loads: wait a little for them.
+    return roles.length || ++op.rolePolls > 12 ? {roles} : {loading: true};
+  });
+  return {url: args.url, name, roles};
+}
+
 // One page of a people search at a company (Find HR): the people whose title
 // matches a keyword, with their profile link, title and location. The page is
 // its own address (&page=N), so a page that failed is simply read again. The
@@ -283,14 +305,15 @@ async function handle(message, sender) {
     if (current && current.operation === args.operation_id) current.cancelled = true;
     return true;
   }
-  if (!['companyId', 'employment', 'companyAbout', 'peoplePage'].includes(action)) throw safeError('The companion does not know this action. Update it.');
+  if (!['companyId', 'employment', 'companyAbout', 'peoplePage', 'profile'].includes(action)) throw safeError('The companion does not know this action. Update it.');
   if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HiringPlug.');
   if (current) throw safeError('The companion is busy with another check. Wait for it, or stop it.');
-  const op = {operation: args.operation_id, cancelled: false, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
+  const op = {operation: args.operation_id, cancelled: false, rolePolls: 0, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
   current = op;
   try {
     if (action === 'companyAbout') return await companyAbout(op, args);
     if (action === 'peoplePage') return await peoplePage(op, args);
+    if (action === 'profile') return await profile(op, args);
     return action === 'companyId' ? await companyId(op, args) : await employment(op, args);
   } finally {
     if (current === op) current = null;

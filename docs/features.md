@@ -834,6 +834,15 @@ lead's company (with the built-in email check).
   dragged by its handle (or moved with the arrow keys) into each person's
   own order, kept with their settings (`dashboardBlocks`); "Reset order"
   restores the default.
+- **A new contact from LinkedIn** ✅: on the Add contact form, their
+  LinkedIn profile and "Fill in from LinkedIn" (the companion, 1.3) fill in
+  their name and job title from the profile and say where LinkedIn shows them
+  now and since when; the companies in HiringPlug that may be theirs are
+  offered, the one with the same LinkedIn page first (then similar names).
+  An email that belongs to a contact already is flagged as you type it. Once
+  saved, a contact with no email gets one guessed from colleagues' (then
+  verified like every new address), and their time at the company is checked
+  on LinkedIn (since when, shown in the contact lists, or marked as left).
 - **Find HR** ✅ (a company's tab): its people in HR on LinkedIn, read by
   the LinkedIn companion in the recruiter's own browser. You choose the
   country, the job titles and how many pages; the titles are run as a few

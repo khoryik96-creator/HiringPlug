@@ -1213,3 +1213,8 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .hr-chip.new { background: #e8f6ee; color: #15803d; }
 .hr-chip.dup { background: #fdf3e2; color: #b45309; }
 .hr-chip.have { background: var(--soft); color: var(--muted); }
+
+/* A new contact from their LinkedIn profile */
+.from-linkedin { display: grid; gap: 0.4rem; justify-items: start; }
+.linkedin-read { display: grid; gap: 0.4rem; font-size: 0.9rem; }
+.linkedin-read .row { flex-wrap: wrap; gap: 0.4rem; align-items: center; }
