@@ -10,9 +10,15 @@ import docx
 import pytest
 
 from hiringplug_ai import office
-from hiringplug_ai.contracts import DocumentPdfRenderedJob, DocumentRenderPdfJob, JobKind
+from hiringplug_ai.contracts import (
+    DocumentPdfRenderedJob,
+    DocumentRenderPdfJob,
+    JdPdfRenderedJob,
+    JdRenderPdfJob,
+    JobKind,
+)
 from hiringplug_ai.extraction import DEFAULT_LIMITS
-from hiringplug_ai.jobs import Deps, render_pdf
+from hiringplug_ai.jobs import Deps, render_jd_pdf, render_pdf
 
 DOC_ID = "doc_01jbz6w0m0k8q9x2r3s4t5v6w7"
 
@@ -90,3 +96,21 @@ def test_any_file_gets_an_answer_not_a_crash() -> None:
     result = follow_up.payload
     assert isinstance(result, DocumentPdfRenderedJob)
     assert (result.pdfBase64 is None) != (result.error is None), "a PDF, or why not"
+
+
+def test_a_word_job_description_becomes_a_pdf() -> None:
+    """jd.render_pdf: the job's page previews a Word JD as it looks."""
+    job = JdRenderPdfJob.model_validate(
+        {
+            "jdFileId": "jdf_01jbz6w0m0k8q9x2r3s4t5v6w7",
+            "downloadUrl": "http://api.test/internal/files/x?sig=1",
+        }
+    )
+    [follow_up] = render_jd_pdf.run(job, deps_for(a_docx()))
+    assert follow_up.queue == "core"
+    assert follow_up.kind == JobKind.jd_pdf_rendered
+    result = follow_up.payload
+    assert isinstance(result, JdPdfRenderedJob)
+    assert result.error is None
+    assert result.pdfBase64 is not None
+    assert base64.b64decode(result.pdfBase64).startswith(b"%PDF-")

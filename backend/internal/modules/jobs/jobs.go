@@ -73,7 +73,7 @@ func (m *Module) UseAI(ai AI) { m.service.ai = ai }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead, api.JobKindJdBlinded: m.service.saveBlindRewrite}
+	return jobqueue.Handlers{api.JobKindJobJdRead: m.service.saveJDRead, api.JobKindJdBlinded: m.service.saveBlindRewrite, api.JobKindJdPdfRendered: m.service.saveJDPdf}
 }
 
 // TokensSince is the AI tokens blind ad rewrites used since a time (the

@@ -40,6 +40,7 @@ type JDFile struct {
 	JobID                *string // nil: read before its job was added
 	Error                *string
 	Details              *JDDetails
+	PdfStatus            *string // a Word file's PDF copy: queued, ready or failed
 	CreatedAt            time.Time
 }
 
@@ -103,6 +104,13 @@ func (s *Service) UploadJD(ctx context.Context, p authz.Principal, jobID, fileNa
 		row, err := q.InsertJdFile(ctx, params)
 		if err != nil {
 			return err
+		}
+		if filekind.Office(ctype) { // previewed as it looks: a PDF copy
+			if err := s.queueJDPdf(ctx, tx, p.TenantID, id, key); err != nil {
+				return err
+			}
+			queued := string(api.PdfStatusQueued)
+			row.PdfStatus = &queued
 		}
 		if !filekind.ReadHere(ctype) {
 			if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJobReadJd, api.JobReadJdJob{
@@ -182,7 +190,7 @@ func (s *Service) saveJDRead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) e
 func jdFrom(r store.GetJdFileRow) (JDFile, error) {
 	out := JDFile{
 		ID: r.ID, JobID: r.JobID, FileName: r.FileName, ContentType: r.ContentType, SizeBytes: int(r.SizeBytes),
-		Status: r.Status, Error: r.Error, CreatedAt: r.CreatedAt,
+		Status: r.Status, Error: r.Error, PdfStatus: r.PdfStatus, CreatedAt: r.CreatedAt,
 	}
 	if len(r.Details) > 0 {
 		var d JDDetails
@@ -258,7 +266,8 @@ func readJDForm(r *multipart.Reader, limit int64) (string, []byte, error) {
 }
 
 func jdToAPI(f JDFile) api.JdFile {
-	out := api.JdFile{Id: f.ID, JobId: c.OrNull(f.JobID), FileName: f.FileName, ContentType: f.ContentType, SizeBytes: f.SizeBytes, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error)}
+	out := api.JdFile{Id: f.ID, JobId: c.OrNull(f.JobID), FileName: f.FileName, ContentType: f.ContentType, SizeBytes: f.SizeBytes, Status: api.JdFileStatus(f.Status), CreatedAt: f.CreatedAt, Error: c.OrNull(f.Error),
+		PdfStatus: c.OrNull(c.Convert[api.PdfStatus](f.PdfStatus))}
 	out.Details.SetNull()
 	if d := f.Details; d != nil {
 		v := api.JdDetails{

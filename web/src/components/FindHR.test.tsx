@@ -70,8 +70,26 @@ describe("Find HR", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add 1 as contacts" }));
     await waitFor(() => { expect(patch).toHaveBeenCalled(); });
     expect((post.mock.calls[0]?.[1] as unknown as { body: unknown }).body).toEqual({ companyId: "comp_1", firstName: "Daniel", lastName: "Lee",
-      title: "HR Business Partner", linkedinUrl: "https://www.linkedin.com/in/daniel" });
+      title: "HR Business Partner", linkedinUrl: "https://www.linkedin.com/in/daniel", role: "hr" }); // found as HR, tagged HR
     expect((patch.mock.calls[0]?.[1] as unknown as { body: unknown }).body).toEqual({ version: 1, email: "daniel.lee@majubank.my" });
+  });
+
+  it("reads joining dates only for those not read yet, so a second click carries on where a failure stopped", async () => {
+    serve();
+    let signIn = true;
+    const call = vi.spyOn(companion, "companionCall").mockImplementation(() =>
+      signIn ? Promise.reject(new Error("LinkedIn asked to sign in")) : Promise.resolve({ joined: "2024-01", left: "", current: true }));
+    vi.spyOn(api, "POST").mockResolvedValue(ok({ scan }));
+    renderWithClient(<FindHR company={company} canCreate />);
+    await screen.findByText("Daniel Lee");
+    fireEvent.click(screen.getByRole("button", { name: "All 3" })); // Farah and Aisha read already, Daniel not
+    fireEvent.click(screen.getByRole("button", { name: "Joining dates (1)" }));
+    expect(await screen.findByText("LinkedIn asked to sign in")).toBeTruthy();
+    signIn = false;
+    fireEvent.click(screen.getByRole("button", { name: "Joining dates (1)" }));
+    await waitFor(() => { expect(call).toHaveBeenCalledTimes(2); });
+    // Only Daniel, both times: those whose dates are known are never read again.
+    expect(call.mock.calls.map((c) => (c[1] as { url: string }).url)).toEqual(["https://www.linkedin.com/in/daniel", "https://www.linkedin.com/in/daniel"]);
   });
 
   it("a scan goes on while another tab is shown, and is picked up again", async () => {

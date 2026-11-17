@@ -11,7 +11,7 @@ afterEach(() => {
 });
 
 const jd = (id: string, fileName: string, contentType: string, status: Schemas["JdFile"]["status"] = "read"): Schemas["JdFile"] => ({
-  id, jobId: "jo_1", fileName, contentType, sizeBytes: 14_744, status, error: null, details: null, createdAt: "2026-11-10T04:24:00Z",
+  id, jobId: "jo_1", fileName, contentType, sizeBytes: 14_744, status, error: null, details: null, pdfStatus: null, createdAt: "2026-11-10T04:24:00Z",
 });
 const listed = [jd("jdf_1", "Hub Operations Manager JD.pdf", "application/pdf"), jd("jdf_2", "JD.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "reading")];
 

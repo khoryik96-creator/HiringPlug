@@ -6,7 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { api, type Company, type Schemas, unwrap } from "../api/client";
+import { api, ApiError, type Company, type Schemas, unwrap } from "../api/client";
 import { companionAtLeast, companionCall, operationId, useCompanion } from "../companion";
 import { linkedinDates } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
@@ -38,6 +38,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const [picked, setPicked] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [datesAt, setDatesAt] = useState<{ done: number; of: number } | null>(null);
   useEffect(() => {
     if (!running) return;
     const t = setInterval(() => {
@@ -55,7 +56,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const go = async (from: Scan) => {
     const run = newRun(setNote);
     activeRuns.set(company.id, run);
-    setRunning(run); setError(null); setNow(Date.now());
+    setRunning(run); setError(null); setNow(run.started);
     try { await runScan(from, run, show); } catch (e) { setError(e); } finally { activeRuns.delete(company.id); setRunning(null); setNote(""); }
   };
   const start = async () => {
@@ -78,21 +79,33 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const chosen = people.filter((p) => picked.includes(p.url));
   const toggle = (p: Person) => { if (!p.contactId) setPicked((x) => (x.includes(p.url) ? x.filter((u) => u !== p.url) : [...x, p.url])); };
 
+  // Read already: their dates (or that they left) are known. Clicking again after a
+  // failure carries on from the person it stopped at, not from the first.
+  const datesRead = (p: Person) => p.joined !== null || p.left !== null || p.current !== null;
   const dates = useMutation({
     mutationFn: async () => {
       if (!s) return;
-      for (const p of chosen) {
+      const todo = chosen.filter((p) => !datesRead(p));
+      setDatesAt({ done: 0, of: todo.length });
+      for (const [i, p] of todo.entries()) {
         const r = await companionCall<{ joined: string; left: string; current: boolean | null }>("employment",
           { operation_id: operationId(), url: p.url, company_url: page, company_id: s.linkedinCompanyId });
         show(unwrap(await api.POST("/v1/companies/{companyId}/hr-scan/joined", { params: { path: { companyId: company.id } },
           body: { url: p.url, current: r.current, joined: r.joined || null, left: r.left || null } })));
+        setDatesAt({ done: i + 1, of: todo.length });
       }
     },
+    onSettled: () => { setDatesAt(null); },
   });
   const add = useMutation({
     mutationFn: async () => {
       for (const p of chosen.filter((x) => !x.contactId)) {
-        const c = unwrap(await api.POST("/v1/contacts", { body: { companyId: company.id, ...splitName(p.name), title: p.title.slice(0, 200) || null, linkedinUrl: p.url } }));
+        // Found by Find HR, so HR: tagged with the hr role (unless the agency removed it from its roles).
+        const body = { companyId: company.id, ...splitName(p.name), title: p.title.slice(0, 200) || null, linkedinUrl: p.url };
+        const c = await api.POST("/v1/contacts", { body: { ...body, role: "hr" } }).then(unwrap).catch((e: unknown) => {
+          if (e instanceof ApiError && e.code === "VALIDATION_FAILED") return api.POST("/v1/contacts", { body }).then(unwrap);
+          throw e;
+        });
         const guess = unwrap(await api.GET("/v1/contacts/{contactId}/email-suggestion", { params: { path: { contactId: c.id } } })).suggestion;
         if (guess) await api.PATCH("/v1/contacts/{contactId}", { params: { path: { contactId: c.id } }, body: { version: c.version, email: guess.email } });
       }
@@ -165,7 +178,8 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
             </span>
           </span>
           {picked.length > 0 && canCreate && <>
-            <button type="button" disabled={dates.isPending || !!running} onClick={() => { dates.mutate(); }}>{dates.isPending ? "Reading dates…" : `Joining dates (${String(picked.length)})`}</button>
+            <button type="button" disabled={dates.isPending || !!running || chosen.every(datesRead)} onClick={() => { dates.mutate(); }}>{dates.isPending ? (datesAt ? `Reading dates… ${String(datesAt.done)} of ${String(datesAt.of)}` : "Reading dates…")
+              : `Joining dates (${String(chosen.filter((p) => !datesRead(p)).length)})`}</button>
             <button type="button" className="primary" disabled={add.isPending} onClick={() => { add.mutate(); }}>{add.isPending ? "Adding…" : `Add ${String(picked.length)} as contacts`}</button>
           </>}
         </div>

@@ -189,6 +189,8 @@ class JobKind(StrEnum):
     interview_remind = "interview.remind"
     jd_blind = "jd.blind"
     jd_blinded = "jd.blinded"
+    jd_pdf_rendered = "jd.pdf_rendered"
+    jd_render_pdf = "jd.render_pdf"
     job_jd_read = "job.jd_read"
     job_read_jd = "job.read_jd"
     lead_source_check = "lead_source.check"
@@ -3286,6 +3288,25 @@ class JobReadJdJob(BaseModel):
     contentType: str
     fileName: str
     sizeBytes: int
+
+
+class JdRenderPdfJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jdFileId: JdFileId
+    downloadUrl: Annotated[str, Field(description="A short-lived link to the file.")]
+
+
+class JdPdfRenderedJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    jdFileId: JdFileId
+    pdfBase64: Annotated[
+        str | None, Field(description="The PDF (base64); null when it failed.", max_length=28000000)
+    ]
+    error: Annotated[str | None, Field(max_length=1000)]
 
 
 class JobJdReadJob(BaseModel):
@@ -6801,6 +6822,12 @@ class JdFile(BaseModel):
         str | None, Field(description="Why it could not be read (a scan with no text, a damaged file...).")
     ]
     details: Annotated[JdDetails | None, Field(description="Once read.")]
+    pdfStatus: Annotated[
+        PdfStatus | None,
+        Field(
+            description="A Word, RTF or ODT file's PDF copy, to preview it as it looks: queued, ready (GET .../pdf) or failed; null for a PDF, a picture, a text file, or a Word file uploaded before previews began (POST .../pdf makes one)."
+        ),
+    ]
     createdAt: AwareDatetime
 
 

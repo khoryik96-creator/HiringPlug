@@ -1236,3 +1236,6 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .cv-compare .compare { grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
 .cv-compare-diff { margin-top: 12px; }
 .cv-compare-diff summary { cursor: pointer; font-size: 13px; color: var(--accent, #7653ed); }
+.ad-columns .seg { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; margin: 4px 0 8px; }
+.ad-columns .seg button { border: 0; background: transparent; box-shadow: none; border-radius: 999px; padding: 4px 12px; min-height: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.ad-columns .seg button[aria-pressed=true] { background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); }

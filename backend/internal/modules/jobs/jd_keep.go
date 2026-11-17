@@ -53,6 +53,7 @@ func (s *Service) JDFiles(ctx context.Context, p authz.Principal, jobID string) 
 // in from it (the job, an ad) stays as it is.
 func (s *Service) DeleteJD(ctx context.Context, p authz.Principal, id string) error {
 	var key string
+	var pdfKey *string
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		row, err := store.New(tx).DeleteJdFile(ctx, id)
 		if database.IsNoRows(err) {
@@ -62,6 +63,7 @@ func (s *Service) DeleteJD(ctx context.Context, p authz.Principal, id string) er
 			return err
 		}
 		key = row.StorageKey
+		pdfKey = row.PdfKey
 		entity, entityID := "jd_file", id
 		if row.JobID != nil {
 			entity, entityID = "job", *row.JobID
@@ -74,6 +76,11 @@ func (s *Service) DeleteJD(ctx context.Context, p authz.Principal, id string) er
 	if err == nil {
 		if err := s.files.Delete(key); err != nil {
 			logx.From(ctx).Warn("could not remove a deleted job description's file", "error", err)
+		}
+		if pdfKey != nil {
+			if err := s.files.Delete(*pdfKey); err != nil {
+				logx.From(ctx).Warn("could not remove a deleted job description's PDF copy", "error", err)
+			}
 		}
 	}
 	return err

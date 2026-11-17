@@ -9,6 +9,7 @@ import { AdText } from "./AdText";
 import { BlindRewrite } from "./BlindRewrite";
 import { ErrorMessage } from "./ErrorMessage";
 import { fieldErrors } from "./forms";
+import { JdFilePreview, useJdFiles } from "./JobDescriptionView";
 import { useFieldSettings } from "./useFieldSettings";
 
 type Ad = Schemas["JobAd"];
@@ -56,9 +57,7 @@ export function AdVersions({ ad, canEdit, show = "both" }: { ad: Ad; canEdit: bo
           <h5>As written {live && !ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>
           <Exports ad={ad} version="original" title={ad.title} />
         </div>
-        <p className="muted">{factsOf(ad.location, ad.salaryText)}</p>
-        <strong>{ad.title}</strong>
-        {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
+        <AsWritten ad={ad} facts={factsOf(ad.location, ad.salaryText)} />
       </section>}
       {show !== "original" && <section aria-label="Blind">
         <div className="row spread">
@@ -70,6 +69,27 @@ export function AdVersions({ ad, canEdit, show = "both" }: { ad: Ad; canEdit: bo
       </section>}
     </div>
   );
+}
+
+/** The original: the job description the client sent, as it looks, when one was
+ * uploaded (switch to the ad's own text); else the ad's text. */
+function AsWritten({ ad, facts }: { ad: Ad; facts: string }) {
+  const files = useJdFiles(ad.jobId);
+  const original = files.data?.[0];
+  const [view, setView] = useState<"file" | "text">("file");
+  const text = <>
+    <p className="muted">{facts}</p>
+    <strong>{ad.title}</strong>
+    {ad.description ? <AdText text={ad.description} /> : <p className="muted">No text yet.</p>}
+  </>;
+  if (!original) return text;
+  return <>
+    <div className="seg" role="group" aria-label="Show">
+      <button type="button" aria-pressed={view === "file"} onClick={() => { setView("file"); }}>Original file</button>
+      <button type="button" aria-pressed={view === "text"} onClick={() => { setView("text"); }}>Ad text</button>
+    </div>
+    {view === "file" ? <JdFilePreview jobId={ad.jobId} file={original} /> : text}
+  </>;
 }
 
 function BlindText({ ad, canEdit, facts }: { ad: Ad; canEdit: boolean; facts: string }) {

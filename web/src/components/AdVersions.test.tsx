@@ -40,6 +40,23 @@ describe("ad versions", () => {
     expect(rewrite.compareDocumentPosition(within(blind).getByText("A logistics firm is growing.")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("shows the client's job description as it looks on the written side, with the ad's text a click away", async () => {
+    const jdFile: Schemas["JdFile"] = { id: "jdf_1", jobId: "jo_1", fileName: "Ops Manager JD.pdf", contentType: "application/pdf", sizeBytes: 1000,
+      status: "read", error: null, details: null, pdfStatus: null, createdAt: "2026-11-01T00:00:00Z" };
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(path === "/v1/jobs/{jobId}/jd-files" ? { items: [jdFile] } : testFieldSettings()))) as never);
+    vi.spyOn(files, "fetchFile").mockResolvedValue(new Blob(["%PDF"], { type: "application/pdf" }));
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:jd");
+    globalThis.URL.revokeObjectURL = vi.fn();
+    renderWithClient(<AdVersions ad={ad} canEdit />);
+    const written = screen.getByRole("region", { name: "As written" });
+    expect((await within(written).findByTitle("Ops Manager JD.pdf")).getAttribute("src")).toContain("blob:jd");
+    expect(within(written).getByRole("button", { name: "Original file" }).getAttribute("aria-pressed")).toBe("true");
+    expect(written.textContent).not.toContain("Maju is growing.");
+    fireEvent.click(within(written).getByRole("button", { name: "Ad text" }));
+    expect(written.textContent).toContain("Maju is growing.");
+    expect(within(screen.getByRole("region", { name: "Blind" })).getByText("A logistics firm is growing.")).toBeTruthy();
+  });
+
   it("saves a person's blind text, or makes it again from the ad", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
     const patch = vi.spyOn(api, "PATCH").mockResolvedValueOnce(invalidField("blindDescription", "still names the client"))

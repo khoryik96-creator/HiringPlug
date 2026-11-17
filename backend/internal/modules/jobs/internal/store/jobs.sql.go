@@ -82,19 +82,25 @@ func (q *Queries) CloseJobAds(ctx context.Context, jobOrderID string) (int64, er
 }
 
 const deleteJdFile = `-- name: DeleteJdFile :one
-DELETE FROM job_description_file WHERE id = $1 RETURNING job_id, file_name, storage_key
+DELETE FROM job_description_file WHERE id = $1 RETURNING job_id, file_name, storage_key, pdf_key
 `
 
 type DeleteJdFileRow struct {
 	JobID      *string
 	FileName   string
 	StorageKey string
+	PdfKey     *string
 }
 
 func (q *Queries) DeleteJdFile(ctx context.Context, id string) (DeleteJdFileRow, error) {
 	row := q.db.QueryRow(ctx, deleteJdFile, id)
 	var i DeleteJdFileRow
-	err := row.Scan(&i.JobID, &i.FileName, &i.StorageKey)
+	err := row.Scan(
+		&i.JobID,
+		&i.FileName,
+		&i.StorageKey,
+		&i.PdfKey,
+	)
 	return i, err
 }
 
@@ -193,7 +199,7 @@ func (q *Queries) GetBlindRewrite(ctx context.Context, id string) (JobAdBlindRew
 }
 
 const getJdFile = `-- name: GetJdFile :one
-SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file WHERE id = $1
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at FROM job_description_file WHERE id = $1
 `
 
 type GetJdFileRow struct {
@@ -205,6 +211,7 @@ type GetJdFileRow struct {
 	Status      string
 	Error       *string
 	Details     []byte
+	PdfStatus   *string
 	CreatedAt   time.Time
 }
 
@@ -220,25 +227,34 @@ func (q *Queries) GetJdFile(ctx context.Context, id string) (GetJdFileRow, error
 		&i.Status,
 		&i.Error,
 		&i.Details,
+		&i.PdfStatus,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getJdFileStorage = `-- name: GetJdFileStorage :one
-SELECT storage_key, file_name, content_type FROM job_description_file WHERE id = $1
+SELECT storage_key, file_name, content_type, pdf_status, pdf_key FROM job_description_file WHERE id = $1
 `
 
 type GetJdFileStorageRow struct {
 	StorageKey  string
 	FileName    string
 	ContentType string
+	PdfStatus   *string
+	PdfKey      *string
 }
 
 func (q *Queries) GetJdFileStorage(ctx context.Context, id string) (GetJdFileStorageRow, error) {
 	row := q.db.QueryRow(ctx, getJdFileStorage, id)
 	var i GetJdFileStorageRow
-	err := row.Scan(&i.StorageKey, &i.FileName, &i.ContentType)
+	err := row.Scan(
+		&i.StorageKey,
+		&i.FileName,
+		&i.ContentType,
+		&i.PdfStatus,
+		&i.PdfKey,
+	)
 	return i, err
 }
 
@@ -425,7 +441,7 @@ func (q *Queries) InsertBlindRewrite(ctx context.Context, arg InsertBlindRewrite
 const insertJdFile = `-- name: InsertJdFile :one
 INSERT INTO job_description_file (id, tenant_id, job_id, file_name, content_type, size_bytes, storage_key, created_by, status, text, details)
 VALUES ($1, app_current_tenant(), $2, $3, $4, $5, $6, app_current_user(), $7, $8, $9)
-RETURNING id, job_id, file_name, content_type, size_bytes, status, error, details, created_at
+RETURNING id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at
 `
 
 type InsertJdFileParams struct {
@@ -449,6 +465,7 @@ type InsertJdFileRow struct {
 	Status      string
 	Error       *string
 	Details     []byte
+	PdfStatus   *string
 	CreatedAt   time.Time
 }
 
@@ -475,6 +492,7 @@ func (q *Queries) InsertJdFile(ctx context.Context, arg InsertJdFileParams) (Ins
 		&i.Status,
 		&i.Error,
 		&i.Details,
+		&i.PdfStatus,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -849,7 +867,7 @@ func (q *Queries) ListJobAds(ctx context.Context, jobOrderID string) ([]JobAd, e
 }
 
 const listJobJdFiles = `-- name: ListJobJdFiles :many
-SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at FROM job_description_file
 WHERE job_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50
 `
 
@@ -862,6 +880,7 @@ type ListJobJdFilesRow struct {
 	Status      string
 	Error       *string
 	Details     []byte
+	PdfStatus   *string
 	CreatedAt   time.Time
 }
 
@@ -883,6 +902,7 @@ func (q *Queries) ListJobJdFiles(ctx context.Context, jobID *string) ([]ListJobJ
 			&i.Status,
 			&i.Error,
 			&i.Details,
+			&i.PdfStatus,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -1118,6 +1138,15 @@ func (q *Queries) PurgeJobs(ctx context.Context, ids []string) ([]string, error)
 	return items, nil
 }
 
+const queueJdPdf = `-- name: QueueJdPdf :exec
+UPDATE job_description_file SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = $1
+`
+
+func (q *Queries) QueueJdPdf(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, queueJdPdf, id)
+	return err
+}
+
 const restoreJobs = `-- name: RestoreJobs :exec
 UPDATE job_order SET binned_at = NULL WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
 `
@@ -1125,6 +1154,32 @@ UPDATE job_order SET binned_at = NULL WHERE id = ANY($1::text[]) AND binned_at I
 func (q *Queries) RestoreJobs(ctx context.Context, ids []string) error {
 	_, err := q.db.Exec(ctx, restoreJobs, ids)
 	return err
+}
+
+const saveJdPdf = `-- name: SaveJdPdf :one
+UPDATE job_description_file SET pdf_status = $1, pdf_key = $2, pdf_error = $3
+WHERE id = $4 AND pdf_status = 'queued'
+RETURNING id
+`
+
+type SaveJdPdfParams struct {
+	PdfStatus *string
+	PdfKey    *string
+	PdfError  *string
+	ID        string
+}
+
+// A copy arriving for a file deleted (or whose copy was asked again) meanwhile is dropped.
+func (q *Queries) SaveJdPdf(ctx context.Context, arg SaveJdPdfParams) (string, error) {
+	row := q.db.QueryRow(ctx, saveJdPdf,
+		arg.PdfStatus,
+		arg.PdfKey,
+		arg.PdfError,
+		arg.ID,
+	)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const saveJdRead = `-- name: SaveJdRead :execrows

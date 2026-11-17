@@ -852,9 +852,11 @@ lead's company (with the built-in email check).
   the CV and the Details section); work authorization is one row of choices
   (Local, PR, RP-T, Spouse visa, Other pass, Needs pass, Not known), also on
   the profile form.
-- **Job details** show the latest uploaded job description as it is (a PDF
-  or picture in a preview, a Word file as the text read from it), else the
-  description pasted.
+- **Job details** show the latest uploaded job description as it looks (a PDF
+  or picture in a preview; a Word, RTF or ODT file as its PDF copy, made by
+  the AI worker with LibreOffice, also for files uploaded earlier, on first
+  view), else the description pasted. On **Job ads**, the "As written" side
+  shows that file too (Original file), with the ad's own text a click away.
 - **Candidate filters** keep the boolean tips; booleans are typed in the
   search box above the list.
 - **Who changes a status, role or category**: changing a candidate's status,
@@ -882,9 +884,10 @@ lead's company (with the built-in email check).
   former staff and interns are hidden. Each shows whether they are a contact
   already (same LinkedIn profile) or may be (same name). Clicking a row
   chooses it (All / None too); clicking a name opens their LinkedIn profile.
-  Chosen people get their joining dates read from their profile, or are
-  added as contacts with an email guessed from colleagues', which is then
-  verified like every new address.
+  Chosen people get their joining dates read from their profile (only those
+  not read yet, so clicking again after a failure carries on from there), or
+  are added as contacts, tagged HR, with an email guessed from colleagues',
+  which is then verified like every new address.
 - **Delete, with a Bin** ✅ (owners and admins, `bin:manage`): a candidate,
   contact or company can be deleted from its page. It goes to Settings › Bin
   for 30 days, hidden everywhere at once by the database (lists, searches,

@@ -41,6 +41,16 @@ x-module:
       payload: JobReadJdJob
       priority: high
       description: Read the text of an uploaded job description (Python AI worker).
+    jd.render_pdf:
+      queue: ai
+      payload: JdRenderPdfJob
+      priority: low
+      description: Turn an uploaded Word (or RTF, ODT) job description into a PDF with LibreOffice, to preview it as it looks (Python AI worker).
+    jd.pdf_rendered:
+      queue: core
+      payload: JdPdfRenderedJob
+      priority: low
+      description: Save a job description's PDF copy with it (Go worker).
     jd.blind:
       queue: ai
       payload: JdBlindJob
@@ -476,6 +486,43 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/jd-files/{jdFileId}/pdf:
+    parameters:
+      - name: jdFileId
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/JdFileId' }
+    get:
+      operationId: getJobDescriptionPdf
+      tags: [jobs]
+      summary: A Word job description's PDF copy, to preview it as it looks
+      x-permission: jobs:read
+      responses:
+        '200':
+          description: The PDF
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: makeJobDescriptionPdf
+      tags: [jobs]
+      summary: Make a Word job description's PDF copy, if it has none yet
+      description: Word files uploaded since previews began get one at once; this makes one for older ones. Any other file, or one whose copy is made or being made, is left as it is.
+      x-permission: jobs:read
+      responses:
+        '202':
+          description: Being made (or already there)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JdFile' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/jd-files/{jdFileId}/file:
     parameters:
       - name: jdFileId
@@ -634,7 +681,7 @@ components:
         items: { type: array, items: { $ref: '#/components/schemas/JdFile' } }
     JdFile:
       type: object
-      required: [id, jobId, fileName, contentType, sizeBytes, status, error, details, createdAt]
+      required: [id, jobId, fileName, contentType, sizeBytes, status, error, details, pdfStatus, createdAt]
       properties:
         id: { $ref: '#/components/schemas/JdFileId' }
         contentType: { type: string }
@@ -650,6 +697,10 @@ components:
           allOf: [{ $ref: '#/components/schemas/JdDetails' }]
           nullable: true
           description: Once read.
+        pdfStatus:
+          description: "A Word, RTF or ODT file's PDF copy, to preview it as it looks: queued, ready (GET .../pdf) or failed; null for a PDF, a picture, a text file, or a Word file uploaded before previews began (POST .../pdf makes one)."
+          nullable: true
+          allOf: [{ $ref: '#/components/schemas/PdfStatus' }]
         createdAt: { type: string, format: date-time }
     JdDetails:
       type: object
@@ -684,6 +735,21 @@ components:
         contentType: { type: string }
         fileName: { type: string }
         sizeBytes: { type: integer, format: int64 }
+    JdRenderPdfJob:
+      type: object
+      additionalProperties: false
+      required: [jdFileId, downloadUrl]
+      properties:
+        jdFileId: { $ref: '#/components/schemas/JdFileId' }
+        downloadUrl: { type: string, description: A short-lived link to the file. }
+    JdPdfRenderedJob:
+      type: object
+      additionalProperties: false
+      required: [jdFileId, pdfBase64, error]
+      properties:
+        jdFileId: { $ref: '#/components/schemas/JdFileId' }
+        pdfBase64: { type: string, nullable: true, maxLength: 28000000, description: The PDF (base64); null when it failed. }
+        error: { type: string, nullable: true, maxLength: 1000 }
     JobJdReadJob:
       type: object
       additionalProperties: false

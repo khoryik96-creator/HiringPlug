@@ -910,6 +910,9 @@ type JobDescriptionFile struct {
 	Details     []byte
 	CreatedBy   string
 	CreatedAt   time.Time
+	PdfStatus   *string
+	PdfKey      *string
+	PdfError    *string
 }
 
 type JobLead struct {

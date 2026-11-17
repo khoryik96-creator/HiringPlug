@@ -31,6 +31,7 @@ from ..contracts import (
     DocumentParseCvJob,
     DocumentRenderPdfJob,
     JdBlindJob,
+    JdRenderPdfJob,
     JobKind,
     JobReadJdJob,
     MatchScoreJob,
@@ -51,6 +52,7 @@ from . import (
     parse_cv,
     read_jd,
     read_linkedin,
+    render_jd_pdf,
     render_pdf,
     talent_rank,
 )
@@ -190,6 +192,7 @@ HANDLERS: dict[JobKind, Handler] = {
     JobKind.document_extract_text: Handler(DocumentExtractTextJob, extract_text.run),
     JobKind.document_parse_cv: Handler(DocumentParseCvJob, parse_cv.run),
     JobKind.document_render_pdf: Handler(DocumentRenderPdfJob, render_pdf.run),
+    JobKind.jd_render_pdf: Handler(JdRenderPdfJob, render_jd_pdf.run),
     JobKind.assistant_ask: Handler(AssistantAskJob, assistant_ask.run),
     JobKind.assistant_email: Handler(AssistantEmailJob, assistant_email.run),
     JobKind.match_score: Handler(MatchScoreJob, match_score.run),

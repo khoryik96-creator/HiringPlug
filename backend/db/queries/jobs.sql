@@ -151,23 +151,32 @@ UPDATE job_order SET owner_id = sqlc.narg(owner_id), version = version + 1, upda
 -- name: InsertJdFile :one
 INSERT INTO job_description_file (id, tenant_id, job_id, file_name, content_type, size_bytes, storage_key, created_by, status, text, details)
 VALUES (@id, app_current_tenant(), @job_id, @file_name, @content_type, @size_bytes, @storage_key, app_current_user(), @status, sqlc.narg(text), sqlc.narg(details))
-RETURNING id, job_id, file_name, content_type, size_bytes, status, error, details, created_at;
+RETURNING id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at;
 
 -- name: NewJdFileID :one
 SELECT new_id('jdf')::text;
 
 -- name: GetJdFile :one
-SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file WHERE id = @id;
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at FROM job_description_file WHERE id = @id;
 
 -- name: ListJobJdFiles :many
-SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, created_at FROM job_description_file
+SELECT id, job_id, file_name, content_type, size_bytes, status, error, details, pdf_status, created_at FROM job_description_file
 WHERE job_id = @job_id ORDER BY created_at DESC, id DESC LIMIT 50;
 
 -- name: GetJdFileStorage :one
-SELECT storage_key, file_name, content_type FROM job_description_file WHERE id = @id;
+SELECT storage_key, file_name, content_type, pdf_status, pdf_key FROM job_description_file WHERE id = @id;
+
+-- name: QueueJdPdf :exec
+UPDATE job_description_file SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = @id;
+
+-- A copy arriving for a file deleted (or whose copy was asked again) meanwhile is dropped.
+-- name: SaveJdPdf :one
+UPDATE job_description_file SET pdf_status = @pdf_status, pdf_key = sqlc.narg(pdf_key), pdf_error = sqlc.narg(pdf_error)
+WHERE id = @id AND pdf_status = 'queued'
+RETURNING id;
 
 -- name: DeleteJdFile :one
-DELETE FROM job_description_file WHERE id = @id RETURNING job_id, file_name, storage_key;
+DELETE FROM job_description_file WHERE id = @id RETURNING job_id, file_name, storage_key, pdf_key;
 
 -- A job description read on the Add job form stays with the job made from it.
 -- name: LinkJdFileToJob :execrows

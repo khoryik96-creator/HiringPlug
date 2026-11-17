@@ -20,7 +20,8 @@ const job: JobOrder = {
 /** Answers the panel's reads: who is signed in (for the careers link), and the ads. */
 const reads = (ads: Schemas["JobAd"][]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) =>
-    Promise.resolve(path === "/v1/me" ? ok(testMe(RECRUITER)) : path === "/v1/settings/fields" ? ok(testFieldSettings()) : ok({ items: ads }))) as never);
+    Promise.resolve(path === "/v1/me" ? ok(testMe(RECRUITER)) : path === "/v1/settings/fields" ? ok(testFieldSettings())
+      : path === "/v1/jobs/{jobId}/jd-files" ? ok({ items: [] }) : ok({ items: ads }))) as never);
 
 const draft: Schemas["JobAd"] = {
   id: "ad_01jbz6w0m0k8q9x2r3s4t5v6w7", version: 1, jobId: job.id, title: "Senior Auditor", location: "Kuala Lumpur",

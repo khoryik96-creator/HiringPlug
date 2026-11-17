@@ -23,18 +23,22 @@ log = logging.getLogger(__name__)
 RESULT_QUEUE = "core"  # checked against the contract by tests/test_contract_wiring.py
 
 
+def make_pdf(data: bytes) -> tuple[bytes | None, str | None]:
+    """A Word (or RTF, ODT) file as a PDF, or why it could not be made.
+    Used for CVs and for job descriptions (jd.render_pdf)."""
+    if not office.available():
+        return None, "LibreOffice is not installed in the AI worker, so no PDF can be made"
+    pdf = _convert(data)
+    if pdf is None and (patched := _end_after_frame(data)) is not None:
+        pdf = _convert(patched)  # the Word file itself is kept as it was made
+    if pdf is None or not pdf.startswith(b"%PDF-"):
+        return None, "LibreOffice could not turn this document into a PDF"
+    return pdf, None
+
+
 def run(payload: DocumentRenderPdfJob, deps: Deps) -> list[FollowUp]:
     data = deps.download(payload.downloadUrl, deps.max_download_bytes)
-    pdf: bytes | None = None
-    error: str | None = None
-    if not office.available():
-        error = "LibreOffice is not installed in the AI worker, so no PDF can be made"
-    else:
-        pdf = _convert(data)
-        if pdf is None and (patched := _end_after_frame(data)) is not None:
-            pdf = _convert(patched)  # the Word file itself is kept as it was made
-        if pdf is None or not pdf.startswith(b"%PDF-"):
-            pdf, error = None, "LibreOffice could not turn this document into a PDF"
+    pdf, error = make_pdf(data)
     log.info("pdf rendered", extra={"document_id": payload.documentId.root, "ok": pdf is not None})
     return [
         FollowUp(
