@@ -184,6 +184,15 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   The Go worker refuses to start if a job on its queue has no handler, and
   tests fail for either worker if one is missing.
 
+## Uploaded files
+
+Files (CVs, PDFs, attachments) live under `HP_FILES_DIR`, through
+`platform/blob`. The database keeps each file's key (`tnt_x/doc_y`); on disk
+the file sits in its agency's folder under two levels of subfolders picked
+from the key's hash (`tnt_x/3f/a9/doc_y`), so even a million CVs leave a few
+dozen files per folder. Files saved before the subfolders are still read
+where they are, and move into their subfolder when saved again.
+
 ## Backups
 
 `hp backup` copies the database (`pg_dump`) and the uploaded files into a

@@ -49,6 +49,7 @@ func New(dir string, secret []byte, baseURL string) (*Store, error) {
 }
 
 // Put writes data under key atomically (a reader never sees half a file).
+// A copy kept the old way (before subfolders) is replaced too.
 func (s *Store) Put(key string, data []byte) error {
 	path, err := s.path(key)
 	if err != nil {
@@ -72,17 +73,22 @@ func (s *Store) Put(key string, data []byte) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return fmt.Errorf("blob: %w", err)
 	}
+	if err := os.Remove(s.flatPath(key)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("blob: %w", err)
+	}
 	return nil
 }
 
-// Delete removes key; a missing file is not an error.
+// Delete removes key (wherever it is kept); a missing file is not an error.
 func (s *Store) Delete(key string) error {
 	path, err := s.path(key)
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("blob: %w", err)
+	for _, p := range []string{path, s.flatPath(key)} {
+		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("blob: %w", err)
+		}
 	}
 	return nil
 }
@@ -94,13 +100,20 @@ func (s *Store) SignedURL(key string, ttl time.Duration) string {
 	return s.baseURL + PathPrefix + key + "?" + q.Encode()
 }
 
-// Open returns the stored file for reading; the caller closes it.
+// Open returns the stored file for reading; the caller closes it. A file
+// saved before subfolders is found where it was.
 func (s *Store) Open(key string) (*os.File, error) {
 	path, err := s.path(key)
 	if err != nil {
 		return nil, err
 	}
-	return os.Open(path) //nolint:gosec // path is validated against keyRe and joined under s.dir
+	f, err := os.Open(path) //nolint:gosec // path is validated against keyRe and joined under s.dir
+	if errors.Is(err, os.ErrNotExist) {
+		if info, oldErr := os.Stat(s.flatPath(key)); oldErr == nil && info.Mode().IsRegular() {
+			return os.Open(s.flatPath(key)) //nolint:gosec // as above
+		}
+	}
+	return f, err //nolint:wrapcheck // callers check os.ErrNotExist
 }
 
 // ServeHTTP serves GET /internal/files/{key}?exp=...&sig=... for workers.
@@ -112,12 +125,11 @@ func (s *Store) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid or expired link", http.StatusForbidden)
 		return
 	}
-	path, err := s.path(key)
-	if err != nil {
+	f, err := s.Open(key)
+	if errors.Is(err, ErrInvalidKey) {
 		http.Error(w, "invalid or expired link", http.StatusForbidden)
 		return
 	}
-	f, err := os.Open(path) //nolint:gosec // path is validated against keyRe and joined under s.dir
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -139,9 +151,24 @@ func (s *Store) sign(key, exp string) string {
 	return hex.EncodeToString(m.Sum(nil))
 }
 
+// path is where key is kept: in the agency's folder, then two levels of
+// subfolders picked from the key's hash ("tnt_x/3f/a9/doc_y"), so no folder
+// holds more than a few dozen files even with millions of CVs (a folder with
+// a million files is slow to open, back up and copy).
 func (s *Store) path(key string) (string, error) {
 	if !keyRe.MatchString(key) {
 		return "", fmt.Errorf("%w: %q", ErrInvalidKey, key)
 	}
-	return filepath.Join(s.dir, filepath.FromSlash(key)), nil
+	sum := sha256.Sum256([]byte(key))
+	h := hex.EncodeToString(sum[:2])
+	owner, rest, nested := strings.Cut(key, "/")
+	if !nested {
+		owner, rest = "", key
+	}
+	return filepath.Join(s.dir, owner, h[:2], h[2:], filepath.FromSlash(rest)), nil
+}
+
+// flatPath is where key was kept before subfolders (key already checked).
+func (s *Store) flatPath(key string) string {
+	return filepath.Join(s.dir, filepath.FromSlash(key))
 }

@@ -1,9 +1,13 @@
 package blob
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -51,4 +55,45 @@ func TestKeysCannotEscapeTheStorageDirectory(t *testing.T) {
 	for _, key := range []string{"../etc/passwd", "/abs", "a/../../b", "A/B", ""} {
 		assert.ErrorIs(t, s.Put(key, []byte("x")), ErrInvalidKey, key)
 	}
+}
+
+func TestFilesAreKeptInSubfolders(t *testing.T) {
+	s := newStore(t)
+	for i := range 300 {
+		require.NoError(t, s.Put(fmt.Sprintf("tnt_a/doc_%d", i), []byte("cv")))
+	}
+	top, err := os.ReadDir(filepath.Join(s.dir, "tnt_a"))
+	require.NoError(t, err)
+	assert.Greater(t, len(top), 100, "spread over many subfolders")
+	for _, e := range top {
+		assert.True(t, e.IsDir(), "only subfolders in the agency's folder: %s", e.Name())
+	}
+	f, err := s.Open("tnt_a/doc_7")
+	require.NoError(t, err)
+	_ = f.Close()
+}
+
+func TestFilesSavedBeforeSubfoldersStillWork(t *testing.T) {
+	s := newStore(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(s.dir, "tnt_a"), 0o750))
+	old := filepath.Join(s.dir, "tnt_a", "doc_old")
+	require.NoError(t, os.WriteFile(old, []byte("old cv"), 0o600))
+
+	f, err := s.Open("tnt_a/doc_old")
+	require.NoError(t, err)
+	data, _ := io.ReadAll(f)
+	_ = f.Close()
+	assert.Equal(t, "old cv", string(data))
+	assert.Equal(t, "old cv", get(s, s.SignedURL("tnt_a/doc_old", time.Minute)).Body.String())
+
+	// Saving it again moves it into its subfolder; deleting removes it.
+	require.NoError(t, s.Put("tnt_a/doc_old", []byte("new cv")))
+	assert.NoFileExists(t, old)
+	assert.Equal(t, "new cv", get(s, s.SignedURL("tnt_a/doc_old", time.Minute)).Body.String())
+	require.NoError(t, os.WriteFile(old, []byte("stray"), 0o600))
+	require.NoError(t, s.Delete("tnt_a/doc_old"))
+	assert.NoFileExists(t, old)
+	_, err = s.Open("tnt_a/doc_old")
+	require.ErrorIs(t, err, os.ErrNotExist)
+	assert.Equal(t, http.StatusNotFound, get(s, s.SignedURL("tnt_a/doc_old", time.Minute)).Code)
 }
