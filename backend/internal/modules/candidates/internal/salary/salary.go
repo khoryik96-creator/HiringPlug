@@ -301,7 +301,7 @@ var (
 	bareDecimalRE     = regexp.MustCompile(`(^|[^0-9])\.(\d)`)
 	letterDigitRE     = regexp.MustCompile(`([A-Za-z])(\d)`)
 	indianWordFirstRE = regexp.MustCompile(`(?i)\b(lpa|lakhs?|lacs?|crores?|cr)\s+(\d+(?:\.\d+)?)`)
-	gluedCodeRE       = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR)\b`)
+	gluedCodeRE       = regexp.MustCompile(`(?i)(\d[kml]?)(BND|KHR|IDR|LAK|MYR|MMK|PHP|SGD|THB|VND|CNY|HKD|AUD|GBP|EUR|USD|INR|RM)\b`)
 	bonuRE            = regexp.MustCompile(`(?i)\bbonu\b`)
 	notFixedRE        = regexp.MustCompile(`not\s+fixed|non[- ]fixed|not\s+guaranteed`)
 	knownAllowanceRE  = regexp.MustCompile(`(?i)allowance|fixed|guaranteed|transport|housing|meal|phone|mobile|internet|parking|petrol|fuel|travel|living`)
