@@ -1218,3 +1218,11 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .from-linkedin { display: grid; gap: 0.4rem; justify-items: start; }
 .linkedin-read { display: grid; gap: 0.4rem; font-size: 0.9rem; }
 .linkedin-read .row { flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+
+/* Work authorization as one row of choices (screening call, profile form) */
+.wa-console { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.wa-console button { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 30px; padding: 0.2rem 0.65rem; border: 1px solid var(--line-strong, #d8d2ea);
+  border-radius: 999px; background: var(--surface); color: var(--text, inherit); font-size: 0.82rem; font-weight: 600; }
+.wa-console button i { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--wa); }
+.wa-console button:hover { border-color: var(--wa); }
+.wa-console button.on { border-color: var(--wa); background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); }

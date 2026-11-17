@@ -105,11 +105,13 @@ describe("candidate form", () => {
     expect(patch).not.toHaveBeenCalled();
   });
 
-  it("asks which pass an expat holds only when it applies", () => {
+  it("chooses work authorization, with the pass an expat holds, in one row of choices", () => {
     renderWithClient(<CandidateForm candidate={testCandidate()} onDone={vi.fn()} />);
-    expect(screen.queryByText("Pass held")).toBeNull();
-    change("Work authorization", "expat_eligible");
-    expect(screen.getByText("Pass held")).toBeTruthy();
+    const group = screen.getByRole("radiogroup", { name: "Work authorization" });
+    expect(within(group).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Local", "PR", "RP-T", "Spouse visa", "Other pass", "Needs pass", "Not known"]);
+    fireEvent.click(within(group).getByRole("radio", { name: "Spouse visa" }));
+    expect(within(group).getByRole("radio", { name: "Spouse visa" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(group).getByRole("radio", { name: "RP-T" }).getAttribute("aria-checked")).toBe("false");
   });
 
   it("picks the specialization, IT skills and certifications from the Settings lists, and removes them", async () => {

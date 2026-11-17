@@ -33,7 +33,7 @@ export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose, mine }:
         )}
         <button type="button" className="link" onClick={onClose}>Close</button>
       </div>
-      <BooleanField value={draft.boolean} onChange={(boolean) => { setDraft((d) => ({ ...d, boolean })); }} />
+      <BooleanTips />
       <SearchFields draft={draft} setDraft={setDraft} canSeeSalary={canSeeSalary} />
       <div className="adv-actions">
         <button type="submit">Search</button>
@@ -61,13 +61,18 @@ export function BooleanField({ value, onChange, label = "Boolean search", note =
         <p className="bool-preview" aria-label="How it is read">
           {booleanTokens(value).map((t, i) => <span key={i} className={`bool-${t.kind}`}>{t.text}</span>)}
         </p>
-      ) : (
-        <p className="muted small adv-help">
-          <b>AND</b> both · <b>OR</b> either · <b>NOT</b> or <b>-word</b> leaves out · <b>( )</b> groups · <b>&quot;exact phrase&quot;</b> · <b>manag*</b> any ending.
-          Words side by side must all appear.
-        </p>
-      )}
+      ) : <BooleanTips />}
     </>
+  );
+}
+
+/** How to write a boolean (the search box above the list reads one). */
+export function BooleanTips() {
+  return (
+    <p className="muted small adv-help">
+      <b>AND</b> both · <b>OR</b> either · <b>NOT</b> or <b>-word</b> leaves out · <b>( )</b> groups · <b>&quot;exact phrase&quot;</b> · <b>manag*</b> any ending.
+      Words side by side must all appear.
+    </p>
   );
 }
 

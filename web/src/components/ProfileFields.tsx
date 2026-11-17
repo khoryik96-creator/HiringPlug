@@ -1,5 +1,7 @@
 // Profile inputs shared by the profile form and the screening call.
-import { keysOf, WORK_AUTH_BASIS, WORK_AUTH_STATUS } from "../labels";
+import type React from "react";
+
+import { WA_KIND } from "./candidateLook";
 import type { CandidateFormState } from "./candidateFormState";
 import { Field } from "./Field";
 import { noticeKey, useFieldSettings } from "./useFieldSettings";
@@ -23,29 +25,38 @@ export function NoticeField({ form, onChange, label, error }: { form: CandidateF
   );
 }
 
-/** Work authorization, and the pass an expat holds when it applies. */
+/** Work authorization as one row of choices (the pass an expat holds included), coloured like the candidate card. */
+const WA_CHOICES: { key: string; label: string; color: string; status: CandidateFormState["waStatus"]; basis: CandidateFormState["waBasis"] }[] = [
+  { key: "local", label: "Local", color: WA_KIND.local.color, status: "local", basis: "" },
+  { key: "pr", label: "PR", color: WA_KIND.pr.color, status: "expat_eligible", basis: "permanent_resident" },
+  { key: "rp_t", label: "RP-T", color: WA_KIND.expat.color, status: "expat_eligible", basis: "rp_t" },
+  { key: "spouse_visa", label: "Spouse visa", color: WA_KIND.expat.color, status: "expat_eligible", basis: "spouse_visa" },
+  { key: "other", label: "Other pass", color: WA_KIND.expat.color, status: "expat_eligible", basis: "other" },
+  { key: "needs", label: "Needs pass", color: WA_KIND.needsPass.color, status: "requires_visa", basis: "" },
+  { key: "unknown", label: "Not known", color: WA_KIND.unknown.color, status: "", basis: "" },
+];
+
 export function WorkAuthFields({ form, onChange, label, errors }: {
   form: CandidateFormState;
   onChange: Change;
   label: string;
   errors: { status?: string; basis?: string };
 }) {
+  const on = (c: (typeof WA_CHOICES)[number]) => c.status === form.waStatus && (c.status !== "expat_eligible" || c.basis === form.waBasis);
+  const error = errors.status ?? errors.basis;
   return (
-    <>
-      <Field label={label} error={errors.status}>
-        <select value={form.waStatus} onChange={(e) => { onChange({ waStatus: e.target.value as CandidateFormState["waStatus"] }); }}>
-          <option value="">—</option>
-          {keysOf(WORK_AUTH_STATUS).map((s) => <option key={s} value={s}>{WORK_AUTH_STATUS[s]}</option>)}
-        </select>
-      </Field>
-      {form.waStatus === "expat_eligible" && (
-        <Field label="Pass held" error={errors.basis}>
-          <select value={form.waBasis} onChange={(e) => { onChange({ waBasis: e.target.value as CandidateFormState["waBasis"] }); }}>
-            <option value="">Choose…</option>
-            {keysOf(WORK_AUTH_BASIS).map((b) => <option key={b} value={b}>{WORK_AUTH_BASIS[b]}</option>)}
-          </select>
-        </Field>
-      )}
-    </>
+    <div className="field full">
+      <span>{label}</span>
+      <div className="wa-console" role="radiogroup" aria-label={label}>
+        {WA_CHOICES.map((c) => (
+          <button key={c.key} type="button" role="radio" aria-checked={on(c)} className={on(c) ? "on" : undefined}
+            style={{ "--wa": c.color } as React.CSSProperties}
+            onClick={() => { onChange({ waStatus: c.status, waBasis: c.basis }); }}>
+            <i aria-hidden="true" />{c.label}
+          </button>
+        ))}
+      </div>
+      {error && <small className="error">{error}</small>}
+    </div>
   );
 }

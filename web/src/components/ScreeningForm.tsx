@@ -5,13 +5,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Candidate, type Permission, type Schemas, unwrap } from "../api/client";
-import { activityKey, candidateKey, candidatesKey, notesKey, screeningCallsKey, usersKey } from "../api/keys";
+import { activityKey, candidateKey, candidatesKey, notesKey, screeningCallsKey } from "../api/keys";
 import { formatDay, regionName } from "../labels";
 import { CallItems, type CallAnswers, callNote, useCallItems } from "./CallItems";
 import { type CandidateFormState, formFromCandidate, toUpdateBody } from "./candidateFormState";
 import { Field } from "./Field";
 import { COUNTRIES, fieldErrors, FormInvalid, sameBody } from "./forms";
-import { IndustryPicker } from "./IndustryPicker";
 import { ScreeningSalary } from "./ScreeningSalary";
 import { formFromCompensation, SALARY_PATHS, salaryProblems, type SalaryFormState, toCompensationBody } from "./salaryFormState";
 import { SaveError } from "./SaveError";
@@ -39,8 +38,6 @@ interface CallDraft {
   notes: string;
   sensitive: boolean;
   salaryShown: boolean;
-  calledOn: string;
-  calledBy: string;
 }
 const baseOf = (c: Candidate): Base => ({
   version: c.version,
@@ -60,7 +57,6 @@ export function screeningBody(
   if (!sameBody(p.nationality, was.nationality)) body.nationality = p.nationality;
   if (!sameBody(p.workAuthorization, was.workAuthorization)) body.workAuthorization = p.workAuthorization;
   if (!sameBody(p.noticePeriod, was.noticePeriod)) body.noticePeriod = p.noticePeriod;
-  if (!sameBody(profile.industrySelections,base.profile.industrySelections) && profile.industrySelections) body.industrySelections=profile.industrySelections;
   if (profile.source && !base.profile.source) body.source = profile.source;
   const comp = toCompensationBody(salary, base.salaryVersion);
   if (withSalary && !sameBody(comp, toCompensationBody(base.salary, base.salaryVersion))) body.compensation = comp;
@@ -78,10 +74,8 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   const items = useCallItems("screening_call");
   const [sensitive, setSensitive] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
-  // Who made the call and when: you and today unless said otherwise (a call logged later).
-  const [calledOn, setCalledOn] = useState(localToday);
-  const [calledBy, setCalledBy] = useState("");
-  const users = useQuery({ queryKey: usersKey, queryFn: async () => unwrap(await api.GET("/v1/users")).items, staleTime: 60_000 });
+  // Who made the call and when: always you, today (not changed here).
+  const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   const salaryShown = permissions.includes("candidates.compensation:update") && !candidate.restrictedFields.includes("compensation");
   const canNote = permissions.includes("notes:create");
   const startFrom = (c: Candidate) => {
@@ -93,10 +87,10 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
 
   const save = useMutation({
     mutationFn: async (draft: CallDraft) => {
-      const { base, profile, salary, notes, sensitive, salaryShown, calledOn, calledBy } = draft;
+      const { base, profile, salary, notes, sensitive, salaryShown } = draft;
       const problems = salaryShown ? salaryProblems(salary) : {};
       if (Object.keys(problems).length > 0) throw new FormInvalid(problems);
-      const body = { ...screeningBody(base, profile, salary, notes, sensitive, salaryShown), calledOn, ...(calledBy ? { calledBy } : {}) };
+      const body = screeningBody(base, profile, salary, notes, sensitive, salaryShown);
       return unwrap(await api.POST("/v1/candidates/{candidateId}/screening-calls", { params: { path: { candidateId: candidate.id } }, body }));
     },
     onSuccess: (res, draft) => {
@@ -113,8 +107,6 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       setSaved(`Call of ${formatDay(res.call.calledOn)} saved to ${res.candidate.fullName}'s profile${res.noteId ? ", with the notes" : ""}.`
         + (res.sourceKept ? " Their source was kept." : "")
         + (sent && !res.salaryApplied ? " The salary was not changed: a later call already set it (the salary follows the latest call)." : ""));
-      setCalledOn(localToday());
-      setCalledBy("");
       window.location.hash = `#/candidates/${candidate.id}${sent && !res.salaryApplied ? "?screeningSalary=kept" : ""}`;
     },
   });
@@ -131,18 +123,10 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
   return (
     <form className="panel form-grid" aria-label="Screening call" onSubmit={(e) => {
       e.preventDefault();
-      save.mutate({ base, profile, salary, notes: callNote(items, answers, notes), sensitive, salaryShown, calledOn, calledBy });
+      save.mutate({ base, profile, salary, notes: callNote(items, answers, notes), sensitive, salaryShown });
     }}>
       <h3 className="full">Screening call</h3>
-      <Field label="Call date" error={errors.calledOn}>
-        <input type="date" value={calledOn} max={localToday()} onChange={(e) => { setSaved(null); setCalledOn(e.target.value); }} />
-      </Field>
-      <Field label="Called by" error={errors.calledBy}>
-        <select value={calledBy} onChange={(e) => { setSaved(null); setCalledBy(e.target.value); }}>
-          <option value="">Me</option>
-          {users.data?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
-      </Field>
+      <p className="full muted call-who">{formatDay(localToday())} · called by {me.data?.user.name ?? "you"}</p>
       {canNote && (
         <div className="full">
           <p className="muted small">What to ask is set in Settings &gt; Screening call. Each answer is saved in the notes after its label (&ldquo;RFL: &hellip;&rdquo;).</p>
@@ -176,7 +160,6 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
         )}
         {errors.source && <small className="error">{errors.source}</small>}
       </div>
-      <IndustryPicker value={profile.industrySelections} legacy={profile.industry} candidate={candidate} onChange={(industrySelections,industry) => { change({industrySelections,industry}); }} />
       {salaryShown && <ScreeningSalary key={base.salaryVersion} form={salary} set={setSalaryField} patch={(value) => { setSaved(null); setSalary((f) => ({ ...f, ...value })); }} errors={errors} />}
       <div className="row full">
         <button type="submit" disabled={save.isPending}>Save the call</button>
@@ -184,7 +167,7 @@ export function ScreeningForm({ candidate, permissions }: { candidate: Candidate
       </div>
       <SaveError
         error={save.error}
-        shown={["body", "notes", "calledOn", "calledBy", "nationality", "noticePeriod.value", "noticePeriod.unit", "workAuthorization.status", "workAuthorization.basis", "source", ...Object.values(SALARY_PATHS)]}
+        shown={["body", "notes", "nationality", "noticePeriod.value", "noticePeriod.unit", "workAuthorization.status", "workAuthorization.basis", "source", ...Object.values(SALARY_PATHS)]}
         reloadLabel="Reload their version (your notes are kept; other changes here are lost)"
         onReload={() => {
           // Someone saved first: start again from their version, keeping the notes typed so far.

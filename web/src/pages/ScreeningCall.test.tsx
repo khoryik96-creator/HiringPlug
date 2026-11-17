@@ -24,6 +24,7 @@ const CALLER: Permission[] = [...RECRUITER, "notes:create", "notes.sensitive:rea
 function reads(c: Candidate) {
   return vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { path?: { documentId?: string } } }) => {
     if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+    if (path === "/v1/me") return Promise.resolve(ok({ user: { id: "usr_1", email: "aina@agency.test", name: "Aina" }, permissions: [] }));
     if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(c));
     if (path === "/v1/candidates/{candidateId}/documents") return Promise.resolve(ok({ items: docs }));
     if (path === "/v1/documents/{documentId}") return Promise.resolve(ok(docs.find((d) => d.id === init?.params?.path?.documentId)));
@@ -58,7 +59,11 @@ describe("screening call", () => {
     fireEvent.click(within(form).getByLabelText(/Sensitive note/));
     fireEvent.change(within(form).getByLabelText("Notice period"), { target: { value: "2_week" } });
     fireEvent.change(within(form).getByLabelText("Nationality"), { target: { value: "SG" } });
-    fireEvent.change(within(form).getByLabelText("Work authorization"), { target: { value: "requires_visa" } });
+    fireEvent.click(within(within(form).getByRole("radiogroup", { name: "Work authorization" })).getByRole("radio", { name: "Needs pass" }));
+    expect(within(form).queryByLabelText("Call date")).toBeNull(); // today, by whoever is signed in
+    expect(within(form).queryByLabelText("Called by")).toBeNull();
+    expect(within(form).queryByText(/Subindustry/)).toBeNull(); // industries come from the CV and the Details section
+    expect(within(form).getByText(/called by Aina/)).toBeTruthy();
     fireEvent.click(within(form).getByRole("button", { name: /Referral/ }));
     fireEvent.change(within(form).getAllByLabelText("From (or the single figure)")[0] as HTMLElement, { target: { value: "9,500" } });
     fireEvent.change(within(form).getAllByLabelText("Currency")[1] as HTMLElement, { target: { value: "sgd" } });
@@ -68,7 +73,7 @@ describe("screening call", () => {
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(post.mock.calls[0]?.[0]).toBe("/v1/candidates/{candidateId}/screening-calls");
     expect(sentBody(post)).toEqual({
-      version: 3, notes: "RFL: Better prospects\nLF: Audit roles in SG\n\nWants hybrid; open to SG.", sensitive: true, calledOn: today,
+      version: 3, notes: "RFL: Better prospects\nLF: Audit roles in SG\n\nWants hybrid; open to SG.", sensitive: true,
       nationality: "SG", workAuthorization: { status: "requires_visa", basis: null, note: null }, noticePeriod: { value: 2, unit: "week" },
       source: "referral",
       compensation: {
@@ -93,7 +98,7 @@ describe("screening call", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Save the call" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     // Only what changed is sent: nothing here, so nothing a colleague changed meanwhile is sent back.
-    expect(sentBody(post)).toEqual({ version: 3, notes: "", sensitive: false, calledOn: today });
+    expect(sentBody(post)).toEqual({ version: 3, notes: "", sensitive: false });
     cleanup();
 
     reads(c);

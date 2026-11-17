@@ -144,16 +144,18 @@ describe("candidate list", () => {
     renderWithClient(<CandidateList canSeeSalary />);
     await screen.findByText("Siti Aisyah");
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    fireEvent.change(screen.getByPlaceholderText(/SAP AND/), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
-    expect(screen.getByText("internship").className).toBe("bool-not"); // read as left out
+    expect(screen.queryByPlaceholderText(/SAP AND/)).toBeNull(); // the box above reads booleans: the filters keep only the tips
+    expect(screen.getByText(/any ending/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /^IT skills/ }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "SAP" }));
     fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Looking out" }));
     fireEvent.change(screen.getByLabelText(/Expects at most/), { target: { value: "12,000" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.change(screen.getByLabelText("Search candidates"), { target: { value: "SAP AND (BW OR BPC) NOT internship" } });
 
-    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    await waitFor(() => { expect(post.mock.calls.some((c) => JSON.stringify(c).includes("internship"))).toBe(true); });
+    post.mock.calls.splice(0, post.mock.calls.findIndex((c) => JSON.stringify(c).includes("internship")));
     expect(sentBody(post)).toEqual({
       limit: 25, skillsMatch: "all", boolean: "SAP AND (BW OR BPC) NOT internship", skills: ["SAP"], availability: ["looking"],
       expectedSalaryMax: { amount: "12000", currency: "MYR" },
