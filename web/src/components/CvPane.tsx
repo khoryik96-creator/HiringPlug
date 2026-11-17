@@ -26,6 +26,21 @@ export function latestCv(docs: Document[]): Document | undefined {
   return [...(theirs.length > 0 ? theirs : docs)].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
 
+/** A candidate's CVs and the one shown: the newest they sent, until another is picked. */
+export function useCandidateCv(candidateId: string, enabled = true) {
+  const docs = useQuery({
+    queryKey: ["documents", candidateId],
+    enabled,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
+  });
+  const [picked, setPicked] = useState<string | undefined>();
+  const list = docs.data ?? [];
+  const selected = picked ?? latestCv(list)?.id;
+  const doc = useDocument(selected);
+  return { docs, list, selected, setPicked, doc };
+}
+
 export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", unified = false, actions }: {
   unified?: boolean;
   actions?: ReactNode;

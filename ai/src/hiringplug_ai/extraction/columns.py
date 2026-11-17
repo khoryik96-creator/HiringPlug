@@ -55,9 +55,9 @@ def _rows(words: list[dict[str, Any]]) -> list[_Row]:
     return rows
 
 
-def find_gutter(words: list[dict[str, Any]], width: float) -> float | None:
+def find_gutter(words: list[dict[str, Any]], width: float, rows: list[_Row] | None = None) -> float | None:
     """The x position of the gap between two columns, or None for one column."""
-    rows = _rows(words)
+    rows = _rows(words) if rows is None else rows
     if len(rows) < MIN_ROWS or width <= 0:
         return None
     total_chars = sum(len(w["text"]) for w in words) or 1
@@ -110,12 +110,12 @@ def _covered(rows: list[_Row]) -> float:
     return max(r.bottom for r in rows) - min(r.top for r in rows) if rows else 0.0
 
 
-def _letter_spaced(words: list[dict[str, Any]]) -> list[tuple[str, str]]:
+def _letter_spaced(rows: list[_Row]) -> list[tuple[str, str]]:
     """Letter-spaced lines ("N O E L L E  K H O O"), read back as words: the
     text has one space between every letter, but the words' gap is wider than
     the letters'. Pairs of (as the text has it, as words)."""
     out: list[tuple[str, str]] = []
-    for row in _rows(words):
+    for row in rows:
         run: list[dict[str, Any]] = []
         for w in [*sorted(row.words, key=lambda w: w["x0"]), None]:
             if w is not None and len(w["text"]) == 1 and w["text"].isalpha():
@@ -133,8 +133,8 @@ def _letter_spaced(words: list[dict[str, Any]]) -> list[tuple[str, str]]:
     return out
 
 
-def _respaced(text: str, words: list[dict[str, Any]]) -> str:
-    for spaced, joined in _letter_spaced(words):
+def _respaced(text: str, rows: list[_Row]) -> str:
+    for spaced, joined in _letter_spaced(rows):
         text = re.sub(rf"(?<!\S){re.escape(spaced)}(?!\S)", joined, text, count=1)
     return text
 
@@ -142,11 +142,12 @@ def _respaced(text: str, words: list[dict[str, Any]]) -> str:
 def page_text(page: Any) -> str:
     """The page's text, column by column when it has two columns."""
     words = page.extract_words()
-    return _respaced(_page_text(page, words), words)
+    rows = _rows(words)
+    return _respaced(_page_text(page, words, rows), rows)
 
 
-def _page_text(page: Any, words: list[dict[str, Any]]) -> str:
-    gutter = find_gutter(words, float(page.width))
+def _page_text(page: Any, words: list[dict[str, Any]], rows: list[_Row]) -> str:
+    gutter = find_gutter(words, float(page.width), rows)
     if gutter is None:
         return str(page.extract_text() or "")
     parts: list[str] = []

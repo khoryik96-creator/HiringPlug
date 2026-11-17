@@ -58,6 +58,7 @@ describe("candidate page", () => {
     expect(localStorage.getItem("hp.cvBeside")).toBe("on");
     fireEvent.click(screen.getByRole("tab", { name: "CV & files" }));
     expect(screen.queryByRole("region", { name: "CV beside the details" }), "the CV tab shows it already").toBeNull();
+    expect(screen.queryByRole("button", { name: "CV beside" }), "no switch that would do nothing there").toBeNull();
     cleanup();
     await show(testCandidate(), ["candidates:read", "documents:read"]);
     expect(screen.getByRole("region", { name: "CV beside the details" }), "remembered").toBeTruthy();

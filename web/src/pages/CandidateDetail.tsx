@@ -126,7 +126,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         canEditSalary={permissions.includes("candidates.compensation:update")}
         onSalary={() => { setEditingSalary(true); setActive("salary"); }} />
       <div className={beside ? "candidate-workspace with-cv" : "candidate-workspace"}>
-        {canSeeCv && <button type="button" className={beside ? "cv-beside-toggle on" : "cv-beside-toggle"} aria-pressed={beside}
+        {canSeeCv && active !== "cv" && <button type="button" className={beside ? "cv-beside-toggle on" : "cv-beside-toggle"} aria-pressed={beside}
           onClick={() => { setBeside(!beside); }}>CV beside</button>}
         <div className="candidate-main">
         <aside className="candidate-contact panel" aria-label="Contact summary">

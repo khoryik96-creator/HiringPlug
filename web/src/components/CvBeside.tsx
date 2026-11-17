@@ -1,23 +1,13 @@
 // The candidate's CV beside their details (the "CV beside" switch on the
 // candidate's page): the newest CV they sent, with a version picker. It stays
 // in view while the details scroll.
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, unwrap } from "../api/client";
-import { CvPane, latestCv, useDocument } from "./CvPane";
+import { CvPane, useCandidateCv } from "./CvPane";
 import { ErrorMessage } from "./ErrorMessage";
 
 export function CvBeside({ candidateId }: { candidateId: string }) {
-  const docs = useQuery({
-    queryKey: ["documents", candidateId],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/candidates/{candidateId}/documents", { params: { path: { candidateId } } })).items,
-  });
-  const [picked, setPicked] = useState<string | undefined>();
-  const list = docs.data ?? [];
-  const selected = picked ?? latestCv(list)?.id;
-  const doc = useDocument(selected);
+  const { docs, list, selected, setPicked, doc } = useCandidateCv(candidateId);
   return (
     <div className="cv-beside" aria-label="CV beside the details" role="region">
       {docs.error ? <ErrorMessage error={docs.error} />

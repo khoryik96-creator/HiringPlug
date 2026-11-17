@@ -89,6 +89,11 @@ def _clean(text: str) -> str:
     return trim(re.sub(r"\s+", " ", text))
 
 
+# A lowercase start with an ordinary joining word later: the rest of a sentence
+# ("exceptional SLA with partners"), not a brand written in lowercase ("foodpanda Malaysia").
+_CONTINUATION = re.compile(r"[a-z]{4,}\s.*\b(?:with|and|of|to|the|for|in|on|by|across|from|while)\b")
+
+
 def headline(text: str) -> bool:
     """A short line that can hold a title or a company: not a bullet, a sentence or a duty."""
     words = text.split()
@@ -98,7 +103,7 @@ def headline(text: str) -> bool:
         and len(words) <= 14
         and len(text) <= 140
         and not re.search(r"[a-z]{4,}\.$", text)  # ends like a sentence (but "Sdn. Bhd." is fine)
-        and not re.match(r"[a-z]{4,}\s", text)  # the rest of a sentence: "exceptional SLA with partners"
+        and not _CONTINUATION.match(text)  # the rest of a sentence: "exceptional SLA with partners"
         and not _DUTY_START.match(text)
         and not _OTHER_LABEL.match(text)
         and not is_sentence(text)

@@ -62,6 +62,20 @@ describe("CVs and documents", () => {
     expect(await screen.findByRole("region", { name: "Details from this CV" })).toBeTruthy();
   });
 
+  it("offers no review after re-reading a formatted CV (our own output)", async () => {
+    const f = doc({ id: "doc_f", source: "formatted", fileName: "Formatted CV.txt", contentType: "text/plain", extractedText: "Formatted text" });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [f] } : f
+    ))) as never);
+    vi.spyOn(api, "POST").mockResolvedValue(ok(f));
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Formatted text");
+    fireEvent.click(screen.getByLabelText("More for Formatted CV.txt"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Read details again" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Details read from Formatted CV.txt.");
+    expect(within(screen.getByRole("status")).queryByRole("button", { name: "Review details" })).toBeNull();
+  });
+
   it("compares two CVs side by side right in the tab, and goes back to one", async () => {
     const a = doc({ id: "doc_a", fileName: "Their CV.txt", contentType: "text/plain", extractedText: "Their text" });
     const b = doc({ id: "doc_b", fileName: "Formatted CV.txt", source: "formatted", contentType: "text/plain", extractedText: "Formatted text" });

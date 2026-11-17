@@ -97,9 +97,13 @@ func TestRecognitionReadsEWalletsAndPlatformsInAName(t *testing.T) {
 		"Touch 'n Go Digital":    "Digital – FinTech/Payment Getaway/E-Wallet",
 		"Shopee Mobile Malaysia": "Digital & E-Commerce",
 		"ShopeeFood":             "Digital & E-Commerce",
+		"Touch ’n Go Digital":    "Digital – FinTech/Payment Getaway/E-Wallet",
 	} {
 		got, _ := Recognize(items, Employment{Name: name, Title: "Product Manager"}, "")
 		require.NotNil(t, got, name)
 		assert.Equal(t, want, got.Label, name)
 	}
+	// Only Shopee's own names run on ("ShopeeFood"); "Grab" is not a prefix.
+	got, _ := Recognize(items, Employment{Name: "Grabowski Engineering GmbH", Title: "Engineer"}, "")
+	assert.Nil(t, got)
 }

@@ -34,8 +34,8 @@ var employerRules = []employerRule{
 	rule("Industrial/Manufacturing", `\b(intel|infineon|micron|western digital|inari|vitrox|proton|perodua|petronas|exxon|tenaga|semiconductor|manufacturing)\b`),
 	rule("FMCG", `\b(nestl[eé]|unilever|procter|dutch lady|coca.cola|pepsi|mondelez|fmcg)\b`),
 	// E-wallets and payment firms before the platforms they belong to ("ShopeePay Malaysia").
-	rule("Digital – FinTech/Payment Getaway/E-Wallet", `\b(shopee ?pay|grab ?pay|grab ?financial|touch ?'?n ?go|tng digital|bigpay|ipay88|razer merchant services|merchantrade|fintech|e-?wallet|payment gateway)\b`),
-	rule("Digital & E-Commerce", `\b(shopee|lazada|grab|foodpanda|zalora|carousell)\w*\b`),
+	rule("Digital – FinTech/Payment Getaway/E-Wallet", `\b(shopee ?pay|grab ?pay|grab ?financial|touch ?['’]?n ?go|tng digital|bigpay|ipay88|razer merchant services|merchantrade|fintech|e-?wallet|payment gateway)\b`),
+	rule("Digital & E-Commerce", `\b(shopee\w*|lazada|grab|foodpanda|zalora|carousell)\b`),
 	rule("Professional Services", `\b(deloitte|pwc|pricewaterhouse|ernst|kpmg|grant thornton|bdo|baker tilly|mckinsey|boston consulting)\b`),
 	rule("Life Science/Medical", `\b(ihh|kpj|pantai|gleneagles|columbia asia|hospital|pharmaceutical|clinic)\b`),
 	rule("Property & Construction", `\b(gamuda|ijm|sp setia|mah sing|eco world|construction|real estate)\b`),

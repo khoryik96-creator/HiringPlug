@@ -257,7 +257,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
         return <p className="reread-status" role="status">
           {d.parseStatus === "queued" ? <>Reading the details from <strong>{d.fileName}</strong>…</>
             : d.parseStatus === "parsed" ? <>Details read from <strong>{d.fileName}</strong>.{" "}
-              {canEdit && <button type="button" className="doc-btn primary-soft" onClick={() => { setReviewing(d.id); setRereading(null); }}>Review details</button>}</>
+              {canEdit && d.source !== "formatted" && <button type="button" className="doc-btn primary-soft" onClick={() => { setReviewing(d.id); setRereading(null); }}>Review details</button>}</>
             : <>The details could not be read from <strong>{d.fileName}</strong>.</>}
           {d.parseStatus !== "queued" && <button type="button" className="link" onClick={() => { setRereading(null); }}>Dismiss</button>}
         </p>;

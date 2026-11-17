@@ -208,3 +208,23 @@ def test_the_end_of_a_summary_sentence_is_not_a_name() -> None:
         ]
     )
     assert parse_cv(text).fullName is None
+
+
+def test_an_employer_written_in_lowercase_is_still_the_company() -> None:
+    # Lines starting lowercase are skipped as the rest of a sentence, but only
+    # with a joining word ("exceptional SLA with partners"), not "foodpanda Malaysia".
+    text = "\n".join(
+        [
+            "WORK EXPERIENCE",
+            "foodpanda Malaysia",
+            "Operations Manager",
+            "January 2020 to Present",
+            "Ran the rider operations for the central region.",
+            "exceptional SLA with partners",
+            "Contoh Logistics Sdn Bhd",
+            "Operations Executive",
+            "March 2017 to December 2019",
+        ]
+    )
+    companies = [j.company.value if j.company else None for j in parse_cv(text).experience]
+    assert companies == ["foodpanda Malaysia", "Contoh Logistics Sdn Bhd"]
