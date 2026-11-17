@@ -26,3 +26,6 @@ data/
 .DS_Store
 Thumbs.db
 /backups/
+
+# Codespaces sign-in link (.devcontainer/start.sh)
+CODESPACE-SIGN-IN.txt

@@ -32,6 +32,7 @@ Read in this order. Each page is short and links to the next.
 - [Debug a problem](playbooks/debug-a-problem.md)
 - [Run it on your own machine or server](playbooks/run-locally.md)
 - [Put it on a server, with HTTPS, off-site backups and alerts](playbooks/deploy-to-a-server.md)
+- [Let someone try it on GitHub Codespaces](playbooks/try-it-on-codespaces.md)
 
 ## Decisions (and why)
 
