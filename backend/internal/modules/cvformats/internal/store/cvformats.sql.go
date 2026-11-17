@@ -269,6 +269,16 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]CvTemplate, error) {
 	return items, nil
 }
 
+const lockStudioCandidate = `-- name: LockStudioCandidate :exec
+SELECT pg_advisory_xact_lock(hashtextextended('studio_cv:' || app_current_tenant() || ':' || $1::text, 0))
+`
+
+// One run at a time per candidate: the second of two clicks waits here, then sees the first.
+func (q *Queries) LockStudioCandidate(ctx context.Context, candidateID string) error {
+	_, err := q.db.Exec(ctx, lockStudioCandidate, candidateID)
+	return err
+}
+
 const newStudioCvID = `-- name: NewStudioCvID :one
 SELECT new_id('scv')::text
 `
@@ -303,6 +313,18 @@ type RecordStudioCvAIUseParams struct {
 func (q *Queries) RecordStudioCvAIUse(ctx context.Context, arg RecordStudioCvAIUseParams) error {
 	_, err := q.db.Exec(ctx, recordStudioCvAIUse, arg.StudioCvID, arg.Tokens)
 	return err
+}
+
+const studioCvRunning = `-- name: StudioCvRunning :one
+SELECT EXISTS (SELECT 1 FROM studio_cv WHERE candidate_id = $1 AND status = 'queued' AND created_at > now() - interval '15 minutes')
+`
+
+// A run still being made (one queued for over 15 minutes is taken as lost, so it never blocks for good).
+func (q *Queries) StudioCvRunning(ctx context.Context, candidateID string) (bool, error) {
+	row := q.db.QueryRow(ctx, studioCvRunning, candidateID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const studioCvTokensSince = `-- name: StudioCvTokensSince :one

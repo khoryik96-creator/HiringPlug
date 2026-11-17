@@ -25,6 +25,9 @@ x-module:
     STUDIO_CV_OFF:
       status: 409
       description: CV Studio formatting needs the AI, and no AI provider is set up (or this month's AI allowance is used up).
+    STUDIO_CV_RUNNING:
+      status: 409
+      description: One of this candidate's CVs is being formatted already; one run at a time, so a double click never makes two.
     STUDIO_CV_SOURCE:
       status: 422
       description: The chosen document cannot be formatted (not this candidate's, not a CV they sent, or not a PDF or Word file).
@@ -187,7 +190,7 @@ paths:
 components:
   responses:
     StudioCvOff:
-      description: No AI for it (STUDIO_CV_OFF).
+      description: No AI for it (STUDIO_CV_OFF), or one is being made already (STUDIO_CV_RUNNING).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

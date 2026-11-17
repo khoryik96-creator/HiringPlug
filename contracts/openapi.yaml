@@ -216,6 +216,10 @@ x-error-codes:
     module: cvformats
     status: 409
     description: CV Studio formatting needs the AI, and no AI provider is set up (or this month's AI allowance is used up).
+  STUDIO_CV_RUNNING:
+    module: cvformats
+    status: 409
+    description: One of this candidate's CVs is being formatted already; one run at a time, so a double click never makes two.
   STUDIO_CV_SOURCE:
     module: cvformats
     status: 422
@@ -5350,7 +5354,7 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
     StudioCvOff:
-      description: No AI for it (STUDIO_CV_OFF).
+      description: No AI for it (STUDIO_CV_OFF), or one is being made already (STUDIO_CV_RUNNING).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
@@ -5574,6 +5578,7 @@ components:
         - SIGN_IN_FAILED
         - STAGE_MOVE_NOT_ALLOWED
         - STUDIO_CV_OFF
+        - STUDIO_CV_RUNNING
         - STUDIO_CV_SOURCE
         - TEAM_CHANGE_NOT_ALLOWED
         - TOO_MANY_ATTEMPTS

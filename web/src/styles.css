@@ -337,10 +337,21 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .format-cv .choice label span { display: flex; flex-direction: column; gap: 0.15rem; }
 .format-cv .choice small { color: var(--muted); font-size: 0.82rem; }
 .format-cv .choice input:disabled + span { opacity: 0.5; }
-.studio-runs { list-style: none; padding: 0; margin: 0.75rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.studio-run { padding: 0.55rem 0.8rem; border-radius: 10px; background: var(--soft); font-size: 0.92rem; }
-.studio-run.queued { background: var(--accent-soft); color: var(--accent-dark); }
-.studio-run p { margin: 0.3rem 0 0; }
+.studio-progress { margin: 0.4rem 0 0.6rem; display: grid; gap: 0.2rem; font-size: 0.8rem; }
+.studio-line { display: flex; align-items: center; gap: 0.6rem; }
+.studio-label { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted, #6b6880); }
+.studio-label strong { font-weight: 600; color: var(--ink); }
+.studio-bar { flex: 1; height: 4px; border-radius: 999px; background: #efeaf8; overflow: hidden; }
+.studio-bar i { display: block; height: 100%; background: #ea580c; transition: width 1s linear; }
+.studio-timer { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; color: #c2410c; }
+.studio-progress.done .studio-bar i { background: #16a34a; }
+.studio-progress.done .studio-timer { color: #15803d; }
+.studio-progress.failed .studio-bar i { background: #dc2626; }
+.studio-progress.failed .studio-timer { color: #b91c1c; }
+.studio-progress small.warning { font-size: 0.78rem; }
+.doc-btn.format-running, .doc-btn.format-running:disabled, .doc-btn.format-running:disabled:hover { opacity: 1; border: 1.5px solid #ea580c; color: #c2410c; font-variant-numeric: tabular-nums; }
+.doc-btn.format-done { border: 1.5px solid #16a34a; color: #15803d; background: #f0fdf4; }
+.doc-btn.format-done:hover { border-color: #15803d; color: #166534; }
 
 .status-dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 1.5px solid; margin-right: 0.35rem; vertical-align: -0.05rem; }
 .candidates-table .small { display: block; }

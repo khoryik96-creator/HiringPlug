@@ -20,6 +20,14 @@ DELETE FROM cv_template WHERE id = @id RETURNING storage_key;
 -- name: NewStudioCvID :one
 SELECT new_id('scv')::text;
 
+-- One run at a time per candidate: the second of two clicks waits here, then sees the first.
+-- name: LockStudioCandidate :exec
+SELECT pg_advisory_xact_lock(hashtextextended('studio_cv:' || app_current_tenant() || ':' || @candidate_id::text, 0));
+
+-- A run still being made (one queued for over 15 minutes is taken as lost, so it never blocks for good).
+-- name: StudioCvRunning :one
+SELECT EXISTS (SELECT 1 FROM studio_cv WHERE candidate_id = @candidate_id AND status = 'queued' AND created_at > now() - interval '15 minutes');
+
 -- name: InsertStudioCv :one
 INSERT INTO studio_cv (id, tenant_id, candidate_id, source_document_id, blind, neutral_gender, correct_language, alignment, created_by)
 VALUES (@id, app_current_tenant(), @candidate_id, @source_document_id, @blind, @neutral_gender, @correct_language, @alignment, app_current_user())

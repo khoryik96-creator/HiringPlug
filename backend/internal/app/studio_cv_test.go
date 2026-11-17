@@ -143,7 +143,9 @@ func TestACVIsFormattedCVStudiosWayAndSaved(t *testing.T) {
 		var r api.StudioCv
 		res.JSON(&r)
 		var p api.CvFormatStudioJob
-		require.NoError(t, json.Unmarshal(claimAIJobWhere(t, aiConn, "studioCvId", r.Id).Payload, &p))
+		first := claimAIJobWhere(t, aiConn, "studioCvId", r.Id)
+		require.NoError(t, json.Unmarshal(first.Payload, &p))
+		answerAIJob(t, a, aiConn, first, api.JobKindCvStudioFormatted, studioResult(r.Id, simpleDocx(t, "Senior Accountant"), "")) // one run at a time
 		assert.Equal(t, api.StudioCvSummaryShort, p.Summary)
 		require.NotNil(t, p.SummaryFocus)
 		assert.Equal(t, api.StudioCvSummaryFocusLeadership, *p.SummaryFocus)
@@ -155,7 +157,9 @@ func TestACVIsFormattedCVStudiosWayAndSaved(t *testing.T) {
 		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 		res.JSON(&r)
 		var none api.CvFormatStudioJob
-		require.NoError(t, json.Unmarshal(claimAIJobWhere(t, aiConn, "studioCvId", r.Id).Payload, &none))
+		second := claimAIJobWhere(t, aiConn, "studioCvId", r.Id)
+		require.NoError(t, json.Unmarshal(second.Payload, &none))
+		answerAIJob(t, a, aiConn, second, api.JobKindCvStudioFormatted, studioResult(r.Id, simpleDocx(t, "Senior Accountant"), ""))
 		assert.Equal(t, api.StudioCvSummaryNone, none.Summary, "no summary: nothing written")
 		assert.False(t, none.SummaryDirection.IsSpecified() && !none.SummaryDirection.IsNull(), "and no direction sent")
 
@@ -171,4 +175,49 @@ func TestACVIsFormattedCVStudiosWayAndSaved(t *testing.T) {
 	// Leave the AI queue tidy for other tests.
 	_, err = testutil.Current.Admin.Exec(ctx, `DELETE FROM job WHERE queue = 'ai' AND tenant_id = $1`, tenant.ID)
 	require.NoError(t, err)
+}
+
+func TestACandidatesCVIsFormattedOneRunAtATimeWhileOthersCanBeFormatted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	token := tenant.Users[api.RoleRecruiter].Token
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	a := newTestApp(t, matchingOn)
+	withCV := func(name string) (string, string) {
+		c := a.createCandidate(token, map[string]any{"firstName": name})
+		res := a.upload("/v1/candidates/"+c.Id+"/documents", token, "original", "cv.docx", minimalDOCX(t))
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var cv api.Document
+		res.JSON(&cv)
+		return c.Id, cv.Id
+	}
+	siti, sitiCV := withCV("Siti")
+	lim, limCV := withCV("Lim")
+
+	// Two clicks at once: one run, the other is told.
+	statuses := make(chan int, 2)
+	for range 2 {
+		go func() {
+			statuses <- a.request(http.MethodPost, "/v1/candidates/"+siti+"/studio-cvs", token, map[string]any{"documentId": sitiCV}).Status
+		}()
+	}
+	got := []int{<-statuses, <-statuses}
+	assert.ElementsMatch(t, []int{http.StatusAccepted, http.StatusConflict}, got)
+	runs := a.studioCvs(token, siti)
+	require.Len(t, runs, 1, "a double click never makes two")
+	res := a.request(http.MethodPost, "/v1/candidates/"+siti+"/studio-cvs", token, map[string]any{"documentId": sitiCV})
+	assert.Equal(t, api.ErrorCodeSTUDIOCVRUNNING, res.Error().Error.Code)
+
+	// Another candidate's CV meanwhile: fine.
+	res = a.request(http.MethodPost, "/v1/candidates/"+lim+"/studio-cvs", token, map[string]any{"documentId": limCV})
+	assert.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+
+	// Once the first is done, the candidate's CV can be formatted again.
+	answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "studioCvId", runs[0].Id), api.JobKindCvStudioFormatted,
+		studioResult(runs[0].Id, simpleDocx(t, "Senior Accountant"), ""))
+	res = a.request(http.MethodPost, "/v1/candidates/"+siti+"/studio-cvs", token, map[string]any{"documentId": sitiCV})
+	assert.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 }

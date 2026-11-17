@@ -121,6 +121,14 @@ func (s *Service) StartStudio(ctx context.Context, p authz.Principal, candidateI
 			direction.Set(o.SummaryDirection)
 		}
 		q := store.New(tx)
+		if err := q.LockStudioCandidate(ctx, candidateID); err != nil {
+			return err
+		}
+		if running, err := q.StudioCvRunning(ctx, candidateID); err != nil {
+			return err
+		} else if running {
+			return apperr.New(api.ErrorCodeSTUDIOCVRUNNING, "This candidate's CV is being formatted already. Wait for it to finish.")
+		}
 		id, err := q.NewStudioCvID(ctx)
 		if err != nil {
 			return err

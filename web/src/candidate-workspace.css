@@ -40,7 +40,6 @@
 .cv-workspace .candidate-cv > .panel { margin: 0; padding: 12px; }
 .cv-selected-name { font-size: 12px; overflow-wrap: anywhere; flex: 1; }
 .cv-workspace .doc-buttons { flex-wrap: wrap; }
-.formatting-history { margin: 12px 0; font-size: 12px; }
 .docs-panel .doc-card[hidden], [role=tabpanel][hidden] { display: none; }
 .toolbar .extra-formatting { display: contents; }
 .toolbar .extra-formatting[hidden] { display: none; }
