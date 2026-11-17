@@ -79,7 +79,7 @@ describe("Find HR", () => {
     let signIn = true;
     const call = vi.spyOn(companion, "companionCall").mockImplementation(() =>
       signIn ? Promise.reject(new Error("LinkedIn asked to sign in")) : Promise.resolve({ joined: "2024-01", left: "", current: true }));
-    vi.spyOn(api, "POST").mockResolvedValue(ok({ scan }));
+    vi.spyOn(api, "POST").mockResolvedValue(ok(scan)); // the scan as saved (Daniel still without dates)
     renderWithClient(<FindHR company={company} canCreate />);
     await screen.findByText("Daniel Lee");
     fireEvent.click(screen.getByRole("button", { name: "All 3" })); // Farah and Aisha read already, Daniel not
@@ -90,6 +90,8 @@ describe("Find HR", () => {
     await waitFor(() => { expect(call).toHaveBeenCalledTimes(2); });
     // Only Daniel, both times: those whose dates are known are never read again.
     expect(call.mock.calls.map((c) => (c[1] as { url: string }).url)).toEqual(["https://www.linkedin.com/in/daniel", "https://www.linkedin.com/in/daniel"]);
+    // Read now (even if the profile gave no dates here): not asked for again.
+    await waitFor(() => { expect(screen.getAllByRole("button").map((b) => b.textContent)).toContain("Joining dates (0)"); });
   });
 
   it("a scan goes on while another tab is shown, and is picked up again", async () => {

@@ -102,6 +102,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
     ?? (mostWaiting && waitingIn(mostWaiting) > 0 ? mostWaiting : undefined)
     ?? OPEN_STAGES.find((st) => active.some((a) => a.stage === st)) ?? "all";
   const [stepStage, setStepStage] = useState<Schemas["Stage"] | "all" | null>(null);
+  // Chosen once, when the pipeline loads: it does not jump when people move or the spotlight ends.
+  if (loaded && stepStage === null) setStepStage(firstStage()); // set during render, once (React's adjust-state pattern)
   const shared = {
     picked, onPick: canPick ? pick : undefined, canMove: canUpdate, busy: move.isPending || moveMany.isPending, onMove: requestMove,
     upcoming, now, fit, onShowFit: setFitShown,

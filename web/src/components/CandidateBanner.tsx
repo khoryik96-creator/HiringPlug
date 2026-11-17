@@ -51,12 +51,11 @@ export function CandidateBanner({ candidate: c, canEdit, canEditStatus = canEdit
           </div>
           {/* Where they are from, then how to reach them: click an email or number to copy it. */}
           <dl className="contact-plate" aria-label="Contact">
-            <dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd>
-            <dt>Lives in</dt><dd>{lives || "—"}</dd>
-            <span className="plate-line" aria-hidden="true" />
-            <dt>Email</dt><dd>{c.email ? <CopyText text={c.email} what="email" /> : "—"}</dd>
-            <dt>Phone</dt><dd>{c.phone ? <CopyText text={c.phone} what="phone number" /> : "—"}</dd>
-            <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>Profile ↗</a> : "—"}</dd>
+            <div><dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd></div>
+            <div><dt>Lives in</dt><dd>{lives || "—"}</dd></div>
+            <div className="plate-reach"><dt>Email</dt><dd>{c.email ? <CopyText text={c.email} what="email" /> : "—"}</dd></div>
+            <div><dt>Phone</dt><dd>{c.phone ? <CopyText text={c.phone} what="phone number" /> : "—"}</dd></div>
+            <div><dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>Profile ↗</a> : "—"}</dd></div>
           </dl>
         </div>
 

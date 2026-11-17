@@ -109,7 +109,9 @@
 .candidate-banner .contact-plate dt { color: #4b5060; }
 .candidate-banner .contact-plate dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .candidate-banner .contact-plate a { color: #5b3fd0; }
-.contact-plate .plate-line { grid-column: 1 / -1; height: 1px; background: rgb(0 0 0 / .1); margin: 3px 0; }
+.contact-plate > div { display: contents; }
+/* A line between where they are from and how to reach them. */
+.contact-plate .plate-reach dt, .contact-plate .plate-reach dd { border-top: 1px solid rgb(0 0 0 / .1); padding-top: 7px; margin-top: 3px; }
 .copy-text { all: unset; cursor: copy; color: #5b3fd0; font-weight: 600; display: inline-flex; gap: 6px; align-items: baseline; overflow-wrap: anywhere; }
 .copy-text:hover .copy-value { text-decoration: underline dashed; text-underline-offset: 3px; }
 .copy-text:focus-visible { outline: 2px solid #7653ed; outline-offset: 2px; border-radius: 3px; }

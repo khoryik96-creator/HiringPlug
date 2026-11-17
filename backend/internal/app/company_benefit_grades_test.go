@@ -43,6 +43,7 @@ func TestCompanyBenefitsByGrade(t *testing.T) {
 	require.NotNil(t, b.Benefits[0].ByGrade)
 	assert.Equal(t, []api.CompanyBenefitGrade{{Grade: "Executive", Value: "14 days"}, {Grade: "Manager", Value: "18 days"}, {Grade: "Senior Manager", Value: "21 days"}}, *b.Benefits[0].ByGrade)
 	assert.Empty(t, *b.Benefits[1].ByGrade, "the same for all")
+	assert.Equal(t, []api.CompanyBenefitGrade{{Grade: "Senior Manager", Value: "RM 1,500"}}, *b.Benefits[2].ByGrade, "spelt as the client's grade (sent as \"senior manager\")")
 	assert.Equal(t, "14 days", b.Benefits[1].Value.MustGet())
 
 	t.Run("the Word file has a column per grade", func(t *testing.T) {

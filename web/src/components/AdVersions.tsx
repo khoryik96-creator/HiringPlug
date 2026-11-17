@@ -71,8 +71,8 @@ export function AdVersions({ ad, canEdit, show = "both" }: { ad: Ad; canEdit: bo
   );
 }
 
-/** The original: the job description the client sent, as it looks, when one was
- * uploaded (switch to the ad's own text); else the ad's text. */
+/** The job's latest uploaded job description, as it looks (named, as an ad is not
+ * tied to the file it came from), with the ad's own text a click away; else the ad's text. */
 function AsWritten({ ad, facts }: { ad: Ad; facts: string }) {
   const files = useJdFiles(ad.jobId);
   const original = files.data?.[0];
@@ -85,7 +85,7 @@ function AsWritten({ ad, facts }: { ad: Ad; facts: string }) {
   if (!original) return text;
   return <>
     <div className="seg" role="group" aria-label="Show">
-      <button type="button" aria-pressed={view === "file"} onClick={() => { setView("file"); }}>Original file</button>
+      <button type="button" aria-pressed={view === "file"} onClick={() => { setView("file"); }}>Job description file</button>
       <button type="button" aria-pressed={view === "text"} onClick={() => { setView("text"); }}>Ad text</button>
     </div>
     {view === "file" ? <JdFilePreview jobId={ad.jobId} file={original} /> : text}

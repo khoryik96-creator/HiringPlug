@@ -59,7 +59,7 @@ function Info({ a, upcoming, now }: { a: Application; upcoming?: Upcoming; now: 
 
 export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (s: Stage | "all") => void }) {
   const { apps, stage, now } = props;
-  const shown = (stage === "all" ? apps : apps.filter((a) => a.stage === stage)).sort(longestFirst(now));
+  const shown = (stage === "all" ? [...apps] : apps.filter((a) => a.stage === stage)).sort(longestFirst(now));
   return (
     <div className="pipeline-steps">
       <div className="funnel" role="tablist" aria-label="Stages">

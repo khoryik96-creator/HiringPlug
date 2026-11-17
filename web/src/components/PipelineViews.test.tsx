@@ -41,6 +41,21 @@ describe("pipeline steps", () => {
     expect(within(screen.getByRole("list", { name: "Everyone" })).getAllByRole("listitem")).toHaveLength(5);
   });
 
+  it("keeps the stage it opened at when people move on (it does not jump)", async () => {
+    let moved = false;
+    vi.spyOn(api, "GET").mockImplementation((() => Promise.resolve(ok({ items: moved
+      ? [app(4, "screening", 9), app(2, "interview", 0), app(5, "submitted", 8)]
+      : [app(4, "screening", 9), app(2, "submitted", 18), app(5, "submitted", 8)] }))) as never);
+    vi.spyOn(api, "POST").mockImplementation((() => { moved = true; return Promise.resolve(ok({ ...app(2, "interview", 0), version: 3 })); }) as never);
+    renderWithClient(<PipelineBoard jobId="jo_1" canUpdate permissions={["pipeline:read", "pipeline:update"]} />);
+    const stages = await screen.findByRole("tablist", { name: "Stages" });
+    expect(within(stages).getByRole("tab", { name: /Submitted/ }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(within(screen.getByRole("list", { name: "Submitted" })).getAllByRole("button", { name: "Interview" })[0] as HTMLElement);
+    await waitFor(() => { expect(within(screen.getByRole("list", { name: "Submitted" })).getAllByRole("listitem")).toHaveLength(1); });
+    // Now Screening and Submitted each have one waiting: it stays on Submitted.
+    expect(within(stages).getByRole("tab", { name: /Submitted/ }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("switches to the board and remembers it; a crowded column shows 8 and folds the rest", async () => {
     show(Array.from({ length: 12 }, (_, i) => app(i + 1, "submitted", 12 - i)));
     fireEvent.click(await screen.findByRole("button", { name: "Board" }));

@@ -50,7 +50,7 @@ describe("ad versions", () => {
     renderWithClient(<AdVersions ad={ad} canEdit />);
     const written = screen.getByRole("region", { name: "As written" });
     expect((await within(written).findByTitle("Ops Manager JD.pdf")).getAttribute("src")).toContain("blob:jd");
-    expect(within(written).getByRole("button", { name: "Original file" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(written).getByRole("button", { name: "Job description file" }).getAttribute("aria-pressed")).toBe("true");
     expect(written.textContent).not.toContain("Maju is growing.");
     fireEvent.click(within(written).getByRole("button", { name: "Ad text" }));
     expect(written.textContent).toContain("Maju is growing.");

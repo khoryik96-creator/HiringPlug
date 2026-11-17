@@ -39,6 +39,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const [showHidden, setShowHidden] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [datesAt, setDatesAt] = useState<{ done: number; of: number } | null>(null);
+  const [tried, setTried] = useState<string[]>([]);
   useEffect(() => {
     if (!running) return;
     const t = setInterval(() => {
@@ -81,7 +82,8 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
 
   // Read already: their dates (or that they left) are known. Clicking again after a
   // failure carries on from the person it stopped at, not from the first.
-  const datesRead = (p: Person) => p.joined !== null || p.left !== null || p.current !== null;
+  // A profile read that found no dates counts too (read again only after reopening the page).
+  const datesRead = (p: Person) => p.joined !== null || p.left !== null || p.current !== null || tried.includes(p.url);
   const dates = useMutation({
     mutationFn: async () => {
       if (!s) return;
@@ -92,6 +94,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
           { operation_id: operationId(), url: p.url, company_url: page, company_id: s.linkedinCompanyId });
         show(unwrap(await api.POST("/v1/companies/{companyId}/hr-scan/joined", { params: { path: { companyId: company.id } },
           body: { url: p.url, current: r.current, joined: r.joined || null, left: r.left || null } })));
+        setTried((t) => [...t, p.url]);
         setDatesAt({ done: i + 1, of: todo.length });
       }
     },

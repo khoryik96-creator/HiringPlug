@@ -71,22 +71,23 @@ func tidyText(s *string, limit int, field string, errs *apperr.FieldErrors) *str
 
 // tidyByGrade keeps a benefit's per-grade values for the client's grades,
 // each grade once; a grade left blank is dropped.
-func tidyByGrade(in []GradeValue, grades map[string]bool, field string, errs *apperr.FieldErrors) []GradeValue {
+func tidyByGrade(in []GradeValue, grades map[string]string, field string, errs *apperr.FieldErrors) []GradeValue {
 	out := []GradeValue{}
 	seen := map[string]bool{}
 	for j, gv := range in {
 		f := fmt.Sprintf("%s.byGrade[%d]", field, j)
 		g := strings.Join(strings.Fields(gv.Grade), " ")
 		v := tidyText(&gv.Value, 1000, f+".value", errs)
+		canonical, known := grades[strings.ToLower(g)]
 		switch {
-		case !grades[strings.ToLower(g)]:
+		case !known:
 			errs.Add(f+".grade", "is not one of the client's grades")
 		case seen[strings.ToLower(g)]:
 			errs.Add(f+".grade", "is already given")
 		}
 		seen[strings.ToLower(g)] = true
-		if v != nil {
-			out = append(out, GradeValue{Grade: g, Value: *v})
+		if v != nil && known {
+			out = append(out, GradeValue{Grade: canonical, Value: *v}) // spelt as the client's grade is
 		}
 	}
 	return out
@@ -109,7 +110,7 @@ func NormalizeBenefits(b Benefits) (Benefits, apperr.FieldErrors) {
 		seen[key] = true
 		return key, label
 	}
-	grades := map[string]bool{}
+	grades := map[string]string{} // lower case -> as written
 	tidyGrades := make([]string, 0, len(b.Grades))
 	for i, g := range b.Grades {
 		g = strings.Join(strings.Fields(g), " ")
@@ -119,10 +120,12 @@ func NormalizeBenefits(b Benefits) (Benefits, apperr.FieldErrors) {
 			errs.Add(f, "is required")
 		case len([]rune(g)) > 60:
 			errs.Add(f, "must be at most 60 characters")
-		case grades[strings.ToLower(g)]:
+		case grades[strings.ToLower(g)] != "":
 			errs.Add(f, "is already in the list")
 		}
-		grades[strings.ToLower(g)] = true
+		if _, seen := grades[strings.ToLower(g)]; !seen {
+			grades[strings.ToLower(g)] = g
+		}
 		tidyGrades = append(tidyGrades, g)
 	}
 	if len(tidyGrades) > 12 {
