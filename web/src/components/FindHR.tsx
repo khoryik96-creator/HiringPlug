@@ -4,13 +4,13 @@
 // people are added as contacts (their email guessed from colleagues', then
 // verified like every new address). A click on a name opens the profile.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api, type Company, type Schemas, unwrap } from "../api/client";
-import { companionCall, operationId, useCompanion } from "../companion";
+import { companionAtLeast, companionCall, operationId, useCompanion } from "../companion";
 import { linkedinDates } from "../labels";
 import { ErrorMessage } from "./ErrorMessage";
-import { newRun, type Run, runScan, splitName, stopRun } from "./findHrRun";
+import { activeRuns, newRun, type Run, runScan, splitName, stopRun } from "./findHrRun";
 import { companyPage } from "./linkedinCompany";
 
 type Scan = Schemas["HrScan"];
@@ -20,7 +20,7 @@ const COUNTRIES: [Schemas["HrCountry"], string][] = [["MY", "Malaysia"], ["SG", 
   ["IN", "India"], ["AU", "Australia"], ["NZ", "New Zealand"], ["AE", "United Arab Emirates"], ["GB", "United Kingdom"], ["US", "United States"]];
 const DEFAULT_KEYWORDS = "talent acquisition, recruiter, recruitment, human resources, HR, people and culture";
 const NEEDS = "1.2.0";
-const newer = (v: string | null) => !!v && v.split(".").map(Number).reduce((d, n, i) => d || n - (Number(NEEDS.split(".")[i]) || 0), 0) >= 0;
+const newer = (v: string | null) => companionAtLeast(v, NEEDS);
 
 export const hrScanKey = (companyId: string) => ["hr-scan", companyId] as const;
 
@@ -31,20 +31,22 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const scan = useQuery({ queryKey: key, queryFn: async () => unwrap(await api.GET("/v1/companies/{companyId}/hr-scan", { params: { path: { companyId: company.id } } })).scan });
   const [form, setForm] = useState({ country: "MY", keywords: DEFAULT_KEYWORDS, pages: 3 });
   const [editing, setEditing] = useState(false);
-  const [running, setRunning] = useState<Run | null>(null);
-  const [note, setNote] = useState("");
+  // A run goes on while another tab of the company is shown; shown again here, it is picked up.
+  const [running, setRunning] = useState<Run | null>(() => activeRuns.get(company.id) ?? null);
+  const [note, setNote] = useState(() => activeRuns.get(company.id)?.note ?? "");
   const [error, setError] = useState<unknown>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [showHidden, setShowHidden] = useState(false);
-  const [started, setStarted] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const runRef = useRef<Run | null>(null);
-  useEffect(() => () => { if (runRef.current) stopRun(runRef.current); }, []);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => { setNow(Date.now()); }, 1000);
+    const t = setInterval(() => {
+      setNow(Date.now());
+      if (!activeRuns.has(company.id)) setRunning(null); // it ended while this tab was not shown
+      else setNote(running.note);
+    }, 1000);
     return () => { clearInterval(t); };
-  }, [running]);
+  }, [running, company.id]);
 
   const s = scan.data ?? null;
   const page = companyPage(company.linkedinUrl ?? "");
@@ -52,9 +54,9 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
 
   const go = async (from: Scan) => {
     const run = newRun(setNote);
-    runRef.current = run;
-    setRunning(run); setError(null); setStarted(Date.now()); setNow(Date.now());
-    try { await runScan(from, run, show); } catch (e) { setError(e); } finally { setRunning(null); runRef.current = null; setNote(""); }
+    activeRuns.set(company.id, run);
+    setRunning(run); setError(null); setNow(Date.now());
+    try { await runScan(from, run, show); } catch (e) { setError(e); } finally { activeRuns.delete(company.id); setRunning(null); setNote(""); }
   };
   const start = async () => {
     setError(null);
@@ -90,7 +92,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
   const add = useMutation({
     mutationFn: async () => {
       for (const p of chosen.filter((x) => !x.contactId)) {
-        const c = unwrap(await api.POST("/v1/contacts", { body: { companyId: company.id, ...splitName(p.name), title: p.title || null, linkedinUrl: p.url } }));
+        const c = unwrap(await api.POST("/v1/contacts", { body: { companyId: company.id, ...splitName(p.name), title: p.title.slice(0, 200) || null, linkedinUrl: p.url } }));
         const guess = unwrap(await api.GET("/v1/contacts/{contactId}/email-suggestion", { params: { path: { contactId: c.id } } })).suggestion;
         if (guess) await api.PATCH("/v1/contacts/{contactId}", { params: { path: { contactId: c.id } }, body: { version: c.version, email: guess.email } });
       }
@@ -104,7 +106,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
 
   if (!page) return <section className="panel"><h3>Find HR</h3><p className="muted">Add the company&apos;s LinkedIn page (Edit company) to find its HR people.</p></section>;
   const settings = !s || editing;
-  const seconds = Math.max(0, Math.round((now - started) / 1000));
+  const seconds = running ? Math.max(0, Math.round((now - running.started) / 1000)) : 0;
   return (
     <section className="panel find-hr" aria-label="Find HR">
       <div className="row spread">
@@ -147,7 +149,7 @@ export function FindHR({ company, canCreate }: { company: Company; canCreate: bo
           </span>
           {running && <span className="studio-timer">{seconds}s</span>}
           {running && <button type="button" className="doc-btn" onClick={() => { stopRun(running); }}>Stop</button>}
-          {!running && s.status !== "done" && canCreate && <button type="button" className="doc-btn primary" disabled={!companion.ready} onClick={() => { void go(s); }}>Resume</button>}
+          {!running && s.status !== "done" && canCreate && <button type="button" className="doc-btn primary" disabled={!companion.ready || !newer(companion.version)} onClick={() => { void go(s); }}>Resume</button>}
         </div>
       )}
       {note && <p className="muted small" role="status">{note}</p>}

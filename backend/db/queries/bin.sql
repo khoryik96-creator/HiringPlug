@@ -17,9 +17,3 @@ SELECT * FROM bin_entry WHERE id = @id;
 
 -- name: DeleteBinEntry :execrows
 DELETE FROM bin_entry WHERE id = @id;
-
--- The candidates and jobs in the Bin now (an application stays hidden while either is).
--- name: BinnedRecordIDs :many
-SELECT record_id AS id FROM bin_entry WHERE kind = 'candidate'
-UNION ALL
-SELECT jsonb_array_elements_text(went_with -> 'jobs') FROM bin_entry WHERE kind = 'company';

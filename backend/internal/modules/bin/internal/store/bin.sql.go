@@ -10,33 +10,6 @@ import (
 	"time"
 )
 
-const binnedRecordIDs = `-- name: BinnedRecordIDs :many
-SELECT record_id AS id FROM bin_entry WHERE kind = 'candidate'
-UNION ALL
-SELECT jsonb_array_elements_text(went_with -> 'jobs') FROM bin_entry WHERE kind = 'company'
-`
-
-// The candidates and jobs in the Bin now (an application stays hidden while either is).
-func (q *Queries) BinnedRecordIDs(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, binnedRecordIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const deleteBinEntry = `-- name: DeleteBinEntry :execrows
 DELETE FROM bin_entry WHERE id = $1
 `

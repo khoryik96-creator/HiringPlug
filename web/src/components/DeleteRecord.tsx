@@ -34,7 +34,10 @@ function DeleteDialog({ kind, id, onClose }: { kind: Kind; id: string; onClose: 
   const [to, setTo] = useState<PickedCompany | null>(null);
   const c = check.data;
   const linked = c ? c.contacts + c.jobs : 0;
-  const moving = kind === "company" && linked > 0 && move;
+  // A company whose jobs have a placement can still go once they move to another company.
+  const mustMove = kind === "company" && !!c?.blocked && linked > 0;
+  const moving = kind === "company" && linked > 0 && (move || mustMove);
+  const blocked = c?.blocked && !mustMove ? c.blocked : null;
   const remove = useMutation({
     mutationFn: async () => unwrap(await api.POST("/v1/bin", { body: { kind, id, ...(moving && to ? { moveTo: to.id } : {}) } })),
     onSuccess: async () => {
@@ -49,25 +52,28 @@ function DeleteDialog({ kind, id, onClose }: { kind: Kind; id: string; onClose: 
         <ErrorMessage error={check.error} />
         {c && <>
           <h3>Delete {c.label}?</h3>
-          {c.blocked
-            ? <p className="warning" role="alert">{c.blocked}</p>
+          {blocked
+            ? <p className="warning" role="alert">{blocked}</p>
             : <p className="muted">It goes to the Bin for 30 days (Settings › Bin), where an admin can restore it; then it is deleted for good.
               {c.applications > 0 && ` ${plural(c.applications, "pipeline entry").replace("entrys", "entries")} are hidden with it.`}</p>}
-          {!c.blocked && kind === "company" && linked > 0 && (
+          {mustMove && <p className="warning small">Its jobs have a placement, so they move to another company; they cannot be deleted.</p>}
+          {!blocked && kind === "company" && linked > 0 && (
             <fieldset className="delete-links">
               <legend>Its {what}</legend>
-              <label className={move ? "on" : undefined}>
-                <input type="radio" name="links" checked={move} onChange={() => { setMove(true); }} /> Move them to another company
+              <label className={move || mustMove ? "on" : undefined}>
+                <input type="radio" name="links" checked={move || mustMove} onChange={() => { setMove(true); }} /> Move them to another company
               </label>
-              {move && <div className="delete-move"><CompanyPicker value={to} onChange={setTo} aria-invalid={!to} /></div>}
-              <label className={!move ? "on" : undefined}>
-                <input type="radio" name="links" checked={!move} onChange={() => { setMove(false); }} /> Delete them with it (to the Bin)
-              </label>
+              {(move || mustMove) && <div className="delete-move"><CompanyPicker value={to} onChange={setTo} aria-invalid={!to} /></div>}
+              {!mustMove && (
+                <label className={!move ? "on" : undefined}>
+                  <input type="radio" name="links" checked={!move} onChange={() => { setMove(false); }} /> Delete them with it (to the Bin)
+                </label>
+              )}
             </fieldset>
           )}
           <ErrorMessage error={remove.error} />
           <div className="row">
-            {!c.blocked && (
+            {!blocked && (
               <button type="button" className="danger" disabled={remove.isPending || (moving && (!to || to.id === id))} onClick={() => { remove.mutate(); }}>
                 {moving ? "Move them and delete" : "Delete"}
               </button>

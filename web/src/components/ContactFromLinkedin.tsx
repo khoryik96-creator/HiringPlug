@@ -2,16 +2,14 @@
 // title, and offers the companies in HiringPlug that may be where they work.
 import { useState } from "react";
 
-import { useCompanion } from "../companion";
+import { api, unwrap } from "../api/client";
+import { companionAtLeast, useCompanion } from "../companion";
 import { linkedinDates } from "../labels";
 import { type CompanyMatch, companiesFor, nameParts, profilePage, type ProfileRead, readProfile, roleAt } from "./contactLinkedin";
+import { companyPage } from "./linkedinCompany";
 import type { PickedCompany } from "./CompanyPicker";
 
-const NEEDS = [1, 3];
-const recent = (v: string | null) => {
-  const [a = 0, b = 0] = (v ?? "").split(".").map(Number);
-  return a > (NEEDS[0] ?? 0) || (a === NEEDS[0] && b >= (NEEDS[1] ?? 0));
-};
+const recent = (v: string | null) => companionAtLeast(v, "1.3.0");
 
 export function ContactFromLinkedin({ url, company, onRead, onCompany }: {
   url: string;
@@ -25,14 +23,19 @@ export function ContactFromLinkedin({ url, company, onRead, onCompany }: {
   const [error, setError] = useState("");
   const [read, setRead] = useState<ProfileRead | null>(null);
   const [matches, setMatches] = useState<CompanyMatch[] | null>(null);
+  const [at, setAt] = useState<string | null>(null); // the chosen company's LinkedIn page
   const page = profilePage(url);
 
   const fill = async () => {
     setBusy(true); setError(""); setMatches(null);
     try {
       const r = await readProfile(page);
-      setRead(r);
-      const role = roleAt(r.roles, null);
+      // Opened at a company: their role there (they may hold several).
+      const linkedin = company
+        ? unwrap(await api.GET("/v1/companies/{companyId}", { params: { path: { companyId: company.id } } })).linkedinUrl
+        : null;
+      setRead(r); setAt(linkedin ?? null);
+      const role = roleAt(r.roles, linkedin);
       onRead({ ...nameParts(r.name), title: role?.title ?? "", linkedinUrl: page });
       if (role) setMatches(await companiesFor(role));
     } catch (e) {
@@ -42,7 +45,8 @@ export function ContactFromLinkedin({ url, company, onRead, onCompany }: {
     }
   };
 
-  const role = read ? roleAt(read.roles, null) : undefined;
+  const role = read ? roleAt(read.roles, at) : undefined;
+  const elsewhere = !!company && !!at && !!role && companyPage(at) !== role.company_url;
   return (
     <div className="full from-linkedin">
       <button type="button" disabled={!page || busy || companion.ready !== true || !recent(companion.version)} onClick={() => { void fill(); }}
@@ -56,6 +60,7 @@ export function ContactFromLinkedin({ url, company, onRead, onCompany }: {
           {role
             ? <span>LinkedIn: <strong>{role.title || "a role"}</strong> at <strong>{role.company_name}</strong> since {linkedinDates(role.since)}</span>
             : <span className="muted">LinkedIn shows no current role.</span>}
+          {elsewhere && <span className="warning small">Not at {company.name} on LinkedIn now: check before adding them here.</span>}
           {matches && !company && (matches.length > 0
             ? <span className="row">Their company: {matches.slice(0, 4).map((m) => (
               <button key={m.id} type="button" className="doc-btn" onClick={() => { onCompany({ id: m.id, name: m.name }); }}>

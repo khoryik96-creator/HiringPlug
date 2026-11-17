@@ -53,6 +53,15 @@ describe("deleting to the Bin", () => {
     expect(sentBody(post, 1)).toEqual({ kind: "company", id: "comp_1" });
   });
 
+  it("a company whose jobs have a placement can still go once they move", async () => {
+    serve(check({ contacts: 1, jobs: 2, blocked: "It has a placement: placements and their invoices are kept, so it cannot be deleted." }));
+    renderWithClient(<DeleteRecord kind="company" id="comp_1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByText(/Its jobs have a placement, so they move to another company/)).toBeTruthy();
+    expect(screen.queryByLabelText(/Delete them with it/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Move them and delete" })).toBeTruthy();
+  });
+
   it("says why a record with a placement cannot be deleted", async () => {
     serve(check({ blocked: "It has a placement: placements and their invoices are kept, so it cannot be deleted." }));
     renderWithClient(<DeleteRecord kind="candidate" id="cand_1" />);

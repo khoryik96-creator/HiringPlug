@@ -54,14 +54,15 @@ export function nameParts(full: string): { firstName: string; lastName: string }
 /**
  * Once a new contact is saved: with no email, one guessed from colleagues'
  * (saving it verifies it); with a LinkedIn profile at a company with a
- * LinkedIn page, their time there checked (since when, or left).
+ * LinkedIn page, and the companion in this browser, their time there checked
+ * (since when, or left).
  */
-export async function afterContactAdded(contact: Contact): Promise<void> {
+export async function afterContactAdded(contact: Contact, withCompanion: boolean): Promise<void> {
   if (!contact.email) {
     const guess = unwrap(await api.GET("/v1/contacts/{contactId}/email-suggestion", { params: { path: { contactId: contact.id } } })).suggestion;
     if (guess) await api.PATCH("/v1/contacts/{contactId}", { params: { path: { contactId: contact.id } }, body: { version: contact.version, email: guess.email } });
   }
-  if (!contact.linkedinUrl) return;
+  if (!contact.linkedinUrl || !withCompanion) return; // the check needs the companion in this browser
   const started = unwrap(await api.POST("/v1/contacts/linkedin-checks", { body: { contactId: contact.id } }));
   const check = started.checks[0];
   if (!check) return; // the company has no LinkedIn page

@@ -51,3 +51,14 @@ export function companionCall<T>(action: string, args: Record<string, unknown>, 
 export function operationId(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+/** Whether the companion's version is at least `needed` ("1.3.0"): newer readers add actions. */
+export function companionAtLeast(version: string | null, needed: string): boolean {
+  if (!version) return false;
+  const have = version.split(".").map(Number), want = needed.split(".").map(Number);
+  for (let i = 0; i < want.length; i++) {
+    const d = (have[i] ?? 0) - (want[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}

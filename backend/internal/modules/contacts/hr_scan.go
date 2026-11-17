@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts/internal/store"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
@@ -78,6 +79,10 @@ func (s *Service) StartHRScan(ctx context.Context, p authz.Principal, companyID 
 		if err != nil {
 			return err
 		}
+		if err := audit.Record(ctx, tx, audit.Entry{Action: "company.hr_scan_started", EntityType: "company", EntityID: companyID,
+			Changes: map[string]any{"country": country, "keywords": keywords, "pages": in.Pages}}); err != nil {
+			return err
+		}
 		out, err = hrScanToAPI(ctx, tx, row)
 		return err
 	})
@@ -87,7 +92,7 @@ func (s *Service) StartHRScan(ctx context.Context, p authz.Principal, companyID 
 // AddHRScanPage records one page the companion read (or why it could not):
 // the scan moves on, or stops at that page to resume there.
 func (s *Service) AddHRScanPage(ctx context.Context, p authz.Principal, companyID string, in api.HrScanPage) (api.HrScan, error) {
-	return s.updateHRScan(ctx, p, companyID, func(row *store.HrScan, people []HRPerson) ([]HRPerson, error) {
+	return s.updateHRScan(ctx, p, companyID, "company.hr_scan_page", func(row *store.HrScan, people []HRPerson) ([]HRPerson, error) {
 		if row.Status == "done" || int(row.NextQuery) != in.Query || int(row.NextPage) != in.Page {
 			return nil, apperr.StaleVersion("scan") // this page was read already, or the scan started again
 		}
@@ -114,7 +119,7 @@ func (s *Service) AddHRScanPage(ctx context.Context, p authz.Principal, companyI
 
 // AddHRScanJoined records a person's dates at the company, read from their profile.
 func (s *Service) AddHRScanJoined(ctx context.Context, p authz.Principal, companyID string, in api.HrScanJoined) (api.HrScan, error) {
-	return s.updateHRScan(ctx, p, companyID, func(_ *store.HrScan, people []HRPerson) ([]HRPerson, error) {
+	return s.updateHRScan(ctx, p, companyID, "company.hr_scan_joined", func(_ *store.HrScan, people []HRPerson) ([]HRPerson, error) {
 		for i := range people {
 			if people[i].URL == in.Url {
 				people[i].Joined, people[i].Left = nullableString(in.Joined), nullableString(in.Left)
@@ -130,7 +135,7 @@ func (s *Service) AddHRScanJoined(ctx context.Context, p authz.Principal, compan
 	})
 }
 
-func (s *Service) updateHRScan(ctx context.Context, p authz.Principal, companyID string,
+func (s *Service) updateHRScan(ctx context.Context, p authz.Principal, companyID, action string,
 	change func(row *store.HrScan, people []HRPerson) ([]HRPerson, error)) (api.HrScan, error) {
 	var out api.HrScan
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -156,6 +161,10 @@ func (s *Service) updateHRScan(ctx context.Context, p authz.Principal, companyID
 		saved, err := q.SaveHrScan(ctx, store.SaveHrScanParams{CompanyID: companyID, Status: row.Status, NextQuery: row.NextQuery,
 			NextPage: row.NextPage, PagesRead: row.PagesRead, Error: row.Error, People: raw})
 		if err != nil {
+			return err
+		}
+		if err := audit.Record(ctx, tx, audit.Entry{Action: action, EntityType: "company", EntityID: companyID,
+			Changes: map[string]any{"status": saved.Status, "pagesRead": saved.PagesRead, "people": len(people)}}); err != nil {
 			return err
 		}
 		out, err = hrScanToAPI(ctx, tx, saved)

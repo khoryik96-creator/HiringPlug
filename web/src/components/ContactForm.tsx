@@ -3,6 +3,7 @@ import { type InputHTMLAttributes, useEffect, useState } from "react";
 
 import { api, type Contact, unwrap } from "../api/client";
 import { contactKey, contactsKey } from "../api/keys";
+import { companionAtLeast, useCompanion } from "../companion";
 import { CONTACT_STATUS, keysOf } from "../labels";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { ContactFromLinkedin } from "./ContactFromLinkedin";
@@ -29,6 +30,7 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
   const fs = useFieldSettings();
   const [opened] = useState(() => ({ id: contact?.id, version: contact?.version ?? 0, form: formFromContact(contact, company) }));
   const [form, setForm] = useState(opened.form);
+  const companion = useCompanion();
   const save = useMutation({
     mutationFn: async () => {
       const problems = contactProblems(form);
@@ -44,7 +46,7 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       // A new contact: an email guessed (then verified) and their time at the
       // company checked on LinkedIn, while you go on working.
       if (saved && !opened.id) {
-        void afterContactAdded(saved).catch(() => undefined).finally(() => {
+        void afterContactAdded(saved, companion.ready === true && companionAtLeast(companion.version, "1.0.0")).catch(() => undefined).finally(() => {
           void queryClient.invalidateQueries({ queryKey: contactsKey });
           void queryClient.invalidateQueries({ queryKey: contactKey(saved.id) });
         });
