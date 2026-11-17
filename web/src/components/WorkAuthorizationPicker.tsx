@@ -32,7 +32,8 @@ export function WorkAuthorizationPicker({ candidate, canEdit }: { candidate: Can
     <div className="work-authorization-options" role="group" aria-label="Work authorization">
       {(Object.keys(WA_KIND) as WaKind[]).map((choice) => {
         const isSuggested = suggested === choice && choice !== "unknown";
-        return <button key={choice} type="button" aria-pressed={kind === choice && !isSuggested}
+        // With a suggestion, "Not known" is not shown as chosen: the striped one is the answer to confirm.
+        return <button key={choice} type="button" aria-pressed={kind === choice && !isSuggested && !(suggestion && suggested !== "unknown" && choice === "unknown")}
           className={isSuggested ? "wa-suggested" : undefined} style={isSuggested ? { "--wa": WA_KIND[choice].color } as React.CSSProperties : undefined}
           title={isSuggested && suggestion ? `Suggested from the CV (${suggestion.reason}): click to confirm` : undefined}
           disabled={save.isPending} onClick={() => { pick(choice, isSuggested ? suggestedPass : undefined); }}>{WA_KIND[choice].label}</button>;

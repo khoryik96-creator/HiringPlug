@@ -112,6 +112,13 @@ describe("candidate form", () => {
     fireEvent.click(within(group).getByRole("radio", { name: "Spouse visa" }));
     expect(within(group).getByRole("radio", { name: "Spouse visa" }).getAttribute("aria-checked")).toBe("true");
     expect(within(group).getByRole("radio", { name: "RP-T" }).getAttribute("aria-checked")).toBe("false");
+    // A radio group: one tab stop, arrows move the choice.
+    const spouse = within(group).getByRole("radio", { name: "Spouse visa" });
+    expect(within(group).getAllByRole("radio").filter((r) => r.tabIndex === 0)).toEqual([spouse]);
+    fireEvent.keyDown(spouse, { key: "ArrowRight" });
+    expect(within(group).getByRole("radio", { name: "Other pass" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.keyDown(within(group).getByRole("radio", { name: "Other pass" }), { key: "ArrowLeft" });
+    expect(spouse.getAttribute("aria-checked")).toBe("true");
   });
 
   it("picks the specialization, IT skills and certifications from the Settings lists, and removes them", async () => {

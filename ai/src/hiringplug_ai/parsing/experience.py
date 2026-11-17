@@ -98,6 +98,7 @@ def headline(text: str) -> bool:
         and len(words) <= 14
         and len(text) <= 140
         and not re.search(r"[a-z]{4,}\.$", text)  # ends like a sentence (but "Sdn. Bhd." is fine)
+        and not re.match(r"[a-z]{4,}\s", text)  # the rest of a sentence: "exceptional SLA with partners"
         and not _DUTY_START.match(text)
         and not _OTHER_LABEL.match(text)
         and not is_sentence(text)
@@ -143,6 +144,10 @@ def from_text(text: str) -> Found:
     segments = [x for x in (_without_places(seg) for seg in _STRONG_SPLIT.split(text)) if len(x) >= 2]
     if len(segments) == 1 and kind(segments[0]) == "":  # one segment, maybe "Title, Company"
         segments = [x for x in (_clean(p) for p in _COMMA_SPLIT.split(segments[0])) if len(x) >= 2]
+    if len(segments) > 1 and kind(segments[0]) == "title" and all(_scope(seg) for seg in segments[1:]):
+        # "Product Management Lead — Payment, Cards, Digital Product": what the role
+        # covers, not an employer (that is on its own line).
+        return _clean(text), None, []
     title, company, unknown = _assign(segments)
     if company and title:
         title = _whole_title(text, title, company)
@@ -152,6 +157,16 @@ def from_text(text: str) -> Found:
         if all(kind(seg) == "title" for seg in segments) and kind(whole) == "title" and headline(whole):
             title, unknown = whole, []
     return title, company, unknown
+
+
+def _scope(segment: str) -> bool:
+    """A list of short areas ("User, Order, Payment, Customer Service"), not a company."""
+    parts = [p.strip() for p in segment.split(",")]
+    return (
+        len(parts) >= 3
+        and not LEGAL_SUFFIX_RE.search(segment)
+        and all(p and len(p.split()) <= 3 and not is_place(p) for p in parts)
+    )
 
 
 def _assign(segments: list[str]) -> Found:

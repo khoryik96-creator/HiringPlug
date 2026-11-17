@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 BIN = 2.0  # points
@@ -109,9 +110,42 @@ def _covered(rows: list[_Row]) -> float:
     return max(r.bottom for r in rows) - min(r.top for r in rows) if rows else 0.0
 
 
+def _letter_spaced(words: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """Letter-spaced lines ("N O E L L E  K H O O"), read back as words: the
+    text has one space between every letter, but the words' gap is wider than
+    the letters'. Pairs of (as the text has it, as words)."""
+    out: list[tuple[str, str]] = []
+    for row in _rows(words):
+        run: list[dict[str, Any]] = []
+        for w in [*sorted(row.words, key=lambda w: w["x0"]), None]:
+            if w is not None and len(w["text"]) == 1 and w["text"].isalpha():
+                run.append(w)
+                continue
+            if len(run) >= 4:
+                gaps = [b["x0"] - a["x1"] for a, b in pairwise(run)]
+                usual = sorted(gaps)[len(gaps) // 2]
+                joined = run[0]["text"]
+                for gap, letter in zip(gaps, run[1:], strict=False):
+                    joined += (" " if gap > max(2 * usual, usual + 3) else "") + letter["text"]
+                if " " in joined or len(joined) >= 4:
+                    out.append((" ".join(x["text"] for x in run), joined))
+            run = []
+    return out
+
+
+def _respaced(text: str, words: list[dict[str, Any]]) -> str:
+    for spaced, joined in _letter_spaced(words):
+        text = re.sub(rf"(?<!\S){re.escape(spaced)}(?!\S)", joined, text, count=1)
+    return text
+
+
 def page_text(page: Any) -> str:
     """The page's text, column by column when it has two columns."""
     words = page.extract_words()
+    return _respaced(_page_text(page, words), words)
+
+
+def _page_text(page: Any, words: list[dict[str, Any]]) -> str:
     gutter = find_gutter(words, float(page.width))
     if gutter is None:
         return str(page.extract_text() or "")

@@ -88,3 +88,18 @@ func TestEmployerSelectionUsesDatesAndAllowsHistoricalGaps(t *testing.T) {
 	_, ok := DateBound("2025-02-30", false)
 	assert.False(t, ok)
 }
+
+// "ShopeePay Malaysia" was not recognised: \bshopee\b needs a word end after "Shopee".
+func TestRecognitionReadsEWalletsAndPlatformsInAName(t *testing.T) {
+	items := testCatalogue(t)
+	for name, want := range map[string]string{
+		"ShopeePay Malaysia":     "Digital – FinTech/Payment Getaway/E-Wallet",
+		"Touch 'n Go Digital":    "Digital – FinTech/Payment Getaway/E-Wallet",
+		"Shopee Mobile Malaysia": "Digital & E-Commerce",
+		"ShopeeFood":             "Digital & E-Commerce",
+	} {
+		got, _ := Recognize(items, Employment{Name: name, Title: "Product Manager"}, "")
+		require.NotNil(t, got, name)
+		assert.Equal(t, want, got.Label, name)
+	}
+}

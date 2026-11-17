@@ -6,12 +6,19 @@ notice/salary ribbon. Work rights are edited in the existing Work authorization
 field under Details. Details opens first, followed by CV & files, Jobs, Activity,
 Salary and Email; document, pipeline and email tabs follow their permissions.
 Tabs load on first visit and keep forms and drafts mounted until the candidate
-changes. Search highlight links open CV & files directly.
+changes. Search highlight links open CV & files directly. **CV beside** (on the
+tab row) splits the page: the details on the left (the contact card, with its
+copy buttons, above the tabs) and the newest CV on the right, in view while the
+details scroll; remembered in the browser, off on the CV & files tab and on
+narrow screens.
 
 CV & files has one document library and one viewer: selecting a file changes its
 preview and action toolbar together. Upload, compare, formatting, formatting
 history, extracted-detail review, text/original view, Word/PDF download, reread
-and permission-gated formatted-file deletion remain available. Jobs uses the
+and permission-gated formatted-file deletion remain available. Compare side by
+side shows two CVs next to each other in the tab itself (each with its own
+picker; what their details disagree on folded underneath). Review details opens
+above the CV; Read details again says while it reads, then offers the review. Jobs uses the
 existing stage badge and separate Move to menu, including reason/cancel/reopen,
 interviews, offers, placements and stage history. Profile/history editing,
 duplicate merging, privacy tools, call history and salary notes remain in their

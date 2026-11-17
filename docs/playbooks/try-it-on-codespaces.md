@@ -46,7 +46,10 @@ terminal:
 git pull && bash .devcontainer/start.sh
 ```
 
-It rebuilds what changed and keeps the data.
+It rebuilds what changed and keeps the data. Plain `docker compose -f
+deploy/docker-compose.yml …` also works: `start.sh` links `deploy/.env` to the
+codespace's secrets, so Compose uses the passwords the database was made with.
+If a start fails, `start.sh` prints what the database set-up (bootstrap) said.
 
 ## Safety
 

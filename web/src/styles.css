@@ -521,7 +521,7 @@ main.candidates-page { max-width: 1600px; margin-left: auto; margin-right: auto;
 .ai-filters[open] summary { margin-bottom: 0.7rem; }
 .cv-picture { max-height: 80vh; overflow: auto; background: #f1f5f9; border-radius: 8px; padding: 0.5rem; text-align: center; }
 .cv-picture img { max-width: 100%; height: auto; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
-.doc-menu button.danger { color: #b91c1c; }
+.doc-menu button.danger { color: #b91c1c; background: transparent; border: 0; } /* not the solid red of button.danger */
 .doc-menu button.danger:hover { background: #fee2e2; }
 /* A client's benefits and pre-offer process (company page). */
 .benefits h3 { margin-bottom: 0.1rem; }
@@ -1231,3 +1231,8 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .jd-preview { display: grid; gap: 0.4rem; }
 .jd-preview-body { width: 100%; height: min(70vh, 52rem); border: 1px solid var(--line); border-radius: 10px; background: #525659; object-fit: contain; }
 .job-description.cv-like { padding: 1rem 1.2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-height: 70vh; overflow: auto; }
+.reread-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft, #efe9fd); font-size: 13px; }
+.cv-compare .compare > .panel { margin: 0; padding: 12px; min-width: 0; }
+.cv-compare .compare { grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+.cv-compare-diff { margin-top: 12px; }
+.cv-compare-diff summary { cursor: pointer; font-size: 13px; color: var(--accent, #7653ed); }

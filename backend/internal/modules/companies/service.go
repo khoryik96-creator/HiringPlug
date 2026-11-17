@@ -153,7 +153,7 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if int(row.Version) != expectedVersion {
 			return apperr.StaleVersion("company").WithDetail("currentVersion", row.Version)
 		}
-		if patch.Category.Set && !sameCategory(patch.Category.Value, row.Category) && !p.Can(api.PermissionCompaniesCategoryUpdate) {
+		if after, _ := Normalize(patch.Apply(fromRow(row).Details)); !sameCategory(after.Category, row.Category) && !p.Can(api.PermissionCompaniesCategoryUpdate) {
 			return apperr.New(api.ErrorCodeFORBIDDEN, "Your role may not change a company's category (Settings › Roles and access).")
 		}
 		if s.industries != nil && patch.IndustrySelections != nil {

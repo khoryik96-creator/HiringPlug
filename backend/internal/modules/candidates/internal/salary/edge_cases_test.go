@@ -207,3 +207,21 @@ func TestExpectedIncreaseRoundsExactHalvesUp(t *testing.T) {
 		assert.Equal(t, tc.want, r.ExpectedMin.String(), tc.current+" + "+tc.expected)
 	}
 }
+
+// "500RM allowance" and a bare "500RM": the currency written after the amount,
+// glued to it, is still an allowance (it was dropped as unreadable).
+func TestAllowanceWithCurrencyAfterTheAmount(t *testing.T) {
+	r := Calculate("rm12K + 300 ALLOWANCE+ 13% EPF + 13.5TH MONTH BONUS + 500RM ALLOWANCE + 3 MONTHS BONUS + RSU", "", DefaultRules())
+	assert.NotContains(t, r.Warnings, "A salary component could not be read.")
+	assert.Equal(t, 800.0, r.Allowances.Float64())
+	assert.Equal(t, 1500.0, r.Bonus.Float64())
+	assert.Equal(t, 14300.0, r.Monthly.Float64())
+	assert.Equal(t, "MYR", r.CurrentCurrency)
+	for _, raw := range []string{"RM12k + 500RM", "RM12k + 500 RM", "RM12k + 500rm allowance", "RM12k + 500RM fixed allowance"} {
+		t.Run(raw, func(t *testing.T) {
+			r := Calculate(raw, "", DefaultRules())
+			assert.Empty(t, r.Warnings)
+			assert.Equal(t, 12500.0, r.Monthly.Float64())
+		})
+	}
+}

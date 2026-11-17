@@ -20,6 +20,7 @@ describe("a work authorization suggested from the CV", () => {
     const expat = screen.getByRole("button", { name: "Spousal / RP-T" });
     expect(expat.className).toBe("wa-suggested");
     expect(expat.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: "Not known" }).getAttribute("aria-pressed"), "not shown as the answer beside a suggestion").toBe("false");
     expect(screen.getByText(/suggested from the CV \(The CV mentions an RP-T/)).toBeTruthy();
     fireEvent.click(expat);
     await waitFor(() => { expect(patch).toHaveBeenCalled(); });

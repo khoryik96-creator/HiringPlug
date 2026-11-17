@@ -69,7 +69,10 @@ services:
     ports: ["127.0.0.1:5432:5432"] # this machine only: never the network
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      # Over TCP: while the image first sets up the database it runs a
+      # temporary server on its socket only, which must not count as ready
+      # (bootstrap, which connects over the network, would fail).
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
       interval: 2s
       retries: 30
 

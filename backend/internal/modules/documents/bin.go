@@ -27,3 +27,10 @@ func (m *Module) PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID stri
 		}
 	}, err
 }
+
+// CVTextOf returns a document's candidate, kind (source) and text, in the
+// caller's transaction.
+func (m *Module) CVTextOf(ctx context.Context, tx pgx.Tx, documentID string) (candidateID, source, text string, err error) {
+	row, err := store.New(tx).CVTextOf(ctx, documentID)
+	return row.CandidateID, row.Source, row.Text, err
+}

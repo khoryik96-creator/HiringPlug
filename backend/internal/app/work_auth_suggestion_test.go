@@ -48,6 +48,9 @@ func TestACVsNationalityAndPassSuggestAWorkAuthorizationUntilOneIsSet(t *testing
 	assert.Equal(t, api.WorkAuthorizationBasisRpT, s.Basis.MustGet())
 	assert.Contains(t, s.Reason, "RP-T")
 	assert.True(t, got.WorkAuthorization.IsNull() || !got.WorkAuthorization.IsSpecified(), "a suggestion is never set on its own")
+	var audited int
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE entity_id = $1 AND action = 'candidate.work_authorization_suggested'`, c.Id).Scan(&audited))
+	assert.Equal(t, 1, audited, "recorded")
 
 	res = a.request(http.MethodPatch, "/v1/candidates/"+c.Id, token, map[string]any{"version": got.Version,
 		"workAuthorization": map[string]any{"status": "expat_eligible", "basis": "rp_t"}})
