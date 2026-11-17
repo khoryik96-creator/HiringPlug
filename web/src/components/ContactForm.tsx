@@ -8,6 +8,7 @@ import { CONTACT_STATUS, keysOf } from "../labels";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
 import { ContactFromLinkedin } from "./ContactFromLinkedin";
 import { afterContactAdded } from "./contactLinkedin";
+import { useCan } from "./useCan";
 import { CONTACT_PATHS, contactFields, type ContactFormState, contactProblems, formFromContact } from "./contactFormState";
 import { Field } from "./Field";
 import { useFieldSettings } from "./useFieldSettings";
@@ -31,6 +32,7 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
   const [opened] = useState(() => ({ id: contact?.id, version: contact?.version ?? 0, form: formFromContact(contact, company) }));
   const [form, setForm] = useState(opened.form);
   const companion = useCompanion();
+  const canRole = useCan("contacts.role:update"); // a new contact's role is theirs to set; changing one needs the permission
   const save = useMutation({
     mutationFn: async () => {
       const problems = contactProblems(form);
@@ -105,7 +107,8 @@ export function ContactForm({ contact, company = null, onDone, onSaved }: {
       {text("mobile", "Mobile")}
       {opened.id && text("linkedinUrl", "LinkedIn", { placeholder: "linkedin.com/in/name" })}
       <Field label="Role" error={errors[CONTACT_PATHS.role]}>
-        <select value={form.role} onChange={(e) => { set("role", e.target.value); }}>
+        <select value={form.role} disabled={!!opened.id && !canRole} title={opened.id && !canRole ? "Your role may not change a contact's role" : undefined}
+          onChange={(e) => { set("role", e.target.value); }}>
           <option value="">Not set</option>
           {fs.options("contact_role", form.role || null).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>

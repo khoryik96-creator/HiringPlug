@@ -140,6 +140,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if err := checkEmailFree(ctx, q, after.Email, id); err != nil {
 			return err
 		}
+		if !sameString(after.Role, current.Details.Role) && !p.Can(api.PermissionContactsRoleUpdate) {
+			return apperr.New(api.ErrorCodeFORBIDDEN, "Your role may not change a contact's role (Settings › Roles and access).")
+		}
 		if err := s.checkRole(ctx, tx, after.Role, current.Details.Role); err != nil {
 			return err
 		}

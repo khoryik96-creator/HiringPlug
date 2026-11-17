@@ -153,6 +153,9 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		if int(row.Version) != expectedVersion {
 			return apperr.StaleVersion("company").WithDetail("currentVersion", row.Version)
 		}
+		if patch.Category.Set && !sameCategory(patch.Category.Value, row.Category) && !p.Can(api.PermissionCompaniesCategoryUpdate) {
+			return apperr.New(api.ErrorCodeFORBIDDEN, "Your role may not change a company's category (Settings › Roles and access).")
+		}
 		if s.industries != nil && patch.IndustrySelections != nil {
 			label, e := s.industries.SummaryIn(ctx, tx, patch.IndustrySelections, nil)
 			if e != nil {
@@ -322,4 +325,8 @@ func fields(d Details) map[string]any {
 		"phone": d.Phone, "address": d.Address, "city": d.City, "country": d.Country,
 		"registrationNumber": d.RegistrationNumber, "about": d.About,
 	}
+}
+
+func sameCategory(a, b *string) bool {
+	return (a == nil) == (b == nil) && (a == nil || *a == *b)
 }

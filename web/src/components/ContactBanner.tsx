@@ -17,7 +17,7 @@ import { useFieldSettings } from "./useFieldSettings";
 type Change = { role?: string | null; status?: Schemas["ContactStatus"] };
 
 /** canEdit: the role and status can be changed here (not while the contact's edit form is open: it would then save a stale version). */
-export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEdit: boolean }) {
+export function ContactBanner({ contact: c, canEdit, canEditRole = canEdit }: { contact: Contact; canEdit: boolean; canEditRole?: boolean }) {
   const queryClient = useQueryClient();
   const fs = useFieldSettings();
   const save = useMutation({
@@ -59,7 +59,8 @@ export function ContactBanner({ contact: c, canEdit }: { contact: Contact; canEd
           </dl>
         </div>
 
-        {canEdit && (
+        {/* Only those given contacts.role:update (Settings › Roles and access) change the role. */}
+        {canEdit && canEditRole && (
           <div className="row" role="group" aria-label="Role">
             {fs.options("contact_role", c.role).map((o) => (
               <button key={o.key} type="button" className="banner-pill" aria-pressed={c.role === o.key} disabled={save.isPending}

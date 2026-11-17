@@ -13,6 +13,9 @@ x-module:
     contacts:update:
       description: Edit contacts and re-check their email.
       roles: [owner, admin, recruiter, sourcer]
+    contacts.role:update:
+      description: "Change a contact's role (hiring manager, HR…) on their card and form."
+      roles: [owner, admin, recruiter]
   errorCodes:
     CONTACT_DUPLICATE_EMAIL:
       status: 409

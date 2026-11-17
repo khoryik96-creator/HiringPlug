@@ -81,7 +81,8 @@ export function CompanyBanner({ company: c, canEdit, permissions }: { company: C
           </dl>
         </div>
 
-        {canEdit && (
+        {/* Only those given companies.category:update (Settings › Roles and access) change the category. */}
+        {canEdit && permissions.includes("companies.category:update") && (
           <div className="row" role="group" aria-label="Category">
             {fs.options("company_category", c.category).map((o) => (
               <button key={o.key} type="button" className="banner-pill" aria-pressed={category === o.key} disabled={save.isPending}

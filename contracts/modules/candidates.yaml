@@ -13,6 +13,9 @@ x-module:
     candidates:update:
       description: Edit candidate profiles.
       roles: [owner, admin, recruiter, sourcer]
+    candidates.status:update:
+      description: "Change a candidate's status (looking, not looking…) on their card and form."
+      roles: [owner, admin, recruiter]
     candidates:merge:
       description: Merge a duplicate candidate into another (needs to see salaries, so nothing is lost unseen).
       roles: [owner, admin, recruiter]

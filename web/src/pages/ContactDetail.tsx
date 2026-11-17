@@ -126,7 +126,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
         </div>
       )}
       <ErrorMessage error={verify.error} />
-      <ContactBanner contact={c} canEdit={canEdit && !editing} />
+      <ContactBanner contact={c} canEdit={canEdit && !editing} canEditRole={permissions.includes("contacts.role:update")} />
       {c.status === "left" && <JobsNeedingContact contactId={c.id} />}
       {c.status === "active" && <EmailSuggestion contact={c} canEdit={canEdit && !editing} />}
       <SectionTabs name="contact" label="Contact sections" sections={sections} active={active} onChange={setActive} />

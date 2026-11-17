@@ -13,8 +13,10 @@ import { useFieldSettings } from "./useFieldSettings";
 
 const SHOWN_SKILLS = 6;
 
-export function CandidateBanner({ candidate: c, canEdit, onAdd, canEditSalary = false, onSalary }: {
+export function CandidateBanner({ candidate: c, canEdit, canEditStatus = canEdit, onAdd, canEditSalary = false, onSalary }: {
   candidate: Candidate; canEdit: boolean;
+  /** Their status may be changed here (candidates.status:update, Settings › Roles and access). */
+  canEditStatus?: boolean;
   /** Opens the profile's form, to fill in a box left empty. */
   onAdd?: () => void;
   /** Whether this person may set the salary (candidates.compensation:update). */
@@ -40,7 +42,7 @@ export function CandidateBanner({ candidate: c, canEdit, onAdd, canEditSalary = 
           <div className="banner-who">
             <div className="row">
               <h2 className="banner-name">{c.fullName}</h2>
-              {canEdit ? <select className="banner-status" aria-label="Availability" value={c.availability ?? ""} disabled={save.isPending}
+              {canEdit && canEditStatus ? <select className="banner-status" aria-label="Availability" value={c.availability ?? ""} disabled={save.isPending}
                 onChange={e => { save.mutate({ availability: (e.target.value || null) as Availability | null }); }}>
                 <option value="">Not set</option>
                 {(Object.keys(AVAILABILITY) as Availability[]).map(a => <option key={a} value={a}>{AVAILABILITY[a].label}</option>)}

@@ -5952,14 +5952,17 @@ components:
         - bin:manage
         - candidates.compensation:read
         - candidates.compensation:update
+        - candidates.status:update
         - candidates:create
         - candidates:merge
         - candidates:read
         - candidates:update
+        - companies.category:update
         - companies.documents:delete
         - companies:create
         - companies:read
         - companies:update
+        - contacts.role:update
         - contacts:create
         - contacts:read
         - contacts:update
@@ -12227,6 +12230,11 @@ x-permissions:
     description: Record or change current and expected salary.
     sensitive: true
     roles: [owner, admin, recruiter]
+  candidates.status:update:
+    module: candidates
+    description: Change a candidate's status (looking, not looking…) on their card and form.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   candidates:create:
     module: candidates
     description: Add candidates.
@@ -12247,6 +12255,11 @@ x-permissions:
     description: Edit candidate profiles.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  companies.category:update:
+    module: companies
+    description: Change a company's category (signed client, prospect…) on its card and form.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   companies.documents:delete:
     module: companies
     description: Delete documents kept with a client's terms of business or benefits (give it to the people you trust).
@@ -12267,6 +12280,11 @@ x-permissions:
     description: Edit companies.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  contacts.role:update:
+    module: contacts
+    description: Change a contact's role (hiring manager, HR…) on their card and form.
+    sensitive: false
+    roles: [owner, admin, recruiter]
   contacts:create:
     module: contacts
     description: Add contacts.

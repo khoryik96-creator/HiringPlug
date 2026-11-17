@@ -31,6 +31,8 @@ export function testMe(permissions: Permission[]): Me {
 export const RECRUITER: Permission[] = [
   "candidates:read", "candidates:create", "candidates:update",
   "candidates.compensation:read", "candidates.compensation:update", "documents:read", "documents:create",
+  // A recruiter changes these by default (Settings › Roles and access may take them away).
+  "candidates.status:update", "contacts.role:update", "companies.category:update",
 ];
 
 /** What an API client call resolves to on success. */

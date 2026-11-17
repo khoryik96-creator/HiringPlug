@@ -158,6 +158,9 @@ func (s *Service) updateIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id
 	}
 	before := fromRow(row).Profile
 	after, errs := NormalizeProfile(change(before), s.phoneRegion)
+	if !sameAvailability(before.Availability, after.Availability) && !p.Can(api.PermissionCandidatesStatusUpdate) {
+		return View{}, apperr.New(api.ErrorCodeFORBIDDEN, "Your role may not change a candidate's status (Settings › Roles and access).")
+	}
 	if unchangedOK && after.IndustrySelections == nil && len(errs) == 0 && len(audit.Diff(profileFields(before), profileFields(after))) == 0 {
 		return s.loadView(ctx, tx, s.users, p, fromRow(row))
 	}
@@ -479,4 +482,8 @@ func updateCompensationParams(candidateID string, expectedVersion int, current *
 		u.ExpectedMin, u.ExpectedMax, u.ExpectedCurrency, u.ExpectedPeriod = &expected.Min, expected.Max, &expected.Currency, &expected.Period
 	}
 	return u
+}
+
+func sameAvailability[T comparable](a, b *T) bool {
+	return (a == nil) == (b == nil) && (a == nil || *a == *b)
 }

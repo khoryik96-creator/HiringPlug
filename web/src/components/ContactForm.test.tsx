@@ -63,13 +63,20 @@ describe("contact page", () => {
   it("explains the email check and lets editors check again", async () => {
     reads(contact);
     const recheck = vi.spyOn(api, "POST").mockResolvedValue(ok({ ...contact, emailCheck: { ...contact.emailCheck, checkedAt: "2026-11-02T00:00:00Z" } }));
-    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update"]} />);
+    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update", "contacts.role:update"]} />);
     await screen.findByRole("heading", { name: "Aisyah Rahman" });
     const details = within(screen.getByRole("region", { name: "Contact details" }));
     expect(details.getByText("⚠ Risky")).toBeTruthy();
     expect(details.getByText(/a shared mailbox \(hr@\), not a person/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
     await waitFor(() => { expect(recheck).toHaveBeenCalled(); });
+  });
+
+  it("shows the role pills only to those who may change a contact's role", async () => {
+    reads(contact);
+    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update"]} />);
+    await screen.findByRole("heading", { name: "Aisyah Rahman" });
+    expect(screen.queryByRole("group", { name: "Role" })).toBeNull();
   });
 
   it("gives viewers no edit or check buttons", async () => {
@@ -85,7 +92,7 @@ describe("contact page", () => {
   it("shows the role down the card in its colour, and saves a new role or status straight away", async () => {
     reads(contact);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...contact, version: 2, role: "hiring_manager" }));
-    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update"]} />);
+    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update", "contacts.role:update"]} />);
     await screen.findByRole("heading", { name: "Aisyah Rahman" });
     const card = screen.getByRole("region", { name: "Contact" });
     await waitFor(() => { expect(card.querySelector<HTMLElement>(".banner-column")?.style.background).toBe("rgb(219, 39, 119)"); });
@@ -102,7 +109,7 @@ describe("contact page", () => {
 
   it("keeps the card read-only while the edit form is open, so the form never saves a stale version", async () => {
     reads(contact);
-    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update"]} />);
+    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update", "contacts.role:update"]} />);
     await screen.findByRole("group", { name: "Role" });
     fireEvent.click(screen.getByRole("button", { name: "Edit contact" }));
     expect(screen.getByRole("form", { name: "Edit contact" })).toBeTruthy();
@@ -123,7 +130,7 @@ describe("contact page", () => {
   it("clears the role when its pill is clicked again", async () => {
     reads(contact);
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...contact, version: 2, role: null }));
-    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update"]} />);
+    renderWithClient(<ContactDetail id={contact.id} permissions={["contacts:read", "contacts:update", "contacts.role:update"]} />);
     fireEvent.click(await screen.findByRole("button", { name: "HR" }));
     await waitFor(() => { expect(sentBody(patch)).toEqual({ version: 1, role: null }); });
     await waitFor(() => { expect(screen.getByRole("region", { name: "Contact" }).querySelector(".banner-column")?.textContent).toBe("Role: Role not set"); });

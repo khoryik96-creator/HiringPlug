@@ -13,6 +13,9 @@ x-module:
     companies:update:
       description: Edit companies.
       roles: [owner, admin, recruiter, sourcer]
+    companies.category:update:
+      description: "Change a company's category (signed client, prospect…) on its card and form."
+      roles: [owner, admin, recruiter]
     companies.documents:delete:
       description: "Delete documents kept with a client's terms of business or benefits (give it to the people you trust)."
       roles: [owner, admin]

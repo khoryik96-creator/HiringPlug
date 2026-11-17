@@ -116,7 +116,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           </span>
         )}
       </div>
-      <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")}
+      <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")} canEditStatus={permissions.includes("candidates.status:update")}
         onAdd={() => { setEditing(true); setActive("details"); }}
         canEditSalary={permissions.includes("candidates.compensation:update")}
         onSalary={() => { setEditingSalary(true); setActive("salary"); }} />
