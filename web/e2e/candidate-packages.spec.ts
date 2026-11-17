@@ -37,7 +37,7 @@ test("selects several candidates in contact, candidate and job emails, preservin
  await page.addInitScript((t)=>{if(window===window.top)sessionStorage.setItem("hiringplug.token",t);},token);
  const shot=async(name:string)=>{
   const dir=process.env.HP_UI_SCREENSHOT_DIR;if(!dir)return;mkdirSync(dir,{recursive:true});
-  const target=name==="screening-notes-and-industry"?page.getByRole("form",{name:"Screening call",exact:true})
+  const target=name==="screening-notes"?page.getByRole("form",{name:"Screening call",exact:true})
    :name==="salary-call-history"?page.getByRole("region",{name:"Screening calls",exact:true})
    :name==="candidate-salary"||name==="edit-salary"?page.getByRole("region",{name:"Salary",exact:true})
    :(name==="job-client-email" || name==="invalid-fields")?page.getByRole("region",{name:"Email client",exact:true})
@@ -49,8 +49,8 @@ test("selects several candidates in contact, candidate and job emails, preservin
  if(process.env.HP_UI_SCREENSHOT_DIR)await page.getByRole("region",{name:"Salary calculation",exact:true}).screenshot({path:`${process.env.HP_UI_SCREENSHOT_DIR}/settings.png`,style:".topbar {visibility:hidden !important;}"});
  await page.goto(`/#/candidates/${first.id}/screening`);
  await expect(page.getByLabel("Salary notes",{exact:true})).toHaveValue("Original salary discussion — retained");
- const picker=page.getByRole("region",{name:"Industries and subindustries"});await expect(picker).toContainText("FSI – Banking");
- await page.getByLabel("Salary notes",{exact:true}).fill("Updated discussion: prefers fixed pay");await shot("screening-notes-and-industry");
+ await expect(page.getByRole("region",{name:"Industries and subindustries"})).toHaveCount(0);
+ await page.getByLabel("Salary notes",{exact:true}).fill("Updated discussion: prefers fixed pay");await shot("screening-notes");
  await page.getByRole("button",{name:"Save the call",exact:true}).click();await expect(page).toHaveURL(new RegExp(`#/candidates/${first.id}$`));
  await page.getByRole("tab",{name:"Salary",exact:true}).click();await page.getByRole("region",{name:"Salary",exact:true}).scrollIntoViewIfNeeded();await shot("candidate-salary");
  await page.getByRole("button",{name:"Edit salary",exact:true}).click();await expect(page.getByLabel("Salary notes",{exact:true})).toHaveValue("Updated discussion: prefers fixed pay");await shot("edit-salary");await page.getByRole("button",{name:"Cancel",exact:true}).click();
