@@ -21,6 +21,10 @@ func discoverDefinitionPages(ctx context.Context, s *Store, c *Client, run int64
 		}
 		if requestErr != nil {
 			status := "failed"
+			var throttled *CooldownError
+			if errors.As(requestErr, &throttled) {
+				status = "rate_limited" // as discover() records a cooldown (a 503 with Retry-After too)
+			}
 			switch code {
 			case 401:
 				status = "reconnect"

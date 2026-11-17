@@ -1,9 +1,7 @@
 import { useState } from "react";
 
 import type { Application, Schemas } from "../api/client";
-import { CHANNEL, CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
-import { Initials } from "./Initials";
-import { FitBadge, type Match } from "./Fit";
+import { CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
@@ -91,67 +89,6 @@ export function offerChip(expiresOn: string, now: number) {
   return <span className={`chip${left <= 1 ? " red" : left <= 3 ? " amber" : ""}`}>{text}</span>;
 }
 
-/**
- * A candidate's card on a job's board: initials, name, current title, how
- * long they have waited in the stage (amber after 7 days, red after 14),
- * their next interview, an offer's deadline and fit. Clicking the card
- * chooses it (for emailing or moving the chosen ones from the bar above the
- * board), as does Space on its name; drag it to another column to move it.
- */
-export function ApplicationCard({ app, match, onShowFit, picked, onPick, canMove, onDragStart, upcoming, now = 0 }: {
-  app: Application;
-  /** Chosen, for the bar above the board. */
-  picked?: boolean;
-  onPick?: (app: Application, on: boolean) => void;
-  match?: Match;
-  onShowFit?: (app: Application) => void;
-  canMove: boolean;
-  onDragStart: (app: Application) => void;
-  upcoming?: Upcoming;
-  /** The time the board was shown (ms). */
-  now?: number;
-}) {
-  const days = daysInStage(app, now);
-  return (
-    <div
-      className={`card app-card${picked ? " picked" : ""}${onPick ? " pickable" : ""}`}
-      draggable={canMove}
-      onDragStart={(e) => { e.dataTransfer.setData("text/plain", app.id); onDragStart(app); }}
-      onClick={(e) => {
-        // The name opens the candidate and the fit opens its reasons; anywhere else ticks the card.
-        if (!onPick || (e.target as HTMLElement).closest("a, button, input, select, label")) return;
-        onPick(app, !picked);
-      }}
-    >
-      <div className="who">
-        <Initials name={app.candidateName} />
-        <div className="who-text">
-          <span className="card-name">
-            <a href={`#/candidates/${app.candidateId}`} title={app.candidateName}
-              onKeyDown={(e) => { if (onPick && e.key === " ") { e.preventDefault(); onPick(app, !picked); } }}>
-              {app.candidateName}
-            </a>
-            {picked && <span className="visually-hidden"> (chosen)</span>}
-          </span>
-          {app.candidateTitle && <div className="who-title">{app.candidateTitle}</div>}
-        </div>
-      </div>
-      <div className="chips">
-        <span className={`chip${waitTone(app, days)}`} title={`In ${STAGE[app.stage].toLowerCase()} since ${day.format(new Date(app.stageChangedAt))}`}>
-          {timeInStage(app, now)}
-        </span>
-        {upcoming?.interviewAt && <span className="chip cal">{when.format(new Date(upcoming.interviewAt))}</span>}
-        {upcoming?.offerExpiresOn && offerChip(upcoming.offerExpiresOn, now)}
-        {app.channel && <span className="chip">via {CHANNEL[app.channel]}</span>}
-        {match && (
-          <button type="button" className="link" aria-label={`Fit of ${app.candidateName}: why?`} onClick={() => onShowFit?.(app)}>
-            <FitBadge match={match} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /** "Move to…" for the chosen cards, asking the reason once when closing them. */
 export function MoveChosen({ apps, onMove, busy }: { apps: Application[]; onMove: (m: Omit<MoveRequest, "app">) => void; busy: boolean }) {

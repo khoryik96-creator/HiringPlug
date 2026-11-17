@@ -43,11 +43,17 @@ func (m *Module) ClearContacts(ctx context.Context, tx pgx.Tx, contactIDs []stri
 // their applications are removed by the pipeline first); after commits,
 // their stored files are removed.
 func (m *Module) Purge(ctx context.Context, tx pgx.Tx, ids []string) (after func(), err error) {
-	keys, err := store.New(tx).PurgeJobs(ctx, ids)
+	rows, err := store.New(tx).PurgeJobs(ctx, ids)
 	return func() {
-		for _, k := range keys {
-			if err := m.service.files.Delete(k); err != nil {
-				logx.From(ctx).Warn("a deleted job's file could not be removed", "error", err)
+		for _, r := range rows {
+			keys := []string{r.StorageKey}
+			if r.PdfKey != nil {
+				keys = append(keys, *r.PdfKey) // its PDF copy too
+			}
+			for _, k := range keys {
+				if err := m.service.files.Delete(k); err != nil {
+					logx.From(ctx).Warn("a deleted job's file could not be removed", "error", err)
+				}
 			}
 		}
 	}, err

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import * as files from "../api/files";
-import { ok, renderWithClient } from "../test-utils";
+import { failure, ok, renderWithClient } from "../test-utils";
 import { JobDescriptionView } from "./JobDescriptionView";
 
 afterEach(() => {
@@ -47,11 +47,23 @@ describe("a job's description", () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(jd({ ...word, pdfStatus: "queued" })));
     renderWithClient(<JobDescriptionView jobId="job_1" pasted="Pasted text" />);
     expect((await screen.findByRole("status")).textContent).toContain("Making a preview of the Word file");
+    expect(screen.getByText("Lead the finance team."), "its text meanwhile").toBeTruthy();
     await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
     cleanup();
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [jd({ ...word, pdfStatus: "failed" })] }));
     renderWithClient(<JobDescriptionView jobId="job_1" pasted="Pasted text" />);
     expect(await screen.findByText("Lead the finance team.")).toBeTruthy();
+  });
+
+  it("says why when the PDF copy cannot be asked for, and keeps the text", async () => {
+    const word = { fileName: "JD.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      details: { title: null, location: null, country: null, workType: null, workArrangement: null, salaryText: null, closesOn: null, description: "Lead the finance team." } };
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [jd(word)] }));
+    vi.spyOn(api, "POST").mockResolvedValue(failure("INTERNAL", "Something went wrong", undefined, 500));
+    renderWithClient(<JobDescriptionView jobId="job_1" pasted="Pasted text" />);
+    expect(await screen.findByText(/Something went wrong/)).toBeTruthy();
+    expect(screen.queryByText(/Making a preview/)).toBeNull();
+    expect(screen.getByText("Lead the finance team.")).toBeTruthy();
   });
 
   it("shows what was pasted when no file was uploaded", async () => {

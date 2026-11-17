@@ -79,36 +79,40 @@ export function System() {
           <section className="panel" aria-label="Background jobs">
             <h3>Background jobs</h3>
             {st.jobs.length === 0 ? <p className="muted">Nothing waiting, nothing failed.</p> : (
-              <table>
-                <thead><tr><th>Work</th><th>Waiting</th><th>Running</th><th>Retrying</th><th>Failed (30 days)</th><th>Waiting since</th></tr></thead>
-                <tbody>
-                  {st.jobs.map((j) => (
-                    <tr key={j.kind}>
-                      <td>{label(j.kind)}</td><td>{j.waiting}</td><td>{j.running}</td><td>{j.retrying}</td>
-                      <td>{j.failed > 0 ? <span className="badge failed">{j.failed}</span> : 0}</td>
-                      <td className="muted">{j.oldestWaitingSince ? formatWhen(j.oldestWaitingSince) : ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table>
+                  <thead><tr><th>Work</th><th>Waiting</th><th>Running</th><th>Retrying</th><th>Failed (30 days)</th><th>Waiting since</th></tr></thead>
+                  <tbody>
+                    {st.jobs.map((j) => (
+                      <tr key={j.kind}>
+                        <td>{label(j.kind)}</td><td>{j.waiting}</td><td>{j.running}</td><td>{j.retrying}</td>
+                        <td>{j.failed > 0 ? <span className="badge failed">{j.failed}</span> : 0}</td>
+                        <td className="muted">{j.oldestWaitingSince ? formatWhen(j.oldestWaitingSince) : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
           {st.failed.length > 0 && (
             <section className="panel" aria-label="Failed jobs">
               <h3>Failed</h3>
-              <table>
-                <thead><tr><th>Work</th><th>Failed</th><th>Why</th><th /></tr></thead>
-                <tbody>
-                  {st.failed.map((f) => (
-                    <tr key={f.id}>
-                      <td>{label(f.kind)}</td>
-                      <td className="muted">{formatWhen(f.failedAt)} after {f.attempts} tries</td>
-                      <td className="small">{f.error}</td>
-                      <td><button type="button" className="link" disabled={retry.isPending} onClick={() => { retry.mutate(f.id); }}>Try again</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table>
+                  <thead><tr><th>Work</th><th>Failed</th><th>Why</th><th /></tr></thead>
+                  <tbody>
+                    {st.failed.map((f) => (
+                      <tr key={f.id}>
+                        <td>{label(f.kind)}</td>
+                        <td className="muted">{formatWhen(f.failedAt)} after {f.attempts} tries</td>
+                        <td className="small">{f.error}</td>
+                        <td><button type="button" className="link" disabled={retry.isPending} onClick={() => { retry.mutate(f.id); }}>Try again</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           )}
         </>

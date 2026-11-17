@@ -232,7 +232,8 @@ func Blind(d AdDetails, c Client) BlindView {
 	}
 	out := BlindView{Title: *words(&d.Title), Location: words(d.Location), SalaryText: words(d.SalaryText)}
 	if d.Description != nil {
-		t := clean(*d.Description)
+		// What would still point to the client goes first, then its name.
+		t := ourClientIs(clean(Soften(*d.Description)), description)
 		out.Description = &t
 	}
 	return out

@@ -77,3 +77,21 @@ func TestRepeatedCategoryPageStopsWithOriginalEvidence(t *testing.T) {
 		t.Fatal("repeated response evidence discarded")
 	}
 }
+
+// A 503 with Retry-After while paging Categories is a cooldown, recorded as
+// rate limited (as other resources record it), not as a failed request.
+func TestCategoryPagingRecordsThrottlingAsRateLimited(t *testing.T) {
+	s := testStore(t)
+	run, _ := s.Start("source", false)
+	c := &Client{Config: Connection{API: "https://api.jobadder.com/v2"}, Wait: wait, HTTP: &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		res := response(503, "busy")
+		res.Header.Set("Retry-After", "120")
+		return res, nil
+	})}}
+	resource := Resource{"categories", "Categories", "/categories", "paged_definitions"}
+	_ = discover(context.Background(), s, c, run, []Resource{resource}, false, func(string) {})
+	report, _ := s.Report()
+	if len(report.Results) != 1 || report.Results[0].Status != "rate_limited" {
+		t.Fatal("throttling not recorded as rate limited", report.Results)
+	}
+}

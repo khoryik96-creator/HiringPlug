@@ -140,6 +140,9 @@ func NormalizeBenefits(b Benefits) (Benefits, apperr.FieldErrors) {
 		x.Value = tidyText(x.Value, 1000, f+".value", &errs)
 		x.Remarks = tidyText(x.Remarks, 2000, f+".remarks", &errs)
 		x.ByGrade = tidyByGrade(x.ByGrade, grades, f, &errs)
+		if len(x.ByGrade) > 0 {
+			x.Value = nil // a value per grade replaces the one for all (as the contract says)
+		}
 	}
 	seen = map[string]bool{}
 	for i := range b.PreOffer {

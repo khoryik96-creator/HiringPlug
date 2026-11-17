@@ -88,8 +88,12 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const moveError = move.error ?? moveMany.error;
   const stale = moveError instanceof ApiError && moveError.code === "CONFLICT_STALE_VERSION";
   const pick = (a: Application, on: boolean) => { setPicked((cur) => (on ? [...cur, a.id] : cur.filter((id) => id !== a.id))); };
+  const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
+  // The order people are shown in, in both views: best fit first when asked, else the longest waiting.
+  const shownOrder = (a: Application, b: Application) => (bestFirst ? scoreOf(b) - scoreOf(a) : longestFirst(now)(a, b));
   const startShortlist = () => {
-    const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)));
+    // In the order they are shown: stage by stage, as ordered in each.
+    const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)).sort(shownOrder));
     // One candidate: the email about their application, with their own fields filled in.
     if (chosen.length === 1 && chosen[0]) { setEmailing(chosen[0]); return; }
     setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
@@ -109,7 +113,6 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
     upcoming, now, fit, onShowFit: setFitShown,
   };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
-  const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
 
   return (
     <section className="panel" aria-label="Pipeline">
@@ -189,12 +192,12 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         )}
       </ErrorMessage>
       {view === "steps" && loaded && (
-        <PipelineSteps {...shared} apps={active} stage={stepStage ?? firstStage()} onStage={setStepStage} />
+        <PipelineSteps {...shared} apps={active} stage={stepStage ?? firstStage()} onStage={setStepStage} order={shownOrder} />
       )}
       {view === "board" && <div className="board compact" ref={board}>
         {OPEN_STAGES.map((stage) => {
           const inStage = apps.filter((a) => a.stage === stage);
-          const cards = bestFirst ? inStage.sort((a, b) => scoreOf(b) - scoreOf(a)) : inStage.sort(longestFirst(now));
+          const cards = inStage.sort(shownOrder);
           return (
             <div
               key={stage}

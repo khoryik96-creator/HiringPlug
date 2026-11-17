@@ -70,7 +70,7 @@ func TestTheJDsOwnWayOfWritingTheNameIsBlindedWhole(t *testing.T) {
 	jd := str("About Maju Foods Berhad\nMaju Foods Berhad is one of Malaysia's leading FMCG makers. Maju Foods (M) Sdn. Bhd. is hiring.")
 	for _, record := range []string{"Maju Foods Berhad", "MAJU FOODS BHD", "Maju Foods Sdn Bhd", "Maju"} {
 		b := Blind(AdDetails{Title: "Finance Manager", Description: jd}, Client{Name: record})
-		assert.Equal(t, "About our client\nOur client is one of Malaysia's leading FMCG makers. Our client is hiring.",
+		assert.Equal(t, "About our client\nOur client is one of Malaysia's established FMCG makers. Our client is hiring.",
 			*b.Description, "client on record: %s", record)
 	}
 	b0 := Blind(AdDetails{Title: "Analyst", Description: str("Maju is a co-founder of the guild.")}, Client{Name: "Maju"})

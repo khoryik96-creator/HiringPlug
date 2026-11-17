@@ -169,6 +169,11 @@ SELECT storage_key, file_name, content_type, pdf_status, pdf_key FROM job_descri
 -- name: QueueJdPdf :exec
 UPDATE job_description_file SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = @id;
 
+-- A copy for a file that has none (one uploaded before previews began); no row
+-- when it has one, or one is being made (two asking at once queue it once).
+-- name: QueueJdPdfIfNone :one
+UPDATE job_description_file SET pdf_status = 'queued' WHERE id = @id AND pdf_status IS NULL RETURNING storage_key;
+
 -- A copy arriving for a file deleted (or whose copy was asked again) meanwhile is dropped.
 -- name: SaveJdPdf :one
 UPDATE job_description_file SET pdf_status = @pdf_status, pdf_key = sqlc.narg(pdf_key), pdf_error = sqlc.narg(pdf_error)
@@ -246,6 +251,6 @@ UPDATE job_order SET contact_id = NULL WHERE contact_id = ANY(@contact_ids::text
 
 -- name: PurgeJobs :many
 WITH files AS (DELETE FROM job_description_file
-               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL) RETURNING storage_key),
+               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL) RETURNING storage_key, pdf_key),
      gone AS (DELETE FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL RETURNING id)
-SELECT storage_key FROM files;
+SELECT storage_key, pdf_key FROM files;

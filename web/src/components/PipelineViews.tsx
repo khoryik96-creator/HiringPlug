@@ -57,9 +57,9 @@ function Info({ a, upcoming, now }: { a: Application; upcoming?: Upcoming; now: 
   return a.channel ? <span className="muted small">via {CHANNEL[a.channel]}</span> : null;
 }
 
-export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (s: Stage | "all") => void }) {
+export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (s: Stage | "all") => void; order: (a: Application, b: Application) => number }) {
   const { apps, stage, now } = props;
-  const shown = (stage === "all" ? [...apps] : apps.filter((a) => a.stage === stage)).sort(longestFirst(now));
+  const shown = (stage === "all" ? [...apps] : apps.filter((a) => a.stage === stage)).sort(props.order);
   return (
     <div className="pipeline-steps">
       <div className="funnel" role="tablist" aria-label="Stages">
@@ -87,7 +87,8 @@ export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (
             <div role="listitem" key={a.id} className={`step-row${props.picked.includes(a.id) ? " picked" : ""}${props.onPick ? " pickable" : ""}`} onClick={choose(props, a)}>
               <Initials name={a.candidateName} />
               <span className="who-text">
-                <a href={`#/candidates/${a.candidateId}`}>{a.candidateName}</a>
+                <a href={`#/candidates/${a.candidateId}`}
+                  onKeyDown={(e) => { if (props.onPick && e.key === " ") { e.preventDefault(); props.onPick(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
                 {props.picked.includes(a.id) && <span className="visually-hidden"> (chosen)</span>}
                 {a.candidateTitle && <span className="who-title">{a.candidateTitle}</span>}
               </span>

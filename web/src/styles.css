@@ -372,7 +372,8 @@ section[aria-label="Mandatory fields"] .row { align-items: flex-start; }
 .column-menu > p { margin: 0 0 0.4rem; }
 .column-choice { display: grid; grid-template-columns: 1fr auto auto; gap: 0.25rem; align-items: center; min-height: 2rem; }
 .column-choice .tool { padding: 0 0.45rem; }
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; position: relative; } /* relative: keeps absolutely placed children (visually-hidden labels) inside the scroll box */
+select { max-width: 100%; }
 .candidates-table .col-status { min-width: 7rem; }
 /* An email template previewed with one candidate's values. */
 .template-preview { border-top: 1px solid var(--border, #d0d7de); padding-top: 0.6rem; }
@@ -667,7 +668,7 @@ fieldset.invoicing .check { display: block; }
 .placement-invoice { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .placement-box .placement-invoice { border-top: 1px solid var(--line); padding-top: 0.75rem; }
 .placement-invoice-status { margin-right: auto; }
-.table-wrap { overflow-x: auto; padding: 0; }
+.table-wrap { overflow-x: auto; padding: 0; position: relative; }
 .placements-table { width: 100%; }
 .placements-table td { vertical-align: top; }
 .placements-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }

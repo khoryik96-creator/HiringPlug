@@ -17,7 +17,8 @@ export function useJdFiles(jobId: string) {
   return useQuery({
     queryKey: jobJdFilesKey(jobId),
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/jd-files", { params: { path: { jobId } } })).items,
-    refetchInterval: (q) => (q.state.data?.some((f) => f.status === "reading" || f.pdfStatus === "queued") ? 2000 : false),
+    // Every 2 s while a file is read or its PDF made, for up to 3 minutes (a worker that is down does not poll forever).
+    refetchInterval: (q) => (q.state.dataUpdateCount < 90 && q.state.data?.some((f) => f.status === "reading" || f.pdfStatus === "queued") ? 2000 : false),
   });
 }
 
@@ -48,11 +49,14 @@ export function JdFilePreview({ jobId, file }: { jobId: string; file: JdFile }) 
         ? <InlineFile path={`/v1/jd-files/${file.id}/file`} type={file.contentType} title={file.fileName} />
         : file.pdfStatus === "ready"
           ? <InlineFile path={`/v1/jd-files/${file.id}/pdf`} type="application/pdf" title={file.fileName} />
-          : office && (file.pdfStatus === "queued" || needsCopy)
-            ? <p className="muted" role="status">Making a preview of the Word file…</p>
-            : file.details?.description
+          : <>
+            {/* Its text meanwhile: a preview being made (or one that never comes) does not hide it. */}
+            {office && (file.pdfStatus === "queued" || (needsCopy && !make.isError)) && <p className="muted small" role="status">Making a preview of the Word file… its text meanwhile:</p>}
+            <ErrorMessage error={make.error} />
+            {file.details?.description
               ? <p className="pre job-description cv-like">{file.details.description}</p>
               : <p className="muted">{file.status === "reading" ? "Reading the file…" : "The file's text could not be shown: download it below to see it."}</p>}
+          </>}
     </div>
   );
 }

@@ -592,6 +592,19 @@ func (q *Queries) QueuePdf(ctx context.Context, id string) error {
 	return err
 }
 
+const queuePdfIfNone = `-- name: QueuePdfIfNone :one
+UPDATE document SET pdf_status = 'queued' WHERE id = $1 AND pdf_status IS NULL RETURNING storage_key
+`
+
+// A copy for a Word document that has none; no row when it has one or one is
+// being made (two asking at once queue it once).
+func (q *Queries) QueuePdfIfNone(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, queuePdfIfNone, id)
+	var storage_key string
+	err := row.Scan(&storage_key)
+	return storage_key, err
+}
+
 const rankCVsByText = `-- name: RankCVsByText :many
 WITH q AS (
   SELECT string_agg(quote_literal(l), ' | ')::tsquery AS query

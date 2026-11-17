@@ -219,42 +219,44 @@ function ListEditor({ list }: { list: List }) {
   return (
     <section className="panel" aria-label={list.label}>
       <h4>{list.label}</h4>
-      <table>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.key ?? `new-${String(i)}`}>
-              <td>
-                {list.colors && (
-                  <input type="color" className="color-input" aria-label={`Colour of ${r.label || `option ${String(i + 1)}`}`} value={r.color}
-                    onChange={(e) => { update(i, { color: e.target.value }); }} />
-                )}
-                <input aria-label={`${list.label} option ${String(i + 1)}`} value={r.label} onChange={(e) => { update(i, { label: e.target.value }); }} />
-                {list.colors && <span className="category-chip" style={chipStyle(r.color)}>{r.label || "…"}</span>}
-                {list.hints && (
-                  <input className="hint-input" aria-label={`Hint for ${r.label || `option ${String(i + 1)}`}`} placeholder="Hint: what to write (optional)"
-                    maxLength={300} value={r.hint} onChange={(e) => { update(i, { hint: e.target.value }); }} />
-                )}
-                {errors[`options[${String(i)}].label`] && <small className="error">{errors[`options[${String(i)}].label`]}</small>}
-                {errors[`options[${String(i)}].hint`] && <small className="error">{errors[`options[${String(i)}].hint`]}</small>}
-                {errors[`options[${String(i)}].key`] && <small className="error">{errors[`options[${String(i)}].key`]}</small>}
-                {errors[`options[${String(i)}].color`] && <small className="error">{errors[`options[${String(i)}].color`]}</small>}
-              </td>
-              <td>
-                <label className="check"><input type="checkbox" checked={r.hidden} onChange={(e) => { update(i, { hidden: e.target.checked }); }} /> Hidden</label>
-              </td>
-              <td>
-                <span className="row">
-                <button type="button" className="link" aria-label={`Move ${r.label} up`} disabled={i === 0} onClick={() => { move(i, -1); }}>↑</button>
-                <button type="button" className="link" aria-label={`Move ${r.label} down`} disabled={i === rows.length - 1} onClick={() => { move(i, 1); }}>↓</button>
-                {list.kind === "open" && !r.builtIn && (
-                  <button type="button" className="link" onClick={() => { setRows(rows.filter((_, j) => j !== i)); }}>Remove</button>
-                )}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.key ?? `new-${String(i)}`}>
+                <td>
+                  {list.colors && (
+                    <input type="color" className="color-input" aria-label={`Colour of ${r.label || `option ${String(i + 1)}`}`} value={r.color}
+                      onChange={(e) => { update(i, { color: e.target.value }); }} />
+                  )}
+                  <input aria-label={`${list.label} option ${String(i + 1)}`} value={r.label} onChange={(e) => { update(i, { label: e.target.value }); }} />
+                  {list.colors && <span className="category-chip" style={chipStyle(r.color)}>{r.label || "…"}</span>}
+                  {list.hints && (
+                    <input className="hint-input" aria-label={`Hint for ${r.label || `option ${String(i + 1)}`}`} placeholder="Hint: what to write (optional)"
+                      maxLength={300} value={r.hint} onChange={(e) => { update(i, { hint: e.target.value }); }} />
+                  )}
+                  {errors[`options[${String(i)}].label`] && <small className="error">{errors[`options[${String(i)}].label`]}</small>}
+                  {errors[`options[${String(i)}].hint`] && <small className="error">{errors[`options[${String(i)}].hint`]}</small>}
+                  {errors[`options[${String(i)}].key`] && <small className="error">{errors[`options[${String(i)}].key`]}</small>}
+                  {errors[`options[${String(i)}].color`] && <small className="error">{errors[`options[${String(i)}].color`]}</small>}
+                </td>
+                <td>
+                  <label className="check"><input type="checkbox" checked={r.hidden} onChange={(e) => { update(i, { hidden: e.target.checked }); }} /> Hidden</label>
+                </td>
+                <td>
+                  <span className="row">
+                  <button type="button" className="link" aria-label={`Move ${r.label} up`} disabled={i === 0} onClick={() => { move(i, -1); }}>↑</button>
+                  <button type="button" className="link" aria-label={`Move ${r.label} down`} disabled={i === rows.length - 1} onClick={() => { move(i, 1); }}>↓</button>
+                  {list.kind === "open" && !r.builtIn && (
+                    <button type="button" className="link" onClick={() => { setRows(rows.filter((_, j) => j !== i)); }}>Remove</button>
+                  )}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {list.kind === "open" && (
         <div className="row">
           {notice ? (

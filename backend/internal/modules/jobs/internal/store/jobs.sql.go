@@ -1113,24 +1113,29 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 
 const purgeJobs = `-- name: PurgeJobs :many
 WITH files AS (DELETE FROM job_description_file
-               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL) RETURNING storage_key),
+               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL) RETURNING storage_key, pdf_key),
      gone AS (DELETE FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL RETURNING id)
-SELECT storage_key FROM files
+SELECT storage_key, pdf_key FROM files
 `
 
-func (q *Queries) PurgeJobs(ctx context.Context, ids []string) ([]string, error) {
+type PurgeJobsRow struct {
+	StorageKey string
+	PdfKey     *string
+}
+
+func (q *Queries) PurgeJobs(ctx context.Context, ids []string) ([]PurgeJobsRow, error) {
 	rows, err := q.db.Query(ctx, purgeJobs, ids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []PurgeJobsRow
 	for rows.Next() {
-		var storage_key string
-		if err := rows.Scan(&storage_key); err != nil {
+		var i PurgeJobsRow
+		if err := rows.Scan(&i.StorageKey, &i.PdfKey); err != nil {
 			return nil, err
 		}
-		items = append(items, storage_key)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1145,6 +1150,19 @@ UPDATE job_description_file SET pdf_status = 'queued', pdf_key = NULL, pdf_error
 func (q *Queries) QueueJdPdf(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, queueJdPdf, id)
 	return err
+}
+
+const queueJdPdfIfNone = `-- name: QueueJdPdfIfNone :one
+UPDATE job_description_file SET pdf_status = 'queued' WHERE id = $1 AND pdf_status IS NULL RETURNING storage_key
+`
+
+// A copy for a file that has none (one uploaded before previews began); no row
+// when it has one, or one is being made (two asking at once queue it once).
+func (q *Queries) QueueJdPdfIfNone(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, queueJdPdfIfNone, id)
+	var storage_key string
+	err := row.Scan(&storage_key)
+	return storage_key, err
 }
 
 const restoreJobs = `-- name: RestoreJobs :exec

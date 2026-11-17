@@ -6,18 +6,15 @@ package jobs
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"io"
 	"mime"
 	"os"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/jobs/internal/store"
-	c "github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -25,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/pdfcopy"
 )
 
 // queueJDPdf asks the Python worker for a job description's PDF copy.
@@ -44,33 +42,23 @@ func (s *Service) saveJDPdf(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 	if err := job.Decode(&result); err != nil {
 		return err
 	}
-	status, key := string(api.PdfStatusFailed), (*string)(nil)
-	errMsg := c.ValueOrNil(result.Error)
-	if encoded, err := result.PdfBase64.Get(); err == nil {
-		pdf, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil || !strings.HasPrefix(string(pdf), "%PDF-") {
-			msg := "the PDF could not be read"
-			errMsg = &msg
-		} else {
-			k := job.TenantID + "/" + result.JdFileId + "_pdf"
-			if err := s.files.Put(k, pdf); err != nil {
-				return err
-			}
-			status, key, errMsg = string(api.PdfStatusReady), &k, nil
-		}
+	saved, err := pdfcopy.Save(s.files, job.TenantID, result.JdFileId, job.ID, result.PdfBase64, result.Error)
+	if err != nil {
+		return err
 	}
-	_, err := store.New(tx).SaveJdPdf(ctx, store.SaveJdPdfParams{ID: result.JdFileId, PdfStatus: &status, PdfKey: key, PdfError: errMsg})
+	_, err = store.New(tx).SaveJdPdf(ctx, store.SaveJdPdfParams{ID: result.JdFileId, PdfStatus: &saved.Status, PdfKey: saved.Key, PdfError: saved.Error})
 	if database.IsNoRows(err) {
+		// Gone, or not waited for: only this result's own file goes.
 		logx.From(ctx).Info("job description gone or its PDF not waited for; dropping it", "jd_file_id", result.JdFileId)
-		if key != nil {
-			_ = s.files.Delete(*key)
+		if saved.Key != nil {
+			_ = s.files.Delete(*saved.Key)
 		}
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return audit.Record(ctx, tx, audit.Entry{Action: "job.jd_pdf_rendered", EntityType: "jd_file", EntityID: result.JdFileId, Changes: map[string]any{"status": status}})
+	return audit.Record(ctx, tx, audit.Entry{Action: "job.jd_pdf_rendered", EntityType: "jd_file", EntityID: result.JdFileId, Changes: map[string]any{"status": saved.Status}})
 }
 
 // MakeJDPdf queues a Word job description's PDF copy when it has none (one
@@ -79,21 +67,32 @@ func (s *Service) MakeJDPdf(ctx context.Context, p authz.Principal, id string) (
 	var out JDFile
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
-		st, err := q.GetJdFileStorage(ctx, id)
+		row, err := q.GetJdFile(ctx, id)
 		if database.IsNoRows(err) {
 			return apperr.NotFound("job description")
 		}
 		if err != nil {
 			return err
 		}
-		if filekind.Office(st.ContentType) && st.PdfStatus == nil { // a failed copy is not tried again on every view
-			if err := s.queueJDPdf(ctx, tx, p.TenantID, id, st.StorageKey); err != nil {
+		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view
+			key, err := q.QueueJdPdfIfNone(ctx, id) // two asking at once: one queues it
+			switch {
+			case database.IsNoRows(err):
+			case err != nil:
+				return err
+			default:
+				if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindJdRenderPdf, api.JdRenderPdfJob{
+					JdFileId: id, DownloadUrl: s.files.SignedURL(key, jdLinkTTL),
+				}); err != nil {
+					return err
+				}
+				if err := audit.Record(ctx, tx, audit.Entry{Action: "job.jd_pdf_requested", EntityType: "jd_file", EntityID: id}); err != nil {
+					return err
+				}
+			}
+			if row, err = q.GetJdFile(ctx, id); err != nil {
 				return err
 			}
-		}
-		row, err := q.GetJdFile(ctx, id)
-		if err != nil {
-			return err
 		}
 		out, err = jdFrom(row)
 		return err
@@ -122,11 +121,7 @@ func (s *Service) JDPdf(ctx context.Context, p authz.Principal, id string) (stri
 	if errors.Is(err, os.ErrNotExist) {
 		return "", nil, apperr.NotFound("PDF of this job description")
 	}
-	name := row.FileName
-	if i := strings.LastIndex(name, "."); i > 0 {
-		name = name[:i]
-	}
-	return name + ".pdf", f, err
+	return pdfcopy.FileName(row.FileName), f, err
 }
 
 // GetJobDescriptionPdf handles GET /v1/jd-files/{jdFileId}/pdf.

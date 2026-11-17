@@ -695,7 +695,15 @@ lead's company (with the built-in email check).
   phone number and link removed. The client description itself may not name
   the client. The first mention of the client becomes the
   ad's "client description" ("a leading Malaysian bank"), later ones "our
-  client". A person may write their own blind title and text; it may not name
+  client"; "<description> is a …" reads "Our client is a …". Without the AI,
+  the rules also soften the details that point at the client
+  (`jobs/blind_soften.go`): head counts ("8,000 employees" becomes "a
+  sizeable team"), "across 12 countries" ("across the region"), "40
+  branches" ("a network of sites"), founding years ("well established"),
+  stock listings ("publicly listed"), revenue and assets ("a significant
+  amount") and rankings ("number one", "the largest", "the leading": all
+  "established"). Requirements, team sizes and the salary line stay as
+  written. A person may write their own blind title and text; it may not name
   the client, changes to the ad then no longer remake it, and the ad shows when
   it was written for an older version ("Make again from the ad" goes back).
   Each ad chooses what the careers page and job feed show: new ads the blind

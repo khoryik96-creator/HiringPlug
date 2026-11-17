@@ -5,6 +5,7 @@ from __future__ import annotations
 from hiringplug_ai.contracts import ParsedProfile, SourcedText
 from hiringplug_ai.extraction import TesseractOcr, extract
 from hiringplug_ai.parsing import parse_cv
+from hiringplug_ai.parsing.experience import from_text, headline
 
 from .documents import scanned_pdf, text_pdf
 
@@ -228,3 +229,16 @@ def test_an_employer_written_in_lowercase_is_still_the_company() -> None:
     )
     companies = [j.company.value if j.company else None for j in parse_cv(text).experience]
     assert companies == ["foodpanda Malaysia", "Contoh Logistics Sdn Bhd"]
+
+
+def test_lowercase_titles_and_employers_with_places_still_read() -> None:
+    titles = ["head of finance", "sales and marketing manager", "senior manager of operations"]
+    for line in [*titles, "foodpanda Malaysia"]:
+        assert headline(line), line
+    assert not headline("exceptional SLA with partners")
+    # An employer and its place after the dash are not a list of areas covered.
+    title, company, unknown = from_text("Software Engineer \u2014 Google, Mountain View, CA")
+    assert title == "Software Engineer"
+    assert "Google, Mountain View, CA" in [company, *unknown]
+    title, _, _ = from_text("Product Management Lead \u2014 Payment, Cards, Digital Product")
+    assert title == "Product Management Lead \u2014 Payment, Cards, Digital Product"

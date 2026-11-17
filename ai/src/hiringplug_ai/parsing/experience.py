@@ -103,7 +103,8 @@ def headline(text: str) -> bool:
         and len(words) <= 14
         and len(text) <= 140
         and not re.search(r"[a-z]{4,}\.$", text)  # ends like a sentence (but "Sdn. Bhd." is fine)
-        and not _CONTINUATION.match(text)  # the rest of a sentence: "exceptional SLA with partners"
+        # the rest of a sentence ("exceptional SLA with partners"), not a lowercase title ("head of finance")
+        and not (_CONTINUATION.match(text) and not ROLE_RE.search(text))
         and not _DUTY_START.match(text)
         and not _OTHER_LABEL.match(text)
         and not is_sentence(text)
@@ -164,13 +165,33 @@ def from_text(text: str) -> Found:
     return title, company, unknown
 
 
+# Words of the areas a role covers ("Payment, Cards, Digital Product").
+_SCOPE_WORD = re.compile(
+    r"\b(?:payments?|cards?|digital|products?|users?|orders?|customers?|services?|sales|marketing|operations|"
+    r"finance|risk|compliance|data|platforms?|growth|partnerships?|retail|corporate|wealth|lending|loans?|"
+    r"deposits?|treasury|technology|engineering|analytics|merchants?|checkout|onboarding|fraud|apps?|"
+    r"web|mobile|infrastructure|security|logistics|supply chain|procurement|hr|talent|brand|content|"
+    r"ecommerce|e-commerce|consumer|enterprise|sme|b2b|b2c)\b",
+    re.IGNORECASE,
+)
+
+
 def _scope(segment: str) -> bool:
-    """A list of short areas ("User, Order, Payment, Customer Service"), not a company."""
+    """A list of short areas ("User, Order, Payment, Customer Service"), not a
+    company or a place ("Google, Mountain View, CA", "Shell, Petronas, Exxon")."""
     parts = [p.strip() for p in segment.split(",")]
     return (
         len(parts) >= 3
         and not LEGAL_SUFFIX_RE.search(segment)
-        and all(p and len(p.split()) <= 3 and not is_place(p) for p in parts)
+        and all(
+            p
+            and len(p.split()) <= 3
+            and not is_place(p)
+            and not re.fullmatch(r"[A-Z]{2,3}", p)  # a state or country code ("CA")
+            and kind(p) != "company"
+            for p in parts
+        )
+        and sum(1 for p in parts if _SCOPE_WORD.search(p)) * 2 >= len(parts)  # mostly areas of work
     )
 
 

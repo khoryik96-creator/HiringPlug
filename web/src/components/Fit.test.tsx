@@ -125,6 +125,11 @@ describe("fit on a job's board", () => {
     expect(names()).toEqual(["Ali", "Siti", "Wei"]);
     fireEvent.click(screen.getByLabelText("Best fit first"));
     expect(names()).toEqual(["Siti", "Ali", "Wei"]); // unscored last
+    // The Steps view follows it too.
+    fireEvent.click(screen.getByRole("button", { name: "Steps" }));
+    fireEvent.click(within(screen.getByRole("tablist", { name: "Stages" })).getByRole("tab", { name: /All/ }));
+    expect(within(screen.getByRole("list", { name: "Everyone" })).getAllByRole("link").map((a) => a.textContent)).toEqual(["Siti", "Ali", "Wei"]);
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
     fireEvent.click(screen.getByRole("button", { name: "Fit of Siti: why?" }));
     const panel = screen.getByRole("region", { name: "Fit of Siti" });
     expect(within(panel).getByText("Why 90%?")).toBeTruthy();

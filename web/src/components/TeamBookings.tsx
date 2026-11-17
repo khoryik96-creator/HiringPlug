@@ -40,28 +40,30 @@ export function TeamBookings() {
       {team.data && (
         <section className="panel">
           <p className="muted small">Each person sets their own hours and calendar under Your account. Calendar addresses stay private to them.</p>
-          <table>
-            <thead><tr><th>Person</th><th>Hours for calls</th><th>Calendar</th><th>Booking links</th></tr></thead>
-            <tbody>
-              {team.data.map((r) => (
-                <tr key={r.userId}>
-                  <td><strong>{r.name}</strong></td>
-                  <td>{r.set ? <>{hoursText(r.hours)} <span className="muted small">({r.timeZone})</span></> : <span className="muted">Not set up</span>}</td>
-                  <td><Calendar c={r.calendar} /></td>
-                  <td>
-                    {r.openLinks === 0 && r.upcoming === 0 ? <span className="muted">None</span> : (
-                      <>
-                        {r.openLinks > 0 && `${String(r.openLinks)} waiting`}
-                        {r.openLinks > 0 && r.upcoming > 0 && " · "}
-                        {r.upcoming > 0 && `${String(r.upcoming)} booked`}
-                        {r.nextAt && <span className="muted small"> · next {formatWhen(r.nextAt)}</span>}
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>Person</th><th>Hours for calls</th><th>Calendar</th><th>Booking links</th></tr></thead>
+              <tbody>
+                {team.data.map((r) => (
+                  <tr key={r.userId}>
+                    <td><strong>{r.name}</strong></td>
+                    <td>{r.set ? <>{hoursText(r.hours)} <span className="muted small">({r.timeZone})</span></> : <span className="muted">Not set up</span>}</td>
+                    <td><Calendar c={r.calendar} /></td>
+                    <td>
+                      {r.openLinks === 0 && r.upcoming === 0 ? <span className="muted">None</span> : (
+                        <>
+                          {r.openLinks > 0 && `${String(r.openLinks)} waiting`}
+                          {r.openLinks > 0 && r.upcoming > 0 && " · "}
+                          {r.upcoming > 0 && `${String(r.upcoming)} booked`}
+                          {r.nextAt && <span className="muted small"> · next {formatWhen(r.nextAt)}</span>}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </main>

@@ -22,10 +22,12 @@ export function Team({ myRole, myId }: { myRole: Schemas["Role"]; myId: string }
       {myRole === "owner" && <p className="muted small"><a href="#/access">Roles and access</a></p>}
       <ErrorMessage error={list.error ?? groups.error} />
       {list.data && (
-        <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Last signed in</th><th /></tr></thead>
-          <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} groups={groups.data ?? []} />)}</tbody>
-        </table>
+        <div className="table-scroll">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Status</th><th>Last signed in</th><th /></tr></thead>
+            <tbody>{list.data.map((m) => <MemberRow key={m.id} member={m} myRole={myRole} me={m.id === myId} groups={groups.data ?? []} />)}</tbody>
+          </table>
+        </div>
       )}
       <Teams groups={groups.data ?? []} />
       <Invite myRole={myRole} />

@@ -48,6 +48,11 @@ UPDATE document SET candidate_id = @to_id WHERE candidate_id = @from_id;
 -- name: QueuePdf :exec
 UPDATE document SET pdf_status = 'queued', pdf_key = NULL, pdf_error = NULL WHERE id = @id;
 
+-- A copy for a Word document that has none; no row when it has one or one is
+-- being made (two asking at once queue it once).
+-- name: QueuePdfIfNone :one
+UPDATE document SET pdf_status = 'queued' WHERE id = @id AND pdf_status IS NULL RETURNING storage_key;
+
 -- name: SavePdf :one
 UPDATE document SET pdf_status = @pdf_status, pdf_key = sqlc.narg(pdf_key), pdf_error = sqlc.narg(pdf_error)
 WHERE id = @id AND pdf_status = 'queued'

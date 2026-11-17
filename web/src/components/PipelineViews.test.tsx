@@ -56,6 +56,13 @@ describe("pipeline steps", () => {
     expect(within(stages).getByRole("tab", { name: /Submitted/ }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("chooses a person in Steps with Space on their name, as on the board", async () => {
+    show([app(1, "applied", 1)]);
+    const name = await screen.findByRole("link", { name: "Person 1" });
+    fireEvent.keyDown(name, { key: " " });
+    expect(screen.getByRole("status").textContent).toContain("1 chosen");
+  });
+
   it("switches to the board and remembers it; a crowded column shows 8 and folds the rest", async () => {
     show(Array.from({ length: 12 }, (_, i) => app(i + 1, "submitted", 12 - i)));
     fireEvent.click(await screen.findByRole("button", { name: "Board" }));

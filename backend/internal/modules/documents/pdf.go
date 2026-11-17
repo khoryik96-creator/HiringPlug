@@ -6,18 +6,15 @@ package documents
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"io"
 	"mime"
 	"os"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/documents/internal/store"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
@@ -25,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/filekind"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/logx"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/pdfcopy"
 )
 
 // queuePdf asks the Python worker for a document's PDF.
@@ -44,33 +42,23 @@ func (s *Service) savePdf(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err := job.Decode(&result); err != nil {
 		return err
 	}
-	status, key := string(api.PdfStatusFailed), (*string)(nil)
-	errMsg := apiconv.ValueOrNil(result.Error)
-	if encoded, err := result.PdfBase64.Get(); err == nil {
-		pdf, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil || !strings.HasPrefix(string(pdf), "%PDF-") {
-			msg := "the PDF could not be read"
-			errMsg = &msg
-		} else {
-			k := job.TenantID + "/" + result.DocumentId + "_pdf"
-			if err := s.files.Put(k, pdf); err != nil {
-				return err
-			}
-			status, key, errMsg = string(api.PdfStatusReady), &k, nil
-		}
+	saved, err := pdfcopy.Save(s.files, job.TenantID, result.DocumentId, job.ID, result.PdfBase64, result.Error)
+	if err != nil {
+		return err
 	}
-	_, err := store.New(tx).SavePdf(ctx, store.SavePdfParams{ID: result.DocumentId, PdfStatus: &status, PdfKey: key, PdfError: errMsg})
+	_, err = store.New(tx).SavePdf(ctx, store.SavePdfParams{ID: result.DocumentId, PdfStatus: &saved.Status, PdfKey: saved.Key, PdfError: saved.Error})
 	if database.IsNoRows(err) {
+		// Gone, or not waited for: only this result's own file goes.
 		logx.From(ctx).Info("document gone or its PDF not waited for; dropping it", "document_id", result.DocumentId)
-		if key != nil {
-			_ = s.files.Delete(*key)
+		if saved.Key != nil {
+			_ = s.files.Delete(*saved.Key)
 		}
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	return audit.Record(ctx, tx, audit.Entry{Action: "document.pdf_rendered", EntityType: "document", EntityID: result.DocumentId, Changes: map[string]any{"status": status}})
+	return audit.Record(ctx, tx, audit.Entry{Action: "document.pdf_rendered", EntityType: "document", EntityID: result.DocumentId, Changes: map[string]any{"status": saved.Status}})
 }
 
 // Pdf opens a document's PDF.
@@ -103,8 +91,7 @@ func (h *HTTP) GetDocumentPdf(ctx context.Context, req api.GetDocumentPdfRequest
 	if err != nil {
 		return nil, err
 	}
-	name := strings.TrimSuffix(strings.TrimSuffix(doc.FileName, ".docx"), ".doc") + ".pdf"
-	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": name})
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": pdfcopy.FileName(doc.FileName)})
 	return api.GetDocumentPdf200ApplicationoctetStreamResponse{
 		Body: f, Headers: api.GetDocumentPdf200ResponseHeaders{ContentDisposition: &disposition},
 	}, nil
@@ -124,8 +111,20 @@ func (s *Service) MakePdf(ctx context.Context, p authz.Principal, id string) (Do
 			return err
 		}
 		if filekind.Office(row.ContentType) && row.PdfStatus == nil { // a failed copy is not tried again on every view
-			if err := s.queuePdf(ctx, tx, p.TenantID, fromRow(row), row.StorageKey); err != nil {
+			key, err := q.QueuePdfIfNone(ctx, id) // two asking at once: one queues it
+			switch {
+			case database.IsNoRows(err):
+			case err != nil:
 				return err
+			default:
+				if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindDocumentRenderPdf, api.DocumentRenderPdfJob{
+					DocumentId: id, DownloadUrl: s.files.SignedURL(key, downloadLinkTTL),
+				}); err != nil {
+					return err
+				}
+				if err := audit.Record(ctx, tx, audit.Entry{Action: "document.pdf_requested", EntityType: "document", EntityID: id}); err != nil {
+					return err
+				}
 			}
 			if row, err = q.GetDocument(ctx, id); err != nil {
 				return err
