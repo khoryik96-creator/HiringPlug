@@ -68,6 +68,24 @@ func (q *Queries) CVSnippets(ctx context.Context, arg CVSnippetsParams) ([]CVSni
 	return items, nil
 }
 
+const cVTextOf = `-- name: CVTextOf :one
+SELECT candidate_id, source, coalesce(extracted_text, '')::text AS text FROM document WHERE id = $1
+`
+
+type CVTextOfRow struct {
+	CandidateID string
+	Source      string
+	Text        string
+}
+
+// A document's candidate, kind and text (for other modules reading a CV just read).
+func (q *Queries) CVTextOf(ctx context.Context, id string) (CVTextOfRow, error) {
+	row := q.db.QueryRow(ctx, cVTextOf, id)
+	var i CVTextOfRow
+	err := row.Scan(&i.CandidateID, &i.Source, &i.Text)
+	return i, err
+}
+
 const candidatesWithMatchingCV = `-- name: CandidatesWithMatchingCV :many
 SELECT candidate_id::text FROM cv_search
 WHERE terms @@ to_tsquery('english', $1::text)

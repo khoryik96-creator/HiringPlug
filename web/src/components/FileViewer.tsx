@@ -9,16 +9,7 @@ export function FileViewer({ title, path, type, actions, onClose }: {
   title: string; path: string; type: string; actions?: ReactNode; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  useEffect(() => {
-    let made: string | null = null;
-    let live = true;
-    fetchFile(path, type)
-      .then((blob) => { if (live) { made = URL.createObjectURL(blob); setUrl(made); } })
-      .catch((e: unknown) => { if (live) setError(e); });
-    return () => { live = false; if (made) URL.revokeObjectURL(made); };
-  }, [path, type]);
+  const { url, error } = useFileUrl(path, type);
   useEffect(() => {
     const d = dialog.current;
     if (d && !d.open) {
@@ -42,4 +33,19 @@ export function FileViewer({ title, path, type, actions, onClose }: {
         : <iframe className="file-viewer-body" title={title} src={`${url}#navpanes=0&view=FitH`} />)}
     </dialog>
   );
+}
+
+/** A file of the app's as a page-local address (for a preview), released when no longer shown. */
+export function useFileUrl(path: string, type: string): { url: string | null; error: unknown } {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    let made: string | null = null;
+    let live = true;
+    fetchFile(path, type)
+      .then((blob) => { if (live) { made = URL.createObjectURL(blob); setUrl(made); } })
+      .catch((e: unknown) => { if (live) setError(e); });
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [path, type]);
+  return { url, error };
 }

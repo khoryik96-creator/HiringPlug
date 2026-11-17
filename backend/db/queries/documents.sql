@@ -163,3 +163,7 @@ LIMIT 500;
 -- A candidate deleted for good (the Bin): their documents, and the stored files to remove.
 -- name: PurgeCandidateDocuments :many
 DELETE FROM document WHERE candidate_id = @candidate_id RETURNING storage_key, pdf_key;
+
+-- A document's candidate, kind and text (for other modules reading a CV just read).
+-- name: CVTextOf :one
+SELECT candidate_id, source, coalesce(extracted_text, '')::text AS text FROM document WHERE id = @id;

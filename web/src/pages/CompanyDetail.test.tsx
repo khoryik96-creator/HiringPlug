@@ -100,6 +100,13 @@ describe("company pages", () => {
     expect(get.mock.calls.some((call) => (call as unknown[])[0] === "/v1/companies/{companyId}/billing")).toBe(false);
   });
 
+  it("shows the category pills only to those given companies.category:update", async () => {
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
+    renderWithClient(<CompanyDetail id={company.id} permissions={["companies:read", "companies:update"]} />);
+    await screen.findByRole("button", { name: "Edit company" });
+    expect(screen.queryByRole("group", { name: "Category" })).toBeNull();
+  });
+
   it("gives viewers no edit or add buttons", async () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(answers[path] ?? { items: [], nextCursor: null }))) as never);
     renderWithClient(<CompanyDetail id={company.id} permissions={["companies:read"]} />);

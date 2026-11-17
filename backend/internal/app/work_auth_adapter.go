@@ -11,7 +11,8 @@ import (
 )
 
 // workAuthFromCV: once a candidate's own CV is read, its nationality and the
-// passes it mentions suggest a work authorization (candidates module).
+// passes it mentions (both from that same CV) suggest a work authorization
+// (candidates module).
 type workAuthFromCV struct {
 	documents  *documents.Module
 	candidates *candidates.Module
@@ -21,17 +22,13 @@ func (a workAuthFromCV) ReadDone(ctx context.Context, tx pgx.Tx, _, documentID s
 	if profile == nil {
 		return nil
 	}
-	doc, _, err := a.documents.SourceCV(ctx, tx, documentID)
-	if err != nil || doc.Source == "formatted" {
+	candidateID, source, text, err := a.documents.CVTextOf(ctx, tx, documentID)
+	if err != nil || source == "formatted" {
 		return err
 	}
 	nationality := ""
 	if v, err := profile.Nationality.Get(); err == nil {
 		nationality = v.Value
 	}
-	text, err := a.documents.LatestCVText(ctx, tx, doc.CandidateID)
-	if err != nil {
-		return err
-	}
-	return a.candidates.SuggestWorkAuthFromCV(ctx, tx, doc.CandidateID, nationality, text)
+	return a.candidates.SuggestWorkAuthFromCV(ctx, tx, candidateID, nationality, text)
 }

@@ -49,4 +49,5 @@ func TestOnlyThoseGivenItChangeACandidatesStatusAContactsRoleOrACompanysCategory
 		res = a.request(http.MethodPatch, c.path, recruiter, body)
 		assert.Equal(t, http.StatusOK, res.Status, "a recruiter may (the default): %s", res.Body)
 	}
+
 }

@@ -44,14 +44,26 @@ export function WorkAuthFields({ form, onChange, label, errors }: {
 }) {
   const on = (c: (typeof WA_CHOICES)[number]) => c.status === form.waStatus && (c.status !== "expat_eligible" || c.basis === form.waBasis);
   const error = errors.status ?? errors.basis;
+  const at = Math.max(0, WA_CHOICES.findIndex(on)); // the one reached with Tab; arrows move the choice (a radio group)
+  const choose = (i: number, e?: React.KeyboardEvent<HTMLButtonElement>) => {
+    const c = WA_CHOICES[(i + WA_CHOICES.length) % WA_CHOICES.length];
+    if (!c) return;
+    onChange({ waStatus: c.status, waBasis: c.basis });
+    const group = e?.currentTarget.parentElement;
+    (group?.children[WA_CHOICES.indexOf(c)] as HTMLElement | undefined)?.focus();
+  };
   return (
     <div className="field full">
       <span>{label}</span>
       <div className="wa-console" role="radiogroup" aria-label={label}>
-        {WA_CHOICES.map((c) => (
+        {WA_CHOICES.map((c, i) => (
           <button key={c.key} type="button" role="radio" aria-checked={on(c)} className={on(c) ? "on" : undefined}
-            style={{ "--wa": c.color } as React.CSSProperties}
-            onClick={() => { onChange({ waStatus: c.status, waBasis: c.basis }); }}>
+            style={{ "--wa": c.color } as React.CSSProperties} tabIndex={i === at ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); choose(i + 1, e); }
+              if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); choose(i - 1, e); }
+            }}
+            onClick={() => { choose(i); }}>
             <i aria-hidden="true" />{c.label}
           </button>
         ))}

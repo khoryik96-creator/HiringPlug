@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/country"
 )
 
@@ -61,7 +62,11 @@ func (m *Module) SuggestWorkAuthFromCV(ctx context.Context, tx pgx.Tx, candidate
 	if err != nil {
 		return err
 	}
-	return store.New(tx).SetWorkAuthSuggestion(ctx, store.SetWorkAuthSuggestionParams{ID: candidateID, Suggestion: raw})
+	if err := store.New(tx).SetWorkAuthSuggestion(ctx, store.SetWorkAuthSuggestionParams{ID: candidateID, Suggestion: raw}); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "candidate.work_authorization_suggested", EntityType: "candidate", EntityID: candidateID,
+		Changes: map[string]any{"status": s.Status, "basis": s.Basis, "reason": s.Reason}})
 }
 
 func suggestionOf(raw []byte) *WorkAuthSuggestion {

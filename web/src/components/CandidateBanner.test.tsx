@@ -57,6 +57,18 @@ describe("candidate banner", () => {
     expect(within(banner).queryByRole("group", { name: "Status" })).toBeNull(); // no buttons without candidates:update
   });
 
+  it("lets only those given candidates.status:update change the status", () => {
+    settings();
+    const c = testCandidate({ availability: "passive" });
+    renderWithClient(<CandidateBanner canEdit canEditStatus={false} candidate={c} />);
+    expect(screen.queryByLabelText("Availability")).toBeNull();
+    expect(screen.getByText("Passive")).toBeTruthy();
+    cleanup();
+    settings();
+    renderWithClient(<CandidateBanner canEdit canEditStatus candidate={c} />);
+    expect(screen.getByLabelText("Availability")).toBeTruthy();
+  });
+
   it("says since when the status is set, and for how many days", () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok(testFieldSettings()));
     const since = new Date(Date.now() - 12 * 86_400_000).toISOString();
