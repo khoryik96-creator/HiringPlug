@@ -83,4 +83,3 @@ func allowSearchIndexes(ctx context.Context, db *sql.DB, w io.Writer) error {
 	}
 	return nil
 }
-
