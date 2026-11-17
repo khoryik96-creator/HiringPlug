@@ -1,4 +1,4 @@
-# Handover (11 Nov 2026)
+# Handover (17 Nov 2026)
 
 For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
 first (the rules, enforced by `task verify`), then `docs/README.md`;
@@ -13,6 +13,19 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   expandable skills, and has a slim notice/salary ribbon with natural height.
 - CV library selection drives a single viewer and toolbar. Existing document,
   stage-move, salary-note and privacy behavior is retained; see `docs/features.md`.
+
+## External JobAdder migration tool
+
+- `tools/jobadder-migrator` is a separate Go executable with a local browser UI
+  and a Windows build. It needs neither Docker nor a HiringPlug database.
+- First release is read-only discovery: counts/access gaps, original response
+  evidence, encrypted credentials/responses, pause/resume and synthetic demo.
+  It does not yet export full records/CVs or write into HiringPlug.
+- The owner requires JobAdder field values to remain unchanged. No normalization,
+  deduplication, salary rewriting or AI enrichment during migration. API access
+  is available; approximately 80,000 candidates and all obtainable related
+  records are in scope. See [jobadder-migration.md](jobadder-migration.md) for
+  the remaining extraction, projection, import and reconciliation architecture.
 
 ## Where things stand
 

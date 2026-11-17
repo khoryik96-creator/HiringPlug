@@ -28,6 +28,42 @@ jobs:
         with: { version: 3.x, repo-token: "${{ secrets.GITHUB_TOKEN }}" }
       - run: task lint:shell test:ci
 
+  migrator:
+    name: JobAdder discovery tool (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run: { working-directory: tools/jobadder-migrator }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/jobadder-migrator/go.mod
+          cache-dependency-path: tools/jobadder-migrator/go.sum
+      - run: go vet ./...
+      - run: node --check web/app.js
+      - name: Windows tests
+        if: runner.os == 'Windows'
+        run: go test ./...
+      - name: Race checks
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+      - name: Build Windows executable
+        if: runner.os == 'Windows'
+        env: { GOOS: windows, GOARCH: amd64, CGO_ENABLED: "0" }
+        run: go build -trimpath -ldflags="-s -w" -o dist/HiringPlugMigration.exe .
+      - name: Include Windows launchers and instructions
+        if: runner.os == 'Windows'
+        run: Copy-Item Start.bat, Demo.bat, README.md dist/
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: HiringPlugMigration-windows-x64
+          path: tools/jobadder-migrator/dist/*
+
   backend:
     name: Go backend and contract
     runs-on: ubuntu-latest
@@ -198,6 +234,10 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm build
           pnpm e2e
+      - name: JobAdder discovery browser checks (synthetic data only)
+        run: |
+          go -C tools/jobadder-migrator build -trimpath -o dist/HiringPlugMigration .
+          node tools/jobadder-migrator/test/browser-smoke.cjs tools/jobadder-migrator/dist/HiringPlugMigration "$RUNNER_TEMP/jobadder-discovery-ui"
       - name: Service logs
         if: always()
         run: tail -n 50 "$RUNNER_TEMP"/*.log

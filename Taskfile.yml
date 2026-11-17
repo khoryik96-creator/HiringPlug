@@ -90,7 +90,7 @@ tasks:
 
   lint:
     desc: Lint and type-check all three parts
-    cmds: [task: lint:shell, task: lint:go, task: lint:py, task: lint:web]
+    cmds: [task: lint:shell, task: lint:go, task: lint:py, task: lint:web, task: lint:migrator]
 
   lint:shell:
     desc: Check CI shell scripts (requires ShellCheck)
@@ -110,7 +110,7 @@ tasks:
 
   test:
     desc: Run every test (needs PostgreSQL - `task db:up` - and Tesseract)
-    cmds: [task: test:ci, task: test:go, task: test:py, task: test:web]
+    cmds: [task: test:ci, task: test:go, task: test:py, task: test:web, task: test:migrator]
 
   test:ci:
     desc: Test CI scripts without the application or external services (Python 3 standard library)
@@ -143,6 +143,22 @@ tasks:
       - task: lint
       - task: test
       - task: build:web
+      - task: build:migrator
+
+  lint:migrator:
+    desc: Check the standalone JobAdder discovery tool
+    dir: tools/jobadder-migrator
+    cmds: [go vet ./..., node --check web/app.js]
+
+  test:migrator:
+    dir: tools/jobadder-migrator
+    cmds: [go test -race ./...]
+
+  build:migrator:
+    desc: Build the standalone discovery tool for Windows x64
+    dir: tools/jobadder-migrator
+    env: { GOOS: windows, GOARCH: amd64, CGO_ENABLED: "0" }
+    cmds: [go build -trimpath -ldflags="-s -w" -o dist/HiringPlugMigration.exe .]
 
   # --- Local development ---
 
