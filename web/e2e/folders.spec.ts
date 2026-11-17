@@ -35,11 +35,24 @@ test("keeps candidates in folders: drag, add, share, rename and delete", async (
   await folders.getByRole("button", { name: "Create" }).click();
   await expect(page.getByRole("heading", { name: `Shortlist ${stamp}` })).toBeVisible(); // it opens
   await folders.getByRole("button", { name: "All candidates" }).click();
+  await expect(page.getByRole("heading", { name: `Shortlist ${stamp}` })).toBeHidden();
+  await expect(table.getByRole("link", { name: `Folder Alpha ${stamp}` })).toBeVisible();
 
-  // Drag Alpha's row onto the folder.
+  // Drag Alpha's row onto the folder. Under load the list can still re-render
+  // as the drag starts (CI, two browsers at once), so a lost drag is tried again;
+  // putting a candidate in a folder twice keeps them once.
   const shortlist = folders.getByRole("button", { name: new RegExp(`Shortlist ${stamp}`) });
-  await table.getByRole("link", { name: `Folder Alpha ${stamp}` }).dragTo(shortlist);
-  await expect(folders.getByRole("status")).toContainText(`1 candidate put in Shortlist ${stamp}`);
+  await expect(async () => {
+    // By hand, in steps: one-jump dragTo sometimes ends before Chromium starts the drag.
+    await table.getByRole("link", { name: `Folder Alpha ${stamp}` }).hover();
+    await page.mouse.down();
+    const box = await shortlist.boundingBox();
+    if (!box) throw new Error("the folder is not on screen");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 12 });
+    await shortlist.hover();
+    await page.mouse.up();
+    await expect(folders.getByRole("status")).toContainText(`1 candidate put in Shortlist ${stamp}`, { timeout: 2000 });
+  }).toPass({ timeout: 20000 });
   await expect(shortlist).toContainText("1");
 
   // Choose Beta and put them in a new folder from the menu.
