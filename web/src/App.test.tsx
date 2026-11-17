@@ -41,7 +41,7 @@ describe("app", () => {
     window.location.hash = `#/candidates/${bob.id}`;
     await screen.findByRole("heading", { name: "Bob Lee" });
     expect(screen.queryByRole("form", { name: "Edit profile" })).toBeNull();
-    expect(within(screen.getByRole("complementary", {name: "Contact summary"})).getByText("bob@example.com")).toBeTruthy();
+    expect(within(screen.getByRole("region", {name: "Candidate"})).getByText("bob@example.com")).toBeTruthy();
   });
 });
 

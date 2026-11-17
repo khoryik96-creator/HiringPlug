@@ -2,13 +2,14 @@
 
 **Candidate workspace.** The FIFA card keeps its status colours and work-rights
 stripe, with an availability dropdown, expandable plain skills and a slim inline
-notice/salary ribbon. Work rights are edited in the existing Work authorization
+notice/salary ribbon. Its contact plate, on the right, has nationality and
+where they live, then email, phone and LinkedIn: clicking the email or number
+copies it ("Copied"). The source is under Details. Work rights are edited in the existing Work authorization
 field under Details. Details opens first, followed by CV & files, Jobs, Activity,
 Salary and Email; document, pipeline and email tabs follow their permissions.
 Tabs load on first visit and keep forms and drafts mounted until the candidate
 changes. Search highlight links open CV & files directly. **CV beside** (on the
-tab row) splits the page: the details on the left (the contact card, with its
-copy buttons, above the tabs) and the newest CV on the right, in view while the
+tab row) splits the page: the details on the left and the newest CV on the right, in view while the
 details scroll; remembered in the browser, off on the CV & files tab and on
 narrow screens.
 
@@ -460,7 +461,10 @@ for each of their jobs, with **Score fit** / **Score again**.
   working hours, dental and optical, fixed, performance and other bonuses,
   commission, special benefits; then reference and background checks,
   health screening, payslips, NRIC/passport, education certificate and
-  anything else). Filled in as one form, each item with a value and remarks
+  anything else). A client's grades (Executive, Manager...) are set on the
+  form; a benefit that differs by grade has a value per grade, shown as
+  chips (a grade chosen at the top shows only its values), and the Word/PDF
+  has a column per grade. Filled in as one form, each item with a value and remarks
   and a hint saying what to write; each pre-offer step Yes, No or Not known
   with remarks. It reads as cards, says which items are not recorded yet,
   and downloads as Word or PDF in two tables. The template is in Settings,

@@ -1239,3 +1239,15 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .ad-columns .seg { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; margin: 4px 0 8px; }
 .ad-columns .seg button { border: 0; background: transparent; box-shadow: none; border-radius: 999px; padding: 4px 12px; min-height: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .ad-columns .seg button[aria-pressed=true] { background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); }
+.grade-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.grade-chips button { min-height: 0; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.grade-chips button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.grade-values { display: flex; flex-wrap: wrap; gap: 6px; }
+.grade-value, .grade-input { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; font-size: 12.5px; align-items: stretch; }
+.grade-value i, .grade-input i { font-style: normal; background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); padding: 2px 9px; font-weight: 600; display: inline-flex; align-items: center; }
+.grade-value span { padding: 2px 10px; }
+.grade-input input { border: 0; border-radius: 0; min-height: 0; padding: 3px 8px; width: 9rem; }
+.benefit-value-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.grade-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.grade-chip { display: inline-flex; gap: 4px; align-items: center; background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12.5px; font-weight: 600; }
+.grade-editor input { width: 8rem; min-height: 0; padding: 3px 10px; border-radius: 999px; }

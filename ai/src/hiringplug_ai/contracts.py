@@ -1187,18 +1187,12 @@ class CompanyBenefitsFormat(StrEnum):
     pdf = "pdf"
 
 
-class CompanyBenefit(BaseModel):
+class CompanyBenefitGrade(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    key: Annotated[
-        str, Field(description="The item's key in the company_benefits list.", max_length=100, min_length=1)
-    ]
-    label: Annotated[str, Field(max_length=100, min_length=1)]
-    value: Annotated[
-        str | None, Field(description="e.g. 18 days, rising to 21 after 3 years.", max_length=1000)
-    ]
-    remarks: Annotated[str | None, Field(description="Remarks or clauses.", max_length=2000)]
+    grade: Annotated[str, Field(max_length=60, min_length=1)]
+    value: Annotated[str, Field(description="e.g. 18 days.", max_length=1000, min_length=1)]
 
 
 class CompanyPreOfferStep(BaseModel):
@@ -1215,20 +1209,8 @@ class CompanyPreOfferStep(BaseModel):
     remarks: Annotated[str | None, Field(max_length=2000)]
 
 
-class CompanyBenefits(BaseModel):
-    benefits: list[CompanyBenefit]
-    preOffer: list[CompanyPreOfferStep]
-    version: Annotated[int, Field(description="0 before the first save.")]
-    updatedAt: Annotated[AwareDatetime | None, Field(...)]
-
-
-class CompanyBenefitsInput(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    version: Annotated[int, Field(ge=0)]
-    benefits: Annotated[list[CompanyBenefit], Field(max_length=100)]
-    preOffer: Annotated[list[CompanyPreOfferStep], Field(max_length=100)]
+class Grade(RootModel[str]):
+    root: Annotated[str, Field(max_length=60, min_length=1)]
 
 
 class CompanyId(RootModel[str]):
@@ -5293,6 +5275,53 @@ class PublicJobAd(BaseModel):
     description: Annotated[str, Field(description="The blind text when the ad is published blind.")]
     closesOn: Annotated[date | None, Field(...)]
     publishedAt: AwareDatetime
+
+
+class CompanyBenefit(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        str, Field(description="The item's key in the company_benefits list.", max_length=100, min_length=1)
+    ]
+    label: Annotated[str, Field(max_length=100, min_length=1)]
+    value: Annotated[
+        str | None, Field(description="e.g. 18 days, rising to 21 after 3 years.", max_length=1000)
+    ]
+    remarks: Annotated[str | None, Field(description="Remarks or clauses.", max_length=2000)]
+    byGrade: Annotated[
+        list[CompanyBenefitGrade] | None,
+        Field(
+            description="When it differs by grade: a value for each grade it applies to (grades from the client's list); value is then null. Empty or left out: the same for all grades.",
+            max_length=12,
+        ),
+    ] = None
+
+
+class CompanyBenefits(BaseModel):
+    grades: Annotated[
+        list[str],
+        Field(
+            description="The client's grades, in order (e.g. Executive, Manager, Senior Manager), for benefits that differ by grade; empty when they do not."
+        ),
+    ]
+    benefits: list[CompanyBenefit]
+    preOffer: list[CompanyPreOfferStep]
+    version: Annotated[int, Field(description="0 before the first save.")]
+    updatedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class CompanyBenefitsInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=0)]
+    grades: Annotated[
+        list[Grade] | None,
+        Field(description="The client's grades, in order (left out keeps none).", max_length=12),
+    ] = None
+    benefits: Annotated[list[CompanyBenefit], Field(max_length=100)]
+    preOffer: Annotated[list[CompanyPreOfferStep], Field(max_length=100)]
 
 
 class Company(BaseModel):

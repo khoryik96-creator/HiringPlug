@@ -111,18 +111,18 @@ LIMIT 5000;
 
 -- A client's benefits and pre-offer process (JSON arrays; see the migration).
 -- name: GetCompanyBenefits :one
-SELECT benefits, pre_offer, version, updated_at FROM company_benefits WHERE company_id = @company_id;
+SELECT benefits, pre_offer, grades, version, updated_at FROM company_benefits WHERE company_id = @company_id;
 
 -- The first save (nothing is saved yet, or someone saved first: no row).
 -- name: InsertCompanyBenefits :one
-INSERT INTO company_benefits (tenant_id, company_id, benefits, pre_offer, updated_by)
-VALUES (app_current_tenant(), @company_id, @benefits, @pre_offer, app_current_user())
+INSERT INTO company_benefits (tenant_id, company_id, benefits, pre_offer, grades, updated_by)
+VALUES (app_current_tenant(), @company_id, @benefits, @pre_offer, @grades, app_current_user())
 ON CONFLICT (tenant_id, company_id) DO NOTHING
 RETURNING version, updated_at;
 
 -- name: UpdateCompanyBenefits :one
 UPDATE company_benefits
-SET benefits = @benefits, pre_offer = @pre_offer, version = version + 1, updated_by = app_current_user(), updated_at = now()
+SET benefits = @benefits, pre_offer = @pre_offer, grades = @grades, version = version + 1, updated_by = app_current_user(), updated_at = now()
 WHERE company_id = @company_id AND version = @expected_version
 RETURNING version, updated_at;
 

@@ -10,9 +10,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const empty = { benefits: [], preOffer: [], version: 0, updatedAt: null };
+const empty = { grades: [], benefits: [], preOffer: [], version: 0, updatedAt: null };
 const saved = {
-  version: 2, updatedAt: "2026-11-09T03:00:00Z",
+  grades: [], version: 2, updatedAt: "2026-11-09T03:00:00Z",
   benefits: [
     { key: "annual_leave", label: "Annual leave", value: "18 days", remarks: "21 after 3 years" },
     { key: "dental_optical", label: "Dental & optical", value: null, remarks: null },
@@ -43,10 +43,11 @@ describe("a client's benefits", () => {
     await waitFor(() => { expect(put).toHaveBeenCalled(); });
     expect(sentBody(put)).toEqual({
       version: 0,
+      grades: [],
       benefits: [
-        { key: "annual_leave", label: "Annual leave", value: "18 days", remarks: null },
-        { key: "dental_optical", label: "Dental & optical", value: null, remarks: null },
-        { key: "fixed_bonus", label: "Fixed bonus", value: null, remarks: "13th month, paid in December" },
+        { key: "annual_leave", label: "Annual leave", value: "18 days", remarks: null, byGrade: [] },
+        { key: "dental_optical", label: "Dental & optical", value: null, remarks: null, byGrade: [] },
+        { key: "fixed_bonus", label: "Fixed bonus", value: null, remarks: "13th month, paid in December", byGrade: [] },
       ],
       preOffer: [
         { key: "reference_check", label: "Reference check", applies: true, remarks: null },
@@ -68,5 +69,43 @@ describe("a client's benefits", () => {
     expect(steps.textContent).toContain("Not knownHealth screening");
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(screen.getByRole("button", { name: "Word" })).toBeTruthy();
+  });
+});
+
+describe("benefits by grade", () => {
+  it("adds the client's grades, gives a value per grade where it differs, and shows each grade's values", async () => {
+    answer(empty);
+    const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(saved));
+    renderWithClient(<CompanyBenefits companyId="comp_1" companyName="Maju Foods" permissions={["companies:read", "companies:update"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fill in" }));
+    const newGrade = screen.getByLabelText("New grade");
+    for (const g of ["Executive", "Manager", "executive"]) { // the same grade twice is kept once
+      fireEvent.change(newGrade, { target: { value: g } });
+      fireEvent.keyDown(newGrade, { key: "Enter" });
+    }
+    expect(within(screen.getByRole("group", { name: "The client's grades" })).getAllByRole("button", { name: /^Remove/ })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Differs by grade" })[0] as HTMLElement); // Annual leave
+    fireEvent.change(screen.getByLabelText("Annual leave: Executive"), { target: { value: "14 days" } });
+    fireEvent.change(screen.getByLabelText("Annual leave: Manager"), { target: { value: "18 days" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => { expect(put).toHaveBeenCalled(); });
+    const body = sentBody(put) as { grades: string[]; benefits: { key: string; value: string | null; byGrade: unknown[] }[] };
+    expect(body.grades).toEqual(["Executive", "Manager"]);
+    expect(body.benefits[0]).toMatchObject({ key: "annual_leave", value: null, byGrade: [{ grade: "Executive", value: "14 days" }, { grade: "Manager", value: "18 days" }] });
+  });
+
+  it("reads per grade: chips on the benefit, and a grade chosen at the top shows only its values", async () => {
+    answer({ ...saved, grades: ["Executive", "Manager"], benefits: [
+      { key: "annual_leave", label: "Annual leave", value: null, remarks: null, byGrade: [{ grade: "Executive", value: "14 days" }, { grade: "Manager", value: "18 days" }] },
+      { key: "medical_leave", label: "Medical leave", value: "14 days", remarks: null, byGrade: [] },
+    ] });
+    renderWithClient(<CompanyBenefits companyId="comp_1" companyName="Maju Foods" permissions={["companies:read"]} />);
+    const leave = (await screen.findByText("Annual leave")).closest("div") as HTMLElement;
+    expect(leave.textContent).toContain("Executive14 days");
+    expect(leave.textContent).toContain("Manager18 days");
+    expect(screen.getByText("Medical leave").closest("div")?.textContent).toContain("14 days · all grades");
+    fireEvent.click(within(screen.getByRole("group", { name: "Grades" })).getByRole("button", { name: "Manager" }));
+    expect(leave.textContent).not.toContain("Executive");
+    expect(leave.textContent).toContain("Manager18 days");
   });
 });

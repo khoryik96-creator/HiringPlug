@@ -50,3 +50,20 @@ export function CopyButton({ text, what }: { text: string; what: string }) {
     </button>
   );
 }
+
+/** The text itself as the button: clicking an email or a number copies it, and it says "Copied" for a moment. */
+export function CopyText({ text, what }: { text: string; what: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => { setCopied(false); }, 1500);
+    return () => { clearTimeout(t); };
+  }, [copied]);
+  return (
+    <button type="button" className="copy-text" title={`Click to copy the ${what}`} aria-label={`${text}: copy ${what}`}
+      onClick={() => { void copyText(text).then((ok) => { if (ok) setCopied(true); }); }}>
+      <span className="copy-value">{text}</span>
+      {copied && <span className="copy-done" role="status">Copied</span>}
+    </button>
+  );
+}

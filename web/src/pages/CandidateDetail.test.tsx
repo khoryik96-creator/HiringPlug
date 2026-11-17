@@ -72,7 +72,7 @@ describe("candidate page", () => {
   it("lists industries and tags in one column, under the specialization", async () => {
     await show(testCandidate(), ["candidates:read"]);
     const profile = screen.getByRole("region", { name: "Profile" });
-    expect([...profile.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Work authorization", "Specialization", "Industries", "IT skills", "Certifications", "Tags"]);
+    expect([...profile.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Work authorization", "Specialization", "Industries", "IT skills", "Certifications", "Tags", "Source"]);
     expect(profile.className, "one column on the candidate's page only (companies and contacts keep theirs)").toContain("one-column");
   });
   it("opens the CV workspace for a search highlight link", async () => {
@@ -142,7 +142,9 @@ describe("candidate page", () => {
     );
     const banner = screen.getByRole("region", { name: "Candidate" });
     expect(within(banner).getByText("Malaysia")).toBeTruthy();
-    expect(within(banner).getByText("Careers page")).toBeTruthy();
+    // The source is under Details now, not on the card (its contact plate has email, phone and LinkedIn).
+    expect(within(banner).queryByText("Careers page")).toBeNull();
+    expect(within(screen.getByRole("region", {name: "Profile"})).getByText("Careers page")).toBeTruthy();
     expect(banner.textContent).toContain("Work authorization: RP-T"); // the column on the right
     expect(within(screen.getByRole("region", {name: "Profile"})).getByRole("button", {name: "Spousal / RP-T"})).toBeTruthy();
   });
@@ -181,5 +183,22 @@ describe("possible duplicates", () => {
     fireEvent.click(screen.getByRole("button", { name: "Merge into this one" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ duplicateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", version: 3 });
+  });
+});
+
+describe("the candidate's card", () => {
+  it("has email, phone and LinkedIn under where they live; clicking the email or number copies it", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    await show(testCandidate({ email: "farah@example.com", phone: "+60123456789", linkedinUrl: "https://www.linkedin.com/in/farah" }), RECRUITER);
+    const plate = within(screen.getByRole("region", { name: "Candidate" })).getByLabelText("Contact");
+    expect([...plate.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Nationality", "Lives in", "Email", "Phone", "LinkedIn"]);
+    fireEvent.click(within(plate).getByRole("button", { name: "farah@example.com: copy email" }));
+    expect(await within(plate).findByText("Copied")).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith("farah@example.com");
+    fireEvent.click(within(plate).getByRole("button", { name: "+60123456789: copy phone number" }));
+    await waitFor(() => { expect(writeText).toHaveBeenLastCalledWith("+60123456789"); });
+    expect(within(plate).getByRole("link", { name: "Profile ↗" }).getAttribute("href")).toBe("https://www.linkedin.com/in/farah");
+    expect(screen.queryByRole("complementary", { name: "Contact summary" }), "no second contact box").toBeNull();
   });
 });

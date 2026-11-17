@@ -6,7 +6,6 @@ import { candidateKey, candidatesKey } from "../api/keys";
 import { Assistant } from "../components/Assistant";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateBanner } from "../components/CandidateBanner";
-import { CopyButton } from "../components/CopyButton";
 import { CandidateTabs, type CandidateTab, type CandidateSection } from "../components/CandidateTabs";
 import { WorkAuthorizationPicker } from "../components/WorkAuthorizationPicker";
 import { hashParam } from "../hashQuery";
@@ -25,6 +24,7 @@ import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
 import { StageMoves } from "../components/StageMoves";
 import { CvBeside, useCvBeside } from "../components/CvBeside";
+import { useFieldSettings } from "../components/useFieldSettings";
 /**
  * One candidate: profile, salary (if permitted) and documents. Render it with
  * key={id}: edit state belongs to one candidate and must not carry over.
@@ -35,6 +35,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   const [active, setActive] = useState<CandidateTab>(hashParam("hl") && permissions.includes("documents:read") ? "cv" : "details");
   const [writing, setWriting] = useState(false);
   const [besideOn, setBeside] = useCvBeside();
+  const fs = useFieldSettings();
   const queryClient = useQueryClient();
   const candidate = useQuery({
     queryKey: candidateKey(id),
@@ -63,7 +64,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
       ) : (
         <section className="panel candidate-profile one-column" aria-label="Profile">
-          {/* Email, phone and LinkedIn are in the Contact box beside the tabs. */}
+          {/* Email, phone and LinkedIn are on the card above (click to copy). */}
           <dl>
             <dt>Work authorization</dt>
             <dd><WorkAuthorizationPicker candidate={c} canEdit={canUpdate} /></dd>
@@ -75,6 +76,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <dt>Certifications</dt><dd><QuickWords candidate={c} canEdit={canUpdate} field="certifications" /></dd>
             <dt>Tags</dt>
             <dd><Chips labels={c.tags} /></dd>
+            <dt>Source</dt>
+            <dd>{c.source ? fs.label("candidate_source", c.source) : "—"}</dd>
           </dl>
         </section>
       )}
@@ -129,12 +132,6 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         {canSeeCv && active !== "cv" && <button type="button" className={beside ? "cv-beside-toggle on" : "cv-beside-toggle"} aria-pressed={beside}
           onClick={() => { setBeside(!beside); }}>CV beside</button>}
         <div className="candidate-main">
-        <aside className="candidate-contact panel" aria-label="Contact summary">
-          <h3>Contact</h3>
-          <dl><dt>Email</dt><dd className="copyable">{c.email ? <><a href={`mailto:${c.email}`} title={c.email}>{c.email}</a><CopyButton text={c.email} what="email" /></> : "—"}</dd>
-          <dt>Phone</dt><dd className="copyable">{c.phone ? <><a href={`tel:${c.phone}`}>{c.phone}</a><CopyButton text={c.phone} what="phone number" /></> : "—"}</dd>
-          <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>LinkedIn profile</a> : "—"}</dd></dl>
-        </aside>
         <CandidateTabs sections={sections} active={active} onChange={setActive} />
         </div>
         {beside && <CvBeside candidateId={c.id} />}

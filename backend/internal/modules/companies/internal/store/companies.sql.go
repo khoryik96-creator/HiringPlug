@@ -265,12 +265,13 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 }
 
 const getCompanyBenefits = `-- name: GetCompanyBenefits :one
-SELECT benefits, pre_offer, version, updated_at FROM company_benefits WHERE company_id = $1
+SELECT benefits, pre_offer, grades, version, updated_at FROM company_benefits WHERE company_id = $1
 `
 
 type GetCompanyBenefitsRow struct {
 	Benefits  []byte
 	PreOffer  []byte
+	Grades    []byte
 	Version   int32
 	UpdatedAt time.Time
 }
@@ -282,6 +283,7 @@ func (q *Queries) GetCompanyBenefits(ctx context.Context, companyID string) (Get
 	err := row.Scan(
 		&i.Benefits,
 		&i.PreOffer,
+		&i.Grades,
 		&i.Version,
 		&i.UpdatedAt,
 	)
@@ -476,8 +478,8 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 }
 
 const insertCompanyBenefits = `-- name: InsertCompanyBenefits :one
-INSERT INTO company_benefits (tenant_id, company_id, benefits, pre_offer, updated_by)
-VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
+INSERT INTO company_benefits (tenant_id, company_id, benefits, pre_offer, grades, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
 ON CONFLICT (tenant_id, company_id) DO NOTHING
 RETURNING version, updated_at
 `
@@ -486,6 +488,7 @@ type InsertCompanyBenefitsParams struct {
 	CompanyID string
 	Benefits  []byte
 	PreOffer  []byte
+	Grades    []byte
 }
 
 type InsertCompanyBenefitsRow struct {
@@ -495,7 +498,12 @@ type InsertCompanyBenefitsRow struct {
 
 // The first save (nothing is saved yet, or someone saved first: no row).
 func (q *Queries) InsertCompanyBenefits(ctx context.Context, arg InsertCompanyBenefitsParams) (InsertCompanyBenefitsRow, error) {
-	row := q.db.QueryRow(ctx, insertCompanyBenefits, arg.CompanyID, arg.Benefits, arg.PreOffer)
+	row := q.db.QueryRow(ctx, insertCompanyBenefits,
+		arg.CompanyID,
+		arg.Benefits,
+		arg.PreOffer,
+		arg.Grades,
+	)
 	var i InsertCompanyBenefitsRow
 	err := row.Scan(&i.Version, &i.UpdatedAt)
 	return i, err
@@ -1120,14 +1128,15 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 
 const updateCompanyBenefits = `-- name: UpdateCompanyBenefits :one
 UPDATE company_benefits
-SET benefits = $1, pre_offer = $2, version = version + 1, updated_by = app_current_user(), updated_at = now()
-WHERE company_id = $3 AND version = $4
+SET benefits = $1, pre_offer = $2, grades = $3, version = version + 1, updated_by = app_current_user(), updated_at = now()
+WHERE company_id = $4 AND version = $5
 RETURNING version, updated_at
 `
 
 type UpdateCompanyBenefitsParams struct {
 	Benefits        []byte
 	PreOffer        []byte
+	Grades          []byte
 	CompanyID       string
 	ExpectedVersion int32
 }
@@ -1141,6 +1150,7 @@ func (q *Queries) UpdateCompanyBenefits(ctx context.Context, arg UpdateCompanyBe
 	row := q.db.QueryRow(ctx, updateCompanyBenefits,
 		arg.Benefits,
 		arg.PreOffer,
+		arg.Grades,
 		arg.CompanyID,
 		arg.ExpectedVersion,
 	)

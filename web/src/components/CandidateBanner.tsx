@@ -8,8 +8,8 @@ import {
   WA_KIND, waColumnLabel, waKind,
 } from "./candidateLook";
 import { cardGradient } from "./companyCategory";
+import { CopyText } from "./CopyButton";
 import { ErrorMessage } from "./ErrorMessage";
-import { useFieldSettings } from "./useFieldSettings";
 
 const SHOWN_SKILLS = 6;
 
@@ -24,7 +24,6 @@ export function CandidateBanner({ candidate: c, canEdit, canEditStatus = canEdit
   /** Opens the salary form (the Salary tab): the salary is not in the profile's form. */
   onSalary?: () => void;
 }) {
-  const fs = useFieldSettings();
   const [expanded, setExpanded] = useState(false);
   const save = useCandidateUpdate(c);
   const status = c.availability ? AVAILABILITY[c.availability] : null;
@@ -50,10 +49,14 @@ export function CandidateBanner({ candidate: c, canEdit, canEditStatus = canEdit
               {status && sinceText(c.availabilitySince) && <span className="banner-since">{sinceText(c.availabilitySince)}</span>}
             </div>
           </div>
-          <dl className="banner-facts">
-            <div><dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd></div>
-            <div><dt>Lives in</dt><dd>{lives || "—"}</dd></div>
-            <div><dt>Source</dt><dd>{c.source ? fs.label("candidate_source", c.source) : "—"}</dd></div>
+          {/* Where they are from, then how to reach them: click an email or number to copy it. */}
+          <dl className="contact-plate" aria-label="Contact">
+            <dt>Nationality</dt><dd>{c.nationality ? regionName(c.nationality) ?? c.nationality : "—"}</dd>
+            <dt>Lives in</dt><dd>{lives || "—"}</dd>
+            <span className="plate-line" aria-hidden="true" />
+            <dt>Email</dt><dd>{c.email ? <CopyText text={c.email} what="email" /> : "—"}</dd>
+            <dt>Phone</dt><dd>{c.phone ? <CopyText text={c.phone} what="phone number" /> : "—"}</dd>
+            <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>Profile ↗</a> : "—"}</dd>
           </dl>
         </div>
 

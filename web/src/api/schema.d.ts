@@ -5005,6 +5005,13 @@ export interface components {
             value: string | null;
             /** @description Remarks or clauses. */
             remarks: string | null;
+            /** @description When it differs by grade: a value for each grade it applies to (grades from the client's list); value is then null. Empty or left out: the same for all grades. */
+            byGrade?: components["schemas"]["CompanyBenefitGrade"][];
+        };
+        CompanyBenefitGrade: {
+            grade: string;
+            /** @description e.g. 18 days. */
+            value: string;
         };
         CompanyPreOfferStep: {
             /** @description The item's key in the pre_offer_process list. */
@@ -5015,6 +5022,8 @@ export interface components {
             remarks: string | null;
         };
         CompanyBenefits: {
+            /** @description The client's grades, in order (e.g. Executive, Manager, Senior Manager), for benefits that differ by grade; empty when they do not. */
+            grades: string[];
             benefits: components["schemas"]["CompanyBenefit"][];
             preOffer: components["schemas"]["CompanyPreOfferStep"][];
             /** @description 0 before the first save. */
@@ -5024,6 +5033,8 @@ export interface components {
         };
         CompanyBenefitsInput: {
             version: number;
+            /** @description The client's grades, in order (left out keeps none). */
+            grades?: string[];
             benefits: components["schemas"]["CompanyBenefit"][];
             preOffer: components["schemas"]["CompanyPreOfferStep"][];
         };

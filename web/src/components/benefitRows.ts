@@ -9,7 +9,7 @@ export type Step = Schemas["CompanyPreOfferStep"];
 type Item = { key: string; label: string };
 export type Row<T> = { item: T; hint: string; retired: boolean };
 
-const said = (x: Benefit | Step) => ("value" in x ? x.value != null : x.applies != null) || x.remarks != null;
+const said = (x: Benefit | Step) => ("value" in x ? x.value != null || (x.byGrade ?? []).length > 0 : x.applies != null) || x.remarks != null;
 
 export function rowsFor<T extends Item>(template: Schemas["FieldList"] | undefined, saved: T[], blank: (i: Item) => T): Row<T>[] {
   const byKey = new Map(saved.map((s) => [s.key, s]));
@@ -28,4 +28,4 @@ export function rowsFor<T extends Item>(template: Schemas["FieldList"] | undefin
 
 export const blankBenefit = (i: Item): Benefit => ({ key: i.key, label: i.label, value: null, remarks: null });
 export const blankStep = (i: Item): Step => ({ key: i.key, label: i.label, applies: null, remarks: null });
-export const filled = (b: Benefit) => b.value != null || b.remarks != null;
+export const filled = (b: Benefit) => b.value != null || b.remarks != null || (b.byGrade ?? []).length > 0;

@@ -7483,6 +7483,18 @@ components:
         label: {type: string, minLength: 1, maxLength: 100}
         value: {type: string, nullable: true, maxLength: 1000, description: "e.g. 18 days, rising to 21 after 3 years."}
         remarks: {type: string, nullable: true, maxLength: 2000, description: Remarks or clauses.}
+        byGrade:
+          type: array
+          maxItems: 12
+          description: "When it differs by grade: a value for each grade it applies to (grades from the client's list); value is then null. Empty or left out: the same for all grades."
+          items: {$ref: '#/components/schemas/CompanyBenefitGrade'}
+    CompanyBenefitGrade:
+      type: object
+      additionalProperties: false
+      required: [grade, value]
+      properties:
+        grade: {type: string, minLength: 1, maxLength: 60}
+        value: {type: string, minLength: 1, maxLength: 1000, description: "e.g. 18 days."}
     CompanyPreOfferStep:
       type: object
       additionalProperties: false
@@ -7494,8 +7506,12 @@ components:
         remarks: {type: string, nullable: true, maxLength: 2000}
     CompanyBenefits:
       type: object
-      required: [benefits, preOffer, version, updatedAt]
+      required: [grades, benefits, preOffer, version, updatedAt]
       properties:
+        grades:
+          type: array
+          items: {type: string}
+          description: "The client's grades, in order (e.g. Executive, Manager, Senior Manager), for benefits that differ by grade; empty when they do not."
         benefits: {type: array, items: {$ref: '#/components/schemas/CompanyBenefit'}}
         preOffer: {type: array, items: {$ref: '#/components/schemas/CompanyPreOfferStep'}}
         version: {type: integer, description: 0 before the first save.}
@@ -7506,6 +7522,11 @@ components:
       required: [version, benefits, preOffer]
       properties:
         version: {type: integer, minimum: 0}
+        grades:
+          type: array
+          maxItems: 12
+          description: The client's grades, in order (left out keeps none).
+          items: {type: string, minLength: 1, maxLength: 60}
         benefits: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/CompanyBenefit'}}
         preOffer: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/CompanyPreOfferStep'}}
     CompanyId:

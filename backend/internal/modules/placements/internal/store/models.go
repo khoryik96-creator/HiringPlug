@@ -379,6 +379,7 @@ type CompanyBenefit struct {
 	Version   int32
 	UpdatedBy string
 	UpdatedAt time.Time
+	Grades    []byte
 }
 
 type CompanyDocument struct {
