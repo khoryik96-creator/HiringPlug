@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -77,6 +78,9 @@ func TestFindHRReadsPageByPageResumesWhereAPageFailedAndKnowsWhoIsAContact(t *te
 	assert.True(t, byName["Farah Aziz"].ContactId.IsNull())
 	assert.False(t, byName["Nurul Huda"].Hidden.IsNull(), "interns are left out")
 
+	var audited int
+	require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT count(*) FROM audit_log WHERE tenant_id = $1 AND entity_id = $2 AND action LIKE 'company.hr_scan_%'`, tenant.ID, bank.Id).Scan(&audited))
+	assert.Equal(t, 5, audited, "the start and each page read or failed, recorded")
 	scan = a.hrScan(http.MethodPost, base+"/joined", token, map[string]any{"url": "https://www.linkedin.com/in/farah", "current": true, "joined": "2023-03"}, http.StatusOK)
 	for _, p := range scan.People {
 		if p.Name == "Farah Aziz" {

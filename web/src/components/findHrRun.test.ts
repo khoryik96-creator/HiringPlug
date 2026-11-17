@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, type Schemas } from "../api/client";
 import * as companion from "../companion";
 import { ok } from "../test-utils";
-import { newRun, runScan, splitName } from "./findHrRun";
+import { matchWords, newRun, runScan, splitName } from "./findHrRun";
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -45,6 +45,15 @@ describe("Find HR's run", () => {
     vi.spyOn(api, "POST").mockResolvedValue(ok(scan({ status: "done", next: null })));
     await runScan(scan({ status: "stopped", next: { query: 0, page: 2 }, error: "LinkedIn did not finish loading." }), newRun(vi.fn()), vi.fn());
     expect(call.mock.calls[0]?.[1]).toMatchObject({ page: 2 });
+  });
+
+  it("matches \"People & Culture\" titles for \"people and culture\", and the other way round", () => {
+    expect(matchWords(["people and culture", "HR"])).toBe("people and culture,people & culture,HR");
+    expect(matchWords(["People & Culture"])).toBe("People & Culture,People and Culture");
+  });
+
+  it("keeps a new contact's names within what a contact holds", () => {
+    expect(splitName(`${"A".repeat(150)} Lee`).firstName).toHaveLength(100);
   });
 
   it("splits a name for a new contact", () => {

@@ -28,6 +28,28 @@ function serve() {
 }
 
 describe("a new contact from LinkedIn", () => {
+  it("without the companion, only guesses the email: no LinkedIn check is started", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ suggestion: null }));
+    const post = vi.spyOn(api, "POST");
+    const call = vi.spyOn(companion, "companionCall");
+    await afterContactAdded({ id: "ct_9", version: 1, email: null, linkedinUrl: "https://www.linkedin.com/in/farah-aziz" } as Contact, false);
+    expect(post).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("opened at a company: takes their role there, and says when LinkedIn has them elsewhere", async () => {
+    const get = serve();
+    get.mockImplementation(((path: string) => Promise.resolve(path === "/v1/settings/fields" ? ok(testFieldSettings())
+      : ok({ id: "comp_1", linkedinUrl: "https://www.linkedin.com/company/other-co/" }))) as never);
+    vi.spyOn(companion, "companionCall").mockResolvedValue({ url: "https://www.linkedin.com/in/farah-aziz", name: "Farah Aziz", roles: [
+      { company_url: page, company_name: "Maju Bank", title: "Head of Talent Acquisition", since: "2023-03" },
+    ] });
+    renderWithClient(<ContactForm contact={null} company={{ id: "comp_1", name: "Other Co" }} onDone={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("LinkedIn profile"), { target: { value: "linkedin.com/in/farah-aziz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fill in from LinkedIn" }));
+    expect(await screen.findByText(/Not at Other Co on LinkedIn now/)).toBeTruthy();
+  });
+
   it("fills in their name and title from the profile, and offers their company, the same LinkedIn page first", async () => {
     serve();
     vi.spyOn(companion, "companionCall").mockResolvedValue({ url: "https://www.linkedin.com/in/farah-aziz", name: "Farah binti Aziz",
@@ -63,7 +85,7 @@ describe("a new contact from LinkedIn", () => {
     vi.spyOn(companion, "companionCall").mockImplementation(((action: string) => Promise.resolve(action === "companyId"
       ? { company_id: "123" }
       : { url: "https://www.linkedin.com/in/farah-aziz", company_url: page, company_id: "123", joined: "2023-03", left: "", current: true })));
-    await afterContactAdded({ id: "ct_9", version: 1, email: null, linkedinUrl: "https://www.linkedin.com/in/farah-aziz" } as Contact);
+    await afterContactAdded({ id: "ct_9", version: 1, email: null, linkedinUrl: "https://www.linkedin.com/in/farah-aziz" } as Contact, true);
     expect(get).toHaveBeenCalledWith("/v1/contacts/{contactId}/email-suggestion", expect.anything());
     expect(sentBody(patch)).toEqual({ version: 1, email: "farah.aziz@majubank.my" });
     expect(sentBody(post, 1)).toEqual({ profileUrl: "https://www.linkedin.com/in/farah-aziz", companyUrl: page, linkedinCompanyId: "123", joined: "2023-03", left: "", current: true });

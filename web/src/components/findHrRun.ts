@@ -14,6 +14,9 @@ const NEEDS_YOU = /sign in|stopped|busy|update|connect|company filter|location f
 
 export interface Run {
   operation: string;
+  /** The latest retry message, and when it started, for a tab shown again while it runs. */
+  note: string;
+  started: number;
   stopped: boolean; // set by stopRun while a read is in progress (read through isStopped)
   /** "Retrying page 2 in 15s (LinkedIn did not finish loading)". */
   onRetry: (message: string) => void;
@@ -21,7 +24,8 @@ export interface Run {
 }
 
 export function newRun(onRetry: (m: string) => void, wait = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); })): Run {
-  return { operation: operationId(), stopped: false, onRetry, wait };
+  const run: Run = { operation: operationId(), note: "", started: Date.now(), stopped: false, onRetry: (m) => { run.note = m; onRetry(m); }, wait };
+  return run;
 }
 
 async function savePage(companyId: string, body: Schemas["HrScanPage"]): Promise<Scan> {
@@ -29,6 +33,17 @@ async function savePage(companyId: string, body: Schemas["HrScanPage"]): Promise
 }
 
 const isStopped = (run: Run) => run.stopped;
+
+/** The titles a person's must contain: each keyword, and its "&" / "and" twin ("People & Culture"). */
+export function matchWords(keywords: string[]): string {
+  const out = new Set<string>();
+  for (const k of keywords) {
+    out.add(k);
+    if (/\s&\s/.test(k)) out.add(k.replace(/\s&\s/g, " and "));
+    if (/\sand\s/i.test(k)) out.add(k.replace(/\sand\s/gi, " & "));
+  }
+  return [...out].join(",");
+}
 
 /** Reads the scan's pages from where it is (a stopped scan resumes at its failed page), calling onScan after each. */
 export async function runScan(scan: Scan, run: Run, onScan: (s: Scan) => void): Promise<Scan> {
@@ -42,7 +57,7 @@ export async function runScan(scan: Scan, run: Run, onScan: (s: Scan) => void): 
         read = await companionCall<Page>("peoplePage", {
           operation_id: run.operation, company_id: s.linkedinCompanyId, company_name: s.linkedinCompanyName,
           ...(s.geoId && s.countryName ? { geo_id: s.geoId, country: s.countryName } : {}),
-          query: s.queries[query], keywords: s.keywords.join(","), page,
+          query: s.queries[query], keywords: matchWords(s.keywords), page,
         }, 90_000);
         break;
       } catch (e) {
@@ -72,6 +87,10 @@ export function stopRun(run: Run) {
 /** "Farah binti Aziz" -> first "Farah binti", last "Aziz" (one word: first only). */
 export function splitName(full: string): { firstName: string; lastName: string } {
   const words = full.trim().split(/\s+/);
-  if (words.length < 2) return { firstName: words[0] ?? "", lastName: "" };
-  return { firstName: words.slice(0, -1).join(" "), lastName: words.at(-1) ?? "" };
+  // A contact's names hold 100 characters each.
+  if (words.length < 2) return { firstName: (words[0] ?? "").slice(0, 100), lastName: "" };
+  return { firstName: words.slice(0, -1).join(" ").slice(0, 100), lastName: (words.at(-1) ?? "").slice(0, 100) };
 }
+
+/** Runs going on, by company: a run goes on while its tab is not shown (and shows again when it is). */
+export const activeRuns = new Map<string, Run>();

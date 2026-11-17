@@ -74,6 +74,16 @@ describe("Find HR", () => {
     expect((patch.mock.calls[0]?.[1] as unknown as { body: unknown }).body).toEqual({ version: 1, email: "daniel.lee@majubank.my" });
   });
 
+  it("a scan goes on while another tab is shown, and is picked up again", async () => {
+    serve();
+    const { activeRuns, newRun } = await import("./findHrRun");
+    const run = newRun(vi.fn());
+    activeRuns.set("comp_1", run);
+    renderWithClient(<FindHR company={company} canCreate />);
+    expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
+    activeRuns.delete("comp_1");
+  });
+
   it("asks for the company's LinkedIn page first", () => {
     serve();
     renderWithClient(<FindHR company={{ ...company, linkedinUrl: null }} canCreate />);
