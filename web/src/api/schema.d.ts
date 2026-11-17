@@ -4427,6 +4427,12 @@ export interface components {
         BinPurgeJob: {
             entryId: components["schemas"]["BinEntryId"];
         };
+        WorkAuthorizationSuggestion: {
+            status: components["schemas"]["WorkAuthorizationStatus"];
+            basis: components["schemas"]["WorkAuthorizationBasis"] | null;
+            /** @description Why, from the CV ("Nationality: Malaysia", "The CV mentions an RP-T"). */
+            reason: string;
+        };
         OwnerInput: {
             /** @description A user of the company, or null for nobody. */
             ownerId: components["schemas"]["UserId"] | null;
@@ -4552,6 +4558,8 @@ export interface components {
              * @description When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.
              */
             availabilitySince: string | null;
+            /** @description Suggested from their CV while no work authorization is set (shown striped until confirmed); null otherwise. */
+            workAuthorizationSuggestion?: components["schemas"]["WorkAuthorizationSuggestion"] | null;
             workAuthorization: components["schemas"]["WorkAuthorization"] | null;
             noticePeriod: components["schemas"]["NoticePeriod"] | null;
             industry: string | null;

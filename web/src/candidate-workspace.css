@@ -88,3 +88,11 @@
   .candidate-actions { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding-bottom: 2px; }
   .candidate-actions > * { flex: none; min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.88rem; }
 }
+
+/* A work authorization suggested from the CV: diagonal stripes of its colour, not a solid fill, until confirmed. */
+.work-authorization-options button.wa-suggested, .wa-suggested-chip {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--wa) 26%, transparent) 0 5px, color-mix(in srgb, var(--wa) 8%, transparent) 5px 10px);
+  color: var(--wa); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wa) 55%, transparent); font-weight: 650;
+}
+.wa-suggested-chip { display: inline-block; border-radius: 6px; padding: 2px 8px; font-size: 12px; }
+.wa-suggestion-note { margin: 4px 0 0; font-size: 11px; }

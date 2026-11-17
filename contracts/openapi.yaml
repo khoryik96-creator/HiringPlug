@@ -6646,6 +6646,15 @@ components:
       required: [entryId]
       properties:
         entryId: {$ref: '#/components/schemas/BinEntryId'}
+    WorkAuthorizationSuggestion:
+      type: object
+      required: [status, basis, reason]
+      properties:
+        status: {$ref: '#/components/schemas/WorkAuthorizationStatus'}
+        basis:
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/WorkAuthorizationBasis'}]
+        reason: {type: string, description: "Why, from the CV (\"Nationality: Malaysia\", \"The CV mentions an RP-T\")."}
     OwnerInput:
       type: object
       additionalProperties: false
@@ -6868,6 +6877,10 @@ components:
           format: date-time
           nullable: true
           description: "When the status was last set (the page shows \"Not looking since 3 Nov, 5 days\"); null without a status."
+        workAuthorizationSuggestion:
+          description: "Suggested from their CV while no work authorization is set (shown striped until confirmed); null otherwise."
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/WorkAuthorizationSuggestion'}]
         workAuthorization:
           allOf: [{$ref: '#/components/schemas/WorkAuthorization'}]
           nullable: true

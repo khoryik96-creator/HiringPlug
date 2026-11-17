@@ -834,6 +834,27 @@ lead's company (with the built-in email check).
   dragged by its handle (or moved with the arrow keys) into each person's
   own order, kept with their settings (`dashboardBlocks`); "Reset order"
   restores the default.
+- **Work authorization suggested from the CV** ✅: once a CV is read, its
+  nationality (the agency's own country: Local; another: Needs pass) and the
+  passes it mentions (RP-T, a spouse or dependant pass, permanent residency)
+  suggest a work authorization while none is set. The card shows it in
+  diagonal stripes of its colour, with why; a click confirms it. It is never
+  set on its own.
+- **Screening call** (changes): the call is today's, by whoever records it
+  (no date or caller to change); industries are not asked (they come from
+  the CV and the Details section); work authorization is one row of choices
+  (Local, PR, RP-T, Spouse visa, Other pass, Needs pass, Not known), also on
+  the profile form.
+- **Job details** show the latest uploaded job description as it is (a PDF
+  or picture in a preview, a Word file as the text read from it), else the
+  description pasted.
+- **Candidate filters** keep the boolean tips; booleans are typed in the
+  search box above the list.
+- **Who changes a status, role or category**: changing a candidate's status,
+  a contact's role or a company's category needs its own permission
+  (candidates.status:update, contacts.role:update, companies.category:update;
+  owners, admins and recruiters to start with), set in Settings › Roles and
+  access; the card hides the control without it.
 - **A new contact from LinkedIn** ✅: on the Add contact form, their
   LinkedIn profile and "Fill in from LinkedIn" (the companion, 1.3) fill in
   their name and job title from the profile and say where LinkedIn shows them

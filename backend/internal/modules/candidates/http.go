@@ -226,6 +226,13 @@ func candidateToAPI(v View) api.Candidate {
 			Note:   orNull(wa.Note),
 		})
 	}
+	if ws := v.WorkAuthSuggestion; ws != nil && p.WorkAuthorization == nil {
+		out.WorkAuthorizationSuggestion = nullable.NewNullableWithValue(api.WorkAuthorizationSuggestion{
+			Status: api.WorkAuthorizationStatus(ws.Status), Basis: orNull(convertPtr[api.WorkAuthorizationBasis](ws.Basis)), Reason: ws.Reason,
+		})
+	} else {
+		out.WorkAuthorizationSuggestion = nullable.NewNullNullable[api.WorkAuthorizationSuggestion]()
+	}
 	if np := p.NoticePeriod; np != nil {
 		out.NoticePeriod = nullable.NewNullableWithValue(api.NoticePeriod{Value: np.Value, Unit: api.NoticePeriodUnit(np.Unit)})
 	}

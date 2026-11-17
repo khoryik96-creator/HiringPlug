@@ -71,8 +71,10 @@ type Candidate struct {
 	OwnerID *string // the recruiter they belong to; nil for none
 	// AvailabilitySince is when the status (Profile.Availability) was last set.
 	AvailabilitySince *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	// WorkAuthSuggestion was read from their CV (shown while none is set).
+	WorkAuthSuggestion *WorkAuthSuggestion
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // View is a candidate as one particular user may see it.

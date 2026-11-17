@@ -475,3 +475,7 @@ DELETE FROM candidate WHERE id = @id AND binned_at IS NOT NULL;
 
 -- name: CandidateLabel :one
 SELECT btrim(first_name || ' ' || last_name)::text AS label FROM candidate WHERE id = @id;
+
+-- A work authorization suggested from their CV, kept only while none is set.
+-- name: SetWorkAuthSuggestion :exec
+UPDATE candidate SET wa_suggestion = sqlc.narg(suggestion)::jsonb WHERE id = @id AND work_authorization IS NULL;

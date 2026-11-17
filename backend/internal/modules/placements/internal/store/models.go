@@ -283,6 +283,7 @@ type Candidate struct {
 	Certifications         []string
 	ProfileTerms           interface{}
 	BinnedAt               *time.Time
+	WaSuggestion           []byte
 }
 
 type CandidateCompensation struct {

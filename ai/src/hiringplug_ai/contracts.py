@@ -4958,6 +4958,14 @@ class BinInput(BaseModel):
     ] = None
 
 
+class WorkAuthorizationSuggestion(BaseModel):
+    status: WorkAuthorizationStatus
+    basis: Annotated[WorkAuthorizationBasis | None, Field(...)]
+    reason: Annotated[
+        str, Field(description='Why, from the CV ("Nationality: Malaysia", "The CV mentions an RP-T").')
+    ]
+
+
 class Candidate(BaseModel):
     ownerId: Annotated[
         UserId | None,
@@ -4997,6 +5005,12 @@ class Candidate(BaseModel):
             description='When the status was last set (the page shows "Not looking since 3 Nov, 5 days"); null without a status.'
         ),
     ]
+    workAuthorizationSuggestion: Annotated[
+        WorkAuthorizationSuggestion | None,
+        Field(
+            description="Suggested from their CV while no work authorization is set (shown striped until confirmed); null otherwise."
+        ),
+    ] = None
     workAuthorization: Annotated[WorkAuthorization | None, Field(...)]
     noticePeriod: Annotated[NoticePeriod | None, Field(...)]
     industry: Annotated[str | None, Field(...)]

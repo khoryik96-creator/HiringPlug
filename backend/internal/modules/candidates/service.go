@@ -383,7 +383,7 @@ func fromRow(r store.Candidate) Candidate {
 	if r.NoticePeriodValue != nil && r.NoticePeriodUnit != nil {
 		p.NoticePeriod = &NoticePeriod{Value: int(*r.NoticePeriodValue), Unit: *r.NoticePeriodUnit}
 	}
-	return Candidate{ID: r.ID, Version: int(r.Version), Profile: p, OwnerID: r.OwnerID, AvailabilitySince: r.AvailabilitySince,
+	return Candidate{ID: r.ID, Version: int(r.Version), Profile: p, OwnerID: r.OwnerID, AvailabilitySince: r.AvailabilitySince, WorkAuthSuggestion: suggestionOf(r.WaSuggestion),
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt}
 }
 
