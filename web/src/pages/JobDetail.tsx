@@ -9,6 +9,7 @@ import { Timeline } from "../components/Timeline";
 import { JobAds } from "../components/JobAds";
 import { MarketMap } from "../components/MarketMap";
 import { JdFiles } from "../components/JdFiles";
+import { JobDescriptionView } from "../components/JobDescriptionView";
 import { JobForm } from "../components/JobForm";
 import { JobRetainer } from "../components/JobRetainer";
 import { JobStatusSelect } from "../components/JobStatusSelect";
@@ -47,7 +48,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
     { id: "details", label: "Job details", content: (
       <section className="panel" aria-label="Job details">
         <p>{facts}</p>
-        <p className="pre job-description">{j.description ?? <span className="muted">No description yet.</span>}</p>
+        <JobDescriptionView jobId={j.id} pasted={j.description} />
         <JdFiles jobId={j.id} permissions={permissions} />
       </section>
     ) },

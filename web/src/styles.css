@@ -1226,3 +1226,8 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .wa-console button i { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--wa); }
 .wa-console button:hover { border-color: var(--wa); }
 .wa-console button.on { border-color: var(--wa); background: color-mix(in srgb, var(--wa) 12%, var(--surface)); color: var(--wa); }
+
+/* Job details: the uploaded job description, shown like a CV */
+.jd-preview { display: grid; gap: 0.4rem; }
+.jd-preview-body { width: 100%; height: min(70vh, 52rem); border: 1px solid var(--line); border-radius: 10px; background: #525659; object-fit: contain; }
+.job-description.cv-like { padding: 1rem 1.2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-height: 70vh; overflow: auto; }
