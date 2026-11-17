@@ -224,3 +224,24 @@ RETURNING contact_id;
 
 -- name: CountMailboxesChecking :one
 SELECT count(*)::int FROM contact_mailbox_check WHERE status = 'checking';
+
+-- The Bin (bin module): binned contacts are hidden by the database; these run with app.show_binned on.
+-- name: BinContacts :many
+UPDATE contact SET binned_at = now() WHERE id = ANY(@ids::text[]) AND binned_at IS NULL
+RETURNING id, btrim(first_name || ' ' || last_name)::text AS label;
+
+-- name: RestoreContacts :execrows
+UPDATE contact SET binned_at = NULL WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL;
+
+-- name: PurgeContacts :execrows
+DELETE FROM contact WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL;
+
+-- name: ContactIDsOfCompany :many
+SELECT id FROM contact WHERE company_id = @company_id AND binned_at IS NULL ORDER BY id;
+
+-- name: MoveContactsToCompany :execrows
+UPDATE contact SET company_id = @to_id, version = version + 1, updated_at = now()
+WHERE company_id = @from_id AND binned_at IS NULL;
+
+-- name: ContactLabel :one
+SELECT btrim(first_name || ' ' || last_name)::text AS label FROM contact WHERE id = @id;

@@ -458,3 +458,20 @@ ORDER BY
   c.id DESC
 LIMIT @row_limit OFFSET @row_offset;
 
+
+-- The Bin (bin module): a binned candidate is hidden by the database; these run with app.show_binned on.
+-- name: BinCandidate :one
+UPDATE candidate SET binned_at = now() WHERE id = @id AND binned_at IS NULL
+RETURNING btrim(first_name || ' ' || last_name)::text AS label;
+
+-- name: RestoreCandidate :execrows
+UPDATE candidate SET binned_at = NULL WHERE id = @id AND binned_at IS NOT NULL;
+
+-- name: BinnedCandidates :many
+SELECT id FROM candidate WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL;
+
+-- name: PurgeCandidate :execrows
+DELETE FROM candidate WHERE id = @id AND binned_at IS NOT NULL;
+
+-- name: CandidateLabel :one
+SELECT btrim(first_name || ' ' || last_name)::text AS label FROM candidate WHERE id = @id;

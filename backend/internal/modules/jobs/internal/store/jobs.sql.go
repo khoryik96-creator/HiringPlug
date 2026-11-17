@@ -12,6 +12,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const binJobs = `-- name: BinJobs :exec
+UPDATE job_order SET binned_at = now() WHERE id = ANY($1::text[]) AND binned_at IS NULL
+`
+
+// The Bin (bin module): a company's jobs go to the Bin with it, or move to another company.
+func (q *Queries) BinJobs(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, binJobs, ids)
+	return err
+}
+
+const binnedJobs = `-- name: BinnedJobs :many
+SELECT id FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
+`
+
+func (q *Queries) BinnedJobs(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, binnedJobs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const blindRewriteTokensSince = `-- name: BlindRewriteTokensSince :one
 SELECT coalesce(sum(tokens), 0)::bigint FROM job_ad_blind_rewrite WHERE created_at >= $1
 `
@@ -21,6 +55,16 @@ func (q *Queries) BlindRewriteTokensSince(ctx context.Context, since time.Time) 
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const clearJobContacts = `-- name: ClearJobContacts :exec
+UPDATE job_order SET contact_id = NULL WHERE contact_id = ANY($1::text[])
+`
+
+// A contact deleted for good leaves the jobs it was the contact of.
+func (q *Queries) ClearJobContacts(ctx context.Context, contactIds []string) error {
+	_, err := q.db.Exec(ctx, clearJobContacts, contactIds)
+	return err
 }
 
 const closeJobAds = `-- name: CloseJobAds :execrows
@@ -234,7 +278,7 @@ func (q *Queries) GetJobAd(ctx context.Context, id string) (JobAd, error) {
 }
 
 const getJobOrder = `-- name: GetJobOrder :one
-SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date FROM job_order WHERE id = $1
+SELECT id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date, binned_at FROM job_order WHERE id = $1
 `
 
 func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) {
@@ -260,6 +304,7 @@ func (q *Queries) GetJobOrder(ctx context.Context, id string) (JobOrder, error) 
 		&i.OwnerID,
 		&i.Country,
 		&i.IntakeDate,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -510,7 +555,7 @@ INSERT INTO job_order (
   app_current_tenant(), $1, $2, $3, $4, $5, $6,
   $7, $8, $9, $10, $11, $12, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date, binned_at
 `
 
 type InsertJobOrderParams struct {
@@ -567,6 +612,7 @@ func (q *Queries) InsertJobOrder(ctx context.Context, arg InsertJobOrderParams) 
 		&i.OwnerID,
 		&i.Country,
 		&i.IntakeDate,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -980,6 +1026,24 @@ func (q *Queries) ListPublishedAds(ctx context.Context, today pgtype.Date) ([]Jo
 	return items, nil
 }
 
+const moveJobsToCompany = `-- name: MoveJobsToCompany :execrows
+UPDATE job_order SET company_id = $1, version = version + 1, updated_at = now()
+WHERE company_id = $2 AND binned_at IS NULL
+`
+
+type MoveJobsToCompanyParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveJobsToCompany(ctx context.Context, arg MoveJobsToCompanyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveJobsToCompany, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const newJdFileID = `-- name: NewJdFileID :one
 SELECT new_id('jdf')::text
 `
@@ -1025,6 +1089,42 @@ func (q *Queries) OpenJobOrders(ctx context.Context, rowLimit int32) ([]OpenJobO
 		return nil, err
 	}
 	return items, nil
+}
+
+const purgeJobs = `-- name: PurgeJobs :many
+WITH files AS (DELETE FROM job_description_file
+               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL) RETURNING storage_key),
+     gone AS (DELETE FROM job_order WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL RETURNING id)
+SELECT storage_key FROM files
+`
+
+func (q *Queries) PurgeJobs(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, purgeJobs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var storage_key string
+		if err := rows.Scan(&storage_key); err != nil {
+			return nil, err
+		}
+		items = append(items, storage_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const restoreJobs = `-- name: RestoreJobs :exec
+UPDATE job_order SET binned_at = NULL WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
+`
+
+func (q *Queries) RestoreJobs(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, restoreJobs, ids)
+	return err
 }
 
 const saveJdRead = `-- name: SaveJdRead :execrows
@@ -1241,7 +1341,7 @@ UPDATE job_order SET
   version = version + 1,
   updated_at = now()
 WHERE id = $12 AND version = $13
-RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date
+RETURNING id, tenant_id, version, company_id, contact_id, title, status, location, work_type, work_arrangement, openings, description, search_text, created_by, created_at, updated_at, owner_id, country, intake_date, binned_at
 `
 
 type UpdateJobOrderParams struct {
@@ -1298,6 +1398,7 @@ func (q *Queries) UpdateJobOrder(ctx context.Context, arg UpdateJobOrderParams) 
 		&i.OwnerID,
 		&i.Country,
 		&i.IntakeDate,
+		&i.BinnedAt,
 	)
 	return i, err
 }

@@ -21,6 +21,21 @@ func (q *Queries) DeleteNote(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const deleteSubjectNotes = `-- name: DeleteSubjectNotes :exec
+DELETE FROM note WHERE subject_type = $1 AND subject_id = ANY($2::text[])
+`
+
+type DeleteSubjectNotesParams struct {
+	SubjectType string
+	SubjectIds  []string
+}
+
+// A record deleted for good (the Bin) takes its notes with it.
+func (q *Queries) DeleteSubjectNotes(ctx context.Context, arg DeleteSubjectNotesParams) error {
+	_, err := q.db.Exec(ctx, deleteSubjectNotes, arg.SubjectType, arg.SubjectIds)
+	return err
+}
+
 const getNote = `-- name: GetNote :one
 SELECT id, tenant_id, subject_type, subject_id, kind, body, sensitive, author_id, author_name, created_at FROM note WHERE id = $1
 `

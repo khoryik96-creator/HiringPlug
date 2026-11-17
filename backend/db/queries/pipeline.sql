@@ -120,3 +120,14 @@ SELECT
   (SELECT count(DISTINCT application_id) FROM application_stage_change
     WHERE from_stage IS NOT NULL AND changed_at > now() - interval '14 days' AND changed_at <= now() - interval '7 days')::integer AS moved_last_week,
   (SELECT count(*) FROM application WHERE created_at > now() - interval '7 days')::integer AS added_this_week;
+
+-- The Bin: applications of binned candidates or jobs are hidden with them.
+-- name: ApplicationsOf :many
+SELECT id, candidate_id, job_order_id FROM application
+WHERE candidate_id = ANY(@candidate_ids::text[]) OR job_order_id = ANY(@job_ids::text[]);
+
+-- name: SetApplicationsBinned :exec
+UPDATE application SET binned = @binned WHERE id = ANY(@ids::text[]);
+
+-- name: PurgeApplications :exec
+DELETE FROM application WHERE id = ANY(@ids::text[]) AND binned;

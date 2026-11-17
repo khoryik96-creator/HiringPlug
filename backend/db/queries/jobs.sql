@@ -216,3 +216,27 @@ RETURNING *;
 -- A company's jobs, open or closed (its billing adds up their placements).
 -- name: JobOrderIDsOfCompany :many
 SELECT id FROM job_order WHERE company_id = @company_id;
+
+-- The Bin (bin module): a company's jobs go to the Bin with it, or move to another company.
+-- name: BinJobs :exec
+UPDATE job_order SET binned_at = now() WHERE id = ANY(@ids::text[]) AND binned_at IS NULL;
+
+-- name: RestoreJobs :exec
+UPDATE job_order SET binned_at = NULL WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL;
+
+-- name: BinnedJobs :many
+SELECT id FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL;
+
+-- name: MoveJobsToCompany :execrows
+UPDATE job_order SET company_id = @to_id, version = version + 1, updated_at = now()
+WHERE company_id = @from_id AND binned_at IS NULL;
+
+-- A contact deleted for good leaves the jobs it was the contact of.
+-- name: ClearJobContacts :exec
+UPDATE job_order SET contact_id = NULL WHERE contact_id = ANY(@contact_ids::text[]);
+
+-- name: PurgeJobs :many
+WITH files AS (DELETE FROM job_description_file
+               WHERE job_id IN (SELECT id FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL) RETURNING storage_key),
+     gone AS (DELETE FROM job_order WHERE id = ANY(@ids::text[]) AND binned_at IS NOT NULL RETURNING id)
+SELECT storage_key FROM files;

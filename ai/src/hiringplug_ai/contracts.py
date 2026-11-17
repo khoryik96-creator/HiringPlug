@@ -25,6 +25,7 @@ class Permission(StrEnum):
     automations_approve = "automations:approve"
     automations_manage = "automations:manage"
     automations_read = "automations:read"
+    bin_manage = "bin:manage"
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
     candidates_create = "candidates:create"
@@ -102,6 +103,8 @@ class ErrorCode(StrEnum):
     ASSISTANT_LIMIT_REACHED = "ASSISTANT_LIMIT_REACHED"
     ASSISTANT_OFF = "ASSISTANT_OFF"
     AUTOMATION_NOT_ALLOWED = "AUTOMATION_NOT_ALLOWED"
+    BIN_BLOCKED = "BIN_BLOCKED"
+    BIN_RESTORE_CONFLICT = "BIN_RESTORE_CONFLICT"
     BOOKING_CLOSED = "BOOKING_CLOSED"
     BOOKING_SLOT_TAKEN = "BOOKING_SLOT_TAKEN"
     BOOKING_TOO_MANY_TRIES = "BOOKING_TOO_MANY_TRIES"
@@ -162,6 +165,7 @@ class JobKind(StrEnum):
     assistant_emailed = "assistant.emailed"
     automation_event = "automation.event"
     automation_run = "automation.run"
+    bin_purge = "bin.purge"
     company_autofill = "company.autofill"
     company_industried = "company.industried"
     company_industry = "company.industry"
@@ -685,6 +689,47 @@ class AutomationRunJob(BaseModel):
         AwareDatetime,
         Field(description="When it was scheduled for (a run moved since then leaves this job behind)."),
     ]
+
+
+class BinEntryId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^bin_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class BinKind(StrEnum):
+    candidate = "candidate"
+    contact = "contact"
+    company = "company"
+
+
+class BinCheck(BaseModel):
+    label: Annotated[str, Field(description="The record's name.")]
+    contacts: Annotated[int, Field(description="A company's contacts (they go with it, or move).")]
+    jobs: Annotated[int, Field(description="A company's jobs (they go with it, or move).")]
+    applications: Annotated[int, Field(description="Pipeline entries hidden with it.")]
+    blocked: Annotated[str | None, Field(description="Why it cannot be binned (a placement), or null.")]
+
+
+class BinEntry(BaseModel):
+    id: BinEntryId
+    kind: BinKind
+    recordId: str
+    label: str
+    contacts: Annotated[int, Field(description="Contacts that went with it (a company).")]
+    jobs: Annotated[int, Field(description="Jobs that went with it (a company).")]
+    binnedByName: str
+    binnedAt: AwareDatetime
+    purgeAfter: Annotated[AwareDatetime, Field(description="When it is deleted for good.")]
+
+
+class BinList(BaseModel):
+    items: list[BinEntry]
+
+
+class BinPurgeJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    entryId: BinEntryId
 
 
 class OwnerInput(BaseModel):
@@ -4823,6 +4868,20 @@ class AutomationInput(BaseModel):
 class AutomationList(BaseModel):
     items: list[Automation]
     settings: AutomationSettings
+
+
+class BinInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: BinKind
+    id: Annotated[str, Field(max_length=40)]
+    moveTo: Annotated[
+        CompanyId | None,
+        Field(
+            description="A company only: the company its contacts and jobs move to (they stay out of the Bin)."
+        ),
+    ] = None
 
 
 class Candidate(BaseModel):

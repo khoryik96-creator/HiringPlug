@@ -1,0 +1,167 @@
+# Module contract: bin. See contracts/README.md for the format.
+x-module:
+  name: bin
+  description: >
+    The Bin: candidates, contacts and companies an admin deleted. A binned
+    record disappears from every list, search and count at once (the database
+    hides it), waits 30 days in the Bin, where an admin can restore it, and is
+    then deleted for good with what belongs to it. A company's contacts and
+    jobs go with it, unless they are moved to another company first. A record
+    with a placement is never binned (placements and invoices are money
+    records). Binning, restoring and the final deletion are each recorded in
+    the audit log.
+  permissions:
+    bin:manage:
+      description: Delete candidates, contacts and companies (to the Bin), see the Bin and restore from it.
+      roles: [owner, admin]
+  errorCodes:
+    BIN_BLOCKED:
+      status: 409
+      description: The record cannot be binned (it has a placement); the message says why.
+    BIN_RESTORE_CONFLICT:
+      status: 409
+      description: Another record now has this one's email or name; the message says which. Change one of them, then restore.
+  jobs:
+    bin.purge:
+      queue: core
+      payload: BinPurgeJob
+      priority: low
+      description: Delete a binned record for good once its 30 days in the Bin are over (nothing happens if it was restored).
+
+paths:
+  /v1/bin:
+    get:
+      operationId: listBin
+      tags: ["bin"]
+      summary: What is in the Bin, the latest first
+      x-permission: bin:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BinList' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: binRecord
+      tags: ["bin"]
+      summary: Delete a candidate, contact or company (to the Bin)
+      description: >
+        A company's contacts and jobs are moved to moveTo (another company)
+        when it is given, and otherwise go to the Bin with it.
+      x-permission: bin:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BinInput' }
+      responses:
+        '201':
+          description: Binned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BinEntry' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BinBlocked' }
+  /v1/bin/check:
+    get:
+      operationId: checkBinRecord
+      tags: ["bin"]
+      summary: What deleting a record would take with it, and whether it can be deleted
+      x-permission: bin:manage
+      parameters:
+        - { name: kind, in: query, required: true, schema: { $ref: '#/components/schemas/BinKind' } }
+        - { name: id, in: query, required: true, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BinCheck' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/bin/{entryId}/restore:
+    parameters:
+      - { name: entryId, in: path, required: true, schema: { $ref: '#/components/schemas/BinEntryId' } }
+    post:
+      operationId: restoreBinEntry
+      tags: ["bin"]
+      summary: Restore a record from the Bin, with what went with it
+      x-permission: bin:manage
+      responses:
+        '204': { description: Restored }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BinRestoreConflict' }
+
+components:
+  responses:
+    BinBlocked:
+      description: Cannot be binned (BIN_BLOCKED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BinRestoreConflict:
+      description: Another record has its email or name now (BIN_RESTORE_CONFLICT).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    BinEntryId:
+      type: string
+      pattern: '^bin_[0-9a-hjkmnp-tv-z]{26}$'
+    BinKind:
+      type: string
+      enum: [candidate, contact, company]
+    BinInput:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: { $ref: '#/components/schemas/BinKind' }
+        id: { type: string, maxLength: 40 }
+        moveTo:
+          description: "A company only: the company its contacts and jobs move to (they stay out of the Bin)."
+          allOf: [{ $ref: '#/components/schemas/CompanyId' }]
+    BinCheck:
+      type: object
+      required: [label, contacts, jobs, applications, blocked]
+      properties:
+        label: { type: string, description: The record's name. }
+        contacts: { type: integer, description: "A company's contacts (they go with it, or move)." }
+        jobs: { type: integer, description: "A company's jobs (they go with it, or move)." }
+        applications: { type: integer, description: Pipeline entries hidden with it. }
+        blocked: { type: string, nullable: true, description: "Why it cannot be binned (a placement), or null." }
+    BinEntry:
+      type: object
+      required: [id, kind, recordId, label, contacts, jobs, binnedByName, binnedAt, purgeAfter]
+      properties:
+        id: { $ref: '#/components/schemas/BinEntryId' }
+        kind: { $ref: '#/components/schemas/BinKind' }
+        recordId: { type: string }
+        label: { type: string }
+        contacts: { type: integer, description: Contacts that went with it (a company). }
+        jobs: { type: integer, description: Jobs that went with it (a company). }
+        binnedByName: { type: string }
+        binnedAt: { type: string, format: date-time }
+        purgeAfter: { type: string, format: date-time, description: When it is deleted for good. }
+    BinList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BinEntry' }
+    BinPurgeJob:
+      type: object
+      additionalProperties: false
+      required: [entryId]
+      properties:
+        entryId: { $ref: '#/components/schemas/BinEntryId' }

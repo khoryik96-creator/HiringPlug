@@ -207,3 +207,19 @@ SELECT coalesce(sum(input_tokens + output_tokens), 0)::bigint FROM company_indus
 
 -- name: SetIndustryPickSince :exec
 UPDATE company SET industry_pick_since = sqlc.narg(since) WHERE id = @id;
+
+-- The Bin (bin module): a binned company is hidden by the database; these run with app.show_binned on.
+-- name: BinCompany :one
+UPDATE company SET binned_at = now() WHERE id = @id AND binned_at IS NULL RETURNING name;
+
+-- name: RestoreCompany :execrows
+UPDATE company SET binned_at = NULL WHERE id = @id AND binned_at IS NOT NULL;
+
+-- name: PurgeCompany :many
+WITH docs AS (DELETE FROM company_document WHERE company_id = @id
+               AND EXISTS (SELECT 1 FROM company WHERE id = @id AND binned_at IS NOT NULL) RETURNING storage_key),
+     gone AS (DELETE FROM company WHERE id = @id AND binned_at IS NOT NULL RETURNING id)
+SELECT storage_key FROM docs WHERE EXISTS (SELECT 1 FROM gone);
+
+-- name: CompanyLabel :one
+SELECT name FROM company WHERE id = @id;

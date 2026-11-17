@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { DeleteRecord } from "../components/DeleteRecord";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { contactKey, contactsKey } from "../api/keys";
@@ -120,6 +121,7 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
             )}
             {canEmail && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
             {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit contact</button>}
+            {permissions.includes("bin:manage") && <DeleteRecord kind="contact" id={c.id} />}
           </span>
         </div>
       )}

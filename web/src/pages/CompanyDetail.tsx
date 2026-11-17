@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { DeleteRecord } from "../components/DeleteRecord";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { IndustrySummary } from "../components/IndustryPicker";
@@ -74,8 +75,13 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
           <p className="muted">Showing the version loaded earlier.</p>
         </ErrorMessage>
       )}
-      {canEdit && !editing && (
-        <div className="row spread"><span /><button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit company</button></div>
+      {(canEdit || permissions.includes("bin:manage")) && !editing && (
+        <div className="row spread"><span />
+          <span className="row">
+            {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit company</button>}
+            {permissions.includes("bin:manage") && <DeleteRecord kind="company" id={c.id} />}
+          </span>
+        </div>
       )}
       {/* While the edit form is open the card is read-only: a change there would make the form's save stale. */}
       <CompanyBanner company={c} canEdit={canEdit && !editing} permissions={permissions} />

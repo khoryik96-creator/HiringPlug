@@ -21,6 +21,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/aiproviders"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
@@ -80,6 +81,7 @@ type Modules struct {
 	Industries   *industries.Module
 	Automations  *automations.Module
 	Folders      *folders.Module
+	Bin          *bin.Module
 	// scaffold:fields
 }
 
@@ -188,6 +190,7 @@ func NewModules(d Deps) *Modules {
 		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
 		Mailer: automationMailer{m.Emails}, TimeZone: d.Config.TimeZone,
 	})
+	m.Bin = bin.New(d.Pool, binDeps(m))
 	m.Folders = folders.New(d.Pool, folderUsers{m.Identity}, folderRecords{m.Candidates, m.Contacts, m.Companies})
 	// The lists show a folder's records.
 	m.Candidates.UseFolders(m.Folders.ItemsOf(folders.Candidates))
@@ -251,6 +254,7 @@ type (
 	industriesHTTP   = industries.HTTP
 	automationsHTTP  = automations.HTTP
 	foldersHTTP      = folders.HTTP
+	binHTTP          = bin.HTTP
 	// scaffold:aliases
 )
 
@@ -286,6 +290,7 @@ type Server struct {
 	*industriesHTTP
 	*automationsHTTP
 	*foldersHTTP
+	*binHTTP
 	// scaffold:embeds
 }
 
@@ -322,6 +327,7 @@ func (m *Modules) Server() *Server {
 		industriesHTTP:   m.Industries.HTTP,
 		automationsHTTP:  m.Automations.HTTP,
 		foldersHTTP:      m.Folders.HTTP,
+		binHTTP:          m.Bin.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -345,6 +351,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Matching.JobHandlers(),
 		m.AIProviders.JobHandlers(),
 		m.Scheduling.JobHandlers(),
+		m.Bin.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

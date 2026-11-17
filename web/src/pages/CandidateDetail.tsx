@@ -12,6 +12,7 @@ import { WorkAuthorizationPicker } from "../components/WorkAuthorizationPicker";
 import { hashParam } from "../hashQuery";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
+import { DeleteRecord } from "../components/DeleteRecord";
 import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
 import { Chips } from "../components/LabelInput";
@@ -111,6 +112,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
             {permissions.includes("notes:create") && <a className="button" href={`#/candidates/${c.id}/reference-check`}>Reference check</a>}
             <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit profile</button>
+            {permissions.includes("bin:manage") && <DeleteRecord kind="candidate" id={c.id} />}
           </span>
         )}
       </div>

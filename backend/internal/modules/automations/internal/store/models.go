@@ -82,6 +82,7 @@ type Application struct {
 	UpdatedAt      time.Time
 	// NULL when a recruiter added the candidate
 	Channel *string
+	Binned  bool
 }
 
 type ApplicationStageChange struct {
@@ -207,6 +208,19 @@ type BackupRun struct {
 	OffsiteError  *string
 }
 
+type BinEntry struct {
+	ID         string
+	TenantID   string
+	Kind       string
+	RecordID   string
+	Label      string
+	WentWith   []byte
+	BinnedBy   string
+	BinnedName string
+	BinnedAt   time.Time
+	PurgeAfter time.Time
+}
+
 type BookingLink struct {
 	ID              string
 	TenantID        string
@@ -268,6 +282,7 @@ type Candidate struct {
 	AvailabilitySince      *time.Time
 	Certifications         []string
 	ProfileTerms           interface{}
+	BinnedAt               *time.Time
 }
 
 type CandidateCompensation struct {
@@ -352,6 +367,7 @@ type Company struct {
 	IndustryHint        *string
 	IndustryPickSince   *time.Time
 	IndustryTerms       *string
+	BinnedAt            *time.Time
 }
 
 type CompanyBenefit struct {
@@ -437,6 +453,7 @@ type Contact struct {
 	NameText          *string
 	PhoneDigits       *string
 	Role              *string
+	BinnedAt          *time.Time
 }
 
 type ContactEmploymentCheck struct {
@@ -942,6 +959,7 @@ type JobOrder struct {
 	OwnerID         *string
 	Country         *string
 	IntakeDate      time.Time
+	BinnedAt        *time.Time
 }
 
 type JobOrderSalary struct {

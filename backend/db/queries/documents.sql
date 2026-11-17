@@ -159,3 +159,7 @@ WHERE lower(file_name) = ANY(@names::text[]) AND (sqlc.narg(candidate_id)::text 
   AND source <> 'formatted'
 ORDER BY created_at DESC
 LIMIT 500;
+
+-- A candidate deleted for good (the Bin): their documents, and the stored files to remove.
+-- name: PurgeCandidateDocuments :many
+DELETE FROM document WHERE candidate_id = @candidate_id RETURNING storage_key, pdf_key;

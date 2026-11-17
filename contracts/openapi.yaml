@@ -61,6 +61,14 @@ x-error-codes:
     module: automations
     status: 422
     description: The automation run cannot be sent or skipped like this (it is no longer waiting, the candidate cannot be emailed, ...). The message says why.
+  BIN_BLOCKED:
+    module: bin
+    status: 409
+    description: The record cannot be binned (it has a placement); the message says why.
+  BIN_RESTORE_CONFLICT:
+    module: bin
+    status: 409
+    description: Another record now has this one's email or name; the message says which. Change one of them, then restore.
   BOOKING_CLOSED:
     module: scheduling
     status: 409
@@ -636,6 +644,77 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/bin:
+    get:
+      operationId: listBin
+      tags: ["bin"]
+      summary: What is in the Bin, the latest first
+      x-permission: bin:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BinList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: binRecord
+      tags: ["bin"]
+      summary: Delete a candidate, contact or company (to the Bin)
+      description: >
+        A company's contacts and jobs are moved to moveTo (another company) when it is given, and otherwise go to the Bin with it.
+
+      x-permission: bin:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/BinInput'}
+      responses:
+        '201':
+          description: Binned
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BinEntry'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/BinBlocked'}
+  /v1/bin/check:
+    get:
+      operationId: checkBinRecord
+      tags: ["bin"]
+      summary: What deleting a record would take with it, and whether it can be deleted
+      x-permission: bin:manage
+      parameters:
+        - {name: kind, in: query, required: true, schema: {$ref: '#/components/schemas/BinKind'}}
+        - {name: id, in: query, required: true, schema: {type: string, maxLength: 40}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BinCheck'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/bin/{entryId}/restore:
+    parameters:
+      - {name: entryId, in: path, required: true, schema: {$ref: '#/components/schemas/BinEntryId'}}
+    post:
+      operationId: restoreBinEntry
+      tags: ["bin"]
+      summary: Restore a record from the Bin, with what went with it
+      x-permission: bin:manage
+      responses:
+        '204': {description: Restored}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/BinRestoreConflict'}
   /v1/salary-calculations:
     post:
       operationId: calculateSalary
@@ -5666,6 +5745,16 @@ components:
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
+    BinBlocked:
+      description: Cannot be binned (BIN_BLOCKED).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    BinRestoreConflict:
+      description: Another record has its email or name now (BIN_RESTORE_CONFLICT).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
     StudioCvOff:
       description: No AI for it (STUDIO_CV_OFF), or one is being made already (STUDIO_CV_RUNNING).
       content:
@@ -5776,6 +5865,7 @@ components:
         - automations:approve
         - automations:manage
         - automations:read
+        - bin:manage
         - candidates.compensation:read
         - candidates.compensation:update
         - candidates:create
@@ -5853,6 +5943,8 @@ components:
         - ASSISTANT_LIMIT_REACHED
         - ASSISTANT_OFF
         - AUTOMATION_NOT_ALLOWED
+        - BIN_BLOCKED
+        - BIN_RESTORE_CONFLICT
         - BOOKING_CLOSED
         - BOOKING_SLOT_TAKEN
         - BOOKING_TOO_MANY_TRIES
@@ -5913,6 +6005,7 @@ components:
         - assistant.emailed
         - automation.event
         - automation.run
+        - bin.purge
         - company.autofill
         - company.industried
         - company.industry
@@ -6415,6 +6508,57 @@ components:
       properties:
         runId: {$ref: '#/components/schemas/AutomationRunId'}
         dueAt: {type: string, format: date-time, description: When it was scheduled for (a run moved since then leaves this job behind).}
+    BinEntryId:
+      type: string
+      pattern: '^bin_[0-9a-hjkmnp-tv-z]{26}$'
+    BinKind:
+      type: string
+      enum: [candidate, contact, company]
+    BinInput:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: {$ref: '#/components/schemas/BinKind'}
+        id: {type: string, maxLength: 40}
+        moveTo:
+          description: "A company only: the company its contacts and jobs move to (they stay out of the Bin)."
+          allOf: [{$ref: '#/components/schemas/CompanyId'}]
+    BinCheck:
+      type: object
+      required: [label, contacts, jobs, applications, blocked]
+      properties:
+        label: {type: string, description: The record's name.}
+        contacts: {type: integer, description: "A company's contacts (they go with it, or move)."}
+        jobs: {type: integer, description: "A company's jobs (they go with it, or move)."}
+        applications: {type: integer, description: Pipeline entries hidden with it.}
+        blocked: {type: string, nullable: true, description: "Why it cannot be binned (a placement), or null."}
+    BinEntry:
+      type: object
+      required: [id, kind, recordId, label, contacts, jobs, binnedByName, binnedAt, purgeAfter]
+      properties:
+        id: {$ref: '#/components/schemas/BinEntryId'}
+        kind: {$ref: '#/components/schemas/BinKind'}
+        recordId: {type: string}
+        label: {type: string}
+        contacts: {type: integer, description: Contacts that went with it (a company).}
+        jobs: {type: integer, description: Jobs that went with it (a company).}
+        binnedByName: {type: string}
+        binnedAt: {type: string, format: date-time}
+        purgeAfter: {type: string, format: date-time, description: When it is deleted for good.}
+    BinList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/BinEntry'}
+    BinPurgeJob:
+      type: object
+      additionalProperties: false
+      required: [entryId]
+      properties:
+        entryId: {$ref: '#/components/schemas/BinEntryId'}
     OwnerInput:
       type: object
       additionalProperties: false
@@ -11857,6 +12001,11 @@ x-permissions:
     description: See the automations, what they did and the emails waiting for approval.
     sensitive: false
     roles: [owner, admin, recruiter]
+  bin:manage:
+    module: bin
+    description: Delete candidates, contacts and companies (to the Bin), see the Bin and restore from it.
+    sensitive: false
+    roles: [owner, admin]
   candidates.compensation:read:
     module: candidates
     description: See current and expected salary.
@@ -12248,6 +12397,12 @@ x-jobs:
     payload: AutomationRunJob
     priority: normal
     description: 'An automation run is due: check it still applies, then email or add the task, or put the email up for approval (Go worker).'
+  bin.purge:
+    module: bin
+    queue: core
+    payload: BinPurgeJob
+    priority: low
+    description: Delete a binned record for good once its 30 days in the Bin are over (nothing happens if it was restored).
   company.autofill:
     module: companies
     queue: core
@@ -12435,6 +12590,8 @@ x-modules:
     description: The AI assistant. Go gathers what the asking user may see (never contact details, never salary), queues it for the Python AI worker, which asks the AI provider; the answer comes back on the queue. Answers are shown only to the person who asked. Off until an AI provider is set up; each company has a monthly token limit.
   - name: automations
     description: 'An automation is a rule: WHEN something happens (an application arrives, a candidate moves to a stage, an interview is booked, a placement starts, its guarantee ends, its invoice falls due), IF the job is at a given client (optional), THEN after some days (or before, for dates) email the candidate, the client''s hiring contact or the recruiter, or give the recruiter a task. Emails go from the recruiter''s mailbox, on their own or after a recruiter approves them (a choice per automation, with a default in Settings). Every run is logged; what happened is checked again when it is due, so a moved interview or a paid invoice sends nothing.'
+  - name: bin
+    description: 'The Bin: candidates, contacts and companies an admin deleted. A binned record disappears from every list, search and count at once (the database hides it), waits 30 days in the Bin, where an admin can restore it, and is then deleted for good with what belongs to it. A company''s contacts and jobs go with it, unless they are moved to another company first. A record with a placement is never binned (placements and invoices are money records). Binning, restoring and the final deletion are each recorded in the audit log.'
   - name: candidates
     description: Candidate profiles. Salary details are stored and permissioned separately.
   - name: careers

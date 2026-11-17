@@ -110,6 +110,7 @@ details get their own permissions.
 | `privacy:manage` (the Data protection page, decide requests, download a copy of a candidate's data) | ✓ | ✓ | | | | |
 | `identity.roles:manage` (Roles and access: what each role may do and which candidates it sees) | ✓ | | | | | |
 | `folders:use` (folders of candidates, contacts and companies; a folder shows only the records you may see) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `bin:manage` (delete candidates, contacts and companies to the Bin, see it and restore) | ✓ | ✓ | | | | |
 
 
 The table above is the default. **Each company can change it** on the

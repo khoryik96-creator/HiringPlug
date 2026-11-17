@@ -499,6 +499,36 @@ func (q *Queries) NewDocumentID(ctx context.Context) (string, error) {
 	return id, err
 }
 
+const purgeCandidateDocuments = `-- name: PurgeCandidateDocuments :many
+DELETE FROM document WHERE candidate_id = $1 RETURNING storage_key, pdf_key
+`
+
+type PurgeCandidateDocumentsRow struct {
+	StorageKey string
+	PdfKey     *string
+}
+
+// A candidate deleted for good (the Bin): their documents, and the stored files to remove.
+func (q *Queries) PurgeCandidateDocuments(ctx context.Context, candidateID string) ([]PurgeCandidateDocumentsRow, error) {
+	rows, err := q.db.Query(ctx, purgeCandidateDocuments, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PurgeCandidateDocumentsRow
+	for rows.Next() {
+		var i PurgeCandidateDocumentsRow
+		if err := rows.Scan(&i.StorageKey, &i.PdfKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const queueParse = `-- name: QueueParse :one
 UPDATE document SET parse_status = 'queued', updated_at = now() WHERE id = $1 RETURNING id, tenant_id, candidate_id, source, file_name, content_type, size_bytes, sha256, storage_key, status, extracted_text, page_count, extractor, error_message, extraction_warnings, created_by, created_at, updated_at, parse_status, parsed_profile, parser, pdf_status, pdf_key, pdf_error
 `

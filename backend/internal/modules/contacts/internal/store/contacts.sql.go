@@ -10,6 +10,37 @@ import (
 	"time"
 )
 
+const binContacts = `-- name: BinContacts :many
+UPDATE contact SET binned_at = now() WHERE id = ANY($1::text[]) AND binned_at IS NULL
+RETURNING id, btrim(first_name || ' ' || last_name)::text AS label
+`
+
+type BinContactsRow struct {
+	ID    string
+	Label string
+}
+
+// The Bin (bin module): binned contacts are hidden by the database; these run with app.show_binned on.
+func (q *Queries) BinContacts(ctx context.Context, ids []string) ([]BinContactsRow, error) {
+	rows, err := q.db.Query(ctx, binContacts, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BinContactsRow
+	for rows.Next() {
+		var i BinContactsRow
+		if err := rows.Scan(&i.ID, &i.Label); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const colleagueAddresses = `-- name: ColleagueAddresses :many
 SELECT c.first_name, c.last_name, c.email::text AS email
 FROM contact c LEFT JOIN contact_mailbox_check m ON m.contact_id = c.id AND m.email = c.email
@@ -132,6 +163,41 @@ func (q *Queries) ContactExists(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const contactIDsOfCompany = `-- name: ContactIDsOfCompany :many
+SELECT id FROM contact WHERE company_id = $1 AND binned_at IS NULL ORDER BY id
+`
+
+func (q *Queries) ContactIDsOfCompany(ctx context.Context, companyID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, contactIDsOfCompany, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const contactLabel = `-- name: ContactLabel :one
+SELECT btrim(first_name || ' ' || last_name)::text AS label FROM contact WHERE id = $1
+`
+
+func (q *Queries) ContactLabel(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, contactLabel, id)
+	var label string
+	err := row.Scan(&label)
+	return label, err
+}
+
 const contactsForLinkedin = `-- name: ContactsForLinkedin :many
 SELECT c.id, c.company_id, c.first_name, c.last_name, c.linkedin_url, l.checked_at AS last_checked
 FROM contact c LEFT JOIN LATERAL (
@@ -247,7 +313,7 @@ func (q *Queries) FindContactIDByEmail(ctx context.Context, email *string) (stri
 }
 
 const getContact = `-- name: GetContact :one
-SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role FROM contact WHERE id = $1
+SELECT id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at FROM contact WHERE id = $1
 `
 
 func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
@@ -277,6 +343,7 @@ func (q *Queries) GetContact(ctx context.Context, id string) (Contact, error) {
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.Role,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -370,7 +437,7 @@ INSERT INTO contact (
   $6, $7, $8,
   $9, $10, $11, $12, $13, $14, app_current_user()
 )
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at
 `
 
 type InsertContactParams struct {
@@ -434,6 +501,7 @@ func (q *Queries) InsertContact(ctx context.Context, arg InsertContactParams) (C
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.Role,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -743,6 +811,24 @@ func (q *Queries) MarkMailboxBounced(ctx context.Context, arg MarkMailboxBounced
 	return items, nil
 }
 
+const moveContactsToCompany = `-- name: MoveContactsToCompany :execrows
+UPDATE contact SET company_id = $1, version = version + 1, updated_at = now()
+WHERE company_id = $2 AND binned_at IS NULL
+`
+
+type MoveContactsToCompanyParams struct {
+	ToID   string
+	FromID string
+}
+
+func (q *Queries) MoveContactsToCompany(ctx context.Context, arg MoveContactsToCompanyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveContactsToCompany, arg.ToID, arg.FromID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const newEmploymentCheckID = `-- name: NewEmploymentCheckID :one
 SELECT new_id('cec')::text
 `
@@ -752,6 +838,18 @@ func (q *Queries) NewEmploymentCheckID(ctx context.Context) (string, error) {
 	var column_1 string
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const purgeContacts = `-- name: PurgeContacts :execrows
+DELETE FROM contact WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
+`
+
+func (q *Queries) PurgeContacts(ctx context.Context, ids []string) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeContacts, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const renewMailboxControl = `-- name: RenewMailboxControl :exec
@@ -775,6 +873,18 @@ func (q *Queries) RenewMailboxControl(ctx context.Context, arg RenewMailboxContr
 		arg.Email,
 	)
 	return err
+}
+
+const restoreContacts = `-- name: RestoreContacts :execrows
+UPDATE contact SET binned_at = NULL WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
+`
+
+func (q *Queries) RestoreContacts(ctx context.Context, ids []string) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreContacts, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const saveEmploymentCheck = `-- name: SaveEmploymentCheck :execrows
@@ -917,7 +1027,7 @@ UPDATE contact SET
   email_check_reasons = $2,
   email_checked_at = $3
 WHERE id = $4 AND email = $5
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at
 `
 
 type SetEmailCheckParams struct {
@@ -962,6 +1072,7 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.Role,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -1088,7 +1199,7 @@ UPDATE contact SET
   version = version + 1,
   updated_at = now()
 WHERE id = $15 AND version = $16
-RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role
+RETURNING id, tenant_id, version, company_id, first_name, last_name, title, email, email_check_status, email_check_reasons, email_checked_at, phone, mobile, linkedin_url, status, notes, search_text, created_by, created_at, updated_at, name_text, phone_digits, role, binned_at
 `
 
 type UpdateContactParams struct {
@@ -1155,6 +1266,7 @@ func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (C
 		&i.NameText,
 		&i.PhoneDigits,
 		&i.Role,
+		&i.BinnedAt,
 	)
 	return i, err
 }

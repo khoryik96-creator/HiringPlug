@@ -1,0 +1,133 @@
+package bin
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+)
+
+// purge handles bin.purge: once a record's 30 days in the Bin are over, it is
+// deleted for good with what belongs to it. A restored record is left alone.
+// A company still referred to by something else in the Bin (a contact binned
+// on its own, deleted later) waits a day and tries again. Stored files are
+// removed last (the rows referring to them are gone by then).
+func (s *Service) purge(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.BinPurgeJob
+	if err := job.Decode(&payload); err != nil {
+		return err
+	}
+	q := store.New(tx)
+	if err := q.ShowBinned(ctx); err != nil {
+		return err
+	}
+	e, err := q.GetBinEntry(ctx, payload.EntryId)
+	if database.IsNoRows(err) {
+		return nil // restored
+	}
+	if err != nil {
+		return err
+	}
+	if time.Now().Before(e.PurgeAfter) {
+		return jobqueue.Later(e.PurgeAfter)
+	}
+	sp, err := tx.Begin(ctx) // a savepoint: a record still referred to rolls back to here
+	if err != nil {
+		return err
+	}
+	after, err := s.purgeRecords(ctx, sp, e)
+	var fk *pgconn.PgError
+	if errors.As(err, &fk) && fk.Code == "23503" {
+		_ = sp.Rollback(ctx)
+		return jobqueue.Later(time.Now().Add(24 * time.Hour))
+	}
+	if err != nil {
+		return err
+	}
+	if err := sp.Commit(ctx); err != nil {
+		return err
+	}
+	if _, err := q.DeleteBinEntry(ctx, e.ID); err != nil {
+		return err
+	}
+	if err := audit.Record(ctx, tx, audit.Entry{Action: e.Kind + ".deleted", EntityType: e.Kind, EntityID: e.RecordID,
+		Changes: map[string]any{"label": e.Label, "binnedBy": e.BinnedName, "binnedAt": e.BinnedAt}}); err != nil {
+		return err
+	}
+	for _, f := range after {
+		f()
+	}
+	return nil
+}
+
+func (s *Service) purgeRecords(ctx context.Context, tx pgx.Tx, e store.BinEntry) ([]func(), error) {
+	d := s.deps
+	var after []func()
+	keep := func(f func(), err error) error {
+		if f != nil {
+			after = append(after, f)
+		}
+		return err
+	}
+	switch e.Kind {
+	case "candidate":
+		apps, err := d.Pipeline.ApplicationsOf(ctx, tx, []string{e.RecordID}, nil)
+		if err == nil {
+			err = d.Pipeline.Purge(ctx, tx, appIDs(apps))
+		}
+		if err == nil {
+			err = d.Files.DeleteNotes(ctx, tx, "candidate", []string{e.RecordID})
+		}
+		if err == nil {
+			err = keep(d.Files.PurgeCandidate(ctx, tx, e.RecordID))
+		}
+		if err == nil {
+			err = d.Candidates.Purge(ctx, tx, e.RecordID)
+		}
+		return after, err
+	case "contact":
+		return after, s.purgeContacts(ctx, tx, []string{e.RecordID})
+	}
+	went := decodeWentWith(e.WentWith)
+	err := s.purgeContacts(ctx, tx, went.Contacts)
+	if err == nil && len(went.Jobs) > 0 {
+		var apps []Application
+		if apps, err = d.Pipeline.ApplicationsOf(ctx, tx, nil, went.Jobs); err == nil {
+			err = d.Pipeline.Purge(ctx, tx, appIDs(apps))
+		}
+		if err == nil {
+			err = d.Files.DeleteNotes(ctx, tx, "job", went.Jobs)
+		}
+		if err == nil {
+			err = keep(d.Jobs.Purge(ctx, tx, went.Jobs))
+		}
+	}
+	if err == nil {
+		err = d.Files.DeleteNotes(ctx, tx, "company", []string{e.RecordID})
+	}
+	if err == nil {
+		err = keep(d.Companies.Purge(ctx, tx, e.RecordID))
+	}
+	return after, err
+}
+
+func (s *Service) purgeContacts(ctx context.Context, tx pgx.Tx, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if err := s.deps.Jobs.ClearContacts(ctx, tx, ids); err != nil {
+		return err
+	}
+	if err := s.deps.Files.DeleteNotes(ctx, tx, "contact", ids); err != nil {
+		return err
+	}
+	return s.deps.Contacts.Purge(ctx, tx, ids)
+}

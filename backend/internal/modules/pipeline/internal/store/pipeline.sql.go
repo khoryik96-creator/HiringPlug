@@ -62,6 +62,43 @@ func (q *Queries) ApplicationFacts(ctx context.Context, arg ApplicationFactsPara
 	return items, nil
 }
 
+const applicationsOf = `-- name: ApplicationsOf :many
+SELECT id, candidate_id, job_order_id FROM application
+WHERE candidate_id = ANY($1::text[]) OR job_order_id = ANY($2::text[])
+`
+
+type ApplicationsOfParams struct {
+	CandidateIds []string
+	JobIds       []string
+}
+
+type ApplicationsOfRow struct {
+	ID          string
+	CandidateID string
+	JobOrderID  string
+}
+
+// The Bin: applications of binned candidates or jobs are hidden with them.
+func (q *Queries) ApplicationsOf(ctx context.Context, arg ApplicationsOfParams) ([]ApplicationsOfRow, error) {
+	rows, err := q.db.Query(ctx, applicationsOf, arg.CandidateIds, arg.JobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ApplicationsOfRow
+	for rows.Next() {
+		var i ApplicationsOfRow
+		if err := rows.Scan(&i.ID, &i.CandidateID, &i.JobOrderID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteApplications = `-- name: DeleteApplications :execrows
 DELETE FROM application WHERE id = ANY($1::text[])
 `
@@ -138,7 +175,7 @@ func (q *Queries) FirstPlacedBetween(ctx context.Context, arg FirstPlacedBetween
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id string) (Application, error) {
@@ -158,6 +195,7 @@ func (q *Queries) GetApplication(ctx context.Context, id string) (Application, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Channel,
+		&i.Binned,
 	)
 	return i, err
 }
@@ -167,7 +205,7 @@ const insertApplication = `-- name: InsertApplication :one
 INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned
 `
 
 type InsertApplicationParams struct {
@@ -201,6 +239,7 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Channel,
+		&i.Binned,
 	)
 	return i, err
 }
@@ -248,7 +287,7 @@ func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivi
 }
 
 const listCandidateApplications = `-- name: ListCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID string) ([]Application, error) {
@@ -274,6 +313,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Channel,
+			&i.Binned,
 		); err != nil {
 			return nil, err
 		}
@@ -286,7 +326,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 }
 
 const listJobApplications = `-- name: ListJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
 `
 
 // A job's pipeline, oldest first (the order cards were added).
@@ -313,6 +353,7 @@ func (q *Queries) ListJobApplications(ctx context.Context, jobOrderID string) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Channel,
+			&i.Binned,
 		); err != nil {
 			return nil, err
 		}
@@ -333,7 +374,7 @@ UPDATE application SET
   version = version + 1,
   updated_at = now()
 WHERE id = $4 AND version = $5
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned
 `
 
 type MoveApplicationParams struct {
@@ -368,6 +409,7 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Channel,
+		&i.Binned,
 	)
 	return i, err
 }
@@ -460,6 +502,15 @@ func (q *Queries) PlacedApplicationIDsOnJobs(ctx context.Context, jobOrderIds []
 	return items, nil
 }
 
+const purgeApplications = `-- name: PurgeApplications :exec
+DELETE FROM application WHERE id = ANY($1::text[]) AND binned
+`
+
+func (q *Queries) PurgeApplications(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, purgeApplications, ids)
+	return err
+}
+
 const recentResults = `-- name: RecentResults :one
 SELECT
   count(*) FILTER (WHERE stage = 'placed' AND stage_changed_at > now() - interval '30 days')::integer AS placed_last_30_days,
@@ -477,6 +528,20 @@ func (q *Queries) RecentResults(ctx context.Context) (RecentResultsRow, error) {
 	var i RecentResultsRow
 	err := row.Scan(&i.PlacedLast30Days, &i.MovedLast7Days)
 	return i, err
+}
+
+const setApplicationsBinned = `-- name: SetApplicationsBinned :exec
+UPDATE application SET binned = $1 WHERE id = ANY($2::text[])
+`
+
+type SetApplicationsBinnedParams struct {
+	Binned bool
+	Ids    []string
+}
+
+func (q *Queries) SetApplicationsBinned(ctx context.Context, arg SetApplicationsBinnedParams) error {
+	_, err := q.db.Exec(ctx, setApplicationsBinned, arg.Binned, arg.Ids)
+	return err
 }
 
 const stageCounts = `-- name: StageCounts :many
@@ -567,7 +632,7 @@ func (q *Queries) StageMoves(ctx context.Context, arg StageMovesParams) ([]Stage
 }
 
 const stuckApplications = `-- name: StuckApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel FROM application
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application
 WHERE job_order_id = ANY($1::text[])
   AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
   AND stage_changed_at < now() - make_interval(days => $2::integer)
@@ -603,6 +668,7 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Channel,
+			&i.Binned,
 		); err != nil {
 			return nil, err
 		}

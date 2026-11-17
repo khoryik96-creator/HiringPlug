@@ -35,6 +35,18 @@ func (q *Queries) AutofillState(ctx context.Context, id string) (AutofillStateRo
 	return i, err
 }
 
+const binCompany = `-- name: BinCompany :one
+UPDATE company SET binned_at = now() WHERE id = $1 AND binned_at IS NULL RETURNING name
+`
+
+// The Bin (bin module): a binned company is hidden by the database; these run with app.show_binned on.
+func (q *Queries) BinCompany(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, binCompany, id)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
 const clearIndustryTermsExcept = `-- name: ClearIndustryTermsExcept :exec
 UPDATE company SET industry_terms = NULL WHERE industry_terms IS NOT NULL AND id <> ALL($1::text[])
 `
@@ -63,6 +75,17 @@ func (q *Queries) CompanyExists(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const companyLabel = `-- name: CompanyLabel :one
+SELECT name FROM company WHERE id = $1
+`
+
+func (q *Queries) CompanyLabel(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, companyLabel, id)
+	var name string
+	err := row.Scan(&name)
+	return name, err
 }
 
 const companyLinkedin = `-- name: CompanyLinkedin :one
@@ -199,7 +222,7 @@ func (q *Queries) FindCompanyIDByName(ctx context.Context, name string) (string,
 }
 
 const getCompany = `-- name: GetCompany :one
-SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms FROM company WHERE id = $1
+SELECT id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at FROM company WHERE id = $1
 `
 
 func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
@@ -236,6 +259,7 @@ func (q *Queries) GetCompany(ctx context.Context, id string) (Company, error) {
 		&i.IndustryHint,
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -377,7 +401,7 @@ INSERT INTO company (
   $8, $9, $10, $11,
   $12, $13, app_current_user()
 )
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
 `
 
 type InsertCompanyParams struct {
@@ -446,6 +470,7 @@ func (q *Queries) InsertCompany(ctx context.Context, arg InsertCompanyParams) (C
 		&i.IndustryHint,
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -767,6 +792,45 @@ func (q *Queries) PendingSuggestions(ctx context.Context, companyID string) ([]C
 	return items, nil
 }
 
+const purgeCompany = `-- name: PurgeCompany :many
+WITH docs AS (DELETE FROM company_document WHERE company_id = $1
+               AND EXISTS (SELECT 1 FROM company WHERE id = $1 AND binned_at IS NOT NULL) RETURNING storage_key),
+     gone AS (DELETE FROM company WHERE id = $1 AND binned_at IS NOT NULL RETURNING id)
+SELECT storage_key FROM docs WHERE EXISTS (SELECT 1 FROM gone)
+`
+
+func (q *Queries) PurgeCompany(ctx context.Context, id string) ([]string, error) {
+	rows, err := q.db.Query(ctx, purgeCompany, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var storage_key string
+		if err := rows.Scan(&storage_key); err != nil {
+			return nil, err
+		}
+		items = append(items, storage_key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const restoreCompany = `-- name: RestoreCompany :execrows
+UPDATE company SET binned_at = NULL WHERE id = $1 AND binned_at IS NOT NULL
+`
+
+func (q *Queries) RestoreCompany(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreCompany, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const saveIndustryPick = `-- name: SaveIndustryPick :one
 UPDATE company_industry_pick
 SET status = $1, choice_id = $2, error = $3, model = $4,
@@ -912,7 +976,7 @@ func (q *Queries) SetIndustryTerms(ctx context.Context, arg SetIndustryTermsPara
 }
 
 const touchCompany = `-- name: TouchCompany :one
-UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms
+UPDATE company SET version = version + 1, updated_at = now() WHERE id = $1 AND version = $2 RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
 `
 
 type TouchCompanyParams struct {
@@ -954,6 +1018,7 @@ func (q *Queries) TouchCompany(ctx context.Context, arg TouchCompanyParams) (Com
 		&i.IndustryHint,
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -976,7 +1041,7 @@ UPDATE company SET
   version = version + 1,
   updated_at = now()
 WHERE id = $14 AND version = $15
-RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms
+RETURNING id, tenant_id, version, name, type, website, industry, size, phone, address, city, country, registration_number, about, search_text, name_key, created_by, created_at, updated_at, autofill_status, autofill_error, autofill_checked_at, phone_digits, category, linkedin_url, autofill_fill_empty, autofill_name_guessed, industry_hint, industry_pick_since, industry_terms, binned_at
 `
 
 type UpdateCompanyParams struct {
@@ -1048,6 +1113,7 @@ func (q *Queries) UpdateCompany(ctx context.Context, arg UpdateCompanyParams) (C
 		&i.IndustryHint,
 		&i.IndustryPickSince,
 		&i.IndustryTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }

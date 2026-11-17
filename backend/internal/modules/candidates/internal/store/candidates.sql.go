@@ -12,6 +12,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const binCandidate = `-- name: BinCandidate :one
+UPDATE candidate SET binned_at = now() WHERE id = $1 AND binned_at IS NULL
+RETURNING btrim(first_name || ' ' || last_name)::text AS label
+`
+
+// The Bin (bin module): a binned candidate is hidden by the database; these run with app.show_binned on.
+func (q *Queries) BinCandidate(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, binCandidate, id)
+	var label string
+	err := row.Scan(&label)
+	return label, err
+}
+
+const binnedCandidates = `-- name: BinnedCandidates :many
+SELECT id FROM candidate WHERE id = ANY($1::text[]) AND binned_at IS NOT NULL
+`
+
+func (q *Queries) BinnedCandidates(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, binnedCandidates, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const candidateBriefs = `-- name: CandidateBriefs :many
 SELECT id, first_name, last_name, current_title, email, source FROM candidate WHERE id = ANY($1::text[])
 `
@@ -61,6 +98,17 @@ func (q *Queries) CandidateExists(ctx context.Context, id string) (bool, error) 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const candidateLabel = `-- name: CandidateLabel :one
+SELECT btrim(first_name || ' ' || last_name)::text AS label FROM candidate WHERE id = $1
+`
+
+func (q *Queries) CandidateLabel(ctx context.Context, id string) (string, error) {
+	row := q.db.QueryRow(ctx, candidateLabel, id)
+	var label string
+	err := row.Scan(&label)
+	return label, err
 }
 
 const countCandidates = `-- name: CountCandidates :one
@@ -198,7 +246,7 @@ func (q *Queries) FindCandidates(ctx context.Context, arg FindCandidatesParams) 
 }
 
 const getCandidate = `-- name: GetCandidate :one
-SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms FROM candidate WHERE id = $1
+SELECT id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms, binned_at FROM candidate WHERE id = $1
 `
 
 func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error) {
@@ -239,6 +287,7 @@ func (q *Queries) GetCandidate(ctx context.Context, id string) (Candidate, error
 		&i.AvailabilitySince,
 		&i.Certifications,
 		&i.ProfileTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -284,7 +333,7 @@ INSERT INTO candidate (
   $16, $17, $18, $19, $20, $21, $22,
   $23, app_current_user(), CASE WHEN $8::text IS NULL THEN NULL ELSE now() END
 )
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms, binned_at
 `
 
 type InsertCandidateParams struct {
@@ -377,6 +426,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		&i.AvailabilitySince,
 		&i.Certifications,
 		&i.ProfileTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -1176,6 +1226,30 @@ func (q *Queries) MoveWorkIfNone(ctx context.Context, arg MoveWorkIfNoneParams) 
 	return err
 }
 
+const purgeCandidate = `-- name: PurgeCandidate :execrows
+DELETE FROM candidate WHERE id = $1 AND binned_at IS NOT NULL
+`
+
+func (q *Queries) PurgeCandidate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeCandidate, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restoreCandidate = `-- name: RestoreCandidate :execrows
+UPDATE candidate SET binned_at = NULL WHERE id = $1 AND binned_at IS NOT NULL
+`
+
+func (q *Queries) RestoreCandidate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreCandidate, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const screeningSalarySnapshots = `-- name: ScreeningSalarySnapshots :many
 SELECT call_id, tenant_id, snapshot FROM screening_call_salary WHERE call_id=ANY($1::text[])
 `
@@ -1688,7 +1762,7 @@ func (q *Queries) SimilarCandidates(ctx context.Context, arg SimilarCandidatesPa
 const touchCandidate = `-- name: TouchCandidate :one
 UPDATE candidate SET version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms, binned_at
 `
 
 type TouchCandidateParams struct {
@@ -1736,6 +1810,7 @@ func (q *Queries) TouchCandidate(ctx context.Context, arg TouchCandidateParams) 
 		&i.AvailabilitySince,
 		&i.Certifications,
 		&i.ProfileTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }
@@ -1770,7 +1845,7 @@ UPDATE candidate SET
   version = version + 1,
   updated_at = now()
 WHERE id = $23 AND version = $24
-RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms
+RETURNING id, tenant_id, version, first_name, last_name, email, phone, nationality, work_authorization, work_authorization_basis, work_authorization_note, notice_period_value, notice_period_unit, industry, specialization, current_title, current_company, location, source, created_by, created_at, updated_at, tags, skills, owner_id, residence_country, linkedin_url, availability, search_text, name_text, phone_digits, availability_since, certifications, profile_terms, binned_at
 `
 
 type UpdateCandidateParams struct {
@@ -1865,6 +1940,7 @@ func (q *Queries) UpdateCandidate(ctx context.Context, arg UpdateCandidateParams
 		&i.AvailabilitySince,
 		&i.Certifications,
 		&i.ProfileTerms,
+		&i.BinnedAt,
 	)
 	return i, err
 }

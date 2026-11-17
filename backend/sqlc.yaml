@@ -201,3 +201,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/folders/internal/store
+  - <<: *module
+    queries: db/queries/bin.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/bin/internal/store

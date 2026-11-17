@@ -21,3 +21,7 @@ DELETE FROM note WHERE id = @id;
 
 -- name: MoveCandidateNotes :execrows
 UPDATE note SET subject_id = @to_id WHERE subject_type = 'candidate' AND subject_id = @from_id;
+
+-- A record deleted for good (the Bin) takes its notes with it.
+-- name: DeleteSubjectNotes :exec
+DELETE FROM note WHERE subject_type = @subject_type AND subject_id = ANY(@subject_ids::text[]);

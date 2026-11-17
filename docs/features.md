@@ -834,6 +834,16 @@ lead's company (with the built-in email check).
   dragged by its handle (or moved with the arrow keys) into each person's
   own order, kept with their settings (`dashboardBlocks`); "Reset order"
   restores the default.
+- **Delete, with a Bin** ✅ (owners and admins, `bin:manage`): a candidate,
+  contact or company can be deleted from its page. It goes to Settings › Bin
+  for 30 days, hidden everywhere at once by the database (lists, searches,
+  counts, the pipeline), where it can be restored; then it is deleted for good
+  with its CVs, notes and pipeline entries. Deleting a company asks about its
+  contacts and jobs: move them to another company you choose, or delete them
+  with it. A record with a placement is never deleted (placements and invoices
+  are money records). Deleting, restoring and the final deletion are recorded
+  in the audit log. While a record is in the Bin its email or name is free; if
+  another record takes it, restoring says so.
 - **Copy** ✅: one click copies a candidate's email or phone number.
 - **Jobs list** ✅: each job with a bar of where its candidates are (and the
   counts), how many days it has been open and its owner's initials
