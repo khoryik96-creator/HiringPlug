@@ -12434,7 +12434,10 @@ export interface operations {
     };
     listIndustries: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description With true, how many candidates and companies use each category, for those who manage Settings (counting takes seconds with a million records; otherwise the counts are 0). */
+                counts?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;

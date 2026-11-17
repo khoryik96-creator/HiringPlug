@@ -21,22 +21,22 @@ type Service struct {
 	options LegacyOptions
 }
 
-func (s *Service) List(ctx context.Context, p authz.Principal) (api.IndustryCatalogue, error) {
+// List reads the catalogue; with counts, and for those who manage Settings,
+// how many records use each category.
+func (s *Service) List(ctx context.Context, p authz.Principal, counts bool) (api.IndustryCatalogue, error) {
 	var out api.IndustryCatalogue
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		if err := s.ensureIn(ctx, tx); err != nil {
 			return err
 		}
 		var err error
-		out, err = catalogueIn(ctx, tx)
+		if counts && p.Can(api.PermissionSettingsManage) {
+			out, err = catalogueWithCountsIn(ctx, tx)
+		} else {
+			out, err = catalogueIn(ctx, tx)
+		}
 		return err
 	})
-	if !p.Can(api.PermissionSettingsManage) {
-		for i := range out.Items {
-			out.Items[i].CandidateCount = 0
-			out.Items[i].CompanyCount = 0
-		}
-	}
 	return out, err
 }
 func (s *Service) Edit(ctx context.Context, p authz.Principal, id string, in api.IndustryEdit) (api.IndustryCatalogue, error) {
@@ -83,7 +83,7 @@ func (s *Service) Edit(ctx context.Context, p authz.Principal, id string, in api
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "industry.saved", EntityType: "industry", EntityID: id}); err != nil {
 			return err
 		}
-		out, err = catalogueIn(ctx, tx)
+		out, err = catalogueWithCountsIn(ctx, tx)
 		return err
 	})
 	return out, err
@@ -97,7 +97,7 @@ func (s *Service) Remove(ctx context.Context, p authz.Principal, id string, in a
 		if _, err := store.New(tx).LockCatalogue(ctx); err != nil {
 			return err
 		}
-		c, err := catalogueIn(ctx, tx)
+		c, err := catalogueWithCountsIn(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (s *Service) Remove(ctx context.Context, p authz.Principal, id string, in a
 		if err := audit.Record(ctx, tx, audit.Entry{Action: "industry." + string(in.Action), EntityType: "industry", EntityID: id}); err != nil {
 			return err
 		}
-		out, err = catalogueIn(ctx, tx)
+		out, err = catalogueWithCountsIn(ctx, tx)
 		return err
 	})
 	return out, err

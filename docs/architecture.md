@@ -143,6 +143,13 @@ unit and integration tests, and the wiring. See
   download files through short-lived signed links, never with storage keys.
 - **Audit trail.** Every change records who, what, when and the request ID.
   Salary changes record only that they changed, never the amounts.
+- **Searches still use their indexes.** Row-level security keeps conditions
+  PostgreSQL does not know to be "leakproof" away from indexes, so LIKE, @@
+  (text search) and @> (tags) searches read every row. `hp migrate` and
+  `hp restore` mark those operators' functions LEAKPROOF
+  (`database.SearchFunctions`); the policies still decide which rows anyone
+  sees. `TestSearchesCanUseTheirIndexes` fails if a search loses its index.
+  A function added to a search index's expression belongs on that list.
 
 ## Background jobs
 
@@ -238,7 +245,13 @@ All state is in PostgreSQL and file storage, so the API and workers are
 stateless and scale by running more copies:
 
 1. **One machine (today):** Docker Compose runs PostgreSQL, the API, both
-   workers and the web app.
+   workers and the web app. Load-tested with one agency of 1,000,000
+   candidates with CVs (made-up data), 50,000 companies and 200,000 contacts:
+   the lists open in milliseconds, boolean CV searches take 0.1-0.9 s, name
+   or phone searches up to 0.6 s, sorting by name or notice about 1 s, and
+   a full database backup about 3 minutes (1.4 GB, CV files not included). The
+   database is about 9 GB. Settings › Industries counts every category's
+   records, about 5 s at that size.
 2. **Growing:** more API and worker copies behind a load balancer, connection
    pooling (PgBouncer), a read replica for reports, files in S3.
 3. **Large:** a dedicated search engine fed by jobs, partitioned activity and

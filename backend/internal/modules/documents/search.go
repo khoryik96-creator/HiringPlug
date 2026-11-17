@@ -5,6 +5,7 @@ package documents
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -21,7 +22,12 @@ import (
 // not formatted) matching ts, a text search query, in the caller's
 // transaction (row-level security: only candidates the user may see).
 func (m *Module) CandidatesWithMatchingCV(ctx context.Context, tx pgx.Tx, ts string, limit int) ([]string, error) {
-	return store.New(tx).CandidatesWithMatchingCV(ctx, store.CandidatesWithMatchingCVParams{Ts: ts, RowLimit: int32(limit)}) //nolint:gosec // a small constant
+	ids, err := store.New(tx).CandidatesWithMatchingCV(ctx, store.CandidatesWithMatchingCVParams{Ts: ts, RowLimit: int32(limit)}) //nolint:gosec // a small constant
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids), nil
 }
 
 // CVSnippets returns, for each candidate given whose CV matches ts, where

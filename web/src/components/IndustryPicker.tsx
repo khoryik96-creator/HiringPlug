@@ -8,7 +8,12 @@ import "./industries.css";
 export type Category = Schemas["Industry"];
 export type IndustryChoices = Schemas["IndustrySelections"];
 export const industryKey = ["industries"] as const;
-export const useIndustries = () => useQuery({ queryKey: industryKey, queryFn: async () => unwrap(await api.GET("/v1/industries")) });
+/** The catalogue with how many records use each category (Settings only: counting is slow with many records). */
+export const industryCountsKey = ["industries", "counts"] as const;
+export const useIndustries = (counts = false) => useQuery({
+  queryKey: counts ? industryCountsKey : industryKey,
+  queryFn: async () => unwrap(await api.GET("/v1/industries", { params: { query: counts ? { counts: true } : {} } })),
+});
 export const categoryLabel = (item: Category, items: Category[]) => {
   const parent = items.find((i) => i.id === item.parentId);
   return parent ? `${parent.label} / ${item.label}` : item.label;

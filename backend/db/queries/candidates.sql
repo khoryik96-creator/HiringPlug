@@ -381,8 +381,8 @@ WHERE (sqlc.narg(query)::text IS NULL
   AND (sqlc.narg(owner)::text IS NULL OR c.owner_id = sqlc.narg(owner)::text)
   AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
 ORDER BY
-  CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN @sort::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN @sort::text = 'name' THEN c.name_text END ASC,
+  CASE WHEN @sort::text = 'name_desc' THEN c.name_text END DESC,
   CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
   CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
@@ -444,8 +444,8 @@ WHERE (sqlc.narg(query)::text IS NULL
   AND (sqlc.narg(in_ids)::text[] IS NULL OR c.id = ANY (sqlc.narg(in_ids)::text[])) -- a folder's
   AND (sqlc.narg(updated_within_days)::int IS NULL OR c.updated_at >= now() - make_interval(days => sqlc.narg(updated_within_days)::int))
 ORDER BY
-  CASE WHEN @sort::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN @sort::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN @sort::text = 'name' THEN c.name_text END ASC,
+  CASE WHEN @sort::text = 'name_desc' THEN c.name_text END DESC,
   CASE WHEN @sort::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
   CASE WHEN @sort::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.

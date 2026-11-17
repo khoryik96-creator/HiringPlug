@@ -10,8 +10,8 @@ import (
 // HTTP converts contract requests to tenant-scoped catalogue use cases.
 type HTTP struct{ svc *Service }
 
-func (h *HTTP) ListIndustries(ctx context.Context, _ api.ListIndustriesRequestObject) (api.ListIndustriesResponseObject, error) {
-	c, e := h.svc.List(ctx, authz.MustFromContext(ctx))
+func (h *HTTP) ListIndustries(ctx context.Context, r api.ListIndustriesRequestObject) (api.ListIndustriesResponseObject, error) {
+	c, e := h.svc.List(ctx, authz.MustFromContext(ctx), r.Params.Counts != nil && *r.Params.Counts)
 	return api.ListIndustries200JSONResponse(c), e
 }
 func (h *HTTP) CreateIndustry(ctx context.Context, r api.CreateIndustryRequestObject) (api.CreateIndustryResponseObject, error) {

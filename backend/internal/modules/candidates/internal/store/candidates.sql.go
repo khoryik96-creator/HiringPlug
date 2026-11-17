@@ -719,8 +719,8 @@ WHERE ($1::text IS NULL
   AND ($6::text IS NULL OR c.owner_id = $6::text)
   AND ($7::text[] IS NULL OR c.id = ANY ($7::text[])) -- a folder's
 ORDER BY
-  CASE WHEN $8::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $8::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $8::text = 'name' THEN c.name_text END ASC,
+  CASE WHEN $8::text = 'name_desc' THEN c.name_text END DESC,
   CASE WHEN $8::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
   CASE WHEN $8::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.
@@ -1421,8 +1421,8 @@ WHERE ($2::text IS NULL
   AND ($23::text[] IS NULL OR c.id = ANY ($23::text[])) -- a folder's
   AND ($24::int IS NULL OR c.updated_at >= now() - make_interval(days => $24::int))
 ORDER BY
-  CASE WHEN $25::text = 'name' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END ASC,
-  CASE WHEN $25::text = 'name_desc' THEN app_normalize_text(c.first_name || ' ' || c.last_name) END DESC,
+  CASE WHEN $25::text = 'name' THEN c.name_text END ASC,
+  CASE WHEN $25::text = 'name_desc' THEN c.name_text END DESC,
   CASE WHEN $25::text = 'notice' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END ASC NULLS LAST,
   CASE WHEN $25::text = 'notice_desc' THEN c.notice_period_value * CASE c.notice_period_unit WHEN 'day' THEN 1 WHEN 'week' THEN 7 ELSE 30 END END DESC NULLS LAST,
   -- Salaries in different currencies are never compared: ringgit first, then each other currency together.

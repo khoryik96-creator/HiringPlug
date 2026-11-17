@@ -91,6 +91,27 @@ func (q *Queries) AssignIndustry(ctx context.Context, arg AssignIndustryParams) 
 	return err
 }
 
+const assignIndustryMany = `-- name: AssignIndustryMany :exec
+INSERT INTO industry_assignment(category_id, candidate_id, company_id, is_primary)
+SELECT $1::text AS category_id, c AS candidate_id, NULL::text AS company_id, true AS is_primary
+FROM unnest($2::text[]) AS c
+UNION ALL
+SELECT $1::text, NULL::text, c, true FROM unnest($3::text[]) AS c
+`
+
+type AssignIndustryManyParams struct {
+	CategoryID   string
+	CandidateIds []string
+	CompanyIds   []string
+}
+
+// Many records into one category at once, as their current one (seeding
+// the catalogue from the labels records already had).
+func (q *Queries) AssignIndustryMany(ctx context.Context, arg AssignIndustryManyParams) error {
+	_, err := q.db.Exec(ctx, assignIndustryMany, arg.CategoryID, arg.CandidateIds, arg.CompanyIds)
+	return err
+}
+
 const bumpCatalogue = `-- name: BumpCatalogue :exec
 UPDATE industry_catalogue SET version = version + 1 WHERE tenant_id = app_current_tenant()
 `
@@ -176,6 +197,45 @@ func (q *Queries) EnsureCatalogue(ctx context.Context) error {
 	return err
 }
 
+const industryCounts = `-- name: IndustryCounts :many
+SELECT k.category_id::text AS category_id,
+       count(DISTINCT a.candidate_id)::integer AS candidate_count,
+       count(DISTINCT a.company_id)::integer AS company_count
+FROM industry_assignment a
+JOIN industry i ON i.id = a.category_id
+CROSS JOIN LATERAL (VALUES (a.category_id), (i.parent_id)) AS k(category_id)
+WHERE k.category_id IS NOT NULL
+GROUP BY k.category_id
+`
+
+type IndustryCountsRow struct {
+	CategoryID     string
+	CandidateCount int32
+	CompanyCount   int32
+}
+
+// How many candidates and companies each category has, a group counting the
+// records of its subindustries once each (one pass over the assignments).
+func (q *Queries) IndustryCounts(ctx context.Context) ([]IndustryCountsRow, error) {
+	rows, err := q.db.Query(ctx, industryCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IndustryCountsRow
+	for rows.Next() {
+		var i IndustryCountsRow
+		if err := rows.Scan(&i.CategoryID, &i.CandidateCount, &i.CompanyCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertIndustry = `-- name: InsertIndustry :one
 INSERT INTO industry(parent_id, label, label_key, aliases, retired, source_key)
 VALUES ($1, $2, $3, $4::text[], $5, $6) RETURNING id, tenant_id, parent_id, label, label_key, aliases, retired, source_key
@@ -243,39 +303,21 @@ func (q *Queries) InsertLegacyIndustry(ctx context.Context, arg InsertLegacyIndu
 }
 
 const listIndustries = `-- name: ListIndustries :many
-WITH usage AS (
- SELECT category_id, candidate_id, company_id FROM industry_assignment
- UNION ALL
- SELECT i.parent_id, a.candidate_id, a.company_id FROM industry_assignment a JOIN industry i ON i.id=a.category_id WHERE i.parent_id IS NOT NULL
-), counts AS (
- SELECT category_id,count(DISTINCT candidate_id)::integer AS candidate_count,count(DISTINCT company_id)::integer AS company_count FROM usage GROUP BY category_id
-)
-SELECT i.id, i.tenant_id, i.parent_id, i.label, i.label_key, i.aliases, i.retired, i.source_key,coalesce(c.candidate_count,0)::integer AS candidate_count,coalesce(c.company_count,0)::integer AS company_count
-FROM industry i LEFT JOIN counts c ON c.category_id=i.id ORDER BY i.parent_id NULLS FIRST,i.label,i.id
+SELECT i.id, i.tenant_id, i.parent_id, i.label, i.label_key, i.aliases, i.retired, i.source_key FROM industry i ORDER BY i.parent_id NULLS FIRST, i.label, i.id
 `
 
-type ListIndustriesRow struct {
-	ID             string
-	TenantID       string
-	ParentID       *string
-	Label          string
-	LabelKey       string
-	Aliases        []string
-	Retired        bool
-	SourceKey      *string
-	CandidateCount int32
-	CompanyCount   int32
-}
-
-func (q *Queries) ListIndustries(ctx context.Context) ([]ListIndustriesRow, error) {
+// The catalogue alone: read on every save and search that names an
+// industry, so it never counts the records (a million assignments take
+// seconds to count).
+func (q *Queries) ListIndustries(ctx context.Context) ([]Industry, error) {
 	rows, err := q.db.Query(ctx, listIndustries)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListIndustriesRow
+	var items []Industry
 	for rows.Next() {
-		var i ListIndustriesRow
+		var i Industry
 		if err := rows.Scan(
 			&i.ID,
 			&i.TenantID,
@@ -285,8 +327,6 @@ func (q *Queries) ListIndustries(ctx context.Context) ([]ListIndustriesRow, erro
 			&i.Aliases,
 			&i.Retired,
 			&i.SourceKey,
-			&i.CandidateCount,
-			&i.CompanyCount,
 		); err != nil {
 			return nil, err
 		}

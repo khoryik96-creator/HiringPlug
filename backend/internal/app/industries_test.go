@@ -20,7 +20,7 @@ import (
 
 func industryCatalogue(t *testing.T, a *testApp, token string) api.IndustryCatalogue {
 	t.Helper()
-	r := a.request("GET", "/v1/industries", token, nil)
+	r := a.request("GET", "/v1/industries?counts=true", token, nil)
 	require.Equal(t, 200, r.Status, "%s", r.Body)
 	var c api.IndustryCatalogue
 	r.JSON(&c)

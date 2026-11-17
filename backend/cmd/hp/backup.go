@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/backup"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 )
 
 func backupOptions() (backup.Options, error) {
@@ -182,6 +183,10 @@ func runRestore(ctx context.Context, args []string) error {
 		return errors.New("HP_DATABASE_ADMIN_URL is required")
 	}
 	if err := backup.Restore(ctx, o, fs.Arg(0)); err != nil {
+		return err
+	}
+	// A restore recreates pg_trgm, whose functions then lose their mark.
+	if err := database.AllowSearchIndexes(ctx, o.AdminURL, os.Stderr); err != nil {
 		return err
 	}
 	fmt.Println("restored", fs.Arg(0), "- run `hp bootstrap` if this backup is from an older version, then start the API and workers")

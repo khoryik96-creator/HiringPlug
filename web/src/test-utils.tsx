@@ -55,6 +55,7 @@ export function invalidField(field: string, message: string): never {
 export function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["industries"], testIndustryCatalogue());
+  client.setQueryData(["industries", "counts"], testIndustryCatalogue()); // Settings › Industries
   client.setQueryDefaults(["industries"], { staleTime: Infinity });
   const wrap = (node: ReactElement) => <QueryClientProvider client={client}>{node}</QueryClientProvider>;
   const result = render(wrap(ui));

@@ -69,7 +69,7 @@ func (q *Queries) CVSnippets(ctx context.Context, arg CVSnippetsParams) ([]CVSni
 }
 
 const candidatesWithMatchingCV = `-- name: CandidatesWithMatchingCV :many
-SELECT DISTINCT candidate_id::text FROM cv_search
+SELECT candidate_id::text FROM cv_search
 WHERE terms @@ to_tsquery('english', $1::text)
 LIMIT $2
 `
@@ -80,7 +80,10 @@ type CandidatesWithMatchingCVParams struct {
 }
 
 // Advanced search: the candidates with a CV (read, not formatted) matching
-// a boolean search (as a text search query), up to a limit.
+// a boolean search (as a text search query), up to a limit of CVs. A
+// candidate with two matching CVs comes twice (the caller drops repeats):
+// DISTINCT would read every match before the first one is returned, which
+// for a common word is most of the CVs.
 func (q *Queries) CandidatesWithMatchingCV(ctx context.Context, arg CandidatesWithMatchingCVParams) ([]string, error) {
 	rows, err := q.db.Query(ctx, candidatesWithMatchingCV, arg.Ts, arg.RowLimit)
 	if err != nil {

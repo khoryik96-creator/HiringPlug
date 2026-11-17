@@ -4,13 +4,13 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Field } from "../components/Field";
 import { fieldErrors } from "../components/forms";
-import { categoryMatches, industryKey, useIndustries, type Category } from "../components/IndustryPicker";
+import { categoryMatches, industryCountsKey, industryKey, useIndustries, type Category } from "../components/IndustryPicker";
 import { filledIn } from "../requiredFields";
 
 type Edit = { item?: Category; parentId?: string };
 /** Shared catalogue administration; server checks usage and versions in one transaction. */
 export function Industries() {
-  const query = useIndustries();
+  const query = useIndustries(true);
   const [search, setSearch] = useState("");
   const [retired, setRetired] = useState(false);
   const [edit, setEdit] = useState<Edit | null>(null);
@@ -40,6 +40,7 @@ export function Industries() {
 function useSaved(onDone: () => void) {
   const client = useQueryClient();
   return async (data: Schemas["IndustryCatalogue"]) => {
+    client.setQueryData(industryCountsKey, data);
     client.setQueryData(industryKey, data);
     // Renames and moves update saved summaries and make open editors stale.
     await Promise.all([client.invalidateQueries({ queryKey: ["candidate"] }), client.invalidateQueries({ queryKey: ["company"] }), client.invalidateQueries({ queryKey: ["candidates"] }), client.invalidateQueries({ queryKey: ["companies"] })]);

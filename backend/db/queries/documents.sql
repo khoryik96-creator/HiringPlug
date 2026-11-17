@@ -93,9 +93,12 @@ INSERT INTO document_ai_use (tenant_id, document_id, tokens) VALUES (app_current
 SELECT coalesce(sum(tokens), 0)::bigint FROM document_ai_use WHERE created_at >= @since;
 
 -- Advanced search: the candidates with a CV (read, not formatted) matching
--- a boolean search (as a text search query), up to a limit.
+-- a boolean search (as a text search query), up to a limit of CVs. A
+-- candidate with two matching CVs comes twice (the caller drops repeats):
+-- DISTINCT would read every match before the first one is returned, which
+-- for a common word is most of the CVs.
 -- name: CandidatesWithMatchingCV :many
-SELECT DISTINCT candidate_id::text FROM cv_search
+SELECT candidate_id::text FROM cv_search
 WHERE terms @@ to_tsquery('english', @ts::text)
 LIMIT @row_limit;
 

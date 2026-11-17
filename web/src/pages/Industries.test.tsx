@@ -17,7 +17,7 @@ it("requires a replacement for used categories and preserves the retirement choi
  const parent = catalogue.items.find((i) => i.label === "Financial Services");
  if (!parent) throw new Error("missing test industry");
  parent.candidateCount = 5;
- const { client } = renderWithClient(<Industries />);client.setQueryData(["industries"], catalogue);
+ const { client } = renderWithClient(<Industries />);client.setQueryData(["industries", "counts"], catalogue);
  await waitFor(() => { expect(screen.getByText(/5 profiles/)).toBeTruthy(); });
  const row = screen.getByText("Financial Services").closest("tr");expect(row).toBeTruthy();
  fireEvent.click(within(row as HTMLTableRowElement).getByRole("button", { name: "Delete" }));
@@ -29,4 +29,11 @@ it("requires a replacement for used categories and preserves the retirement choi
  expect(within(dialog).getByRole<HTMLButtonElement>("button", { name: "Retire" }).disabled).toBe(false);
  fireEvent.change(within(dialog).getByLabelText("Replacement"), { target: { value: "industry_education" } });
  expect(within(dialog).getByLabelText<HTMLSelectElement>("Replacement").validity.valid).toBe(true);
+});
+it("asks for the usage counts, which the dropdowns never do (slow with many records)", async () => {
+ const get = vi.spyOn(api, "GET").mockResolvedValue(ok(testIndustryCatalogue()));
+ const { client } = renderWithClient(<Industries />);
+ await client.invalidateQueries({ queryKey: ["industries"] });
+ await waitFor(() => { expect(get).toHaveBeenCalledWith("/v1/industries", { params: { query: { counts: true } } }); });
+ expect(get).not.toHaveBeenCalledWith("/v1/industries", { params: { query: {} } });
 });

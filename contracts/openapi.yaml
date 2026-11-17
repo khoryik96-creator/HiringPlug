@@ -3152,6 +3152,12 @@ paths:
       tags: [industries]
       summary: Read the agency industry catalogue and usage counts
       x-permission: settings:read
+      parameters:
+        - name: counts
+          in: query
+          required: false
+          description: "With true, how many candidates and companies use each category, for those who manage Settings (counting takes seconds with a million records; otherwise the counts are 0)."
+          schema: {type: boolean, default: false}
       responses:
         '200':
           description: OK
