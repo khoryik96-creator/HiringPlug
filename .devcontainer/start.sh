@@ -27,7 +27,13 @@ fi
 for _ in $(seq 60); do docker info >/dev/null 2>&1 && break; sleep 2; done
 compose=(docker compose -f deploy/docker-compose.yml)
 echo "Starting HiringPlug (the first start builds it: about 10 minutes)..."
-"${compose[@]}" up -d --build --wait postgres mailpit api worker ai-worker web
+if ! "${compose[@]}" up -d --build --wait postgres mailpit api worker ai-worker web; then
+  echo
+  echo "HiringPlug did not start. What the database set-up (bootstrap) said:"
+  "${compose[@]}" logs --no-color --tail 30 bootstrap || true
+  echo "Run this script again to retry: bash .devcontainer/start.sh"
+  exit 1
+fi
 
 link_file=CODESPACE-SIGN-IN.txt
 agencies=$("${compose[@]}" exec -T postgres psql -U postgres -d hiringplug -Atc "SELECT count(*) FROM tenant")
