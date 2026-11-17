@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Application } from "../api/client";
 import { failure, ok, renderWithClient, sentBody } from "../test-utils";
@@ -9,6 +9,8 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
+// These are about the board; the Steps view has its own tests (PipelineViews.test.tsx).
+beforeEach(() => { localStorage.setItem("hp.pipelineView", "board"); });
 
 const base: Omit<Application, "id" | "candidateId" | "candidateName" | "stage"> = {
   version: 3, jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", jobTitle: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
@@ -20,7 +22,7 @@ const wei: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w2", candi
 
 /** Clicking a card (not its name) ticks it. */
 /** A candidate's card on the board, by their name. */
-const cardOf = (name: string) => { const card = screen.getByRole("link", { name }).closest<HTMLElement>(".card"); if (!card) throw new Error("no card"); return card; };
+const cardOf = (name: string) => { const card = screen.getByRole("link", { name }).closest<HTMLElement>(".board-line"); if (!card) throw new Error("no card"); return card; };
 const choose = (name: string) => { fireEvent.click(cardOf(name)); };
 const moveChosen = (stage: string) => { fireEvent.change(screen.getByRole("combobox", { name: "Move the chosen candidates" }), { target: { value: stage } }); };
 
@@ -46,7 +48,7 @@ describe("pipeline board", () => {
   it("shows each candidate in their stage, and closed ones with the reason", async () => {
     await showBoard();
     expect(within(screen.getByRole("list", { name: "Screening" })).getByRole("link", { name: "Siti Aisyah" })).toBeTruthy();
-    expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3 days")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Screening" })).getByText("3d")).toBeTruthy();
     expect(screen.getByText("Rejected or withdrawn").closest("summary")?.textContent).toBe("Rejected or withdrawn 1");
     expect(screen.getByText(/Salary does not match: Wants 15k/)).toBeTruthy();
   });
@@ -142,7 +144,7 @@ describe("pipeline board", () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });
     const card = cardOf("Siti Aisyah");
-    expect(card.textContent).toContain("Accountant");
+    expect(screen.getByRole("link", { name: "Siti Aisyah" }).getAttribute("title")).toBe("Siti Aisyah · Accountant"); // one line each: the title on hover
     expect(within(card).getByLabelText("Siti Aisyah").textContent).toBe("SA");
     expect(card.querySelector("input")).toBeNull();
     fireEvent.keyDown(name, { key: " " });
@@ -217,8 +219,8 @@ it("flags who waits too long, the next interview and an offer's deadline", async
   ))) as never);
   renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "interviews:read", "offers:read"]} />);
   await screen.findByRole("link", { name: "Siti Aisyah" });
-  expect((await within(cardOf("Siti Aisyah")).findByText("16 days")).className).toBe("chip red");
-  expect(within(cardOf("Mei Lim")).getByText("8 days").className).toBe("chip amber");
+  expect((await within(cardOf("Siti Aisyah")).findByText("16d")).className).toBe("chip red");
+  expect(within(cardOf("Mei Lim")).getByText("8d").className).toBe("chip amber");
   expect(await within(cardOf("Aina Liyana")).findByText("answer by tomorrow")).toBeTruthy();
   const chips = cardOf("Mei Lim").querySelectorAll(".chip.cal");
   expect(chips).toHaveLength(1); // the next one only

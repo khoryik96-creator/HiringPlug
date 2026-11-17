@@ -73,16 +73,16 @@ export interface Upcoming {
   offerExpiresOn?: string; // a sent offer's last day to answer (YYYY-MM-DD)
 }
 
-const when = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+export const when = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const day = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
 /** Waiting in a stage: grey, amber after 7 days, red after 14 (not once placed). */
-function waitTone(app: Application, days: number): string {
+export function waitTone(app: Application, days: number): string {
   if (app.stage === "placed") return "";
   return days >= 14 ? " red" : days >= 7 ? " amber" : "";
 }
 
-function offerChip(expiresOn: string, now: number) {
+export function offerChip(expiresOn: string, now: number) {
   // Calendar days from today to the last day (local dates, so "tomorrow" means tomorrow).
   const today = new Date(now);
   today.setHours(0, 0, 0, 0);

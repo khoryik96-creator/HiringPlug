@@ -1251,3 +1251,38 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .grade-editor { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
 .grade-chip { display: inline-flex; gap: 4px; align-items: center; background: var(--accent-soft); color: var(--accent-dark, #5b3fd0); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12.5px; font-weight: 600; }
 .grade-editor input { width: 8rem; min-height: 0; padding: 3px 10px; border-radius: 999px; }
+/* Pipeline: Steps (a funnel, then that stage's people with their next step) or a compact Board. */
+.pipeline-steps { display: grid; gap: 0.6rem; }
+.funnel { display: grid; grid-template-columns: 70px repeat(6, minmax(0, 1fr)); gap: 4px; overflow-x: auto; }
+.stage-step { all: unset; box-sizing: border-box; cursor: pointer; display: grid; gap: 1px; align-content: center; min-height: 58px; padding: 6px 12px 6px 20px; background: var(--soft); border: 1px solid var(--line);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%); }
+.stage-step.all { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); padding-left: 12px; border-radius: 10px 0 0 10px; }
+.stage-step small { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 650; color: var(--muted); }
+.stage-step b { font-family: var(--display, inherit); font-size: 1.35rem; line-height: 1; }
+.stage-step .stage-wait { font-size: 10.5px; color: #b91c1c; font-weight: 600; }
+.stage-step[aria-selected=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.stage-step[aria-selected=true] small, .stage-step[aria-selected=true] .stage-wait { color: #f1edff; }
+.stage-step:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+.step-rows { display: grid; }
+.step-row { display: grid; grid-template-columns: 32px minmax(0, 1.4fr) minmax(0, 1.3fr) auto minmax(0, auto); gap: 0.75rem; align-items: center; padding: 0.55rem 0.4rem; border-top: 1px solid var(--line); border-radius: 8px; }
+.step-row.pickable { cursor: pointer; }
+.step-row.picked { background: var(--accent-soft); }
+.step-row .who-text { display: grid; min-width: 0; }
+.step-row .who-text a { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-row .who-title { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-info { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; min-width: 0; }
+.step-actions { display: flex; gap: 0.4rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.step-actions button, .step-actions select { min-height: 0; padding: 0.3rem 0.75rem; font-size: 0.82rem; }
+.board.compact .column { padding: 0.45rem; display: grid; align-content: start; gap: 3px; }
+.board-line { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 4px 6px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid transparent; font-size: 0.82rem; }
+.board-line.pickable { cursor: pointer; }
+.board-line.picked { border-color: var(--accent); background: var(--accent-soft); }
+.board-line.stale { box-shadow: inset 3px 0 0 #b91c1c; }
+.board-line a { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-line .avatar { width: 22px; height: 22px; font-size: 9px; }
+.board-line .chip { padding: 0 6px; font-size: 10.5px; }
+.board-line .line-chips { display: inline-flex; gap: 3px; align-items: center; }
+.board-line .line-next { min-height: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; opacity: 0; }
+.board-line:hover .line-next, .board-line:focus-within .line-next { opacity: 1; }
+.fold-more { justify-self: center; font-size: 0.8rem; font-weight: 600; }
+@media (hover: none) { .board-line .line-next { opacity: 1; } }

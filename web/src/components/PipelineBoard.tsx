@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
-import { ApplicationCard, MoveChosen, MoveMenu, type Upcoming } from "./ApplicationCard";
+import { MoveChosen, MoveMenu, type Upcoming } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
 import { type Person, SeparateEmail } from "./SeparateEmail";
@@ -12,6 +12,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { hashParam } from "../hashQuery";
 import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
+import { FoldedLines, longestFirst, PipelineSteps, usePipelineView } from "./PipelineViews";
 import { needsDetails, StagePrompt } from "./StagePrompt";
 import { type MoveRequest, useMoveApplication, useMoveApplications } from "./useMoveApplication";
 
@@ -93,6 +94,18 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
     if (chosen.length === 1 && chosen[0]) { setEmailing(chosen[0]); return; }
     setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
   };
+  const [view, setView] = usePipelineView();
+  // Steps opens where most people have waited 7+ days (else the first stage with anyone).
+  const waitingIn = (st: Schemas["Stage"]) => st === "placed" ? 0 : active.filter((a) => a.stage === st && Date.parse(a.stageChangedAt) < now - 7 * 86_400_000).length;
+  const mostWaiting = [...OPEN_STAGES].sort((x, y) => waitingIn(y) - waitingIn(x))[0];
+  const firstStage = (): Schemas["Stage"] | "all" => spotlight
+    ?? (mostWaiting && waitingIn(mostWaiting) > 0 ? mostWaiting : undefined)
+    ?? OPEN_STAGES.find((st) => active.some((a) => a.stage === st)) ?? "all";
+  const [stepStage, setStepStage] = useState<Schemas["Stage"] | "all" | null>(null);
+  const shared = {
+    picked, onPick: canPick ? pick : undefined, canMove: canUpdate, busy: move.isPending || moveMany.isPending, onMove: requestMove,
+    upcoming, now, fit, onShowFit: setFitShown,
+  };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
   const scoreOf = (a: Application) => fit.get(a.id)?.score ?? -1;
 
@@ -114,6 +127,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
             </span>
           )}
           {canUpdate && <AddCandidate jobId={jobId} />}
+          <span className="segmented" role="group" aria-label="View">
+            <button type="button" className={view === "steps" ? "on" : undefined} aria-pressed={view === "steps"} onClick={() => { setView("steps"); }}>Steps</button>
+            <button type="button" className={view === "board" ? "on" : undefined} aria-pressed={view === "board"} onClick={() => { setView("board"); }}>Board</button>
+          </span>
         </div>
       </div>
       {matches.data && permissions.includes("matching:create") && (
@@ -169,10 +186,13 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
           </button>
         )}
       </ErrorMessage>
-      <div className="board" ref={board}>
+      {view === "steps" && loaded && (
+        <PipelineSteps {...shared} apps={active} stage={stepStage ?? firstStage()} onStage={setStepStage} />
+      )}
+      {view === "board" && <div className="board compact" ref={board}>
         {OPEN_STAGES.map((stage) => {
           const inStage = apps.filter((a) => a.stage === stage);
-          const cards = bestFirst ? inStage.sort((a, b) => scoreOf(b) - scoreOf(a)) : inStage;
+          const cards = bestFirst ? inStage.sort((a, b) => scoreOf(b) - scoreOf(a)) : inStage.sort(longestFirst(now));
           return (
             <div
               key={stage}
@@ -202,17 +222,11 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                 ) : <span className="count-chip">{String(cards.length)}</span>}
               </div>
               {cards.length === 0 && <p className="column-empty">{stage === "placed" ? "Drag here when they accept" : "Nobody here"}</p>}
-              {cards.map((a) => (
-                <div role="listitem" key={a.id}>
-                  <ApplicationCard app={a} match={fit.get(a.id)} onShowFit={setFitShown}
-                    picked={picked.includes(a.id)} onPick={canPick ? pick : undefined} canMove={canUpdate} onDragStart={setDragging}
-                    upcoming={upcoming.get(a.id)} now={now} />
-                </div>
-              ))}
+              <FoldedLines {...shared} apps={cards} lines={cards} onDragStart={setDragging} />
             </div>
           );
         })}
-      </div>
+      </div>}
       {closed.length > 0 && (
         <details className="fold">
           <summary><span className="fold-title">Rejected or withdrawn</span> <span className="count-chip">{String(closed.length)}</span></summary>

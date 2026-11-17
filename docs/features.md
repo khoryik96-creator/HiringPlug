@@ -953,8 +953,15 @@ lead's company (with the built-in email check).
   stages: applied → screening → submitted (to the client or hiring manager) →
   interview → offer → placed, or rejected / withdrawn with a reason (not
   qualified, salary, client said no, took another offer, ...) and a note. Each
-  job has a **board** (drag a card to another column, or use its "Move to"
-  menu) showing how long each candidate has been in their stage; closed
+  job's pipeline has two views (a switch, remembered in the browser):
+  **Steps**, the stages as a funnel (each flags how many have waited 7+ days;
+  it opens where most wait) with that stage's people below, longest waiting
+  first, each with the button for the usual next step (Screen, Submit to
+  client, Interview, Offer, Placed) and a "Move to" menu; and the **Board**, a
+  column per stage with one line per person (longest waiting first, red edge
+  after 14 days, 8 shown then "+N more", "›" for the next step; drag a line
+  to another column). Clicking a person chooses them for emailing or moving
+  several at once. Closed
   applications are listed below with their reasons and can be reopened. A
   candidate's page lists their jobs and adds them to another. The rules are in
   one place (`pipeline/domain.go`) and tested for every from → to move: a

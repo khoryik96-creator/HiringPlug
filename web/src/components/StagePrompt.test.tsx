@@ -1,9 +1,12 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 import { api, type Application, type Permission } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { PipelineBoard } from "./PipelineBoard";
+
+// About the board (the pipeline opens on Steps otherwise).
+beforeEach(() => { localStorage.setItem("hp.pipelineView", "board"); });
 
 afterEach(() => {
   cleanup();
@@ -30,7 +33,7 @@ function board() {
   return post;
 }
 const moveTo = async (stage: string) => {
-  fireEvent.click((await screen.findByRole("link", { name: "Siti Aisyah" })).closest(".card") as Element);
+  fireEvent.click((await screen.findByRole("link", { name: "Siti Aisyah" })).closest(".board-line") as Element);
   fireEvent.change(screen.getByRole("combobox", { name: "Move the chosen candidates" }), { target: { value: stage } });
 };
 const paths = (post: ReturnType<typeof board>) => post.mock.calls.map((c) => (c as unknown[])[0]);

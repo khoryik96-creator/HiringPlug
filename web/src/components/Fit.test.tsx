@@ -1,11 +1,14 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
 import { api, type Application, type Permission } from "../api/client";
 import { ok, renderWithClient, sentBody } from "../test-utils";
 import { ApplicationFit, fitBand, FitBadge, FitReasons, type Match } from "./Fit";
 import { ratingBand } from "./FitStats";
 import { PipelineBoard } from "./PipelineBoard";
+
+// About the board (the pipeline opens on Steps otherwise).
+beforeEach(() => { localStorage.setItem("hp.pipelineView", "board"); });
 
 afterEach(() => {
   cleanup();
