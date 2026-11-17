@@ -1,7 +1,6 @@
 package main
 
 import (
-	"archive/zip"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -22,6 +21,8 @@ var assets embed.FS
 
 type App struct {
 	connecting              bool
+	closing                 bool
+	work                    sync.WaitGroup
 	mu                      sync.Mutex
 	store                   *Store
 	origin, session         string
@@ -44,7 +45,7 @@ func randomID() string {
 	return hex.EncodeToString(b)
 }
 func (a *App) client(c Connection) *Client {
-	return &Client{Config: c, HTTP: a.clientHTTP, Wait: wait, Pace: a.pace, Save: func(next Connection) error {
+	return &Client{Config: c, HTTP: a.clientHTTP, Wait: wait, Pace: a.pace, LoadRetry: a.store.RetryUntil, SaveRetry: a.store.SetRetryUntil, Save: func(next Connection) error {
 		if err := a.store.SaveConfig(next); err != nil {
 			return err
 		}
@@ -90,6 +91,15 @@ func (a *App) Handler() http.Handler {
 		_, _ = w.Write(body)
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.mu.Lock()
+		if a.closing {
+			a.mu.Unlock()
+			http.Error(w, "Application is closing", http.StatusServiceUnavailable)
+			return
+		}
+		a.work.Add(1)
+		a.mu.Unlock()
+		defer a.work.Done()
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -134,20 +144,39 @@ func input(w http.ResponseWriter, r *http.Request, target any) bool {
 	}
 	return true
 }
-func (a *App) status(w http.ResponseWriter, _ *http.Request) {
+func (a *App) statusData() (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	data := map[string]any{"demo": a.demo, "unlocked": a.unlocked, "connected": a.connection.Fingerprint != "", "running": a.running, "connecting": a.connecting, "current": a.current, "message": a.message, "resources": len(Catalog()), "account": a.connection.Account, "callback": a.origin + "/oauth/callback"}
 	if a.unlocked {
 		report, err := a.store.Report()
-		if err == nil {
-			if report.Status == "running" && !a.running {
-				report.Status = "paused"
-			}
-			data["report"] = report
+		if err != nil {
+			return nil, err
+		}
+		until, err := a.store.RetryUntil()
+		if err != nil {
+			return nil, err
+		}
+		if report.Status == "running" && !a.running {
+			report.Status = "paused"
+		}
+		data["report"] = report
+		if time.Now().Before(until) {
+			data["retryAt"] = until.UTC().Format(time.RFC3339Nano)
 		}
 	}
-	reply(w, 200, data)
+	return data, nil
+}
+func workspaceFailure(w http.ResponseWriter) {
+	reply(w, http.StatusServiceUnavailable, map[string]string{"error": "Workspace progress could not be read. Saved results may be stale; check the workspace before continuing."})
+}
+func (a *App) status(w http.ResponseWriter, _ *http.Request) {
+	data, err := a.statusData()
+	if err != nil {
+		workspaceFailure(w)
+		return
+	}
+	reply(w, http.StatusOK, data)
 }
 func (a *App) unlock(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -178,7 +207,7 @@ func (a *App) unlock(w http.ResponseWriter, r *http.Request) {
 func (a *App) available() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if !a.unlocked || a.running || a.demo || a.connecting {
+	if !a.unlocked || a.running || a.demo || a.connecting || a.closing {
 		return false
 	}
 	a.connecting = true
@@ -189,7 +218,7 @@ func (a *App) connectionDone() { a.mu.Lock(); a.connecting = false; a.mu.Unlock(
 func (a *App) accept(ctx context.Context, c Connection) error {
 	// A new connection is untrusted until its identity matches the workspace.
 	// Refreshes during this check must not overwrite an existing connection.
-	client := &Client{Config: c, HTTP: a.clientHTTP, Wait: wait, Pace: a.pace}
+	client := &Client{Config: c, HTTP: a.clientHTTP, Wait: wait, Pace: a.pace, LoadRetry: a.store.RetryUntil, SaveRetry: a.store.SetRetryUntil}
 	identified, err := identify(ctx, client)
 	if err != nil {
 		return err
@@ -242,8 +271,21 @@ func (a *App) start(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if !a.unlocked || a.running || a.connecting || a.connection.Fingerprint == "" {
+	if !a.unlocked || a.running || a.connecting || a.closing || a.connection.Fingerprint == "" {
 		failure(w, "Connect JobAdder before starting an inventory")
+		return
+	}
+	if _, err := a.store.Report(); err != nil {
+		workspaceFailure(w)
+		return
+	}
+	until, err := a.store.RetryUntil()
+	if err != nil {
+		workspaceFailure(w)
+		return
+	}
+	if time.Now().Before(until) {
+		reply(w, http.StatusTooManyRequests, map[string]string{"error": (&CooldownError{Until: until}).Error()})
 		return
 	}
 	run, err := a.store.Start(a.connection.Fingerprint, in.Resume)
@@ -257,7 +299,9 @@ func (a *App) start(w http.ResponseWriter, r *http.Request) {
 	a.message = ""
 	a.current = "Starting"
 	c := a.client(a.connection)
+	a.work.Add(1)
 	go func() {
+		defer a.work.Done()
 		err := discover(ctx, a.store, c, run, Catalog(), in.Resume, func(label string) { a.mu.Lock(); a.current = label; a.mu.Unlock() })
 		status, message := "finished", "Inventory finished. Review all coverage gaps before planning a full export."
 		if err != nil {
@@ -288,64 +332,21 @@ func (a *App) pause(w http.ResponseWriter, _ *http.Request) {
 }
 func (a *App) report(w http.ResponseWriter, _ *http.Request) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if !a.unlocked {
+		a.mu.Unlock()
 		failure(w, "Unlock the workspace")
 		return
 	}
 	r, err := a.store.Report()
+	running := a.running
+	a.mu.Unlock()
 	if err != nil {
 		failure(w, "Report could not be read")
 		return
 	}
-	if r.Status == "running" && !a.running {
+	if r.Status == "running" && !running {
 		r.Status = "paused"
 	}
 	w.Header().Set("Content-Disposition", `attachment; filename="jobadder-discovery-report.json"`)
 	reply(w, 200, map[string]any{"demo": a.demo, "report": r})
-}
-func (a *App) originals(w http.ResponseWriter, _ *http.Request) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if !a.unlocked || a.running {
-		failure(w, "Pause the inventory before exporting original responses")
-		return
-	}
-	report, err := a.store.Report()
-	if err != nil {
-		failure(w, "Report could not be read")
-		return
-	}
-	for _, result := range report.Results {
-		if result.Digest != "" {
-			if _, err = a.store.Original(report.Run, result.Key); err != nil {
-				failure(w, "Original responses failed verification; no archive was exported")
-				return
-			}
-		}
-	}
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", `attachment; filename="jobadder-original-responses.zip"`)
-	z := zip.NewWriter(w)
-	defer z.Close()
-	for _, r := range report.Results {
-		if r.Digest == "" {
-			continue
-		}
-		body, err := a.store.Original(report.Run, r.Key)
-		if err != nil {
-			return
-		}
-		f, err := z.Create("responses/" + r.Key + ".json")
-		if err != nil {
-			return
-		}
-		if _, err = f.Write(body); err != nil {
-			return
-		}
-	}
-	f, err := z.Create("manifest.json")
-	if err == nil {
-		_ = json.NewEncoder(f).Encode(map[string]any{"demo": a.demo, "report": report})
-	}
 }

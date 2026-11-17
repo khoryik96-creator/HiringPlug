@@ -8,27 +8,31 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/gofrs/flock"
-	_ "modernc.org/sqlite"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
+
+	"github.com/gofrs/flock"
+	_ "modernc.org/sqlite"
 )
 
 type Store struct {
-	lock *flock.Flock
-	db   *sql.DB
-	key  []byte
+	retryMu sync.Mutex
+	lock    *flock.Flock
+	db      *sql.DB
+	key     []byte
 }
 type Result struct {
-	Key     string `json:"key"`
-	Label   string `json:"label"`
-	Kind    string `json:"kind"`
-	Status  string `json:"status"`
-	Count   *int64 `json:"count"`
-	HTTP    int    `json:"http"`
-	Digest  string `json:"sha256,omitempty"`
-	Checked string `json:"checkedAt,omitempty"`
+	Key             string `json:"key"`
+	Label           string `json:"label"`
+	Kind            string `json:"kind"`
+	Status          string `json:"status"`
+	Count           *int64 `json:"count"`
+	HTTP            int    `json:"http"`
+	Digest          string `json:"sha256,omitempty"`
+	Checked         string `json:"checkedAt,omitempty"`
+	EvidenceChecked string `json:"evidenceCheckedAt,omitempty"`
 }
 type Report struct {
 	Run      int64    `json:"run"`
@@ -69,6 +73,9 @@ func OpenStore(dir string) (*Store, error) {
  CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value BLOB NOT NULL);
  CREATE TABLE IF NOT EXISTS runs(id INTEGER PRIMARY KEY,source TEXT NOT NULL,started TEXT NOT NULL,status TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS results(run_id INTEGER NOT NULL,key TEXT NOT NULL,label TEXT NOT NULL,kind TEXT NOT NULL,status TEXT NOT NULL,count INTEGER,http INTEGER NOT NULL,sha TEXT NOT NULL,checked TEXT NOT NULL,body BLOB,PRIMARY KEY(run_id,key));`)
+	if err == nil {
+		err = initObservations(db)
+	}
 	if err != nil {
 		_ = db.Close()
 		return nil, err
@@ -175,8 +182,24 @@ func (s *Store) SaveResult(run int64, r Resource, status string, count *int64, h
 			return err
 		}
 	}
-	_, err := s.db.Exec(`INSERT INTO results VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(run_id,key) DO UPDATE SET status=excluded.status,count=excluded.count,http=excluded.http,sha=excluded.sha,checked=excluded.checked,body=excluded.body`, run, r.Key, r.Label, r.Kind, status, count, httpCode, digest, time.Now().UTC().Format(time.RFC3339), body)
-	return err
+	checked := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`INSERT INTO observations(run_id,key,status,count,http,sha,checked,body) VALUES(?,?,?,?,?,?,?,?)`, run, r.Key, status, count, httpCode, digest, checked, body)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`INSERT INTO results VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(run_id,key) DO UPDATE SET
+ label=excluded.label,kind=excluded.kind,status=excluded.status,count=excluded.count,http=excluded.http,
+ sha=CASE WHEN excluded.body IS NULL THEN results.sha ELSE excluded.sha END,
+ checked=excluded.checked,body=COALESCE(excluded.body,results.body)`, run, r.Key, r.Label, r.Kind, status, count, httpCode, digest, checked, body)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (s *Store) Finish(run int64, status string) error {
 	_, err := s.db.Exec(`UPDATE runs SET status=? WHERE id=?`, status, run)
@@ -192,7 +215,9 @@ func (s *Store) Report() (Report, error) {
 	if err != nil {
 		return out, err
 	}
-	rows, err := s.db.Query(`SELECT key,label,kind,status,count,http,sha,checked FROM results WHERE run_id=? ORDER BY key`, out.Run)
+	rows, err := s.db.Query(`SELECT key,label,kind,status,count,http,sha,checked,
+ COALESCE((SELECT checked FROM observations o WHERE o.run_id=results.run_id AND o.key=results.key AND o.sha=results.sha AND o.body IS NOT NULL ORDER BY o.id DESC LIMIT 1),'')
+ FROM results WHERE run_id=? ORDER BY key`, out.Run)
 	if err != nil {
 		return out, err
 	}
@@ -200,7 +225,7 @@ func (s *Store) Report() (Report, error) {
 	for rows.Next() {
 		var r Result
 		var n sql.NullInt64
-		if err = rows.Scan(&r.Key, &r.Label, &r.Kind, &r.Status, &n, &r.HTTP, &r.Digest, &r.Checked); err != nil {
+		if err = rows.Scan(&r.Key, &r.Label, &r.Kind, &r.Status, &n, &r.HTTP, &r.Digest, &r.Checked, &r.EvidenceChecked); err != nil {
 			return out, err
 		}
 		if n.Valid {

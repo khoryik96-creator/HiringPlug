@@ -78,10 +78,13 @@ func TestResponseSizeIsNotSilentlyTruncated(t *testing.T) {
 		t.Fatal("truncated source accepted")
 	}
 }
-func TestRetryAfterIsBoundedWithoutDurationOverflow(t *testing.T) {
-	for _, header := range []string{"300", "9999999999999999"} {
-		if got := retryDelay(header, 0); got != 5*time.Minute {
-			t.Fatalf("unexpected retry bound: %v", got)
+func TestRetryAfterRetainsDelayWithoutDurationOverflow(t *testing.T) {
+	if got := retryDelay("900", 0); got != 15*time.Minute {
+		t.Fatal("provider delay shortened", got)
+	}
+	for _, header := range []string{"9999999999999999", "99999999999999999999999999999999999"} {
+		if got := retryDelay(header, 0); got <= 15*time.Minute {
+			t.Fatal("large retry interval overflowed", got)
 		}
 	}
 }

@@ -21,6 +21,10 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 - First release is read-only discovery: counts/access gaps, original response
   evidence, encrypted credentials/responses, pause/resume and synthetic demo.
   It does not yet export full records/CVs or write into HiringPlug.
+- Discovery preserves append-only observations across retries, recognises
+  JobAdder's definition envelopes, pages categories, defers the candidate-only
+  payroll endpoint, persists provider retry deadlines and surfaces workspace
+  errors. Archive preparation/downloads do not hold the application lock.
 - The owner requires JobAdder field values to remain unchanged. No normalization,
   deduplication, salary rewriting or AI enrichment during migration. API access
   is available; approximately 80,000 candidates and all obtainable related

@@ -71,15 +71,25 @@ Register the corresponding port's callback. Flags also include `--demo` and
 - Counts for candidates, companies, contacts, jobs, applications, placements,
   notes, submissions, floats, interviews, events, tasks, folders, users, groups,
   offices, ads, opportunities, requisitions and candidate attachment metadata.
-- Activity collections, candidate payroll/billing access and source definitions
+- Activity collections and source definitions
   such as custom fields, statuses, attachment categories and lookup lists.
 - Individual access gaps, failed requests, missing totals and resumable progress.
+- Payroll/billing is marked **Requires candidate-level discovery**. Its API
+  accepts candidate IDs, not a global count request; this stage does not access it.
 
 Counts use JobAdder's `Limit=0` where supported. Permissions, default visibility
-and resources not supported by your account can limit the result. Definition
-responses can be paginated: saving one response does not mean every definition
-or custom-field value has been exported. Counts are observed at different times,
+and resources not supported by your account can limit the result. Unpaged
+definitions are counted from their `items`; category pages are preserved
+individually and counted only after pagination completes. Unexpected/repeated
+pages or the discovery bound (100 pages of up to 1,000 categories) require review.
+Record-level custom-field values are not exported. Counts are observed at different times,
 not a transactionally consistent account snapshot.
+
+If JobAdder requests a long retry delay, discovery pauses immediately and shows
+the earliest retry time. The deadline survives pause, reconnect and restart.
+Start/resume stay disabled until that time; no early retry is sent. If workspace
+progress cannot be read, an error appears and the last displayed figures remain
+visible as stale until the workspace is healthy again.
 
 CV binaries/versions, nested attachments, folder membership, invoices,
 timesheets, rate cards, requisition forms/approvals, complete stage histories,
@@ -92,11 +102,21 @@ separate JobAdder export. The coverage report lists these gaps explicitly.
   with a scrypt-derived workspace key, and hashed with SHA-256. Originals are
   checked before download. Numeric precision, unknown fields, nulls, wording
   and typos in those responses are not rewritten.
+- Response/attempt history is append-only. A failed retry does not erase an
+  earlier saved response, and changed responses retain both versions. ZIPs
+  include `observations/` with saved versions, `responses/` with the latest saved
+  response per resource, and a manifest identifying attempt/evidence timestamps.
+  For paginated categories, `responses/` is the last saved page; use all the
+  pages in the completed scan's observation history. Upgrades preserve evidence
+  still present in older workspaces; already overwritten data cannot be recovered.
 - Saved credentials and response bodies are encrypted. Counts, labels, run
   timestamps, status codes and hashes are SQLite metadata and are not encrypted.
   Use a private local folder and an encrypted disk; avoid shared/synced folders.
 - Downloaded reports and original-response ZIP files are **unencrypted**. They
   may contain personal data; handle them as private account exports.
+- ZIPs are prepared and verified in a private temporary file before download,
+  without locking the interface. The OS removes staging on close/process exit
+  (unlinked on Unix, delete-on-close on Windows); downloads have a write deadline.
 - Stop the application before backing up the **whole workspace folder**.
   Preserve the passphrase separately. Do not copy only an open SQLite database
   and omit its WAL files. Replacing the executable does not reset the workspace.

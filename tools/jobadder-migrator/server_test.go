@@ -163,8 +163,11 @@ func TestInventoryCompletesWithExplicitAccessGap(t *testing.T) {
 		t.Fatal("inventory incomplete", err)
 	}
 	for _, r := range report.Results {
-		if r.Key == "payroll" && (r.Status != "denied" || r.Count != nil) {
-			t.Fatalf("denied payroll counted as zero: %+v", r)
+		if r.Key == "payroll" && (r.Status != "deferred" || r.Count != nil || r.HTTP != 0) {
+			t.Fatalf("candidate-level payroll was probed: %+v", r)
+		}
+		if r.Key == "opportunities" && (r.Status != "denied" || r.Count != nil) {
+			t.Fatal("denied resource counted as zero")
 		}
 	}
 }

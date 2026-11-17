@@ -51,6 +51,31 @@ jobs:
       - name: Race checks
         if: runner.os == 'Linux'
         run: go test -race ./...
+      - uses: pnpm/action-setup@v4
+        if: runner.os == 'Linux'
+        with: { package_json_file: web/package.json }
+      - uses: actions/setup-node@v4
+        if: runner.os == 'Linux'
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - uses: actions/cache@v4
+        if: runner.os == 'Linux'
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+      - name: Install browser test dependencies
+        if: runner.os == 'Linux'
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Standalone browser checks (synthetic data only)
+        if: runner.os == 'Linux'
+        run: |
+          go build -trimpath -o dist/HiringPlugMigration .
+          node test/browser-smoke.cjs dist/HiringPlugMigration "${{ runner.temp }}/jobadder-discovery-ui"
       - name: Build Windows executable
         if: runner.os == 'Windows'
         env: { GOOS: windows, GOARCH: amd64, CGO_ENABLED: "0" }
@@ -234,10 +259,6 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm build
           pnpm e2e
-      - name: JobAdder discovery browser checks (synthetic data only)
-        run: |
-          go -C tools/jobadder-migrator build -trimpath -o dist/HiringPlugMigration .
-          node tools/jobadder-migrator/test/browser-smoke.cjs tools/jobadder-migrator/dist/HiringPlugMigration "$RUNNER_TEMP/jobadder-discovery-ui"
       - name: Service logs
         if: always()
         run: tail -n 50 "$RUNNER_TEMP"/*.log

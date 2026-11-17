@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -25,11 +24,13 @@ type Connection struct {
 	Fingerprint  string `json:"fingerprint"`
 }
 type Client struct {
-	Config Connection
-	HTTP   *http.Client
-	Save   func(Connection) error
-	Wait   func(context.Context, time.Duration) error
-	Pace   time.Duration
+	Config    Connection
+	HTTP      *http.Client
+	Save      func(Connection) error
+	Wait      func(context.Context, time.Duration) error
+	Pace      time.Duration
+	LoadRetry func() (time.Time, error)
+	SaveRetry func(time.Time) error
 }
 
 func secureHTTP() *http.Client {
@@ -115,15 +116,6 @@ func (c *Client) refresh(ctx context.Context) error {
 	c.Config = next
 	return nil
 }
-func retryDelay(h string, attempt int) time.Duration {
-	if seconds, err := strconv.Atoi(h); err == nil && seconds >= 0 {
-		return time.Duration(min(seconds, 300)) * time.Second
-	}
-	if at, err := http.ParseTime(h); err == nil {
-		return max(0, min(time.Until(at), 5*time.Minute))
-	}
-	return time.Duration(1<<attempt) * time.Second
-}
 func readLimited(r io.Reader, max int64) ([]byte, error) {
 	body, err := io.ReadAll(io.LimitReader(r, max+1))
 	if err != nil {
@@ -137,6 +129,15 @@ func readLimited(r io.Reader, max int64) ([]byte, error) {
 
 // get never follows API-supplied links and never accepts caller-supplied methods.
 func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
+	if c.LoadRetry != nil {
+		until, err := c.LoadRetry()
+		if err != nil {
+			return nil, 0, errors.New("retry checkpoint could not be read")
+		}
+		if time.Now().Before(until) {
+			return nil, 0, &CooldownError{Until: until}
+		}
+	}
 	refreshed := false
 	for attempt := 0; attempt < 4; attempt++ {
 		if c.Pace > 0 {
@@ -176,6 +177,15 @@ func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
 		if status == 429 || status >= 500 {
 			delay := retryDelay(res.Header.Get("Retry-After"), attempt)
 			_ = res.Body.Close()
+			until := time.Now().Add(delay)
+			if c.SaveRetry != nil {
+				if err := c.SaveRetry(until); err != nil {
+					return nil, status, errors.New("retry checkpoint could not be saved")
+				}
+			}
+			if delay > maxInlineRetry || attempt == 3 {
+				return nil, status, &CooldownError{Until: until}
+			}
 			if attempt < 3 {
 				if err = c.Wait(ctx, delay); err != nil {
 					return nil, status, err

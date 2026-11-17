@@ -23,10 +23,11 @@ func Catalog() []Resource {
 		{"jobads", "Job ads", "/jobads"}, {"opportunities", "Opportunities", "/opportunities"},
 		{"requisitions", "Requisitions", "/requisitions"},
 		{"candidate_attachments", "Candidate attachment metadata", "/candidates/attachments"},
-		{"payroll", "Candidate payroll/billing", "/candidates/payrollbilling"},
 	} {
 		out = append(out, Resource{r.key, r.label, r.path, "count"})
 	}
+	// This FT360 lookup accepts candidate IDs, not Limit=0 or a global total.
+	out = append(out, Resource{"payroll", "Candidate payroll/billing", "/candidates/payrollbilling", "deferred"})
 	for _, entity := range []string{"candidates", "companies", "contacts", "jobs", "applications", "placements"} {
 		out = append(out, Resource{entity + "_activities", entity + " activities", "/" + entity + "/activities", "count"})
 	}
@@ -42,7 +43,7 @@ func Catalog() []Resource {
 	for _, r := range []Resource{
 		{"candidate_sources", "Candidate sources", "/candidates/lists/source", "definitions"},
 		{"job_sources", "Job sources", "/jobs/lists/source", "definitions"},
-		{"categories", "Categories", "/categories", "definitions"},
+		{"categories", "Categories", "/categories", "paged_definitions"},
 		{"countries", "Countries", "/countries", "definitions"},
 		{"locations", "Locations", "/locations", "definitions"},
 		{"worktypes", "Work types", "/worktypes", "definitions"},
@@ -56,8 +57,9 @@ var Coverage = []string{
 	"This is read-only discovery, not a completed migration or a full account backup.",
 	"Counts reflect the connected user's API permissions and JobAdder's default list visibility; reconcile against account exports.",
 	"CV/file bytes and versions, folder memberships, company/contact/job/application/placement attachments, invoices, timesheets, rate cards, requisition forms/approval history and other per-record relationships still require deeper inventory.",
+	"Payroll/billing requires candidate-level discovery and is not requested during this count-only inventory; access and coverage have not been verified.",
 	"Email/SMS bodies, complete stage histories, deleted/purged records and any data not exposed to this account require separate access/export checks. Unavailable is never reported as zero.",
 	"Original JSON responses are retained byte for byte. No source fields are mapped, cleaned, merged or sent to AI or HiringPlug.",
-	"Definition responses may be paginated; these are original discovery responses, not a complete export of every definition or field value.",
+	"Known unpaged definition envelopes are counted from their items. Unexpected pagination requires review; record-level custom-field values are not exported by discovery.",
 	"Inventory requests occur at different times; changing counts are not a transactionally consistent JobAdder snapshot.",
 }

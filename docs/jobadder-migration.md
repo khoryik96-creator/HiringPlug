@@ -17,18 +17,27 @@ database or Python worker. Its initial release provides:
 - A persistent SQLite workspace, exclusive process lock, encrypted credentials
   and original response bodies (AES-GCM/scrypt), plus source identity binding.
 - A reviewed catalog of GET collection counts, activity counts, attachment
-  metadata, payroll/billing access and field/lookup definitions. It records
+  metadata and field/lookup definitions. Payroll/billing is explicitly deferred
+  to candidate-level discovery rather than requested as a global count. It records
   access failures and missing authoritative counts as unknown, never zero.
 - Pause/resume checkpoints, bounded retries with `Retry-After`, cancellation,
   token refresh, count reports and integrity-checked original-response ZIPs.
+- An append-only encrypted observation history. Failed retries keep earlier
+  responses, and the manifest separates latest attempts from evidence timestamps.
+  Existing workspaces retain their saved evidence when the schema is upgraded.
+- Durable provider cooldowns, including across restarts; long waits pause
+  immediately instead of retrying early. Storage failures show an error and
+  disable new runs while keeping the last displayed results visible as stale.
 - A clearly marked synthetic demo, Go tests, browser smoke coverage and a
   Windows x64 build. Linux/Windows tests run in repository CI. `task verify`
   includes this module's checks and Windows cross-build.
 
 This is **discovery only**, not a full source backup or completed importer.
-Current resource requests use `Limit=0` for collection totals. Definitions may
-be paginated; original responses are evidence of what was observed, not proof
-that all definition pages or record custom-field values were retrieved. Counts
+Current resource requests use `Limit=0` for collection totals. Known unpaged
+definition envelopes are counted from `items`; categories use fixed-offset
+pagination, retaining every page and reporting a total only on completion.
+Repeated pages, unexpected pagination and bounds require review rather than
+being reported as complete. Record custom-field values are not retrieved. Counts
 reflect account permissions/default visibility and are not one consistent
 database snapshot. No live credentials are required for automated tests.
 
@@ -131,6 +140,10 @@ cutover. Source deletions must never cause automatic destination deletion.
 Credentials and original responses are encrypted, but operational SQLite
 metadata is plaintext. Use a private local directory and disk encryption.
 Downloads are unencrypted and must be treated as private account exports.
+Archives are fully prepared and verified outside the application lock before
+headers are sent. Their private temporary staging file is unlinked on Unix or
+uses delete-on-close on Windows, including process termination. Download writes
+are bounded, and shutdown cancels handlers before closing their workspace.
 Passphrases cannot be recovered. Stop the tool before backing up the whole
 workspace. Use separate workspaces for different accounts/API users.
 

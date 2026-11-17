@@ -75,24 +75,31 @@ func run() error {
 	if !*noBrowser {
 		openBrowser(a.origin + "/#" + a.session)
 	}
-	server := &http.Server{Handler: a.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
+	requestContext, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+	server := &http.Server{Handler: a.Handler(), BaseContext: func(net.Listener) context.Context { return requestContext }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: exportWriteTimeout, IdleTimeout: 60 * time.Second}
 	signals, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	done := make(chan struct{})
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		select {
 		case <-signals.Done():
 		case <-done:
-			return
 		}
+		cancelRequests()
 		a.mu.Lock()
+		a.closing = true
 		if a.cancel != nil {
 			a.cancel()
 		}
 		a.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = server.Shutdown(ctx)
+		if server.Shutdown(ctx) != nil {
+			_ = server.Close()
+		}
 	}()
 	err = server.Serve(listener)
 	a.mu.Lock()
@@ -101,16 +108,9 @@ func run() error {
 	}
 	a.mu.Unlock()
 	close(done)
-	// Wait for a cancelled inventory to release the database before closing it.
-	for {
-		a.mu.Lock()
-		running := a.running
-		a.mu.Unlock()
-		if !running {
-			break
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	<-shutdownDone
+	// HTTP handlers and inventory workers finish before their store is closed.
+	a.work.Wait()
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("local browser server stopped unexpectedly")
 	}
@@ -150,12 +150,14 @@ func (demoTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		data = map[string]any{"items": []any{}, "totalCount": 4000}
 	case "/candidates/attachments":
 		data = map[string]any{"items": []any{}, "totalCount": 96000}
-	case "/candidates/payrollbilling":
+	case "/opportunities":
 		code = 403
 		data = map[string]string{"error": "demo unavailable"}
+	case "/categories", "/countries", "/locations", "/worktypes":
+		data = map[string]any{"items": []any{map[string]any{"name": "Original source label", "value": "Keep unchanged"}}}
 	default:
 		if strings.Contains(r.URL.Path, "/fields/") || strings.Contains(r.URL.Path, "/lists/") {
-			data = []any{map[string]any{"name": "Original source label", "value": "Keep unchanged"}}
+			data = map[string]any{"items": []any{map[string]any{"name": "Original source label", "value": "Keep unchanged"}}}
 		}
 	}
 	raw, _ := json.Marshal(data)
