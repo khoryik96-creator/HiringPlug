@@ -191,3 +191,20 @@ def test_name_particles_are_not_email_support() -> None:
     # "bin" is in "robinson", but that says nothing about who the CV belongs to.
     p = parse_cv("SKILLS\nAhmad Bin Ali\nEMAIL\nrobinson@example.com\n")
     assert p.fullName is None
+
+
+def test_the_end_of_a_summary_sentence_is_not_a_name() -> None:
+    # The name was letter-spaced and unreadable; the summary's last line, all
+    # lowercase, was taken for it.
+    text = "\n".join(
+        [
+            "N O E L K H O",
+            "PRODUCT MANAGER",
+            "SUMMARY",
+            "Impact-driven Product Manager with 8+ years of experience across",
+            "bringing solutions that matter to life, with a curious, boundary-pushing",
+            "mindset to explore new frontiers.",
+            "PROFESSIONAL EXPERIENCE",
+        ]
+    )
+    assert parse_cv(text).fullName is None

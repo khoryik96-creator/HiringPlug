@@ -15,7 +15,10 @@ narrow screens.
 CV & files has one document library and one viewer: selecting a file changes its
 preview and action toolbar together. Upload, compare, formatting, formatting
 history, extracted-detail review, text/original view, Word/PDF download, reread
-and permission-gated formatted-file deletion remain available. Jobs uses the
+and permission-gated formatted-file deletion remain available. Compare side by
+side shows two CVs next to each other in the tab itself (each with its own
+picker; what their details disagree on folded underneath). Review details opens
+above the CV; Read details again says while it reads, then offers the review. Jobs uses the
 existing stage badge and separate Move to menu, including reason/cancel/reopen,
 interviews, offers, placements and stage history. Profile/history editing,
 duplicate merging, privacy tools, call history and salary notes remain in their

@@ -88,6 +88,10 @@ def _plausible(value: str, supported: bool) -> bool:
         return False
     if all(w.lower().strip(".,") in PLACES for w in words) or section_of(value):
         return False
+    # "mindset to explore new frontiers": the end of a sentence, not a name
+    # (a name written in lowercase counts only with the email's or link's backing).
+    if not supported and all(w.islower() for w in words):
+        return False
     # "Dynamic and result-oriented": a capitalised start, then ordinary lowercase words.
     return not (words[0][0].isupper() and any(w.islower() and w.lower() not in _PARTICLES for w in words[1:]))
 

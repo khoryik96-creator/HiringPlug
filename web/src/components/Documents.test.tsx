@@ -36,6 +36,51 @@ describe("CVs and documents", () => {
     expect(screen.getByRole("menuitem", {name: "Delete this formatted CV"})).toBeTruthy();
   });
 
+  it("opens Review details above the CV, and says what Read details again is doing", async () => {
+    let parseStatus: Document["parseStatus"] = "parsed";
+    const cv = () => doc({ id: "doc_cv", fileName: "Noelle CV.txt", contentType: "text/plain", extractedText: "CV text", parseStatus,
+      parsedProfile: { parser: "rules@1", fullName: { value: "Noelle Khoo", quote: "NOELLE KHOO" }, skills: [], experience: [], education: [], dropped: 0 } as never });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("CV text");
+    fireEvent.click(screen.getByRole("button", { name: "Review details" }));
+    const review = await screen.findByRole("region", { name: "Details from this CV" });
+    const viewer = document.querySelector(".cv-workspace") as HTMLElement;
+    // Before the tall viewer, where the button is: it used to open below it, out of sight.
+    expect(review.compareDocumentPosition(viewer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("More for Noelle CV.txt"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Read details again" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Reading the details from Noelle CV.txt…");
+    expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
+    parseStatus = "parsed";
+    await waitFor(() => { expect(screen.getByRole("status").textContent).toContain("Details read from Noelle CV.txt."); }, { timeout: 4000 });
+    fireEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "Review details" }));
+    expect(await screen.findByRole("region", { name: "Details from this CV" })).toBeTruthy();
+  });
+
+  it("compares two CVs side by side right in the tab, and goes back to one", async () => {
+    const a = doc({ id: "doc_a", fileName: "Their CV.txt", contentType: "text/plain", extractedText: "Their text" });
+    const b = doc({ id: "doc_b", fileName: "Formatted CV.txt", source: "formatted", contentType: "text/plain", extractedText: "Formatted text" });
+    vi.spyOn(api, "GET").mockImplementation(((path: string, init: { params: { path: { documentId: string } } }) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [a, b] } : init.params.path.documentId === a.id ? a : b
+    ))) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Their text");
+    // A button in the tab, not a link to another page.
+    expect(screen.queryByRole("link", { name: "Compare side by side" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Compare side by side" }));
+    const both = await screen.findByRole("region", { name: "CVs side by side" });
+    expect(await within(both).findByText("Their text")).toBeTruthy();
+    expect(await within(both).findByText("Formatted text")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back to one CV" }));
+    expect(screen.queryByRole("region", { name: "CVs side by side" })).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Candidate files" })).toBeTruthy();
+  });
+
   it("lists their CVs before the formatted ones, each with its own actions", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
       doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "ready" }),

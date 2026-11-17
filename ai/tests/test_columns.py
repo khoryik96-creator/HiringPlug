@@ -81,3 +81,23 @@ def test_right_aligned_dates_keep_a_one_column_page_whole() -> None:
     c.save()
     text = extract(buffer.getvalue(), ocr=None).text or ""
     assert "Regional Sales Manager 06/2014 - 11/2015" in text
+
+
+def test_a_letter_spaced_name_is_read_as_words() -> None:
+    """A designed CV prints "N O E L L E  K H O O": each letter is its own word
+    in the PDF, the words' gap wider than the letters'."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setFont("Helvetica-Bold", 22)
+    x = 200.0
+    for word in ("AINA", "KAMAL"):
+        for letter in word:
+            c.drawString(x, 780, letter)
+            x += c.stringWidth(letter, "Helvetica-Bold", 22) + 6
+        x += 12
+    c.setFont("Helvetica", 11)
+    c.drawString(200, 750, "P R O D U C T")  # one space between letters: one word
+    c.drawString(200, 720, "Summary of a career")
+    c.save()
+    text = extract(buffer.getvalue(), ocr=None).text or ""
+    assert "AINA KAMAL" in text.splitlines()
