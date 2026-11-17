@@ -1129,6 +1129,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/companies/{companyId}/hr-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        /** The company's latest Find HR scan (LinkedIn people in HR), with who is a contact already */
+        get: operations["getHrScan"];
+        /** Start a new Find HR scan (it replaces the last one); the companion then reads its pages */
+        put: operations["startHrScan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/hr-scan/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What the companion read on one page of the scan (or why it could not): the scan moves on, or stops there to resume */
+        post: operations["addHrScanPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/companies/{companyId}/hr-scan/joined": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A person's dates at the company, read from their LinkedIn profile by the companion */
+        post: operations["addHrScanJoined"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/cv-templates": {
         parameters: {
             query?: never;
@@ -5105,6 +5163,103 @@ export interface components {
             model: string | null;
             inputTokens: number;
             outputTokens: number;
+        };
+        /**
+         * @description A country LinkedIn's people search is narrowed to (its two-letter code).
+         * @enum {string}
+         */
+        HrCountry: "MY" | "SG" | "ID" | "PH" | "TH" | "VN" | "HK" | "TW" | "CN" | "JP" | "KR" | "IN" | "AU" | "NZ" | "AE" | "GB" | "US";
+        HrScanStart: {
+            /** @description LinkedIn's number for the company (the companion reads it). */
+            linkedinCompanyId: string;
+            /** @description The company's name as LinkedIn shows it. */
+            linkedinCompanyName: string;
+            /** @description Only people in this country; none means anywhere. */
+            country?: components["schemas"]["HrCountry"];
+            keywords: string[];
+            /** @description Pages read for each search. */
+            pages: number;
+        };
+        HrScanPage: {
+            /** @description Which search (HrScan.queries). */
+            query: number;
+            page: number;
+            people?: components["schemas"]["HrScanPersonRead"][];
+            hasNext?: boolean;
+            /** @description Why the page could not be read; the scan stops there, to resume. */
+            error?: string;
+        };
+        HrScanPersonRead: {
+            url: string;
+            name: string;
+            title: string;
+            location?: string;
+        };
+        HrScanJoined: {
+            url: string;
+            current: boolean | null;
+            joined?: components["schemas"]["LinkedinYearMonth"] | null;
+            left?: components["schemas"]["LinkedinYearMonth"] | null;
+        };
+        /**
+         * @description running: pages still to read (next says which); stopped: a page could not be read (resume reads it again); done.
+         * @enum {string}
+         */
+        HrScanStatus: "running" | "stopped" | "done";
+        HrScanPerson: {
+            url: string;
+            name: string;
+            title: string;
+            location: string;
+            /**
+             * @description How likely they hire: A recruitment and HR leads, B HR managers and partners, C other HR roles.
+             * @enum {string}
+             */
+            tier: "A" | "B" | "C";
+            /** @description Why they are left out (a former employee, an intern), or null. */
+            hidden: string | null;
+            joined: components["schemas"]["LinkedinYearMonth"] | null;
+            left: components["schemas"]["LinkedinYearMonth"] | null;
+            /** @description From their profile once read: true works there now; null not read or unclear. */
+            current: boolean | null;
+            /** @description A contact with this LinkedIn profile already. */
+            contactId: string | null;
+            contactName: string | null;
+            /** @description A contact with the same name (a possible duplicate). */
+            duplicateOf: string | null;
+            duplicateName: string | null;
+        };
+        HrScanNext: {
+            query: number;
+            page: number;
+        };
+        HrScan: {
+            companyId: components["schemas"]["CompanyId"];
+            linkedinCompanyId: string;
+            linkedinCompanyName: string;
+            country: components["schemas"]["HrCountry"] | null;
+            /** @description The country as LinkedIn names it ("Hong Kong SAR"). */
+            countryName: string | null;
+            /** @description LinkedIn's number for the country (its geoUrn). */
+            geoId: string | null;
+            keywords: string[];
+            /** @description The searches run, a few keywords each (LinkedIn returns nothing for long ORs). */
+            queries: string[];
+            pages: number;
+            status: components["schemas"]["HrScanStatus"];
+            /** @description The page to read next (also after a stop); null once done. */
+            next: components["schemas"]["HrScanNext"] | null;
+            pagesRead: number;
+            error: string | null;
+            /** @description Best first (tier, then name). */
+            people: components["schemas"]["HrScanPerson"][];
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        HrScanOrNone: {
+            scan: components["schemas"]["HrScan"] | null;
         };
         /** @example cont_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ContactId: string;
@@ -10746,6 +10901,122 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             413: components["responses"]["PayloadTooLarge"];
+        };
+    };
+    getHrScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK (scan is null before the first) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrScanOrNone"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startHrScan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrScanStart"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrScan"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addHrScanPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrScanPage"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrScan"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    addHrScanJoined: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: components["parameters"]["CompanyIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrScanJoined"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrScan"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listCvTemplates: {

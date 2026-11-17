@@ -78,7 +78,7 @@ describe("company pages", () => {
     expect(within(card).getByText("Billing 2026"), "the agency's year, from the server").toBeTruthy();
     expect(within(card).getByText("RM 30,000 all time")).toBeTruthy();
 
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Details", "Terms & benefits", "Jobs", "Contacts", "Activity"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Details", "Terms & benefits", "Jobs", "Contacts", "Find HR", "Activity"]);
     expect(screen.queryByRole("region", { name: "Contacts" }), "a tab loads when opened").toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Contacts" }));
     expect(await screen.findByRole("region", { name: "Contacts" })).toBeTruthy();

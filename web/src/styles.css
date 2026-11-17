@@ -1192,3 +1192,24 @@ button.danger:hover { filter: brightness(1.08); }
 .delete-links label { display: flex; align-items: center; gap: 0.45rem; }
 .delete-move { margin: 0 0 0.2rem 1.6rem; }
 .bin-table td { vertical-align: top; }
+
+/* Company > Find HR */
+.hr-settings { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+.hr-settings .grow { flex: 1 1 18rem; }
+.hr-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.hr-status > span:first-child { flex: 1; }
+.hr-status.stopped > span:first-child { color: #b45309; }
+table.hr-people tbody tr { cursor: pointer; user-select: none; }
+table.hr-people tbody tr:hover td { background: var(--soft); }
+table.hr-people tbody tr.picked td { background: var(--accent-soft); }
+table.hr-people tbody tr.picked td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.hr-people tbody tr.have { cursor: default; }
+table.hr-people tbody tr.have td { color: var(--muted); }
+.hr-name { font-weight: 650; color: var(--ink, inherit); }
+.hr-tier { font-weight: 800; }
+.hr-tier.tA { color: var(--accent); }
+.hr-tier.tC { color: var(--muted); }
+.hr-chip { display: inline-block; border-radius: 999px; padding: 0.1rem 0.6rem; font-size: 0.78rem; font-weight: 650; white-space: nowrap; text-decoration: none; }
+.hr-chip.new { background: #e8f6ee; color: #15803d; }
+.hr-chip.dup { background: #fdf3e2; color: #b45309; }
+.hr-chip.have { background: var(--soft); color: var(--muted); }

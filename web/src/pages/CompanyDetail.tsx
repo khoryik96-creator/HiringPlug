@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { DeleteRecord } from "../components/DeleteRecord";
+import { FindHR } from "../components/FindHR";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { IndustrySummary } from "../components/IndustryPicker";
@@ -16,7 +17,7 @@ import { ErrorMessage } from "../components/ErrorMessage";
 import { type Section, SectionTabs } from "../components/SectionTabs";
 import { Timeline } from "../components/Timeline";
 
-type Tab = "details" | "terms" | "jobs" | "contacts" | "activity";
+type Tab = "details" | "terms" | "jobs" | "contacts" | "find-hr" | "activity";
 
 /**
  * One company, laid out like a candidate: its card (where it is based, size,
@@ -64,6 +65,7 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
     { id: "contacts", label: "Contacts", content:
       <CompanyContacts company={c} canCreate={permissions.includes("contacts:create")} canEmail={permissions.includes("emails:send")}
         canCheck={permissions.includes("contacts:update")} /> },
+    { id: "find-hr", label: "Find HR", content: <FindHR company={c} canCreate={permissions.includes("contacts:create")} /> },
     { id: "activity", label: "Activity", content: <Timeline compact subjectType="company" subjectId={c.id} permissions={permissions} /> },
   ];
 

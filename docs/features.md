@@ -834,6 +834,20 @@ lead's company (with the built-in email check).
   dragged by its handle (or moved with the arrow keys) into each person's
   own order, kept with their settings (`dashboardBlocks`); "Reset order"
   restores the default.
+- **Find HR** ✅ (a company's tab): its people in HR on LinkedIn, read by
+  the LinkedIn companion in the recruiter's own browser. You choose the
+  country, the job titles and how many pages; the titles are run as a few
+  short searches (LinkedIn returns nothing for long ORs) and each page is its
+  own address, so a page that fails is tried again on its own (after 5, 15
+  and 30 seconds) and the scan then stops at that page, keeping what it
+  found, to resume there. A sign-in or check page is never retried. People
+  are ranked A (recruitment and HR leads), B (HR managers and partners), C;
+  former staff and interns are hidden. Each shows whether they are a contact
+  already (same LinkedIn profile) or may be (same name). Clicking a row
+  chooses it (All / None too); clicking a name opens their LinkedIn profile.
+  Chosen people get their joining dates read from their profile, or are
+  added as contacts with an email guessed from colleagues', which is then
+  verified like every new address.
 - **Delete, with a Bin** ✅ (owners and admins, `bin:manage`): a candidate,
   contact or company can be deleted from its page. It goes to Settings › Bin
   for 30 days, hidden everywhere at once by the database (lists, searches,

@@ -251,6 +251,44 @@ func (q *Queries) ContactsForLinkedin(ctx context.Context, arg ContactsForLinked
 	return items, nil
 }
 
+const contactsLike = `-- name: ContactsLike :many
+SELECT id, btrim(first_name || ' ' || last_name)::text AS name, coalesce(linkedin_url, '')::text AS linkedin_url
+FROM contact
+WHERE linkedin_url = ANY($1::text[]) OR lower(btrim(first_name || ' ' || last_name)) = ANY($2::text[])
+`
+
+type ContactsLikeParams struct {
+	Urls  []string
+	Names []string
+}
+
+type ContactsLikeRow struct {
+	ID          string
+	Name        string
+	LinkedinUrl string
+}
+
+// Contacts that may be the same people: by LinkedIn profile, or by name (anywhere in the agency).
+func (q *Queries) ContactsLike(ctx context.Context, arg ContactsLikeParams) ([]ContactsLikeRow, error) {
+	rows, err := q.db.Query(ctx, contactsLike, arg.Urls, arg.Names)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactsLikeRow
+	for rows.Next() {
+		var i ContactsLikeRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.LinkedinUrl); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countContactsWithRole = `-- name: CountContactsWithRole :one
 SELECT count(*) FROM contact WHERE role = $1
 `
@@ -366,6 +404,35 @@ func (q *Queries) GetEmploymentCheck(ctx context.Context, id string) (ContactEmp
 		&i.Result,
 		&i.CreatedBy,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getHrScan = `-- name: GetHrScan :one
+SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at FROM hr_scan WHERE company_id = $1
+`
+
+// Find HR: one LinkedIn people scan per company.
+func (q *Queries) GetHrScan(ctx context.Context, companyID string) (HrScan, error) {
+	row := q.db.QueryRow(ctx, getHrScan, companyID)
+	var i HrScan
+	err := row.Scan(
+		&i.TenantID,
+		&i.CompanyID,
+		&i.LinkedinCompanyID,
+		&i.LinkedinCompanyName,
+		&i.Country,
+		&i.Keywords,
+		&i.Pages,
+		&i.Status,
+		&i.NextQuery,
+		&i.NextPage,
+		&i.PagesRead,
+		&i.Error,
+		&i.People,
+		&i.StartedBy,
+		&i.StartedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -754,6 +821,34 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]L
 	return items, nil
 }
 
+const lockHrScan = `-- name: LockHrScan :one
+SELECT tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at FROM hr_scan WHERE company_id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockHrScan(ctx context.Context, companyID string) (HrScan, error) {
+	row := q.db.QueryRow(ctx, lockHrScan, companyID)
+	var i HrScan
+	err := row.Scan(
+		&i.TenantID,
+		&i.CompanyID,
+		&i.LinkedinCompanyID,
+		&i.LinkedinCompanyName,
+		&i.Country,
+		&i.Keywords,
+		&i.Pages,
+		&i.Status,
+		&i.NextQuery,
+		&i.NextPage,
+		&i.PagesRead,
+		&i.Error,
+		&i.People,
+		&i.StartedBy,
+		&i.StartedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markContactLeft = `-- name: MarkContactLeft :one
 UPDATE contact SET status = 'left', version = version + 1, updated_at = now()
 WHERE id = $1 AND status = 'active' AND company_id = $2
@@ -911,6 +1006,55 @@ func (q *Queries) SaveEmploymentCheck(ctx context.Context, arg SaveEmploymentChe
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const saveHrScan = `-- name: SaveHrScan :one
+UPDATE hr_scan SET status = $1, next_query = $2, next_page = $3, pages_read = $4,
+  error = $5, people = $6, updated_at = now()
+WHERE company_id = $7
+RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at
+`
+
+type SaveHrScanParams struct {
+	Status    string
+	NextQuery int32
+	NextPage  int32
+	PagesRead int32
+	Error     *string
+	People    []byte
+	CompanyID string
+}
+
+func (q *Queries) SaveHrScan(ctx context.Context, arg SaveHrScanParams) (HrScan, error) {
+	row := q.db.QueryRow(ctx, saveHrScan,
+		arg.Status,
+		arg.NextQuery,
+		arg.NextPage,
+		arg.PagesRead,
+		arg.Error,
+		arg.People,
+		arg.CompanyID,
+	)
+	var i HrScan
+	err := row.Scan(
+		&i.TenantID,
+		&i.CompanyID,
+		&i.LinkedinCompanyID,
+		&i.LinkedinCompanyName,
+		&i.Country,
+		&i.Keywords,
+		&i.Pages,
+		&i.Status,
+		&i.NextQuery,
+		&i.NextPage,
+		&i.PagesRead,
+		&i.Error,
+		&i.People,
+		&i.StartedBy,
+		&i.StartedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const saveLinkedinCheck = `-- name: SaveLinkedinCheck :one
@@ -1073,6 +1217,57 @@ func (q *Queries) SetEmailCheck(ctx context.Context, arg SetEmailCheckParams) (C
 		&i.PhoneDigits,
 		&i.Role,
 		&i.BinnedAt,
+	)
+	return i, err
+}
+
+const startHrScan = `-- name: StartHrScan :one
+INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, started_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, $5, $6, app_current_user())
+ON CONFLICT (tenant_id, company_id) DO UPDATE SET
+  linkedin_company_id = EXCLUDED.linkedin_company_id, linkedin_company_name = EXCLUDED.linkedin_company_name,
+  country = EXCLUDED.country, keywords = EXCLUDED.keywords, pages = EXCLUDED.pages, status = 'running',
+  next_query = 0, next_page = 1, pages_read = 0, error = NULL, people = '[]'::jsonb,
+  started_by = EXCLUDED.started_by, started_at = now(), updated_at = now()
+RETURNING tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, status, next_query, next_page, pages_read, error, people, started_by, started_at, updated_at
+`
+
+type StartHrScanParams struct {
+	CompanyID           string
+	LinkedinCompanyID   string
+	LinkedinCompanyName string
+	Country             *string
+	Keywords            []string
+	Pages               int32
+}
+
+func (q *Queries) StartHrScan(ctx context.Context, arg StartHrScanParams) (HrScan, error) {
+	row := q.db.QueryRow(ctx, startHrScan,
+		arg.CompanyID,
+		arg.LinkedinCompanyID,
+		arg.LinkedinCompanyName,
+		arg.Country,
+		arg.Keywords,
+		arg.Pages,
+	)
+	var i HrScan
+	err := row.Scan(
+		&i.TenantID,
+		&i.CompanyID,
+		&i.LinkedinCompanyID,
+		&i.LinkedinCompanyName,
+		&i.Country,
+		&i.Keywords,
+		&i.Pages,
+		&i.Status,
+		&i.NextQuery,
+		&i.NextPage,
+		&i.PagesRead,
+		&i.Error,
+		&i.People,
+		&i.StartedBy,
+		&i.StartedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

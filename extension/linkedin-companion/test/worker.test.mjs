@@ -11,7 +11,7 @@ const profile = 'https://www.linkedin.com/in/ana-lim-example';
 const company = 'https://www.linkedin.com/company/maju-logistik/';
 const op = 'clc_01jbz6w0m0k8q9x2r3s4t5v6w7';
 
-function browser({page = () => ({joined: '2019-04', left: '2025-08', current: false}), origins = [app], grouping = true} = {}) {
+function browser({page = () => ({joined: '2019-04', left: '2025-08', current: false}), origins = [app], grouping = true, fast = false} = {}) {
   const listeners = {message: [], activated: [], removed: []};
   const tabs = new Map([[1, {id: 1, url: app + '/#/companies/comp_1', status: 'complete', active: true, windowId: 7, groupId: -1}]]);
   const groups = new Map();
@@ -52,7 +52,7 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
     },
   };
   chrome.tabGroups = {update: async (id, props) => { Object.assign(groups.get(id), props); }};
-  const context = vm.createContext({chrome, setTimeout, URL, globalThis: {}});
+  const context = vm.createContext({chrome, setTimeout: fast ? f => setTimeout(f, 0) : setTimeout, URL, globalThis: {}});
   context.globalThis = context;
   vm.runInContext(source, context);
   const send = (message, origin = app) => new Promise(resolve => {
@@ -161,7 +161,7 @@ test("finds LinkedIn's number for the company on its People page", async () => {
   let url = '';
   const b = browser({page: tab => { url = tab.url; return {company_name: 'Maju', company_id: '123456'}; }});
   const reply = await b.send({action: 'companyId', args: {operation_id: 'a'.repeat(32), company_url: company}});
-  assert.deepEqual({...reply.result}, {company_url: company, company_id: '123456'});
+  assert.deepEqual({...reply.result}, {company_url: company, company_id: '123456', company_name: 'Maju'});
   assert.equal(url, company + 'people/');
 });
 
@@ -186,4 +186,31 @@ test("reads a company's About page for a new company, in a background tab it the
   assert.match((await blocked.send({action: 'companyAbout', args: {operation_id: op, company_url: company}})).error, /verification check/,
     'the reason it stopped, as the reader says it');
   assert.equal(blocked.tabs.size, 1, 'and its tab is closed');
+});
+
+test('Find HR reads one page of a people search at the company, filtered to a country, then closes its tab', async () => {
+  let opened = '', seen = '';
+  const b = browser({page: (tab, args) => {
+    opened = tab.url;
+    seen = JSON.stringify(args);
+    return {people: [{url: 'https://www.linkedin.com/in/farah', name: ' Farah  Aziz ', title: 'Head of Talent Acquisition', location: 'Kuala Lumpur'},
+      {url: 'https://evil.test/in/x', name: 'X', title: 'HR'}], hasNext: true, empty: false};
+  }});
+  const reply = await b.send({action: 'peoplePage', args: {operation_id: op, company_id: '123456', company_name: 'Maju Bank', geo_id: '106808692', country: 'Malaysia',
+    query: '"talent acquisition" OR "recruiter"', keywords: 'talent acquisition,recruiter', page: 2}});
+  assert.equal(seen, JSON.stringify(['Maju Bank', 'Malaysia', 'talent acquisition,recruiter']));
+  assert.deepEqual(JSON.parse(JSON.stringify(reply.result)), {people: [{url: 'https://www.linkedin.com/in/farah', name: 'Farah Aziz', title: 'Head of Talent Acquisition', location: 'Kuala Lumpur'}], has_next: true});
+  const url = new URL(opened);
+  assert.equal(url.pathname, '/search/results/people/');
+  assert.equal(url.searchParams.get('currentCompany'), '["123456"]');
+  assert.equal(url.searchParams.get('geoUrn'), '["106808692"]');
+  assert.equal(url.searchParams.get('page'), '2');
+  assert.equal(b.tabs.size, 1, 'its tab is closed');
+});
+
+test('Find HR says when LinkedIn does not show the country asked for', async () => {
+  const b = browser({page: () => ({loading: true, wait_stage: 'country_filter'}), fast: true});
+  const reply = await b.send({action: 'peoplePage', args: {operation_id: op, company_id: '123456', company_name: 'Maju Bank', geo_id: '106808692', country: 'Malaysia',
+    query: '"HR"', keywords: 'HR', page: 1}});
+  assert.match(reply.error, /location filter as Malaysia/);
 });

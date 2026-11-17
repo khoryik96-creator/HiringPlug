@@ -245,3 +245,32 @@ WHERE company_id = @from_id AND binned_at IS NULL;
 
 -- name: ContactLabel :one
 SELECT btrim(first_name || ' ' || last_name)::text AS label FROM contact WHERE id = @id;
+
+-- Find HR: one LinkedIn people scan per company.
+-- name: GetHrScan :one
+SELECT * FROM hr_scan WHERE company_id = @company_id;
+
+-- name: LockHrScan :one
+SELECT * FROM hr_scan WHERE company_id = @company_id FOR UPDATE;
+
+-- name: StartHrScan :one
+INSERT INTO hr_scan (tenant_id, company_id, linkedin_company_id, linkedin_company_name, country, keywords, pages, started_by)
+VALUES (app_current_tenant(), @company_id, @linkedin_company_id, @linkedin_company_name, sqlc.narg(country), @keywords, @pages, app_current_user())
+ON CONFLICT (tenant_id, company_id) DO UPDATE SET
+  linkedin_company_id = EXCLUDED.linkedin_company_id, linkedin_company_name = EXCLUDED.linkedin_company_name,
+  country = EXCLUDED.country, keywords = EXCLUDED.keywords, pages = EXCLUDED.pages, status = 'running',
+  next_query = 0, next_page = 1, pages_read = 0, error = NULL, people = '[]'::jsonb,
+  started_by = EXCLUDED.started_by, started_at = now(), updated_at = now()
+RETURNING *;
+
+-- name: SaveHrScan :one
+UPDATE hr_scan SET status = @status, next_query = @next_query, next_page = @next_page, pages_read = @pages_read,
+  error = sqlc.narg(error), people = @people, updated_at = now()
+WHERE company_id = @company_id
+RETURNING *;
+
+-- Contacts that may be the same people: by LinkedIn profile, or by name (anywhere in the agency).
+-- name: ContactsLike :many
+SELECT id, btrim(first_name || ' ' || last_name)::text AS name, coalesce(linkedin_url, '')::text AS linkedin_url
+FROM contact
+WHERE linkedin_url = ANY(@urls::text[]) OR lower(btrim(first_name || ' ' || last_name)) = ANY(@names::text[]);

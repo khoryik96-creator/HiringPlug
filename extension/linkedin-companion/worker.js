@@ -1,7 +1,8 @@
 /*
  * HiringPlug LinkedIn companion: in the recruiter's own browser, reads from a
- * contact's LinkedIn profile the dates of their time at one company, and from
- * a company's About page its name, industry, size and website, for the
+ * contact's LinkedIn profile the dates of their time at one company, from
+ * a company's About page its name, industry, size and website, and pages of
+ * a people search at a company (Find HR), for the
  * HiringPlug address the recruiter connected (and no other site). Adapted
  * from CV Studio's LinkedIn companion (its employment check); reader.js is
  * CV Studio's reader, unchanged.
@@ -55,8 +56,22 @@ const ready = (async () => {
   await persist();
 })().catch(() => { owned.clear(); viewed.clear(); });
 
+// A people search is the same while its filters and page are (LinkedIn adds
+// tracking options such as origin to the address as it loads).
+function searchKey(value) {
+  try {
+    const url = new URL(value);
+    if (url.origin !== 'https://www.linkedin.com' || url.pathname.replace(/\/$/, '') !== '/search/results/people') return '';
+    for (const name of ['origin', 'lipi', 'trk', 'sid', 'skipRedirect', 'spellCorrectionEnabled', 'prioritizeMessage']) url.searchParams.delete(name);
+    url.searchParams.sort(); url.hash = '';
+    return url.pathname.replace(/\/$/, '') + '?' + url.searchParams.toString();
+  } catch { return ''; }
+}
+
 function samePage(value, expected) {
-  return typeof value === 'string' && !/[?#]/.test(value) && value.replace(/\/$/, '') === expected.replace(/\/$/, '');
+  if (typeof value !== 'string') return false;
+  if (searchKey(expected)) return searchKey(value) === searchKey(expected);
+  return !/[?#]/.test(value) && value.replace(/\/$/, '') === expected.replace(/\/$/, '');
 }
 
 // The tab, if it is still on the page it was opened at; looking at it makes it the recruiter's.
@@ -167,7 +182,47 @@ async function companyId(op, args) {
     try { return globalThis.SourcerReader.readHRCompany(expected, '', true); } catch { return {failed: true}; }
   }, [args.company_url], 'The LinkedIn company page could not be read.'));
   if (!/^[0-9]{1,24}$/.test(value.company_id || '')) throw safeError('LinkedIn showed no single number for this company.');
-  return {company_url: args.company_url, company_id: value.company_id};
+  const name = typeof value.company_name === 'string' ? value.company_name.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+  return {company_url: args.company_url, company_id: value.company_id, company_name: name};
+}
+
+// One page of a people search at a company (Find HR): the people whose title
+// matches a keyword, with their profile link, title and location. The page is
+// its own address (&page=N), so a page that failed is simply read again. The
+// filters LinkedIn shows must name the company and the country.
+async function peoplePage(op, args) {
+  const text = (v, n) => typeof v === 'string' && v.trim() && v.length <= n;
+  if (!/^[0-9]{1,24}$/.test(args.company_id || '') || !text(args.company_name, 200) || !text(args.query, 300) || !text(args.keywords, 800) ||
+      !Number.isInteger(args.page) || args.page < 1 || args.page > 10 ||
+      (args.geo_id !== undefined && (!/^[0-9]{1,24}$/.test(args.geo_id) || !text(args.country, 100)))) {
+    throw safeError('Start Find HR from the company in HiringPlug.');
+  }
+  const url = new URL('https://www.linkedin.com/search/results/people/');
+  url.searchParams.set('currentCompany', JSON.stringify([args.company_id]));
+  if (args.geo_id) url.searchParams.set('geoUrn', JSON.stringify([args.geo_id]));
+  url.searchParams.set('keywords', args.query);
+  url.searchParams.set('origin', 'FACETED_SEARCH');
+  if (args.page > 1) url.searchParams.set('page', String(args.page));
+  let waiting = '';
+  let value;
+  try {
+    value = await withTab(op, url.href, async tabId => {
+      const read = await inject(tabId, (company, country, keywords) => {
+        try { return globalThis.SourcerReader.readHRSearch(company, country, keywords); } catch { return {failed: true}; }
+      }, [args.company_name, args.country || '', args.keywords], 'The LinkedIn results could not be read.');
+      waiting = read?.wait_stage || '';
+      return read;
+    });
+  } catch (e) {
+    if (waiting === 'company_filter') throw safeError(`LinkedIn did not show the company filter as ${args.company_name}. Check the company's LinkedIn page.`);
+    if (waiting === 'country_filter') throw safeError(`LinkedIn did not show the location filter as ${args.country}.`);
+    throw e;
+  }
+  const clip = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+  const people = (Array.isArray(value.people) ? value.people : []).slice(0, 40)
+    .filter(p => p && profileRe.test(p.url) && clip(p.name, 200))
+    .map(p => ({url: p.url, name: clip(p.name, 200), title: clip(p.title, 500), location: clip(p.location, 240)}));
+  return {people, has_next: value.hasNext === true && !value.empty};
 }
 
 // The dates of the profile's time at the company: current, former or unknown.
@@ -228,13 +283,14 @@ async function handle(message, sender) {
     if (current && current.operation === args.operation_id) current.cancelled = true;
     return true;
   }
-  if (!['companyId', 'employment', 'companyAbout'].includes(action)) throw safeError('The companion does not know this action. Update it.');
+  if (!['companyId', 'employment', 'companyAbout', 'peoplePage'].includes(action)) throw safeError('The companion does not know this action. Update it.');
   if (!operationRe.test(args.operation_id || '')) throw safeError('Start the check from HiringPlug.');
   if (current) throw safeError('The companion is busy with another check. Wait for it, or stop it.');
   const op = {operation: args.operation_id, cancelled: false, source: {id: sender.tab.id, windowId: sender.tab.windowId}};
   current = op;
   try {
     if (action === 'companyAbout') return await companyAbout(op, args);
+    if (action === 'peoplePage') return await peoplePage(op, args);
     return action === 'companyId' ? await companyId(op, args) : await employment(op, args);
   } finally {
     if (current === op) current = null;

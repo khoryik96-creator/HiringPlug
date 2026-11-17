@@ -741,6 +741,25 @@ type FolderShare struct {
 	CreatedAt time.Time
 }
 
+type HrScan struct {
+	TenantID            string
+	CompanyID           string
+	LinkedinCompanyID   string
+	LinkedinCompanyName string
+	Country             *string
+	Keywords            []string
+	Pages               int32
+	Status              string
+	NextQuery           int32
+	NextPage            int32
+	PagesRead           int32
+	Error               *string
+	People              []byte
+	StartedBy           string
+	StartedAt           time.Time
+	UpdatedAt           time.Time
+}
+
 type Industry struct {
 	ID        string
 	TenantID  string
