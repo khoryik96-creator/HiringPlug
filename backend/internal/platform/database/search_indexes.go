@@ -39,7 +39,7 @@ var SearchFunctions = []string{
 	"textlike(text,text)", "texticlike(text,text)", "ts_match_vq(tsvector,tsquery)",
 	"arraycontains(anyarray,anyarray)", "arrayoverlap(anyarray,anyarray)",
 	"similarity_op(text,text)", "word_similarity_op(text,text)", "word_similarity_commutator_op(text,text)",
-	"textcat(text,text)", "app_lower_array(text[])", "app_search_doc(text[])", "app_normalize_text(text)",
+	"textcat(text,text)", "lower(text)", "btrim(text)", "app_lower_array(text[])", "app_search_doc(text[])", "app_normalize_text(text)",
 }
 
 const markLeakproof = `

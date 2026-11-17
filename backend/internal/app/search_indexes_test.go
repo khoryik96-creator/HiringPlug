@@ -58,6 +58,8 @@ func TestSearchesCanUseTheirIndexes(t *testing.T) {
 		{"company_search_trgm_idx", "company", `search_text LIKE '%bank%'`},
 		{"contact_search_doc_idx", "contact", `app_search_doc(first_name || ' ' || last_name, title, email) @@ to_tsquery('english', 'manager')`},
 		{"contact_name_trgm_idx", "contact", `name_text LIKE '%tanaka%'`},
+		{"contact_full_name_idx", "contact", `lower(btrim(first_name || ' ' || last_name)) = ANY(ARRAY['synthetic contact 7'])`},
+		{"contact_linkedin_url_idx", "contact", `linkedin_url = ANY(ARRAY['https://www.linkedin.com/in/x'])`},
 	}
 	ctx := context.Background()
 	explain := func(q pgx.Tx, query string, args ...any) string {
