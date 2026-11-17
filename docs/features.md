@@ -6,7 +6,11 @@ notice/salary ribbon. Work rights are edited in the existing Work authorization
 field under Details. Details opens first, followed by CV & files, Jobs, Activity,
 Salary and Email; document, pipeline and email tabs follow their permissions.
 Tabs load on first visit and keep forms and drafts mounted until the candidate
-changes. Search highlight links open CV & files directly.
+changes. Search highlight links open CV & files directly. **CV beside** (on the
+tab row) splits the page: the details on the left (the contact card, with its
+copy buttons, above the tabs) and the newest CV on the right, in view while the
+details scroll; remembered in the browser, off on the CV & files tab and on
+narrow screens.
 
 CV & files has one document library and one viewer: selecting a file changes its
 preview and action toolbar together. Upload, compare, formatting, formatting

@@ -24,6 +24,7 @@ import { Timeline } from "../components/Timeline";
 import { SalaryPanel } from "../components/SalaryPanel";
 import { SimilarCandidates } from "../components/SimilarCandidates";
 import { StageMoves } from "../components/StageMoves";
+import { CvBeside, useCvBeside } from "../components/CvBeside";
 /**
  * One candidate: profile, salary (if permitted) and documents. Render it with
  * key={id}: edit state belongs to one candidate and must not carry over.
@@ -33,6 +34,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   const [editingSalary, setEditingSalary] = useState(false);
   const [active, setActive] = useState<CandidateTab>(hashParam("hl") && permissions.includes("documents:read") ? "cv" : "details");
   const [writing, setWriting] = useState(false);
+  const [besideOn, setBeside] = useCvBeside();
   const queryClient = useQueryClient();
   const candidate = useQuery({
     queryKey: candidateKey(id),
@@ -51,6 +53,9 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
   }
 
   const canUpdate = permissions.includes("candidates:update");
+  const canSeeCv = permissions.includes("documents:read");
+  // The CV & files tab already shows the CV: not twice.
+  const beside = canSeeCv && besideOn && active !== "cv";
   const sections: CandidateSection[] = [
     { id: "details", label: "Details", content: <>
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
@@ -120,7 +125,10 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         onAdd={() => { setEditing(true); setActive("details"); }}
         canEditSalary={permissions.includes("candidates.compensation:update")}
         onSalary={() => { setEditingSalary(true); setActive("salary"); }} />
-      <div className="candidate-workspace">
+      <div className={beside ? "candidate-workspace with-cv" : "candidate-workspace"}>
+        {canSeeCv && <button type="button" className={beside ? "cv-beside-toggle on" : "cv-beside-toggle"} aria-pressed={beside}
+          onClick={() => { setBeside(!beside); }}>CV beside</button>}
+        <div className="candidate-main">
         <aside className="candidate-contact panel" aria-label="Contact summary">
           <h3>Contact</h3>
           <dl><dt>Email</dt><dd className="copyable">{c.email ? <><a href={`mailto:${c.email}`} title={c.email}>{c.email}</a><CopyButton text={c.email} what="email" /></> : "—"}</dd>
@@ -128,6 +136,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
           <dt>LinkedIn</dt><dd>{c.linkedinUrl ? <a href={c.linkedinUrl} target="_blank" rel="noreferrer noopener" title={c.linkedinUrl}>LinkedIn profile</a> : "—"}</dd></dl>
         </aside>
         <CandidateTabs sections={sections} active={active} onChange={setActive} />
+        </div>
+        {beside && <CvBeside candidateId={c.id} />}
       </div>
       {permissions.includes("assistant:use") && <details className="candidate-assistant"><summary>AI assistant</summary>
         <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} />

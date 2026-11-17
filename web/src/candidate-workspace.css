@@ -13,7 +13,25 @@
 /* Salary and notice period read at a glance: larger than the job title. */
 .candidate-banner .banner-strip > div:not(:first-child) .figure { font-size: 24px; }
 .candidate-banner .banner-strip .figure small, .candidate-banner .banner-strip .note { font: 10px Inter, sans-serif; }
-.candidate-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+.candidate-workspace { position: relative; }
+.candidate-main { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+/* "CV beside": on the tab row's right; with it on, the CV takes the right half. */
+.cv-beside-toggle { position: absolute; top: 4px; right: 0; z-index: 1; padding: 5px 12px; font-size: 12px; border-radius: 999px; }
+.cv-beside-toggle.on { background: #7653ed; border-color: #7653ed; color: #fff; }
+.candidate-workspace:has(.cv-beside-toggle) .candidate-tablist { padding-right: 110px; }
+.candidate-workspace.with-cv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 8px 20px; align-items: start; }
+.with-cv .candidate-main { grid-column: 1; grid-row: 1 / 3; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.with-cv .candidate-tablist { padding-right: 0; }
+.with-cv .cv-beside-toggle { position: static; grid-column: 2; grid-row: 1; justify-self: end; }
+.cv-beside { grid-column: 2; grid-row: 2; position: sticky; top: 12px; min-width: 0; }
+.cv-beside > .panel { margin-top: 0; }
+.cv-beside .cv-frame { height: calc(100vh - 140px); min-height: 420px; }
+/* Beside the CV the contact card is one row per item: email, then phone, then LinkedIn. */
+.with-cv .candidate-contact { padding: 12px 16px; }
+.with-cv .candidate-contact h3 { display: none; }
+.with-cv .candidate-contact dl { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.with-cv .candidate-contact dt { margin: 0; }
+.with-cv .candidate-contact dd { margin: 0; }
 .candidate-contact { margin-top: 0; padding: 18px; font-size: 12px; overflow-wrap: anywhere; }
 .candidate-contact h3 { font-size: 14px; margin-top: 0; }
 .candidate-contact dl { display: block; margin: 0; }
@@ -47,7 +65,7 @@
 .docs-panel .doc-card[hidden], [role=tabpanel][hidden] { display: none; }
 .toolbar .extra-formatting { display: contents; }
 .toolbar .extra-formatting[hidden] { display: none; }
-@media (max-width: 1100px) { .candidate-workspace { grid-template-columns: minmax(0, 1fr); } .candidate-contact { display: none; } }
+@media (max-width: 1100px) { .candidate-main { grid-template-columns: minmax(0, 1fr); } .candidate-contact { display: none; } .cv-beside-toggle, .cv-beside { display: none; } .candidate-workspace.with-cv { display: block; } .candidate-workspace .candidate-tablist { padding-right: 0; } }
 @media (max-width: 760px) {
   .candidate-banner .banner-body { padding: 18px 16px; gap: 18px; }
   .candidate-banner .banner-name { font-size: 36px; }

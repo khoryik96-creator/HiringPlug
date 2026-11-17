@@ -46,6 +46,28 @@ describe("candidate page", () => {
     expect(await screen.findByRole("region", {name: "Documents"})).toBeTruthy();
   });
 
+  it("shows the CV beside the details on request, remembers it, and not on the CV tab", async () => {
+    localStorage.removeItem("hp.cvBeside");
+    await show(testCandidate(), ["candidates:read", "documents:read"]);
+    const toggle = screen.getByRole("button", { name: "CV beside" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByRole("region", { name: "CV beside the details" })).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByText("No CV yet. Add one in CV & files.")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Profile" }), "the details stay").toBeTruthy();
+    expect(localStorage.getItem("hp.cvBeside")).toBe("on");
+    fireEvent.click(screen.getByRole("tab", { name: "CV & files" }));
+    expect(screen.queryByRole("region", { name: "CV beside the details" }), "the CV tab shows it already").toBeNull();
+    cleanup();
+    await show(testCandidate(), ["candidates:read", "documents:read"]);
+    expect(screen.getByRole("region", { name: "CV beside the details" }), "remembered").toBeTruthy();
+    localStorage.removeItem("hp.cvBeside");
+  });
+  it("offers no CV beside to a role that may not see CVs", async () => {
+    await show(testCandidate(), ["candidates:read"]);
+    expect(screen.queryByRole("button", { name: "CV beside" })).toBeNull();
+  });
+
   it("lists industries and tags in one column, under the specialization", async () => {
     await show(testCandidate(), ["candidates:read"]);
     const profile = screen.getByRole("region", { name: "Profile" });

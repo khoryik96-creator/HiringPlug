@@ -22,7 +22,12 @@ set -a
 set +a
 if [ -n "${CODESPACE_NAME:-}" ]; then
   export HP_PUBLIC_URL="https://${CODESPACE_NAME}-3000.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
+  grep -q '^HP_PUBLIC_URL=' "$secrets" || echo "HP_PUBLIC_URL=$HP_PUBLIC_URL" >> "$secrets"
 fi
+# Docker Compose reads deploy/.env (ignored by git) on its own, so a plain
+# "docker compose -f deploy/docker-compose.yml ..." uses the same passwords
+# the database was created with (without them the set-up step is refused).
+[ -e deploy/.env ] || ln -s "$secrets" deploy/.env
 
 for _ in $(seq 60); do docker info >/dev/null 2>&1 && break; sleep 2; done
 compose=(docker compose -f deploy/docker-compose.yml)
