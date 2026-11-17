@@ -235,8 +235,12 @@ before this get their copy the first time the page is opened.
 **Formatted CVs, CV Studio's way ✅.** "Make formatted CV" offers two ways.
 **From their CV** formats one of the CVs the candidate sent with CV Studio's
 own engine: the AI reads it, CV Studio's rules tidy and check it, and its
-renderer lays it out in its template, in the background (a minute; the
-candidate's page shows its progress). Options: correct spelling, punctuation
+renderer lays it out in its template, in the background (a minute). One run
+at a time per candidate (other candidates' CVs can be formatted meanwhile): the
+button turns orange with the seconds elapsed while it runs, under it a bar
+fills, and once saved the button turns green "Done" (clicking it shows the new
+CV and turns it back to "Format a CV"). When a formatted CV is saved already,
+"Format a CV" asks before formatting again. Options: correct spelling, punctuation
 and capitals (never the meaning, numbers or dates); blind (no name or contact
 details, employers and schools described rather than named, optionally "the
 candidate" instead of he or she); paragraphs aligned left or justified. Lines

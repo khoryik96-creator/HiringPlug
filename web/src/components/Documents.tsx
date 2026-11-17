@@ -13,7 +13,7 @@ import { findMatches, matchText } from "./duplicateCvs";
 import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
 import { FormatCv } from "./FormatCv";
-import { StudioCvRuns } from "./StudioCvRuns";
+import { StudioProgress, useStudioRun } from "./StudioProgress";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
 type Source = (typeof SOURCES)[number];
@@ -43,6 +43,8 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
   const [open, setOpen] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const canFormat = permissions.includes("cvformats:create");
+  const studio = useStudioRun(candidateId, canFormat);
+  const [again, setAgain] = useState(false); // asked: format again, a formatted CV being saved already
 
   const docs = useQuery({
     queryKey: ["documents", candidateId],
@@ -188,7 +190,14 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
         <h3>CVs and documents</h3>
         <div className="docs-actions">
           {all.length >= 2 && <a className="doc-btn" href={`#/candidates/${candidateId}/compare`}>Compare side by side</a>}
-          {canFormat && !formatting && <button type="button" className="doc-btn" onClick={() => { setFormatting(true); }}>Format a CV</button>}
+          {canFormat && !formatting && (studio.running
+            ? <button type="button" className="doc-btn format-running" disabled>Formatting… {studio.seconds}s</button>
+            : studio.finished?.status === "done"
+              ? <button type="button" className="doc-btn format-done" onClick={() => { const id = studio.finished?.documentId; if (id) setPicked(id); studio.acknowledge(); }}>Done</button>
+              : <button type="button" className="doc-btn" onClick={() => {
+                studio.acknowledge();
+                if (all.some((d) => d.source === "formatted")) setAgain(true); else setFormatting(true);
+              }}>Format a CV</button>)}
           {canUpload && !uploading && <button type="button" className="doc-btn primary" onClick={() => { setUploading(true); }}>Upload</button>}
           {uploading && <button type="button" className="doc-btn" onClick={() => { setUploading(false); }}>Cancel upload</button>}
         </div>
@@ -220,10 +229,17 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
           )}
         </div>
       )}
+      {again && (
+        <div className="dup-ask" role="alert">
+          <p>A formatted CV is saved already{(() => { const f = all.find((d) => d.source === "formatted"); return f ? <>: <strong>{f.fileName}</strong></> : null; })()}. Format again?</p>
+          <div className="row">
+            <button type="button" className="doc-btn primary" onClick={() => { setAgain(false); setFormatting(true); }}>Format again</button>
+            <button type="button" className="doc-btn" onClick={() => { setAgain(false); }}>Cancel</button>
+          </div>
+        </div>
+      )}
       {formatting && <FormatCv candidateId={candidateId} permissions={permissions} onDone={() => { setFormatting(false); }} />}
-      {canFormat && <details className="formatting-history"><summary>Formatting history</summary>
-        <StudioCvRuns candidateId={candidateId} documentIds={docs.data ? new Set(all.map((d) => d.id)) : undefined} />
-      </details>}
+      {canFormat && <StudioProgress run={studio} />}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error ?? remove.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
       {workspace && selected && <div className="cv-workspace">
