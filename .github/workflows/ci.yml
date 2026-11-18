@@ -29,7 +29,7 @@ jobs:
       - run: task lint:shell test:ci
 
   migrator:
-    name: JobAdder discovery tool (${{ matrix.os }})
+    name: JobAdder extraction tool (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -45,6 +45,7 @@ jobs:
           cache-dependency-path: tools/jobadder-migrator/go.sum
       - run: go vet ./...
       - run: node --check web/app.js
+      - run: node --check web/extraction.js
       - name: Windows tests
         if: runner.os == 'Windows'
         run: go test ./...

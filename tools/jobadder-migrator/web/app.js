@@ -36,12 +36,12 @@ function render() {
     $('callback').textContent = state.callback || '';
     $('connection-state').textContent = state.connected ? 'Connected' : 'Not connected';
     $('connection-controls').hidden = !!state.demo;
-    const blocked = !healthy || !!coolingDown();
+    const blocked = !healthy || !!coolingDown() || !!state.transferring;
     $('start').disabled = blocked || !state.connected || state.running || state.connecting || busy;
     $('resume').disabled = blocked || !state.connected || state.running || state.connecting || busy || !state.report?.run;
-    $('pause').hidden = !state.running;
+    $('pause').hidden = !state.running || state.mode === 'extraction';
     $('run-state').textContent = state.running ? 'Running' : (state.report?.status || 'Not started').replace('_', ' ');
-    $('current').textContent = coolingDown() ? `Waiting until ${new Date(state.retryAt).toLocaleString()}. Completed checkpoints are saved.` : (state.current ? `Checking ${state.current}…` : state.message || '');
+    $('current').textContent = coolingDown() ? `Waiting until ${new Date(state.retryAt).toLocaleString()}. Completed checkpoints are saved.` : (state.mode === 'extraction' ? '' : state.current ? `Checking ${state.current}…` : state.message || '');
     const rows = state.report?.results || [];
     $('progress').max = state.resources || 1;
     $('progress').value = rows.length;
@@ -57,6 +57,7 @@ function render() {
         tr.append(td);
         $('results').append(tr);
     }
+    if(typeof renderExtraction === 'function') renderExtraction();
     $('coverage').replaceChildren(...(state.report?.coverage || []).map(t => node('li', t)));
 }
 async function refresh() {

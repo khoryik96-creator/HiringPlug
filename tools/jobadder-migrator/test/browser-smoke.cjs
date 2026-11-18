@@ -77,6 +77,39 @@ async function start(demo) {
         await page.getByRole('button', { name: 'Download original responses', exact: true }).click();
         if ((await zipDownload).suggestedFilename() !== 'jobadder-original-responses.zip')
             throw Error('Original response export unavailable');
+        await page.getByRole('button', {name:'Start full API extraction',exact:true}).click();
+        await page.getByRole('button', {name:'Pause extraction',exact:true}).click();
+        await expect(page.locator('#extraction-status')).toHaveText('paused',{timeout:15000});
+        await page.getByRole('button', {name:'Resume extraction / retry gaps',exact:true}).click();
+        await expect(page.locator('#extraction-status')).toHaveText('api pass finished',{timeout:45000});
+        await expect(page.locator('#extraction-metrics')).toContainText('Native files saved');
+        const metricValues = await page.locator('#extraction-metrics strong').allTextContents();
+        if(Number(metricValues[1].replaceAll(',','')) < 2) throw Error('Native file extraction missing');
+        await expect(page.locator('#scope-results tr')).toHaveCount(30);
+        await expect(page.locator('#route-results tr')).toHaveCount(240);
+        await page.getByRole('button', {name:'Prepare downloads',exact:true}).click();
+        const manifestDownload=page.waitForEvent('download');
+        await page.getByRole('button', {name:'Download manifest & indexes',exact:true}).click();
+        if((await manifestDownload).suggestedFilename()!=='jobadder-extraction-manifest.zip') throw Error('Extraction manifest missing');
+        await expect(page.getByRole('button', {name:'Download selected part',exact:true})).toBeEnabled({timeout:10000});
+        const objectsDownload=page.waitForEvent('download');
+        await page.getByRole('button', {name:'Download selected part',exact:true}).click();
+        if(!(await objectsDownload).suggestedFilename().startsWith('jobadder-objects-')) throw Error('Extraction objects missing');
+        await expect(page.getByRole('button', {name:'Preserve & index file',exact:true})).toBeEnabled({timeout:10000});
+        await page.locator('#source-file').setInputFiles({name:'synthetic-candidates.csv',mimeType:'text/csv',buffer:Buffer.from('candidateId,name\n7,Synthetic Person\n')});
+        await page.locator('#source-entity').selectOption('candidates');
+        await page.getByRole('button', {name:'Preserve & index file',exact:true}).click();
+        await expect(page.locator('#source-results')).toContainText('indexed unverified');
+        await page.locator('#source-file').setInputFiles({name:'synthetic-account.bak',mimeType:'application/octet-stream',buffer:Buffer.from('synthetic opaque backup')});
+        await page.getByRole('button', {name:'Preserve & index file',exact:true}).click();
+        await expect(page.locator('#source-results')).toContainText('needs adapter');
+        // Actual HTTP streaming; a synthetic directory sink replaces the OS picker.
+        await page.evaluate(() => {window.__exported={};window.showDirectoryPicker=async()=>({getDirectoryHandle:async()=>({getFileHandle:async(name)=>({createWritable:async()=>new WritableStream({write(chunk){window.__exported[name]=(window.__exported[name]||0)+chunk.length;}})})})});});
+        await page.getByRole('button',{name:'Save complete export to folder',exact:true}).click();
+        await expect(page.locator('#folder-progress')).toContainText('Export saved.',{timeout:30000});
+        const folderFiles=await page.evaluate(()=>window.__exported);
+        if(Object.keys(folderFiles).length<2||Object.values(folderFiles).some(n=>n<=0)) throw Error('Folder export missed manifest/object bytes');
+        if (screenshots) await page.screenshot({path:path.join(screenshots,'full-extraction.png'),fullPage:true});
         if (screenshots)
             await page.screenshot({ path: path.join(screenshots, 'discovery-demo.png'), fullPage: true });
         await page.setViewportSize({ width: 390, height: 900 });
@@ -146,7 +179,7 @@ async function start(demo) {
             await page.screenshot({ path: path.join(screenshots, 'jobadder-connect.png'), fullPage: true });
         if (errors.length)
             throw Error('UI runtime error');
-        console.log('UI passed: private workspace, demo inventory, pause/resume, denied-access reporting, downloads, storage errors, cooldown, clean shutdown and mobile layout.');
+        console.log('UI passed: full extraction, native files, 30-area/240-route coverage, provider CSV/opaque intake, native downloads, private workspace, demo inventory, pause/resume, denied-access reporting, downloads, storage errors, cooldown, clean shutdown and mobile layout.');
     }
     finally {
         await browser?.close();

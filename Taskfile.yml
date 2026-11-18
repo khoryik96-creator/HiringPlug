@@ -146,16 +146,16 @@ tasks:
       - task: build:migrator
 
   lint:migrator:
-    desc: Check the standalone JobAdder discovery tool
+    desc: Check the standalone JobAdder extraction tool
     dir: tools/jobadder-migrator
-    cmds: [go vet ./..., node --check web/app.js]
+    cmds: [go vet ./..., node --check web/app.js, node --check web/extraction.js]
 
   test:migrator:
     dir: tools/jobadder-migrator
     cmds: [go test -race ./...]
 
   build:migrator:
-    desc: Build the standalone discovery tool for Windows x64
+    desc: Build the standalone extraction tool for Windows x64
     dir: tools/jobadder-migrator
     env: { GOOS: windows, GOARCH: amd64, CGO_ENABLED: "0" }
     cmds: [go build -trimpath -ldflags="-s -w" -o dist/HiringPlugMigration.exe .]

@@ -128,7 +128,7 @@ func readLimited(r io.Reader, max int64) ([]byte, error) {
 }
 
 // get never follows API-supplied links and never accepts caller-supplied methods.
-func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
+func (c *Client) open(ctx context.Context, path string, native bool) (*http.Response, int, error) {
 	if c.LoadRetry != nil {
 		until, err := c.LoadRetry()
 		if err != nil {
@@ -150,8 +150,14 @@ func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
 			return nil, 0, errors.New("invalid API request")
 		}
 		req.Header.Set("Authorization", "Bearer "+c.Config.AccessToken)
-		req.Header.Set("Accept", "application/json")
-		res, err := c.HTTP.Do(req)
+		if !native {
+			req.Header.Set("Accept", "application/json")
+		}
+		h := c.HTTP
+		if native {
+			h = nativeHTTP(c.HTTP, req.URL.Host)
+		}
+		res, err := h.Do(req)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, 0, ctx.Err()
@@ -198,9 +204,17 @@ func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
 			_ = res.Body.Close()
 			return nil, status, errors.New("resource unavailable")
 		}
-		raw, err := readLimited(res.Body, 8<<20)
-		_ = res.Body.Close()
-		return raw, status, err
+		return res, status, nil
 	}
 	return nil, 0, errors.New("request could not complete")
+}
+
+func (c *Client) get(ctx context.Context, path string) ([]byte, int, error) {
+	res, status, err := c.open(ctx, path, false)
+	if err != nil {
+		return nil, status, err
+	}
+	defer res.Body.Close()
+	raw, err := readLimited(res.Body, 8<<20)
+	return raw, status, err
 }

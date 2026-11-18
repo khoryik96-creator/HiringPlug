@@ -22,6 +22,7 @@ type Store struct {
 	lock    *flock.Flock
 	db      *sql.DB
 	key     []byte
+	dir     string
 }
 type Result struct {
 	Key             string `json:"key"`
@@ -76,12 +77,15 @@ func OpenStore(dir string) (*Store, error) {
 	if err == nil {
 		err = initObservations(db)
 	}
+	if err == nil {
+		err = initExtraction(db)
+	}
 	if err != nil {
 		_ = db.Close()
 		return nil, err
 	}
 	success = true
-	return &Store{db: db, lock: lock}, nil
+	return &Store{db: db, lock: lock, dir: dir}, nil
 }
 func (s *Store) Close() error { err := s.db.Close(); _ = s.lock.Unlock(); return err }
 func (s *Store) Unlock(pass string) error {

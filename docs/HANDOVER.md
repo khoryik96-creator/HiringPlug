@@ -1,4 +1,4 @@
-# Handover (17 Nov 2026)
+# Handover (18 Nov 2026)
 
 For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
 first (the rules, enforced by `task verify`), then `docs/README.md`;
@@ -18,13 +18,19 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 - `tools/jobadder-migrator` is a separate Go executable with a local browser UI
   and a Windows build. It needs neither Docker nor a HiringPlug database.
-- First release is read-only discovery: counts/access gaps, original response
-  evidence, encrypted credentials/responses, pause/resume and synthetic demo.
-  It does not yet export full records/CVs or write into HiringPlug.
-- Discovery preserves append-only observations across retries, recognises
-  JobAdder's definition envelopes, pages categories, defers the candidate-only
-  payroll endpoint, persists provider retry deadlines and surfaces workspace
-  errors. Archive preparation/downloads do not hold the application lock.
+- Full API extraction now queues paged collections, details and native files,
+  with per-request checkpoints, encrypted chunked objects, all observed record
+  representations and relationship pointers. All 30 scope areas and 240 public
+  GET routes have explicit coverage; bulk equivalents name their actual source.
+- Provider intake preserves originals/ZIP members and indexes CSV/JSON/JSONL.
+  Unknown backups, PST and other formats stay intact with `needs_adapter` status;
+  no export format is known yet. Generic indexing never verifies full coverage.
+- Manifest/index downloads and object ZIP parts use native browser downloads.
+  Original values are authoritative, including unknown fields and precision.
+  Discovery remains available. The tool still does not write into HiringPlug.
+- Public APIs do not expose complete mailbox/settings/audit history. Review
+  `docs/jobadder-extraction-scope.md`, route gaps and provider exports before
+  claiming an account backup is complete. No live account was used in tests.
 - The owner requires JobAdder field values to remain unchanged. No normalization,
   deduplication, salary rewriting or AI enrichment during migration. API access
   is available; approximately 80,000 candidates and all obtainable related

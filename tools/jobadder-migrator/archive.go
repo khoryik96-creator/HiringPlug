@@ -122,7 +122,7 @@ func (s *Store) prepareArchive(ctx context.Context, report Report, observations 
 func (a *App) archiveSnapshot() (Report, []Observation, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if !a.unlocked || a.running || a.closing {
+	if !a.unlocked || a.running || a.transferring || a.closing {
 		return Report{}, nil, errors.New("Pause the inventory before exporting original responses")
 	}
 	report, err := a.store.Report()

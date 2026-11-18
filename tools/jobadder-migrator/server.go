@@ -21,6 +21,8 @@ var assets embed.FS
 
 type App struct {
 	connecting              bool
+	transferring            bool
+	tickets                 map[string]DownloadTicket
 	closing                 bool
 	work                    sync.WaitGroup
 	mu                      sync.Mutex
@@ -32,6 +34,7 @@ type App struct {
 	pace                    time.Duration
 	cancel                  context.CancelFunc
 	current, message        string
+	mode                    string
 	oauthState              string
 	oauthUntil              time.Time
 	pending                 Connection
@@ -57,6 +60,12 @@ func (a *App) client(c Connection) *Client {
 }
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/extract", a.startExtraction)
+	mux.HandleFunc("GET /api/extraction", a.extractionReport)
+	mux.HandleFunc("POST /api/sources", a.sourceUpload)
+	mux.HandleFunc("GET /api/downloads", a.downloadPlan)
+	mux.HandleFunc("POST /api/download-ticket", a.downloadTicket)
+	mux.HandleFunc("GET /download/{ticket}", a.downloadExtraction)
 	mux.HandleFunc("GET /api/status", a.status)
 	mux.HandleFunc("POST /api/unlock", a.unlock)
 	mux.HandleFunc("POST /api/connect", a.connect)
@@ -74,6 +83,9 @@ func (a *App) Handler() http.Handler {
 		case "/":
 		case "/app.js":
 			name = "web/app.js"
+			kind = "text/javascript; charset=utf-8"
+		case "/extraction.js":
+			name = "web/extraction.js"
 			kind = "text/javascript; charset=utf-8"
 		case "/app.css":
 			name = "web/app.css"
@@ -147,7 +159,7 @@ func input(w http.ResponseWriter, r *http.Request, target any) bool {
 func (a *App) statusData() (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	data := map[string]any{"demo": a.demo, "unlocked": a.unlocked, "connected": a.connection.Fingerprint != "", "running": a.running, "connecting": a.connecting, "current": a.current, "message": a.message, "resources": len(Catalog()), "account": a.connection.Account, "callback": a.origin + "/oauth/callback"}
+	data := map[string]any{"demo": a.demo, "unlocked": a.unlocked, "connected": a.connection.Fingerprint != "", "running": a.running, "connecting": a.connecting, "transferring": a.transferring, "current": a.current, "mode": a.mode, "message": a.message, "resources": len(Catalog()), "account": a.connection.Account, "callback": a.origin + "/oauth/callback"}
 	if a.unlocked {
 		report, err := a.store.Report()
 		if err != nil {
@@ -207,7 +219,7 @@ func (a *App) unlock(w http.ResponseWriter, r *http.Request) {
 func (a *App) available() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if !a.unlocked || a.running || a.demo || a.connecting || a.closing {
+	if !a.unlocked || a.running || a.transferring || a.demo || a.connecting || a.closing {
 		return false
 	}
 	a.connecting = true
@@ -271,7 +283,7 @@ func (a *App) start(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if !a.unlocked || a.running || a.connecting || a.closing || a.connection.Fingerprint == "" {
+	if !a.unlocked || a.running || a.transferring || a.connecting || a.closing || a.connection.Fingerprint == "" {
 		failure(w, "Connect JobAdder before starting an inventory")
 		return
 	}
@@ -298,6 +310,7 @@ func (a *App) start(w http.ResponseWriter, r *http.Request) {
 	a.running = true
 	a.message = ""
 	a.current = "Starting"
+	a.mode = "inventory"
 	c := a.client(a.connection)
 	a.work.Add(1)
 	go func() {

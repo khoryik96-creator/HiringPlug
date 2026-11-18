@@ -137,6 +137,9 @@ func (demoTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.Method != http.MethodGet {
 		return nil, fmt.Errorf("demo refuses writes")
 	}
+	if r.URL.Query().Get("Limit") != "0" && r.URL.Query().Get("limit") != "0" {
+		return demoExtraction(r)
+	}
 	code := 200
 	var data any = map[string]any{"items": []any{}, "totalCount": 12}
 	switch strings.TrimPrefix(r.URL.Path, "/v2") {

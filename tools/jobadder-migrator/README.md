@@ -1,9 +1,11 @@
-# HiringPlug Migration: JobAdder discovery
+# HiringPlug Migration: JobAdder extraction
 
-A separate Go application with a local browser interface. This first release
-inventories accessible JobAdder resources and saves the original discovery
-responses. **It does not yet export 80,000 candidate records, download CVs or
-import anything into HiringPlug.** No source records are modified.
+A separate Go application with a local browser interface. It extracts available
+JobAdder records, related data and native files into an encrypted local workspace.
+It also preserves provider exports and indexes supported logical formats.
+**All 30 scope areas are tracked; complete account coverage still requires source
+reconciliation and provider exports for API gaps. Nothing is imported into
+HiringPlug or changed in JobAdder by this tool.**
 
 ## Windows: run the packaged tool
 
@@ -14,9 +16,17 @@ import anything into HiringPlug.** No source records are modified.
 3. Double-click **Start.bat** for your real account. Keep the console open.
 4. Choose a private workspace passphrase of at least 16 characters. Keep it in
    your password manager; there is no recovery if it is lost.
-5. Connect JobAdder as described below, then click **Start new inventory**.
-6. Review denied/unavailable resources and coverage gaps. **Unknown** is not
-   zero. Download the count report and, if needed, original responses.
+5. Connect JobAdder as described below, then click **Start new inventory** for counts or **Start full API extraction**.
+6. Use **Pause** and **Resume extraction / retry gaps** to continue saved work.
+   Keep the console open during extraction. Reopening the same workspace does
+   not refetch completed checkpoints. A new extraction deliberately reads again.
+7. Review **30-area coverage**, **API route coverage** and unresolved requests.
+   Add any JobAdder/provider exports under **Add provider exports**.
+8. Pause work. In Chrome/Edge, **Save complete export to folder** streams all
+   parts into a new private folder you select. Alternatively, choose
+   **Prepare downloads**, then download the manifest and
+   **every object part**. Keep them together. The manifest has IDs, associations,
+   original filenames, headers, source metadata, statuses and checksums.
 
 The default workspace is `%APPDATA%\HiringPlugMigration`. Demo data lives in its
 separate `demo` subfolder. The browser opens automatically; if it does not, open
@@ -24,7 +34,7 @@ separate `demo` subfolder. The browser opens automatically; if it does not, open
 That shortcut contains a private local session key: do not share it.
 
 Press Ctrl+C to stop. Reopen with the same workspace and passphrase, then use
-**Resume / retry unresolved** to keep completed checkpoints. A new inventory
+the appropriate **Resume** button to keep completed checkpoints. A new inventory
 keeps earlier runs in the workspace and displays the latest one.
 
 The executable is not code-signed. Windows SmartScreen may ask you to inspect
@@ -66,35 +76,79 @@ For another port or a separate account, run in PowerShell from the tool folder:
 Register the corresponding port's callback. Flags also include `--demo` and
 `--no-browser`. The listener accepts connections only on `127.0.0.1`.
 
-## What this release checks
+## Extraction and coverage
 
-- Counts for candidates, companies, contacts, jobs, applications, placements,
-  notes, submissions, floats, interviews, events, tasks, folders, users, groups,
-  offices, ads, opportunities, requisitions and candidate attachment metadata.
-- Activity collections and source definitions
-  such as custom fields, statuses, attachment categories and lookup lists.
-- Individual access gaps, failed requests, missing totals and resumable progress.
-- Payroll/billing is marked **Requires candidate-level discovery**. Its API
-  accepts candidate IDs, not a global count request; this stage does not access it.
+The tool bundles all 240 documented v2 GET operations. It queues fixed, typed
+routes from actual source identifiers; it never fetches arbitrary URLs found in
+notes, exports or API bodies. Bulk collections provide notes, applications,
+placements and activities; the route report names each equivalent bulk source.
+Full detail routes and non-equivalent child routes are separately checkpointed.
+It preserves every returned field, including unknown fields and original custom,
+salary, note, status and tag values. Related references remain separate observed
+representations; a short reference cannot replace a full profile.
 
-Counts use JobAdder's `Limit=0` where supported. Permissions, default visibility
-and resources not supported by your account can limit the result. Unpaged
-definitions are counted from their `items`; category pages are preserved
-individually and counted only after pagination completes. Unexpected/repeated
-pages or the discovery bound (100 pages of up to 1,000 categories) require review.
-Record-level custom-field values are not exported. Counts are observed at different times,
-not a transactionally consistent account snapshot.
+- Explicit partitions include open/closed jobs, active/inactive applications,
+  approved/unapproved placements and folders owned by active/inactive users.
+  Placement queries include permanent, contract, temporary and credit types.
+- Old/completed tasks, inactive/deleted users, activity details and non-latest
+  attachments are requested where the documented endpoint supports them.
+- Attachment metadata discovers original retained files across candidates,
+  companies, contacts, jobs, applications, placements, requisitions and notes.
+  Native downloads omit conversion `Accept` headers. Approved HTTPS object-storage
+  redirects strip bearer credentials; unknown destinations become review gaps.
+- JSON pagination advances by actual page size, checks totals and detects
+  repeated pages independently of changing pagination links. Source changes
+  during a run can still cause offset drift; this is not a database snapshot.
+- The queue grows as records are found. Known-task counts are not a final
+  percentage. Default requests are paced conservatively (about two/second,
+  excluding response/processing time). An 80,000-candidate account with files and
+  linked records can take many hours or days; do a representative pilot first.
+- `Retry-After` deadlines persist across restart. Long waits pause immediately.
+  Expired token-only connections require reconnection; OAuth can refresh.
+- Errors and denied/missing resources remain unresolved. A missing optional
+  photo may return the same 404 as an inaccessible photo; absence is not proof
+  of permission. A zero-request child route is unverified, not confirmed empty.
 
-If JobAdder requests a long retry delay, discovery pauses immediately and shows
-the earliest retry time. The deadline survives pause, reconnect and restart.
-Start/resume stay disabled until that time; no early retry is sent. If workspace
-progress cannot be read, an error appears and the last displayed figures remain
-visible as stale until the workspace is healthy again.
+**API pass finished** means the current known queue was processed, not that all
+30 areas were completely recovered. The public API lacks a complete mailbox,
+personal settings/templates and full audit/privacy history. Deleted endpoints
+return limited recent tombstones, not restorable deleted record bodies.
+Video URLs and rate-card strings remain references; external contents need an
+appropriate separate source. Ask JobAdder for a full account export, attachments
+and a schema/manifest, then reconcile IDs, versions, links and boundary samples.
 
-CV binaries/versions, nested attachments, folder membership, invoices,
-timesheets, rate cards, requisition forms/approvals, complete stage histories,
-email/SMS bodies and deleted/purged records still need deeper extraction or a
-separate JobAdder export. The coverage report lists these gaps explicitly.
+### Provider exports: format may be unknown
+
+The tool first encrypts and preserves the original file byte for byte. ZIP
+members are additionally retained without extracting source paths onto disk.
+CSV (including BOM-marked UTF-16), JSON arrays/`items` envelopes and JSONL/NDJSON
+are streamed into a row-pointer index. Choose the declared record type and an
+optional original ID field; values and column names are not renamed or cleaned.
+An unmapped type remains unmapped. Generic indexing does not interpret foreign
+keys, grant accounts, resolve conflicts or verify source/account identity.
+
+Opaque `.bak`, `.pst`, `.eml`, `.mbox`, SQL, Excel and other files remain intact
+with **needs adapter** status. A SQL Server backup needs a restore/read adapter
+or logical relational export after its actual schema is known. No SQL or
+archive executable is run. Uploading an archive never marks an area complete.
+A cancelled/malformed intake retains its saved original and reports review.
+
+Safety bounds are explicit: 1 TiB per original, 16 MiB per logical indexing
+record, 32 MiB per API JSON indexing response, 100,000 ZIP members per archive,
+three ZIP levels, and expansion-ratio checks. Exceeding a bound flags review;
+it does not pretend truncated contents are complete. Large original objects
+are streamed using 1 MiB authenticated encrypted chunks. Export parts target
+256 MiB/1,000 objects; a single larger object occupies its own larger part.
+A part is staged on disk before download, so allow space for the largest part,
+ZIP intake staging and the encrypted workspace. Browser downloads stream to disk. Folder export
+requires Chrome/Edge's directory picker; other browsers use individual parts.
+If the saved object set changes between parts, a plan check stops the export
+rather than combining inconsistent manifest/parts. Incomplete folders must be
+kept separate and retried. Unlinked completed objects from interrupted indexing
+are included for association review, rather than silently omitted.
+
+Inventory remains available separately: `Limit=0` counts, original definition
+responses, category paging and its original discovery evidence downloads.
 
 ## Preservation and privacy
 
@@ -109,13 +163,13 @@ separate JobAdder export. The coverage report lists these gaps explicitly.
   For paginated categories, `responses/` is the last saved page; use all the
   pages in the completed scan's observation history. Upgrades preserve evidence
   still present in older workspaces; already overwritten data cannot be recovered.
-- Saved credentials and response bodies are encrypted. Counts, labels, run
+- Saved credentials and response bodies are encrypted. Source IDs, routing paths, relationships, counts, labels, run
   timestamps, status codes and hashes are SQLite metadata and are not encrypted.
   Use a private local folder and an encrypted disk; avoid shared/synced folders.
 - Downloaded reports and original-response ZIP files are **unencrypted**. They
   may contain personal data; handle them as private account exports.
 - ZIPs are prepared and verified in a private temporary file before download,
-  without locking the interface. The OS removes staging on close/process exit
+  while retaining status access; new extraction/intake waits until staging/download ends. The OS removes staging on close/process exit
   (unlinked on Unix, delete-on-close on Windows); downloads have a write deadline.
 - Stop the application before backing up the **whole workspace folder**.
   Preserve the passphrase separately. Do not copy only an open SQLite database
@@ -129,7 +183,6 @@ separate JobAdder export. The coverage report lists these gaps explicitly.
 From this folder:
 
 ```sh
-go mod download
 go vet ./...
 go test -race ./...
 go build -trimpath -o dist/HiringPlugMigration .
@@ -148,7 +201,8 @@ node tools/jobadder-migrator/test/browser-smoke.cjs \
 ```
 
 It uses synthetic data only and checks unlock/connect screens, inventory,
-pause/resume, denied-access reporting, downloads and mobile layout. It does not
+pause/resume, full extraction, exact native IDs/files, 30-area/240-route coverage,
+provider intake, manifest/object downloads and mobile layout. It does not
 test real JobAdder consent or promise that every account exposes every endpoint.
 
 The full migration architecture and remaining stages are documented in

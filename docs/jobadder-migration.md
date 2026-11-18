@@ -6,89 +6,73 @@ JobAdder API access is available. The owner explicitly requires existing fields
 to stay unchanged: do not clean notes, normalize salary, merge duplicates,
 rename statuses, infer employers or run AI enrichment during migration.
 
-## Implemented: read-only discovery
+## Implemented: external source extraction
 
-`tools/jobadder-migrator` is an independent Go module and executable. It embeds
-a small browser interface, listens on loopback and needs no Docker, HiringPlug
-database or Python worker. Its initial release provides:
+`tools/jobadder-migrator` is an independent Go module with an embedded local
+browser interface, Windows x64 build and encrypted SQLite/object workspace.
+It needs no Docker, Python or HiringPlug database. Discovery remains available;
+full extraction adds durable list/detail/file tasks, original byte preservation,
+record observations and relationship pointers, native downloads and a coverage
+report for all 30 areas and all 240 documented GET routes.
 
-- JobAdder OAuth with state validation, encrypted refresh credentials and an
-  access-token alternative; use the regional `api` returned by authorization.
-- A persistent SQLite workspace, exclusive process lock, encrypted credentials
-  and original response bodies (AES-GCM/scrypt), plus source identity binding.
-- A reviewed catalog of GET collection counts, activity counts, attachment
-  metadata and field/lookup definitions. Payroll/billing is explicitly deferred
-  to candidate-level discovery rather than requested as a global count. It records
-  access failures and missing authoritative counts as unknown, never zero.
-- Pause/resume checkpoints, bounded retries with `Retry-After`, cancellation,
-  token refresh, count reports and integrity-checked original-response ZIPs.
-- An append-only encrypted observation history. Failed retries keep earlier
-  responses, and the manifest separates latest attempts from evidence timestamps.
-  Existing workspaces retain their saved evidence when the schema is upgraded.
-- Durable provider cooldowns, including across restarts; long waits pause
-  immediately instead of retrying early. Storage failures show an error and
-  disable new runs while keeping the last displayed results visible as stale.
-- A clearly marked synthetic demo, Go tests, browser smoke coverage and a
-  Windows x64 build. Linux/Windows tests run in repository CI. `task verify`
-  includes this module's checks and Windows cross-build.
+The API extraction engine uses bulk equivalents explicitly named in the route
+report, expands actual typed identifiers, includes retained inactive/closed/old
+partitions, and checkpoints each page plus discovered work atomically. Every
+successful response and native file is stored before indexing. Unknown fields,
+precision, rich text and original names remain in authoritative raw objects.
+All observed representations are retained; no person/company deduplication,
+salary rewriting, CV parsing, enrichment or source writes occur.
 
-This is **discovery only**, not a full source backup or completed importer.
-Current resource requests use `Limit=0` for collection totals. Known unpaged
-definition envelopes are counted from `items`; categories use fixed-offset
-pagination, retaining every page and reporting a total only on completion.
-Repeated pages, unexpected pagination and bounds require review rather than
-being reported as complete. Record custom-field values are not retrieved. Counts
-reflect account permissions/default visibility and are not one consistent
-database snapshot. No live credentials are required for automated tests.
+Provider intake preserves original uploads and ZIP members; CSV, JSON and JSONL
+support streaming row indexing, including BOM-marked UTF-16 CSV. Unsupported
+formats remain archived with **needs adapter**, not fabricated records. The
+owner does not yet have an export or know its format. SQL Server backups and
+PST need a later format/schema adapter or logical export. Uploaded sources are
+unverified and never automatically resolve a scope area.
 
-See the tool's [operating instructions](../tools/jobadder-migrator/README.md).
-Public API reference: [JobAdder API v2](https://api.jobadder.com/v2/docs), with
-the [machine-readable specification](https://api.jobadder.com/v2/openapi.json).
-Runtime access to a user's account must still be verified; public documentation
-does not guarantee that an account has every feature or scope.
+Downloads comprise a manifest ZIP (all request statuses, source metadata,
+record observations, relationship and provider-row indexes) plus object ZIP
+parts, with original names mapped separately from safe object paths. Parts
+are verified before headers and downloaded natively, avoiding browser RAM
+proportional to account size. Native redirects allow only HTTPS JobAdder/object
+storage hosts, with credentials stripped across hosts. Arbitrary record links
+are retained as data and never followed.
 
-## Remaining architecture
+OAuth refresh rotation, persistent provider cooldowns, source binding, private
+loopback sessions, exclusive workspace locks, pause/resume, synthetic demo and
+Linux/Windows CI are retained. Encrypted objects use independently authenticated
+1 MiB frames with a final size/hash commitment, detecting tampering/truncation.
+Operational IDs/statuses/paths remain plaintext SQLite metadata; sensitive
+record bodies, credentials and original filename/header metadata are encrypted.
+
+See [operating instructions](../tools/jobadder-migrator/README.md) and the
+[full-account scope and source limits](jobadder-extraction-scope.md).
+The bundled `extraction_routes.json` is a snapshot of the
+[public v2 specification](https://api.jobadder.com/v2/openapi.json), not evidence
+of live account access. Tests and screenshots use synthetic data only.
+
+## Remaining projection, import and reconciliation
 
 ```mermaid
 flowchart LR
-  JA[JobAdder API / approved exports] --> Read[Go extraction workers]
-  Read --> Raw[Immutable original responses and files]
-  Read --> State[SQLite checkpoints and ID registry]
+  JA[JobAdder API / provider exports] --> Read[Go source extractor]
+  Read --> Raw[Encrypted originals and native files]
+  Read --> State[SQLite checkpoints and source indexes]
   Raw --> Check[Coverage and integrity reconciliation]
   State --> Check
   Check --> Plan[Reviewed destination projection]
   Plan --> Import[HiringPlug migration API]
   Import --> HP[HiringPlug records and relationships]
-  HP --> Verify[Reconciliation and cutover report]
 ```
 
-Only discovery and its evidence/checkpoint store exist today. All extraction,
-projection, import and cutover components below remain to be built.
-
-### 1. Full extraction, resumable at record and file level
-
-Use bounded Go workers with a shared account-level rate limiter. Keep request
-concurrency conservative and adapt to measured throttling. Persist each
-original list/detail response before advancing its checkpoint. List pagination,
-detail expansion and attachment downloads must be separate retryable tasks;
-an interruption must not restart 80,000 records from the beginning.
-
-Preserve exact raw bytes as the source of truth. Parsing extracts routing IDs
-and relationship keys without reserializing the original as its replacement.
-Track source account, entity type, source ID, source modification/version if
-available, observed time, endpoint and SHA-256 in separate metadata. Preserve
-all versions observed; record tombstones separately. Keep original filenames,
-attachment metadata, MIME type and binary hashes, including multiple CVs and
-formatted documents. Stream large binaries rather than loading them into RAM.
-
-The expanded coverage manifest must enumerate nested endpoints and related
-records: folder membership, company/contact/job/application/placement files,
-custom-field values and definitions, statuses, notes/activities, submissions,
-interviews, placements, invoices, timesheets, rate cards, approvals and user
-ownership. Retrieve email/SMS and history where the API/export actually exposes
-them. Inaccessible, unsupported, empty, missing and failed are distinct states.
-Use approved exports for API gaps; never claim “all records” from candidate
-counts alone. Do not browse/scrape around API permissions.
+The extractor does not claim a verified full-account backup: email threads,
+communications, personal settings, templates, full privacy/audit history and
+purged records cannot be inferred from note counts or public API availability.
+A provider export must be reconciled against source IDs and attachment versions.
+There is no automatic delta snapshot: use a new pass with overlap and a final
+freeze/export at cutover; offset pagination can drift while JobAdder changes.
+Destination projection, schema-specific backup adapters, HiringPlug import and
+final reconciliation remain separate implementation stages.
 
 ### 2. Preview the destination without changing source values
 
@@ -148,7 +132,7 @@ Passphrases cannot be recovered. Stop the tool before backing up the whole
 workspace. Use separate workspaces for different accounts/API users.
 
 The local interface requires a random session key, rejects other origins/hosts
-and never follows provider redirects with bearer credentials. API business
+and never follows cross-host provider redirects with bearer credentials. API business
 calls are GET only; token requests are POST to JobAdder's authorization server.
 There is no telemetry or AI traffic. A Windows package needs only the executable,
 launchers and instructions, not the HiringPlug source tree.
