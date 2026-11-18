@@ -40,3 +40,12 @@ func hasAmount(text string) bool {
 	}
 	return false
 }
+
+var money = regexp.MustCompile(`(?i)(?:\b(?:rm|myr|sgd|usd|idr|eur|gbp)|s\$|\$)\s?\d[\d,.]*(?:\s?k\b)?|\b\d[\d,.]*\s?k\b|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b`)
+
+// WithoutMoney takes every amount of money out of a short free text (a
+// question someone typed), salary word or not: "RM 8,765", "$5k", "9k",
+// "12,500". Years and counts ("5 years", "2019") stay.
+func WithoutMoney(text string) string {
+	return money.ReplaceAllString(WithoutSalary(text), "[amount removed]")
+}

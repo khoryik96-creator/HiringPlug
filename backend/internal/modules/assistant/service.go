@@ -15,6 +15,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/redact"
 )
 
 // Service holds the assistant's use cases.
@@ -70,7 +71,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 		if err != nil {
 			return err
 		}
-		sections, err := s.sections(ctx, tx, p, q)
+		sections, person, err := s.sections(ctx, tx, p, q)
 		if err != nil {
 			return err
 		}
@@ -81,7 +82,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 			return err
 		}
 		job := api.AssistantAskJob{
-			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), SubjectType: ptr(api.AssistantSubjectType(q.SubjectType)), Question: apiconv.OrNull(q.Question), Sections: toAPISections(sections), Ai: ai,
+			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), SubjectType: ptr(api.AssistantSubjectType(q.SubjectType)), Question: apiconv.OrNull(CleanQuestion(q.Question, person)), Sections: toAPISections(sections), Ai: ai,
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindAssistantAsk, job); err != nil {
 			return err
@@ -107,13 +108,16 @@ func (s *Service) used(ctx context.Context, tx pgx.Tx) (int64, error) {
 }
 
 // sections gathers what the AI may see of the subject: only what the user
-// may see (a record they may not see is "not found").
-func (s *Service) sections(ctx context.Context, tx pgx.Tx, p authz.Principal, q Question) ([]Section, error) {
+// may see (a record they may not see is "not found"), and who the candidate
+// is (to take them out of the question too).
+func (s *Service) sections(ctx context.Context, tx pgx.Tx, p authz.Principal, q Question) ([]Section, redact.Identity, error) {
+	var person redact.Identity
 	candidate := func(id string) (Candidate, string, error) {
 		if !p.Can(api.PermissionCandidatesRead) {
 			return Candidate{}, "", apperr.NotFound("candidate")
 		}
 		c, err := s.deps.Candidates.ForAssistant(ctx, tx, p, id)
+		person = redact.IdentityOf(c.Name, c.Email, c.Phone)
 		if err != nil || !p.Can(api.PermissionDocumentsRead) {
 			return c, "", err
 		}
@@ -129,31 +133,31 @@ func (s *Service) sections(ctx context.Context, tx pgx.Tx, p authz.Principal, q 
 	switch q.SubjectType {
 	case "candidate":
 		c, text, err := candidate(q.SubjectID)
-		return CandidateSections(c, text), err
+		return CandidateSections(c, text), person, err
 	case "job":
 		j, err := job(q.SubjectID)
 		if err != nil || q.Kind != "market_map" || s.deps.Market == nil {
-			return JobSections(j), err
+			return JobSections(j), person, err
 		}
 		pool, err := s.deps.Market.PoolText(ctx, tx, p, q.SubjectID)
 		if err != nil || pool == "" {
-			return JobSections(j), err
+			return JobSections(j), person, err
 		}
-		return append(JobSections(j), Section{Title: "In our own database", Text: pool}), nil
+		return append(JobSections(j), Section{Title: "In our own database", Text: pool}), person, nil
 	default: // application
 		if !p.Can(api.PermissionPipelineRead) {
-			return nil, apperr.NotFound("application")
+			return nil, person, apperr.NotFound("application")
 		}
 		a, err := s.deps.Applications.ForAssistant(ctx, tx, q.SubjectID)
 		if err != nil {
-			return nil, err
+			return nil, person, err
 		}
 		c, text, err := candidate(a.CandidateID)
 		if err != nil {
-			return nil, err
+			return nil, person, err
 		}
 		j, err := job(a.JobID)
-		return ApplicationSections(a, c, text, j), err
+		return ApplicationSections(a, c, text, j), person, err
 	}
 }
 

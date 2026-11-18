@@ -4,7 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Permission, type Schemas, unwrap } from "../api/client";
+import { api, type Permission, type Schemas, throwFor, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
 import { getToken } from "../auth";
 import { formatWhen } from "../labels";
@@ -36,7 +36,7 @@ export function CompanyDocuments({ companyId, section, permissions }: { companyI
         const res = await fetch(`/v1/companies/${companyId}/documents`, {
           method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` },
         });
-        if (!res.ok) unwrap({ error: await res.json(), response: res });
+        if (!res.ok) await throwFor(res);
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: key }),

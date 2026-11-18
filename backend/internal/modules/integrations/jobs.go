@@ -12,66 +12,91 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/safehttp"
 )
 
-// deliver handles webhook.deliver: it posts one delivery and records the
-// outcome. A failure is tried again later (NextAttempt), with its reason
-// recorded, until the last attempt fails it.
-func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+// deliver handles webhook.deliver, with no queue transaction open while the
+// receiver answers (it may take its 10 seconds): it reads the delivery, posts
+// it, and records the outcome in a transaction of its own. A failure is tried
+// again later (NextAttempt), with its reason recorded, until the last
+// attempt fails it. A delivery recorded meanwhile (this job ran twice) is
+// left as it is.
+func (s *Service) deliver(ctx context.Context, job jobqueue.Job) error {
 	var payload api.WebhookDeliverJob
 	if err := job.Decode(&payload); err != nil {
 		return err
 	}
-	q := store.New(tx)
-	d, err := q.GetDeliveryToSend(ctx, payload.DeliveryId)
-	if database.IsNoRows(err) {
-		return nil // the webhook was removed
-	}
-	if err != nil || d.Status != "pending" {
-		return err
-	}
-	if !d.Active {
-		msg := "The webhook is turned off."
-		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg})
-	}
-	secret, restore, err := s.sealer.Open(job.TenantID, d.Secret)
-	if err != nil {
-		msg := err.Error()
-		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg})
-	}
-	if restore { // saved in the clear, or sealed by an earlier version's key: sealed (again) now
-		if stored, err := s.sealer.Seal(job.TenantID, secret); err != nil {
-			return err
-		} else if err := q.SealWebhookSecret(ctx, store.SealWebhookSecretParams{Sealed: stored, Plain: d.Secret}); err != nil {
+	var d store.GetDeliveryToSendRow
+	send := false
+	err := database.InTx(ctx, s.pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
+		q := store.New(tx)
+		var err error
+		d, err = q.GetDeliveryToSend(ctx, payload.DeliveryId)
+		if database.IsNoRows(err) {
+			return nil // the webhook was removed
+		}
+		if err != nil || d.Status != "pending" {
 			return err
 		}
+		if !d.Active {
+			msg := "The webhook is turned off."
+			return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg, Attempts: d.Attempts})
+		}
+		secret, restore, err := s.sealer.Open(job.TenantID, d.Secret)
+		if err != nil {
+			msg := err.Error()
+			return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", LastError: &msg, Attempts: d.Attempts})
+		}
+		if restore { // saved in the clear, or sealed by an earlier version's key: sealed (again) now
+			if stored, err := s.sealer.Seal(job.TenantID, secret); err != nil {
+				return err
+			} else if err := q.SealWebhookSecret(ctx, store.SealWebhookSecretParams{Sealed: stored, Plain: d.Secret}); err != nil {
+				return err
+			}
+		}
+		d.Secret, send = secret, true
+		return nil
+	})
+	if err != nil || !send {
+		return err
 	}
-	d.Secret = secret
 	now := time.Now()
 	code, sendErr := s.post(ctx, d, now)
+	return database.InTx(ctx, s.pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
+		return s.record(ctx, tx, job, payload, d, code, sendErr, now)
+	})
+}
+
+// record saves how a delivery went, and queues its next try when it failed.
+func (s *Service) record(ctx context.Context, tx pgx.Tx, job jobqueue.Job, payload api.WebhookDeliverJob, d store.GetDeliveryToSendRow, code int, sendErr error, now time.Time) error {
+	q := store.New(tx)
 	var status *int32
 	if code != 0 {
 		c := int32(code) //nolint:gosec // an HTTP status
 		status = &c
 	}
+	at := store.RecordAttemptParams{ID: d.ID, Status: "delivered", ResponseStatus: status, Attempts: d.Attempts}
 	if sendErr == nil {
-		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "delivered", ResponseStatus: status})
+		return q.RecordAttempt(ctx, at)
 	}
 	msg := sendErr.Error()
 	if len(msg) > 1000 {
 		msg = msg[:1000]
 	}
+	at.LastError = &msg
 	next, again := NextAttempt(int(d.Attempts)+1, now)
 	if !again {
-		return q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "failed", ResponseStatus: status, LastError: &msg})
+		at.Status = "failed"
+		return q.RecordAttempt(ctx, at)
 	}
-	if err := q.RecordAttempt(ctx, store.RecordAttemptParams{ID: d.ID, Status: "pending", ResponseStatus: status, LastError: &msg, NextAttemptAt: &next}); err != nil {
+	at.Status, at.NextAttemptAt = "pending", &next
+	if err := q.RecordAttempt(ctx, at); err != nil {
 		return err
 	}
-	_, err = jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindWebhookDeliver, payload, next)
+	_, err := jobqueue.EnqueueAt(ctx, tx, job.TenantID, api.JobKindWebhookDeliver, payload, next)
 	return err
 }
 

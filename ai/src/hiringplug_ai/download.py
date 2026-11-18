@@ -9,6 +9,11 @@ class DownloadError(RuntimeError):
     """Temporary failure: the job is retried."""
 
 
+class FileTooLargeError(DownloadError):
+    """The file is larger than the worker may read: trying again cannot help,
+    so the job is given up at once (see worker.process)."""
+
+
 def download(url: str, max_bytes: int, timeout_seconds: float = 30.0) -> bytes:
     try:
         with httpx.stream("GET", url, timeout=timeout_seconds, follow_redirects=False) as response:
@@ -19,7 +24,7 @@ def download(url: str, max_bytes: int, timeout_seconds: float = 30.0) -> bytes:
             for chunk in response.iter_bytes():
                 size += len(chunk)
                 if size > max_bytes:
-                    raise DownloadError(f"file is larger than {max_bytes} bytes")
+                    raise FileTooLargeError(f"file is larger than {max_bytes} bytes")
                 chunks.append(chunk)
             return b"".join(chunks)
     except httpx.HTTPError as exc:

@@ -701,6 +701,10 @@ class AutomationEventJob(BaseModel):
     entityType: str
     entityId: str
     changes: dict[str, Any] | None = None
+    occurredAt: Annotated[
+        AwareDatetime | None,
+        Field(description="When the change happened (its audit entry); runs count from then."),
+    ] = None
 
 
 class AutomationRunJob(BaseModel):
@@ -3343,6 +3347,13 @@ class InterviewRemindJob(BaseModel):
             description="When the interview was when the reminder was queued; a moved interview has a newer reminder."
         ),
     ]
+    interviewerIds: Annotated[
+        list[UserId] | None,
+        Field(
+            description="Only these interviewers (added to the panel after the reminder went to the others).",
+            max_length=50,
+        ),
+    ] = None
 
 
 class BlindRewriteId(RootModel[str]):

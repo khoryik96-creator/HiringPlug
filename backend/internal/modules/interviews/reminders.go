@@ -8,6 +8,7 @@ package interviews
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -71,6 +72,31 @@ func (s *Service) queueReminder(ctx context.Context, tx pgx.Tx, tenantID, id str
 	return err
 }
 
+// Added is who is in after but not in before (people added to a panel).
+func Added(before, after []string) []string {
+	var out []string
+	for _, id := range after {
+		if !slices.Contains(before, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// remindAdded reminds people added to a panel whose reminder already went.
+func (s *Service) remindAdded(ctx context.Context, tx pgx.Tx, tenantID, id string, d Details, added []string) error {
+	if len(added) == 0 || d.Status != "scheduled" {
+		return nil
+	}
+	at, ok := ReminderTime(d.StartsAt, time.Now())
+	if !ok {
+		return nil
+	}
+	_, err := jobqueue.EnqueueAt(ctx, tx, tenantID, api.JobKindInterviewRemind,
+		api.InterviewRemindJob{InterviewId: id, StartsAt: d.StartsAt, InterviewerIds: &added}, at)
+	return err
+}
+
 // remind handles interview.remind: it emails the interviewers, once per
 // interview time, if the interview is still on at the time it was queued for.
 func (s *Service) remind(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
@@ -88,8 +114,16 @@ func (s *Service) remind(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 	}
 	d := detailsOf(row)
 	reminded := row.RemindedFor != nil && row.RemindedFor.Equal(row.StartsAt)
-	if d.Status != "scheduled" || !row.StartsAt.Equal(payload.StartsAt) || reminded || !row.StartsAt.After(time.Now()) {
+	only := payload.InterviewerIds != nil // people added to the panel after the others were reminded
+	if d.Status != "scheduled" || !row.StartsAt.Equal(payload.StartsAt) || (reminded && !only) || !row.StartsAt.After(time.Now()) {
 		return nil // cancelled, moved (the new time has its own reminder), already reminded, or over
+	}
+	to := d.Interviewers
+	if only {
+		to = slices.DeleteFunc(slices.Clone(*payload.InterviewerIds), func(id string) bool { return !slices.Contains(d.Interviewers, id) })
+		if len(to) == 0 {
+			return nil // taken off the panel again
+		}
 	}
 	apps, err := s.applications.Briefs(ctx, tx, []string{row.ApplicationID})
 	if err != nil {
@@ -110,7 +144,7 @@ func (s *Service) remind(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 		}
 	}
 	subject, body := ReminderText(d, app, list, s.settings.TimeZone, s.settings.PublicURL)
-	sent, err := s.mailer.EmailUsers(ctx, tx, job.TenantID, d.Interviewers, Message{Subject: subject, Body: body, ApplicationID: row.ApplicationID})
+	sent, err := s.mailer.EmailUsers(ctx, tx, job.TenantID, to, Message{Subject: subject, Body: body, ApplicationID: row.ApplicationID})
 	if err != nil {
 		return err
 	}

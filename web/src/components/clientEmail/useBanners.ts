@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { api, unwrap } from "../../api/client";
+import { api, throwFor, unwrap } from "../../api/client";
 import { emailBannersKey } from "../../api/keys";
 import { getToken } from "../../auth";
 
@@ -30,9 +30,8 @@ export function useBanners() {
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/v1/email-banners", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
-      const data: unknown = await res.json();
-      if (!res.ok) unwrap({ error: data, response: res });
-      return data as { id: string };
+      if (!res.ok) await throwFor(res);
+      return (await res.json()) as { id: string };
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: emailBannersKey }),
   });

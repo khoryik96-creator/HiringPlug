@@ -273,6 +273,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 			if err := s.queueReminder(ctx, tx, p.TenantID, id, after); err != nil {
 				return err
 			}
+		} else if row.RemindedFor != nil && row.RemindedFor.Equal(row.StartsAt) {
+			// Reminded already: those added to the panel since are reminded on their own.
+			if err := s.remindAdded(ctx, tx, p.TenantID, id, after, Added(before.Interviewers, after.Interviewers)); err != nil {
+				return err
+			}
 		}
 		if s.calendar != nil {
 			if err := s.calendar.SourceChanged(ctx, tx, p.TenantID, "interview", id); err != nil {

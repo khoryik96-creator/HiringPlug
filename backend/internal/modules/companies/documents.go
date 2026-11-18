@@ -8,7 +8,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -143,7 +145,8 @@ func (s *Service) DeleteDocument(ctx context.Context, p authz.Principal, company
 // DocumentFile is a document to download.
 type DocumentFile struct {
 	FileName, ContentType string
-	Data                  []byte
+	Body                  io.ReadCloser // sent as it is read (closed when sent)
+	Size                  int64
 }
 
 // DocumentFile returns a document's file.
@@ -161,12 +164,18 @@ func (s *Service) DocumentFile(ctx context.Context, p authz.Principal, companyID
 		return DocumentFile{}, err
 	}
 	f, err := s.files.Open(doc.StorageKey)
+	if errors.Is(err, os.ErrNotExist) {
+		return DocumentFile{}, apperr.NotFound("document file")
+	}
 	if err != nil {
 		return DocumentFile{}, err
 	}
-	defer func() { _ = f.Close() }()
-	data, err := io.ReadAll(f)
-	return DocumentFile{FileName: doc.FileName, ContentType: doc.ContentType, Data: data}, err
+	info, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return DocumentFile{}, err
+	}
+	return DocumentFile{FileName: doc.FileName, ContentType: doc.ContentType, Body: f, Size: info.Size()}, nil
 }
 
 func (s *Service) mustExist(ctx context.Context, q *store.Queries, companyID string) error {

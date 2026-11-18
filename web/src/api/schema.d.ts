@@ -4625,6 +4625,11 @@ export interface components {
             changes?: {
                 [key: string]: unknown;
             };
+            /**
+             * Format: date-time
+             * @description When the change happened (its audit entry); runs count from then.
+             */
+            occurredAt?: string;
         };
         AutomationRunJob: {
             runId: components["schemas"]["AutomationRunId"];
@@ -7155,6 +7160,8 @@ export interface components {
              * @description When the interview was when the reminder was queued; a moved interview has a newer reminder.
              */
             startsAt: string;
+            /** @description Only these interviewers (added to the panel after the reminder went to the others). */
+            interviewerIds?: components["schemas"]["UserId"][];
         };
         /** @example jbr_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         BlindRewriteId: string;

@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+const forgetAnswers = `-- name: ForgetAnswers :exec
+DELETE FROM assistant_answer WHERE subject_type = $1 AND subject_id = ANY ($2::text[])
+`
+
+type ForgetAnswersParams struct {
+	SubjectType string
+	Ids         []string
+}
+
+// What the AI said about records deleted for good (the Bin): it describes them.
+func (q *Queries) ForgetAnswers(ctx context.Context, arg ForgetAnswersParams) error {
+	_, err := q.db.Exec(ctx, forgetAnswers, arg.SubjectType, arg.Ids)
+	return err
+}
+
 const getEmail = `-- name: GetEmail :one
 SELECT id, tenant_id, user_id, mode, status, subject, body, error, model, input_tokens, output_tokens, created_at, written_at FROM assistant_email WHERE id = $1 AND user_id = app_current_user()
 `

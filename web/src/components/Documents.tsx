@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
+import { api, type Candidate, type Document, type Permission, type Schemas, throwFor, unwrap } from "../api/client";
 import { downloadDocument } from "../api/files";
 import { getToken } from "../auth";
 import { CandidateCv } from "./CandidateCv";
@@ -111,7 +111,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         body,
         headers: { Authorization: `Bearer ${getToken() ?? ""}` },
       });
-      if (!res.ok) unwrap({ error: await res.json(), response: res });
+      if (!res.ok) await throwFor(res);
     },
     onSuccess: async () => {
       setUploading(false);

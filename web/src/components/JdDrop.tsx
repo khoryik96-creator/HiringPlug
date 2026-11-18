@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-import { api, type Schemas, unwrap } from "../api/client";
+import { api, type Schemas, throwFor, unwrap } from "../api/client";
 import { jobJdFilesKey } from "../api/keys";
 import { getToken } from "../auth";
 import { DropZone } from "./DropZone";
@@ -16,9 +16,8 @@ export async function sendJd(jobId: string | undefined, file: File): Promise<Sch
   const body = new FormData();
   body.append("file", file);
   const res = await fetch(jobId ? `/v1/jobs/${jobId}/jd-files` : "/v1/jd-files", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
-  const json: unknown = await res.json();
-  if (!res.ok) unwrap({ error: json, response: res });
-  return json as Schemas["JdFile"];
+  if (!res.ok) await throwFor(res);
+  return (await res.json()) as Schemas["JdFile"];
 }
 
 /**

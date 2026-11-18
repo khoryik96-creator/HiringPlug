@@ -32,7 +32,10 @@ chosen for it (admin, recruiter, sourcer, hiring manager or viewer; never
 owner), in your company only. Send it as `Authorization: Bearer hpk_...` to any
 endpoint in `/docs`. The key is shown once; only its SHA-256 is stored. A
 revoked key stops working at once. Changes made with a key are recorded with
-the key as the actor. Keys cannot create keys or webhooks, even as admin.
+the key as the actor. Keys cannot create keys or webhooks, even as admin. A
+key sees the candidates its role sees: for a role limited to its own (or its
+team's) candidates, none, so a key cannot be made for one. Nobody makes a key
+that can do more than they can.
 
 **Webhooks.** Choose the events (candidate created or updated, application
 added or moved, careers applications, interviews scheduled or changed,

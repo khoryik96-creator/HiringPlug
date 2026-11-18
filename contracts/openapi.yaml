@@ -7239,6 +7239,7 @@ components:
         entityType: {type: string}
         entityId: {type: string}
         changes: {type: object, additionalProperties: true}
+        occurredAt: {type: string, format: date-time, description: "When the change happened (its audit entry); runs count from then."}
     AutomationRunJob:
       type: object
       required: [runId, dueAt]
@@ -11011,6 +11012,11 @@ components:
       properties:
         interviewId: {$ref: '#/components/schemas/InterviewId'}
         startsAt: {type: string, format: date-time, description: When the interview was when the reminder was queued; a moved interview has a newer reminder.}
+        interviewerIds:
+          type: array
+          maxItems: 50
+          items: {$ref: '#/components/schemas/UserId'}
+          description: Only these interviewers (added to the panel after the reminder went to the others).
     BlindRewriteId:
       type: string
       pattern: '^jbr_[0-9a-hjkmnp-tv-z]{26}$'

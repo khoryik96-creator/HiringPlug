@@ -58,6 +58,22 @@ export function unwrap<T>(result: { data?: T; error?: unknown; response: Respons
   throw new Error(`Unexpected response ${String(result.response.status)}`);
 }
 
+/**
+ * Throws for a failed response from a plain fetch (uploads, files): the
+ * API's own error when it sent one, else what the status says (a proxy in
+ * front may answer with a page, not JSON: a file too large, a gateway down).
+ */
+export async function throwFor(res: Response): Promise<never> {
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    body = undefined; // not JSON
+  }
+  if (isErrorBody(body)) throw new ApiError(body);
+  throw new Error(res.status === 413 ? "The file is too large to upload." : `The server answered ${String(res.status)}: try again in a moment.`);
+}
+
 function isErrorBody(value: unknown): value is ErrorBody {
   return typeof value === "object" && value !== null && "error" in value;
 }

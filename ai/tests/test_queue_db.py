@@ -159,6 +159,20 @@ def test_a_failure_is_recorded_for_a_later_retry(database: dict[str, str]) -> No
     queue.close()
 
 
+def test_a_job_given_up_ends_at_once(database: dict[str, str]) -> None:
+    job_id = enqueue_ai_job(database["admin"], database["tenant"])
+    queue = Queue(database["ai"], "pytest-worker")
+    job = queue.claim(lease_seconds=60)
+    assert job is not None
+    assert queue.give_up(job, "FileTooLargeError: file is larger than 10 bytes") == "dead"
+    assert job_row(database["admin"], job_id) == (
+        "dead",
+        1,
+        "FileTooLargeError: file is larger than 10 bytes",
+    )
+    queue.close()
+
+
 def test_after_losing_the_lease_nothing_is_committed(database: dict[str, str]) -> None:
     job_id = enqueue_ai_job(database["admin"], database["tenant"])
     queue = Queue(database["ai"], "pytest-worker")

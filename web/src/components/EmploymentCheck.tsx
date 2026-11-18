@@ -2,7 +2,7 @@
 // see whether they still work at the company they are recorded at.
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { type Schemas, unwrap } from "../api/client";
+import { type Schemas, throwFor } from "../api/client";
 import { getToken } from "../auth";
 import { contactKey } from "../api/keys";
 import { formatWhen } from "../labels";
@@ -17,9 +17,8 @@ async function sendProfile(contactId: string, file: File): Promise<Employment> {
   const body = new FormData();
   body.append("file", file);
   const res = await fetch(`/v1/contacts/${contactId}/linkedin-profile`, { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
-  const json: unknown = await res.json();
-  if (!res.ok) unwrap({ error: json, response: res });
-  return json as Employment;
+  if (!res.ok) await throwFor(res);
+  return (await res.json()) as Employment;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

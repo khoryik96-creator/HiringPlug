@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,5 +19,19 @@ func TestSalaryFiguresAreTakenOut(t *testing.T) {
 		"Saved RM 1.2 million on audit fees":                        "Saved RM 1.2 million on audit fees",
 	} {
 		assert.Equal(t, want, WithoutSalary(in), in)
+	}
+}
+
+func TestWithoutMoneyTakesOutEveryAmount(t *testing.T) {
+	got := WithoutMoney("She expects RM 8,765 a month, or $5k, or 9k, or MYR9500, or 12,500; 5 years since 2019.")
+	for _, leak := range []string{"8,765", "5k", "9k", "9500", "12,500"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("%q still has %q", got, leak)
+		}
+	}
+	for _, kept := range []string{"5 years", "2019"} {
+		if !strings.Contains(got, kept) {
+			t.Errorf("%q lost %q", got, kept)
+		}
 	}
 }

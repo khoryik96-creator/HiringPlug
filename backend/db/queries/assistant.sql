@@ -38,3 +38,7 @@ UPDATE assistant_email
 SET status = @status, subject = sqlc.narg(subject), body = sqlc.narg(body), error = sqlc.narg(error), model = sqlc.narg(model),
     input_tokens = @input_tokens, output_tokens = @output_tokens, written_at = now()
 WHERE id = @id AND status = 'queued';
+
+-- What the AI said about records deleted for good (the Bin): it describes them.
+-- name: ForgetAnswers :exec
+DELETE FROM assistant_answer WHERE subject_type = @subject_type AND subject_id = ANY (@ids::text[]);

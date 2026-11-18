@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Schemas, unwrap } from "../api/client";
+import { api, type Schemas, throwFor, unwrap } from "../api/client";
 import { getToken } from "../auth";
 import { candidatesKey, cvImportsKey } from "../api/keys";
 import { CV_TYPES, DropZone } from "./DropZone";
@@ -40,7 +40,7 @@ async function sendFile(importId: string, file: File): Promise<void> {
     body,
     headers: { Authorization: `Bearer ${getToken() ?? ""}` },
   });
-  if (!res.ok) unwrap({ error: await res.json(), response: res });
+  if (!res.ok) await throwFor(res);
 }
 
 /**

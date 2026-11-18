@@ -98,7 +98,11 @@ Reacting to what happened elsewhere goes through the **audit log**: every
 change writes an entry in its own transaction, and database triggers on
 `audit_log` queue work for those listening, in that same transaction.
 Webhooks (`webhook.deliver`) and automations (`automation.event`) work this
-way, so a module never has to call them when something changes.
+way, so a module never has to call them when something changes. An
+`automation.event` carries when the change happened, so a run "2 days after"
+counts from then even when the queue was behind. A webhook is posted with no
+transaction open (an outside handler), so a slow receiver holds no database
+connection.
 
 **Adding a module** is one command (`task new:module`): it creates the contract
 file, a migration with row-level security, the SQL, the Go code in this layout,
@@ -167,7 +171,7 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   without counting an attempt or queuing another job.
 - **Outside a transaction, for slow calls.** A Go handler is normally given
   the queue's transaction, and its work commits with the job. One that waits
-  minutes on another service (Outlook's calendar sync) is registered as an
+  minutes on another service (Outlook's calendar sync, a webhook) is registered as an
   outside handler (`Worker.Outside`, `jobqueue.OutsideHandlers`): it gets no
   transaction, writes in its own short ones (so must be safe to run again),
   and only marking the job done takes one.
@@ -180,7 +184,9 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   not run another test's jobs.
 - **Retried** with growing waits (10s, 20s, 40s, up to 1 hour), then marked
   `dead` with its last error, so failures are visible, never silent: owners
-  and admins see them in **Settings > System** and can try one again.
+  and admins see them in **Settings > System** and can try one again. A
+  failure retrying cannot fix (a file larger than the AI worker may read) is
+  given up at once (`job_give_up`).
 - **Most urgent first.** Each job kind has a priority in the contract: `high`
   when someone waits on screen (an assistant question, an email, a job
   description's preview on the job's page), `low` for upkeep (webhooks,
