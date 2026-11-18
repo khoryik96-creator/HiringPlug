@@ -23,7 +23,7 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
     set: async values => { Object.assign(store[name], values); },
   });
   const chrome = {
-    runtime: {id: 'companion', getManifest: () => ({version: '1.0.0'}), onMessage: {addListener: f => listeners.message.push(f)}},
+    runtime: {id: 'companion', getManifest: () => ({version: '1.0.0'}), getURL: path => 'chrome-extension://companion/' + path, onMessage: {addListener: f => listeners.message.push(f)}},
     storage: {local: area('local'), session: area('session')},
     tabs: {
       create: async ({url, active, windowId, openerTabId}) => {
@@ -56,7 +56,7 @@ function browser({page = () => ({joined: '2019-04', left: '2025-08', current: fa
   context.globalThis = context;
   vm.runInContext(source, context);
   const send = (message, origin = app) => new Promise(resolve => {
-    listeners.message[0](message, {id: 'companion', tab: {id: 1, windowId: 7}, frameId: 0, origin}, resolve);
+    listeners.message[0](message, {id: 'companion', tab: {id: 1, windowId: 7, index: 0}, frameId: 0, origin}, resolve);
   });
   const look = id => { tabs.get(id).active = true; listeners.activated.forEach(f => f({tabId: id})); };
   return {send, tabs, groups, look, context};
@@ -68,6 +68,15 @@ test('only the connected HiringPlug may use it', async () => {
   const b = browser();
   assert.match((await b.send(check, 'https://evil.test')).error, /Connect this HiringPlug/);
   assert.equal((await b.send({action: 'status'})).result.version, '1.0.0');
+});
+
+test('HiringPlug opens the update page beside its tab (the connected HiringPlug only)', async () => {
+  const b = browser();
+  assert.match((await b.send({action: 'openUpdater'}, 'https://evil.test')).error, /Connect this HiringPlug/);
+  assert.equal((await b.send({action: 'openUpdater'})).result, true);
+  const page = [...b.tabs.values()].find(t => t.url === 'chrome-extension://companion/update.html');
+  assert.ok(page, 'the update page opened');
+  assert.equal(page.windowId, 7);
 });
 
 test('reads the dates of the time at the company in a background tab, then closes it', async () => {

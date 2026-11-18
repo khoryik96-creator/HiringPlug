@@ -51,4 +51,8 @@ document.getElementById('connect').addEventListener('click', async () => {
   await show();
 });
 
+document.getElementById('update').addEventListener('click', () => {
+  void chrome.tabs.create({url: chrome.runtime.getURL('update.html')});
+});
+
 void show();

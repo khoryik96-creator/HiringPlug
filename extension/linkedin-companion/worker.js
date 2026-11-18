@@ -301,6 +301,10 @@ async function handle(message, sender) {
   }
   const {action, args = {}} = message || {};
   if (action === 'status') return {version: chrome.runtime.getManifest().version, busy: !!current};
+  if (action === 'openUpdater') { // HiringPlug's "Update the companion": the update page, beside its tab
+    await chrome.tabs.create({url: chrome.runtime.getURL('update.html'), windowId: sender.tab.windowId, index: sender.tab.index + 1});
+    return true;
+  }
   if (action === 'cancel') {
     if (current && current.operation === args.operation_id) current.cancelled = true;
     return true;

@@ -16,6 +16,20 @@ LinkedIn sign-in**: HiringPlug's server never reads LinkedIn.
    HiringPlug**. The browser asks to allow that one address; the companion
    then answers only that HiringPlug (and LinkedIn), nowhere else.
 
+## Update
+
+From 1.4.0 the companion updates itself from the HiringPlug it is connected
+to: **Settings › LinkedIn companion › Update the companion** (shown when the
+HiringPlug has a newer one), or **Check for an update** under its icon, opens
+its update page (`update.html`). The first time, choose the folder it was
+loaded from and allow editing it; the browser remembers that folder. The page
+fetches `/linkedin-companion.json` from the connected HiringPlug (its version
+and files, built with the web app like the zip), writes them into the folder
+(manifest last) and reloads the companion: no download, no extensions page.
+It only writes files; the browser runs them after it loads the folder again,
+as when updating by hand. It accepts only this companion (its manifest name)
+at the version it states, with the companion's own kinds of file.
+
 On a company's contacts, **Check employment on LinkedIn** then checks each
 contact with a LinkedIn profile (the company needs its LinkedIn page set).
 A company's **Find HR** tab reads pages of a LinkedIn people search at that
@@ -60,7 +74,8 @@ agency's industries).
 - `worker.js`: the background worker: who may ask (connected HiringPlug pages
   only), the tabs it opens and closes, and the checks on what it returns.
 - `bridge.js`: runs on the connected HiringPlug page and passes messages.
-- `popup.html`, `popup.js`: connect or disconnect a HiringPlug address.
-- `test/worker.test.mjs`: the worker with a fake browser
-  (`node --test extension/linkedin-companion/test/worker.test.mjs`, part of
-  `task test:web`).
+- `popup.html`, `popup.js`: connect or disconnect a HiringPlug address; check for an update.
+- `update.html`, `update.js`, `updater.js`: the self-update (see Update).
+- `test/worker.test.mjs`: the worker with a fake browser, and
+  `test/updater.test.mjs`: the update with a fake folder (both with
+  `node --test`, part of `task test:web`).

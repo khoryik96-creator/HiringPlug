@@ -592,7 +592,9 @@ for each of their jobs, with **Score fit** / **Score again**.
   LinkedIn companion**, `extension/linkedin-companion`; each person downloads
   it from **Settings › LinkedIn companion**, which shows the install steps and
   whether this browser is connected; the zip is built with the web app, so it
-  always matches it): **Check employment on
+  always matches it; from 1.4.0 it **updates itself**: **Update the
+  companion** there, when a newer one is ready, writes the new version into
+  its folder, chosen once, and restarts it, with no download): **Check employment on
   LinkedIn** on a company's contacts (or **Check on LinkedIn now** on one
   contact). The companion, a browser extension connected to this HiringPlug
   only, reads each contact's LinkedIn profile in the recruiter's own browser

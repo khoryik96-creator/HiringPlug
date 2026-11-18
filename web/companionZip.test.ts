@@ -2,7 +2,7 @@
 import { inflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 
-import { companionFiles, crc32, zip } from "./companionZip";
+import { companionBundle, companionFiles, crc32, zip } from "./companionZip";
 
 const dir = new URL("../extension/linkedin-companion/", import.meta.url).pathname;
 
@@ -34,6 +34,18 @@ describe("the companion download", () => {
     expect(names.some((n) => n.includes("/test/")), "tests stay out").toBe(false);
     const manifest = JSON.parse(files.get("hiringplug-linkedin-companion/manifest.json")?.toString() ?? "{}") as { manifest_version?: number };
     expect(manifest.manifest_version).toBe(3);
+  });
+
+  it("is also served as the bundle the companion updates itself from: the same files, at its manifest's version", () => {
+    const bundle = companionBundle(dir);
+    const zipped = [...companionFiles(dir).keys()].map((n) => n.replace("hiringplug-linkedin-companion/", "")).sort();
+    expect(Object.keys(bundle.files).sort()).toEqual(zipped);
+    const manifest = JSON.parse(bundle.files["manifest.json"] ?? "{}") as { version?: string; name?: string };
+    expect(bundle.version).toBe(manifest.version);
+    expect(manifest.name).toBe("HiringPlug LinkedIn Companion"); // what the companion's updater accepts
+    expect(Object.keys(bundle.files)).toContain("update.html");
+    // Every path is one the updater writes (extension/linkedin-companion/updater.js).
+    for (const p of Object.keys(bundle.files)) expect(p).toMatch(/^[a-z0-9_-]+(\/[a-z0-9_-]+)*\.(js|json|html|css|md|txt)$/i);
   });
 
   it("is the same bytes each build", () => {

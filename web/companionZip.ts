@@ -9,6 +9,8 @@ import { deflateRawSync } from "node:zlib";
 import type { Plugin } from "vite";
 
 export const COMPANION_ZIP = "linkedin-companion.zip";
+/** The same files for the companion's own Update (extension/linkedin-companion/updater.js). */
+export const COMPANION_BUNDLE = "linkedin-companion.json";
 const FOLDER = "hiringplug-linkedin-companion";
 
 /** The companion's files (path inside the zip → contents), tests and hidden files left out. */
@@ -67,19 +69,45 @@ export function zip(files: Map<string, Buffer>): Buffer {
   return Buffer.concat([...local, dir, end]);
 }
 
-/** Serves /linkedin-companion.zip while developing and adds it to the built app. */
+/**
+ * What the companion fetches to update itself: its version and files (paths
+ * inside its folder, as text), the same files as the zip.
+ */
+export function companionBundle(dir: string): { version: string; files: Record<string, string> } {
+  const files: Record<string, string> = {};
+  for (const [name, data] of companionFiles(dir)) files[name.slice(FOLDER.length + 1)] = data.toString("utf8");
+  const manifest = JSON.parse(files["manifest.json"] ?? "{}") as { version?: string };
+  if (!manifest.version) throw new Error("the companion has no manifest version");
+  return { version: manifest.version, files };
+}
+
+/**
+ * Serves /linkedin-companion.zip and /linkedin-companion.json while developing
+ * and adds them to the built app; the app knows the companion's version
+ * (__COMPANION_VERSION__) to say when one in a browser is older.
+ */
 export function companionZip(dir: string): Plugin {
   const build = () => zip(companionFiles(dir));
+  const bundle = () => JSON.stringify(companionBundle(dir));
   return {
     name: "hiringplug-companion-zip",
+    config() {
+      return { define: { __COMPANION_VERSION__: JSON.stringify(companionBundle(dir).version) } };
+    },
     configureServer(server) {
       server.middlewares.use(`/${COMPANION_ZIP}`, (_req, res) => {
         res.setHeader("Content-Type", "application/zip");
         res.end(build());
       });
+      server.middlewares.use(`/${COMPANION_BUNDLE}`, (_req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(bundle());
+      });
     },
     generateBundle() {
       this.emitFile({ type: "asset", fileName: COMPANION_ZIP, source: build() });
+      this.emitFile({ type: "asset", fileName: COMPANION_BUNDLE, source: bundle() });
     },
   };
 }
