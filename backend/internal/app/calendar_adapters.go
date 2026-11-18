@@ -9,11 +9,15 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/identity"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/pipeline"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/privacy"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/scheduling"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
 
 type calendarApps struct{ emails *emails.Module }
@@ -28,6 +32,10 @@ type calendarUsers struct{ identity *identity.Module }
 func (a calendarUsers) CalendarUserActive(ctx context.Context, tx pgx.Tx, user string) (bool, error) {
 	active, err := a.identity.ActiveUsers(ctx, tx, []string{user})
 	return slices.Contains(active[user], api.PermissionCalendarsUse), err
+}
+
+func (a calendarUsers) PrincipalFor(ctx context.Context, tx pgx.Tx, user string) (authz.Principal, bool, error) {
+	return a.identity.PrincipalFor(ctx, tx, user)
 }
 
 type calendarSources struct {
@@ -74,8 +82,36 @@ func (a calendarSources) Existing(ctx context.Context, tx pgx.Tx, kind string, i
 	return map[string]bool{}, nil
 }
 func interviewMeeting(m interviews.CalendarMeeting) calendars.Meeting {
-	return calendars.Meeting{Kind: "interview", ID: m.ID, Title: m.Title, Location: m.Location, Version: m.Version, Users: m.Users, Start: m.Start, End: m.End, Cancelled: m.Cancelled}
+	return calendars.Meeting{Kind: "interview", ID: m.ID, Title: m.Title, Location: m.Location, Version: m.Version, Users: m.Users, Start: m.Start, End: m.End,
+		ApplicationID: m.ApplicationID, Mode: m.Mode, Instructions: m.Instructions, Cancelled: m.Cancelled, Scheduled: m.Scheduled}
 }
 func bookingMeeting(m scheduling.CalendarMeeting) calendars.Meeting {
 	return calendars.Meeting{Kind: "booking", ID: m.ID, Title: m.Title, Location: m.Location, Version: m.Version, Users: []string{m.Host}, Start: m.Start, End: m.End, Cancelled: m.Cancelled}
+}
+
+type calendarRecipients struct {
+	pipeline   *pipeline.Module
+	candidates *candidates.Module
+	privacy    *privacy.Module
+}
+
+func (a calendarRecipients) InterviewRecipient(ctx context.Context, tx pgx.Tx, applicationID string) (string, bool, error) {
+	apps, err := a.pipeline.Briefs(ctx, tx, []string{applicationID})
+	if err != nil {
+		return "", false, err
+	}
+	application, ok := apps[applicationID]
+	if !ok {
+		return "", false, nil
+	}
+	people, err := a.candidates.Briefs(ctx, tx, []string{application.CandidateID})
+	if err != nil {
+		return "", false, err
+	}
+	person, ok := people[application.CandidateID]
+	if !ok || person.Email == nil {
+		return "", false, nil
+	}
+	optedOut, err := a.privacy.DoNotContact(ctx, tx, application.CandidateID)
+	return *person.Email, optedOut, err
 }

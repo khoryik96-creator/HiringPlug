@@ -171,6 +171,12 @@ func eventBody(row store.CalendarEvent) ([]byte, error) {
 		body["isOnlineMeeting"] = true
 		body["onlineMeetingProvider"] = "teamsForBusiness"
 	}
+	if row.Source == invitationSource {
+		body["isReminderOn"] = row.ReminderMinutes > 0
+		if row.ReminderMinutes > 0 {
+			body["reminderMinutesBeforeStart"] = row.ReminderMinutes
+		}
+	}
 	return json.Marshal(body)
 }
 

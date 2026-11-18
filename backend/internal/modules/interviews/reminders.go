@@ -144,6 +144,15 @@ func (s *Service) remind(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error
 		}
 	}
 	subject, body := ReminderText(d, app, list, s.settings.TimeZone, s.settings.PublicURL)
+	if s.calendar != nil {
+		link, err := s.calendar.InterviewJoinLink(ctx, tx, job.TenantID, row.ID)
+		if err != nil {
+			return err
+		}
+		if link != "" {
+			body = "Join in Microsoft Teams: " + link + "\n\n" + body
+		}
+	}
 	sent, err := s.mailer.EmailUsers(ctx, tx, job.TenantID, to, Message{Subject: subject, Body: body, ApplicationID: row.ApplicationID})
 	if err != nil {
 		return err

@@ -48,6 +48,20 @@ shared/delegated calendars are not included.
   The existing candidate ICS/email invitation flow remains. A booking host whose
   Outlook is working receives the native hold instead of another ICS email copy;
   while their connection is failing or needs reconnecting they are emailed.
+- On a scheduled interview, open **Outlook invitation** and check the candidate's
+  address before sending. The organizer can add a Teams meeting for a video
+  interview when the connected default calendar supports Teams. The reminder
+  choice sets the Outlook event reminder. Each attendee's calendar keeps its
+  own notification settings.
+- HiringPlug updates that invitation when the interview moves and asks Outlook
+  to cancel it when the interview is cancelled. The original organizer and
+  candidate address are pinned. A disconnected or switched account, a changed
+  candidate address or withdrawn consent requires attention. In those cases,
+  review the original event in Outlook before taking action. Private panel
+  holds still apply, and the organizer's native event replaces their hold once
+  Outlook has accepted it. **Join Teams** appears on the interview when
+  Microsoft returns the link. The panel's day-before email includes it if the
+  link is available when the reminder runs.
 - An Outlook change to an own appointment is reflected on the next refresh.
   A changed/deleted interview or booking hold is flagged for review; its source
   schedule stays in HiringPlug. **Keep HiringPlug details & sync** explicitly

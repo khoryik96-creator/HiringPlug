@@ -126,6 +126,9 @@ func (s *Service) byTransaction(ctx context.Context, q *store.Queries, c store.C
 	rows, err := q.UnreceiptedCalendarEvents(ctx, store.UnreceiptedCalendarEventsParams{UserID: c.UserID, ConnectionID: c.ID})
 	out := make(map[string]store.CalendarEvent, 2*len(rows))
 	for _, r := range rows {
+		if r.Source == invitationSource && !inviteCalendar(r, c) {
+			continue
+		}
 		out[transactionID(r, r.RemoteGeneration)] = r
 		if r.RemoteGeneration > 0 {
 			out[transactionID(r, r.RemoteGeneration-1)] = r
@@ -149,10 +152,17 @@ func (s *Service) adopt(ctx context.Context, tx pgx.Tx, c store.CalendarConnecti
 }
 
 func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, e graphEvent) error {
+	q := store.New(tx)
+	if row.Source == invitationSource && row.Teams && row.JoinUrl == nil && !e.IsCancelled {
+		if link := e.join(); link != nil {
+			if err := q.SaveInterviewJoinLink(ctx, store.SaveInterviewJoinLinkParams{ID: row.ID, JoinUrl: link, ExpectedVersion: row.Version}); err != nil {
+				return err
+			}
+		}
+	}
 	if text(row.RemoteKey) == text(e.key()) || row.Version != row.SentVersion {
 		return nil
 	}
-	q := store.New(tx)
 	snapshot, _ := json.Marshal(e)
 	start, end, err := e.times()
 	if err != nil {

@@ -4381,6 +4381,45 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/InterviewNotAllowed'}
+  /v1/interviews/{interviewId}/outlook-invitation:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    get:
+      operationId: getInterviewInvitation
+      tags: [interviews]
+      summary: Candidate Outlook invitation status and the interview's Teams link
+      x-permission: interviews:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InterviewInvitation'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      operationId: sendInterviewInvitation
+      tags: [interviews]
+      summary: Send or retry the candidate Outlook invitation from your calendar
+      x-permission: interviews:schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InterviewInvitationInput'}
+      responses:
+        '202':
+          description: Queued for Outlook
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InterviewInvitation'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/InterviewNotAllowed'}
   /v1/interviews/{interviewId}/calendar.ics:
     parameters:
       - $ref: '#/components/parameters/InterviewIdPath'
@@ -7497,6 +7536,7 @@ components:
           enum:
             - local
             - interview
+            - interview_invitation
             - booking
             - outlook
         sourceId:
@@ -10895,6 +10935,25 @@ components:
       required: [deliveryId]
       properties:
         deliveryId: {$ref: '#/components/schemas/WebhookDeliveryId'}
+    InterviewInvitationInput:
+      type: object
+      required: [version, teams, reminderMinutes]
+      properties:
+        version: {type: integer, minimum: 1, maximum: 2147483647}
+        teams: {type: boolean}
+        reminderMinutes: {type: integer, minimum: 0, maximum: 1440}
+    InterviewInvitation:
+      type: object
+      required: [status, canSend, teamsAvailable, teams, reminderMinutes, recipient, joinUrl, issue]
+      properties:
+        status: {type: string, enum: [none, pending, sent, failed, conflict, cancelled]}
+        canSend: {type: boolean}
+        teamsAvailable: {type: boolean}
+        teams: {type: boolean}
+        reminderMinutes: {type: integer}
+        recipient: {type: string, nullable: true}
+        joinUrl: {type: string, nullable: true}
+        issue: {type: string, nullable: true}
     InterviewId:
       type: string
       pattern: '^intv_[0-9a-hjkmnp-tv-z]{26}$'

@@ -8,6 +8,7 @@ import { INTERVIEW_MODE, INTERVIEW_STATUS, RECOMMENDATION, formatWhen } from "..
 import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 import { InterviewForm } from "./InterviewForm";
+import { InterviewInvitation } from "./InterviewInvitation";
 
 type Interview = Schemas["Interview"];
 
@@ -81,6 +82,7 @@ export function InterviewItem({ interview: iv, permissions, showCandidate = fals
         </div>
       </div>
       <ErrorMessage error={setStatus.error} />
+      {(canSchedule || onPanel) && permissions.includes("calendars:use") && <InterviewInvitation interview={iv} />}
       {emailing && (
         <EmailComposer permissions={permissions} candidateId={iv.candidateId} applicationId={iv.applicationId} interviewId={iv.id} template="Interview invitation"
           canManageTemplates={permissions.includes("emails.templates:manage")}

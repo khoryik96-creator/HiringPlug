@@ -39,6 +39,7 @@ type outlookFixture struct {
 	loseCreateAnswer            int            // creates whose event is stored but whose answer is lost (a 503)
 	lastPatch                   map[string]any // what the last change sent
 	deleteStatus                int            // answer to deletes when not 0 (a broken or busy Outlook)
+	trialJoinURL                string
 	config                      calendars.Config
 }
 
@@ -90,6 +91,9 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		e["id"] = id
 		e["changeKey"] = "v1"
 		e["showAs"] = "busy"
+		if f.trialJoinURL != "" && e["isOnlineMeeting"] == true {
+			e["onlineMeeting"] = map[string]string{"joinUrl": f.trialJoinURL}
+		}
 		e["_account"] = f.signedIn()
 		f.events[id] = e
 		if f.loseCreateAnswer > 0 {
