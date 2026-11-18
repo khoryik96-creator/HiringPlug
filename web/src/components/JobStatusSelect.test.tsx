@@ -26,7 +26,7 @@ describe("a job's status", () => {
 
   it("shows the choice while it saves", async () => {
     let answer: (v: never) => void = () => undefined;
-    vi.spyOn(api, "PATCH").mockReturnValue(new Promise((r) => { answer = r; }) as never);
+    vi.spyOn(api, "PATCH").mockReturnValue(new Promise<never>((r) => { answer = r; }));
     renderWithClient(<JobStatusSelect job={job} canChange />);
     const select = screen.getByLabelText<HTMLSelectElement>("Job status");
     fireEvent.change(select, { target: { value: "closed" } });

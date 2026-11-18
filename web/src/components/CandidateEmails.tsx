@@ -6,6 +6,7 @@ import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
 import { CandidateBookings } from "./CandidateBookings";
 import { EmailComposer } from "./EmailComposer";
+import { OutlookProfileMail } from "./outlook/OutlookProfileMail";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** Emails sent about a candidate, newest first, and writing a new one. */
@@ -44,6 +45,7 @@ export function CandidateEmails({ candidateId, email, permissions, writing: cont
       {permissions.includes("scheduling:use") && <CandidateBookings candidateId={candidateId} />}
       <ErrorMessage error={list.error} />
       <SentEmails emails={list.data} />
+      {canSend && permissions.includes("candidates:read") && <OutlookProfileMail profile={{ candidateId }} address={email} />}
     </section>
   );
 }

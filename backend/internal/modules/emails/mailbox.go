@@ -147,6 +147,9 @@ func (s *Service) saveSMTP(ctx context.Context, p authz.Principal, in api.SmtpMa
 		if err != nil {
 			return err
 		}
+		if err := store.New(tx).RemoveOutlookSync(ctx); err != nil {
+			return err
+		}
 		_, err = q.SaveMailbox(ctx, store.SaveMailboxParams{Provider: "smtp", Address: strings.ToLower(string(in.Address)), Host: host, Port: smtpPort, Tls: string(in.Tls), Username: in.Username, SealedSecret: sealed})
 		if err != nil {
 			return err

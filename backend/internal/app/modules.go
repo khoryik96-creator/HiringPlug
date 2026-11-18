@@ -120,7 +120,7 @@ func NewModules(d Deps) *Modules {
 	}, d.Config.MaxUploadBytes, d.Config.PublicURL)
 	m.Emails = emails.New(d.Pool, emails.Deps{
 		Candidates: emailCandidates{m.Candidates, m.Industries, m.Settings}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
-		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy,
+		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy, Users: m.Identity,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
 		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts,
 	}, d.Mail, d.Files)

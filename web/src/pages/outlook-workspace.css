@@ -1,0 +1,76 @@
+.outlook-page .outlook-actions { flex-wrap: wrap; }
+.outlook-workspace {
+  display: grid;
+  grid-template-columns: minmax(8rem, 10rem) minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+.outlook-folders {
+  background: var(--page, #f7f4fc);
+  padding: .7rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  border-right: 1px solid var(--line, #ded8eb);
+  max-height: 75vh;
+  overflow: auto;
+}
+.outlook-folders button {
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  overflow-wrap: anywhere;
+}
+.outlook-folders button[aria-current],
+.outlook-message[aria-pressed="true"] {
+  background: var(--accent-soft, #eee8ff);
+  color: var(--accent, #6946c8);
+}
+.outlook-content > form { padding: .65rem; }
+.outlook-columns {
+  border-top: 1px solid var(--line, #ded8eb);
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
+  min-height: 26rem;
+}
+.outlook-messages { border-right: 1px solid var(--line, #ded8eb); max-height: 70vh; overflow: auto; }
+.outlook-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .2rem;
+  text-align: left;
+  padding: .65rem;
+  width: 100%;
+  border-width: 0 0 1px;
+  border-color: var(--line, #ded8eb);
+  border-radius: 0;
+  box-shadow: none;
+  overflow-wrap: anywhere;
+}
+.outlook-message small { color: var(--muted); font-weight: normal; }
+.outlook-unread {
+  display: inline-block;
+  width: .45rem;
+  height: .45rem;
+  border-radius: 50%;
+  margin-right: .4rem;
+  background: var(--accent, #6946c8);
+  vertical-align: .12rem;
+}
+.outlook-reading, .outlook-empty, .outlook-messages > p, .outlook-messages > .row { padding: .85rem; }
+.outlook-reading { overflow-wrap: anywhere; }
+.outlook-reading h3 { margin: 0; }
+.outlook-envelope { margin: .35rem 0 .8rem; font-size: .85rem; }
+.outlook-reading .outlook-actions { margin-bottom: .65rem; }
+.outlook-body { white-space: pre-wrap; margin: 1rem 0; }
+.outlook-reply textarea { width: 100%; }
+.outlook-reply .row { margin-top: .45rem; }
+@media (max-width: 830px) {
+  .outlook-workspace, .outlook-columns { grid-template-columns: 1fr; }
+  .outlook-folders { flex-direction: row; overflow: auto; border-right: 0; border-bottom: 1px solid var(--line, #ded8eb); }
+  .outlook-folders button { flex-shrink: 0; }
+  .outlook-messages { max-height: 15rem; border-right: 0; border-bottom: 1px solid var(--line, #ded8eb); }
+  .outlook-content input { flex: 1; width: 0; min-width: 8rem; max-width: 100%; }
+}

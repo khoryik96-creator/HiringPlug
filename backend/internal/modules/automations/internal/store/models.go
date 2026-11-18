@@ -742,6 +742,59 @@ type EmailMailboxState struct {
 	TicketHash     *string
 }
 
+type EmailOutlookFolder struct {
+	ID        string
+	MailboxID string
+	TenantID  string
+	UserID    string
+	RemoteID  string
+	Name      string
+	Kind      string
+	ParentID  *string
+	CursorUrl *string
+	Complete  bool
+	CheckedAt *time.Time
+}
+
+type EmailOutlookLink struct {
+	MailboxID    string
+	TenantID     string
+	UserID       string
+	Conversation string
+	CandidateID  *string
+	ContactID    *string
+}
+
+type EmailOutlookMessage struct {
+	ID             string
+	MailboxID      string
+	TenantID       string
+	UserID         string
+	FolderID       string
+	RemoteID       string
+	Conversation   string
+	Subject        string
+	Sender         string
+	Participants   []string
+	ReceivedAt     time.Time
+	ChangedAt      time.Time
+	IsRead         bool
+	IsDraft        bool
+	HasAttachments bool
+	WebUrl         *string
+}
+
+type EmailOutlookSync struct {
+	MailboxID   string
+	TenantID    string
+	UserID      string
+	Generation  string
+	RequestedAt time.Time
+	LastSyncAt  *time.Time
+	FoldersAt   *time.Time
+	SyncError   *string
+}
+
 type EmailTemplate struct {
 	ID        string
 	TenantID  string

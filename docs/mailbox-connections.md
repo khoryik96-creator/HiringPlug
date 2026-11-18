@@ -3,7 +3,7 @@
 Settings > Email connection belongs to the signed-in user in the current agency.
 Microsoft, Google and authenticated SMTP are supported independently of the
 user's login domain or the recipients' domains. One active mailbox is selected
-per user per agency. This is outbound email; it does not synchronize an inbox.
+per user per agency. Microsoft also supports the opt-in Outlook Mail workspace described below.
 
 Existing server SMTP remains the fallback for users without a connection and for
 system-generated mail (password resets, calendar notices and invoices). Configure
@@ -149,3 +149,33 @@ HTTP provider overrides exist only for in-process tests, never as user input.
 Calendar uses the same Microsoft app registration with a separate consent flow
 and `/v1/calendar/callback` Web redirect. See [calendar.md](calendar.md) before
 adding `Calendars.ReadWrite`; existing mailbox tokens/scopes remain separate.
+
+## Outlook Mail
+
+Open **More > Outlook** after connecting Microsoft. Choose **Enable sync**
+to index your personal Outlook mailbox in this agency. Outbound email keeps working
+through the same connection. Outlook Mail uses the existing delegated Microsoft
+permissions. Shared or delegated mailboxes require a separate workflow.
+
+HiringPlug discovers visible folders and reads message delta pages in the Go
+worker. Initial indexing covers up to 90 days of mail, subject to Microsoft's
+5,000-result limit for filtered delta queries per folder. Drafts are indexed
+without the date filter. Large mailboxes fill in over several background runs.
+Use **Open in Outlook** to see attachments, formatting and full history. Message
+details are fetched as plain text on demand. HiringPlug indexes subject,
+participants, dates and folder/read state locally and does not store bodies or
+attachment contents in the inbox index.
+
+Read/unread, move and archive update the original Outlook message. Outlook changes
+arrive through polling, which also works on a laptop without a public webhook
+address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save
+in Outlook Drafts** creates the draft in the original thread. Open it in Outlook
+to continue editing. HiringPlug reports provider acceptance and asks you to check
+Outlook before retrying if the result is uncertain.
+
+On a candidate or contact's **Email** tab, open **My Outlook conversations**.
+**Find in Outlook** starts an exact address search. Open a message and confirm the
+profile link. Linking a conversation does not share it with other recruiters or
+admins. It remains visible only to you and only through profiles you can access.
+**Turn off sync** or disconnecting/replacing the mailbox removes its local index
+and links. Your original mail and drafts remain in Outlook.

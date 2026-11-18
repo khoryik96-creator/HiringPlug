@@ -1574,3 +1574,12 @@ checks for interviews and booking links. HiringPlug meetings sync as private hol
 candidate invitations retain their existing flow. Attendee invitations on ordinary
 appointments are explicit. See [calendar.md](calendar.md) for setup, privacy,
 synchronization behavior and the sync window.
+
+## Outlook Mail
+
+**More > Outlook** indexes a recruiter's own Outlook folders on request.
+Browse, search, mark read or unread, archive, move and reply in the original
+thread. Save reply drafts in Outlook or open a message there to see formatting
+and attachments. **My Outlook conversations** on candidate and contact Email
+tabs links private threads after the recruiter confirms an exact email match.
+See [Outlook Mail setup](mailbox-connections.md#outlook-mail).

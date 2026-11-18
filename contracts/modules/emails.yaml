@@ -34,6 +34,12 @@ x-module:
     EMAIL_UNDELIVERABLE:
       status: 409
       description: An automated email's recipient is a contact who has left, or whose mailbox does not exist (it would bounce), so it is not sent.
+    OUTLOOK_UNAVAILABLE:
+      status: 503
+      description: Outlook is unavailable or has not confirmed a write.
+    OUTLOOK_NOT_CONNECTED:
+      status: 409
+      description: Connect a personal Microsoft mailbox and enable inbox sync.
   jobs:
     email.send:
       queue: core
@@ -45,7 +51,310 @@ x-module:
       payload: EmailBounceScanJob
       description: Look in the sending Microsoft 365 mailbox's inbox for bounce notices about a sent email (Go worker).
 
+    email.outlook_sync:
+      queue: core
+      payload: OutlookMailSyncJob
+      priority: low
+      description: Incrementally index the connected recruiter's Outlook folders.
+
 paths:
+  /v1/outlook/mail:
+    get:
+      operationId: listOutlookMail
+      tags:
+      - emails
+      summary: Browse your private Outlook mailbox
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookMailPage'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: folder
+        in: query
+        schema:
+          type: string
+          maxLength: 60
+      - name: search
+        in: query
+        schema:
+          type: string
+          maxLength: 254
+      - name: conversation
+        in: query
+        schema:
+          type: string
+          maxLength: 1024
+      - name: candidateId
+        in: query
+        schema:
+          type: string
+          maxLength: 60
+      - name: contactId
+        in: query
+        schema:
+          type: string
+          maxLength: 60
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
+    post:
+      operationId: syncOutlookMail
+      tags:
+      - emails
+      summary: Enable inbox sync or request a refresh
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      operationId: disableOutlookMail
+      tags:
+      - emails
+      summary: Disable sync and remove the local Outlook index and links
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/messages/{messageId}:
+    get:
+      operationId: getOutlookMessage
+      tags:
+      - emails
+      summary: Read an Outlook message as plain text
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookMessageBody'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^omg_[0-9a-z]{26}$
+    patch:
+      operationId: changeOutlookMessage
+      tags:
+      - emails
+      summary: Update read status or move a message in Outlook
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^omg_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookMessageChange'
+  /v1/outlook/messages/{messageId}/reply:
+    post:
+      operationId: replyOutlookMessage
+      tags:
+      - emails
+      summary: Reply, reply all, or save the reply in Outlook Drafts
+      x-permission: emails:send
+      responses:
+        '202':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^omg_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookReplyInput'
+  /v1/outlook/messages/{messageId}/link:
+    put:
+      operationId: linkOutlookConversation
+      tags:
+      - emails
+      summary: Link this private conversation to a candidate or contact
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^omg_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookConversationLink'
+    delete:
+      operationId: unlinkOutlookConversation
+      tags:
+      - emails
+      summary: Remove the conversation link from its profile
+      x-permission: emails:send
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable or the outcome of a write is uncertain
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^omg_[0-9a-z]{26}$
   /v1/mailbox:
     get:
       operationId: getMailboxConnection
@@ -558,6 +867,158 @@ components:
       schema: { $ref: '#/components/schemas/EmailTemplateId' }
 
   schemas:
+    OutlookMailFolder:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - parentId
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+    OutlookMessage:
+      type: object
+      required:
+      - id
+      - folderId
+      - conversation
+      - subject
+      - sender
+      - participants
+      - receivedAt
+      - isRead
+      - isDraft
+      - hasAttachments
+      - webUrl
+      properties:
+        id:
+          type: string
+        folderId:
+          type: string
+        conversation:
+          type: string
+        subject:
+          type: string
+        sender:
+          type: string
+        participants:
+          type: array
+          items:
+            type: string
+        receivedAt:
+          type: string
+          format: date-time
+        isRead:
+          type: boolean
+        isDraft:
+          type: boolean
+        hasAttachments:
+          type: boolean
+        webUrl:
+          type: string
+          nullable: true
+    OutlookMailPage:
+      type: object
+      required:
+      - connected
+      - enabled
+      - syncing
+      - lastSyncAt
+      - error
+      - folders
+      - items
+      - nextOffset
+      properties:
+        connected:
+          type: boolean
+        enabled:
+          type: boolean
+        syncing:
+          type: boolean
+        lastSyncAt:
+          type: string
+          nullable: true
+          format: date-time
+        error:
+          type: string
+          nullable: true
+        folders:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutlookMailFolder'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutlookMessage'
+        nextOffset:
+          type: integer
+          nullable: true
+    OutlookMessageBody:
+      type: object
+      required:
+      - text
+      - truncated
+      properties:
+        text:
+          type: string
+        truncated:
+          type: boolean
+    OutlookMessageChange:
+      type: object
+      properties:
+        isRead:
+          type: boolean
+        folderId:
+          type: string
+          maxLength: 60
+    OutlookReplyInput:
+      type: object
+      required:
+      - text
+      - mode
+      - saveDraft
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        mode:
+          type: string
+          enum:
+          - reply
+          - replyAll
+        saveDraft:
+          type: boolean
+    OutlookConversationLink:
+      type: object
+      properties:
+        candidateId:
+          type: string
+          maxLength: 60
+        contactId:
+          type: string
+          maxLength: 60
+    OutlookMailSyncJob:
+      type: object
+      required:
+      - mailboxId
+      - userId
+      - generation
+      properties:
+        mailboxId:
+          type: string
+        userId:
+          type: string
+        generation:
+          type: string
     MailAppProvider:
       type: string
       enum: [microsoft, google]

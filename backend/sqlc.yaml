@@ -71,7 +71,7 @@ sql:
         <<: *go
         out: internal/modules/interviews/internal/store
   - <<: *module
-    queries: db/queries/emails.sql
+    queries: [db/queries/emails.sql, db/queries/outlook_mail.sql]
     gen:
       go:
         <<: *go

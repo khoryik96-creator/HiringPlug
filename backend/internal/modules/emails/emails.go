@@ -83,6 +83,9 @@ type Interview struct {
 // Deps is what the module needs from other modules, each read in the caller's
 // transaction.
 type Deps struct {
+	Users interface {
+		PrincipalFor(context.Context, pgx.Tx, string) (authz.Principal, bool, error)
+	}
 	Candidates interface {
 		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Candidate, error)
 		// Detailed is a candidate with Details, as p may see them (salary
@@ -154,7 +157,7 @@ func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender, files *blob.Store) *
 
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindEmailSend: m.service.deliver, api.JobKindEmailBounceScan: m.service.scanBounces}
+	return jobqueue.Handlers{api.JobKindEmailSend: m.service.deliver, api.JobKindEmailBounceScan: m.service.scanBounces, api.JobKindEmailOutlookSync: m.service.syncOutlook}
 }
 
 // MoveCandidate moves a merged duplicate's emails to the candidate kept, in

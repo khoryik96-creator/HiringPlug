@@ -142,6 +142,8 @@ class ErrorCode(StrEnum):
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
+    OUTLOOK_NOT_CONNECTED = "OUTLOOK_NOT_CONNECTED"
+    OUTLOOK_UNAVAILABLE = "OUTLOOK_UNAVAILABLE"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
     ROLE_NOT_EDITABLE = "ROLE_NOT_EDITABLE"
@@ -191,6 +193,7 @@ class JobKind(StrEnum):
     document_render_pdf = "document.render_pdf"
     document_text_extracted = "document.text_extracted"
     email_bounce_scan = "email.bounce_scan"
+    email_outlook_sync = "email.outlook_sync"
     email_send = "email.send"
     interview_remind = "interview.remind"
     jd_blind = "jd.blind"
@@ -2217,6 +2220,70 @@ class DocumentCvParsedJob(BaseModel):
     aiTokens: Annotated[
         int | None, Field(description="Tokens the AI used (counted in the monthly allowance).", ge=0)
     ] = None
+
+
+class OutlookMailFolder(BaseModel):
+    id: str
+    name: str
+    kind: str
+    parentId: Annotated[str | None, Field(...)]
+
+
+class OutlookMessage(BaseModel):
+    id: str
+    folderId: str
+    conversation: str
+    subject: str
+    sender: str
+    participants: list[str]
+    receivedAt: AwareDatetime
+    isRead: bool
+    isDraft: bool
+    hasAttachments: bool
+    webUrl: Annotated[str | None, Field(...)]
+
+
+class OutlookMailPage(BaseModel):
+    connected: bool
+    enabled: bool
+    syncing: bool
+    lastSyncAt: Annotated[AwareDatetime | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    folders: list[OutlookMailFolder]
+    items: list[OutlookMessage]
+    nextOffset: Annotated[int | None, Field(...)]
+
+
+class OutlookMessageBody(BaseModel):
+    text: str
+    truncated: bool
+
+
+class OutlookMessageChange(BaseModel):
+    isRead: bool | None = None
+    folderId: Annotated[str | None, Field(max_length=60)] = None
+
+
+class Mode(StrEnum):
+    reply = "reply"
+    replyAll = "replyAll"
+
+
+class OutlookReplyInput(BaseModel):
+    text: Annotated[str, Field(max_length=10000, min_length=1)]
+    mode: Mode
+    saveDraft: bool
+
+
+class OutlookConversationLink(BaseModel):
+    candidateId: Annotated[str | None, Field(max_length=60)] = None
+    contactId: Annotated[str | None, Field(max_length=60)] = None
+
+
+class OutlookMailSyncJob(BaseModel):
+    mailboxId: str
+    userId: str
+    generation: str
 
 
 class MailAppProvider(StrEnum):

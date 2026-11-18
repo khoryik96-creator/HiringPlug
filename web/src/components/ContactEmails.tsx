@@ -8,6 +8,7 @@ import { api, type Permission, unwrap } from "../api/client";
 import { contactEmailsKey } from "../api/keys";
 import { SentEmails } from "./CandidateEmails";
 import { EmailComposer } from "./EmailComposer";
+import { OutlookProfileMail } from "./outlook/OutlookProfileMail";
 import { ErrorMessage } from "./ErrorMessage";
 
 export function ContactEmails({ contactId, email, permissions, writing: controlledWriting, onWritingChange }: {
@@ -37,6 +38,7 @@ export function ContactEmails({ contactId, email, permissions, writing: controll
       )}
       <ErrorMessage error={list.error} />
       <SentEmails emails={list.data} />
+      {permissions.includes("emails:send") && permissions.includes("contacts:read") && <OutlookProfileMail profile={{ contactId }} address={email} />}
     </section>
   );
 }

@@ -36,6 +36,7 @@ const Companion = page(() => import("./pages/Companion"), "Companion");
 const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
+const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
@@ -112,6 +113,7 @@ export const ROUTES: Route[] = [
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
+  { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true }, render: () => <OutlookMail /> },
   { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", menu: { in: "main", label: "Calendar", href: "#/calendar", more: true }, render: () => <Calendar /> },
 
   // Settings, in its menu's order.
