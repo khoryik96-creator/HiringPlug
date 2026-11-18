@@ -126,6 +126,15 @@ class Queue:
         )
         return str(row[0]) if row and row[0] else "unknown"
 
+    def give_up(self, job: ClaimedJob, error: str) -> str:
+        """End a job at once (dead), for a failure trying again cannot fix."""
+        row = (
+            self._connection()
+            .execute("SELECT job_give_up(%s, %s, %s)", (job.id, self.worker_id, error))
+            .fetchone()
+        )
+        return str(row[0]) if row and row[0] else "unknown"
+
     def wait_for_work(self, timeout: float) -> None:
         """Sleep until a job is queued on the AI queue (Postgres NOTIFY) or timeout passes."""
         if self._listener is None or self._listener.closed:

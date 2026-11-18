@@ -355,8 +355,10 @@ the panel takes the whole width).
   phone numbers and profile links are taken out of every text
   (`platform/redact`, shared with blind CVs); recorded salaries are never
   read; salary figures written in a CV or job description ("Expected salary:
-  RM 5,000") are cut out (`redact.WithoutSalary`). Nationality is left out
-  as well: the right to work says what matters for a job.
+  RM 5,000") are cut out (`redact.WithoutSalary`). The question you type is
+  cleaned the same way, and every amount of money in it taken out
+  (`redact.WithoutMoney`); you still see it as you wrote it. Nationality is
+  left out as well: the right to work says what matters for a job.
 - **The prompts** (in `ai/src/hiringplug_ai/jobs/assistant_ask.py`) tell the
   model to answer only from the data, say when something is missing, never
   judge or guess race, religion, age, gender, marital status, health or
@@ -830,7 +832,8 @@ lead's company (with the built-in email check).
   the invitation. The interviewers get an email reminder the day before (when,
   how, where, who else, and a link to the candidate), with the time in the
   company's time zone (`HP_TIME_ZONE`); a moved interview is reminded of at
-  its new time only, and a cancelled one not at all.
+  its new time only, and a cancelled one not at all; someone added to the
+  panel after the reminder went gets their own.
 - **Email a client's contact** ✅: a contact's page has **Emails**: **Write
   email** opens the same composer, to the contact's address, with the
   templates; fields are filled from the contact ([First name], [Last name],
@@ -948,11 +951,12 @@ lead's company (with the built-in email check).
   contact or company can be deleted from its page. It goes to Settings › Bin
   for 30 days, hidden everywhere at once by the database (lists, searches,
   counts, the pipeline), where it can be restored; then it is deleted for good
-  with its CVs, notes and pipeline entries. Deleting a company asks about its
+  with its CVs, notes, pipeline entries and what the AI assistant said about
+  it (and its applications). Deleting a company asks about its
   contacts and jobs: move them to another company you choose, or delete them
   with it. A record with a placement is never deleted (placements and invoices
   are money records). Deleting, restoring and the final deletion are recorded
-  in the audit log. While a record is in the Bin its email or name is free; if
+  in the audit log, which never names the person (a company is named). While a record is in the Bin its email or name is free; if
   another record takes it, restoring says so.
 - **Copy** ✅: one click copies a candidate's email or phone number.
 - **Jobs list** ✅: each job with a bar of where its candidates are (and the

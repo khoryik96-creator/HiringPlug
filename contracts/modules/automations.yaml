@@ -418,6 +418,7 @@ components:
         entityType: { type: string }
         entityId: { type: string }
         changes: { type: object, additionalProperties: true }
+        occurredAt: { type: string, format: date-time, description: "When the change happened (its audit entry); runs count from then." }
     AutomationRunJob:
       type: object
       required: [runId, dueAt]

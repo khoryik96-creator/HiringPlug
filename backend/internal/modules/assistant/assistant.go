@@ -97,6 +97,16 @@ func (m *Module) TokensSince(ctx context.Context, tx pgx.Tx, since time.Time) (i
 }
 
 // JobHandlers returns the handlers for this module's jobs on the core queue.
+// Forget deletes what the AI said about records deleted for good (subjectType
+// candidate, application or job), in the caller's transaction.
+func (m *Module) Forget(ctx context.Context, tx pgx.Tx, subjectType string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return store.New(tx).ForgetAnswers(ctx, store.ForgetAnswersParams{SubjectType: subjectType, Ids: ids})
+}
+
+// JobHandlers returns the handlers for the module's jobs on the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
 	return jobqueue.Handlers{api.JobKindAssistantAnswered: m.service.answered, api.JobKindAssistantEmailed: m.service.emailed}
 }

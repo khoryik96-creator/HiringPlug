@@ -190,6 +190,40 @@ func TestInterviewReminders(t *testing.T) {
 	assert.Len(t, mailServer.To(managerEmail), 1)
 }
 
+// Someone added to the panel after the reminder went is reminded too, and
+// the others are not reminded again.
+func TestAnInterviewerAddedAfterTheReminderIsRemindedToo(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter, api.RoleHiringManager, api.RoleSourcer)
+	recruiter, manager, sourcer := tenant.Users[api.RoleRecruiter], tenant.Users[api.RoleHiringManager], tenant.Users[api.RoleSourcer]
+	company := a.createCompany(recruiter.Token, map[string]any{"name": "Contoh Berhad"})
+	job := a.createJob(recruiter.Token, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	app := a.addToJob(recruiter.Token, job.Id, a.createCandidate(recruiter.Token, map[string]any{"firstName": "Wei"}).Id)
+	iv := a.interview(http.MethodPost, "/v1/applications/"+app.Id+"/interviews", recruiter.Token, map[string]any{
+		"title": "First interview", "startsAt": time.Now().UTC().Add(72 * time.Hour).Truncate(time.Minute), "durationMinutes": 60, "mode": "phone",
+		"interviewerIds": []string{manager.ID},
+	}, http.StatusCreated)
+	due := func() {
+		_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND kind = 'interview.remind' AND status = 'pending'`, tenant.ID)
+		require.NoError(t, err)
+		runCoreJobsUntilIdle(t, a, tenant.ID)
+	}
+	due()
+	managerEmail, sourcerEmail := "hiring_manager."+tenant.ID+"@test.local", "sourcer."+tenant.ID+"@test.local"
+	require.Len(t, mailServer.To(managerEmail), 1)
+
+	var version int
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT version FROM interview WHERE id = $1`, iv.Id).Scan(&version))
+	a.interview(http.MethodPatch, "/v1/interviews/"+iv.Id, recruiter.Token, map[string]any{"version": version, "interviewerIds": []string{manager.ID, sourcer.ID}}, http.StatusOK)
+	due()
+	msgs := mailServer.To(sourcerEmail)
+	require.Len(t, msgs, 1, "the one added is reminded")
+	assert.Equal(t, []string{sourcerEmail}, msgs[0].To)
+	assert.Len(t, mailServer.To(managerEmail), 1, "not the one reminded already")
+}
+
 func kualaLumpur(t *testing.T) *time.Location {
 	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
 	require.NoError(t, err)

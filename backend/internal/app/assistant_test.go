@@ -133,6 +133,23 @@ func TestTheAssistantSeesOnlyWhatItMayAndNoSalary(t *testing.T) {
 		assert.Equal(t, "What should I ask?", got[0].Question.MustGet())
 	})
 
+	t.Run("the question is cleaned for the AI like everything else", func(t *testing.T) {
+		typed := "Siti expects RM 8,765 a month (call 012-345 6789 or siti.aisyah@mail.com): is that fair?"
+		res := a.ask(token, map[string]any{"subjectType": "candidate", "subjectId": c.Id, "kind": "question", "question": typed})
+		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
+		var q api.AssistantAnswer
+		res.JSON(&q)
+		asked := aiAnswers(t, a, aiConn, q.Id, api.AssistantAnsweredJob{
+			Answer: nullable.NewNullableWithValue("It depends."), Error: nullable.NewNullNullable[string](), Model: nullable.NewNullNullable[string](),
+		})
+		question := asked.Question.MustGet()
+		for _, leak := range []string{"Siti", "8,765", "345 6789", "siti.aisyah@mail.com"} {
+			assert.NotContains(t, question, leak)
+		}
+		assert.Contains(t, question, "is that fair?")
+		assert.Equal(t, typed, a.answers(token, "candidate", c.Id)[0].Question.MustGet(), "kept as typed for the person who asked")
+	})
+
 	t.Run("the monthly allowance", func(t *testing.T) {
 		res := a.ask(token, map[string]any{"subjectType": "candidate", "subjectId": c.Id, "kind": "summary"})
 		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)

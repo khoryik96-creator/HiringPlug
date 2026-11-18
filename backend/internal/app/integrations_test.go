@@ -18,6 +18,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/integrations"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
 )
 
@@ -70,6 +71,61 @@ func TestAPIKeys(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, a.request(http.MethodGet, "/v1/candidates", "hpk_"+strings.Repeat("0", 64), nil).Status)
 		assert.Equal(t, http.StatusNotFound, a.request(http.MethodDelete, "/v1/api-keys/"+created.ApiKey.Id, admin, nil).Status)
 	})
+}
+
+// A key sees the candidates its role sees (a limited role: none, as a key
+// owns none), and nobody makes a key that can do more than they can.
+func TestAPIKeysKeepToTheirRolesAccess(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner, api.RoleAdmin, api.RoleHiringManager)
+	owner, admin, manager := tenant.Users[api.RoleOwner].Token, tenant.Users[api.RoleAdmin].Token, tenant.Users[api.RoleHiringManager].Token
+	a.createCandidate(owner, map[string]any{"firstName": "Siti"})
+	var key api.ApiKeyCreated
+	res := a.request(http.MethodPost, "/v1/api-keys", admin, map[string]any{"name": "Sync", "role": "recruiter"})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	res.JSON(&key)
+	var list api.CandidatePage
+	a.request(http.MethodGet, "/v1/candidates", key.Key, nil).JSON(&list)
+	assert.Len(t, list.Items, 1, "recruiters see every candidate")
+
+	a.setRole(owner, "recruiter", map[string]any{"version": 0, "permissions": authz.PermissionsForRole(api.RoleRecruiter), "candidateScope": "own", "jobCandidates": false}, http.StatusOK)
+	a.request(http.MethodGet, "/v1/candidates", key.Key, nil).JSON(&list)
+	assert.Empty(t, list.Items, "now only their own: the key owns none")
+	res = a.request(http.MethodPost, "/v1/api-keys", admin, map[string]any{"name": "Another", "role": "recruiter"})
+	assert.Equal(t, http.StatusForbidden, res.Status)
+	assert.Contains(t, string(res.Body), "would see none")
+
+	managerCan := append(authz.PermissionsForRole(api.RoleHiringManager), api.PermissionIntegrationsManage)
+	a.setRole(owner, "hiring_manager", map[string]any{"version": 0, "permissions": managerCan, "candidateScope": "all", "jobCandidates": true}, http.StatusOK)
+	res = a.request(http.MethodPost, "/v1/api-keys", manager, map[string]any{"name": "Mine", "role": "admin"})
+	assert.Equal(t, http.StatusForbidden, res.Status, "never more than they can do: %s", res.Body)
+	res = a.request(http.MethodPost, "/v1/api-keys", manager, map[string]any{"name": "Mine", "role": "hiring_manager"})
+	assert.Equal(t, http.StatusCreated, res.Status, "their own role's access: %s", res.Body)
+}
+
+// No transaction is held open while a webhook receiver answers (a slow one
+// would hold a database connection and the queue's slot for its 10 seconds).
+func TestAWebhookIsPostedWithNoTransactionOpen(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	var open atomic.Int32
+	open.Store(-1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		var n int32
+		_ = testutil.Current.Admin.QueryRow(context.Background(), `SELECT count(*) FROM pg_stat_activity
+			WHERE state LIKE 'idle in transaction%' AND query LIKE '%GetDeliveryToSend%'`).Scan(&n)
+		open.Store(n)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	res := a.request(http.MethodPost, "/v1/webhooks", owner, map[string]any{"url": srv.URL + "/hooks", "events": []string{"candidate.created"}})
+	require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+	a.createCandidate(owner, map[string]any{"firstName": "Siti"})
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	assert.Zero(t, open.Load(), "posted, with no transaction waiting on it")
 }
 
 // receiver is a webhook receiver for tests.

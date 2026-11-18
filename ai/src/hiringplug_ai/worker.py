@@ -23,7 +23,7 @@ import psycopg
 from . import logs
 from .config import Config, ConfigError, load_config
 from .contracts import JobKind
-from .download import download
+from .download import FileTooLargeError, download
 from .extraction import DEFAULT_LIMITS, TesseractOcr
 from .jobs import HANDLERS, Deps, ProviderLog, ReportGate
 from .providers import OpenAICompatible, connect
@@ -65,7 +65,10 @@ def process(
         except LeaseLostError:
             log.warning("job outlived its lease; its results were discarded and another worker owns it")
         except Exception as exc:  # every failure must be recorded on the job
-            status = queue.fail(job, f"{type(exc).__name__}: {exc}")
+            reason = f"{type(exc).__name__}: {exc}"
+            # A file too large to read stays too large: no retries.
+            too_large = isinstance(exc, FileTooLargeError)
+            status = queue.give_up(job, reason) if too_large else queue.fail(job, reason)
             log.exception("job failed", extra={"new_status": status, "max_attempts": job.max_attempts})
             # The provider is why: say so now, not after the retries.
             failed = calls.ok is False and gate.should(job.tenant_id, calls.provider, False)

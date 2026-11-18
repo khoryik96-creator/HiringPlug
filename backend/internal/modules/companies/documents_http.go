@@ -3,7 +3,6 @@ package companies
 // HTTP handlers for documents kept with a client's terms and benefits.
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -58,7 +57,7 @@ func (h *HTTP) GetCompanyDocumentFile(ctx context.Context, req api.GetCompanyDoc
 	}
 	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": f.FileName})
 	return api.GetCompanyDocumentFile200ApplicationoctetStreamResponse{
-		Body: bytes.NewReader(f.Data), ContentLength: int64(len(f.Data)),
+		Body: f.Body, ContentLength: f.Size, // the file, as it is read: not all in memory
 		Headers: api.GetCompanyDocumentFile200ResponseHeaders{ContentDisposition: &disposition},
 	}, nil
 }

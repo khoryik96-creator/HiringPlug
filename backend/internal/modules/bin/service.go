@@ -145,7 +145,8 @@ func (s *Service) Bin(ctx context.Context, p authz.Principal, kind, id, moveTo s
 		if _, err := jobqueue.EnqueueAt(ctx, tx, p.TenantID, api.JobKindBinPurge, api.BinPurgeJob{EntryId: entry.ID}, entry.PurgeAfter); err != nil {
 			return err
 		}
-		changes := map[string]any{"label": label, "contacts": len(went.Contacts), "jobs": len(went.Jobs), "applications": len(apps)}
+		changes := map[string]any{"contacts": len(went.Contacts), "jobs": len(went.Jobs), "applications": len(apps)}
+		addLabel(changes, kind, label)
 		if moveTo != "" {
 			changes["movedTo"] = moveTo
 		}
@@ -214,7 +215,7 @@ func (s *Service) Restore(ctx context.Context, p authz.Principal, entryID string
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: e.Kind + ".restored", EntityType: e.Kind, EntityID: e.RecordID,
-			Changes: map[string]any{"label": e.Label, "contacts": len(went.Contacts), "jobs": len(went.Jobs)}})
+			Changes: addLabel(map[string]any{"contacts": len(went.Contacts), "jobs": len(went.Jobs)}, e.Kind, e.Label)})
 	})
 }
 
@@ -236,4 +237,14 @@ func (s *Service) showApplications(ctx context.Context, tx pgx.Tx, apps []Applic
 		return err
 	}
 	return s.deps.Pipeline.SetBinned(ctx, tx, unbinnable(apps, binnedC, binnedJ), false)
+}
+
+// addLabel adds a record's name to an audit entry's changes, for a company
+// only: a candidate's or contact's name is a person's, and the audit log is
+// kept after they are deleted for good (the Bin's own list names them).
+func addLabel(changes map[string]any, kind, label string) map[string]any {
+	if kind == "company" {
+		changes["label"] = label
+	}
+	return changes
 }

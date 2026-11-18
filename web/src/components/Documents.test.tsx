@@ -189,6 +189,16 @@ describe("CVs and documents", () => {
     expect(screen.getByRole("button", { name: "Compare side by side" })).toBeTruthy();
   });
 
+  it("says a file is too large when the server in front answers with a page, not the API's error", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [] }));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>413 Request Entity Too Large</html>", { status: 413, headers: { "Content-Type": "text/html" } }));
+    renderWithClient(<Documents candidate={testCandidate({ id: "cand_1" })} canUpload canEdit={false} />);
+    expect(await screen.findByText(/No CV yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    fireEvent.change(screen.getByLabelText("Drop the file here"), { target: { files: [new File(["%PDF"], "Big.pdf", { type: "application/pdf" })] } });
+    expect(await screen.findByText("The file is too large to upload.")).toBeTruthy();
+  });
+
   it("uploads a file as the kind chosen", async () => {
     vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [] }));
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 201 }));

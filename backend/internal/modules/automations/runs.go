@@ -98,7 +98,10 @@ func (s *Service) onEvent(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 // eventOf reads what an audit entry is about; false when no automation
 // starts from it (a cancelled interview, a placement that fell through, ...).
 func (s *Service) eventOf(ctx context.Context, tx pgx.Tx, j api.AutomationEventJob) (event, bool, error) {
-	now := s.now()
+	now := s.now() // when the change happened: queued before it said so
+	if j.OccurredAt != nil && j.OccurredAt.Before(now) {
+		now = *j.OccurredAt
+	}
 	switch j.Action {
 	case "application.created":
 		return event{subjectType: OnApplication, subjectID: j.EntityId, applicationID: j.EntityId,

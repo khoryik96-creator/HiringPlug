@@ -59,7 +59,7 @@ func (s *Service) purge(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error 
 		return err
 	}
 	if err := audit.Record(ctx, tx, audit.Entry{Action: e.Kind + ".deleted", EntityType: e.Kind, EntityID: e.RecordID,
-		Changes: map[string]any{"label": e.Label, "binnedBy": e.BinnedName, "binnedAt": e.BinnedAt}}); err != nil {
+		Changes: addLabel(map[string]any{"binnedBy": e.BinnedName, "binnedAt": e.BinnedAt}, e.Kind, e.Label)}); err != nil {
 		return err
 	}
 	for _, f := range after {

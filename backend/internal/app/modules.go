@@ -11,6 +11,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/mail"
@@ -345,7 +346,11 @@ func (m *Modules) Server() *Server {
 // OutsideJobHandlers are the core jobs that wait minutes on another service
 // and so run with no queue transaction open (see jobqueue.OutsideHandlers).
 func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
-	return m.Calendars.OutsideJobHandlers()
+	all := jobqueue.OutsideHandlers{}
+	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers()} {
+		maps.Copy(all, handlers)
+	}
+	return all
 }
 
 // JobHandlers merges every module's handlers for the core queue.

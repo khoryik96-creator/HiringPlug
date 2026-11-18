@@ -339,7 +339,7 @@ const recordAttempt = `-- name: RecordAttempt :exec
 UPDATE webhook_delivery SET status = $1, attempts = attempts + 1, response_status = $2,
   last_error = $3, next_attempt_at = $4,
   delivered_at = CASE WHEN $1 = 'delivered' THEN now() END
-WHERE id = $5
+WHERE id = $5 AND status = 'pending' AND attempts = $6
 `
 
 type RecordAttemptParams struct {
@@ -348,6 +348,7 @@ type RecordAttemptParams struct {
 	LastError      *string
 	NextAttemptAt  *time.Time
 	ID             string
+	Attempts       int32
 }
 
 func (q *Queries) RecordAttempt(ctx context.Context, arg RecordAttemptParams) error {
@@ -357,6 +358,7 @@ func (q *Queries) RecordAttempt(ctx context.Context, arg RecordAttemptParams) er
 		arg.LastError,
 		arg.NextAttemptAt,
 		arg.ID,
+		arg.Attempts,
 	)
 	return err
 }

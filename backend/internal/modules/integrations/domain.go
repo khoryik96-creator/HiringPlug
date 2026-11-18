@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
 
 // KeyPrefix starts every API key, so the API tells them from sign-in tokens.
@@ -37,6 +39,33 @@ func IsKeyPrincipal(userID string) bool { return strings.HasPrefix(userID, "akey
 // let to manage integrations (a key is never an owner).
 func MayGiveKeyRole(actorRole, keyRole string) bool {
 	return keyRole != "admin" || actorRole == "admin" || actorRole == "owner"
+}
+
+// KeyScope is which candidates a key sees: all when its role sees all, else
+// none (a role limited to its own or its team's candidates: a key owns none,
+// and is in no team).
+func KeyScope(allCandidates bool) authz.Scope {
+	if allCandidates {
+		return authz.Scope{}
+	}
+	return authz.Scope{Users: []string{}}
+}
+
+// KeyProblem is why someone may not make a key acting as a role ("" when
+// they may): it would see no candidates, or could do what they cannot.
+func KeyProblem(maker authz.Principal, keyRole string, perms []api.Permission, allCandidates bool) string {
+	if !MayGiveKeyRole(string(maker.Role), keyRole) {
+		return "Only an admin or owner can make a key that acts as an admin."
+	}
+	if !allCandidates {
+		return "That role sees only its own or its team's candidates (Settings › Roles and access): a key owns none, so it would see none. Choose a role that sees every candidate."
+	}
+	for _, perm := range perms {
+		if !maker.Can(perm) {
+			return "A key cannot do more than you can: that role may " + string(perm) + ", which you may not. Ask an owner to make it."
+		}
+	}
+	return ""
 }
 
 // Events are those a webhook may listen for (audit actions; the contract's

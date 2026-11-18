@@ -2,8 +2,13 @@ package app_test
 
 import (
 	"bytes"
+	"context"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,6 +75,27 @@ func TestCompanyDocumentsAndWhoMayDeleteThem(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Status, "%s", res.Body)
 	assert.Equal(t, minimalPDF, res.Body)
 	assert.Contains(t, res.Header.Get("Content-Disposition"), "Signed TOB 2026.pdf")
+	assert.Equal(t, strconv.Itoa(len(minimalPDF)), res.Header.Get("Content-Length"), "sent as it is read, its size known")
+
+	t.Run("a file gone from the disk is not found, not a server error", func(t *testing.T) {
+		res := a.addDocument(recruiter, company.Id, "terms", "lost.pdf", minimalPDF)
+		require.Equal(t, http.StatusCreated, res.Status, "%s", res.Body)
+		var lost api.CompanyDocument
+		res.JSON(&lost)
+		var key string
+		require.NoError(t, testutil.Current.Admin.QueryRow(context.Background(), `SELECT storage_key FROM company_document WHERE id = $1`, lost.Id).Scan(&key))
+		removed := false
+		require.NoError(t, filepath.WalkDir(filesDir, func(path string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && strings.HasSuffix(filepath.ToSlash(path), "/"+filepath.Base(key)) {
+				removed = true
+				return os.Remove(path)
+			}
+			return err
+		}))
+		require.True(t, removed, "the stored file %s", key)
+		assert.Equal(t, http.StatusNotFound, a.request(http.MethodGet, path+"/"+lost.Id+"/file", viewer, nil).Status)
+		assert.Equal(t, http.StatusNoContent, a.request(http.MethodDelete, path+"/"+lost.Id, admin, nil).Status)
+	})
 
 	t.Run("deleting is a permission of its own: owners and admins to start with", func(t *testing.T) {
 		assert.Contains(t, authz.PermissionsForRole(api.RoleAdmin), api.PermissionCompaniesDocumentsDelete)

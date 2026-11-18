@@ -129,7 +129,10 @@ The table above is the default. **Each company can change it** on the
   takes them). Handing a candidate over is allowed even if the giver then no
   longer sees them. The candidate list has a "Mine" filter.
 - Changes apply on each person's next click. API keys acting as a role get
-  the company's permissions for it (and all candidates: a key owns none).
+  the company's permissions for it, and every candidate when the role sees
+  every candidate; a role limited to its own (or its team's) candidates sees
+  none through a key (a key owns none), and no new key can be made for it.
+  Nobody makes a key that can do more than they can themselves.
   Who may interview follows the company's settings too.
 
 **A candidate out of someone's scope is hidden everywhere**, enforced by the

@@ -38,7 +38,8 @@ import (
 // company (identity module).
 type Users interface {
 	UserNames(ctx context.Context, tx pgx.Tx, ids []string) (map[string]string, error)
-	RolePermissions(ctx context.Context, tx pgx.Tx, role string) ([]api.Permission, error)
+	// RoleKeyAccess is a role's permissions, and whether it sees every candidate.
+	RoleKeyAccess(ctx context.Context, tx pgx.Tx, role string) (perms []api.Permission, allCandidates bool, err error)
 }
 
 // Module is the integrations module.
@@ -59,7 +60,8 @@ func New(pool *pgxpool.Pool, users Users, allowPrivate bool, keysSecret, legacyS
 
 // Authenticate signs in with an API key: the principal is the key, with what
 // its role may do in its company (the company's settings for the role), and
-// every candidate (a key owns none). Unknown and revoked keys are refused.
+// every candidate when the role sees every candidate (else none: a key owns
+// none). Unknown and revoked keys are refused.
 func (m *Module) Authenticate(ctx context.Context, key string) (authz.Principal, error) {
 	row, err := store.New(m.pool).ApiKeyByHash(ctx, HashKey(key))
 	if database.IsNoRows(err) {
@@ -69,17 +71,23 @@ func (m *Module) Authenticate(ctx context.Context, key string) (authz.Principal,
 		return authz.Principal{}, err
 	}
 	var perms []api.Permission
+	var all bool
 	err = database.InTx(ctx, m.pool, authz.TenantOnly(row.TenantID), func(tx pgx.Tx) error {
-		perms, err = m.service.users.RolePermissions(ctx, tx, row.KeyRole)
+		perms, all, err = m.service.users.RoleKeyAccess(ctx, tx, row.KeyRole)
 		return err
 	})
 	if err != nil {
 		return authz.Principal{}, err
 	}
-	return authz.NewPrincipalWithAccess(row.TenantID, row.KeyID, "", "API key: "+row.KeyName, api.Role(row.KeyRole), perms, authz.Scope{}), nil
+	return authz.NewPrincipalWithAccess(row.TenantID, row.KeyID, "", "API key: "+row.KeyName, api.Role(row.KeyRole), perms, KeyScope(all)), nil
 }
 
-// JobHandlers returns the module's handlers for the core queue.
-func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindWebhookDeliver: m.service.deliver}
+// JobHandlers returns the module's handlers for the core queue (none run in
+// the queue's transaction: see OutsideJobHandlers).
+func (m *Module) JobHandlers() jobqueue.Handlers { return jobqueue.Handlers{} }
+
+// OutsideJobHandlers returns the module's jobs that wait on another server
+// (a webhook receiver), run with no queue transaction open.
+func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
+	return jobqueue.OutsideHandlers{api.JobKindWebhookDeliver: m.service.deliver}
 }

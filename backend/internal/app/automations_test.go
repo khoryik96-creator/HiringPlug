@@ -207,6 +207,31 @@ func TestAutomations(t *testing.T) {
 
 // A run about a candidate the user does not see is not shown to them, nor
 // theirs to send or skip.
+// A run counts from when the change happened, not from when the worker got
+// to it: a queue that was behind does not push it later.
+func TestAutomationsCountFromWhenTheChangeHappened(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleOwner)
+	owner := tenant.Users[api.RoleOwner].Token
+	a.switchOn(owner, preset(t, a.automations(owner), "not_progressing"), api.AutomationSendModeSend) // 2 days after rejected
+	company := a.createCompany(owner, map[string]any{"name": "Maju"})
+	appl := a.addToJob(owner, a.createJob(owner, map[string]any{"companyId": company.Id, "title": "Accountant"}).Id,
+		a.createCandidate(owner, map[string]any{"firstName": "Siti"}).Id)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	require.Equal(t, http.StatusOK, a.move(owner, appl, map[string]any{"stage": "rejected", "reason": "failed_interview"}).Status)
+	// The worker was a day behind: the move happened a day before it runs.
+	happened := time.Now().UTC().Add(-24 * time.Hour)
+	_, err := testutil.Current.Admin.Exec(ctx, `UPDATE job SET payload = jsonb_set(payload, '{occurredAt}', to_jsonb($2::text))
+		WHERE tenant_id = $1 AND kind = 'automation.event' AND status = 'pending'`, tenant.ID, happened.Format(time.RFC3339Nano))
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	var due time.Time
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT due_at FROM automation_run WHERE tenant_id = $1 AND status = 'scheduled'`, tenant.ID).Scan(&due))
+	assert.WithinDuration(t, happened.Add(48*time.Hour), due, time.Minute, "2 days after the move itself")
+}
+
 func TestAutomationsOnlyTheirCandidates(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

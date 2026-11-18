@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from hiringplug_ai.contracts import DocumentCvParsedJob, DocumentTextExtractedJob, JobJdReadJob, JobKind
+from hiringplug_ai.download import DownloadError, FileTooLargeError
 from hiringplug_ai.extraction import DEFAULT_LIMITS
 from hiringplug_ai.jobs import HANDLERS, Deps, Handler
 from hiringplug_ai.jobs import parse_cv as parse_job
@@ -51,6 +52,12 @@ class FakeQueue:
     def fail(self, job: ClaimedJob, error: str) -> str:
         self.failed.append(error)
         return "pending"
+
+    given_up: list[str] = field(default_factory=list)
+
+    def give_up(self, job: ClaimedJob, error: str) -> str:
+        self.given_up.append(error)
+        return "dead"
 
     extended: list[int] = field(default_factory=list)
 
@@ -114,6 +121,20 @@ def test_an_unreadable_document_is_a_result_not_a_retry() -> None:
     assert isinstance(result, DocumentTextExtractedJob)
     assert result.status.value == "failed"
     assert (result.errorMessage or "").startswith("Only PDF, Word (.docx or .doc), text")
+
+
+def test_a_file_too_large_to_read_is_given_up_at_once() -> None:
+    queue = FakeQueue()
+    process(queue, job(), deps(error=FileTooLargeError("file is larger than 10000000 bytes")))  # type: ignore[arg-type]
+    assert queue.failed == [], "not retried: it stays too large"
+    assert queue.given_up == ["FileTooLargeError: file is larger than 10000000 bytes"]
+
+
+def test_a_download_that_failed_for_now_is_retried() -> None:
+    queue = FakeQueue()
+    process(queue, job(), deps(error=DownloadError("download failed with HTTP 503")))  # type: ignore[arg-type]
+    assert queue.failed == ["DownloadError: download failed with HTTP 503"]
+    assert queue.given_up == []
 
 
 def test_parse_cv_sends_the_profile_back_to_the_go_worker() -> None:

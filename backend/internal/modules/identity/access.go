@@ -62,12 +62,13 @@ func principalOf(ctx context.Context, q *store.Queries, u store.UserAuthRow) (au
 	return authz.NewPrincipalWithAccess(u.TenantID, u.ID, u.Email, u.Name, api.Role(u.Role), a.Permissions, ScopeFor(a, u.ID, team)), nil
 }
 
-// RolePermissions returns the permissions a role has in tx's company, for
-// API keys acting as that role (they see all candidates: they are not a
-// person who owns any).
-func (m *Module) RolePermissions(ctx context.Context, tx pgx.Tx, role string) ([]api.Permission, error) {
+// RoleKeyAccess returns what an API key acting as role may do in tx's
+// company: the role's permissions, and whether the role sees every
+// candidate. A key owns no candidates, so for a role limited to its own (or
+// its team's) it sees none.
+func (m *Module) RoleKeyAccess(ctx context.Context, tx pgx.Tx, role string) (perms []api.Permission, allCandidates bool, err error) {
 	a, err := roleAccess(ctx, store.New(tx), role)
-	return a.Permissions, err
+	return a.Permissions, a.Scope == ScopeAll, err
 }
 
 // AccessSettings returns every role's access in the company.

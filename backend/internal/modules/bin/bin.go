@@ -75,7 +75,9 @@ type Pipeline interface {
 	Purge(ctx context.Context, tx pgx.Tx, ids []string) error
 }
 
-// Files are the candidates' CVs (documents module) and the notes on records (notes module).
+// Files are the candidates' CVs (documents module), the notes on records
+// (notes module) and what the AI said about them (assistant module, deleted
+// with a candidate's or job's notes, and with applications).
 type Files interface {
 	PurgeCandidate(ctx context.Context, tx pgx.Tx, candidateID string) (after func(), err error)
 	DeleteNotes(ctx context.Context, tx pgx.Tx, subjectType string, ids []string) error

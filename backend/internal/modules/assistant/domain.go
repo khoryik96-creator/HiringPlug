@@ -99,6 +99,17 @@ func CheckQuestion(q Question) (Question, error) {
 	return q, errs.Err()
 }
 
+// CleanQuestion is the recruiter's question as the AI may see it: like the
+// sections, without salary figures, contact details or the candidate's name
+// (what they typed is kept as they wrote it for them).
+func CleanQuestion(q *string, person redact.Identity) *string {
+	if q == nil {
+		return nil
+	}
+	clean := redact.WithoutMoney(redact.Scrub(*q, person))
+	return &clean
+}
+
 // MonthStart is when the month that holds now began, in loc.
 func MonthStart(now time.Time, loc *time.Location) time.Time {
 	t := now.In(loc)

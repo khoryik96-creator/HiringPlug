@@ -113,6 +113,40 @@ func TestABinnedCandidateIsDeletedForGoodAfter30Days(t *testing.T) {
 	assert.Zero(t, left, "the candidate, their pipeline entry, notes and the Bin entry are gone")
 }
 
+// What the AI said about a candidate goes with them, and the audit log, kept
+// for good, never names them.
+func TestADeletedCandidateLeavesNoAIAnswersOrNameBehind(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	tenant := testutil.Current.NewTenant(t, api.RoleAdmin)
+	admin := tenant.Users[api.RoleAdmin]
+	siti := a.createCandidate(admin.Token, map[string]any{"firstName": "Siti", "lastName": "Zulaikha"})
+	company := a.createCompany(admin.Token, map[string]any{"name": "Contoh"})
+	job := a.createJob(admin.Token, map[string]any{"companyId": company.Id, "title": "Accountant"})
+	app := a.addToJob(admin.Token, job.Id, siti.Id)
+	for _, s := range [][2]string{{"candidate", siti.Id}, {"application", app.Id}, {"job", job.Id}} {
+		_, err := testutil.Current.Admin.Exec(ctx, `INSERT INTO assistant_answer (tenant_id, user_id, subject_type, subject_id, kind, status, answer)
+			VALUES ($1, $2, $3, $4, 'summary', 'done', 'Siti led the month-end close.')`, tenant.ID, admin.ID, s[0], s[1])
+		require.NoError(t, err)
+	}
+	require.Equal(t, http.StatusCreated, a.bin(admin.Token, map[string]any{"kind": "candidate", "id": siti.Id}).Status)
+	purgeNow(t, a, tenant.ID)
+
+	var left []string
+	rows, err := testutil.Current.Admin.Query(ctx, `SELECT subject_type FROM assistant_answer WHERE tenant_id = $1 ORDER BY subject_type`, tenant.ID)
+	require.NoError(t, err)
+	for rows.Next() {
+		var s string
+		require.NoError(t, rows.Scan(&s))
+		left = append(left, s)
+	}
+	assert.Equal(t, []string{"job"}, left, "the candidate's and their application's answers are gone; the job stays")
+	var named int
+	require.NoError(t, testutil.Current.Admin.QueryRow(ctx, `SELECT count(*) FROM audit_log WHERE tenant_id = $1 AND changes::text LIKE '%Zulaikha%'`, tenant.ID).Scan(&named))
+	assert.Zero(t, named, "no audit entry names them")
+}
+
 func TestACompanysContactsAndJobsGoWithItOrMoveToTheCompanyChosen(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)

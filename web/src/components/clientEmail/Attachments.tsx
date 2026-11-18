@@ -2,7 +2,7 @@
 // as PDF too, once made) and files from the computer.
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { api, type Schemas, unwrap } from "../../api/client";
+import { api, type Schemas, throwFor, unwrap } from "../../api/client";
 import { getToken } from "../../auth";
 import { ErrorMessage } from "../ErrorMessage";
 
@@ -37,9 +37,8 @@ export function Attachments({ candidateId, canSeeCvs, cvs, onCvs, uploads, onUpl
         const body = new FormData();
         body.append("file", f);
         const res = await fetch("/v1/email-attachments", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
-        const data: unknown = await res.json();
-        if (!res.ok) unwrap({ error: data, response: res });
-        out.push(data as Upload);
+        if (!res.ok) await throwFor(res);
+        out.push((await res.json()) as Upload);
       }
       return out;
     },
