@@ -1276,8 +1276,9 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .step-actions { display: flex; gap: 0.4rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .step-actions button, .step-actions select { min-height: 0; padding: 0.3rem 0.75rem; font-size: 0.82rem; }
 .board.compact .column { padding: 0.45rem; display: grid; align-content: start; gap: 3px; }
-.board-line { position: relative; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 4px 30px 4px 6px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid transparent; font-size: 0.82rem; } /* in a narrow column the chips wrap under the name, never over the card's edge */
+.board-line { position: relative; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 4px 6px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid transparent; font-size: 0.82rem; } /* in a narrow column the chips wrap under the name, never over the card's edge */
 .board-line.pickable { cursor: pointer; }
+.board-line.movable { padding-right: 30px; } /* room for the move arrow, only where there is one */
 .board-line.picked { border-color: var(--accent); background: var(--accent-soft); }
 .board-line.stale { box-shadow: inset 3px 0 0 #b91c1c; }
 .board-line a { flex: 1 1 5.5rem; min-width: 5.5rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

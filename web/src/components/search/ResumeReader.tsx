@@ -8,7 +8,7 @@ import { jobsKey } from "../../api/keys";
 import { formatNotice } from "../../labels";
 import { searchOpenJobs, useAddToJob } from "../addToJob";
 import { CandidateCv } from "../CandidateCv";
-import { WaDisc, workAuth } from "../candidateColumns";
+import { StatusDisc, workAuth } from "../candidateColumns";
 import { rangeText, salaryText, waColumnLabel } from "../candidateLook";
 import { ErrorMessage } from "../ErrorMessage";
 import { type Picked, SearchPicker } from "../SearchPicker";
@@ -105,7 +105,7 @@ export function ResumeReader({ hits, highlight, seen, onSeen, chosen, onChoose, 
                   // On a phone the resume replaces the list: start at its top.
                   if (narrow()) requestAnimationFrame(() => { if (pane.current) reveal(pane.current, "start"); });
                 }}>
-                <WaDisc c={c} />
+                <StatusDisc c={c} />
                 <span className="who">
                   <span className="nm">{c.fullName}</span>
                   <span className="ln">{[c.currentTitle, c.currentCompany].filter(Boolean).join(" · ") || "—"}</span>
@@ -194,7 +194,7 @@ function PaneHead({ c }: { c: Summary }) {
   );
   return (
     <div className="pane-head">
-      <WaDisc c={c} big />
+      <StatusDisc c={c} big />
       <div className="pane-who">
         <h3>{c.fullName}</h3>
         <div className="muted">{[c.currentTitle, c.currentCompany, wa ? waColumnLabel(wa) : null].filter(Boolean).join(" · ")}</div>

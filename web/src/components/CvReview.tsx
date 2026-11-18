@@ -18,10 +18,12 @@ export function CvReview({ documentId, candidate, onDone, onReread, canMerge = f
   const doc = useQuery({
     queryKey: ["document", documentId],
     queryFn: async () => unwrap(await api.GET("/v1/documents/{documentId}", { params: { path: { documentId } } })),
+    refetchOnMount: "always",
   });
   const profile = doc.data?.parsedProfile;
   if (doc.error) return <ErrorMessage error={doc.error} />;
-  if (!doc.data) return <p className="muted">Loading…</p>;
+  // The details as read now: a copy cached before "Read again" would offer the old ones (the review keeps what it opened with).
+  if (!doc.data || !doc.isFetchedAfterMount) return <p className="muted">Loading…</p>;
   if (!profile) return <p className="muted">No details were read from this CV.</p>;
   return <Review profile={profile} candidate={candidate} onDone={onDone} onReread={onReread} canMerge={canMerge} />;
 }

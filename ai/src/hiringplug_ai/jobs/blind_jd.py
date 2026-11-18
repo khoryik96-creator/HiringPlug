@@ -15,6 +15,7 @@ is sent back as the reason, never raised, so the person waiting sees why.
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from .. import cvstudio, cvstudio_jd
@@ -156,17 +157,42 @@ def _warnings(done: dict[str, Any]) -> list[str]:
     return warnings
 
 
+def _key(name: str) -> str:
+    """A JSON key as CV Studio writes it: "aboutClient", "About Client" -> "about_client"."""
+    snake = re.sub(r"(?<=[a-z0-9])([A-Z])", r"_\1", name.strip())
+    return re.sub(r"[^a-z0-9]+", "_", snake.lower()).strip("_")
+
+
+def _item(x: Any) -> str:
+    """One list item as text: a string or number, or an object's text values ("Title: detail")."""
+    if isinstance(x, (str, int, float)) and not isinstance(x, bool):
+        return re.sub(r"^\s*(?:[-•*]|\d+[.)])\s+", "", str(x)).strip()
+    if isinstance(x, dict):
+        return ": ".join(t for t in (_item(v) for v in x.values()) if t)
+    return ""
+
+
+def _items(value: Any) -> list[str]:
+    """A list as the AI may write it: a list (of strings or objects), or one text of lines."""
+    if isinstance(value, list):
+        return [t for t in (_item(x) for x in value) if t]
+    if isinstance(value, str) and value.strip() and value.strip() != "null":
+        return [t for t in (_item(line) for line in value.splitlines()) if t]
+    return []
+
+
 def _contract(data: dict[str, Any]) -> BlindJd:
     """CV Studio's JD in the contract's shape: text where text is expected,
-    lists of non-empty lines, everything held to its size."""
+    lists of non-empty lines, everything held to its size. Keys in any
+    spelling, list items as text or objects; an answer with no job text in
+    it is not a rewrite (the blind version made by the rules stays)."""
+    data = {_key(k): v for k, v in data.items()} if isinstance(data, dict) else {}
     out: dict[str, Any] = {}
     for key, (name, limit) in _TEXTS.items():
         value = data.get(key)
-        out[name] = value.strip()[:limit] if isinstance(value, str) and value != "null" else ""
+        out[name] = value.strip()[:limit] if isinstance(value, str) and value.strip() != "null" else ""
     for key, (name, count, limit) in _LISTS.items():
-        value = data.get(key)
-        items = value if isinstance(value, list) else ([value] if isinstance(value, str) and value else [])
-        out[name] = [
-            str(x).strip()[:limit] for x in items if isinstance(x, (str, int, float)) and str(x).strip()
-        ][:count]
+        out[name] = [t[:limit] for t in _items(data.get(key))][:count]
+    if not (out["aboutClient"] or out["aboutRole"] or out["responsibilities"] or out["requirements"]):
+        raise _FailedError("the AI's answer had no job description in it")
     return BlindJd.model_validate(out)

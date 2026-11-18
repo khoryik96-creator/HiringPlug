@@ -185,6 +185,10 @@ func (s *Service) saveBlindRewrite(ctx context.Context, tx pgx.Tx, job jobqueue.
 		return err
 	}
 	title, text := RewriteText(jd, Blind(ad.Details, client).Title)
+	if strings.TrimSpace(text) == "" { // a title alone is no ad: the rules' blind version stays
+		reason := "The AI wrote no text for the ad, so the blind version made by the rules stays. Try again, or edit the blind ad yourself."
+		return finish("failed", &reason)
+	}
 	if NamesClient(title, client) || NamesClient(text, client) { // never shown to candidates
 		reason := "The AI's version still names the client, so it was not used. Try again, or edit the blind ad yourself."
 		return finish("failed", &reason)

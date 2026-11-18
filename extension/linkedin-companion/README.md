@@ -28,7 +28,11 @@ and files, built with the web app like the zip), writes them into the folder
 (manifest last) and reloads the companion: no download, no extensions page.
 It only writes files; the browser runs them after it loads the folder again,
 as when updating by hand. It accepts only this companion (its manifest name)
-at the version it states, with the companion's own kinds of file.
+at the version it states, with the companion's own kinds of file, and only an
+update that asks for no more access than the running one (one that does is
+installed by hand, so the browser shows what it asks for). The folder must be
+the copy the browser runs (its version is the running one); a write that fails
+puts the old files back.
 
 On a company's contacts, **Check employment on LinkedIn** then checks each
 contact with a LinkedIn profile (the company needs its LinkedIn page set).

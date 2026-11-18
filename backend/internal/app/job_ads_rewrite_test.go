@@ -119,6 +119,21 @@ func TestABlindAdIsRewrittenByTheAICVStudiosWay(t *testing.T) {
 		assert.Equal(t, got.BlindDescription.MustGet(), after.BlindDescription.MustGet(), "the blind ad is unchanged")
 	})
 
+	t.Run("a rewrite with a title but no text is not used: the blind ad never goes empty", func(t *testing.T) {
+		var again api.BlindRewrite
+		a.request(http.MethodPost, rewrites, token, map[string]any{"tone": "professional", "strength": "medium"}).JSON(&again)
+		hollow := api.BlindJd{JobTitle: "Production Support Analyst", TechStack: []string{}, Responsibilities: []string{}, Requirements: []string{},
+			NiceToHave: []string{}, WhyJoin: []string{}, AltTitles: []string{}}
+		answerAIJob(t, a, aiConn, claimAIJobWhere(t, aiConn, "rewriteId", again.Id), api.JobKindJdBlinded, rewriteAnswer(again.Id, &hollow, ""))
+		var list api.BlindRewriteList
+		a.request(http.MethodGet, rewrites, token, nil).JSON(&list)
+		assert.Equal(t, api.BlindRewriteStatusFailed, list.Items[0].Status)
+		assert.True(t, strings.HasPrefix(list.Items[0].Error.MustGet(), "The AI wrote no text for the ad"))
+		after := a.adRequest(http.MethodGet, "/v1/job-ads/"+ad.Id, token, nil, http.StatusOK)
+		assert.Equal(t, got.BlindDescription.MustGet(), after.BlindDescription.MustGet(), "the blind ad keeps its text")
+		assert.Equal(t, got.BlindTitle, after.BlindTitle)
+	})
+
 	t.Run("changes to the ad while the AI works still mark the blind version out of date", func(t *testing.T) {
 		var again api.BlindRewrite
 		a.request(http.MethodPost, rewrites, token, map[string]any{"tone": "professional", "strength": "medium"}).JSON(&again)

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, ApiError, unwrap } from "../api/client";
+import { candidateKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
 
 /**
@@ -19,9 +20,11 @@ export function DuplicateEmail({ error, merge }: { error: unknown; merge?: { id:
         params: { path: { candidateId: keepId } }, body: { duplicateId: merge.id, version: keep.version },
       }));
     },
-    onSuccess: async (_, keepId) => {
-      await queryClient.invalidateQueries(); // CVs, jobs, notes and lists all changed
+    onSuccess: (_, keepId) => {
+      // Their page at once; this candidate is gone, so its queries are dropped, not asked again (they would 404).
       location.hash = `#/candidates/${keepId}`;
+      if (merge) queryClient.removeQueries({ queryKey: candidateKey(merge.id) });
+      void queryClient.invalidateQueries(); // CVs, jobs, notes and lists all changed
     },
   });
   if (!(error instanceof ApiError) || error.code !== "CANDIDATE_DUPLICATE_EMAIL") return null;

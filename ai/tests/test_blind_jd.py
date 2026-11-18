@@ -174,3 +174,31 @@ def test_failures_come_back_as_the_reason() -> None:
     assert run(None, job()).error == "no AI provider is set up"
     busy = run(FakeAI(ProviderError("the AI provider is busy")), job())
     assert busy.error == "the AI provider is busy"
+
+
+def test_an_answer_written_another_way_still_reads() -> None:
+    """Models differ: keys in camelCase, list items as objects or as one text of
+    lines. The rewrite still has its sections (it used to come back empty)."""
+    jd = blind_jd._contract(  # the answer reader itself
+        {
+            "jobTitle": "Production Support Analyst",
+            "aboutClient": "A major North American bank.",
+            "Responsibilities": [{"title": "Support", "detail": "Keep the surveillance platform running."}],
+            "requirements": "- 3 years in production support\n- SQL and Unix",
+            "nice_to_have": [{"item": "Kafka"}],
+        }
+    )
+    out = jd.model_dump(mode="json")
+    assert out["jobTitle"] == "Production Support Analyst"
+    assert out["responsibilities"] == ["Support: Keep the surveillance platform running."]
+    assert out["requirements"] == ["3 years in production support", "SQL and Unix"]
+    assert out["niceToHave"] == ["Kafka"]
+
+
+def test_an_answer_with_no_job_text_is_a_failure_not_an_empty_ad() -> None:
+    hollow = json.dumps(
+        {"job_title": "Production Support Analyst", "responsibilities": [], "requirements": []}
+    )
+    out = run(FakeAI(hollow, hollow), job())
+    assert out.jd is None
+    assert out.error == "the AI's answer had no job description in it"

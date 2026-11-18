@@ -2,7 +2,7 @@
 // shows it (orange while it runs, green "Done" once saved), and a bar with
 // the seconds elapsed takes the place of a history.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { studioCvsKey } from "./FormatCv";
@@ -61,24 +61,40 @@ export function useStudioRun(candidateId: string, enabled: boolean): StudioRun {
   };
 }
 
+/** How full a bar is after `seconds` of a job that usually takes `typical` seconds: never full until done. */
+export const fill = (seconds: number, typical: number) => Math.min(95, 95 * (1 - Math.exp(-seconds / (typical / 2))));
+
+/**
+ * One progress line (formatting a CV, reading one): a label, a bar filling
+ * orange while running, full green when done (red when failed), and on the
+ * right the seconds while running or `end` once finished.
+ */
+export function ProgressLine({ state, label, ariaLabel, pct, seconds, end, children }: {
+  state: "running" | "done" | "failed"; label: ReactNode; ariaLabel: string; pct: number; seconds: number; end?: ReactNode; children?: ReactNode;
+}) {
+  return (
+    <div className={`studio-progress ${state}`} role="status" aria-label={ariaLabel}>
+      <div className="studio-line">
+        <span className="studio-label">{label}</span>
+        <span className="studio-bar" aria-hidden="true"><i style={{ width: `${String(pct)}%` }} /></span>
+        {state === "running" || end === undefined ? <span className="studio-timer" aria-label={`${String(seconds)} seconds`}>{seconds}s</span> : end}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** The bar: filling while the CV is formatted (an estimate: about a minute), full once done. */
 export function StudioProgress({ run }: { run: StudioRun }) {
   const r = run.running ?? run.finished;
   if (!r) return null;
   const s = run.seconds;
-  const state = run.running ? "running" : r.status;
-  const pct = run.running ? Math.min(95, 95 * (1 - Math.exp(-s / (TYPICAL / 2)))) : 100;
+  const state = run.running ? "running" : r.status === "done" ? "done" : "failed";
   return (
-    <div className={`studio-progress ${state}`} role="status" aria-label="CV formatting">
-      <div className="studio-line">
-        <span className="studio-label">
-          {run.running ? `Formatting${r.blind ? " (blind)" : ""}…` : r.status === "done" ? <>Saved <strong>{r.fileName}</strong></> : "Not formatted"}
-        </span>
-        <span className="studio-bar" aria-hidden="true"><i style={{ width: `${String(pct)}%` }} /></span>
-        <span className="studio-timer" aria-label={`${String(s)} seconds`}>{s}s</span>
-      </div>
+    <ProgressLine state={state} ariaLabel="CV formatting" pct={run.running ? fill(s, TYPICAL) : 100} seconds={s}
+      label={run.running ? `Formatting${r.blind ? " (blind)" : ""}…` : r.status === "done" ? <>Saved <strong>{r.fileName}</strong></> : "Not formatted"}>
       {r.warning && <small className="warning">Compare with the CV before sending: {r.warning}</small>}
       {r.status === "failed" && <small className="warning" role="alert">{r.error}</small>}
-    </div>
+    </ProgressLine>
   );
 }

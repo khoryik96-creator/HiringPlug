@@ -28,7 +28,8 @@ details** opens the review **beside the CV** (in place of the list of files),
 the CV staying in view while the review scrolls; **Read this CV again** is at
 the review's foot. When the details cannot be read, the bar says so with
 where the reader broke (its error type and line, never CV text), until
-dismissed; asking again clears it. Jobs uses the
+dismissed; asking again clears it. A formatted CV (our own output) has no
+review: it is read for comparing, again from its ⋯ menu. Jobs uses the
 existing stage badge and separate Move to menu, including reason/cancel/reopen,
 interviews, offers, placements and stage history. Profile/history editing,
 duplicate merging, privacy tools, call history and salary notes remain in their
@@ -753,7 +754,11 @@ lead's company (with the built-in email check).
   "Excel" only as tools), soften company scale and scrub the client's name.
   The result becomes the blind version in sections (About our client, Tech
   stack, What you will do, What you need to succeed, Nice to have, Why join
-  us), as a person's edit would; Go refuses one that still names the client.
+  us), as a person's edit would; Go refuses one that still names the client,
+  and one with a title but no text (the rules' blind version stays: the blind
+  ad never goes empty). The AI's answer is read whatever the model's spelling
+  of its keys, with list items as text or as objects; an answer with no job
+  text in it fails with that reason.
   What to check (tech terms missing, wording still close) is shown with it.
   It is cut at a whole line to the blind text's 20,000 characters. If the ad
   is changed while the AI works, the blind version is marked out of date (it

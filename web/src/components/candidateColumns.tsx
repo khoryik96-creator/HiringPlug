@@ -90,7 +90,7 @@ export function WaName({ c, href, children }: { c: Summary; href: string; childr
   const label = wa ? waColumnLabel(wa) : kind.label;
   return (
     <span className="wa-who">
-      <WaDisc c={c} label={label} />
+      <StatusDisc c={c} named />
       <span className="wa-name">
         <span><a href={href}>{c.fullName}</a>{children}</span>
         <small className="wa-label" style={{ color: kind.color }}>{label}</small>
@@ -99,10 +99,10 @@ export function WaName({ c, href, children }: { c: Summary; href: string; childr
   );
 }
 
-/** Their initials in a disc of their status's colours (Looking out, Placed...), as their page's banner; with a label, said to screen readers too. */
-export function WaDisc({ c, label, big = false }: { c: Summary; label?: string; big?: boolean }) {
+/** Their initials in a disc of their status's colours (Looking out, Placed...), as their page's banner; named: the status said to screen readers too. */
+export function StatusDisc({ c, named = false, big = false }: { c: Summary; named?: boolean; big?: boolean }) {
   const look = statusLook(c.availability);
-  const said = label ? { role: "img", "aria-label": `Status: ${look.label}`, title: `Status: ${look.label}` } : { "aria-hidden": true };
+  const said = named ? { role: "img", "aria-label": `Status: ${look.label}`, title: `Status: ${look.label}` } : { "aria-hidden": true };
   return (
     <span className={big ? "wa-disc big" : "wa-disc"} style={{ background: look.bg, color: "#1F2937", boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${look.edge}` }} {...said}>
       {initials(c.fullName)}

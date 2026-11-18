@@ -11,9 +11,11 @@ afterEach(() => {
 });
 
 const doc = (over: Partial<Document>): Document => ({
-  id: "doc_1", candidateId: "cand_1", source: "original", fileName: "Siti CV.pdf", contentType: "application/pdf", sizeBytes: 1000,
+  id: "doc_1", candidateId: "cand_1", source: "original", fileName: "Siti CV.docx", sizeBytes: 1000,
+  // A Word CV whose preview could not be made: the viewer shows its text (nothing to fetch in tests).
+  contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "pdf", errorMessage: null, extractionWarnings: [],
-  parseStatus: "parsed", parseError: null, pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
+  parseStatus: "parsed", parseError: null, pdfStatus: "failed", createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
 });
 const run = (over: Partial<Schemas["StudioCv"]>): Schemas["StudioCv"] => ({
   id: "scv_1", candidateId: "cand_1", sourceDocumentId: "doc_1", status: "queued", blind: false, correctLanguage: true,
@@ -23,8 +25,10 @@ const run = (over: Partial<Schemas["StudioCv"]>): Schemas["StudioCv"] => ({
 
 /** The server: the candidate's documents and formatting runs, as they are now. */
 function serve(state: { docs: Document[]; runs: Schemas["StudioCv"][] }) {
-  vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
-    path === "/v1/candidates/{candidateId}/studio-cvs" ? { items: state.runs } : { items: state.docs },
+  vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { path?: { documentId?: string } } }) => Promise.resolve(ok(
+    path === "/v1/candidates/{candidateId}/studio-cvs" ? { items: state.runs }
+      : path === "/v1/documents/{documentId}" ? state.docs.find((d) => d.id === init?.params?.path?.documentId) ?? state.docs[0]
+        : { items: state.docs },
   ))) as never);
 }
 
@@ -71,7 +75,7 @@ describe("formatting a CV", () => {
   it("opens the form at once when no formatted CV is saved", async () => {
     serve({ docs: [doc({})], runs: [] });
     show();
-    await screen.findByText("Siti CV.pdf");
+    await screen.findByRole("button", { name: "Format a CV" });
     fireEvent.click(screen.getByRole("button", { name: "Format a CV" }));
     expect(screen.getByRole("form", { name: "Format their CV" })).toBeTruthy();
   });

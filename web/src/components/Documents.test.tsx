@@ -16,6 +16,13 @@ const doc = (over: Partial<Document>): Document => ({
   parseStatus: "parsed", parseError: null, pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
 });
 
+/** The server: the candidate's documents, as a list and one by one (the viewer reads the one shown). */
+function serveDocs(items: Document[]) {
+  vi.spyOn(api, "GET").mockImplementation(((path: string, init?: { params?: { path?: { documentId?: string } } }) => Promise.resolve(ok(
+    path === "/v1/documents/{documentId}" ? items.find((d) => d.id === init?.params?.path?.documentId) ?? items[0] : { items },
+  ))) as never);
+}
+
 describe("CVs and documents", () => {
   it("shares one selected file between the library, preview and file actions", async () => {
     const first = doc({id: "doc_first", fileName: "Original CV.txt", contentType: "text/plain", extractedText: "Original text"});
@@ -23,7 +30,7 @@ describe("CVs and documents", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string, init: {params: {path: {documentId: string}}}) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? {items: [first, formatted]} : init.params.path.documentId === first.id ? first : formatted
     ))) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read", "documents:delete"]}/>);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read", "documents:delete"]}/>);
     const library = await screen.findByRole("navigation", {name: "Candidate files"});
     expect(await screen.findByText("Original text")).toBeTruthy();
     expect(screen.queryByRole("combobox", {name: "CV version"})).toBeNull();
@@ -44,22 +51,23 @@ describe("CVs and documents", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [pdf] } : pdf
     ))) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByRole("button", { name: "Review details" });
     expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
     expect(screen.queryByLabelText("More for Siti CV.pdf")).toBeNull(); // an empty menu is not shown
   });
 
-  it("opens the review beside the CV, and reads it again from there", async () => {
+  it("opens the review beside the CV, and reads it again from there, offering the new details", async () => {
     let parseStatus: Document["parseStatus"] = "parsed";
+    let name = "Noelle Khoo";
     const cv = () => doc({ id: "doc_cv", fileName: "Noelle CV.txt", contentType: "text/plain", extractedText: "CV text", parseStatus,
       updatedAt: new Date().toISOString(),
-      parsedProfile: { parser: "rules@1", fullName: { value: "Noelle Khoo", quote: "NOELLE KHOO" }, skills: [], experience: [], education: [], dropped: 0 } as never });
+      parsedProfile: { parser: "rules@1", fullName: { value: name, quote: name.toUpperCase() }, skills: [], experience: [], education: [], dropped: 0 } as never });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
     ))) as never);
     vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("CV text");
     fireEvent.click(screen.getByRole("button", { name: "Review details" }));
     const review = await screen.findByRole("region", { name: "Details from this CV" });
@@ -74,9 +82,13 @@ describe("CVs and documents", () => {
     expect((await screen.findByRole("status", { name: "Reading the CV" })).textContent).toContain("Reading the details…");
     expect(screen.getByRole<HTMLButtonElement>("button", { name: /^Reading details…/ }).disabled).toBe(true);
     expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
+    expect(within(review).getByText("Noelle Khoo")).toBeTruthy();
+    name = "Noelle Khoo Jia Yi"; // the reader did better this time
     parseStatus = "parsed";
-    // Read: the review asked for opens by itself.
-    expect(await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 })).toBeTruthy();
+    // Read: the review asked for opens by itself, with the new details (not the copy cached before).
+    const again = await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 });
+    expect(await within(again).findByText("Noelle Khoo Jia Yi")).toBeTruthy();
+    expect(within(again).queryByText("Noelle Khoo")).toBeNull();
   });
 
   it("reads a CV never read with the same button, then shows it ready", async () => {
@@ -87,7 +99,7 @@ describe("CVs and documents", () => {
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
     ))) as never);
     const post = vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("Old text");
     expect(screen.queryByRole("button", { name: "Review details" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Read details" }));
@@ -105,7 +117,7 @@ describe("CVs and documents", () => {
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
     ))) as never);
     vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("Bad text");
     fireEvent.click(screen.getByRole("button", { name: "Read details" }));
     await screen.findByRole("button", { name: /^Reading details…/ });
@@ -119,16 +131,25 @@ describe("CVs and documents", () => {
     expect(screen.getByRole("button", { name: "Read details again" })).toBeTruthy();
   });
 
-  it("offers no details for a formatted CV (our own output)", async () => {
-    const f = doc({ id: "doc_f", source: "formatted", fileName: "Formatted CV.txt", contentType: "text/plain", extractedText: "Formatted text" });
+  it("reads a formatted CV again only for comparing: from the menu, never offering its review", async () => {
+    let parseStatus: Document["parseStatus"] = "parsed";
+    const f = () => doc({ id: "doc_f", source: "formatted", fileName: "Formatted CV.txt", contentType: "text/plain", extractedText: "Formatted text", parseStatus,
+      parsedProfile: { parser: "rules@1", fullName: { value: "Siti", quote: "SITI" }, skills: [], experience: [], education: [], dropped: 0 } as never });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
-      path === "/v1/candidates/{candidateId}/documents" ? { items: [f] } : f
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [f()] } : f()
     ))) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    const post = vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(f())); }) as never);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("Formatted text");
     expect(screen.queryByRole("button", { name: /details/ })).toBeNull();
     fireEvent.click(screen.getByLabelText("More for Formatted CV.txt"));
-    expect(screen.queryByRole("menuitem", { name: /Read details/ })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Read details again (for comparing)" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(1); });
+    parseStatus = "parsed";
+    const bar = await screen.findByRole("status", { name: "Reading the CV" });
+    await waitFor(() => { expect(bar.textContent).toContain("Details read from Formatted CV.txt"); }, { timeout: 4000 });
+    expect(within(bar).queryByRole("button", { name: "Review details" })).toBeNull(); // our own output
+    expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
   });
 
   it("compares two CVs side by side right in the tab, and goes back to one", async () => {
@@ -137,7 +158,7 @@ describe("CVs and documents", () => {
     vi.spyOn(api, "GET").mockImplementation(((path: string, init: { params: { path: { documentId: string } } }) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [a, b] } : init.params.path.documentId === a.id ? a : b
     ))) as never);
-    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("Their text");
     // A button in the tab, not a link to another page.
     expect(screen.queryByRole("link", { name: "Compare side by side" })).toBeNull();
@@ -150,23 +171,22 @@ describe("CVs and documents", () => {
     expect(screen.getByRole("navigation", { name: "Candidate files" })).toBeTruthy();
   });
 
-  it("lists their CVs before the formatted ones, each with its own actions", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [
-      doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "ready" }),
-      doc({ id: "doc_q", fileName: "Siti new.pdf", status: "queued", parseStatus: null }),
-      doc({}),
-    ] }));
+  it("lists their CVs before the formatted ones in the library, each with what it is", async () => {
+    serveDocs([
+      doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "failed" }),
+      doc({ id: "doc_q", fileName: "Siti new.txt", contentType: "text/plain", status: "queued", parseStatus: null, createdAt: "2026-11-04T00:00:00Z" }),
+      doc({ fileName: "Siti CV.txt", contentType: "text/plain" }),
+    ]);
     renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["cvformats:create"]} />);
-    const groups = await screen.findAllByRole("heading", { level: 4 });
-    expect(groups.map((g) => g.textContent)).toEqual(["From the candidate", "Formatted"]);
-    const theirs = screen.getByText("Siti CV.pdf").closest("li") as HTMLElement;
-    expect(within(theirs).getByText(/Their CV · added 3 Nov 2026/)).toBeTruthy();
-    expect(within(theirs).getByRole("button", { name: "Review details" })).toBeTruthy();
-    expect(within(screen.getByText("Siti new.pdf").closest("li") as HTMLElement).getByText(/Reading the text…/)).toBeTruthy();
-    const formatted = screen.getByText("Contoh CV - Siti.docx").closest("li") as HTMLElement;
-    expect(within(formatted).queryByRole("button", { name: "Review details" })).toBeNull(); // our own output
-    expect(within(formatted).getAllByRole("button").map((b) => b.textContent)).toContain("PDF");
-    expect(screen.getByRole("link", { name: "Compare side by side" })).toBeTruthy();
+    const library = await screen.findByRole("navigation", { name: "Candidate files" });
+    expect(within(library).getAllByRole("heading", { level: 4 }).map((g) => g.textContent)).toEqual(["From the candidate", "Formatted"]);
+    expect(within(library).getByRole("button", { name: /Siti CV\.txt/ }).textContent).toContain("Their CV · 3 Nov 2026 · Text read · Details read");
+    expect(within(library).getByRole("button", { name: /Siti new\.txt/ }).textContent).toContain("Reading the text…");
+    fireEvent.click(within(library).getByRole("button", { name: /Siti CV\.txt/ }));
+    expect(await screen.findByRole("button", { name: "Review details" })).toBeTruthy();
+    fireEvent.click(within(library).getByRole("button", { name: /Contoh CV - Siti\.docx/ }));
+    await waitFor(() => { expect(screen.queryByRole("button", { name: "Review details" })).toBeNull(); }); // our own output
+    expect(screen.getByRole("button", { name: "Compare side by side" })).toBeTruthy();
   });
 
   it("uploads a file as the kind chosen", async () => {
@@ -209,16 +229,18 @@ describe("CVs and documents", () => {
   });
 
   it("deletes a formatted CV after asking, never the candidate's own", async () => {
-    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx" }), doc({})] }));
+    // Their own CV a PDF (the viewer's own download, so no menu); the formatted one a Word file whose preview failed.
+    serveDocs([doc({ id: "doc_f", source: "formatted", fileName: "Contoh CV - Siti.docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfStatus: "failed" }), doc({})]);
     const del = vi.spyOn(api, "DELETE").mockResolvedValue(ok(undefined));
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:delete"]} />);
-    const own = (await screen.findByText("Siti CV.pdf")).closest("li") as HTMLElement;
-    fireEvent.click(within(own).getByLabelText(/More for/));
-    expect(within(own).queryByRole("menuitem", { name: /Delete/ })).toBeNull();
-    const formatted = screen.getByText("Contoh CV - Siti.docx").closest("li") as HTMLElement;
-    fireEvent.click(within(formatted).getByLabelText(/More for/));
-    fireEvent.click(within(formatted).getByRole("menuitem", { name: "Delete this formatted CV" }));
+    const library = await screen.findByRole("navigation", { name: "Candidate files" });
+    // Their own PDF: nothing to delete (and the viewer downloads it), so no menu at all.
+    await screen.findByRole("button", { name: "Review details" });
+    expect(screen.queryByLabelText("More for Siti CV.pdf")).toBeNull();
+    fireEvent.click(within(library).getByRole("button", { name: /Contoh CV - Siti\.docx/ }));
+    fireEvent.click(await screen.findByLabelText("More for Contoh CV - Siti.docx"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete this formatted CV" }));
     await waitFor(() => { expect(del).toHaveBeenCalledWith("/v1/documents/{documentId}", { params: { path: { documentId: "doc_f" } } }); });
   });
 });

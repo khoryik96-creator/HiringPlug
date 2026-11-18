@@ -74,6 +74,18 @@ describe("pipeline steps", () => {
     expect(within(column).getAllByRole("listitem")).toHaveLength(12);
   });
 
+  it("keeps room for the move arrow on a board line only for those who may move people", async () => {
+    vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [app(1, "submitted", 3)] }));
+    renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={["pipeline:read"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Board" }));
+    const line = (await screen.findByRole("link", { name: "Person 1" })).closest(".board-line") as HTMLElement;
+    expect(line.classList.contains("movable")).toBe(false);
+    cleanup();
+    show([app(1, "submitted", 3)]);
+    const movable = (await screen.findByRole("link", { name: "Person 1" })).closest(".board-line") as HTMLElement;
+    expect(movable.classList.contains("movable")).toBe(true);
+  });
+
   it("colours each person's initials by their status, in Steps and on the board", async () => {
     show([{ ...app(1, "submitted", 3), candidateAvailability: "placed" }, app(2, "submitted", 2)]);
     const placed = await screen.findByTitle("Person 1 · Placed");

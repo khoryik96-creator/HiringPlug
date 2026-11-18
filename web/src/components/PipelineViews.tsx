@@ -122,7 +122,7 @@ export function BoardLine(props: Shared & { a: Application; onDragStart: (a: App
   const upcoming = props.upcoming.get(a.id);
   const match = props.fit.get(a.id);
   return (
-    <div className={`board-line${props.picked.includes(a.id) ? " picked" : ""}${waiting(a, now) && days >= 14 ? " stale" : ""}${props.onPick ? " pickable" : ""}`}
+    <div className={`board-line${props.picked.includes(a.id) ? " picked" : ""}${waiting(a, now) && days >= 14 ? " stale" : ""}${props.onPick ? " pickable" : ""}${props.canMove && next ? " movable" : ""}`}
       draggable={props.canMove} onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); props.onDragStart(a); }} onClick={choose(props, a)}>
       <Initials name={a.candidateName} status={a.candidateAvailability} />
       <a href={`#/candidates/${a.candidateId}`} title={a.candidateTitle ? `${a.candidateName} · ${a.candidateTitle}` : a.candidateName}

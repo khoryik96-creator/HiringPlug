@@ -8,7 +8,8 @@ import vm from 'node:vm';
 const context = vm.createContext({});
 context.globalThis = context;
 vm.runInContext(readFileSync(new URL('../updater.js', import.meta.url), 'utf8'), context);
-const {newer, check, isCompanionFolder, write, latest, NAME} = context.hiringplugUpdater;
+const {newer, check, widens: widensIn, folderVersion, write, latest, NAME} = context.hiringplugUpdater;
+const widens = (next, current) => Array.from(widensIn(next, current)); // an array of this realm, for deepEqual
 
 const manifest = (version, name = NAME) => JSON.stringify({manifest_version: 3, name, version});
 const bundle = (version, files = {}) => ({version, files: {'manifest.json': manifest(version), 'worker.js': '// v' + version, ...files}});
@@ -52,12 +53,40 @@ test('accepts only this companion, at the version it says, with its own kinds of
   assert.throws(() => check({version: 'latest', files: {}}), /did not send a companion/);
 });
 
+test('refuses by itself an update that asks for more access: that one is installed by hand', () => {
+  const running = {name: NAME, version: '1.4.0', permissions: ['activeTab', 'scripting', 'storage', 'tabGroups'], host_permissions: ['https://www.linkedin.com/*']};
+  assert.deepEqual(widens({...running, version: '1.5.0'}, running), []);
+  assert.deepEqual(widens({...running, permissions: ['activeTab', 'storage']}, running), [], 'asking for less is fine');
+  assert.deepEqual(widens({...running, permissions: [...running.permissions, 'cookies']}, running), ['permissions']);
+  assert.deepEqual(widens({...running, host_permissions: ['<all_urls>']}, running), ['host_permissions']);
+  assert.deepEqual(widens({...running, content_scripts: [{matches: ['<all_urls>'], js: ['x.js']}]}, running), ['content_scripts']);
+});
+
+test('knows the companion folder and the version in it', async () => {
+  assert.equal(await folderVersion(folder({'manifest.json': manifest('1.3.0')})), '1.3.0');
+  assert.equal(await folderVersion(folder({'manifest.json': manifest('1.0', 'Other')})), null);
+  assert.equal(await folderVersion(folder({})), null, 'a folder with no manifest');
+});
+
+test('puts the old files back when a write fails halfway, so the folder stays one version', async () => {
+  const files = {'manifest.json': manifest('1.3.0'), 'worker.js': '// v1.3.0'};
+  const dir = folder(files);
+  const broken = {
+    ...dir,
+    async getFileHandle(n, opts) {
+      const h = await dir.getFileHandle(n, opts);
+      if (n === 'reader.js' && opts && opts.create) return {...h, createWritable: async () => { throw new Error('disk full'); }};
+      return h;
+    },
+  };
+  await assert.rejects(write(broken, {...bundle('1.4.0').files, 'reader.js': '// new'}), /could not be written, so nothing was changed: disk full/);
+  assert.equal(files['worker.js'], '// v1.3.0', 'the file already written got its old contents back');
+  assert.equal(JSON.parse(files['manifest.json']).version, '1.3.0');
+});
+
 test('writes the files into the folder, its manifest last, making folders as needed', async () => {
   const log = [];
   const dir = folder({'manifest.json': manifest('1.3.0'), 'old.js': 'kept'}, log);
-  assert.equal(await isCompanionFolder(dir), true);
-  assert.equal(await isCompanionFolder(folder({'manifest.json': manifest('1.0', 'Other')})), false);
-  assert.equal(await isCompanionFolder(folder({})), false, 'a folder with no manifest');
   await write(dir, bundle('1.4.0', {'lib/util.js': '// util'}).files);
   assert.equal(log[log.length - 1], 'manifest.json', 'a half-written update never loads as the new version');
   assert.ok(log.includes('lib/util.js'));

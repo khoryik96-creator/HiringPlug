@@ -1,7 +1,7 @@
 // The update page: finds the newest companion among the connected
 // HiringPlugs, writes it into the companion's folder (remembered once
 // chosen) and reloads the companion (see updater.js).
-const {newer, check, isCompanionFolder, write, latest} = globalThis.hiringplugUpdater;
+const {newer, check, widens, folderVersion, write, latest} = globalThis.hiringplugUpdater;
 const $ = id => document.getElementById(id);
 const say = (text, problem = false) => { $('status').textContent = text; $('status').className = problem ? 'problem' : ''; };
 const installed = chrome.runtime.getManifest().version;
@@ -34,10 +34,19 @@ async function showFolder() {
   return dir;
 }
 
+/** The folder must be the copy the browser runs: the companion's, at the version running now. */
+async function checkFolder(dir) {
+  const version = await folderVersion(dir);
+  if (version === null) throw new Error('That folder is not the companion: choose the folder with its manifest.json (the one you loaded).');
+  if (version !== installed) {
+    throw new Error(`That folder holds version ${version}, but the browser runs ${installed}: choose the folder it loads the companion from (the extensions page shows it under the companion's Details, "Loaded from").`);
+  }
+}
+
 async function choose() {
   if (!window.showDirectoryPicker) throw new Error('This browser cannot edit a folder from a page: update it by hand (download it again from HiringPlug).');
   const dir = await window.showDirectoryPicker({id: 'hiringplug-companion', mode: 'readwrite'});
-  if (!await isCompanionFolder(dir)) throw new Error('That folder is not the companion: choose the folder with its manifest.json (the one you loaded).');
+  await checkFolder(dir);
   await stored(dir);
   await showFolder();
   return dir;
@@ -53,8 +62,10 @@ $('update').addEventListener('click', async () => {
   try {
     const dir = (await stored().catch(() => null)) || await choose();
     if (await dir.requestPermission({mode: 'readwrite'}) !== 'granted') throw new Error('Editing the folder was not allowed.');
-    if (!await isCompanionFolder(dir)) throw new Error('The folder chosen is no longer the companion: choose it again.');
+    await checkFolder(dir);
     check(offer.bundle);
+    const wider = widens(JSON.parse(offer.bundle.files['manifest.json']), chrome.runtime.getManifest());
+    if (wider.length) throw new Error(`This update asks for more access (${wider.join(', ')}): download it from HiringPlug and load it by hand, so the browser shows what it asks for.`);
     say(`Writing version ${offer.bundle.version}…`);
     await write(dir, offer.bundle.files);
     say(`Updated to ${offer.bundle.version}. The companion restarts now: refresh your HiringPlug tabs.`);
@@ -72,6 +83,11 @@ $('update').addEventListener('click', async () => {
   const found = await latest(origins);
   if (!found) { $('versions').textContent = `Version ${installed}. The connected HiringPlug did not answer: try again later.`; return; }
   if (!newer(found.bundle.version, installed)) { $('versions').textContent = `Version ${installed}: up to date.`; return; }
+  const wider = widens(JSON.parse(found.bundle.files['manifest.json']), chrome.runtime.getManifest());
+  if (wider.length) {
+    $('versions').textContent = `Version ${found.bundle.version} is ready at ${found.origin}, but it asks for more access (${wider.join(', ')}): download it there and load it by hand this time, so the browser shows what it asks for.`;
+    return;
+  }
   offer = found;
   $('versions').textContent = `Version ${installed} installed; ${found.bundle.version} is ready at ${found.origin}.`;
   $('update').textContent = `Update to ${found.bundle.version}`;
