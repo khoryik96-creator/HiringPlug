@@ -1183,6 +1183,10 @@ button.danger-quiet { color: #b91c1c; }
 button.danger-quiet:hover { border-color: #b91c1c; color: #b91c1c; }
 button.danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
 button.danger:hover { filter: brightness(1.08); }
+/* "danger" on a quiet button (doc-btn, pill-btn, secondary, link) is red text on its own background: solid red is for
+   plain buttons only (with both, the red text sat on a red button and could not be read). */
+button.danger:is(.doc-btn, .pill-btn, .secondary) { background: var(--surface); border-color: var(--line-strong); color: #b91c1c; }
+button.danger.link { background: transparent; border-color: transparent; color: #b91c1c; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 1rem; background: rgb(24 18 43 / 0.35); }
 .dialog { width: min(30rem, 100%); padding: 1.1rem 1.25rem; border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 18px 50px rgb(24 18 43 / 0.25); display: grid; gap: 0.6rem; }
 .dialog h3 { margin: 0; }

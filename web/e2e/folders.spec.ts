@@ -72,7 +72,7 @@ test("keeps candidates in folders: drag, add, share, rename and delete", async (
   await expect(table.getByRole("link", { name: `Folder Beta ${stamp}` })).toHaveCount(0);
 
   // Share with a colleague, then take them off again.
-  await page.getByRole("button", { name: "Share", exact: true }).click();
+  await page.getByRole("button", { name: "Share folder" }).click();
   const dialog = page.getByRole("dialog", { name: `Share Shortlist ${stamp}` });
   await dialog.getByLabel("Someone to share with").selectOption({ label: "Demo recruiter" });
   await dialog.getByRole("button", { name: "Share" }).click();
@@ -82,7 +82,7 @@ test("keeps candidates in folders: drag, add, share, rename and delete", async (
   await dialog.getByRole("button", { name: "Done" }).click();
 
   // Rename, then delete: the candidates stay.
-  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("button", { name: "Rename folder" }).click();
   await page.getByLabel("Folder name").fill(`Final ${stamp}`);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: `Final ${stamp}` })).toBeVisible();

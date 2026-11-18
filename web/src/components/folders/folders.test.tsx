@@ -187,14 +187,14 @@ describe("an open folder", () => {
     const onGone = vi.fn();
     renderWithClient(<FolderHead kind="contact" folder={folder({ sharedWith: [BEN] })} meId={ME} onGone={onGone} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
     fireEvent.change(screen.getByLabelText("Folder name"), { target: { value: "HR in Penang" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
       expect(patch).toHaveBeenCalledWith("/v1/folders/{folderId}", { params: { path: { folderId: "fld_01jbz6w0m0k8q9x2r3s4t5v6f1" } }, body: { name: "HR in Penang", version: 1 } });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(screen.getByRole("button", { name: "Share folder" }));
     const dialog = screen.getByRole("dialog", { name: "Share HR in KL" });
     await within(dialog).findByText("Ben Lim");
     expect(within(dialog).getByText("Demo Owner (you)")).toBeTruthy();

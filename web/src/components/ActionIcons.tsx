@@ -24,6 +24,10 @@ export const BuildingIcon = () => (
 );
 export const PersonIcon = () => <Svg><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></Svg>;
 export const SparkIcon = () => <Svg><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z" /></Svg>;
+export const ShareIcon = () => (
+  <Svg><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" /></Svg>
+);
+export const LeaveIcon = () => <Svg><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="M10 16l-4-4 4-4" /><path d="M6 12h10" /></Svg>;
 export const MailCheckIcon = () => (
   <Svg><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7" /><path d="m3 7 9 6 9-6" /><path d="m16 19 2 2 4-4" /></Svg>
 );
@@ -36,10 +40,15 @@ export function IconActions({ label, children }: { label: string; children: Reac
   return <span className="icon-actions" role="toolbar" aria-label={label}>{children}</span>;
 }
 
-export function IconButton({ label, icon, onClick, disabled = false, tip = label }: {
+export function IconButton({ label, icon, onClick, disabled = false, tip = label, danger = false }: {
   label: string; icon: ReactNode; onClick: () => void; disabled?: boolean; tip?: string;
+  /** Deletes or removes something: red on hover. */
+  danger?: boolean;
 }) {
-  return <button type="button" className="icon-action" aria-label={label} data-tip={tip} disabled={disabled} onClick={onClick}>{icon}</button>;
+  return (
+    <button type="button" className={danger ? "icon-action icon-danger" : "icon-action"} aria-label={label} data-tip={tip}
+      disabled={disabled} onClick={onClick}>{icon}</button>
+  );
 }
 
 export function IconLink({ label, icon, href }: { label: string; icon: ReactNode; href: string }) {

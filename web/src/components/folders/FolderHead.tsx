@@ -3,6 +3,7 @@
 // leave it.
 import { useEffect, useRef, useState } from "react";
 
+import { EditIcon, IconActions, IconButton, LeaveIcon, ShareIcon, TrashIcon } from "../ActionIcons";
 import { ErrorMessage } from "../ErrorMessage";
 import { Initials } from "../Initials";
 import { FolderIcon } from "./FolderPanel";
@@ -50,23 +51,25 @@ export function FolderHead({ kind, folder, meId, onGone }: {
         <span className="folder-people">{folder.sharedWith.map((id) => <Initials key={id} name={nameOf(id)} />)}</span>
       )}
       <span className="sp" />
-      {folder.mine ? (
-        <>
-          <button type="button" className="pill-btn" onClick={() => { setSharing(true); }}>Share</button>
-          {!renaming && <button type="button" className="pill-btn" onClick={() => { setName(folder.name); setRenaming(true); }}>Rename</button>}
-          <button type="button" className="pill-btn danger" disabled={change.remove.isPending} onClick={() => {
-            if (window.confirm(`Delete the folder "${folder.name}"? The ${plural(kind)} in it stay as they are.`)) {
-              change.remove.mutate(folder.id, { onSuccess: onGone });
+      <IconActions label="Folder actions">
+        {folder.mine ? (
+          <>
+            <IconButton label="Share folder" icon={<ShareIcon />} onClick={() => { setSharing(true); }} />
+            {!renaming && <IconButton label="Rename folder" icon={<EditIcon />} onClick={() => { setName(folder.name); setRenaming(true); }} />}
+            <IconButton label="Delete folder" danger icon={<TrashIcon />} disabled={change.remove.isPending} onClick={() => {
+              if (window.confirm(`Delete the folder "${folder.name}"? The ${plural(kind)} in it stay as they are.`)) {
+                change.remove.mutate(folder.id, { onSuccess: onGone });
+              }
+            }} />
+          </>
+        ) : (
+          <IconButton label="Leave folder" danger icon={<LeaveIcon />} disabled={change.unshare.isPending} onClick={() => {
+            if (window.confirm(`Leave "${folder.name}"? You will no longer see it; ${nameOf(folder.ownerId)} can share it again.`)) {
+              change.unshare.mutate({ folderId: folder.id, userId: meId }, { onSuccess: onGone });
             }
-          }}>Delete folder</button>
-        </>
-      ) : (
-        <button type="button" className="pill-btn" disabled={change.unshare.isPending} onClick={() => {
-          if (window.confirm(`Leave "${folder.name}"? You will no longer see it; ${nameOf(folder.ownerId)} can share it again.`)) {
-            change.unshare.mutate({ folderId: folder.id, userId: meId }, { onSuccess: onGone });
-          }
-        }}>Leave folder</button>
-      )}
+          }} />
+        )}
+      </IconActions>
       <ErrorMessage error={change.rename.error ?? change.remove.error ?? change.unshare.error} />
       {sharing && <ShareFolder kind={kind} folder={folder} meId={meId} onClose={() => { setSharing(false); }} />}
     </div>
