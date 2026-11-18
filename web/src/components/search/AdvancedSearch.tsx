@@ -23,8 +23,8 @@ export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose, mine }:
 }) {
   const [draft, setDraft] = useState(value);
   return (
-    <form className="panel adv-search" aria-label="Advanced search" onSubmit={(e) => { e.preventDefault(); onSearch(draft); }}>
-      <div className="adv-head">
+    <form className="panel power-search-search" aria-label="Advanced search" onSubmit={(e) => { e.preventDefault(); onSearch(draft); }}>
+      <div className="power-search-head">
         <h3>Advanced search</h3>
         {mine && (
           <label className={`toggle-chip${mine.on ? " on" : ""}`}>
@@ -35,7 +35,7 @@ export function AdvancedSearch({ value, canSeeSalary, onSearch, onClose, mine }:
       </div>
       <BooleanTips />
       <SearchFields draft={draft} setDraft={setDraft} canSeeSalary={canSeeSalary} />
-      <div className="adv-actions">
+      <div className="power-search-actions">
         <button type="submit">Search</button>
         <button type="button" className="link" onClick={() => { setDraft(EMPTY); onSearch(EMPTY); }}>Clear all</button>
       </div>
@@ -52,8 +52,8 @@ export function BooleanField({ value, onChange, label = "Boolean search", note =
 }) {
   return (
     <>
-      <label className="adv-boolean">
-        <span className="adv-label">{label} <span className="muted small">{note}</span></span>
+      <label className="power-search-boolean">
+        <span className="power-search-label">{label} <span className="muted small">{note}</span></span>
         <input value={value} placeholder="SAP AND (BW OR BPC) NOT internship" spellCheck={false}
           onChange={(e) => { onChange(e.target.value); }} />
       </label>
@@ -69,7 +69,7 @@ export function BooleanField({ value, onChange, label = "Boolean search", note =
 /** How to write a boolean (the search box above the list reads one). */
 export function BooleanTips() {
   return (
-    <p className="muted small adv-help">
+    <p className="muted small power-search-help">
       <b>AND</b> both · <b>OR</b> either · <b>NOT</b> or <b>-word</b> leaves out · <b>( )</b> groups · <b>&quot;exact phrase&quot;</b> · <b>manag*</b> any ending.
       Words side by side must all appear.
     </p>
@@ -102,7 +102,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
     return plain([...listed, ...[...new Set([...vs, ...chosen])].filter((v) => !seen.has(v.toLowerCase()))]);
   };
   return (
-    <div className="adv-grid">
+    <div className="power-search-grid">
       <MultiSelect label="Status" choices={Object.entries(AVAILABILITY).map(([v, a]) => ({ value: v, label: a.label }))}
         value={draft.availability} onChange={(v) => { set("availability")(v as SearchState["availability"]); }} />
       <MultiSelect label="Work authorization" choices={WORK_KINDS} value={draft.workAuthorization}
@@ -113,7 +113,7 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
         value={draft.source} onChange={set("source")} />
       {industries.data ? <IndustryFilters items={industries.data.items} value={draft.industry} onChange={set("industry")} fav={favs.of("industry")} />
         : <MultiSelect label="Industry" align="end" choices={withChosen(used.industries, draft.industry)} value={draft.industry} onChange={set("industry")} />}
-      <div className="adv-skills">
+      <div className="power-search-skills">
         <MultiSelect label="IT skills" choices={fromList("it_skill", used.skills, draft.skills)} value={draft.skills} onChange={set("skills")} fav={favs.of("itSkill")} />
         {draft.skills.length > 1 && (
           <div className="seg" role="group" aria-label="Skills needed">
@@ -127,21 +127,21 @@ export function SearchFields({ draft, setDraft, canSeeSalary }: {
       <MultiSelect label="Certifications" choices={fromList("certification", used.certifications, draft.certifications)}
         value={draft.certifications} onChange={set("certifications")} fav={favs.of("certification")} />
       <MultiSelect label="Tags" choices={withChosen(used.tags, draft.tags)} value={draft.tags} onChange={set("tags")} />
-      <label className="adv-field"><span className="multi-label">Location</span>
+      <label className="power-search-field"><span className="multi-label">Location</span>
         <input value={draft.location} placeholder="e.g. Petaling Jaya" onChange={(e) => { set("location")(e.target.value); }} />
       </label>
-      <label className="adv-field"><span className="multi-label">Notice period</span>
+      <label className="power-search-field"><span className="multi-label">Notice period</span>
         <select value={draft.noticeMaxDays ?? ""} onChange={(e) => { set("noticeMaxDays")(e.target.value === "" ? null : Number(e.target.value)); }}>
           <option value="">Any</option>
           {NOTICE_CHOICES.map((n) => <option key={n.days} value={n.days}>{n.label}</option>)}
         </select>
       </label>
       {canSeeSalary && (
-        <label className="adv-field"><span className="multi-label">Expects at most (RM / month)</span>
+        <label className="power-search-field"><span className="multi-label">Expects at most (RM / month)</span>
           <input inputMode="decimal" value={draft.salaryMax} placeholder="e.g. 12000" onChange={(e) => { set("salaryMax")(e.target.value); }} />
         </label>
       )}
-      <label className="adv-field"><span className="multi-label">Profile updated</span>
+      <label className="power-search-field"><span className="multi-label">Profile updated</span>
         <select value={draft.updatedWithinDays ?? ""} onChange={(e) => { set("updatedWithinDays")(e.target.value === "" ? null : Number(e.target.value)); }}>
           <option value="">Any time</option>
           {UPDATED_CHOICES.map((u) => <option key={u.days} value={u.days}>{u.label}</option>)}

@@ -61,6 +61,12 @@ Status: ✅ built in milestone 1 · 🧩 designed, scheduled (see [roadmap](road
 | 6 | API documentation for integration | contract → `/docs` | ✅ |
 | 7 | User access: view / modify / write, sensitive (salary) | `identity` + platform | ✅ roles, each company's own permissions and candidate scope per role, teams, owners |
 
+**Version.** The top bar shows HiringPlug's version beside its name (the
+`VERSION` file, raised with every update), so anyone can tell which update
+their copy runs. **Ad blockers.** No class or id in the app looks like an
+advert (`ad-…`, `adv-…`, `sponsor…`): blockers hide those on every site, and
+once hid a job ad's text (`blockerSafeClasses.test.ts`).
+
 ## 3. Candidates
 
 Profile fields (all in the contract, `contracts/modules/candidates.yaml`):
@@ -461,12 +467,14 @@ for each of their jobs, with **Score fit** / **Score again**.
   used.
 - **Outdated scores**: once the job's description or ad changes, its scores
   say "outdated"; **Score** (beside the pipeline's order menu) asks again for
-  them and for anyone not scored yet.
+  them and for anyone not scored yet; with people chosen it reads **Score N**
+  and scores those again.
 - **The job's pipeline toolbar**: Steps and Board as tabs beside the title;
   Add a candidate on the left; the order (longest waiting, or best fit once
   anyone is scored) and Score on the right. People are chosen by clicking
-  them; a board column's count chooses its stage, and in Steps "Choose all N"
-  chooses those shown.
+  them, their name included (a double-click, Enter or Ctrl/Cmd-click opens
+  their profile); a board column's count chooses its stage, and in Steps
+  "Choose all N" chooses those shown.
 - **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
   share the most words with its description and ad (a keyword search of CVs,
   not the AI, so it works without one), best first, with where their CV has

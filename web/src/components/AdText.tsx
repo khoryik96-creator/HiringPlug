@@ -44,10 +44,10 @@ export function AdText({ text }: { text: string }) {
     else blocks.push({ bullets: Boolean(bullet), lines: [content] });
   }
   return (
-    <div className="ad-text">
+    <div className="prose-text">
       {blocks.filter((b) => b.lines.length > 0).map((b, i) =>
         b.heading ? (
-          <p key={i} className="ad-heading"><strong>{b.lines[0]}</strong></p>
+          <p key={i} className="prose-heading"><strong>{b.lines[0]}</strong></p>
         ) : b.bullets ? (
           <ul key={i}>{b.lines.map((l, j) => <li key={j}><Inline text={l} /></li>)}</ul>
         ) : (

@@ -32,16 +32,16 @@ export function AdCard({ ad, startOpen, canEdit, busy, careersSlug, onEdit, onSt
     ad.closesOn && `closes ${ad.closesOn}`,
   ].filter(Boolean).join(" · ");
   return (
-    <article className={`ad-card${open ? " open" : ""}`} aria-label={ad.title}>
-      <header className="ad-card-head">
-        <button type="button" className="fold-toggle ad-card-title" aria-expanded={open} onClick={() => { setOpen(!open); }}>
+    <article className={`posting-card${open ? " open" : ""}`} aria-label={ad.title}>
+      <header className="posting-card-head">
+        <button type="button" className="fold-toggle posting-card-title" aria-expanded={open} onClick={() => { setOpen(!open); }}>
           {ad.title}
         </button>
         <span className={`badge ${ad.status}`}>{STATUS[ad.status]}</span>
         {ad.status === "published" && <span className="muted small">{ad.publishBlind ? "blind" : "as written"} on the careers page</span>}
-        <span className="ad-card-facts muted small">{facts}</span>
+        <span className="posting-card-facts muted small">{facts}</span>
         {canEdit && (
-          <span className="row ad-card-actions">
+          <span className="row posting-card-actions">
             <button type="button" className="link" onClick={() => { setOpen(true); onEdit(); }}>Edit</button>
             {ad.status !== "published" && (
               <button type="button" disabled={busy} onClick={() => { onStatus("published"); }}>Publish</button>
@@ -56,7 +56,7 @@ export function AdCard({ ad, startOpen, canEdit, busy, careersSlug, onEdit, onSt
         )}
       </header>
       {open && (
-        <div className="ad-card-body">
+        <div className="posting-card-body">
           <div className="segmented" role="group" aria-label="Show">
             {VIEWS.map(([v, label]) => (
               <button key={v} type="button" aria-pressed={view === v} className={view === v ? "on" : undefined}

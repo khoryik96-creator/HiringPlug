@@ -133,7 +133,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               <option value="fit">Best fit</option>
             </select>
           )}
-          {matches.data && permissions.includes("matching:create") && <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} />}
+          {matches.data && permissions.includes("matching:create") && <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} chosen={chosenApps.filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn").map((a) => a.id)} />}
         </div>
       </div>
       {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}

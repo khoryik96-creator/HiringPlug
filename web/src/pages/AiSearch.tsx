@@ -50,8 +50,8 @@ export function AiSearch({ canSeeSalary, canReadJd }: { canSeeSalary: boolean; c
         <form className="panel ai-form" aria-label="What you need" onSubmit={(e) => { e.preventDefault(); start.mutate(); }}>
           <h3>What you need</h3>
           {canReadJd && <JdDrop readText="Check it, then find candidates." onRead={(d) => { setJd([d.title, d.description].filter(Boolean).join("\n\n")); }} />}
-          <label className="adv-field">
-            <span className="adv-label">Job description <span className="muted small">{canReadJd ? "or paste it" : "paste it"} · optional with a boolean</span></span>
+          <label className="power-search-field">
+            <span className="power-search-label">Job description <span className="muted small">{canReadJd ? "or paste it" : "paste it"} · optional with a boolean</span></span>
             <textarea rows={8} required={!ready} value={jd} maxLength={20000} placeholder="Responsibilities, requirements, tech stack…" onChange={(e) => { setJd(e.target.value); }} />
             <span className="muted small">{jd.length.toLocaleString("en-MY")} characters. The AI looks at responsibilities, requirements, tech stack and nice-to-haves, not the company blurb or benefits.</span>
           </label>
@@ -70,7 +70,7 @@ export function AiSearch({ canSeeSalary, canReadJd }: { canSeeSalary: boolean; c
               </select>
             </label>
           </div>
-          <div className="adv-actions">
+          <div className="power-search-actions">
             <button type="submit" disabled={start.isPending}>{start.isPending ? "Finding…" : "Find candidates"}</button>
             <button type="button" className="link" onClick={() => { setJd(""); setDraft(EMPTY); setStrict(false); }}>Clear</button>
           </div>
@@ -79,7 +79,7 @@ export function AiSearch({ canSeeSalary, canReadJd }: { canSeeSalary: boolean; c
         </form>
 
         <section className="panel ai-out" aria-label="Shortlist">
-          <div className="adv-head">
+          <div className="power-search-head">
             <h3>Shortlist</h3>
             {(history.data?.length ?? 0) > 0 && (
               <select aria-label="Earlier searches" value={shownId ?? ""} onChange={(e) => { setShownId(e.target.value || null); }}>

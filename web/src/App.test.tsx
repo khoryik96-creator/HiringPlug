@@ -66,6 +66,13 @@ describe("top bar", () => {
     render(<App />);
   };
 
+  it("shows HiringPlug's version (the VERSION file) beside its name, so anyone can tell which update runs", async () => {
+    signedIn(RECRUITER);
+    const version = await screen.findByTitle("HiringPlug version");
+    expect(version.textContent).toBe(`v${__APP_VERSION__}`);
+    expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   it("has one Settings button, leading to every part of Settings the user may open", async () => {
     signedIn([...RECRUITER, "settings:manage", "aiproviders:manage", "identity.team:manage"]);
     const button = await screen.findByRole("link", { name: "Settings" });

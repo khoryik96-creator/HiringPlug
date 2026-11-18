@@ -51,7 +51,7 @@ export function AdVersions({ ad, canEdit, show = "both" }: { ad: Ad; canEdit: bo
   ].filter(Boolean).join(" · ") + (ad.closesOn ? ` · closes ${ad.closesOn}` : "");
   const live = ad.status === "published";
   return (
-    <div className={show === "both" ? "ad-columns" : "ad-columns single"}>
+    <div className={show === "both" ? "jd-columns" : "jd-columns single"}>
       {show !== "blind" && <section aria-label="As written">
         <div className="row spread">
           <h5>As written {live && !ad.publishBlind && <span className="badge published">On the careers page</span>}</h5>

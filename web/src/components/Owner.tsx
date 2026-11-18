@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "../api/client";
 import { usersKey } from "../api/keys";
 import { ErrorMessage } from "./ErrorMessage";
+import { PersonIcon } from "./ActionIcons";
 import { Initials } from "./Initials";
 
 /**
@@ -22,7 +23,9 @@ export function Owner({ what, ownerId, ownerName, canChange, save, chip = false 
   const change = useMutation({ mutationFn: save });
   return (
     <span className={chip ? "owner owner-chip" : "owner"} title={chip ? "Owner" : undefined}>
-      {chip ? <Initials name={ownerName ?? "Nobody"} /> : "Owner: "}
+      {!chip ? "Owner: " : ownerId && ownerName
+        ? <Initials name={ownerName} />
+        : <span className="avatar no-owner" aria-hidden="true"><PersonIcon /></span>}
       {canChange ? (
         <select aria-label={`Owner of this ${what}`} value={ownerId ?? ""} disabled={change.isPending}
           onChange={(e) => { change.mutate(e.target.value || null); }}>

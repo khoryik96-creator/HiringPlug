@@ -144,7 +144,7 @@ describe("pipeline board", () => {
     await showBoard();
     const name = screen.getByRole("link", { name: "Siti Aisyah" });
     const card = cardOf("Siti Aisyah");
-    expect(screen.getByRole("link", { name: "Siti Aisyah" }).getAttribute("title")).toBe("Siti Aisyah · Accountant"); // one line each: the title on hover
+    expect(screen.getByRole("link", { name: "Siti Aisyah" }).getAttribute("title")).toBe("Siti Aisyah · Accountant\nClick to choose · double-click to open"); // one line each: the title, and how to open them, on hover
     expect(within(card).getByLabelText("Siti Aisyah (status: Not set)").textContent).toBe("SA");
     expect(card.querySelector("input")).toBeNull();
     fireEvent.keyDown(name, { key: " " });
@@ -180,9 +180,20 @@ describe("pipeline board", () => {
     expect(screen.queryByText("1 chosen")).toBeNull();
   });
 
-  it("does not tick the card when its name is clicked to open the candidate", async () => {
+  it("chooses the card when its name is clicked, and opens the candidate on a double-click", async () => {
+    window.location.hash = "#/jobs/jo_1";
     await showBoard();
-    fireEvent.click(screen.getByRole("link", { name: "Siti Aisyah" })); // the name link
+    const name = screen.getByRole("link", { name: "Siti Aisyah" });
+    // A mouse click (detail 1) on the name chooses them instead of leaving the page.
+    expect(fireEvent.click(name, { detail: 1 })).toBe(false); // the link was not followed
+    expect(screen.getByText("1 chosen")).toBeTruthy();
+    fireEvent.click(name, { detail: 1 });
+    expect(screen.queryByText("1 chosen")).toBeNull();
+    fireEvent.doubleClick(name);
+    expect(window.location.hash).toBe(`#/candidates/${siti.candidateId}`);
+    // Enter on the name (a click with no mouse) and Ctrl-click still open it, without choosing.
+    expect(fireEvent.click(name, { detail: 0 })).toBe(true);
+    expect(fireEvent.click(name, { detail: 1, ctrlKey: true })).toBe(true);
     expect(screen.queryByText("1 chosen")).toBeNull();
   });
 });

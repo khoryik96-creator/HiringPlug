@@ -70,7 +70,7 @@ export function JobAds({ job, canEdit }: { job: JobOrder; canEdit: boolean }) {
           )}
           {editing && <AdForm job={job} ad={editing === "new" ? null : editing} jd={dropped}
             onDone={() => { setEditing(null); setDropped(null); }} />}
-          <div className="ad-cards">
+          <div className="posting-cards">
             {list.map((ad, i) => (
               <AdCard key={ad.id} ad={ad} startOpen={i === 0 /* the newest; older ones folded */} canEdit={canEdit && editing === null} busy={setStatus.isPending}
                 careersSlug={me.data?.tenant.careersSlug}

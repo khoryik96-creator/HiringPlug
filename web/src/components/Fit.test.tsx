@@ -144,6 +144,27 @@ describe("fit on a job's board", () => {
     expect((await screen.findByText(/Scoring 1/)).textContent).toBe("Scoring 1… 1 without a readable CV left out. 1 who withdrew consent left out.");
   });
 
+  it("scores the chosen people again, and says when everyone is scored already", async () => {
+    gets({
+      "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali"), app("a2", "Siti")] },
+      "/v1/matches": { enabled: true, items: [match({ applicationId: "a1", score: 40 }), match({ id: "mat_2", applicationId: "a2", score: 90 })] },
+    });
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ queued: 0, alreadyScored: 2, withoutCv: 0, consentWithdrawn: 0 }));
+    renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={[...SCORE, "emails:send"]} />);
+    await screen.findByText("Fit 90%");
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
+    expect(await screen.findByText("Everyone is scored. Choose people to score them again.")).toBeTruthy();
+    expect(sentBody(post)).toEqual({ jobId: "jo_1", rescore: false });
+
+    const siti = screen.getByRole("link", { name: "Siti" });
+    fireEvent.click(siti, { detail: 1 }); // a click on the name chooses them
+    fireEvent.click(screen.getByRole("button", { name: "Score 1" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect(post.mock.calls[1]?.[0]).toBe("/v1/matches");
+    expect(sentBody(post, 1)).toEqual({ applicationId: "a2" });
+    expect(await screen.findByText("Scoring 1…")).toBeTruthy();
+  });
+
   it("says when matching is off, and shows nothing without the permission", async () => {
     gets({ "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali")] }, "/v1/matches": { enabled: false, items: [] } });
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={SCORE} />);

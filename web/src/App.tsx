@@ -54,6 +54,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
     <>
       <header className="topbar">
         <span className="brand">Hiring<span>Plug</span></span>
+        <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
         <a className="settings-link" href="#/settings" aria-current={inSettings ? "page" : undefined}>
           <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

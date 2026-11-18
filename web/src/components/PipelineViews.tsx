@@ -44,11 +44,31 @@ interface Shared {
   onShowFit: (a: Application) => void;
 }
 
-/** Clicking anywhere but a link or a control chooses the person. */
+/** Clicking anywhere but a control (their name included) chooses the person. */
 const choose = (props: Shared, a: Application) => (e: React.MouseEvent) => {
-  if (!props.onPick || (e.target as HTMLElement).closest("a, button, input, select, label, form")) return;
+  const target = e.target as HTMLElement;
+  if (!props.onPick || target.closest("a:not(.pick-name), button, input, select, label, form")) return;
+  if (target.closest("a.pick-name") && (e.detail === 0 || opensElsewhere(e))) return; // Enter, or a new tab: opening them
   props.onPick(a, !props.picked.includes(a.id));
 };
+
+const opensElsewhere = (e: React.MouseEvent) => e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0;
+
+/**
+ * Their name. Where people can be chosen, a click chooses them (the line's
+ * own click) and a double-click opens their profile; Enter, Ctrl/Cmd-click
+ * and a middle click still open it. Elsewhere it is a plain link.
+ */
+function PickName({ props, a, title }: { props: Shared; a: Application; title?: string }) {
+  const href = `#/candidates/${a.candidateId}`;
+  if (!props.onPick) return <a href={href} title={title}>{a.candidateName}</a>;
+  return (
+    <a href={href} className="pick-name" title={`${title ? `${title}\n` : ""}Click to choose · double-click to open`}
+      onClick={(e) => { if (e.detail !== 0 && !opensElsewhere(e)) e.preventDefault(); }}
+      onDoubleClick={() => { window.location.hash = href; }}
+      onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); props.onPick?.(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
+  );
+}
 
 /** What matters about them in their stage: the interview's time, the offer's deadline, how they came. */
 function Info({ a, upcoming, now }: { a: Application; upcoming?: Upcoming; now: number }) {
@@ -85,7 +105,7 @@ export function PipelineSteps(props: Shared & {
       </div>
       {props.onPickAll && shown.length > 0 && (
         <div className="step-tools">
-          <button type="button" className="link" aria-pressed={allPicked} onClick={() => { props.onPickAll?.(shown, !allPicked); }}>
+          <button type="button" className="link" onClick={() => { props.onPickAll?.(shown, !allPicked); }}>
             {allPicked ? `Unchoose all ${String(shown.length)}${where}` : `Choose all ${String(shown.length)}${where}`}
           </button>
         </div>
@@ -100,8 +120,7 @@ export function PipelineSteps(props: Shared & {
             <div role="listitem" key={a.id} className={`step-row${props.picked.includes(a.id) ? " picked" : ""}${props.onPick ? " pickable" : ""}`} onClick={choose(props, a)}>
               <Initials name={a.candidateName} status={a.candidateAvailability} />
               <span className="who-text">
-                <a href={`#/candidates/${a.candidateId}`}
-                  onKeyDown={(e) => { if (props.onPick && e.key === " ") { e.preventDefault(); props.onPick(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
+                <PickName props={props} a={a} />
                 {props.picked.includes(a.id) && <span className="visually-hidden"> (chosen)</span>}
                 {a.candidateTitle && <span className="who-title">{a.candidateTitle}</span>}
               </span>
@@ -138,8 +157,7 @@ export function BoardLine(props: Shared & { a: Application; onDragStart: (a: App
     <div className={`board-line${props.picked.includes(a.id) ? " picked" : ""}${waiting(a, now) && days >= 14 ? " stale" : ""}${props.onPick ? " pickable" : ""}${props.canMove && next ? " movable" : ""}`}
       draggable={props.canMove} onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); props.onDragStart(a); }} onClick={choose(props, a)}>
       <Initials name={a.candidateName} status={a.candidateAvailability} />
-      <a href={`#/candidates/${a.candidateId}`} title={a.candidateTitle ? `${a.candidateName} · ${a.candidateTitle}` : a.candidateName}
-        onKeyDown={(e) => { if (props.onPick && e.key === " ") { e.preventDefault(); props.onPick(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
+      <PickName props={props} a={a} title={a.candidateTitle ? `${a.candidateName} · ${a.candidateTitle}` : a.candidateName} />
       {props.picked.includes(a.id) && <span className="visually-hidden"> (chosen)</span>}
       <span className="line-chips">
         {match && <button type="button" className="link" aria-label={`Fit of ${a.candidateName}: why?`} onClick={() => { props.onShowFit(a); }}>

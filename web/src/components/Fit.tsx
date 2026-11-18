@@ -64,26 +64,37 @@ export function FitReasons({ match, open = false }: { match: Match; open?: boole
   );
 }
 
-/** "Score fit" for every active candidate on a job (the board's header). */
-export function ScoreJobFit({ jobId, enabled }: { jobId: string; enabled: boolean }) {
+/**
+ * Score on a job's pipeline: with people chosen, scores them (again); else
+ * everyone not scored yet, or scored from an older job text.
+ */
+export function ScoreJobFit({ jobId, enabled, chosen = [] }: { jobId: string; enabled: boolean; chosen?: string[] }) {
   const queryClient = useQueryClient();
   const score = useMutation({
-    mutationFn: async () => unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore: false } })),
+    mutationFn: async (ids: string[]): Promise<{ queued: number; withoutCv?: number; consentWithdrawn?: number; failed?: string[] }> => {
+      if (ids.length === 0) return unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore: false } }));
+      const done = await Promise.allSettled(ids.map(async (applicationId) => unwrap(await api.POST("/v1/matches", { body: { applicationId } }))));
+      const failed = done.flatMap((d) => (d.status === "rejected" ? [d.reason instanceof Error ? d.reason.message : String(d.reason)] : []));
+      return { queued: ids.length - failed.length, failed };
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: matchesKey }),
   });
   if (!enabled) return null;
   const r = score.data;
+  const n = chosen.length;
   return (
     <>
       {r && (
         <span className="muted small" role="status">
-          {r.queued === 0 ? "Nothing new to score." : `Scoring ${String(r.queued)}…`}
-          {r.withoutCv > 0 && ` ${String(r.withoutCv)} without a readable CV left out.`}
-          {r.consentWithdrawn > 0 && ` ${String(r.consentWithdrawn)} who withdrew consent left out.`}
+          {r.queued > 0 ? `Scoring ${String(r.queued)}…` : r.failed ? "" : "Everyone is scored. Choose people to score them again."}
+          {(r.withoutCv ?? 0) > 0 && ` ${String(r.withoutCv)} without a readable CV left out.`}
+          {(r.consentWithdrawn ?? 0) > 0 && ` ${String(r.consentWithdrawn)} who withdrew consent left out.`}
+          {r.failed && r.failed.length > 0 && ` ${String(r.failed.length)} not scored: ${r.failed[0] ?? ""}`}
         </span>
       )}
-      <button type="button" className="doc-btn score-btn" title="Score the fit of everyone not scored yet" disabled={score.isPending}
-        onClick={() => { score.mutate(); }}><SparkIcon />Score</button>
+      <button type="button" className="doc-btn score-btn" disabled={score.isPending}
+        title={n > 0 ? `Score the ${String(n)} chosen again` : "Score everyone not scored yet (choose people to score them again)"}
+        onClick={() => { score.mutate(chosen); }}><SparkIcon />{n > 0 ? `Score ${String(n)}` : "Score"}</button>
       <ErrorMessage error={score.error} />
     </>
   );

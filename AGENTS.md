@@ -7,6 +7,9 @@ checked in review.
 ## Commands
 
 - `task verify` before every push. It must pass. Commit any files it regenerates.
+- Raise `VERSION` (major.minor.patch, shown beside HiringPlug's name in the top
+  bar) with every update pushed to main: the patch number for fixes, the minor
+  for new features, so anyone can tell which update they are running.
 - ShellCheck is required by `task lint:shell` (Debian/Ubuntu:
   `apt-get install shellcheck`; macOS: `brew install shellcheck`; Windows: use
   WSL). `task test:ci` runs CI-script tests with Python 3's standard library.
