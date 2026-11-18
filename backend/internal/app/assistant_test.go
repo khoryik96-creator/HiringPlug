@@ -95,6 +95,8 @@ func TestTheAssistantSeesOnlyWhatItMayAndNoSalary(t *testing.T) {
 	assert.Contains(t, string(sent), "Lead the finance team.")
 	assert.Contains(t, string(sent), "Accountant at Contoh Sdn Bhd, 2019-2023", "the CV's text, scrubbed")
 	assert.Equal(t, api.AssistantKindFit, asked.Kind)
+	require.NotNil(t, asked.SubjectType)
+	assert.Equal(t, api.AssistantSubjectTypeApplication, *asked.SubjectType)
 
 	got := a.answers(token, "application", appl.Id)
 	require.Len(t, got, 1)
@@ -118,10 +120,12 @@ func TestTheAssistantSeesOnlyWhatItMayAndNoSalary(t *testing.T) {
 		require.Equal(t, http.StatusAccepted, res.Status, "%s", res.Body)
 		var q api.AssistantAnswer
 		res.JSON(&q)
-		aiAnswers(t, a, aiConn, q.Id, api.AssistantAnsweredJob{
+		about := aiAnswers(t, a, aiConn, q.Id, api.AssistantAnsweredJob{
 			Answer: nullable.NewNullNullable[string](), Error: nullable.NewNullableWithValue("the AI provider did not answer in time"),
 			Model: nullable.NewNullNullable[string](),
 		})
+		require.NotNil(t, about.SubjectType)
+		assert.Equal(t, api.AssistantSubjectTypeJob, *about.SubjectType, "the AI is told it is a job, not a candidate")
 		got := a.answers(token, "job", job.Id)
 		require.Len(t, got, 1)
 		assert.Equal(t, api.AssistantAnswerStatusFailed, got[0].Status)

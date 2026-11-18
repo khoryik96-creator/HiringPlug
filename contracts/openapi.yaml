@@ -6378,6 +6378,9 @@ components:
       properties:
         answerId: {$ref: '#/components/schemas/AssistantAnswerId'}
         kind: {$ref: '#/components/schemas/AssistantKind'}
+        subjectType:
+          allOf: [{$ref: '#/components/schemas/AssistantSubjectType'}]
+          description: What it is about (a job is asked about as a job, not a candidate); left out = a candidate.
         question: {type: string, nullable: true}
         sections:
           type: array

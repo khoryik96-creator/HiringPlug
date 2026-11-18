@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptr[T any](v T) *T { return &v }
-
 func allText(sections []Section) string {
 	var b strings.Builder
 	for _, s := range sections {

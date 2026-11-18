@@ -15,11 +15,12 @@ from hiringplug_ai.providers import Completion, OpenAICompatible, ProviderError
 ANSWER_ID = "ask_01jbz6w0m0k8q9x2r3s4t5v6w7"
 
 
-def ask(kind: str = "fit", question: str | None = None) -> AssistantAskJob:
+def ask(kind: str = "fit", question: str | None = None, subject: str | None = None) -> AssistantAskJob:
     return AssistantAskJob.model_validate(
         {
             "answerId": ANSWER_ID,
             "kind": kind,
+            **({"subjectType": subject} if subject else {}),
             "question": question,
             "sections": [
                 {"title": "Job", "text": "Title: Finance Manager"},
@@ -75,6 +76,31 @@ def test_the_answer_and_tokens_go_back_to_go() -> None:
 def test_every_kind_has_a_task() -> None:
     for kind in ("summary", "red_flags", "fit", "question", "market_map"):
         assert assistant_ask.prompt(ask(kind)).startswith("Task: ")
+
+
+@pytest.mark.parametrize(
+    ("kind", "task"),
+    [
+        ("summary", "Summarise this job for a busy recruiter"),
+        ("red_flags", "a question to ask the client"),
+        ("question", "Answer the recruiter's question about this job."),
+    ],
+)
+def test_a_job_is_asked_about_as_a_job_not_a_candidate(kind: str, task: str) -> None:
+    # On a job's page there is no candidate: asked about one, the AI answered
+    # "there is no candidate information" whatever was asked.
+    ai = FakeProvider(Completion(text="The role.", model="m", input_tokens=10, output_tokens=5))
+    result(
+        assistant_ask.run(ask(kind, "Who reports to whom?" if kind == "question" else None, "job"), deps(ai))
+    )
+    [(system, user)] = ai.calls
+    assert "not a candidate: answer about the job" in system
+    assert "the candidate" not in system
+    assert task in user
+    assert "Salary is never included" in system
+    # A candidate (and one left unsaid, as before) keeps the candidate's wording.
+    assert assistant_ask.prompt(ask(kind, subject="candidate")) == assistant_ask.prompt(ask(kind))
+    assert task not in assistant_ask.prompt(ask(kind))
 
 
 def test_market_insights_may_use_market_knowledge_marked_as_estimates() -> None:

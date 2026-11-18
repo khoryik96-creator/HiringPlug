@@ -446,6 +446,12 @@ class AssistantAskJob(BaseModel):
     )
     answerId: AssistantAnswerId
     kind: AssistantKind
+    subjectType: Annotated[
+        AssistantSubjectType | None,
+        Field(
+            description="What it is about (a job is asked about as a job, not a candidate); left out = a candidate."
+        ),
+    ] = None
     question: Annotated[str | None, Field(...)]
     sections: Annotated[
         list[AssistantSection],

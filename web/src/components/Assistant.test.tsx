@@ -66,6 +66,17 @@ describe("AI assistant", () => {
     expect(sentBody(post)).toEqual({ subjectType: "application", subjectId: "appl_1", kind: "fit" });
   });
 
+  it("on a job, asks for the gaps to raise with the client, not a candidate's red flags", async () => {
+    reads(on, [answer({ subjectType: "job", subjectId: "job_1", kind: "red_flags", answer: "No pay range: ask the client." })]);
+    const post = vi.spyOn(api, "POST").mockResolvedValue(ok(answer({ status: "queued" })));
+    renderWithClient(<Assistant subjectType="job" subjectId="job_1" permissions={[...USE]} />);
+    expect(await screen.findByRole("article", { name: "Gaps to ask the client" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Gaps and red flags" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Gaps to ask the client" }));
+    await waitFor(() => { expect(post).toHaveBeenCalled(); });
+    expect(sentBody(post)).toEqual({ subjectType: "job", subjectId: "job_1", kind: "red_flags" });
+  });
+
   it("shows why it could not ask (this month's allowance)", async () => {
     reads(on, []);
     vi.spyOn(api, "POST").mockResolvedValue(failure("ASSISTANT_LIMIT_REACHED", "Your company has used this month's AI allowance.", undefined, 429));

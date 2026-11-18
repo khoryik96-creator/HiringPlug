@@ -153,7 +153,7 @@ function Conversation({ subject }: { subject: Subject }) {
     <div className="assistant">
       <div className="assistant-quick">
         {kinds.map((k) => (
-          <button key={k} type="button" className="chip-btn" disabled={waiting} onClick={() => { ask.mutate({ kind: k }); }}>{ASSISTANT_KIND[k]}</button>
+          <button key={k} type="button" className="chip-btn" disabled={waiting} onClick={() => { ask.mutate({ kind: k }); }}>{kindLabel(k, subject.type)}</button>
         ))}
       </div>
       <form className="assistant-ask" onSubmit={(e) => { e.preventDefault(); if (question.trim()) ask.mutate({ kind: "question", text: question.trim() }); }}>
@@ -162,8 +162,10 @@ function Conversation({ subject }: { subject: Subject }) {
         <button type="submit" disabled={waiting}>Ask</button>
       </form>
       <ErrorMessage error={ask.error ?? answers.error} />
-      {answers.data?.length === 0 && <p className="muted small">Ask for a summary, the gaps and red flags, or anything about them.</p>}
-      <div className="answers">{answers.data?.map((a, i) => <AnswerItem key={a.id} a={a} startOpen={i === 0} />)}</div>
+      {answers.data?.length === 0 && <p className="muted small">{subject.type === "job"
+        ? "Ask for a summary, the gaps to ask the client about, or anything about the job."
+        : "Ask for a summary, the gaps and red flags, or anything about them."}</p>}
+      <div className="answers">{answers.data?.map((a, i) => <AnswerItem key={a.id} a={a} about={subject.type} startOpen={i === 0} />)}</div>
     </div>
   );
 }
@@ -171,10 +173,13 @@ function Conversation({ subject }: { subject: Subject }) {
 /** Long answers past the newest are folded to a few lines. */
 const LONG = 500;
 
-function AnswerItem({ a, startOpen }: { a: Answer; startOpen: boolean }) {
+/** A job's "red flags" are what is missing or unclear in it, to ask the client. */
+const kindLabel = (k: Kind, about: SubjectType) => (about === "job" && k === "red_flags" ? "Gaps to ask the client" : ASSISTANT_KIND[k]);
+
+function AnswerItem({ a, about, startOpen }: { a: Answer; about: SubjectType; startOpen: boolean }) {
   const long = (a.answer?.length ?? 0) > LONG;
   const [open, setOpen] = useState(startOpen || !long);
-  const title = a.question ?? ASSISTANT_KIND[a.kind];
+  const title = a.question ?? kindLabel(a.kind, about);
   return (
     <article className={`answer${open ? "" : " folded"}`} aria-label={title}>
       <header className="answer-head">

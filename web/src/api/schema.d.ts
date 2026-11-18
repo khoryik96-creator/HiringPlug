@@ -4188,6 +4188,8 @@ export interface components {
         AssistantAskJob: {
             answerId: components["schemas"]["AssistantAnswerId"];
             kind: components["schemas"]["AssistantKind"];
+            /** @description What it is about (a job is asked about as a job, not a candidate); left out = a candidate. */
+            subjectType?: components["schemas"]["AssistantSubjectType"];
             question: string | null;
             /** @description What the asking user may see, without contact details or salary. */
             sections: components["schemas"]["AssistantSection"][];

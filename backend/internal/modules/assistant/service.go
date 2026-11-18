@@ -81,7 +81,7 @@ func (s *Service) Ask(ctx context.Context, p authz.Principal, q Question) (store
 			return err
 		}
 		job := api.AssistantAskJob{
-			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), Question: apiconv.OrNull(q.Question), Sections: toAPISections(sections), Ai: ai,
+			AnswerId: out.ID, Kind: api.AssistantKind(q.Kind), SubjectType: ptr(api.AssistantSubjectType(q.SubjectType)), Question: apiconv.OrNull(q.Question), Sections: toAPISections(sections), Ai: ai,
 		}
 		if _, err := jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindAssistantAsk, job); err != nil {
 			return err
@@ -202,3 +202,5 @@ func toAPISections(in []Section) []api.AssistantSection {
 	}
 	return out
 }
+
+func ptr[T any](v T) *T { return &v }

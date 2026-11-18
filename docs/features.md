@@ -330,7 +330,7 @@ Employers, clients and their branded products are masked as whole names
 
 A panel on candidate and job pages (on a candidate's page its own tab,
 **AI assistant**, beside Email; docked, it stays on the right whatever tab is
-open): **Summary**, **Gaps and red flags**, and your own questions. On a candidate's page, "About" switches to one of their
+open): **Summary**, **Gaps and red flags** (on a job's page **Gaps to ask the client**: the AI is told it is reading a job, not a candidate), and your own questions. On a candidate's page, "About" switches to one of their
 jobs for **Fit for this job** ("how well does this candidate fit?").
 Answers come back in a few seconds and are kept, newest first; each person
 sees only their own. Each answer is a card; long ones past the newest are
