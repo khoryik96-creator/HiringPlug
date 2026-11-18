@@ -91,3 +91,55 @@ SELECT EXISTS(SELECT 1 FROM email_outlook_message WHERE mailbox_id= @mailbox_id 
 
 -- name: NudgeOutlookFolders :exec
 UPDATE email_outlook_folder SET checked_at=NULL WHERE mailbox_id = @mailbox_id;
+
+-- name: OutlookDraftFolder :one
+SELECT * FROM email_outlook_folder WHERE mailbox_id = @mailbox_id AND kind='drafts';
+
+-- name: OutlookByRemoteID :one
+SELECT * FROM email_outlook_message WHERE mailbox_id = @mailbox_id AND remote_id = @remote_id;
+
+-- name: OutlookScheduled :one
+SELECT * FROM email_outlook_send WHERE id = @id;
+
+-- name: OutlookActiveSend :one
+SELECT * FROM email_outlook_send WHERE mailbox_id = @mailbox_id AND remote_id = @remote_id
+ AND status IN ('scheduled','confirming','uncertain');
+
+-- name: OutlookRecentSends :many
+SELECT * FROM email_outlook_send WHERE user_id=app_current_user()
+ORDER BY CASE status WHEN 'scheduled' THEN 0 WHEN 'confirming' THEN 1 WHEN 'needs_review' THEN 2 WHEN 'uncertain' THEN 3 ELSE 4 END,
+ CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 200;
+
+-- name: CreateOutlookScheduled :one
+INSERT INTO email_outlook_send(mailbox_id,message_id,remote_id,draft_version,candidate_id,subject,send_at)
+VALUES (@mailbox_id,@message_id,@remote_id,@draft_version,sqlc.narg(candidate_id),@subject,@send_at)
+RETURNING *;
+
+-- name: RescheduleOutlookSend :one
+UPDATE email_outlook_send SET send_at= @send_at, version=version+1,
+ message_id= @message_id,draft_version= @draft_version,subject= @subject,
+ candidate_id=sqlc.narg(candidate_id),updated_at=now(),error=NULL,attempted_at=NULL
+WHERE id= @id AND status='scheduled' AND version= @version RETURNING *;
+
+-- name: ReviewOutlookScheduled :exec
+UPDATE email_outlook_send SET draft_version= @draft_version,subject= @subject,updated_at=now()
+WHERE id= @id AND status='scheduled' AND draft_version= @previous_draft_version;
+
+-- name: CancelOutlookSend :one
+UPDATE email_outlook_send SET status='cancelled',version=version+1,updated_at=now(),error=NULL
+WHERE id= @id AND status IN ('scheduled','needs_review') AND version= @version RETURNING *;
+
+-- name: CancelOutlookSendsForMailbox :exec
+UPDATE email_outlook_send SET status='cancelled',version=version+1,updated_at=now(),error='The Outlook mailbox was disconnected or replaced.'
+WHERE user_id=app_current_user() AND status='scheduled';
+
+-- name: ClaimOutlookSend :execrows
+UPDATE email_outlook_send SET status='confirming',attempted_at=now(),updated_at=now(),error=NULL
+WHERE id= @id AND status='scheduled' AND version= @version;
+
+-- name: FinishOutlookSend :execrows
+UPDATE email_outlook_send SET status= @status,error=sqlc.narg(error),updated_at=now()
+WHERE id= @id AND version= @version AND status= @previous_status;
+
+-- name: TryLockOutlookSendMailbox :one
+SELECT pg_try_advisory_lock(hashtextextended(@tenant_id::text || ':' || @user_id::text,0)) AS acquired;

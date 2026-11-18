@@ -147,6 +147,9 @@ func (s *Service) saveSMTP(ctx context.Context, p authz.Principal, in api.SmtpMa
 		if err != nil {
 			return err
 		}
+		if err := store.New(tx).CancelOutlookSendsForMailbox(ctx); err != nil {
+			return err
+		}
 		if err := store.New(tx).RemoveOutlookSync(ctx); err != nil {
 			return err
 		}
@@ -165,6 +168,9 @@ func (s *Service) disconnectMailbox(ctx context.Context, p authz.Principal) erro
 	return database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
 		q := store.New(tx)
 		if err := q.LockMailboxUser(ctx); err != nil {
+			return err
+		}
+		if err := q.CancelOutlookSendsForMailbox(ctx); err != nil {
 			return err
 		}
 		if err := q.DeleteMailbox(ctx); err != nil {

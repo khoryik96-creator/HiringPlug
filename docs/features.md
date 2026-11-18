@@ -1587,3 +1587,8 @@ thread. Save reply drafts in Outlook or open a message there to see formatting
 and attachments. **My Outlook conversations** on candidate and contact Email
 tabs links private threads after the recruiter confirms an exact email match.
 See [Outlook Mail setup](mailbox-connections.md#outlook-mail).
+
+Use **New message** or **Drafts** in Outlook Mail to edit a personal draft or
+queue it for immediate or scheduled send. **Scheduled** shows send status,
+lets the owner cancel pending delivery, and opens the reviewed draft for edits
+or rescheduling. Outlook changes after scheduling require a fresh review.
