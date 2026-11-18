@@ -31,6 +31,11 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 - Public APIs do not expose complete mailbox/settings/audit history. Review
   `docs/jobadder-extraction-scope.md`, route gaps and provider exports before
   claiming an account backup is complete. No live account was used in tests.
+- OAuth accepts a missing optional account name when the server-issued
+  account/instance identity and current API user are verified. Legacy checkpoint
+  keys are retained for the same source; known source identities cannot switch
+  on refresh/reconnect. Login failures appear beside Connect JobAdder with safe
+  token-exchange/account-verification guidance instead of a generic hidden error.
 - The owner requires JobAdder field values to remain unchanged. No normalization,
   deduplication, salary rewriting or AI enrichment during migration. API access
   is available; approximately 80,000 candidates and all obtainable related

@@ -177,6 +177,18 @@ async function start(demo) {
         await expect(page.getByRole('button', { name: 'Start new inventory', exact: true })).toBeDisabled();
         if (screenshots)
             await page.screenshot({ path: path.join(screenshots, 'jobadder-connect.png'), fullPage: true });
+        await page.route('**/api/status',async route => {
+            const original=await route.fetch();const data=await original.json();
+            data.connectionError='Token exchange: JobAdder rejected the app credentials. Recopy the Client ID and current Client Secret from the same JobAdder application (HTTP 400).';
+            await route.fulfill({response:original,json:data});
+        });
+        await expect(page.locator('#connection-error')).toBeVisible();
+        await expect(page.locator('#connection-error')).toContainText('Token exchange:');
+        await expect(page.locator('#connection-state')).toHaveText('Not connected');
+        await page.locator('#connection-error').scrollIntoViewIfNeeded();
+        if(screenshots) await page.screenshot({path:path.join(screenshots,'jobadder-connection-error.png'),fullPage:true});
+        await page.unroute('**/api/status');
+        await expect(page.locator('#connection-error')).toBeHidden();
         if (errors.length)
             throw Error('UI runtime error');
         console.log('UI passed: full extraction, native files, 30-area/240-route coverage, provider CSV/opaque intake, native downloads, private workspace, demo inventory, pause/resume, denied-access reporting, downloads, storage errors, cooldown, clean shutdown and mobile layout.');

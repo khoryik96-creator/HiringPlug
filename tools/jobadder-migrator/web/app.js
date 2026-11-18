@@ -34,7 +34,9 @@ function render() {
     $('workspace').hidden = !state.unlocked;
     $('account').textContent = state.connected ? state.account : 'No account connected.';
     $('callback').textContent = state.callback || '';
-    $('connection-state').textContent = state.connected ? 'Connected' : 'Not connected';
+    $('connection-state').textContent = state.connecting ? 'Checking connection…' : state.connected ? 'Connected' : 'Not connected';
+    $('connection-error').textContent = state.connectionError || '';
+    $('connection-error').hidden = !state.connectionError;
     $('connection-controls').hidden = !!state.demo;
     const blocked = !healthy || !!coolingDown() || !!state.transferring;
     $('start').disabled = blocked || !state.connected || state.running || state.connecting || busy;

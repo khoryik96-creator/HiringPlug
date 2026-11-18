@@ -62,10 +62,24 @@ token and its returned API address, ending in `/v2`. Token-only connections
 cannot refresh: reconnect when they expire. Do not paste secrets or tokens into
 chat, issues, reports or source code.
 
-The workspace is bound conservatively to the API address, current API user and
-account name. A different user/account/address requires a separate workspace.
-If the account name is missing, the connection is refused rather than risking
-mixing data. The tool needs access to `/users/current` to verify this identity.
+OAuth workspaces bind to the provider-issued account/instance IDs, API address
+and current API user. JobAdder's optional account name is a display label; its
+absence does not reject a valid OAuth grant. Existing workspace/checkpoint keys
+are retained when the original identity can be verified. A different agency,
+instance, API address or user requires a separate workspace. The tool needs
+access to `/users/current` to verify the user. Token-only connections retain the
+legacy account-name check if no complete verified OAuth account identity is
+available; a user ID alone is never accepted as proof of agency identity.
+
+If sign-in returns to **Not connected**, the connection panel shows the failed
+stage: token exchange or account verification. Wrong app credentials, an expired
+or reused code, denied scopes, current-user permission failures and absent
+identity metadata have distinct guidance. Provider descriptions, codes and
+credentials are never echoed. Recopy credentials from the same JobAdder app,
+verify the exact callback and retry from the tool; do not reload a callback URL
+or share a URL containing a code/token/state. A failed attempt retains any
+previous saved connection. Use an agency admin or a user with **Grant API
+Access** to approve JobAdder consent, rather than a developer-portal login.
 
 For another port or a separate account, run in PowerShell from the tool folder:
 

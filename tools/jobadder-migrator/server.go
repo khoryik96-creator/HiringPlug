@@ -34,6 +34,7 @@ type App struct {
 	pace                    time.Duration
 	cancel                  context.CancelFunc
 	current, message        string
+	connectionError         string
 	mode                    string
 	oauthState              string
 	oauthUntil              time.Time
@@ -159,7 +160,7 @@ func input(w http.ResponseWriter, r *http.Request, target any) bool {
 func (a *App) statusData() (map[string]any, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	data := map[string]any{"demo": a.demo, "unlocked": a.unlocked, "connected": a.connection.Fingerprint != "", "running": a.running, "connecting": a.connecting, "transferring": a.transferring, "current": a.current, "mode": a.mode, "message": a.message, "resources": len(Catalog()), "account": a.connection.Account, "callback": a.origin + "/oauth/callback"}
+	data := map[string]any{"demo": a.demo, "unlocked": a.unlocked, "connected": a.connection.Fingerprint != "", "running": a.running, "connecting": a.connecting, "transferring": a.transferring, "current": a.current, "mode": a.mode, "message": a.message, "resources": len(Catalog()), "account": a.connection.Account, "connectionError": a.connectionError, "callback": a.origin + "/oauth/callback"}
 	if a.unlocked {
 		report, err := a.store.Report()
 		if err != nil {
@@ -239,14 +240,16 @@ func (a *App) accept(ctx context.Context, c Connection) error {
 	if err != nil {
 		return errors.New("saved connection could not be checked")
 	}
-	if old.Fingerprint != "" && old.Fingerprint != identified.Fingerprint {
-		return errors.New("this workspace belongs to another account or API user; choose a separate workspace")
+	if err := preserveSourceKey(old, &identified); err != nil {
+		return err
 	}
+	identified.legacyFingerprint = ""
 	if err = a.store.SaveConfig(identified); err != nil {
 		return errors.New("encrypted connection could not be saved")
 	}
 	a.mu.Lock()
 	a.connection = identified
+	a.connectionError = ""
 	a.message = "JobAdder connected. No source records changed."
 	a.mu.Unlock()
 	return nil

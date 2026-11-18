@@ -15,13 +15,17 @@ import (
 const tokenEndpoint = "https://id.jobadder.com/connect/token"
 
 type Connection struct {
-	API          string `json:"api"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
-	Account      string `json:"account"`
-	Fingerprint  string `json:"fingerprint"`
+	API               string `json:"api"`
+	AccessToken       string `json:"access_token"`
+	RefreshToken      string `json:"refresh_token"`
+	ClientID          string `json:"client_id"`
+	ClientSecret      string `json:"client_secret"`
+	Account           string `json:"account"`
+	AccountID         string `json:"account_id,omitempty"`
+	Instance          string `json:"instance,omitempty"`
+	UserID            string `json:"user_id,omitempty"`
+	Fingerprint       string `json:"fingerprint"`
+	legacyFingerprint string
 }
 type Client struct {
 	Config    Connection
@@ -71,13 +75,15 @@ func tokenExchange(ctx context.Context, h *http.Client, endpoint string, form ur
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return Connection{}, errors.New("JobAdder did not authorize this connection; check the app, redirect and permissions")
+		return Connection{}, authorizationFailure(res.StatusCode, res.Body)
 	}
 	var payload struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		API          string `json:"api"`
-		TokenType    string `json:"token_type"`
+		AccessToken  string          `json:"access_token"`
+		RefreshToken string          `json:"refresh_token"`
+		API          string          `json:"api"`
+		TokenType    string          `json:"token_type"`
+		Account      json.RawMessage `json:"account"`
+		Instance     json.RawMessage `json:"instance"`
 	}
 	raw, err := readLimited(res.Body, 128<<10)
 	if err != nil {
@@ -89,7 +95,15 @@ func tokenExchange(ctx context.Context, h *http.Client, endpoint string, form ur
 	if err = validateAPI(payload.API); err != nil {
 		return Connection{}, err
 	}
-	return Connection{API: strings.TrimSuffix(payload.API, "/"), AccessToken: payload.AccessToken, RefreshToken: payload.RefreshToken}, nil
+	account, err := tokenAccountID(payload.Account)
+	if err != nil {
+		return Connection{}, err
+	}
+	instance, err := tokenInstance(payload.Instance)
+	if err != nil {
+		return Connection{}, err
+	}
+	return Connection{API: strings.TrimSuffix(payload.API, "/"), AccessToken: payload.AccessToken, RefreshToken: payload.RefreshToken, AccountID: account, Instance: instance}, nil
 }
 func (c *Client) refresh(ctx context.Context) error {
 	old := c.Config
@@ -103,6 +117,16 @@ func (c *Client) refresh(ctx context.Context) error {
 	if next.RefreshToken == "" {
 		next.RefreshToken = old.RefreshToken
 	}
+	if (old.AccountID != "" && next.AccountID != "" && old.AccountID != next.AccountID) || (old.Instance != "" && next.Instance != "" && old.Instance != next.Instance) || old.API != next.API {
+		return errors.New("refreshed connection changed source identity; reconnect using the original JobAdder account")
+	}
+	if next.AccountID == "" {
+		next.AccountID = old.AccountID
+	}
+	if next.Instance == "" {
+		next.Instance = old.Instance
+	}
+	next.UserID = old.UserID
 	next.ClientID = old.ClientID
 	next.ClientSecret = old.ClientSecret
 	next.Account = old.Account

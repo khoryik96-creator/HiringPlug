@@ -3,32 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strconv"
 )
 
-func identify(ctx context.Context, c *Client) (Connection, error) {
-	raw, _, err := c.get(ctx, "/users/current")
-	if err != nil {
-		return Connection{}, errors.New("could not verify the JobAdder account; check the connection and user-read permission")
-	}
-	var identity struct {
-		ID      json.Number `json:"userId"`
-		Account string      `json:"accountName"`
-	}
-	if json.Unmarshal(raw, &identity) != nil || identity.ID == "" || identity.Account == "" {
-		return Connection{}, errors.New("JobAdder returned no account identity; connection was not saved")
-	}
-	// Preserve exact source responses elsewhere; these values only bind the workspace.
-	sum := sha256.Sum256([]byte(c.Config.API + "\x00" + identity.ID.String() + "\x00" + identity.Account))
-	out := c.Config
-	out.Account = identity.Account
-	out.Fingerprint = hex.EncodeToString(sum[:])
-	return out, nil
-}
 func countResponse(raw []byte, kind string) (int64, error) {
 	if kind == "definitions" && bytes.HasPrefix(bytes.TrimSpace(raw), []byte("[")) {
 		var list []json.RawMessage

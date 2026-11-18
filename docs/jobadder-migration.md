@@ -38,6 +38,13 @@ proportional to account size. Native redirects allow only HTTPS JobAdder/object
 storage hosts, with credentials stripped across hosts. Arbitrary record links
 are retained as data and never followed.
 
+OAuth source identity uses the account/instance IDs from the server-side token
+response plus the verified current API user; optional missing account names do
+not prevent connection. Legacy checkpoint keys are preserved only after matching
+the original source, and refresh cannot switch known agency/instance/API
+identity. Callback failures display safe stage-specific guidance beside the
+connection controls, without provider descriptions, codes or credentials.
+
 OAuth refresh rotation, persistent provider cooldowns, source binding, private
 loopback sessions, exclusive workspace locks, pause/resume, synthetic demo and
 Linux/Windows CI are retained. Encrypted objects use independently authenticated
