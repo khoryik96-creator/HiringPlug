@@ -187,7 +187,7 @@ describe("pipeline board", () => {
   });
 });
 
-it("chooses a column with its count, or the whole board with All / None", async () => {
+it("chooses a column with its count; the toolbar has no All / None", async () => {
  const applied = { ...siti, id: "appl_applied", candidateId: "cand_applied", candidateName: "Applied Person", stage: "applied" as const };
  vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, applied, wei] }));
  renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
@@ -197,10 +197,21 @@ it("chooses a column with its count, or the whole board with All / None", async 
  fireEvent.click(screen.getByRole("button", { name: "Choose all 1 in Applied" })); // again: unchooses the column only
  expect(cardOf("Siti Aisyah").className).toContain("picked");
  expect(cardOf("Applied Person").className).not.toContain("picked");
- const board = screen.getByRole("group", { name: "Choose" });
- fireEvent.click(within(board).getByRole("button", { name: /^All \d+$/ }));
- expect(within(board).getByRole("button", { name: /^All \d+$/ }).getAttribute("aria-pressed")).toBe("true");
- fireEvent.click(within(board).getByRole("button", { name: "None" }));
+ expect(screen.queryByRole("group", { name: "Choose" })).toBeNull();
+ fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+ expect(screen.queryByText(/chosen$/)).toBeNull();
+});
+
+it("chooses everyone in the Steps view's stage, and unchooses them again", async () => {
+ const applied = { ...siti, id: "appl_applied", candidateId: "cand_applied", candidateName: "Applied Person", stage: "applied" as const };
+ vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [siti, applied, wei] }));
+ renderWithClient(<PipelineBoard jobId={base.jobId} canUpdate permissions={["pipeline:read", "emails:send"]} />);
+ await screen.findByRole("button", { name: "Choose all 1 in Applied" });
+ fireEvent.click(screen.getByRole("button", { name: "Steps" }));
+ fireEvent.click(within(screen.getByRole("tablist", { name: "Stages" })).getByRole("tab", { name: /All/ }));
+ fireEvent.click(screen.getByRole("button", { name: /^Choose all \d+$/ }));
+ expect(screen.getByText(/^\d+ chosen$/).textContent).toBe(`${String(within(screen.getByRole("list", { name: "Everyone" })).getAllByRole("listitem").length)} chosen`);
+ fireEvent.click(screen.getByRole("button", { name: /^Unchoose all \d+$/ }));
  expect(screen.queryByText(/chosen$/)).toBeNull();
 });
 

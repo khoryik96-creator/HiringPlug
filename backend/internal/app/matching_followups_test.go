@@ -71,6 +71,15 @@ func TestFitIsScoredWithoutBeingAskedWhileTheAIIsOn(t *testing.T) {
 				assert.True(t, x.Outdated, "score it again")
 			}
 		}
+		// Score (no "score all again") picks up the outdated score, and only that.
+		var r api.MatchJobResult
+		a.request(http.MethodPost, "/v1/matches/for-job", token, map[string]any{"jobId": job.Id}).JSON(&r)
+		assert.Equal(t, 1, r.Queued, "the outdated score is asked again")
+		now := a.matches(token, "applicationId="+appl.Id).Items[0]
+		assert.Equal(t, api.MatchStatusQueued, now.Status)
+		assert.False(t, now.Outdated)
+		a.request(http.MethodPost, "/v1/matches/for-job", token, map[string]any{"jobId": job.Id}).JSON(&r)
+		assert.Equal(t, 0, r.Queued, "while it is on its way, not again")
 	})
 }
 

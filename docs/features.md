@@ -460,7 +460,13 @@ for each of their jobs, with **Score fit** / **Score again**.
   too, `MATCH_CONSENT_WITHDRAWN`), and nothing once the month's allowance is
   used.
 - **Outdated scores**: once the job's description or ad changes, its scores
-  say "outdated"; **Score all again** refreshes them.
+  say "outdated"; **Score** (beside the pipeline's order menu) asks again for
+  them and for anyone not scored yet.
+- **The job's pipeline toolbar**: Steps and Board as tabs beside the title;
+  Add a candidate on the left; the order (longest waiting, or best fit once
+  anyone is scored) and Score on the right. People are chosen by clicking
+  them; a board column's count chooses its stage, and in Steps "Choose all N"
+  chooses those shown.
 - **Possible candidates** on each job's page (folded under the pipeline): people not on the job whose CVs
   share the most words with its description and ad (a keyword search of CVs,
   not the AI, so it works without one), best first, with where their CV has

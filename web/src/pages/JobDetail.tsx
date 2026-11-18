@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { applicationsKey, jobKey } from "../api/keys";
-import { EditIcon, IconActions, IconButton } from "../components/ActionIcons";
+import { BuildingIcon, EditIcon, IconActions, IconButton, PersonIcon } from "../components/ActionIcons";
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
@@ -66,32 +66,35 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
 
   return (
     <main className="list-page">
-      <a href="#/jobs">← Jobs</a>
+      <nav className="crumbs" aria-label="Breadcrumb">
+        <a href="#/jobs">Jobs</a><span aria-hidden="true">›</span><a href={`#/companies/${j.companyId}`}>{j.companyName}</a>
+      </nav>
       {job.error && (
         <ErrorMessage error={job.error}>
           <p className="muted">Showing the version loaded earlier.</p>
         </ErrorMessage>
       )}
-      <div className="row spread">
-        <div className="row job-title">
-          <h2>{j.title}</h2>
-          <JobStatusSelect job={j} canChange={permissions.includes("jobs:update") && !editing} />
+      <div className="row spread job-head">
+        <div className="job-head-text">
+          <div className="row job-title">
+            <h2>{j.title}</h2>
+            <JobStatusSelect job={j} canChange={permissions.includes("jobs:update") && !editing} />
+          </div>
+          <div className="job-meta">
+            <span title="Client"><BuildingIcon /><a href={`#/companies/${j.companyId}`}>{j.companyName}</a></span>
+            {j.contactId && <span title="Contact"><PersonIcon /><a href={`#/contacts/${j.contactId}`}>{j.contactName}</a></span>}
+            <Owner chip what="job" ownerId={j.ownerId} ownerName={j.ownerName} canChange={permissions.includes("jobs:update")}
+              save={async (ownerId) => {
+                unwrap(await api.PUT("/v1/jobs/{jobId}/owner", { params: { path: { jobId: j.id } }, body: { ownerId } }));
+                await queryClient.invalidateQueries({ queryKey: jobKey(j.id) });
+                await queryClient.invalidateQueries({ queryKey: applicationsKey }); // who sees its candidates may change
+              }} />
+          </div>
         </div>
         {permissions.includes("jobs:update") && !editing && (
           <IconActions label="Job actions"><IconButton label="Edit job" icon={<EditIcon />} onClick={() => { setEditing(true); }} /></IconActions>
         )}
       </div>
-      <p className="muted">
-        <a href={`#/companies/${j.companyId}`}>{j.companyName}</a>
-        {j.contactId && <> · contact <a href={`#/contacts/${j.contactId}`}>{j.contactName}</a></>}
-        {" · "}
-        <Owner what="job" ownerId={j.ownerId} ownerName={j.ownerName} canChange={permissions.includes("jobs:update")}
-          save={async (ownerId) => {
-            unwrap(await api.PUT("/v1/jobs/{jobId}/owner", { params: { path: { jobId: j.id } }, body: { ownerId } }));
-            await queryClient.invalidateQueries({ queryKey: jobKey(j.id) });
-            await queryClient.invalidateQueries({ queryKey: applicationsKey }); // who sees its candidates may change
-          }} />
-      </p>
       {editing && <JobForm job={j} onDone={() => { setEditing(false); }} />}
       {permissions.includes("pipeline:read") && (
         <PipelineBoard jobId={j.id} canUpdate={permissions.includes("pipeline:update")} permissions={permissions}>

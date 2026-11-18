@@ -2971,7 +2971,7 @@ export interface paths {
         put?: never;
         /**
          * Score the fit of every active candidate on a job (in the background)
-         * @description Candidates already scored (or waiting) are left as they are unless rescore is true; candidates without a CV with readable text are counted and left out. At most 100 candidates at a time.
+         * @description Candidates already scored (or waiting) are left as they are unless rescore is true, except a score made from another version of the job's text (outdated), which is asked again; candidates without a CV with readable text are counted and left out. At most 100 candidates at a time.
          */
         post: operations["scoreJobApplications"];
         delete?: never;

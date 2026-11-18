@@ -57,9 +57,15 @@ function Info({ a, upcoming, now }: { a: Application; upcoming?: Upcoming; now: 
   return a.channel ? <span className="muted small">via {CHANNEL[a.channel]}</span> : null;
 }
 
-export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (s: Stage | "all") => void; order: (a: Application, b: Application) => number }) {
+export function PipelineSteps(props: Shared & {
+  stage: Stage | "all"; onStage: (s: Stage | "all") => void; order: (a: Application, b: Application) => number;
+  /** Choose (or, all chosen, unchoose) everyone shown. */
+  onPickAll?: (apps: Application[], on: boolean) => void;
+}) {
   const { apps, stage, now } = props;
   const shown = (stage === "all" ? [...apps] : apps.filter((a) => a.stage === stage)).sort(props.order);
+  const allPicked = shown.length > 0 && shown.every((a) => props.picked.includes(a.id));
+  const where = stage === "all" ? "" : ` in ${STAGE[stage]}`;
   return (
     <div className="pipeline-steps">
       <div className="funnel" role="tablist" aria-label="Stages">
@@ -77,6 +83,13 @@ export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (
           );
         })}
       </div>
+      {props.onPickAll && shown.length > 0 && (
+        <div className="step-tools">
+          <button type="button" className="link" aria-pressed={allPicked} onClick={() => { props.onPickAll?.(shown, !allPicked); }}>
+            {allPicked ? `Unchoose all ${String(shown.length)}${where}` : `Choose all ${String(shown.length)}${where}`}
+          </button>
+        </div>
+      )}
       <div role="list" aria-label={stage === "all" ? "Everyone" : STAGE[stage]} className="step-rows">
         {shown.length === 0 && <p className="column-empty">{stage === "placed" ? "Nobody placed yet" : "Nobody here"}</p>}
         {shown.map((a) => {

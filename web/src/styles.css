@@ -1301,3 +1301,31 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .icon-action[data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 30; }
 .icon-action[data-tip]:hover::after, .icon-action[data-tip]:focus-visible::after { opacity: 1; }
 .icon-actions > :last-child[data-tip]::after { left: auto; right: 0; transform: none; } /* the last tooltip keeps to the screen's edge */
+/* A job's header: a breadcrumb, the title and status, then client, contact and owner with icons. */
+.crumbs { display: flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; color: var(--muted); min-width: 0; }
+.crumbs a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 28rem; }
+.job-head { align-items: flex-start; }
+.job-head-text { display: grid; gap: 0.4rem; min-width: 0; }
+.job-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1.1rem; font-size: 0.88rem; color: var(--muted); }
+.job-meta > span { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.job-meta svg { width: 16px; height: 16px; color: var(--muted); flex: none; opacity: 0.75; }
+.owner-chip { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid var(--line); border-radius: 999px; padding: 2px 4px 2px 3px; background: var(--surface); }
+.owner-chip .avatar { width: 22px; height: 22px; font-size: 0.6rem; }
+.owner-chip select { border: 0; background-color: transparent; background-position: right 0.4rem center; box-shadow: none; padding: 0.1rem 1.7rem 0.1rem 0.15rem; min-height: 0; height: auto; font-size: 0.86rem; font-weight: 550; color: var(--text); }
+.owner-chip strong { font-weight: 550; padding-right: 0.4rem; }
+/* The pipeline: its title with the view tabs beside it, then one toolbar (add left; order and Score right). */
+.pipeline-head { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.pipeline-head h3 { margin: 0; padding-right: 0.9rem; border-right: 1px solid var(--line); }
+.view-tabs { display: inline-flex; gap: 0.2rem; }
+.view-tabs button { border: 0; background: transparent; box-shadow: none; min-height: 0; padding: 0.3rem 0.7rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.view-tabs button:hover { color: var(--accent-dark); }
+.view-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-dark); }
+.pipeline-tools { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; margin: 0.7rem 0 0.9rem; }
+.pipeline-tools input { min-height: 34px; padding: 0.35rem 0.75rem; width: 16rem; max-width: 100%; font-size: 0.88rem; }
+.pipeline-tools > .row { gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+.order-select { width: auto; min-height: 34px; padding-top: 0.3rem; padding-bottom: 0.3rem; padding-right: 1.9rem; background-position: right 0.6rem center; font-size: 0.85rem; font-weight: 600; color: var(--accent-dark); border-color: transparent; background-color: transparent; box-shadow: none; }
+.order-select:hover { background-color: var(--accent-soft); }
+.score-btn { display: inline-flex; align-items: center; gap: 0.35rem; }
+.score-btn svg { width: 15px; height: 15px; color: var(--accent); }
+.step-tools { display: flex; justify-content: flex-end; margin: 0.2rem 0; font-size: 0.85rem; }
+.score-btn { min-height: 34px; }

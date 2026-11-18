@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationMatchKey, jobMatchesKey, matchesKey } from "../api/keys";
 import { formatWhen, MATCH_VERDICT } from "../labels";
+import { SparkIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitStats } from "./FitStats";
 
@@ -64,29 +65,27 @@ export function FitReasons({ match, open = false }: { match: Match; open?: boole
 }
 
 /** "Score fit" for every active candidate on a job (the board's header). */
-export function ScoreJobFit({ jobId, enabled, anyScored }: { jobId: string; enabled: boolean; anyScored: boolean }) {
+export function ScoreJobFit({ jobId, enabled }: { jobId: string; enabled: boolean }) {
   const queryClient = useQueryClient();
   const score = useMutation({
-    mutationFn: async (rescore: boolean) => unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore } })),
+    mutationFn: async () => unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore: false } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: matchesKey }),
   });
   if (!enabled) return null;
   const r = score.data;
   return (
-    <div className="row">
-      <button type="button" disabled={score.isPending} onClick={() => { score.mutate(false); }}>Score candidates' fit</button>
-      {anyScored && (
-        <button type="button" className="link" disabled={score.isPending} onClick={() => { score.mutate(true); }}>Score all again</button>
-      )}
+    <>
       {r && (
         <span className="muted small" role="status">
-          {r.queued === 0 ? "Nothing new to score." : `Scoring ${String(r.queued)} candidate(s)…`}
+          {r.queued === 0 ? "Nothing new to score." : `Scoring ${String(r.queued)}…`}
           {r.withoutCv > 0 && ` ${String(r.withoutCv)} without a readable CV left out.`}
           {r.consentWithdrawn > 0 && ` ${String(r.consentWithdrawn)} who withdrew consent left out.`}
         </span>
       )}
+      <button type="button" className="doc-btn score-btn" title="Score the fit of everyone not scored yet" disabled={score.isPending}
+        onClick={() => { score.mutate(); }}><SparkIcon />Score</button>
       <ErrorMessage error={score.error} />
-    </div>
+    </>
   );
 }
 

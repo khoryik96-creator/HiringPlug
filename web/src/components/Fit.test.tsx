@@ -123,7 +123,7 @@ describe("fit on a job's board", () => {
     expect(await within(column).findByText("Fit 90%")).toBeTruthy();
     const names = () => within(column).getAllByRole("link").map((a) => a.textContent);
     expect(names()).toEqual(["Ali", "Siti", "Wei"]);
-    fireEvent.click(screen.getByLabelText("Best fit first"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Order" }), { target: { value: "fit" } });
     expect(names()).toEqual(["Siti", "Ali", "Wei"]); // unscored last
     // The Steps view follows it too.
     fireEvent.click(screen.getByRole("button", { name: "Steps" }));
@@ -137,12 +137,11 @@ describe("fit on a job's board", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("region", { name: "Fit of Siti" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Score candidates' fit" }));
+    expect(screen.queryByRole("button", { name: "Score all again" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Score" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ jobId: "jo_1", rescore: false });
-    expect((await screen.findByText(/Scoring 1 candidate/)).textContent).toBe("Scoring 1 candidate(s)… 1 without a readable CV left out. 1 who withdrew consent left out.");
-    fireEvent.click(screen.getByRole("button", { name: "Score all again" }));
-    await waitFor(() => { expect(sentBody(post, 1)).toEqual({ jobId: "jo_1", rescore: true }); });
+    expect((await screen.findByText(/Scoring 1/)).textContent).toBe("Scoring 1… 1 without a readable CV left out. 1 who withdrew consent left out.");
   });
 
   it("says when matching is off, and shows nothing without the permission", async () => {

@@ -154,8 +154,9 @@ func (s *Service) Score(ctx context.Context, p authz.Principal, applicationID st
 }
 
 // ScoreJob asks the AI about each of a job's active candidates not scored
-// yet (all of them with rescore), at most maxBatch at a time. Candidates
-// without a CV with readable text are counted and left out.
+// yet or scored from another version of the job's text (all of them with
+// rescore), at most maxBatch at a time. Candidates without a CV with
+// readable text are counted and left out.
 func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string, rescore bool) (JobResult, error) {
 	var res JobResult
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
@@ -181,12 +182,18 @@ func (s *Service) ScoreJob(ctx context.Context, p authz.Principal, jobID string,
 		if err != nil {
 			return err
 		}
-		status := make(map[string]string, len(latest))
+		current := Hash(job) // a score made from another job text is outdated: scored again
+		skip := make(map[string]bool, len(latest))
 		for _, m := range latest {
-			status[m.ApplicationID] = m.Status
+			switch m.Status {
+			case "queued":
+				skip[m.ApplicationID] = true
+			case "done":
+				skip[m.ApplicationID] = !rescore && !Outdated(m.Status, m.JobHash, current)
+			}
 		}
 		for _, a := range apps {
-			if st := status[a.ID]; st == "queued" || (st == "done" && !rescore) {
+			if skip[a.ID] {
 				res.AlreadyScored++
 				continue
 			}

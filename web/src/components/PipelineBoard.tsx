@@ -116,36 +116,26 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
 
   return (
     <section className="panel" aria-label="Pipeline">
-      <div className="row spread">
+      <div className="pipeline-head">
         <h3>Pipeline <span className="count-chip">{String(apps.length - closed.length)} active</span></h3>
+        <span className="view-tabs" role="group" aria-label="View">
+          <button type="button" aria-pressed={view === "steps"} onClick={() => { setView("steps"); }}>Steps</button>
+          <button type="button" aria-pressed={view === "board"} onClick={() => { setView("board"); }}>Board</button>
+        </span>
+      </div>
+      <div className="pipeline-tools">
+        <div className="row">{canUpdate && <AddCandidate jobId={jobId} />}</div>
         <div className="row">
-          {canPick && apps.length - closed.length > 0 && (
-            <span className="choose" role="group" aria-label="Choose">
-              <span className="choose-label" aria-hidden="true">Choose</span>
-              <span className="segmented">
-                <button type="button" className={active.length > 0 && active.every((a) => picked.includes(a.id)) ? "on" : undefined}
-                  aria-pressed={active.length > 0 && active.every((a) => picked.includes(a.id))}
-                  onClick={() => { setPicked(active.map((a) => a.id)); }}>All {String(active.length)}</button>
-                <button type="button" className={picked.length === 0 ? "on" : undefined} aria-pressed={picked.length === 0}
-                  onClick={() => { setPicked([]); }}>None</button>
-              </span>
-            </span>
+          {fit.size > 0 && (
+            <select className="order-select" aria-label="Order" value={bestFirst ? "fit" : "waiting"}
+              onChange={(e) => { setBestFirst(e.target.value === "fit"); }}>
+              <option value="waiting">Longest waiting</option>
+              <option value="fit">Best fit</option>
+            </select>
           )}
-          {canUpdate && <AddCandidate jobId={jobId} />}
-          <span className="segmented" role="group" aria-label="View">
-            <button type="button" className={view === "steps" ? "on" : undefined} aria-pressed={view === "steps"} onClick={() => { setView("steps"); }}>Steps</button>
-            <button type="button" className={view === "board" ? "on" : undefined} aria-pressed={view === "board"} onClick={() => { setView("board"); }}>Board</button>
-          </span>
+          {matches.data && permissions.includes("matching:create") && <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} />}
         </div>
       </div>
-      {matches.data && permissions.includes("matching:create") && (
-        <ScoreJobFit jobId={jobId} enabled={matches.data.enabled} anyScored={fit.size > 0} />
-      )}
-      {fit.size > 0 && (
-        <label className="small">
-          <input type="checkbox" checked={bestFirst} onChange={(e) => { setBestFirst(e.target.checked); }} /> Best fit first
-        </label>
-      )}
       {separately && <SeparateEmail people={separately} onClose={() => { setSeparately(null); setPicked([]); }} />}
       {canPick && picked.length > 0 && !shortlist && !separately && !emailing && (
         <div className="pick-bar" role="status">
@@ -192,7 +182,10 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         )}
       </ErrorMessage>
       {view === "steps" && loaded && (
-        <PipelineSteps {...shared} apps={active} stage={stepStage ?? firstStage()} onStage={setStepStage} order={shownOrder} />
+        <PipelineSteps {...shared} apps={active} stage={stepStage ?? firstStage()} onStage={setStepStage} order={shownOrder}
+          onPickAll={canPick ? (these, on) => {
+            setPicked((ids) => (on ? [...new Set([...ids, ...these.map((a) => a.id)])] : ids.filter((id) => !these.some((a) => a.id === id))));
+          } : undefined} />
       )}
       {view === "board" && <div className="board compact" ref={board}>
         {OPEN_STAGES.map((stage) => {
