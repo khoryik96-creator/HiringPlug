@@ -201,7 +201,10 @@ func NewModules(d Deps) *Modules {
 	m.Contacts.UseFolders(m.Folders.ItemsOf(folders.Contacts))
 	m.Companies.UseFolders(m.Folders.ItemsOf(folders.Companies))
 	m.Calendars = calendars.New(d.Pool)
-	m.Calendars.ConnectOutlookWith(calendars.Deps{Apps: calendarApps{m.Emails}, Sources: calendarSources{m.Interviews, m.Scheduling}, Users: calendarUsers{m.Identity}}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL})
+	m.Calendars.ConnectOutlookWith(calendars.Deps{
+		Apps: calendarApps{m.Emails}, Sources: calendarSources{m.Interviews, m.Scheduling}, Users: calendarUsers{m.Identity},
+		Recipients: calendarRecipients{m.Pipeline, m.Candidates, m.Privacy},
+	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL})
 	m.Interviews.UseCalendar(m.Calendars)
 	m.Scheduling.UseCalendar(m.Calendars)
 	// scaffold:constructors

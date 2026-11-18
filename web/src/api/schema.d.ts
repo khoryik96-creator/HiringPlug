@@ -2714,6 +2714,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/interviews/{interviewId}/outlook-invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        /** Candidate Outlook invitation status and the interview's Teams link */
+        get: operations["getInterviewInvitation"];
+        put?: never;
+        /** Send or retry the candidate Outlook invitation from your calendar */
+        post: operations["sendInterviewInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/interviews/{interviewId}/calendar.ics": {
         parameters: {
             query?: never;
@@ -4810,7 +4830,7 @@ export interface components {
             allDay: boolean;
             teams: boolean;
             /** @enum {string} */
-            source: "local" | "interview" | "booking" | "outlook";
+            source: "local" | "interview" | "interview_invitation" | "booking" | "outlook";
             sourceId: string | null;
             /** @enum {string} */
             status: "active" | "cancelled";
@@ -7130,6 +7150,22 @@ export interface components {
         };
         WebhookDeliverJob: {
             deliveryId: components["schemas"]["WebhookDeliveryId"];
+        };
+        InterviewInvitationInput: {
+            version: number;
+            teams: boolean;
+            reminderMinutes: number;
+        };
+        InterviewInvitation: {
+            /** @enum {string} */
+            status: "none" | "pending" | "sent" | "failed" | "conflict" | "cancelled";
+            canSend: boolean;
+            teamsAvailable: boolean;
+            teams: boolean;
+            reminderMinutes: number;
+            recipient: string | null;
+            joinUrl: string | null;
+            issue: string | null;
         };
         /** @example intv_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         InterviewId: string;
@@ -14740,6 +14776,63 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["InterviewNotAllowed"];
+        };
+    };
+    getInterviewInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    sendInterviewInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interviewId: components["parameters"]["InterviewIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InterviewInvitationInput"];
+            };
+        };
+        responses: {
+            /** @description Queued for Outlook */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewInvitation"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["InterviewNotAllowed"];
         };
     };

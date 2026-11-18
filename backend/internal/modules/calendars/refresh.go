@@ -167,7 +167,7 @@ func (s *Service) reconcileHolds(ctx context.Context, tx pgx.Tx, user string, fr
 	keys := make([]sourceKey, 0, len(holds))
 	for _, h := range holds {
 		if h.SourceID != nil {
-			keys = append(keys, sourceKey{h.Source, *h.SourceID})
+			keys = append(keys, sourceOf(h.Source, *h.SourceID))
 		}
 	}
 	_, err = s.gone(ctx, tx, keys)

@@ -98,7 +98,7 @@ func (s *Service) list(ctx context.Context, p authz.Principal, from, to time.Tim
 		keys := []sourceKey{}
 		for _, row := range rows {
 			if row.SourceID != nil && row.Status == "active" {
-				keys = append(keys, sourceKey{row.Source, *row.SourceID})
+				keys = append(keys, sourceOf(row.Source, *row.SourceID))
 			}
 		}
 		gone, err := s.gone(ctx, tx, keys) // an interview deleted with its candidate is not shown, and is cleared
@@ -106,7 +106,7 @@ func (s *Service) list(ctx context.Context, p authz.Principal, from, to time.Tim
 			return err
 		}
 		for _, row := range rows {
-			if row.SourceID != nil && gone[sourceKey{row.Source, *row.SourceID}] {
+			if row.SourceID != nil && gone[sourceOf(row.Source, *row.SourceID)] {
 				continue
 			}
 			item, err := eventAPI(row)
@@ -209,7 +209,7 @@ func (s *Service) action(ctx context.Context, p authz.Principal, id string, vers
 		if err != nil {
 			return err
 		}
-		if row.Source == "outlook" || (!retry && row.Source != "local") {
+		if row.Source == invitationSource || row.Source == "outlook" || (!retry && row.Source != "local") {
 			return apperr.New(api.ErrorCodeCALENDAREVENTREADONLY, "Manage this event in its source calendar or HiringPlug screen.")
 		}
 		conn, err := q.CalendarConnection(ctx, p.UserID)

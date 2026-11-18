@@ -824,6 +824,7 @@ class CalendarEventUpdate(BaseModel):
 class Source(StrEnum):
     local = "local"
     interview = "interview"
+    interview_invitation = "interview_invitation"
     booking = "booking"
     outlook = "outlook"
 
@@ -3258,6 +3259,32 @@ class WebhookDeliverJob(BaseModel):
     deliveryId: WebhookDeliveryId
 
 
+class InterviewInvitationInput(BaseModel):
+    version: Annotated[int, Field(ge=1, le=2147483647)]
+    teams: bool
+    reminderMinutes: Annotated[int, Field(ge=0, le=1440)]
+
+
+class Status6(StrEnum):
+    none = "none"
+    pending = "pending"
+    sent = "sent"
+    failed = "failed"
+    conflict = "conflict"
+    cancelled = "cancelled"
+
+
+class InterviewInvitation(BaseModel):
+    status: Status6
+    canSend: bool
+    teamsAvailable: bool
+    teams: bool
+    reminderMinutes: int
+    recipient: Annotated[str | None, Field(...)]
+    joinUrl: Annotated[str | None, Field(...)]
+    issue: Annotated[str | None, Field(...)]
+
+
 class InterviewId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["intv_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^intv_[0-9a-hjkmnp-tv-z]{26}$")
@@ -3395,7 +3422,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status6(StrEnum):
+class Status7(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -4977,7 +5004,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status7(StrEnum):
+class Status8(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -4990,7 +5017,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status7
+    status: Status8
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -5098,7 +5125,7 @@ class OffsiteStatus(StrEnum):
     off = "off"
 
 
-class Status8(StrEnum):
+class Status9(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -5118,7 +5145,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status8
+    status: Status9
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -6492,7 +6519,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status6, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status7, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]

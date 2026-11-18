@@ -11,6 +11,7 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
@@ -50,6 +51,46 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 		if row.UserID != current.UserID || row.Source == "outlook" || row.SyncStatus == "synced" || row.SyncStatus == "local" || row.SyncStatus == "conflict" || row.SyncStatus == "failed" {
 			return nil
 		}
+		if row.Source == invitationSource {
+			args := store.TryLockInterviewInvitationParams{TenantID: p.TenantID, SourceID: text(row.SourceID)}
+			locked, err := store.New(conn).TryLockInterviewInvitation(ctx, args)
+			if err != nil {
+				return err
+			}
+			if !locked {
+				return jobqueue.Later(s.now().Add(5 * time.Second))
+			}
+			defer releaseInvitationLock(conn, args)
+			var organizer authz.Principal
+			var active bool
+			err = database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
+				var err error
+				row, err = store.New(tx).CalendarEvent(ctx, payload.EventId)
+				if err != nil || row.SyncStatus != "pending" {
+					return err
+				}
+				organizer, active, err = s.deps.Users.PrincipalFor(ctx, tx, row.UserID)
+				return err
+			})
+			if database.IsNoRows(err) {
+				return nil
+			}
+			if err != nil || row.SyncStatus != "pending" {
+				return err
+			}
+			if !active || !organizer.Can(api.PermissionInterviewsSchedule) || !organizer.Can(api.PermissionCalendarsUse) {
+				return s.pushFailure(ctx, conn, p, row, current, errors.New("the original organizer no longer has permission to send interview invitations"))
+			}
+			err = database.InTx(ctx, conn, organizer, func(tx pgx.Tx) error {
+				return s.validateInvitationPush(ctx, tx, row, current)
+			})
+			if problem, ok := apperr.As(err); ok {
+				return s.pushFailure(ctx, conn, p, row, current, errors.New(problem.Message))
+			}
+			if err != nil {
+				return err
+			}
+		}
 		token, err := s.access(ctx, conn, current)
 		if err != nil {
 			return s.pushFailure(ctx, conn, p, row, current, err)
@@ -57,7 +98,7 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 		path := s.calendarPath(current.CalendarID) + "/events"
 		method := "POST"
 		var body []byte
-		same := row.RemoteConnection != nil && *row.RemoteConnection == current.ID && row.RemoteID != nil
+		same := row.RemoteID != nil && (text(row.RemoteConnection) == current.ID || row.Source == invitationSource && inviteCalendar(row, current))
 		key := ""
 		if same {
 			path += "/" + url.PathEscape(*row.RemoteID)
@@ -137,7 +178,11 @@ func (s *Service) receipt(ctx context.Context, conn *pgx.Conn, p authz.Principal
 				return err
 			}
 		}
-		_, err := q.SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
+		updated, err := q.SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
+		if err == nil && updated != 0 && row.Source == invitationSource && row.RemoteID == nil && remoteID != nil {
+			_, err = jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCalendarSourceChanged,
+				api.CalendarSourceJob{Kind: "interview", SourceId: text(row.SourceID)})
+		}
 		return err
 	})
 }

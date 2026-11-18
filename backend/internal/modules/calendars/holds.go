@@ -25,6 +25,15 @@ func (s *Service) holdIn(ctx context.Context, tx pgx.Tx, tenant, user string, m 
 	if err != nil && !database.IsNoRows(err) {
 		return "", err
 	}
+	if connected && m.Kind == "interview" && !m.Cancelled {
+		invitation, err := q.InterviewInvitation(ctx, ptr(m.ID))
+		if err != nil && !database.IsNoRows(err) {
+			return "", err
+		}
+		if invitation.UserID == user && invitation.RemoteID != nil && invitation.Status == "active" && inviteCalendar(invitation, conn) {
+			return "", nil
+		}
+	}
 	status, sync := "active", "local"
 	if m.Cancelled {
 		status = "cancelled"
@@ -77,8 +86,15 @@ func (s *Service) reconcileSource(ctx context.Context, tx pgx.Tx, tenant, kind, 
 	if err != nil {
 		return err
 	}
+	organizer := ""
+	if kind == "interview" {
+		organizer, err = s.reconcileInvitation(ctx, tx, tenant, m)
+		if err != nil {
+			return err
+		}
+	}
 	for _, old := range previous {
-		if !slices.Contains(m.Users, old.UserID) || m.Cancelled {
+		if !slices.Contains(m.Users, old.UserID) || m.Cancelled || old.UserID == organizer {
 			row, err := q.CancelCalendarHold(ctx, store.CancelCalendarHoldParams{ID: old.ID, SourceVersion: int32(m.Version)}) //nolint:gosec // source database versions are int32
 			if database.IsNoRows(err) {
 				continue
@@ -102,6 +118,9 @@ func (s *Service) reconcileSource(ctx context.Context, tx pgx.Tx, tenant, kind, 
 		return nil
 	}
 	for _, user := range m.Users {
+		if user == organizer {
+			continue
+		}
 		active, err := s.deps.Users.CalendarUserActive(ctx, tx, user)
 		if err != nil {
 			return err
@@ -129,7 +148,7 @@ func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from,
 	}
 	keys := make([]sourceKey, 0, len(rows))
 	for _, r := range rows {
-		keys = append(keys, sourceKey{r.Source, r.SourceID})
+		keys = append(keys, sourceOf(r.Source, r.SourceID))
 	}
 	gone, err := s.gone(ctx, tx, keys)
 	if err != nil {
@@ -137,7 +156,7 @@ func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from,
 	}
 	out := rows[:0]
 	for _, r := range rows {
-		if !gone[sourceKey{r.Source, r.SourceID}] {
+		if !gone[sourceOf(r.Source, r.SourceID)] {
 			out = append(out, r)
 		}
 	}
@@ -212,7 +231,7 @@ func (s *Service) conflicts(ctx context.Context, tx pgx.Tx, users []string, from
 		return nil, nil, err
 	}
 	for _, r := range rows {
-		if (r.Source != "interview" || !slices.Contains(named, r.SourceID)) && !slices.Contains(busy, r.UserID) {
+		if (sourceOf(r.Source, r.SourceID).kind != "interview" || !slices.Contains(named, r.SourceID)) && !slices.Contains(busy, r.UserID) {
 			busy = append(busy, r.UserID)
 		}
 	}

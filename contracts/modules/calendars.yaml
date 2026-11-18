@@ -527,6 +527,7 @@ components:
           enum:
           - local
           - interview
+          - interview_invitation
           - booking
           - outlook
         sourceId:

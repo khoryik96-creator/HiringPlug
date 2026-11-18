@@ -232,6 +232,11 @@ func (s *Service) Get(ctx context.Context, p authz.Principal, id string) (View, 
 func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expectedVersion int, patch Patch, ignoreClashes bool) (View, error) {
 	var out View
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
+		if s.calendar != nil {
+			if err := s.calendar.LockInterview(ctx, tx, id); err != nil {
+				return err
+			}
+		}
 		q := store.New(tx)
 		row, err := getRow(ctx, q, id)
 		if err != nil {

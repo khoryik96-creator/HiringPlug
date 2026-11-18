@@ -13,17 +13,19 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
 type Application struct{ ClientID, ClientSecret string }
 type Meeting struct {
-	Kind, ID, Title, Location string
-	Version                   int
-	Users                     []string
-	Start, End                time.Time
-	Cancelled                 bool
+	Kind, ID, Title, Location         string
+	ApplicationID, Mode, Instructions string
+	Version                           int
+	Users                             []string
+	Start, End                        time.Time
+	Cancelled, Scheduled              bool
 }
 type Deps struct {
 	Apps interface {
@@ -39,6 +41,10 @@ type Deps struct {
 	}
 	Users interface {
 		CalendarUserActive(context.Context, pgx.Tx, string) (bool, error)
+		PrincipalFor(context.Context, pgx.Tx, string) (authz.Principal, bool, error)
+	}
+	Recipients interface {
+		InterviewRecipient(context.Context, pgx.Tx, string) (email string, optedOut bool, err error)
 	}
 }
 type Provider struct{ AuthorizeURL, TokenURL, GraphURL string }
@@ -75,6 +81,9 @@ func (m *Module) ConnectOutlookWith(deps Deps, c Config) {
 	}
 	if deps.Users != nil {
 		m.service.deps.Users = deps.Users
+	}
+	if deps.Recipients != nil {
+		m.service.deps.Recipients = deps.Recipients
 	}
 	m.service.config = c
 }
