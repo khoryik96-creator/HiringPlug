@@ -224,10 +224,17 @@ func TestEveryCoreJobHasAHandler(t *testing.T) {
 	a := newTestApp(t)
 	handlers, err := a.modules.JobHandlers()
 	require.NoError(t, err)
+	outside := a.modules.OutsideJobHandlers()
 	for _, kind := range jobqueue.KindsForQueue(jobqueue.QueueCore) {
-		assert.Contains(t, handlers, kind, "job %q (queue core) has no Go handler; add it to the module's JobHandlers", kind)
+		_, inside := handlers[kind]
+		_, out := outside[kind]
+		assert.True(t, inside || out, "job %q (queue core) has no Go handler; add it to the module's JobHandlers (or OutsideJobHandlers)", kind)
+		assert.False(t, inside && out, "job %q has two Go handlers, in and outside a transaction", kind)
 	}
 	for kind := range handlers {
+		assert.Equal(t, jobqueue.QueueCore, jobqueue.Kinds()[kind].Queue, "Go handles %q but the contract puts it on another queue", kind)
+	}
+	for kind := range outside {
 		assert.Equal(t, jobqueue.QueueCore, jobqueue.Kinds()[kind].Queue, "Go handles %q but the contract puts it on another queue", kind)
 	}
 }

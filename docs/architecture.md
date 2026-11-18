@@ -165,6 +165,12 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   limit is reached: the email verifier runs two checks at a time) returns
   `jobqueue.Later(at)`: `job_later` puts the same job back to run then,
   without counting an attempt or queuing another job.
+- **Outside a transaction, for slow calls.** A Go handler is normally given
+  the queue's transaction, and its work commits with the job. One that waits
+  minutes on another service (Outlook's calendar sync) is registered as an
+  outside handler (`Worker.Outside`, `jobqueue.OutsideHandlers`): it gets no
+  transaction, writes in its own short ones (so must be safe to run again),
+  and only marking the job done takes one.
 - **Kept while it runs.** `job_extend` renews a worker's lease before a long
   step (a CV Studio CV makes two AI calls of minutes each), and tells it to
   stop when another worker already took the job.

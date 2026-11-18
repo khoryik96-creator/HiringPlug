@@ -122,16 +122,13 @@ func (s *Service) check(ctx context.Context, tx pgx.Tx, q *store.Queries, selfID
 	if err != nil {
 		return err
 	}
+	var calendarBusy, calendarStale []string
 	if s.calendar != nil {
-		busy, err := s.calendar.BusyFor(ctx, tx, d.Interviewers, d.StartsAt, d.Ends(), "interview", selfID)
-		if err != nil {
+		if calendarBusy, calendarStale, err = s.calendar.Conflicts(ctx, tx, d.Interviewers, d.StartsAt, d.Ends(), selfID); err != nil {
 			return err
 		}
-		if len(busy) > 0 {
-			return apperr.New(api.ErrorCodeINTERVIEWCLASH, "An interviewer has a calendar appointment at that time.")
-		}
 	}
-	if len(clashes) == 0 {
+	if len(clashes) == 0 && len(calendarBusy) == 0 && len(calendarStale) == 0 {
 		return nil
 	}
 	names, err := s.users.UserNames(ctx, tx, d.Interviewers)
@@ -148,7 +145,22 @@ func (s *Service) check(ctx context.Context, tx pgx.Tx, q *store.Queries, selfID
 		}
 		list[i] = map[string]any{"interviewId": c.ID, "title": c.Title, "startsAt": c.StartsAt, "interviewers": busy}
 	}
-	return apperr.New(api.ErrorCodeINTERVIEWCLASH, "An interviewer already has an interview at that time.").WithDetail("clashes", list)
+	named := func(ids []string) []string {
+		out := make([]string, 0, len(ids))
+		for _, id := range ids {
+			out = append(out, names[id])
+		}
+		return out
+	}
+	message := "An interviewer already has an interview at that time."
+	switch {
+	case len(clashes) == 0 && len(calendarBusy) > 0:
+		message = "An interviewer has a calendar appointment at that time."
+	case len(clashes) == 0:
+		message = "An interviewer's Outlook calendar has not synced lately, so their availability is not certain."
+	}
+	return apperr.New(api.ErrorCodeINTERVIEWCLASH, message).WithDetail("clashes", list).
+		WithDetail("calendarBusy", named(calendarBusy)).WithDetail("calendarStale", named(calendarStale))
 }
 
 // ForApplication returns an application's interviews, soonest first.

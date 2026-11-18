@@ -44,6 +44,7 @@ type graphAttendee struct {
 type graphEvent struct {
 	Body                                                 struct{ ContentType, Content string }
 	ID, Subject, BodyPreview, ChangeKey, WebLink, ShowAs string
+	TransactionID                                        string `json:"transactionId"`
 	ETag                                                 string `json:"@odata.etag"`
 	Start, End                                           graphTime
 	IsAllDay, IsCancelled, IsOrganizer                   bool
@@ -94,7 +95,7 @@ func (e graphEvent) join() *string {
 }
 func (s *Service) readEvents(ctx context.Context, c store.CalendarConnection, token string, from, to time.Time) ([]graphEvent, error) {
 	path := s.calendarPath(c.CalendarID) + "/calendarView"
-	q := url.Values{"startDateTime": {from.UTC().Format(time.RFC3339)}, "endDateTime": {to.UTC().Format(time.RFC3339)}, "$top": {"250"}, "$select": {"id,subject,body,bodyPreview,start,end,isAllDay,isCancelled,isOrganizer,sensitivity,showAs,location,onlineMeeting,webLink,changeKey,attendees"}}
+	q := url.Values{"startDateTime": {from.UTC().Format(time.RFC3339)}, "endDateTime": {to.UTC().Format(time.RFC3339)}, "$top": {"250"}, "$select": {"id,subject,body,bodyPreview,start,end,isAllDay,isCancelled,isOrganizer,sensitivity,showAs,location,onlineMeeting,webLink,changeKey,attendees,transactionId"}}
 	next := s.graph(path) + "?" + q.Encode()
 	seen := map[string]bool{}
 	ids := map[string]bool{}
@@ -165,11 +166,35 @@ func eventBody(row store.CalendarEvent) ([]byte, error) {
 		}
 		people = append(people, map[string]any{"emailAddress": map[string]string{"address": string(a.Email), "name": name}, "type": "required"})
 	}
-	body := map[string]any{"subject": row.Title, "body": map[string]string{"contentType": "text", "content": row.Notes}, "start": map[string]string{"dateTime": start.Format("2006-01-02T15:04:05"), "timeZone": zone}, "end": map[string]string{"dateTime": end.Format("2006-01-02T15:04:05"), "timeZone": zone}, "isAllDay": row.AllDay, "location": map[string]string{"displayName": row.Location}, "attendees": people, "transactionId": stableTransactionID(row.ID + ":" + strconv.FormatInt(int64(row.RemoteGeneration), 10))}
+	body := map[string]any{"subject": row.Title, "body": map[string]string{"contentType": "text", "content": row.Notes}, "start": map[string]string{"dateTime": start.Format("2006-01-02T15:04:05"), "timeZone": zone}, "end": map[string]string{"dateTime": end.Format("2006-01-02T15:04:05"), "timeZone": zone}, "isAllDay": row.AllDay, "location": map[string]string{"displayName": row.Location}, "attendees": people, "transactionId": transactionID(row, row.RemoteGeneration)}
 	if row.Teams {
 		body["isOnlineMeeting"] = true
 		body["onlineMeetingProvider"] = "teamsForBusiness"
 	}
 	return json.Marshal(body)
+}
+
+// transactionID is the stable ID a create of row carries, so Outlook keeps one
+// event however often the create is retried (and a lost answer can be matched).
+func transactionID(row store.CalendarEvent, generation int32) string {
+	return stableTransactionID(row.ID + ":" + strconv.FormatInt(int64(generation), 10))
+}
+
+// patchBody is what a change sends to an event already in Outlook: never its
+// transaction ID, and the notes only when they changed and the event is no
+// Teams meeting (its body carries the join details; replacing it can turn the
+// online meeting off).
+func patchBody(row store.CalendarEvent, body []byte) ([]byte, error) {
+	var patch map[string]any
+	if err := json.Unmarshal(body, &patch); err != nil {
+		return nil, err
+	}
+	delete(patch, "transactionId")
+	var sent graphEvent
+	_ = json.Unmarshal(row.RemoteSnapshot, &sent)
+	if row.Teams || sent.OnlineMeeting != nil || (sent.Body.ContentType == "text" && strings.TrimSpace(sent.Body.Content) == strings.TrimSpace(row.Notes)) {
+		delete(patch, "body")
+	}
+	return json.Marshal(patch)
 }
 func toEmail(s string) openapi_types.Email { return openapi_types.Email(strings.TrimSpace(s)) }

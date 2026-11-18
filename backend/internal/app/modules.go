@@ -342,6 +342,12 @@ func (m *Modules) Server() *Server {
 	}
 }
 
+// OutsideJobHandlers are the core jobs that wait minutes on another service
+// and so run with no queue transaction open (see jobqueue.OutsideHandlers).
+func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
+	return m.Calendars.OutsideJobHandlers()
+}
+
 // JobHandlers merges every module's handlers for the core queue.
 func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 	all := jobqueue.Handlers{}

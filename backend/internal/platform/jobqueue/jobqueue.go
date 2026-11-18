@@ -61,6 +61,15 @@ type Handler func(ctx context.Context, tx pgx.Tx, job Job) error
 // Handlers maps each job kind to the code that runs it.
 type Handlers map[api.JobKind]Handler
 
+// OutsideHandler does a job's slow work (calls to other services that can
+// take minutes) with no transaction open: only marking the job done takes
+// one. What it writes commits on its own, so it must be safe to run again
+// (a job whose lease runs out is retried).
+type OutsideHandler func(ctx context.Context, job Job) error
+
+// OutsideHandlers maps job kinds to handlers that run outside a transaction.
+type OutsideHandlers map[api.JobKind]OutsideHandler
+
 // Enqueue queues a job inside tx: it only exists if tx commits. payload must
 // be the generated type for kind (e.g. api.DocumentExtractTextJob).
 func Enqueue(ctx context.Context, tx pgx.Tx, tenantID string, kind api.JobKind, payload any) (string, error) {
@@ -104,9 +113,11 @@ type Worker struct {
 	Queue    string
 	ID       string // unique per process, e.g. hostname:pid
 	Handlers Handlers
-	Logger   *slog.Logger
-	Lease    time.Duration // how long a claimed job is ours before others may retry it
-	Idle     time.Duration // how long to wait for new jobs when the queue is empty
+	// Outside are the kinds whose handlers run with no transaction open.
+	Outside OutsideHandlers
+	Logger  *slog.Logger
+	Lease   time.Duration // how long a claimed job is ours before others may retry it
+	Idle    time.Duration // how long to wait for new jobs when the queue is empty
 	// Tenant, if set, limits the worker to one company's jobs (tests: each
 	// test's worker runs only its own companies' jobs). Empty: every company.
 	Tenant string
@@ -201,6 +212,12 @@ func (w *Worker) handle(ctx context.Context, job Job) (err error) {
 			err = fmt.Errorf("panic: %v", r)
 		}
 	}()
+	if outside, ok := w.Outside[job.Kind]; ok {
+		if err := outside(ctx, job); err != nil {
+			return err
+		}
+		return database.InTx(ctx, w.Pool, authz.System(job.TenantID), func(tx pgx.Tx) error { return w.complete(ctx, tx, job) })
+	}
 	handler, ok := w.Handlers[job.Kind]
 	if !ok {
 		return fmt.Errorf("no handler for job kind %q on queue %q", job.Kind, w.Queue)
@@ -209,15 +226,20 @@ func (w *Worker) handle(ctx context.Context, job Job) (err error) {
 		if err := handler(ctx, tx, job); err != nil {
 			return err
 		}
-		var completed bool
-		if err := tx.QueryRow(ctx, `SELECT job_complete($1, $2)`, job.ID, w.ID).Scan(&completed); err != nil {
-			return err
-		}
-		if !completed {
-			return errLeaseLost
-		}
-		return nil
+		return w.complete(ctx, tx, job)
 	})
+}
+
+// complete marks the job done, in the transaction of its work (or its own).
+func (w *Worker) complete(ctx context.Context, tx pgx.Tx, job Job) error {
+	var completed bool
+	if err := tx.QueryRow(ctx, `SELECT job_complete($1, $2)`, job.ID, w.ID).Scan(&completed); err != nil {
+		return err
+	}
+	if !completed {
+		return errLeaseLost
+	}
+	return nil
 }
 
 const (
@@ -322,7 +344,9 @@ func (w *Worker) waitForNotifications(ctx context.Context, wakes []chan struct{}
 // checkHandlers refuses to start if a job kind on this queue has no handler.
 func (w *Worker) checkHandlers() error {
 	for _, kind := range KindsForQueue(w.Queue) {
-		if _, ok := w.Handlers[kind]; !ok {
+		_, inside := w.Handlers[kind]
+		_, outside := w.Outside[kind]
+		if !inside && !outside {
 			return fmt.Errorf("jobqueue: no handler registered for %q (queue %q); wire it in internal/app", kind, w.Queue)
 		}
 	}

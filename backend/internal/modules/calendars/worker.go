@@ -22,27 +22,57 @@ func needsReconnect(err error) bool {
 	return errors.As(err, &r) || (errors.As(err, &p) && (p.Status == 401 || p.Status == 403))
 }
 
-// A dedicated connection serializes this user's provider operations without
-// holding business-row locks or waiting for a spare worker-pool connection.
+// networkConns bounds the database connections Outlook work holds at once
+// (each holds one while it waits on Microsoft); the rest wait their turn.
+const networkConns = 4
+
+// A pooled connection serializes this user's provider operations without
+// holding business-row locks or a transaction while Microsoft answers; at
+// most networkConns are held at once, so Outlook work never starves the
+// pool (it used to open a new database connection per job).
 func (s *Service) network(ctx context.Context, tenant, user string, fn func(context.Context, *pgx.Conn) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	conn, err := pgx.ConnectConfig(ctx, s.pool.Config().ConnConfig.Copy())
+	select {
+	case s.netSlots <- struct{}{}:
+		defer func() { <-s.netSlots }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	pc, err := s.pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = conn.Close(context.Background()) }()
+	conn := pc.Conn()
 	q := store.New(conn)
 	if err := q.LockCalendarNetwork(ctx, store.LockCalendarNetworkParams{TenantID: tenant, UserID: user}); err != nil {
+		pc.Release()
 		return err
 	}
 	defer func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		_ = q.UnlockCalendarNetwork(cleanup, store.UnlockCalendarNetworkParams{TenantID: tenant, UserID: user})
+		if q.UnlockCalendarNetwork(cleanup, store.UnlockCalendarNetworkParams{TenantID: tenant, UserID: user}) != nil {
+			_ = pc.Hijack().Close(cleanup) // never return a connection that may still hold the lock
+			return
+		}
+		pc.Release()
 	}()
 	return fn(ctx, conn)
 }
+
+// connectionByID reads a connection in its own short transaction (jobs that
+// talk to Outlook hold none while they wait).
+func (s *Service) connectionByID(ctx context.Context, tenant, id string) (store.CalendarConnection, error) {
+	var row store.CalendarConnection
+	err := database.InTx(ctx, s.pool, authz.System(tenant), func(tx pgx.Tx) error {
+		var err error
+		row, err = store.New(tx).CalendarConnectionByID(ctx, id)
+		return err
+	})
+	return row, err
+}
+
 func (s *Service) access(ctx context.Context, conn *pgx.Conn, expected store.CalendarConnection) (string, error) {
 	var token string
 	err := database.InTx(ctx, conn, authz.System(expected.TenantID), func(tx pgx.Tx) error {

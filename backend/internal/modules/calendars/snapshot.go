@@ -22,6 +22,10 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 	}
 	busy := store.InsertOutlookBusyParams{UserID: c.UserID}
 	seen := map[string]bool{}
+	ours, err := s.byTransaction(ctx, q, c)
+	if err != nil {
+		return err
+	}
 	for _, e := range events {
 		start, end, err := e.times()
 		if err != nil {
@@ -33,6 +37,15 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 		if err != nil && !unknown {
 			return err
 		}
+		if mine, ok := ours[e.TransactionID]; ok && e.TransactionID != "" && (unknown || row.Source == "outlook") {
+			// Our create reached Outlook but its answer was lost: the event is
+			// this row's. Take it back from the import and push the row as it
+			// is now (a change, or the delete of a cancelled appointment).
+			if row, err = s.adopt(ctx, tx, c, mine, e); err != nil {
+				return err
+			}
+			unknown = false
+		}
 		source, sourceID := "outlook", e.ID
 		if !unknown && row.Source != "outlook" {
 			source, sourceID = row.Source, row.ID
@@ -41,6 +54,13 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 			}
 			if err := s.mergeRemote(ctx, tx, row, e); err != nil {
 				return err
+			}
+			if row.Source == "local" {
+				// Outlook has this appointment: its busy time (or Free) governs
+				// from now on, not the interval kept while it was on its way.
+				if err := q.ClearManagedBusy(ctx, store.ClearManagedBusyParams{UserID: row.UserID, Source: "local", SourceID: row.ID}); err != nil {
+					return err
+				}
 			}
 		} else if !e.IsCancelled {
 			attendees, _ := json.Marshal(e.attendees())
@@ -95,6 +115,35 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 	}
 	return nil
 }
+
+// byTransaction maps the transaction IDs this connection's creates carried
+// (the current and previous generation) to rows not tied to an event yet.
+func (s *Service) byTransaction(ctx context.Context, q *store.Queries, c store.CalendarConnection) (map[string]store.CalendarEvent, error) {
+	rows, err := q.UnreceiptedCalendarEvents(ctx, store.UnreceiptedCalendarEventsParams{UserID: c.UserID, ConnectionID: c.ID})
+	out := make(map[string]store.CalendarEvent, 2*len(rows))
+	for _, r := range rows {
+		out[transactionID(r, r.RemoteGeneration)] = r
+		if r.RemoteGeneration > 0 {
+			out[transactionID(r, r.RemoteGeneration-1)] = r
+		}
+	}
+	return out, err
+}
+
+func (s *Service) adopt(ctx context.Context, tx pgx.Tx, c store.CalendarConnection, row store.CalendarEvent, e graphEvent) (store.CalendarEvent, error) {
+	q := store.New(tx)
+	if err := q.ReleaseImportedRemote(ctx, store.ReleaseImportedRemoteParams{UserID: c.UserID, ConnectionID: ptr(c.ID), RemoteID: ptr(e.ID)}); err != nil {
+		return row, err
+	}
+	if err := q.AdoptCalendarRemote(ctx, store.AdoptCalendarRemoteParams{ID: row.ID, RemoteID: ptr(e.ID), RemoteKey: e.key(), ConnectionID: ptr(c.ID)}); err != nil {
+		return row, err
+	}
+	if err := s.queuePush(ctx, tx, c.TenantID, row.ID, c.ID); err != nil {
+		return row, err
+	}
+	return q.CalendarEvent(ctx, row.ID)
+}
+
 func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, e graphEvent) error {
 	if text(row.RemoteKey) == text(e.key()) || row.Version != row.SentVersion {
 		return nil

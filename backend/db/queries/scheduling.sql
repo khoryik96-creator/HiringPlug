@@ -106,3 +106,7 @@ SELECT user_id, count(*)::int AS busy FROM calendar_busy WHERE ends_at > now() G
 SELECT * FROM booking_link WHERE id= @id;
 -- name: CalendarBookings :many
 SELECT * FROM booking_link WHERE host_user_id= @user_id AND starts_at< @to_time::timestamptz AND starts_at+make_interval(mins=>duration_minutes)> @from_time::timestamptz;
+
+-- Which of these booking links are still booked (the calendar drops holds of the others).
+-- name: BookedLinkIDs :many
+SELECT id FROM booking_link WHERE id = ANY(@ids::text[]) AND status = 'booked';

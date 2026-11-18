@@ -251,3 +251,54 @@ func TestAJobThatCannotStartYetWaitsWithoutCountingAnAttemptOrQueuingAnother(t *
 	runUntil(t, w, id, "done")
 	assert.Equal(t, 4, tries)
 }
+
+func TestAnOutsideHandlerRunsWithNoTransactionOpenAndIsMarkedDone(t *testing.T) {
+	tenant := testutil.Current.NewTenant(t)
+	id, err := enqueue(t, tenant.ID, validPayload())
+	require.NoError(t, err)
+	ran := false
+	w := worker(func(context.Context, pgx.Tx, jobqueue.Job) error {
+		t.Error("the in-transaction handler must not run")
+		return nil
+	})
+	w.Handlers = jobqueue.Handlers{}
+	w.Outside = jobqueue.OutsideHandlers{api.JobKindDocumentTextExtracted: func(ctx context.Context, job jobqueue.Job) error {
+		if job.ID == id {
+			// It gets no transaction: what it writes, it writes in its own
+			// short ones, so nothing is held open while a slow call waits.
+			ran = true
+			return database.InTx(ctx, testutil.Current.App, authz.System(job.TenantID), func(pgx.Tx) error { return nil })
+		}
+		return nil
+	}}
+	runUntil(t, w, id, "done")
+	assert.True(t, ran)
+}
+
+func TestAnOutsideHandlersFailureIsRetried(t *testing.T) {
+	tenant := testutil.Current.NewTenant(t)
+	id, err := enqueue(t, tenant.ID, validPayload())
+	require.NoError(t, err)
+	w := worker(nil)
+	w.Handlers = jobqueue.Handlers{}
+	w.Outside = jobqueue.OutsideHandlers{api.JobKindDocumentTextExtracted: func(_ context.Context, job jobqueue.Job) error {
+		if job.ID == id {
+			return errors.New("outlook could not be reached")
+		}
+		return nil
+	}}
+	_, err = testutil.Current.Admin.Exec(context.Background(), `UPDATE job SET run_after = now() WHERE id = $1`, id)
+	require.NoError(t, err)
+	for range 20 {
+		if _, err := w.RunOnce(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if st := state(t, id); st.Attempts > 0 {
+			assert.Equal(t, "pending", st.Status)
+			require.NotNil(t, st.LastError)
+			assert.Contains(t, *st.LastError, "could not be reached")
+			return
+		}
+	}
+	t.Fatal("the job never ran")
+}

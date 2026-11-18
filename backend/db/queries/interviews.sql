@@ -70,3 +70,7 @@ WHERE status = 'scheduled' AND @user_id::text = ANY (interviewer_ids) AND ends_a
 -- Native calendar projection: complete range, without the list screen's cap.
 -- name: CalendarMeetings :many
 SELECT * FROM interview WHERE @user_id::text=ANY(interviewer_ids) AND starts_at< @to_time::timestamptz AND ends_at> @from_time::timestamptz;
+
+-- Which of these interviews still stand: not deleted or cancelled (the calendar drops holds of the others).
+-- name: StandingInterviewIDs :many
+SELECT id FROM interview WHERE id = ANY(@ids::text[]) AND status <> 'cancelled';

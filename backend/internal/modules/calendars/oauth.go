@@ -145,6 +145,11 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 		return err
 	}
 	return s.network(ctx, p.TenantID, p.UserID, func(ctx context.Context, conn *pgx.Conn) error {
+		// Another account: the interviews put into the old one come out of it
+		// (they would never be updated again there).
+		if old, err := s.liveConnection(ctx, conn, p); err == nil && (old.SubjectID != profile.ID || old.CalendarID != profile.CalendarID) {
+			s.withdraw(ctx, conn, old)
+		}
 		return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
 			q := store.New(tx)
 			if err := q.LockCalendarUser(ctx, p.UserID); err != nil {
@@ -225,10 +230,22 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 }
 func (s *Service) disconnect(ctx context.Context, p authz.Principal) error {
 	return s.network(ctx, p.TenantID, p.UserID, func(ctx context.Context, conn *pgx.Conn) error {
+		// The interviews and bookings HiringPlug put into Outlook come out:
+		// nothing would update them once disconnected. (Events the person
+		// made themselves stay: they are theirs.)
+		old, oldErr := s.liveConnection(ctx, conn, p)
+		if oldErr == nil {
+			s.withdraw(ctx, conn, old)
+		}
 		return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
 			q := store.New(tx)
 			if err := q.LockCalendarUser(ctx, p.UserID); err != nil {
 				return err
+			}
+			if oldErr == nil {
+				if err := q.ForgetPushedSourceHolds(ctx, ptr(old.ID)); err != nil {
+					return err
+				}
 			}
 			if err := q.DeleteCalendarConnection(ctx); err != nil {
 				return err
@@ -265,4 +282,36 @@ func (s *Service) askRefresh(ctx context.Context, p authz.Principal) error {
 		_, err = jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCalendarRefresh, api.CalendarRefreshJob{ConnectionId: row.ID, Sequence: int(row.SyncSequence)})
 		return err
 	})
+}
+
+// liveConnection is the user's current Outlook connection, if any.
+func (s *Service) liveConnection(ctx context.Context, conn *pgx.Conn, p authz.Principal) (store.CalendarConnection, error) {
+	var row store.CalendarConnection
+	err := database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
+		var err error
+		row, err = store.New(tx).CalendarConnection(ctx, p.UserID)
+		return err
+	})
+	return row, err
+}
+
+// withdraw deletes from an Outlook connection the interview and booking
+// holds HiringPlug put there, as far as Outlook still lets it: a connection
+// that no longer works keeps them (the person is told to remove them).
+func (s *Service) withdraw(ctx context.Context, conn *pgx.Conn, c store.CalendarConnection) {
+	token, err := s.access(ctx, conn, c)
+	if err != nil {
+		return
+	}
+	var holds []store.CalendarEvent
+	if err := database.InTx(ctx, conn, authz.System(c.TenantID), func(tx pgx.Tx) error {
+		var err error
+		holds, err = store.New(tx).PushedSourceHolds(ctx, store.PushedSourceHoldsParams{UserID: c.UserID, ConnectionID: ptr(c.ID)})
+		return err
+	}); err != nil {
+		return
+	}
+	for _, h := range holds {
+		_, _ = s.request(ctx, "DELETE", s.graph(s.calendarPath(c.CalendarID)+"/events/"+url.PathEscape(*h.RemoteID)), token, nil, "")
+	}
 }

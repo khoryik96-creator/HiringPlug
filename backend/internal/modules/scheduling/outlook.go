@@ -48,3 +48,13 @@ func (m *Module) CalendarMeetings(ctx context.Context, tx pgx.Tx, user string, f
 	}
 	return out, err
 }
+
+// BookedIDs are which of these booking links are still booked.
+func (m *Module) BookedIDs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]bool, error) {
+	rows, err := store.New(tx).BookedLinkIDs(ctx, ids)
+	out := make(map[string]bool, len(rows))
+	for _, id := range rows {
+		out[id] = true
+	}
+	return out, err
+}

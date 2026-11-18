@@ -89,10 +89,6 @@ x-error-codes:
     module: calendars
     status: 409
     description: Connect Outlook before requesting a refresh or a Teams meeting.
-  CALENDAR_UNAVAILABLE:
-    module: calendars
-    status: 503
-    description: Outlook availability is not current; refresh or reconnect before taking bookings.
   CANDIDATE_DUPLICATE_EMAIL:
     module: candidates
     status: 409
@@ -156,7 +152,7 @@ x-error-codes:
   INTERVIEW_CLASH:
     module: interviews
     status: 409
-    description: 'An interviewer already has an interview at that time. `details.clashes` lists them; send ignoreClashes: true to schedule anyway.'
+    description: 'An interviewer is not free then. `details.clashes` lists their other interviews, `details.calendarBusy` names those busy by their calendars and `details.calendarStale` those whose Outlook has not synced lately; send ignoreClashes: true to schedule anyway.'
   INTERVIEW_NOT_ALLOWED:
     module: interviews
     status: 422
@@ -3993,11 +3989,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/InterviewNotAllowed'}
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
   /v1/interviews:
     get:
       operationId: listInterviews
@@ -4061,11 +4052,6 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/InterviewNotAllowed'}
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
   /v1/interviews/{interviewId}/feedback:
     parameters:
       - $ref: '#/components/parameters/InterviewIdPath'
@@ -5810,11 +5796,6 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/PublicBooking'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
     post:
       operationId: bookPublicBooking
       tags: [scheduling]
@@ -5834,11 +5815,6 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/SchedulingConflict'}
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Error'}
         '429':
           description: Too many tries from this address (BOOKING_TOO_MANY_TRIES).
           content:
@@ -6393,7 +6369,6 @@ components:
         - BOOKING_TOO_MANY_TRIES
         - CALENDAR_EVENT_READ_ONLY
         - CALENDAR_NOT_CONNECTED
-        - CALENDAR_UNAVAILABLE
         - CANDIDATE_DUPLICATE_EMAIL
         - CAREERS_TOO_MANY_APPLICATIONS
         - COMPANY_DUPLICATE_NAME

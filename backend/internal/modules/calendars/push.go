@@ -16,12 +16,12 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
 
-func (s *Service) push(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 	var payload api.CalendarPushJob
 	if err := job.Decode(&payload); err != nil {
 		return err
 	}
-	initial, err := store.New(tx).CalendarConnectionByID(ctx, payload.ConnectionId)
+	initial, err := s.connectionByID(ctx, job.TenantID, payload.ConnectionId)
 	if database.IsNoRows(err) {
 		return nil
 	}
@@ -78,13 +78,7 @@ func (s *Service) push(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
 			}
 		}
 		if method == "PATCH" {
-			var patch map[string]any
-			if err := json.Unmarshal(body, &patch); err != nil {
-				return err
-			}
-			delete(patch, "transactionId")
-			body, err = json.Marshal(patch)
-			if err != nil {
+			if body, err = patchBody(row, body); err != nil {
 				return err
 			}
 		}
@@ -134,7 +128,16 @@ func (s *Service) receipt(ctx context.Context, conn *pgx.Conn, p authz.Principal
 	// The receipt commits independently of the queue transaction. A retry reuses
 	// both this ID and the stable Graph transactionId if the worker loses its lease.
 	return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
-		_, err := store.New(tx).SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
+		q := store.New(tx)
+		if remoteID != nil { // a sync may have imported this event before its receipt: it is ours
+			if err := q.ReleaseImportedRemote(ctx, store.ReleaseImportedRemoteParams{UserID: row.UserID, ConnectionID: ptr(c.ID), RemoteID: remoteID}); err != nil {
+				return err
+			}
+			if err := q.ReleaseImportedBusy(ctx, store.ReleaseImportedBusyParams{UserID: row.UserID, RemoteID: *remoteID}); err != nil {
+				return err
+			}
+		}
+		_, err := q.SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
 		return err
 	})
 }

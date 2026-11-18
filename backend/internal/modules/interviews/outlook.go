@@ -7,13 +7,14 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews/internal/store"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
 )
 
 // Calendar shares only scheduling facts, never feedback or candidate salaries.
 type OutlookCalendar interface {
 	SourceChanged(context.Context, pgx.Tx, string, string, string) error
-	BusyFor(context.Context, pgx.Tx, []string, time.Time, time.Time, string, string) ([]ical.Interval, error)
+	// Conflicts: interviewers busy by their calendars then (other interviews
+	// aside) and those whose Outlook is not current.
+	Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string) (busy, stale []string, err error)
 }
 
 func (m *Module) UseCalendar(c OutlookCalendar) { m.service.calendar = c }
@@ -42,6 +43,16 @@ func (m *Module) CalendarMeetings(ctx context.Context, tx pgx.Tx, user string, f
 	out := make([]CalendarMeeting, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, calendarMeeting(row))
+	}
+	return out, err
+}
+
+// StandingIDs are which of these interviews still stand (not deleted or cancelled).
+func (m *Module) StandingIDs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]bool, error) {
+	rows, err := store.New(tx).StandingInterviewIDs(ctx, ids)
+	out := make(map[string]bool, len(rows))
+	for _, id := range rows {
+		out[id] = true
 	}
 	return out, err
 }

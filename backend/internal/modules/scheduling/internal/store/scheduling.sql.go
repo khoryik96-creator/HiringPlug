@@ -59,6 +59,31 @@ func (q *Queries) Book(ctx context.Context, arg BookParams) (BookingLink, error)
 	return i, err
 }
 
+const bookedLinkIDs = `-- name: BookedLinkIDs :many
+SELECT id FROM booking_link WHERE id = ANY($1::text[]) AND status = 'booked'
+`
+
+// Which of these booking links are still booked (the calendar drops holds of the others).
+func (q *Queries) BookedLinkIDs(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, bookedLinkIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const bookingLinkByToken = `-- name: BookingLinkByToken :one
 SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE token_hash = $1
 `

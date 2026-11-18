@@ -48,6 +48,26 @@ describe("interviews", () => {
     expect(sentBody(post, 1)).toMatchObject({ ignoreClashes: true });
   });
 
+  it("offers to go ahead over a busy or unsynced calendar too, naming who", async () => {
+    reads([]);
+    const post = vi.spyOn(api, "POST")
+      .mockResolvedValueOnce(failure("INTERVIEW_CLASH", "An interviewer has a calendar appointment at that time.", {
+        clashes: [], calendarBusy: ["Aina"], calendarStale: ["Demo"],
+      }, 409))
+      .mockResolvedValueOnce(ok(interview()));
+    renderWithClient(<ApplicationInterviews applicationId="appl_1" closed={false} permissions={[...RECRUITER, "interviews:read", "interviews:schedule"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Schedule interview" }));
+    fireEvent.change(screen.getByLabelText("Date and time"), { target: { value: "2026-11-10T10:00" } });
+    fireEvent.click(await screen.findByLabelText("Aina"));
+    fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Aina: an appointment in their calendar");
+    expect(alert.textContent).toContain("Demo: their Outlook has not synced lately");
+    fireEvent.click(within(alert).getByRole("button", { name: "Schedule anyway" })); // there was none without named clashes
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(2); });
+    expect(sentBody(post, 1)).toMatchObject({ ignoreClashes: true });
+  });
+
   it("asks interviewers for feedback once the interview has taken place", async () => {
     reads([]);
     const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(interview()));

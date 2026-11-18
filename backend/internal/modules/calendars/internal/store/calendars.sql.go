@@ -10,6 +10,62 @@ import (
 	"time"
 )
 
+const activeSourceHolds = `-- name: ActiveSourceHolds :many
+SELECT source,source_id FROM calendar_event WHERE user_id= $1 AND source IN ('interview','booking') AND status='active' AND ends_at> $2::timestamptz AND source_id IS NOT NULL
+`
+
+type ActiveSourceHoldsParams struct {
+	UserID   string
+	FromTime time.Time
+}
+
+type ActiveSourceHoldsRow struct {
+	Source   string
+	SourceID *string
+}
+
+// Live interview and booking holds (checked against their sources at each sync).
+func (q *Queries) ActiveSourceHolds(ctx context.Context, arg ActiveSourceHoldsParams) ([]ActiveSourceHoldsRow, error) {
+	rows, err := q.db.Query(ctx, activeSourceHolds, arg.UserID, arg.FromTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActiveSourceHoldsRow
+	for rows.Next() {
+		var i ActiveSourceHoldsRow
+		if err := rows.Scan(&i.Source, &i.SourceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adoptCalendarRemote = `-- name: AdoptCalendarRemote :exec
+UPDATE calendar_event SET remote_id= $1,remote_key=$2,remote_connection= $3,sync_status='pending',sync_error=NULL WHERE id= $4
+`
+
+type AdoptCalendarRemoteParams struct {
+	RemoteID     *string
+	RemoteKey    *string
+	ConnectionID *string
+	ID           string
+}
+
+func (q *Queries) AdoptCalendarRemote(ctx context.Context, arg AdoptCalendarRemoteParams) error {
+	_, err := q.db.Exec(ctx, adoptCalendarRemote,
+		arg.RemoteID,
+		arg.RemoteKey,
+		arg.ConnectionID,
+		arg.ID,
+	)
+	return err
+}
+
 const askOutlookRefresh = `-- name: AskOutlookRefresh :one
 UPDATE calendar_connection SET sync_sequence=sync_sequence+1,status=CASE WHEN status='reconnect' THEN status ELSE 'pending' END WHERE user_id=app_current_user() AND status<>'disconnected' RETURNING tenant_id, user_id, id, version, subject_id, address, app_client_id, calendar_id, calendar_name, teams_available, sealed_tokens, status, sync_sequence, synced_at, sync_error
 `
@@ -44,6 +100,61 @@ UPDATE calendar_event SET sync_status='failed',sync_error='Calendar account chan
 func (q *Queries) BlockReroutedCalendarInvites(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, blockReroutedCalendarInvites)
 	return err
+}
+
+const calendarBusyRows = `-- name: CalendarBusyRows :many
+SELECT user_id,starts_at,ends_at,origin,source,source_id FROM outlook_busy WHERE user_id=ANY($1::text[]) AND starts_at< $2::timestamptz AND ends_at> $3::timestamptz AND NOT(source= $4::text AND source_id= $5::text) ORDER BY starts_at
+`
+
+type CalendarBusyRowsParams struct {
+	UserIds    []string
+	ToTime     time.Time
+	FromTime   time.Time
+	ExceptKind string
+	ExceptID   string
+}
+
+type CalendarBusyRowsRow struct {
+	UserID   string
+	StartsAt time.Time
+	EndsAt   time.Time
+	Origin   string
+	Source   string
+	SourceID string
+}
+
+// Busy times with where they come from (stale interview and booking holds are dropped by the service).
+func (q *Queries) CalendarBusyRows(ctx context.Context, arg CalendarBusyRowsParams) ([]CalendarBusyRowsRow, error) {
+	rows, err := q.db.Query(ctx, calendarBusyRows,
+		arg.UserIds,
+		arg.ToTime,
+		arg.FromTime,
+		arg.ExceptKind,
+		arg.ExceptID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CalendarBusyRowsRow
+	for rows.Next() {
+		var i CalendarBusyRowsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.Origin,
+			&i.Source,
+			&i.SourceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const calendarConnection = `-- name: CalendarConnection :one
@@ -205,11 +316,17 @@ func (q *Queries) CancelCalendarEvent(ctx context.Context, arg CancelCalendarEve
 }
 
 const cancelCalendarHold = `-- name: CancelCalendarHold :one
-UPDATE calendar_event SET status='cancelled',version=version+1,sync_status='pending',updated_at=now() WHERE id= $1 AND status<>'cancelled' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
+UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,$1),version=version+1,sync_status='pending',updated_at=now() WHERE id= $2 AND status<>'cancelled' AND source_version<= $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
 `
 
-func (q *Queries) CancelCalendarHold(ctx context.Context, id string) (CalendarEvent, error) {
-	row := q.db.QueryRow(ctx, cancelCalendarHold, id)
+type CancelCalendarHoldParams struct {
+	SourceVersion int32
+	ID            string
+}
+
+// An older version of the source never cancels a hold a newer one made.
+func (q *Queries) CancelCalendarHold(ctx context.Context, arg CancelCalendarHoldParams) (CalendarEvent, error) {
+	row := q.db.QueryRow(ctx, cancelCalendarHold, arg.SourceVersion, arg.ID)
 	var i CalendarEvent
 	err := row.Scan(
 		&i.ID,
@@ -317,6 +434,33 @@ func (q *Queries) ClearOutlookBusy(ctx context.Context, userID string) error {
 	return err
 }
 
+const clearSourceBusy = `-- name: ClearSourceBusy :exec
+DELETE FROM outlook_busy WHERE user_id= $1 AND source= $2 AND source_id= $3
+`
+
+type ClearSourceBusyParams struct {
+	UserID   string
+	Source   string
+	SourceID string
+}
+
+// A hold HiringPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
+func (q *Queries) ClearSourceBusy(ctx context.Context, arg ClearSourceBusyParams) error {
+	_, err := q.db.Exec(ctx, clearSourceBusy, arg.UserID, arg.Source, arg.SourceID)
+	return err
+}
+
+const currentCalendarTenant = `-- name: CurrentCalendarTenant :one
+SELECT app_current_tenant()::text
+`
+
+func (q *Queries) CurrentCalendarTenant(ctx context.Context) (string, error) {
+	row := q.db.QueryRow(ctx, currentCalendarTenant)
+	var column_1 string
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const deleteCalendarConnection = `-- name: DeleteCalendarConnection :exec
 UPDATE calendar_connection SET status='disconnected',sealed_tokens='',sync_sequence=sync_sequence+1 WHERE user_id=app_current_user()
 `
@@ -365,6 +509,15 @@ func (q *Queries) FinishOutlookRefresh(ctx context.Context, arg FinishOutlookRef
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const forgetPushedSourceHolds = `-- name: ForgetPushedSourceHolds :exec
+UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND remote_connection= $1 AND source IN ('interview','booking')
+`
+
+func (q *Queries) ForgetPushedSourceHolds(ctx context.Context, connectionID *string) error {
+	_, err := q.db.Exec(ctx, forgetPushedSourceHolds, connectionID)
+	return err
 }
 
 const importOutlookEvent = `-- name: ImportOutlookEvent :exec
@@ -573,6 +726,21 @@ func (q *Queries) LockCalendarNetwork(ctx context.Context, arg LockCalendarNetwo
 	return err
 }
 
+const lockCalendarSource = `-- name: LockCalendarSource :exec
+SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || $1::text || ':' || $2::text,0))
+`
+
+type LockCalendarSourceParams struct {
+	Kind     string
+	SourceID string
+}
+
+// Source jobs for one interview or booking run one at a time.
+func (q *Queries) LockCalendarSource(ctx context.Context, arg LockCalendarSourceParams) error {
+	_, err := q.db.Exec(ctx, lockCalendarSource, arg.Kind, arg.SourceID)
+	return err
+}
+
 const lockCalendarUser = `-- name: LockCalendarUser :exec
 SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':outlook:' || $1::text,0))
 `
@@ -595,49 +763,6 @@ type MarkCalendarConflictParams struct {
 func (q *Queries) MarkCalendarConflict(ctx context.Context, arg MarkCalendarConflictParams) error {
 	_, err := q.db.Exec(ctx, markCalendarConflict, arg.RemoteKey, arg.RemoteSnapshot, arg.ID)
 	return err
-}
-
-const outlookBusyForUsers = `-- name: OutlookBusyForUsers :many
-SELECT DISTINCT starts_at,ends_at FROM outlook_busy WHERE user_id=ANY($1::text[]) AND starts_at< $2::timestamptz AND ends_at> $3::timestamptz AND NOT(source= $4::text AND source_id= $5::text) ORDER BY starts_at
-`
-
-type OutlookBusyForUsersParams struct {
-	UserIds    []string
-	ToTime     time.Time
-	FromTime   time.Time
-	ExceptKind string
-	ExceptID   string
-}
-
-type OutlookBusyForUsersRow struct {
-	StartsAt time.Time
-	EndsAt   time.Time
-}
-
-func (q *Queries) OutlookBusyForUsers(ctx context.Context, arg OutlookBusyForUsersParams) ([]OutlookBusyForUsersRow, error) {
-	rows, err := q.db.Query(ctx, outlookBusyForUsers,
-		arg.UserIds,
-		arg.ToTime,
-		arg.FromTime,
-		arg.ExceptKind,
-		arg.ExceptID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []OutlookBusyForUsersRow
-	for rows.Next() {
-		var i OutlookBusyForUsersRow
-		if err := rows.Scan(&i.StartsAt, &i.EndsAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const outlookHealthForUsers = `-- name: OutlookHealthForUsers :many
@@ -771,6 +896,66 @@ func (q *Queries) PreviousCalendarConnection(ctx context.Context, userID string)
 	return i, err
 }
 
+const pushedSourceHolds = `-- name: PushedSourceHolds :many
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id IS NOT NULL AND source IN ('interview','booking')
+`
+
+type PushedSourceHoldsParams struct {
+	UserID       string
+	ConnectionID *string
+}
+
+// Interview and booking holds put into one Outlook connection (taken out of it on disconnect or account change).
+func (q *Queries) PushedSourceHolds(ctx context.Context, arg PushedSourceHoldsParams) ([]CalendarEvent, error) {
+	rows, err := q.db.Query(ctx, pushedSourceHolds, arg.UserID, arg.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CalendarEvent
+	for rows.Next() {
+		var i CalendarEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.UserID,
+			&i.Version,
+			&i.Title,
+			&i.Notes,
+			&i.Location,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.TimeZone,
+			&i.AllDay,
+			&i.Teams,
+			&i.Attendees,
+			&i.Source,
+			&i.SourceID,
+			&i.SourceVersion,
+			&i.Status,
+			&i.SyncStatus,
+			&i.SyncError,
+			&i.RemoteGeneration,
+			&i.RemoteID,
+			&i.RemoteKey,
+			&i.RemoteConnection,
+			&i.SentVersion,
+			&i.WebUrl,
+			&i.JoinUrl,
+			&i.RemoteSnapshot,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const rebindCalendarTargets = `-- name: RebindCalendarTargets :exec
 UPDATE calendar_event SET remote_connection= $1 WHERE user_id=app_current_user() AND source<>'outlook' AND remote_connection= $2
 `
@@ -800,6 +985,37 @@ func (q *Queries) RefreshCalendarTokens(ctx context.Context, arg RefreshCalendar
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const releaseImportedBusy = `-- name: ReleaseImportedBusy :exec
+DELETE FROM outlook_busy WHERE user_id= $1 AND origin='outlook' AND source='outlook' AND source_id= $2
+`
+
+type ReleaseImportedBusyParams struct {
+	UserID   string
+	RemoteID string
+}
+
+func (q *Queries) ReleaseImportedBusy(ctx context.Context, arg ReleaseImportedBusyParams) error {
+	_, err := q.db.Exec(ctx, releaseImportedBusy, arg.UserID, arg.RemoteID)
+	return err
+}
+
+const releaseImportedRemote = `-- name: ReleaseImportedRemote :exec
+DELETE FROM calendar_event WHERE user_id= $1 AND remote_connection= $2 AND remote_id= $3 AND source='outlook'
+`
+
+type ReleaseImportedRemoteParams struct {
+	UserID       string
+	ConnectionID *string
+	RemoteID     *string
+}
+
+// An Outlook event imported before its HiringPlug receipt arrived (the create
+// succeeded but its answer was lost) gives its identity back to the managed row.
+func (q *Queries) ReleaseImportedRemote(ctx context.Context, arg ReleaseImportedRemoteParams) error {
+	_, err := q.db.Exec(ctx, releaseImportedRemote, arg.UserID, arg.ConnectionID, arg.RemoteID)
+	return err
 }
 
 const remoteCalendarEvent = `-- name: RemoteCalendarEvent :one
@@ -1204,6 +1420,67 @@ func (q *Queries) UnlockCalendarNetwork(ctx context.Context, arg UnlockCalendarN
 	return err
 }
 
+const unreceiptedCalendarEvents = `-- name: UnreceiptedCalendarEvents :many
+SELECT id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at FROM calendar_event WHERE user_id= $1 AND source<>'outlook' AND (remote_id IS NULL OR remote_connection IS DISTINCT FROM $2::text) AND updated_at> now()-interval '120 days'
+`
+
+type UnreceiptedCalendarEventsParams struct {
+	UserID       string
+	ConnectionID string
+}
+
+// HiringPlug rows not yet tied to an event in this connection: one may own an
+// Outlook event its lost receipt never named (matched by transaction ID).
+func (q *Queries) UnreceiptedCalendarEvents(ctx context.Context, arg UnreceiptedCalendarEventsParams) ([]CalendarEvent, error) {
+	rows, err := q.db.Query(ctx, unreceiptedCalendarEvents, arg.UserID, arg.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CalendarEvent
+	for rows.Next() {
+		var i CalendarEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.UserID,
+			&i.Version,
+			&i.Title,
+			&i.Notes,
+			&i.Location,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.TimeZone,
+			&i.AllDay,
+			&i.Teams,
+			&i.Attendees,
+			&i.Source,
+			&i.SourceID,
+			&i.SourceVersion,
+			&i.Status,
+			&i.SyncStatus,
+			&i.SyncError,
+			&i.RemoteGeneration,
+			&i.RemoteID,
+			&i.RemoteKey,
+			&i.RemoteConnection,
+			&i.SentVersion,
+			&i.WebUrl,
+			&i.JoinUrl,
+			&i.RemoteSnapshot,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCalendarEvent = `-- name: UpdateCalendarEvent :one
 UPDATE calendar_event SET title= $1,notes= $2,location= $3,starts_at= $4,ends_at= $5,time_zone= $6,all_day= $7,teams= $8,attendees= $9,version=version+1,sync_status= $10,sync_error=NULL,updated_at=now()
 WHERE id= $11 AND version= $12 AND source='local' AND status='active' RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
@@ -1317,7 +1594,7 @@ const upsertCalendarHold = `-- name: UpsertCalendarHold :one
 INSERT INTO calendar_event(tenant_id,user_id,title,location,starts_at,ends_at,time_zone,source,source_id,source_version,status,sync_status)
 VALUES(app_current_tenant(),$1,$2,$3,$4,$5,'UTC',$6,$7,$8,$9,$10)
 ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.title,location=excluded.location,starts_at=excluded.starts_at,ends_at=excluded.ends_at,source_version=excluded.source_version,status=excluded.status,version=calendar_event.version+1,sync_status=excluded.sync_status,sync_error=NULL,updated_at=now()
-WHERE calendar_event.source_version<excluded.source_version OR calendar_event.status<>excluded.status RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
+WHERE calendar_event.source_version<excluded.source_version OR (calendar_event.source_version=excluded.source_version AND calendar_event.status<>excluded.status) RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
 `
 
 type UpsertCalendarHoldParams struct {

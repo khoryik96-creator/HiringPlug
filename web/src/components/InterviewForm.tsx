@@ -48,7 +48,12 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
       onDone();
     },
   });
-  const clashes = save.error instanceof ApiError && save.error.code === "INTERVIEW_CLASH" ? (save.error.details.clashes as Clash[]) : null;
+  // Any clash can be scheduled over: other interviews (named), calendars busy
+  // then, and calendars whose Outlook has not synced lately.
+  const clash = save.error instanceof ApiError && save.error.code === "INTERVIEW_CLASH" ? save.error.details : null;
+  const clashes = clash ? ((clash.clashes as Clash[] | undefined) ?? []) : null;
+  const calendarBusy = (clash?.calendarBusy as string[] | undefined) ?? [];
+  const calendarStale = (clash?.calendarStale as string[] | undefined) ?? [];
   const toggle = (id: string) => {
     setForm({ ...form, interviewerIds: form.interviewerIds.includes(id) ? form.interviewerIds.filter((x) => x !== id) : [...form.interviewerIds, id] });
   };
@@ -84,7 +89,11 @@ export function InterviewForm({ applicationId, interview, onDone }: { applicatio
       {clashes ? (
         <div className="full warning" role="alert">
           <p>Already busy then:</p>
-          <ul>{clashes.map((c, i) => <li key={i}>{c.interviewers.join(", ")}: {c.title}, {formatWhen(c.startsAt)}</li>)}</ul>
+          <ul>
+            {clashes.map((c, i) => <li key={i}>{c.interviewers.join(", ")}: {c.title}, {formatWhen(c.startsAt)}</li>)}
+            {calendarBusy.map((name) => <li key={`busy-${name}`}>{name}: an appointment in their calendar</li>)}
+            {calendarStale.map((name) => <li key={`stale-${name}`}>{name}: their Outlook has not synced lately, so they may be busy</li>)}
+          </ul>
           <button type="button" onClick={() => { save.mutate(true); }}>Schedule anyway</button>
         </div>
       ) : (

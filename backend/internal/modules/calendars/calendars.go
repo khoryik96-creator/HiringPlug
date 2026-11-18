@@ -13,7 +13,6 @@ import (
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
-	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -33,6 +32,10 @@ type Deps struct {
 	Sources interface {
 		Meeting(context.Context, pgx.Tx, string, string) (Meeting, error)
 		MeetingsFor(context.Context, pgx.Tx, string, time.Time, time.Time) ([]Meeting, error)
+		// Existing says which of these interviews or bookings still stand
+		// (an interview not deleted or cancelled, a link still booked):
+		// holds of the others are stale.
+		Existing(ctx context.Context, tx pgx.Tx, kind string, ids []string) (map[string]bool, error)
 	}
 	Users interface {
 		CalendarUserActive(context.Context, pgx.Tx, string) (bool, error)
@@ -51,7 +54,7 @@ type Module struct {
 }
 
 func New(pool *pgxpool.Pool) *Module {
-	s := &Service{pool: pool, now: time.Now}
+	s := &Service{pool: pool, now: time.Now, netSlots: make(chan struct{}, networkConns)}
 	return &Module{service: s, HTTP: &HTTP{svc: s}}
 }
 func (m *Module) ConnectOutlookWith(deps Deps, c Config) {
@@ -76,7 +79,13 @@ func (m *Module) ConnectOutlookWith(deps Deps, c Config) {
 	m.service.config = c
 }
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindCalendarRefresh: m.service.refresh, api.JobKindCalendarPush: m.service.push, api.JobKindCalendarSourceChanged: m.service.sourceChanged}
+	return jobqueue.Handlers{api.JobKindCalendarSourceChanged: m.service.sourceChanged}
+}
+
+// OutsideJobHandlers are the jobs that talk to Outlook (up to minutes): they
+// run with no queue transaction open, each step in its own short one.
+func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
+	return jobqueue.OutsideHandlers{api.JobKindCalendarRefresh: m.service.refresh, api.JobKindCalendarPush: m.service.push}
 }
 func (m *Module) SourceChanged(ctx context.Context, tx pgx.Tx, tenant, kind, id string) error {
 	_, err := jobqueue.Enqueue(ctx, tx, tenant, api.JobKindCalendarSourceChanged, api.CalendarSourceJob{Kind: api.CalendarSourceJobKind(kind), SourceId: id})
@@ -86,10 +95,23 @@ func (m *Module) BusyFor(ctx context.Context, tx pgx.Tx, users []string, from, t
 	return m.service.busy(ctx, tx, users, from, to, exceptKind, exceptID)
 }
 
+// Conflicts are the interviewers busy by their calendars (other interviews
+// aside) and those whose Outlook is not current, for scheduling an interview.
+func (m *Module) Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string) (busy, stale []string, err error) {
+	return m.service.conflicts(ctx, tx, users, from, to, exceptInterview)
+}
+
+// Connected is whether the user's Outlook is working, so it sends them their
+// invitations; with a failing or broken connection HiringPlug emails them.
 func (m *Module) Connected(ctx context.Context, tx pgx.Tx, user string) (bool, error) {
 	rows, err := store.New(tx).OutlookHealthForUsers(ctx, []string{user})
-	if database.IsNoRows(err) {
-		return false, nil
+	if err != nil {
+		return false, err
 	}
-	return len(rows) > 0, err
+	for _, h := range rows {
+		if h.Status == "ok" || h.Status == "pending" {
+			return true, nil
+		}
+	}
+	return false, nil
 }

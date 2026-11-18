@@ -15,9 +15,6 @@ x-module:
       - sourcer
       - hiring_manager
   errorCodes:
-    CALENDAR_UNAVAILABLE:
-      status: 503
-      description: Outlook availability is not current; refresh or reconnect before taking bookings.
     CALENDAR_EVENT_READ_ONLY:
       status: 409
       description: Manage linked interviews and bookings in their original HiringPlug screen; external Outlook events

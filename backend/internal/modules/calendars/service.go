@@ -25,6 +25,8 @@ type Service struct {
 	deps   Deps
 	config Config
 	now    func() time.Time
+	// Slots for Outlook work holding a database connection (see network).
+	netSlots chan struct{}
 }
 
 func personal(ctx context.Context) (authz.Principal, error) {
@@ -93,7 +95,20 @@ func (s *Service) list(ctx context.Context, p authz.Principal, from, to time.Tim
 		if len(rows) > 1000 {
 			return apperr.Validation(apperr.FieldErrors{{Field: "to", Message: "this range has more than 1,000 events; choose fewer days"}})
 		}
+		keys := []sourceKey{}
 		for _, row := range rows {
+			if row.SourceID != nil && row.Status == "active" {
+				keys = append(keys, sourceKey{row.Source, *row.SourceID})
+			}
+		}
+		gone, err := s.gone(ctx, tx, keys) // an interview deleted with its candidate is not shown, and is cleared
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if row.SourceID != nil && gone[sourceKey{row.Source, *row.SourceID}] {
+				continue
+			}
 			item, err := eventAPI(row)
 			if err != nil {
 				return err

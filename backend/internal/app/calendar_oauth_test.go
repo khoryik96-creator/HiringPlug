@@ -125,7 +125,7 @@ func TestCalendarTransientPushRetriesAndConflictsNeedExplicitResolution(t *testi
 	assert.Len(t, f.events, 1)
 	f.mu.Unlock()
 }
-func TestCalendarPartialPagesKeepBusyTimesAndFailClosed(t *testing.T) {
+func TestCalendarPartialPagesKeepBusyTimesAndCanBeScheduledOver(t *testing.T) {
 	t.Parallel()
 	a := newTestApp(t)
 	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
@@ -149,7 +149,18 @@ func TestCalendarPartialPagesKeepBusyTimesAndFailClosed(t *testing.T) {
 	job := a.createJob(token, map[string]any{"companyId": company.Id, "title": "Engineer"})
 	candidate := a.createCandidate(token, map[string]any{"firstName": "Synthetic"})
 	application := a.addToJob(token, job.Id, candidate.Id)
-	r := a.request("POST", "/v1/applications/"+application.Id+"/interviews", token, map[string]any{"title": "Interview", "startsAt": start, "durationMinutes": 30, "mode": "phone", "interviewerIds": []string{user}})
-	assert.Equal(t, 503, r.Status, "unknown provider availability must not be treated as free")
+	body := map[string]any{"title": "Interview", "startsAt": start, "durationMinutes": 30, "mode": "phone", "interviewerIds": []string{user}}
+	r := a.request("POST", "/v1/applications/"+application.Id+"/interviews", token, body)
+	// A sync that failed keeps the last busy times and says so; it never
+	// blocks scheduling outright (it used to answer 503 with no way past it).
+	require.Equal(t, 409, r.Status, "%s", r.Body)
+	e := r.Error().Error
+	assert.Equal(t, api.ErrorCodeINTERVIEWCLASH, e.Code)
+	require.NotNil(t, e.Details)
+	assert.Len(t, (*e.Details)["calendarBusy"], 1, "the dentist appointment, by its owner's name only")
+	assert.Len(t, (*e.Details)["calendarStale"], 1, "and the failed sync")
 	assert.NotContains(t, string(r.Body), "dentist")
+	body["ignoreClashes"] = true
+	r = a.request("POST", "/v1/applications/"+application.Id+"/interviews", token, body)
+	assert.Equal(t, 201, r.Status, "scheduled anyway: %s", r.Body)
 }

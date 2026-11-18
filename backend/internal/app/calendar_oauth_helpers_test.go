@@ -35,6 +35,10 @@ type outlookFixture struct {
 	nextID                      int
 	writeStatus                 int
 	brokenPages                 bool
+	account                     string         // the signed-in Microsoft account ("synthetic-account" when empty)
+	loseCreateAnswer            int            // creates whose event is stored but whose answer is lost (a 503)
+	lastPatch                   map[string]any // what the last change sent
+	config                      calendars.Config
 }
 
 func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
@@ -51,13 +55,15 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "synthetic-access", "refresh_token": "synthetic-rotated-refresh", "token_type": "Bearer", "expires_in": expires, "scope": "Calendars.ReadWrite User.Read offline_access"})
 	case r.URL.Path == "/me":
-		_, _ = w.Write([]byte(`{"id":"synthetic-account","mail":"recruiter@example.test"}`))
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": f.signedIn(), "mail": f.signedIn() + "@example.test"})
 	case r.URL.Path == "/me/calendar":
 		_, _ = w.Write([]byte(`{"id":"default","name":"Calendar","canEdit":true,"allowedOnlineMeetingProviders":["teamsForBusiness"]}`))
 	case strings.HasSuffix(r.URL.Path, "/calendarView"):
 		items := []map[string]any{}
 		for _, e := range f.events {
-			items = append(items, e)
+			if accountOf(e) == f.signedIn() { // each account sees its own calendar
+				items = append(items, e)
+			}
 		}
 		body := map[string]any{"value": items}
 		if f.brokenPages {
@@ -72,12 +78,24 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		var e map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&e)
+		for _, old := range f.events { // a mailbox keeps one event per transactionId
+			if tx, _ := e["transactionId"].(string); tx != "" && old["transactionId"] == tx && accountOf(old) == f.signedIn() {
+				_ = json.NewEncoder(w).Encode(old)
+				return
+			}
+		}
 		f.nextID++
 		id := "remote-" + time.Now().Format("150405.000000000")
 		e["id"] = id
 		e["changeKey"] = "v1"
 		e["showAs"] = "busy"
+		e["_account"] = f.signedIn()
 		f.events[id] = e
+		if f.loseCreateAnswer > 0 {
+			f.loseCreateAnswer--
+			w.WriteHeader(503) // stored, but the answer never arrives
+			return
+		}
 		_ = json.NewEncoder(w).Encode(e)
 	case strings.Contains(r.URL.Path, "/events/"):
 		id := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
@@ -99,6 +117,7 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			}
 			var patch map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&patch)
+			f.lastPatch = patch
 			for key, v := range patch {
 				e[key] = v
 			}
@@ -109,12 +128,29 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(404)
 	}
 }
+
+// accountOf is whose calendar an event is in (events a test seeds: the first account's).
+func accountOf(e map[string]any) string {
+	if a, _ := e["_account"].(string); a != "" {
+		return a
+	}
+	return "synthetic-account"
+}
+
+// signedIn is the account the fixture's tokens belong to (callers hold f.mu).
+func (f *outlookFixture) signedIn() string {
+	if f.account == "" {
+		return "synthetic-account"
+	}
+	return f.account
+}
 func setupOutlook(t *testing.T, a *testApp) *outlookFixture {
 	t.Helper()
 	f := &outlookFixture{events: map[string]map[string]any{}}
 	server := httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(server.Close)
-	a.modules.Calendars.ConnectOutlookWith(calendars.Deps{Apps: calendarTestApps{}}, calendars.Config{KeysSecret: []byte("synthetic-calendar-key-01234567890123456789"), PublicURL: "http://app.test", HTTP: server.Client(), Provider: calendars.Provider{AuthorizeURL: server.URL + "/authorize", TokenURL: server.URL + "/token", GraphURL: server.URL}})
+	f.config = calendars.Config{KeysSecret: []byte("synthetic-calendar-key-01234567890123456789"), PublicURL: "http://app.test", HTTP: server.Client(), Provider: calendars.Provider{AuthorizeURL: server.URL + "/authorize", TokenURL: server.URL + "/token", GraphURL: server.URL}}
+	a.modules.Calendars.ConnectOutlookWith(calendars.Deps{Apps: calendarTestApps{}}, f.config)
 	return f
 }
 func outlookTicket(t *testing.T, a *testApp, token string) string {
@@ -155,4 +191,13 @@ func calendarEventState(t *testing.T, id string) (version int, status string) {
 	t.Helper()
 	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), "SELECT version,sync_status FROM calendar_event WHERE id=$1", id).Scan(&version, &status))
 	return
+}
+
+// runPostponedCalendarJobs makes the tenant's postponed jobs due (a retry an
+// Outlook error put off) and runs the queue until it is idle.
+func runPostponedCalendarJobs(t *testing.T, a *testApp, tenant string) {
+	t.Helper()
+	_, err := testutil.Current.Admin.Exec(t.Context(), `UPDATE job SET run_after = now() WHERE tenant_id = $1 AND status = 'pending'`, tenant)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, a, tenant)
 }

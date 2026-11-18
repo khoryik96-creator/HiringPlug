@@ -16,12 +16,12 @@ import (
 
 // Refresh replaces a complete window atomically. Partial pages never erase
 // known busy times. A sequence makes obsolete or duplicated jobs harmless.
-func (s *Service) refresh(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+func (s *Service) refresh(ctx context.Context, job jobqueue.Job) error {
 	var payload api.CalendarRefreshJob
 	if err := job.Decode(&payload); err != nil {
 		return err
 	}
-	initial, err := store.New(tx).CalendarConnectionByID(ctx, payload.ConnectionId)
+	initial, err := s.connectionByID(ctx, job.TenantID, payload.ConnectionId)
 	if database.IsNoRows(err) {
 		return nil
 	}
@@ -109,6 +109,9 @@ func (s *Service) refresh(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 			if err := s.applySnapshot(ctx, t, current, events, missing, from, to); err != nil {
 				return err
 			}
+			if err := s.reconcileHolds(ctx, t, current.UserID, from); err != nil {
+				return err
+			}
 			changed, err := q.FinishOutlookRefresh(ctx, store.FinishOutlookRefreshParams{ID: current.ID, Sequence: current.SyncSequence})
 			if err != nil || changed == 0 {
 				return err
@@ -151,4 +154,22 @@ func (s *Service) refreshFailure(ctx context.Context, conn *pgx.Conn, p authz.Pr
 		_, err = jobqueue.EnqueueAt(ctx, tx, p.TenantID, api.JobKindCalendarRefresh, api.CalendarRefreshJob{ConnectionId: c.ID, Sequence: int(c.SyncSequence) + 1}, s.now().Add(delay))
 		return err
 	})
+}
+
+// reconcileHolds checks the user's live interview and booking holds against
+// their sources at each sync: one whose interview was deleted (with its
+// candidate, say) is cancelled and taken out of Outlook.
+func (s *Service) reconcileHolds(ctx context.Context, tx pgx.Tx, user string, from time.Time) error {
+	holds, err := store.New(tx).ActiveSourceHolds(ctx, store.ActiveSourceHoldsParams{UserID: user, FromTime: from})
+	if err != nil {
+		return err
+	}
+	keys := make([]sourceKey, 0, len(holds))
+	for _, h := range holds {
+		if h.SourceID != nil {
+			keys = append(keys, sourceKey{h.Source, *h.SourceID})
+		}
+	}
+	_, err = s.gone(ctx, tx, keys)
+	return err
 }

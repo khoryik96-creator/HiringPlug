@@ -52,9 +52,13 @@ SELECT * FROM calendar_event WHERE source= @source AND source_id= @source_id;
 INSERT INTO calendar_event(tenant_id,user_id,title,location,starts_at,ends_at,time_zone,source,source_id,source_version,status,sync_status)
 VALUES(app_current_tenant(),@user_id,@title,@location,@starts_at,@ends_at,'UTC',@source,@source_id,@source_version,@status,@sync_status)
 ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.title,location=excluded.location,starts_at=excluded.starts_at,ends_at=excluded.ends_at,source_version=excluded.source_version,status=excluded.status,version=calendar_event.version+1,sync_status=excluded.sync_status,sync_error=NULL,updated_at=now()
-WHERE calendar_event.source_version<excluded.source_version OR calendar_event.status<>excluded.status RETURNING *;
+WHERE calendar_event.source_version<excluded.source_version OR (calendar_event.source_version=excluded.source_version AND calendar_event.status<>excluded.status) RETURNING *;
+-- An older version of the source never cancels a hold a newer one made.
 -- name: CancelCalendarHold :one
-UPDATE calendar_event SET status='cancelled',version=version+1,sync_status='pending',updated_at=now() WHERE id= @id AND status<>'cancelled' RETURNING *;
+UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,@source_version),version=version+1,sync_status='pending',updated_at=now() WHERE id= @id AND status<>'cancelled' AND source_version<= @source_version RETURNING *;
+-- Source jobs for one interview or booking run one at a time.
+-- name: LockCalendarSource :exec
+SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || @kind::text || ':' || @source_id::text,0));
 -- name: SaveCalendarReceipt :execrows
 UPDATE calendar_event SET remote_id=sqlc.narg(remote_id),remote_key=sqlc.narg(remote_key),remote_connection= @connection_id,sent_version= @sent_version,web_url=sqlc.narg(web_url),join_url=sqlc.narg(join_url),remote_snapshot= @remote_snapshot,
  sync_status=CASE WHEN version= @sent_version THEN 'synced' ELSE 'pending' END,sync_error=NULL
@@ -92,8 +96,11 @@ SELECT * FROM outlook_availability WHERE user_id=ANY(@user_ids::text[]);
 DELETE FROM outlook_busy WHERE user_id= @user_id AND origin='outlook';
 -- name: InsertOutlookBusy :exec
 INSERT INTO outlook_busy(tenant_id,user_id,starts_at,ends_at,source,source_id) SELECT app_current_tenant(),@user_id,unnest(@starts::timestamptz[]),unnest(@ends::timestamptz[]),unnest(@sources::text[]),unnest(@source_ids::text[]);
--- name: OutlookBusyForUsers :many
-SELECT DISTINCT starts_at,ends_at FROM outlook_busy WHERE user_id=ANY(@user_ids::text[]) AND starts_at< @to_time::timestamptz AND ends_at> @from_time::timestamptz AND NOT(source= @except_kind::text AND source_id= @except_id::text) ORDER BY starts_at;
+-- Busy times with where they come from (stale interview and booking holds are dropped by the service).
+-- name: CalendarBusyRows :many
+SELECT user_id,starts_at,ends_at,origin,source,source_id FROM outlook_busy WHERE user_id=ANY(@user_ids::text[]) AND starts_at< @to_time::timestamptz AND ends_at> @from_time::timestamptz AND NOT(source= @except_kind::text AND source_id= @except_id::text) ORDER BY starts_at;
+-- name: CurrentCalendarTenant :one
+SELECT app_current_tenant()::text;
 -- name: RebindCalendarTargets :exec
 UPDATE calendar_event SET remote_connection= @connection_id WHERE user_id=app_current_user() AND source<>'outlook' AND remote_connection= @previous_connection;
 -- name: BlockReroutedCalendarInvites :exec
@@ -106,6 +113,9 @@ SELECT pg_advisory_unlock(hashtextextended('calendar-network:' || @tenant_id::te
 
 -- name: ClearManagedBusy :exec
 DELETE FROM outlook_busy WHERE user_id= @user_id AND origin='local' AND source= @source AND source_id= @source_id;
+-- A hold HiringPlug cancelled frees its time at once, its Outlook copy's too (that copy is being deleted).
+-- name: ClearSourceBusy :exec
+DELETE FROM outlook_busy WHERE user_id= @user_id AND source= @source AND source_id= @source_id;
 -- name: SaveManagedBusy :exec
 INSERT INTO outlook_busy(tenant_id,user_id,origin,source,source_id,starts_at,ends_at) VALUES(app_current_tenant(),@user_id,'local',@source,@source_id,@starts_at,@ends_at);
 
@@ -114,3 +124,24 @@ SELECT * FROM calendar_connection WHERE user_id= @user_id;
 
 -- name: PrepareCalendarTargets :exec
 UPDATE calendar_event SET sync_status='pending' WHERE user_id=app_current_user() AND source<>'outlook' AND sync_status='local';
+
+-- An Outlook event imported before its HiringPlug receipt arrived (the create
+-- succeeded but its answer was lost) gives its identity back to the managed row.
+-- name: ReleaseImportedRemote :exec
+DELETE FROM calendar_event WHERE user_id= @user_id AND remote_connection= @connection_id AND remote_id= @remote_id AND source='outlook';
+-- name: ReleaseImportedBusy :exec
+DELETE FROM outlook_busy WHERE user_id= @user_id AND origin='outlook' AND source='outlook' AND source_id= @remote_id;
+-- HiringPlug rows not yet tied to an event in this connection: one may own an
+-- Outlook event its lost receipt never named (matched by transaction ID).
+-- name: UnreceiptedCalendarEvents :many
+SELECT * FROM calendar_event WHERE user_id= @user_id AND source<>'outlook' AND (remote_id IS NULL OR remote_connection IS DISTINCT FROM @connection_id::text) AND updated_at> now()-interval '120 days';
+-- name: AdoptCalendarRemote :exec
+UPDATE calendar_event SET remote_id= @remote_id,remote_key=sqlc.narg(remote_key),remote_connection= @connection_id,sync_status='pending',sync_error=NULL WHERE id= @id;
+-- Interview and booking holds put into one Outlook connection (taken out of it on disconnect or account change).
+-- name: PushedSourceHolds :many
+SELECT * FROM calendar_event WHERE user_id= @user_id AND remote_connection= @connection_id AND remote_id IS NOT NULL AND source IN ('interview','booking');
+-- name: ForgetPushedSourceHolds :exec
+UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND remote_connection= @connection_id AND source IN ('interview','booking');
+-- Live interview and booking holds (checked against their sources at each sync).
+-- name: ActiveSourceHolds :many
+SELECT source,source_id FROM calendar_event WHERE user_id= @user_id AND source IN ('interview','booking') AND status='active' AND ends_at> @from_time::timestamptz AND source_id IS NOT NULL;

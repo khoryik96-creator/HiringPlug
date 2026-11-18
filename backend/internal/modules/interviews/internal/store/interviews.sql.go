@@ -448,6 +448,31 @@ func (q *Queries) MarkReminded(ctx context.Context, arg MarkRemindedParams) erro
 	return err
 }
 
+const standingInterviewIDs = `-- name: StandingInterviewIDs :many
+SELECT id FROM interview WHERE id = ANY($1::text[]) AND status <> 'cancelled'
+`
+
+// Which of these interviews still stand: not deleted or cancelled (the calendar drops holds of the others).
+func (q *Queries) StandingInterviewIDs(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, standingInterviewIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateInterview = `-- name: UpdateInterview :one
 UPDATE interview SET
   title = $1, starts_at = $2, duration_minutes = $3,

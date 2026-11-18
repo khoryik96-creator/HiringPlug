@@ -56,10 +56,22 @@ func (a calendarSources) MeetingsFor(ctx context.Context, tx pgx.Tx, user string
 		out = append(out, interviewMeeting(m))
 	}
 	bookings, err := a.scheduling.CalendarMeetings(ctx, tx, user, from, to)
+	if err != nil {
+		return nil, err
+	}
 	for _, m := range bookings {
 		out = append(out, bookingMeeting(m))
 	}
-	return out, err
+	return out, nil
+}
+func (a calendarSources) Existing(ctx context.Context, tx pgx.Tx, kind string, ids []string) (map[string]bool, error) {
+	switch kind {
+	case "interview":
+		return a.interviews.StandingIDs(ctx, tx, ids)
+	case "booking":
+		return a.scheduling.BookedIDs(ctx, tx, ids)
+	}
+	return map[string]bool{}, nil
 }
 func interviewMeeting(m interviews.CalendarMeeting) calendars.Meeting {
 	return calendars.Meeting{Kind: "interview", ID: m.ID, Title: m.Title, Location: m.Location, Version: m.Version, Users: m.Users, Start: m.Start, End: m.End, Cancelled: m.Cancelled}

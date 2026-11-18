@@ -19,7 +19,7 @@ x-module:
   errorCodes:
     INTERVIEW_CLASH:
       status: 409
-      description: "An interviewer already has an interview at that time. `details.clashes` lists them; send ignoreClashes: true to schedule anyway."
+      description: "An interviewer is not free then. `details.clashes` lists their other interviews, `details.calendarBusy` names those busy by their calendars and `details.calendarStale` those whose Outlook has not synced lately; send ignoreClashes: true to schedule anyway."
     INTERVIEW_NOT_ALLOWED:
       status: 422
       description: The interview cannot be scheduled or changed like this (closed application, feedback from someone who is not an interviewer, ...). The message says why.
@@ -69,12 +69,6 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InterviewNotAllowed' }
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-
   /v1/interviews:
     get:
       operationId: listInterviews
@@ -139,12 +133,6 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InterviewNotAllowed' }
-        '503':
-          description: Connected calendar availability is unavailable or stale
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-
   /v1/interviews/{interviewId}/feedback:
     parameters:
       - $ref: '#/components/parameters/InterviewIdPath'
