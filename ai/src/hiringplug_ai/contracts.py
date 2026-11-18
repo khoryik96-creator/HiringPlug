@@ -26,6 +26,7 @@ class Permission(StrEnum):
     automations_manage = "automations:manage"
     automations_read = "automations:read"
     bin_manage = "bin:manage"
+    calendars_use = "calendars:use"
     candidates_compensation_read = "candidates.compensation:read"
     candidates_compensation_update = "candidates.compensation:update"
     candidates_status_update = "candidates.status:update"
@@ -111,6 +112,9 @@ class ErrorCode(StrEnum):
     BOOKING_CLOSED = "BOOKING_CLOSED"
     BOOKING_SLOT_TAKEN = "BOOKING_SLOT_TAKEN"
     BOOKING_TOO_MANY_TRIES = "BOOKING_TOO_MANY_TRIES"
+    CALENDAR_EVENT_READ_ONLY = "CALENDAR_EVENT_READ_ONLY"
+    CALENDAR_NOT_CONNECTED = "CALENDAR_NOT_CONNECTED"
+    CALENDAR_UNAVAILABLE = "CALENDAR_UNAVAILABLE"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
@@ -169,6 +173,9 @@ class JobKind(StrEnum):
     automation_event = "automation.event"
     automation_run = "automation.run"
     bin_purge = "bin.purge"
+    calendar_push = "calendar.push"
+    calendar_refresh = "calendar.refresh"
+    calendar_source_changed = "calendar.source_changed"
     company_autofill = "company.autofill"
     company_industried = "company.industried"
     company_industry = "company.industry"
@@ -743,6 +750,164 @@ class BinPurgeJob(BaseModel):
     entryId: BinEntryId
 
 
+class CalendarEventId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^cev_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class Status1(StrEnum):
+    disconnected = "disconnected"
+    pending = "pending"
+    ok = "ok"
+    failed = "failed"
+    reconnect = "reconnect"
+
+
+class OutlookConnection(BaseModel):
+    connected: bool
+    ready: bool
+    callbackUrl: str
+    status: Status1
+    version: int
+    address: Annotated[str | None, Field(...)]
+    calendarName: Annotated[str | None, Field(...)]
+    lastSyncAt: Annotated[AwareDatetime | None, Field(...)]
+    error: Annotated[str | None, Field(...)]
+    teamsAvailable: bool
+
+
+class CalendarAttendee(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    email: EmailStr
+    name: Annotated[str | None, Field(max_length=150)] = None
+
+
+class CalendarEventInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    startsAt: AwareDatetime
+    endsAt: AwareDatetime
+    timeZone: Annotated[str, Field(max_length=64, min_length=1)]
+    notes: Annotated[str | None, Field(max_length=4000)] = None
+    location: Annotated[str | None, Field(max_length=500)] = None
+    attendees: Annotated[list[CalendarAttendee], Field(max_length=50)]
+    allDay: bool
+    teams: bool
+
+
+class CalendarEventUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    title: Annotated[str, Field(max_length=200, min_length=1)]
+    startsAt: AwareDatetime
+    endsAt: AwareDatetime
+    timeZone: Annotated[str, Field(max_length=64, min_length=1)]
+    notes: Annotated[str | None, Field(max_length=4000)] = None
+    location: Annotated[str | None, Field(max_length=500)] = None
+    attendees: Annotated[list[CalendarAttendee], Field(max_length=50)]
+    allDay: bool
+    teams: bool
+    version: Annotated[int, Field(ge=1)]
+
+
+class Source(StrEnum):
+    local = "local"
+    interview = "interview"
+    booking = "booking"
+    outlook = "outlook"
+
+
+class Status2(StrEnum):
+    active = "active"
+    cancelled = "cancelled"
+
+
+class SyncStatus(StrEnum):
+    local = "local"
+    pending = "pending"
+    synced = "synced"
+    conflict = "conflict"
+    failed = "failed"
+
+
+class CalendarEvent(BaseModel):
+    id: CalendarEventId
+    version: int
+    title: str
+    startsAt: AwareDatetime
+    endsAt: AwareDatetime
+    timeZone: str
+    notes: str
+    location: str
+    attendees: list[CalendarAttendee]
+    allDay: bool
+    teams: bool
+    source: Source
+    sourceId: Annotated[str | None, Field(...)]
+    status: Status2
+    syncStatus: SyncStatus
+    syncError: Annotated[str | None, Field(...)]
+    webUrl: Annotated[str | None, Field(...)]
+    joinUrl: Annotated[str | None, Field(...)]
+    editable: bool
+
+
+class CalendarEventList(BaseModel):
+    items: list[CalendarEvent]
+    connection: OutlookConnection
+
+
+class CalendarAuthorize(BaseModel):
+    url: AnyUrl
+
+
+class CalendarCompleteInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ticket: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class CalendarVersionInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+
+
+class CalendarRefreshJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    connectionId: str
+    sequence: int
+
+
+class CalendarPushJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    eventId: CalendarEventId
+    connectionId: str
+
+
+class Kind(StrEnum):
+    interview = "interview"
+    booking = "booking"
+
+
+class CalendarSourceJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Kind
+    sourceId: str
+
+
 class OwnerInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -1048,7 +1213,7 @@ class CandidateMerge(BaseModel):
     version: Annotated[int, Field(description="The version of the candidate you keep.", ge=1)]
 
 
-class Kind(StrEnum):
+class Kind1(StrEnum):
     name = "name"
     email = "email"
     phone = "phone"
@@ -1613,7 +1778,7 @@ class LinkedinMove(BaseModel):
     since: Annotated[str, Field(description="YYYY or YYYY-MM; empty when not shown.", max_length=7)]
 
 
-class Status1(StrEnum):
+class Status3(StrEnum):
     pending = "pending"
     observed = "observed"
     failed = "failed"
@@ -1624,7 +1789,7 @@ class ContactLinkedinCheck(BaseModel):
     id: ContactLinkedinCheckId
     contactId: ContactId
     status: Annotated[
-        Status1,
+        Status3,
         Field(description="observed = read (the dates may still be unclear); failed = could not be read."),
     ]
     joined: Annotated[LinkedinYearMonth | None, Field(...)]
@@ -1687,7 +1852,7 @@ class ContactEmploymentCheckId(RootModel[str]):
     ]
 
 
-class Status2(StrEnum):
+class Status4(StrEnum):
     reading = "reading"
     read = "read"
     failed = "failed"
@@ -2060,7 +2225,7 @@ class MailAppProvider(StrEnum):
     google = "google"
 
 
-class Source(StrEnum):
+class Source1(StrEnum):
     agency = "agency"
     server = "server"
     none = "none"
@@ -2068,7 +2233,7 @@ class Source(StrEnum):
 
 class MailApp(BaseModel):
     source: Annotated[
-        Source,
+        Source1,
         Field(
             description="agency: entered here; server: the server's own settings file; none: not set up (people cannot connect this provider)."
         ),
@@ -2646,13 +2811,13 @@ class PasswordResetRequest(BaseModel):
     email: Annotated[EmailStr, Field(max_length=254)]
 
 
-class Kind1(StrEnum):
+class Kind2(StrEnum):
     invite = "invite"
     reset = "reset"
 
 
 class AuthLink(BaseModel):
-    kind: Kind1
+    kind: Kind2
     email: str
     name: str
     companyName: str
@@ -2784,7 +2949,7 @@ class IndustryEmployer(BaseModel):
     current: bool
 
 
-class Status3(StrEnum):
+class Status5(StrEnum):
     ready = "ready"
     needs_review = "needs_review"
 
@@ -2795,7 +2960,7 @@ class IndustrySuggestion(BaseModel):
     )
     catalogueVersion: int
     candidateVersion: int
-    status: Status3
+    status: Status5
     reason: str
     categoryId: IndustryId | None = None
     employerIndex: int | None = None
@@ -3152,7 +3317,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status4(StrEnum):
+class Status6(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -4603,7 +4768,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status5(StrEnum):
+class Status7(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -4616,7 +4781,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status5
+    status: Status7
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -4724,7 +4889,7 @@ class OffsiteStatus(StrEnum):
     off = "off"
 
 
-class Status6(StrEnum):
+class Status8(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -4744,7 +4909,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status6
+    status: Status8
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -5670,7 +5835,7 @@ class ContactEmailSuggestion(BaseModel):
 
 class ContactEmployment(BaseModel):
     id: ContactEmploymentCheckId
-    status: Status2
+    status: Status4
     verdict: Annotated[
         Verdict,
         Field(
@@ -6118,7 +6283,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status4, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status6, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]
@@ -6742,7 +6907,7 @@ class ScreeningCallResult(BaseModel):
 
 class CandidateFindSearch(BaseModel):
     text: Annotated[str, Field(description="The search as typed.")]
-    kind: Kind
+    kind: Kind1
     company: Annotated[str | None, Field(description='From "name - company".')]
     error: Annotated[str | None, Field(description="Why it could not be run as typed (nothing is searched).")]
     items: Annotated[list[CandidateFound], Field(description="The matches (at most 10).")]

@@ -16,7 +16,7 @@ cannot take the core down:
 |---|---|---|---|
 | Email verifier | Check contact emails | Syntax, MX, disposable and role checks built in; mailbox (SMTP) checks need port 25, often blocked, so a provider can be plugged in. Results keep their evidence and date. | M3 |
 | Company auto-fill | Fill company details from a name or website | Website structured data, then AI extraction; optional Apollo / Google Places / business registry. Suggestions with source; a person accepts. | M3 |
-| Calendars | Interview scheduling | Google and Microsoft 365 (OAuth per user); free/busy and invites | M3–M5 |
+| Calendars | Interviews, booking links and personal appointments | [Microsoft Outlook OAuth per user](calendar.md), private holds and busy-time checks; optional ICS feeds remain | Built (Google OAuth planned) |
 | Email | Send, templates, two-way sync | Outbound via SMTP or a provider; inbox sync with Gmail / Microsoft Graph; messages linked to candidates and contacts | M5 |
 | Careers page | Public job list and apply form | A small public site per company, served from the API under `public` permissions; applications enter the pipeline | M5 |
 | Job ads puller ✅ | Find companies that are hiring | Public ATS feeds (Greenhouse, Lever, Ashby, SmartRecruiters), careers pages with JobPosting markup (robots.txt respected), ads saved by hand; licensed data later. No automated scraping of LinkedIn or JobStreet (their terms forbid it). | 6.4 |

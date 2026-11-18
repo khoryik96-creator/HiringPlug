@@ -100,3 +100,9 @@ SELECT * FROM schedule ORDER BY user_id LIMIT 1000;
 
 -- name: BusyCounts :many
 SELECT user_id, count(*)::int AS busy FROM calendar_busy WHERE ends_at > now() GROUP BY user_id;
+
+-- Read projections without taking the booking mutation lock.
+-- name: CalendarBooking :one
+SELECT * FROM booking_link WHERE id= @id;
+-- name: CalendarBookings :many
+SELECT * FROM booking_link WHERE host_user_id= @user_id AND starts_at< @to_time::timestamptz AND starts_at+make_interval(mins=>duration_minutes)> @from_time::timestamptz;

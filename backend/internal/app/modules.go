@@ -22,6 +22,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/assistant"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/automations"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/bin"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
@@ -82,6 +83,7 @@ type Modules struct {
 	Automations  *automations.Module
 	Folders      *folders.Module
 	Bin          *bin.Module
+	Calendars    *calendars.Module
 	// scaffold:fields
 }
 
@@ -197,6 +199,10 @@ func NewModules(d Deps) *Modules {
 	m.Candidates.UseFolders(m.Folders.ItemsOf(folders.Candidates))
 	m.Contacts.UseFolders(m.Folders.ItemsOf(folders.Contacts))
 	m.Companies.UseFolders(m.Folders.ItemsOf(folders.Companies))
+	m.Calendars = calendars.New(d.Pool)
+	m.Calendars.ConnectOutlookWith(calendars.Deps{Apps: calendarApps{m.Emails}, Sources: calendarSources{m.Interviews, m.Scheduling}, Users: calendarUsers{m.Identity}}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL})
+	m.Interviews.UseCalendar(m.Calendars)
+	m.Scheduling.UseCalendar(m.Calendars)
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
 	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders)
@@ -256,6 +262,7 @@ type (
 	automationsHTTP  = automations.HTTP
 	foldersHTTP      = folders.HTTP
 	binHTTP          = bin.HTTP
+	calendarsHTTP    = calendars.HTTP
 	// scaffold:aliases
 )
 
@@ -292,6 +299,7 @@ type Server struct {
 	*automationsHTTP
 	*foldersHTTP
 	*binHTTP
+	*calendarsHTTP
 	// scaffold:embeds
 }
 
@@ -329,6 +337,7 @@ func (m *Modules) Server() *Server {
 		automationsHTTP:  m.Automations.HTTP,
 		foldersHTTP:      m.Folders.HTTP,
 		binHTTP:          m.Bin.HTTP,
+		calendarsHTTP:    m.Calendars.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -352,6 +361,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Matching.JobHandlers(),
 		m.AIProviders.JobHandlers(),
 		m.Scheduling.JobHandlers(),
+		m.Calendars.JobHandlers(),
 		m.Bin.JobHandlers(),
 		// scaffold:job-handlers
 	} {

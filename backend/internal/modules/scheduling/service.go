@@ -25,6 +25,7 @@ const linkLife = 30 * 24 * time.Hour
 
 // Service holds the module's use cases.
 type Service struct {
+	calendar OutlookCalendar
 	pool     *pgxpool.Pool
 	deps     Deps
 	settings Config
@@ -268,6 +269,11 @@ func (s *Service) CancelLink(ctx context.Context, p authz.Principal, id string) 
 		if row.Status != "cancelled" {
 			if row, err = q.CancelBookingLink(ctx, id); err != nil {
 				return err
+			}
+			if s.calendar != nil {
+				if err := s.calendar.SourceChanged(ctx, tx, p.TenantID, "booking", id); err != nil {
+					return err
+				}
 			}
 			if wasBooked {
 				if err := s.sendInvites(ctx, tx, p.TenantID, row, "CANCEL", cand); err != nil {

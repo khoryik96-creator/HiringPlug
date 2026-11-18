@@ -75,6 +75,55 @@ func (q *Queries) BusyFor(ctx context.Context, arg BusyForParams) ([]BusyForRow,
 	return items, nil
 }
 
+const calendarMeetings = `-- name: CalendarMeetings :many
+SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview WHERE $1::text=ANY(interviewer_ids) AND starts_at< $2::timestamptz AND ends_at> $3::timestamptz
+`
+
+type CalendarMeetingsParams struct {
+	UserID   string
+	ToTime   time.Time
+	FromTime time.Time
+}
+
+// Native calendar projection: complete range, without the list screen's cap.
+func (q *Queries) CalendarMeetings(ctx context.Context, arg CalendarMeetingsParams) ([]Interview, error) {
+	rows, err := q.db.Query(ctx, calendarMeetings, arg.UserID, arg.ToTime, arg.FromTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Interview
+	for rows.Next() {
+		var i Interview
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.ApplicationID,
+			&i.Version,
+			&i.Title,
+			&i.StartsAt,
+			&i.DurationMinutes,
+			&i.EndsAt,
+			&i.Mode,
+			&i.Location,
+			&i.Instructions,
+			&i.Status,
+			&i.InterviewerIds,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RemindedFor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clashes = `-- name: Clashes :many
 SELECT id, title, starts_at, ends_at, interviewer_ids FROM interview
 WHERE status = 'scheduled' AND id <> $1::text AND interviewer_ids && $2::text[]

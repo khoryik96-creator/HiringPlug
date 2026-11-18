@@ -18,6 +18,7 @@ import (
 
 // Service holds the interview use cases.
 type Service struct {
+	calendar     OutlookCalendar
 	pool         *pgxpool.Pool
 	applications Applications
 	users        Users
@@ -87,6 +88,11 @@ func (s *Service) Schedule(ctx context.Context, p authz.Principal, appID string,
 		}); err != nil {
 			return err
 		}
+		if s.calendar != nil {
+			if err := s.calendar.SourceChanged(ctx, tx, p.TenantID, "interview", row.ID); err != nil {
+				return err
+			}
+		}
 		out, err = s.one(ctx, tx, p, row)
 		return err
 	})
@@ -113,8 +119,20 @@ func (s *Service) check(ctx context.Context, tx pgx.Tx, q *store.Queries, selfID
 		return nil
 	}
 	clashes, err := q.Clashes(ctx, store.ClashesParams{ExcludeID: selfID, InterviewerIds: d.Interviewers, StartsAt: d.StartsAt, EndsAt: d.Ends()})
-	if err != nil || len(clashes) == 0 {
+	if err != nil {
 		return err
+	}
+	if s.calendar != nil {
+		busy, err := s.calendar.BusyFor(ctx, tx, d.Interviewers, d.StartsAt, d.Ends(), "interview", selfID)
+		if err != nil {
+			return err
+		}
+		if len(busy) > 0 {
+			return apperr.New(api.ErrorCodeINTERVIEWCLASH, "An interviewer has a calendar appointment at that time.")
+		}
+	}
+	if len(clashes) == 0 {
+		return nil
 	}
 	names, err := s.users.UserNames(ctx, tx, d.Interviewers)
 	if err != nil {
@@ -237,6 +255,11 @@ func (s *Service) Update(ctx context.Context, p authz.Principal, id string, expe
 		// Moved, or on again: remind of the new time (the old reminder sees the change and does nothing).
 		if !after.StartsAt.Equal(before.StartsAt) || before.Status != "scheduled" {
 			if err := s.queueReminder(ctx, tx, p.TenantID, id, after); err != nil {
+				return err
+			}
+		}
+		if s.calendar != nil {
+			if err := s.calendar.SourceChanged(ctx, tx, p.TenantID, "interview", id); err != nil {
 				return err
 			}
 		}

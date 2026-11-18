@@ -69,6 +69,11 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+        '503':
+          description: Connected calendar availability is unavailable or stale
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /v1/interviews:
     get:
@@ -134,6 +139,11 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+        '503':
+          description: Connected calendar availability is unavailable or stale
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /v1/interviews/{interviewId}/feedback:
     parameters:

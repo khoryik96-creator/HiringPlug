@@ -1,0 +1,175 @@
+package calendars
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/mail"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
+)
+
+type graphTime struct{ DateTime, TimeZone string }
+
+func (t graphTime) instant() (time.Time, error) {
+	if value, err := time.Parse(time.RFC3339Nano, t.DateTime); err == nil {
+		return value, nil
+	}
+	loc := time.UTC
+	if t.TimeZone != "" && t.TimeZone != "UTC" {
+		var err error
+		loc, err = time.LoadLocation(t.TimeZone)
+		if err != nil {
+			return time.Time{}, errors.New("outlook returned an unsupported event time zone")
+		}
+	}
+	value, err := time.ParseInLocation("2006-01-02T15:04:05.999999999", t.DateTime, loc)
+	if err != nil {
+		return time.Time{}, errors.New("outlook returned an invalid event time")
+	}
+	return value, nil
+}
+
+type graphAttendee struct {
+	EmailAddress struct{ Address, Name string }
+	Type         string
+}
+type graphEvent struct {
+	Body                                                 struct{ ContentType, Content string }
+	ID, Subject, BodyPreview, ChangeKey, WebLink, ShowAs string
+	ETag                                                 string `json:"@odata.etag"`
+	Start, End                                           graphTime
+	IsAllDay, IsCancelled, IsOrganizer                   bool
+	Location                                             struct{ DisplayName string }
+	OnlineMeeting                                        *struct{ JoinURL string }
+	Attendees                                            []graphAttendee
+}
+
+func (e graphEvent) times() (time.Time, time.Time, error) {
+	start, err := e.Start.instant()
+	if err != nil {
+		return start, time.Time{}, err
+	}
+	end, err := e.End.instant()
+	if err != nil || !end.After(start) {
+		return start, end, errors.New("outlook returned an invalid event interval")
+	}
+	return start, end, nil
+}
+func (e graphEvent) key() *string {
+	v := e.ETag
+	if v == "" && e.ChangeKey != "" {
+		v = `W/"` + e.ChangeKey + `"`
+	}
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+func (e graphEvent) attendees() []api.CalendarAttendee {
+	out := make([]api.CalendarAttendee, 0, len(e.Attendees))
+	for _, a := range e.Attendees {
+		address := strings.TrimSpace(a.EmailAddress.Address)
+		parsed, err := mail.ParseAddress(address)
+		if err != nil || parsed.Address != address || len(address) > 254 || strings.ContainsAny(address, "\r\n") {
+			continue
+		}
+		name := bounded(a.EmailAddress.Name, 150)
+		out = append(out, api.CalendarAttendee{Email: toEmail(a.EmailAddress.Address), Name: &name})
+	}
+	return out
+}
+func (e graphEvent) join() *string {
+	if e.OnlineMeeting == nil {
+		return nil
+	}
+	return safeWebURL(e.OnlineMeeting.JoinURL)
+}
+func (s *Service) readEvents(ctx context.Context, c store.CalendarConnection, token string, from, to time.Time) ([]graphEvent, error) {
+	path := s.calendarPath(c.CalendarID) + "/calendarView"
+	q := url.Values{"startDateTime": {from.UTC().Format(time.RFC3339)}, "endDateTime": {to.UTC().Format(time.RFC3339)}, "$top": {"250"}, "$select": {"id,subject,body,bodyPreview,start,end,isAllDay,isCancelled,isOrganizer,sensitivity,showAs,location,onlineMeeting,webLink,changeKey,attendees"}}
+	next := s.graph(path) + "?" + q.Encode()
+	seen := map[string]bool{}
+	ids := map[string]bool{}
+	out := []graphEvent{}
+	for page := 0; next != ""; page++ {
+		if page >= 100 || seen[next] || !s.validNext(next, path) {
+			return nil, errors.New("outlook calendar pagination could not be verified; previous busy times were kept")
+		}
+		seen[next] = true
+		raw, err := s.request(ctx, "GET", next, token, nil, "")
+		if err != nil {
+			return nil, err
+		}
+		var p struct {
+			Value *[]graphEvent `json:"value"`
+			Next  string        `json:"@odata.nextLink"`
+		}
+		if json.Unmarshal(raw, &p) != nil || p.Value == nil {
+			return nil, errors.New("outlook returned an invalid calendar page")
+		}
+		for _, e := range *p.Value {
+			if e.ID == "" || ids[e.ID] {
+				return nil, errors.New("outlook repeated or omitted an event identity; refresh again")
+			}
+			if _, _, err := e.times(); err != nil {
+				return nil, err
+			}
+			if len(e.Attendees) > 100 || len(out) >= 10000 {
+				return nil, errors.New("outlook calendar exceeds this sync's event limit; previous busy times were kept")
+			}
+			ids[e.ID] = true
+			out = append(out, e)
+		}
+		next = p.Next
+	}
+	return out, nil
+}
+func (s *Service) oneRemote(ctx context.Context, c store.CalendarConnection, id, token string) (graphEvent, error) {
+	raw, err := s.request(ctx, "GET", s.graph(s.calendarPath(c.CalendarID)+"/events/"+url.PathEscape(id)), token, nil, "")
+	if err != nil {
+		return graphEvent{}, err
+	}
+	var e graphEvent
+	if json.Unmarshal(raw, &e) != nil || e.ID == "" {
+		return e, errors.New("outlook returned an invalid event")
+	}
+	return e, nil
+}
+func eventBody(row store.CalendarEvent) ([]byte, error) {
+	var attendees []api.CalendarAttendee
+	if err := json.Unmarshal(row.Attendees, &attendees); err != nil {
+		return nil, err
+	}
+	start, end := row.StartsAt.UTC(), row.EndsAt.UTC()
+	zone := "UTC"
+	if row.AllDay {
+		loc, err := time.LoadLocation(row.TimeZone)
+		if err != nil {
+			return nil, err
+		}
+		start, end, zone = row.StartsAt.In(loc), row.EndsAt.In(loc), row.TimeZone
+	}
+	people := make([]map[string]any, 0, len(attendees))
+	for _, a := range attendees {
+		name := ""
+		if a.Name != nil {
+			name = *a.Name
+		}
+		people = append(people, map[string]any{"emailAddress": map[string]string{"address": string(a.Email), "name": name}, "type": "required"})
+	}
+	body := map[string]any{"subject": row.Title, "body": map[string]string{"contentType": "text", "content": row.Notes}, "start": map[string]string{"dateTime": start.Format("2006-01-02T15:04:05"), "timeZone": zone}, "end": map[string]string{"dateTime": end.Format("2006-01-02T15:04:05"), "timeZone": zone}, "isAllDay": row.AllDay, "location": map[string]string{"displayName": row.Location}, "attendees": people, "transactionId": stableTransactionID(row.ID + ":" + strconv.FormatInt(int64(row.RemoteGeneration), 10))}
+	if row.Teams {
+		body["isOnlineMeeting"] = true
+		body["onlineMeetingProvider"] = "teamsForBusiness"
+	}
+	return json.Marshal(body)
+}
+func toEmail(s string) openapi_types.Email { return openapi_types.Email(strings.TrimSpace(s)) }

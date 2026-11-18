@@ -36,7 +36,9 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 
 // InTx runs fn in a transaction scoped to p. If fn returns an error (or
 // panics) everything it did is rolled back.
-func InTx(ctx context.Context, pool *pgxpool.Pool, p authz.Principal, fn func(pgx.Tx) error) error {
+func InTx(ctx context.Context, pool interface {
+	Begin(context.Context) (pgx.Tx, error)
+}, p authz.Principal, fn func(pgx.Tx) error) error {
 	if p.TenantID == "" {
 		return errors.New("database: InTx needs a principal with a tenant")
 	}

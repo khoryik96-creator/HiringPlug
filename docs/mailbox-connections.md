@@ -145,3 +145,7 @@ The SMTP transport uses its envelope instead. HTML/plain text, inline banners
 and attachments are preserved. Microsoft's preauthorized attachment upload URL
 is checked against its upload hosts and receives no OAuth bearer token. Local
 HTTP provider overrides exist only for in-process tests, never as user input.
+
+Calendar uses the same Microsoft app registration with a separate consent flow
+and `/v1/calendar/callback` Web redirect. See [calendar.md](calendar.md) before
+adding `Calendars.ReadWrite`; existing mailbox tokens/scopes remain separate.

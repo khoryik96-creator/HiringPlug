@@ -207,3 +207,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/bin/internal/store
+  - <<: *module
+    queries: db/queries/calendars.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/calendars/internal/store

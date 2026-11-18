@@ -92,7 +92,15 @@ func (s *Service) sendInvites(ctx context.Context, tx pgx.Tx, tenantID string, r
 			return err
 		}
 	}
-	if host != nil && host.Email != nil {
+	native := false
+	if s.calendar != nil {
+		var err error
+		native, err = s.calendar.Connected(ctx, tx, row.HostUserID)
+		if err != nil {
+			return err
+		}
+	}
+	if !native && host != nil && host.Email != nil {
 		return s.deps.Mailer.Send(ctx, tx, tenantID, Mail{
 			To: *host.Email, Subject: subject + " (" + cand.Name + ")", Body: fmt.Sprintf("Booked by %s.\n\n%s", cand.Name, body), Calendar: calendar,
 			From: from, FromName: fromName,

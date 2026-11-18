@@ -133,6 +133,82 @@ func (q *Queries) BusyCounts(ctx context.Context) ([]BusyCountsRow, error) {
 	return items, nil
 }
 
+const calendarBooking = `-- name: CalendarBooking :one
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE id= $1
+`
+
+// Read projections without taking the booking mutation lock.
+func (q *Queries) CalendarBooking(ctx context.Context, id string) (BookingLink, error) {
+	row := q.db.QueryRow(ctx, calendarBooking, id)
+	var i BookingLink
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.TokenHash,
+		&i.HostUserID,
+		&i.CandidateID,
+		&i.ApplicationID,
+		&i.Title,
+		&i.DurationMinutes,
+		&i.Location,
+		&i.Status,
+		&i.StartsAt,
+		&i.Sequence,
+		&i.ExpiresAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const calendarBookings = `-- name: CalendarBookings :many
+SELECT id, tenant_id, token_hash, host_user_id, candidate_id, application_id, title, duration_minutes, location, status, starts_at, sequence, expires_at, created_by, created_at, updated_at FROM booking_link WHERE host_user_id= $1 AND starts_at< $2::timestamptz AND starts_at+make_interval(mins=>duration_minutes)> $3::timestamptz
+`
+
+type CalendarBookingsParams struct {
+	UserID   string
+	ToTime   time.Time
+	FromTime time.Time
+}
+
+func (q *Queries) CalendarBookings(ctx context.Context, arg CalendarBookingsParams) ([]BookingLink, error) {
+	rows, err := q.db.Query(ctx, calendarBookings, arg.UserID, arg.ToTime, arg.FromTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BookingLink
+	for rows.Next() {
+		var i BookingLink
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.TokenHash,
+			&i.HostUserID,
+			&i.CandidateID,
+			&i.ApplicationID,
+			&i.Title,
+			&i.DurationMinutes,
+			&i.Location,
+			&i.Status,
+			&i.StartsAt,
+			&i.Sequence,
+			&i.ExpiresAt,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const calendarBusy = `-- name: CalendarBusy :many
 SELECT starts_at, ends_at FROM calendar_busy WHERE user_id = $1 AND ends_at > $2::timestamptz AND starts_at < $3::timestamptz
 `

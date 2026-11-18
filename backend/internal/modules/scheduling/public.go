@@ -51,6 +51,16 @@ func (s *Service) busy(ctx context.Context, tx pgx.Tx, hostID, exceptLink string
 	if err != nil {
 		return nil, err
 	}
+	native := false
+	if s.calendar != nil {
+		native, err = s.calendar.Connected(ctx, tx, hostID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if native {
+		cal = nil
+	} // Native Outlook replaces the optional ICS feed, including its own holds.
 	out := make([]ical.Interval, 0, len(cal))
 	for _, b := range cal {
 		out = append(out, ical.Interval{Start: b.StartsAt, End: b.EndsAt})
@@ -68,6 +78,13 @@ func (s *Service) busy(ctx context.Context, tx pgx.Tx, hostID, exceptLink string
 		if b.StartsAt != nil {
 			out = append(out, ical.Interval{Start: *b.StartsAt, End: b.StartsAt.Add(time.Duration(b.DurationMinutes) * time.Minute)})
 		}
+	}
+	if s.calendar != nil {
+		busy, err := s.calendar.BusyFor(ctx, tx, []string{hostID}, from, to, "booking", exceptLink)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, busy...)
 	}
 	return out, nil
 }
@@ -185,6 +202,11 @@ func (s *Service) Book(ctx context.Context, token string, startsAt time.Time, cl
 		}
 		if err := s.sendInvites(ctx, tx, row.TenantID, row, "REQUEST", cand); err != nil {
 			return err
+		}
+		if s.calendar != nil {
+			if err := s.calendar.SourceChanged(ctx, tx, p.TenantID, "booking", row.ID); err != nil {
+				return err
+			}
 		}
 		action := "booking_link.booked"
 		if moved {

@@ -45,3 +45,5 @@ Short records of the big choices, so nobody has to re-argue them:
 - [0004 Contract first, one file per module](adr/0004-contract-first.md)
 - [0005 Tenant and field security inside the database](adr/0005-database-security.md)
 - [0006 Local first, cloud ready](adr/0006-local-first.md)
+
+- [Outlook calendar](calendar.md): personal calendar, Microsoft setup, scheduling and privacy.

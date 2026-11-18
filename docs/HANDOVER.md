@@ -4,6 +4,15 @@ For the next person or AI agent picking up HiringPlug. Read `AGENTS.md`
 first (the rules, enforced by `task verify`), then `docs/README.md`;
 `docs/features.md` says what every screen does.
 
+## Outlook calendar
+
+- More > Calendar is a private calendar per user, using the existing Microsoft
+  app registration with separate delegated calendar consent. Read
+  [calendar.md](calendar.md) for the extra redirect URI, permissions and behavior.
+- Interviews/bookings queue private Outlook holds; scheduling reads only busy
+  intervals. Never add attendees to automatic holds or expose personal event
+  details through team scheduling. Live Entra/mailbox validation is still needed.
+
 ## Candidate workspace
 
 - The approved compact candidate design is implemented: Details first, followed
@@ -38,7 +47,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   10 Nov; see `docs/features.md`). Look at the latest CI run on main first.
 - Nothing uncommitted, nothing half-built. Start new work on a fresh branch
   from main.
-- Latest migration: `00125_document_parse_error.sql`. Migrations are append-only.
+- Latest migration: `00126_calendars.sql`. Migrations are append-only.
 
 ## How the owner works with us
 
@@ -189,8 +198,8 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
   composer hides the salary options and says why); their own salary is fine.
 - Proposed before and still open: batch CV formatting; possible candidates
   by meaning (embeddings); cloud readiness (files in S3, sign-in limits in
-  PostgreSQL, key rotation, alerts). Waiting on the owner: Google/Microsoft
-  calendar sync (OAuth apps), posting ads to job boards (partner accounts),
+  PostgreSQL, key rotation, alerts). Waiting on the owner: Google calendar sync
+  (OAuth apps), posting ads to job boards (partner accounts),
   a test of CV Studio formatting with their real AI key.
 
 ## Things that cost time before

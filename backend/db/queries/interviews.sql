@@ -66,3 +66,7 @@ UPDATE interview SET reminded_for = @starts_at WHERE id = @id;
 -- name: BusyFor :many
 SELECT starts_at, ends_at FROM interview
 WHERE status = 'scheduled' AND @user_id::text = ANY (interviewer_ids) AND ends_at > @from_time::timestamptz AND starts_at < @to_time::timestamptz;
+
+-- Native calendar projection: complete range, without the list screen's cap.
+-- name: CalendarMeetings :many
+SELECT * FROM interview WHERE @user_id::text=ANY(interviewer_ids) AND starts_at< @to_time::timestamptz AND ends_at> @from_time::timestamptz;

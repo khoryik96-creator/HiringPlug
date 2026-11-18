@@ -36,6 +36,7 @@ const Companion = page(() => import("./pages/Companion"), "Companion");
 const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
+const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
 const Invoicing = page(() => import("./pages/Invoicing"), "Invoicing");
@@ -111,6 +112,8 @@ export const ROUTES: Route[] = [
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
+  { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", menu: { in: "main", label: "Calendar", href: "#/calendar", more: true }, render: () => <Calendar /> },
+
   // Settings, in its menu's order.
   // "#/settings" (and "#/settings#…") is General; its other parts have their own addresses.
   { section: "settings", path: /^#\/settings(?!\/)/, permission: "settings:manage", menu: { in: "settings", label: "General", href: "#/settings" },
@@ -159,7 +162,7 @@ export const ROUTES: Route[] = [
   { section: "bin", path: /^#\/bin/, permission: "bin:manage", menu: { in: "settings", label: "Bin", href: "#/bin" },
     render: () => <Bin /> },
   { section: "account", path: /^#\/account/, menu: { in: "settings", label: "Your account", href: "#/account" },
-    render: (c) => <main><h2>Your account</h2>{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
+    render: (c) => <main><h2>Your account</h2>{can(c, "calendars:use") && <p><a href="#/calendar">Outlook calendar</a></p>}{can(c, "scheduling:use") && <BookingHours />}<ChangePassword /></main> },
   { section: "my-dropdowns", path: /^#\/my-dropdowns/, menu: { in: "settings", label: "My dropdowns", href: "#/my-dropdowns" },
     render: () => <MyDropdowns /> },
   { section: "companion", path: /^#\/companion/, menu: { in: "settings", label: "LinkedIn companion", href: "#/companion" },

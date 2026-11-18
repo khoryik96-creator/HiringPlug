@@ -247,6 +247,68 @@ type CalendarBusy struct {
 	EndsAt   time.Time
 }
 
+type CalendarConnection struct {
+	TenantID       string
+	UserID         string
+	ID             string
+	Version        int32
+	SubjectID      string
+	Address        string
+	AppClientID    string
+	CalendarID     string
+	CalendarName   string
+	TeamsAvailable bool
+	SealedTokens   string
+	Status         string
+	SyncSequence   int32
+	SyncedAt       *time.Time
+	SyncError      *string
+}
+
+type CalendarEvent struct {
+	ID               string
+	TenantID         string
+	UserID           string
+	Version          int32
+	Title            string
+	Notes            string
+	Location         string
+	StartsAt         time.Time
+	EndsAt           time.Time
+	TimeZone         string
+	AllDay           bool
+	Teams            bool
+	Attendees        []byte
+	Source           string
+	SourceID         *string
+	SourceVersion    int32
+	Status           string
+	SyncStatus       string
+	SyncError        *string
+	RemoteGeneration int32
+	RemoteID         *string
+	RemoteKey        *string
+	RemoteConnection *string
+	SentVersion      int32
+	WebUrl           *string
+	JoinUrl          *string
+	RemoteSnapshot   []byte
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+type CalendarOauthState struct {
+	TenantID       string
+	UserID         string
+	StateHash      string
+	AppClientID    string
+	SealedVerifier string
+	SealedCode     *string
+	TicketHash     *string
+	Consumed       bool
+	ExpiresAt      time.Time
+}
+
 type Candidate struct {
 	ID                     string
 	TenantID               string
@@ -1084,6 +1146,26 @@ type OfferSalary struct {
 	Period    string
 	UpdatedBy string
 	UpdatedAt time.Time
+}
+
+type OutlookAvailability struct {
+	TenantID     string
+	UserID       string
+	ConnectionID string
+	Status       string
+	SyncedAt     *time.Time
+	WindowStart  *time.Time
+	WindowEnd    *time.Time
+}
+
+type OutlookBusy struct {
+	TenantID string
+	UserID   string
+	StartsAt time.Time
+	EndsAt   time.Time
+	Origin   string
+	Source   string
+	SourceID string
 }
 
 type Placement struct {

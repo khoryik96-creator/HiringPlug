@@ -1,0 +1,636 @@
+# Calendar workspace and Outlook. Source of truth; generated types are never edited.
+x-module:
+  name: calendars
+  description: Private calendar workspace and per-user Microsoft Outlook integration. Outlook event details stay
+    private; scheduling receives busy intervals only. Microsoft consent is independent of email and never replaces
+    mailbox credentials.
+  permissions:
+    calendars:use:
+      description: Use your private calendar and connect Outlook; see other users busy intervals for scheduling,
+        never their event details.
+      roles:
+      - owner
+      - admin
+      - recruiter
+      - sourcer
+      - hiring_manager
+  errorCodes:
+    CALENDAR_UNAVAILABLE:
+      status: 503
+      description: Outlook availability is not current; refresh or reconnect before taking bookings.
+    CALENDAR_EVENT_READ_ONLY:
+      status: 409
+      description: Manage linked interviews and bookings in their original HiringPlug screen; external Outlook events
+        are read-only here.
+    CALENDAR_NOT_CONNECTED:
+      status: 409
+      description: Connect Outlook before requesting a refresh or a Teams meeting.
+  jobs:
+    calendar.refresh:
+      queue: core
+      payload: CalendarRefreshJob
+      priority: low
+      description: Read Outlook calendar and busy times; keep refreshing while the connection remains active.
+    calendar.push:
+      queue: core
+      payload: CalendarPushJob
+      priority: low
+      description: Write one managed appointment to Outlook, with stable transaction ID and source checks.
+    calendar.source_changed:
+      queue: core
+      payload: CalendarSourceJob
+      priority: low
+      description: Mirror the latest interview or booking to participants private calendars.
+paths:
+  /v1/calendar/connection:
+    get:
+      operationId: getOutlookConnection
+      tags:
+      - calendars
+      summary: Your Outlook calendar connection
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookConnection'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      operationId: disconnectOutlookCalendar
+      tags:
+      - calendars
+      summary: Disconnect calendar without changing email or deleting Outlook events
+      x-permission: calendars:use
+      responses:
+        '204':
+          description: Disconnected
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/calendar/authorize:
+    post:
+      operationId: authorizeOutlookCalendar
+      tags:
+      - calendars
+      summary: Connect your Microsoft calendar
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarAuthorize'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/calendar/complete:
+    post:
+      operationId: finishOutlookCalendar
+      tags:
+      - calendars
+      summary: Finish your own Microsoft sign-in
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookConnection'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarCompleteInput'
+  /v1/calendar/refresh:
+    post:
+      operationId: refreshOutlookCalendar
+      tags:
+      - calendars
+      summary: Refresh Outlook calendar in the background
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookConnection'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/calendar/events:
+    get:
+      operationId: listCalendarEvents
+      tags:
+      - calendars
+      summary: Your calendar, interviews and bookings
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventList'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      parameters:
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+    post:
+      operationId: createCalendarEvent
+      tags:
+      - calendars
+      summary: Create an appointment; Outlook sends invitations when attendees are supplied
+      x-permission: calendars:use
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEvent'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarEventInput'
+  /v1/calendar/events/{eventId}:
+    put:
+      operationId: updateCalendarEvent
+      tags:
+      - calendars
+      summary: Change your appointment; Outlook notifies its attendees
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEvent'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarEventUpdate'
+      parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/CalendarEventId'
+  /v1/calendar/events/{eventId}/cancel:
+    post:
+      operationId: cancelCalendarEvent
+      tags:
+      - calendars
+      summary: Cancel your appointment and notify Outlook attendees
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEvent'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarVersionInput'
+      parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/CalendarEventId'
+  /v1/calendar/events/{eventId}/retry:
+    post:
+      operationId: retryCalendarEvent
+      tags:
+      - calendars
+      summary: Retry a failed write or explicitly keep the HiringPlug schedule after an Outlook change
+      x-permission: calendars:use
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEvent'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarVersionInput'
+      parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/CalendarEventId'
+  /v1/calendar/callback:
+    get:
+      operationId: completeOutlookCallback
+      tags:
+      - calendars
+      summary: Park Microsoft consent; the signed-in initiator must finish it
+      x-permission: public
+      parameters:
+      - name: state
+        in: query
+        schema:
+          type: string
+      - name: code
+        in: query
+        schema:
+          type: string
+      - name: error
+        in: query
+        schema:
+          type: string
+      responses:
+        '303':
+          description: Return to calendar to complete sign-in
+          headers:
+            Location:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+            Referrer-Policy:
+              schema:
+                type: string
+components:
+  schemas:
+    CalendarEventId:
+      type: string
+      pattern: ^cev_[0-9a-hjkmnp-tv-z]{26}$
+    OutlookConnection:
+      type: object
+      required:
+      - connected
+      - ready
+      - callbackUrl
+      - status
+      - version
+      - address
+      - calendarName
+      - lastSyncAt
+      - error
+      - teamsAvailable
+      properties:
+        connected:
+          type: boolean
+        ready:
+          type: boolean
+        callbackUrl:
+          type: string
+        status:
+          type: string
+          enum:
+          - disconnected
+          - pending
+          - ok
+          - failed
+          - reconnect
+        version:
+          type: integer
+        address:
+          type: string
+          nullable: true
+        calendarName:
+          type: string
+          nullable: true
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        teamsAvailable:
+          type: boolean
+    CalendarAttendee:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          maxLength: 150
+      additionalProperties: false
+    CalendarEventInput:
+      type: object
+      required:
+      - title
+      - startsAt
+      - endsAt
+      - timeZone
+      - attendees
+      - allDay
+      - teams
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 64
+        notes:
+          type: string
+          maxLength: 4000
+        location:
+          type: string
+          maxLength: 500
+        attendees:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CalendarAttendee'
+        allDay:
+          type: boolean
+        teams:
+          type: boolean
+      additionalProperties: false
+    CalendarEventUpdate:
+      type: object
+      required:
+      - title
+      - startsAt
+      - endsAt
+      - timeZone
+      - attendees
+      - allDay
+      - teams
+      - version
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        timeZone:
+          type: string
+          minLength: 1
+          maxLength: 64
+        notes:
+          type: string
+          maxLength: 4000
+        location:
+          type: string
+          maxLength: 500
+        attendees:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/CalendarAttendee'
+        allDay:
+          type: boolean
+        teams:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+      additionalProperties: false
+    CalendarEvent:
+      type: object
+      required:
+      - id
+      - version
+      - title
+      - startsAt
+      - endsAt
+      - timeZone
+      - notes
+      - location
+      - attendees
+      - allDay
+      - teams
+      - source
+      - sourceId
+      - status
+      - syncStatus
+      - syncError
+      - webUrl
+      - joinUrl
+      - editable
+      properties:
+        id:
+          $ref: '#/components/schemas/CalendarEventId'
+        version:
+          type: integer
+        title:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        timeZone:
+          type: string
+        notes:
+          type: string
+        location:
+          type: string
+        attendees:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarAttendee'
+        allDay:
+          type: boolean
+        teams:
+          type: boolean
+        source:
+          type: string
+          enum:
+          - local
+          - interview
+          - booking
+          - outlook
+        sourceId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+          - active
+          - cancelled
+        syncStatus:
+          type: string
+          enum:
+          - local
+          - pending
+          - synced
+          - conflict
+          - failed
+        syncError:
+          type: string
+          nullable: true
+        webUrl:
+          type: string
+          nullable: true
+        joinUrl:
+          type: string
+          nullable: true
+        editable:
+          type: boolean
+    CalendarEventList:
+      type: object
+      required:
+      - items
+      - connection
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarEvent'
+        connection:
+          $ref: '#/components/schemas/OutlookConnection'
+    CalendarAuthorize:
+      type: object
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          format: uri
+    CalendarCompleteInput:
+      type: object
+      required:
+      - ticket
+      properties:
+        ticket:
+          type: string
+          minLength: 1
+          maxLength: 200
+      additionalProperties: false
+    CalendarVersionInput:
+      type: object
+      required:
+      - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+      additionalProperties: false
+    CalendarRefreshJob:
+      type: object
+      required:
+      - connectionId
+      - sequence
+      properties:
+        connectionId:
+          type: string
+        sequence:
+          type: integer
+      additionalProperties: false
+    CalendarPushJob:
+      type: object
+      required:
+      - eventId
+      - connectionId
+      properties:
+        eventId:
+          $ref: '#/components/schemas/CalendarEventId'
+        connectionId:
+          type: string
+      additionalProperties: false
+    CalendarSourceJob:
+      type: object
+      required:
+      - kind
+      - sourceId
+      properties:
+        kind:
+          type: string
+          enum:
+          - interview
+          - booking
+        sourceId:
+          type: string
+      additionalProperties: false

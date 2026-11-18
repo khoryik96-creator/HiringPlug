@@ -12,6 +12,9 @@ const systemKey = ["settings", "system"] as const;
 
 /** What each background job does, in a recruiter's words (a new kind in the contract must be named here). */
 export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
+  "calendar.push": "Sync calendar appointment",
+  "calendar.refresh": "Refresh Outlook calendar",
+  "calendar.source_changed": "Update calendar meeting",
   "aiprovider.check": "Checking an AI key",
   "aiprovider.checked": "Saving an AI key check",
   "aiprovider.reported": "Noting whether the AI answered",

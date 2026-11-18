@@ -362,6 +362,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/calendar/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your Outlook calendar connection */
+        get: operations["getOutlookConnection"];
+        put?: never;
+        post?: never;
+        /** Disconnect calendar without changing email or deleting Outlook events */
+        delete: operations["disconnectOutlookCalendar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect your Microsoft calendar */
+        post: operations["authorizeOutlookCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish your own Microsoft sign-in */
+        post: operations["finishOutlookCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Outlook calendar in the background */
+        post: operations["refreshOutlookCalendar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your calendar, interviews and bookings */
+        get: operations["listCalendarEvents"];
+        put?: never;
+        /** Create an appointment; Outlook sends invitations when attendees are supplied */
+        post: operations["createCalendarEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change your appointment; Outlook notifies its attendees */
+        put: operations["updateCalendarEvent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/events/{eventId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel your appointment and notify Outlook attendees */
+        post: operations["cancelCalendarEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/events/{eventId}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a failed write or explicitly keep the HiringPlug schedule after an Outlook change */
+        post: operations["retryCalendarEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/calendar/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Park Microsoft consent; the signed-in initiator must finish it */
+        get: operations["completeOutlookCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/salary-calculations": {
         parameters: {
             query?: never;
@@ -3992,11 +4147,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CALENDAR_UNAVAILABLE" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -4451,6 +4606,106 @@ export interface components {
         };
         BinPurgeJob: {
             entryId: components["schemas"]["BinEntryId"];
+        };
+        CalendarEventId: string;
+        OutlookConnection: {
+            connected: boolean;
+            ready: boolean;
+            callbackUrl: string;
+            /** @enum {string} */
+            status: "disconnected" | "pending" | "ok" | "failed" | "reconnect";
+            version: number;
+            address: string | null;
+            calendarName: string | null;
+            /** Format: date-time */
+            lastSyncAt: string | null;
+            error: string | null;
+            teamsAvailable: boolean;
+        };
+        CalendarAttendee: {
+            /** Format: email */
+            email: string;
+            name?: string;
+        };
+        CalendarEventInput: {
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            timeZone: string;
+            notes?: string;
+            location?: string;
+            attendees: components["schemas"]["CalendarAttendee"][];
+            allDay: boolean;
+            teams: boolean;
+        };
+        CalendarEventUpdate: {
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            timeZone: string;
+            notes?: string;
+            location?: string;
+            attendees: components["schemas"]["CalendarAttendee"][];
+            allDay: boolean;
+            teams: boolean;
+            version: number;
+        };
+        CalendarEvent: {
+            id: components["schemas"]["CalendarEventId"];
+            version: number;
+            title: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            timeZone: string;
+            notes: string;
+            location: string;
+            attendees: components["schemas"]["CalendarAttendee"][];
+            allDay: boolean;
+            teams: boolean;
+            /** @enum {string} */
+            source: "local" | "interview" | "booking" | "outlook";
+            sourceId: string | null;
+            /** @enum {string} */
+            status: "active" | "cancelled";
+            /** @enum {string} */
+            syncStatus: "local" | "pending" | "synced" | "conflict" | "failed";
+            syncError: string | null;
+            webUrl: string | null;
+            joinUrl: string | null;
+            editable: boolean;
+        };
+        CalendarEventList: {
+            items: components["schemas"]["CalendarEvent"][];
+            connection: components["schemas"]["OutlookConnection"];
+        };
+        CalendarAuthorize: {
+            /** Format: uri */
+            url: string;
+        };
+        CalendarCompleteInput: {
+            ticket: string;
+        };
+        CalendarVersionInput: {
+            version: number;
+        };
+        CalendarRefreshJob: {
+            connectionId: string;
+            sequence: number;
+        };
+        CalendarPushJob: {
+            eventId: components["schemas"]["CalendarEventId"];
+            connectionId: string;
+        };
+        CalendarSourceJob: {
+            /** @enum {string} */
+            kind: "interview" | "booking";
+            sourceId: string;
         };
         WorkAuthorizationSuggestion: {
             status: components["schemas"]["WorkAuthorizationStatus"];
@@ -9599,6 +9854,287 @@ export interface operations {
             409: components["responses"]["BinRestoreConflict"];
         };
     };
+    getOutlookConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookConnection"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    disconnectOutlookCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    authorizeOutlookCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarAuthorize"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    finishOutlookCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarCompleteInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookConnection"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    refreshOutlookCalendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookConnection"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listCalendarEvents: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEventList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createCalendarEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEvent"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateCalendarEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["CalendarEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEvent"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    cancelCalendarEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["CalendarEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarVersionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEvent"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    retryCalendarEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["schemas"]["CalendarEventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarVersionInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarEvent"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    completeOutlookCallback: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return to calendar to complete sign-in */
+            303: {
+                headers: {
+                    Location?: string;
+                    "Cache-Control"?: string;
+                    "Referrer-Policy"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     calculateSalary: {
         parameters: {
             query?: never;
@@ -13527,6 +14063,15 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["InterviewNotAllowed"];
+            /** @description Connected calendar availability is unavailable or stale */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listInterviews: {
@@ -13612,6 +14157,15 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["InterviewNotAllowed"];
+            /** @description Connected calendar availability is unavailable or stale */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     putInterviewFeedback: {
@@ -15888,6 +16442,15 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            /** @description Connected calendar availability is unavailable or stale */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     bookPublicBooking: {
@@ -15919,6 +16482,15 @@ export interface operations {
             409: components["responses"]["SchedulingConflict"];
             /** @description Too many tries from this address (BOOKING_TOO_MANY_TRIES). */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Connected calendar availability is unavailable or stale */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

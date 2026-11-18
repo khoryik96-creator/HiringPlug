@@ -1565,3 +1565,12 @@ Job details can be expanded or collapsed below the pipeline and start collapsed.
 **Settings → Email connection** supports Microsoft/Google sign-in and SMTP, separately per user and agency. Stored credentials are encrypted and never returned. Composers show the selected account or warn that Mailpit captures mail locally. Test messages say Captured in test inbox; provider acceptance does not prove inbox arrival. Queued messages do not silently change sender after disconnect. See [email connection setup](mailbox-connections.md).
 
 Email composers show Cc and Bcc on demand beside To. Filled copy recipients and invalid fields stay visible.
+
+## Calendar and Outlook
+
+More > Calendar provides private month, week and agenda views, local appointments,
+Microsoft default-calendar connection, Teams when supported, and Outlook busy-time
+checks for interviews and booking links. HiringPlug meetings sync as private holds;
+candidate invitations retain their existing flow. Attendee invitations on ordinary
+appointments are explicit. See [calendar.md](calendar.md) for setup, privacy,
+synchronization behavior and the sync window.

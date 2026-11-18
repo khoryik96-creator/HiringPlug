@@ -1,0 +1,47 @@
+package interviews
+
+import (
+	"context"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/interviews/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/ical"
+)
+
+// Calendar shares only scheduling facts, never feedback or candidate salaries.
+type OutlookCalendar interface {
+	SourceChanged(context.Context, pgx.Tx, string, string, string) error
+	BusyFor(context.Context, pgx.Tx, []string, time.Time, time.Time, string, string) ([]ical.Interval, error)
+}
+
+func (m *Module) UseCalendar(c OutlookCalendar) { m.service.calendar = c }
+
+type CalendarMeeting struct {
+	ID, Title, Location string
+	Version             int
+	Users               []string
+	Start, End          time.Time
+	Cancelled           bool
+}
+
+func calendarMeeting(row store.Interview) CalendarMeeting {
+	location := ""
+	if row.Location != nil {
+		location = *row.Location
+	}
+	return CalendarMeeting{ID: row.ID, Title: row.Title, Location: location, Version: int(row.Version), Users: row.InterviewerIds, Start: row.StartsAt, End: row.EndsAt, Cancelled: row.Status == "cancelled"}
+}
+func (m *Module) CalendarMeeting(ctx context.Context, tx pgx.Tx, id string) (CalendarMeeting, error) {
+	row, err := store.New(tx).GetInterview(ctx, id)
+	return calendarMeeting(row), err
+}
+func (m *Module) CalendarMeetings(ctx context.Context, tx pgx.Tx, user string, from, to time.Time) ([]CalendarMeeting, error) {
+	rows, err := store.New(tx).CalendarMeetings(ctx, store.CalendarMeetingsParams{UserID: user, FromTime: from, ToTime: to})
+	out := make([]CalendarMeeting, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, calendarMeeting(row))
+	}
+	return out, err
+}

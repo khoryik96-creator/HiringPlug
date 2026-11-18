@@ -179,6 +179,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PublicBooking' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Connected calendar availability is unavailable or stale
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
     post:
       operationId: bookPublicBooking
       tags: [scheduling]
@@ -198,6 +204,11 @@ paths:
         '400': { $ref: '#/components/responses/ValidationFailed' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/SchedulingConflict' }
+        '503':
+          description: Connected calendar availability is unavailable or stale
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429':
           description: Too many tries from this address (BOOKING_TOO_MANY_TRIES).
           content:
