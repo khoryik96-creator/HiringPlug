@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { applicationsKey, jobKey } from "../api/keys";
+import { EditIcon, IconActions, IconButton } from "../components/ActionIcons";
 import { Assistant } from "../components/Assistant";
 import { ErrorMessage } from "../components/ErrorMessage";
 import { Timeline } from "../components/Timeline";
@@ -21,7 +22,7 @@ import { type Section, SectionTabs } from "../components/SectionTabs";
 import { countryName, formatDay } from "../labels";
 import { useFieldSettings } from "../components/useFieldSettings";
 
-type JobTab = "activity" | "details" | "ads" | "market" | "money";
+type JobTab = "activity" | "details" | "ads" | "market" | "money" | "assistant";
 
 /** One job: the pipeline on top, the rest in tabs. Render it with key={id} so edit state never carries over. */
 export function JobDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
@@ -58,6 +59,9 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
       <JobSalaryPanel job={j} canEdit={permissions.includes("jobs.salary:update")} />
       <JobRetainer jobId={j.id} permissions={permissions} />
     </> },
+    // Kept mounted: it may be docked on the right whatever tab is open.
+    ...(permissions.includes("assistant:use") ? [{ id: "assistant" as const, label: "AI assistant", keep: true,
+      content: <Assistant subjectType="job" subjectId={j.id} permissions={permissions} /> }] : []),
   ];
 
   return (
@@ -74,7 +78,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
           <JobStatusSelect job={j} canChange={permissions.includes("jobs:update") && !editing} />
         </div>
         {permissions.includes("jobs:update") && !editing && (
-          <button type="button" onClick={() => { setEditing(true); }}>Edit job</button>
+          <IconActions label="Job actions"><IconButton label="Edit job" icon={<EditIcon />} onClick={() => { setEditing(true); }} /></IconActions>
         )}
       </div>
       <p className="muted">
@@ -95,11 +99,6 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
         </PipelineBoard>
       )}
       <SectionTabs name="job" label="Job sections" sections={sections} active={tab} onChange={setTab} />
-      {permissions.includes("assistant:use") && (
-        <details className="candidate-assistant"><summary>AI assistant</summary>
-          <Assistant subjectType="job" subjectId={j.id} permissions={permissions} />
-        </details>
-      )}
     </main>
   );
 }

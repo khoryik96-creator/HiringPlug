@@ -27,13 +27,14 @@ export function fitBand(score: number): string {
 }
 
 /** A short badge: the score, "Scoring…" or "No score". */
-export function FitBadge({ match }: { match?: Match }) {
+/** compact: on a board line, "outdated" is a ↻ (said in full to screen readers and in the tooltip). */
+export function FitBadge({ match, compact = false }: { match?: Match; compact?: boolean }) {
   if (!match) return null;
   if (match.status === "queued") return <span className="badge queued" role="status">Scoring fit…</span>;
   if (match.status === "failed" || match.score === null) return <span className="badge failed">No fit score</span>;
   return (
     <span className={`badge fit-${fitBand(match.score)}`} title={match.outdated ? "The job's description or ad changed since: score it again" : undefined}>
-      Fit {match.score}%{match.outdated && " · outdated"}
+      Fit {match.score}%{match.outdated && (compact ? <><span aria-hidden="true"> ↻</span><span className="visually-hidden"> · outdated</span></> : " · outdated")}
     </span>
   );
 }

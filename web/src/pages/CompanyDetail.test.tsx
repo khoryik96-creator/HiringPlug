@@ -45,7 +45,10 @@ describe("company pages", () => {
     expect(within(card).getByRole("button", { name: "VIP client" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getAllByText("201–1,000 people").length).toBeGreaterThan(0);
     expect(within(card).getByRole("link", { name: "company/grab" }).getAttribute("href")).toBe("https://www.linkedin.com/company/grab");
-    expect(screen.getByRole("button", { name: "Edit company" })).toBeTruthy();
+    // An icon in the page's toolbar, as on a candidate's page.
+    const edit = within(screen.getByRole("toolbar", { name: "Company actions" })).getByRole("button", { name: "Edit company" });
+    expect(edit.textContent).toBe("");
+    expect(edit.getAttribute("data-tip")).toBe("Edit company");
     expect(within(card).queryByRole("link", { name: "Change the categories" }), "Settings needs settings:manage").toBeNull();
 
     const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...company, category: "signed_client", version: 2 }));

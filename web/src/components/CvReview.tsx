@@ -13,7 +13,8 @@ import { SaveError } from "./SaveError";
  * ticks what to use; empty profile fields are ticked by default, filled ones
  * never are. Each value shows the CV text it came from.
  */
-export function CvReview({ documentId, candidate, onDone }: { documentId: string; candidate: Candidate; onDone: () => void }) {
+/** canMerge: an email another candidate has offers to merge this one into them. */
+export function CvReview({ documentId, candidate, onDone, onReread, canMerge = false }: { documentId: string; candidate: Candidate; onDone: () => void; onReread?: () => void; canMerge?: boolean }) {
   const doc = useQuery({
     queryKey: ["document", documentId],
     queryFn: async () => unwrap(await api.GET("/v1/documents/{documentId}", { params: { path: { documentId } } })),
@@ -22,10 +23,10 @@ export function CvReview({ documentId, candidate, onDone }: { documentId: string
   if (doc.error) return <ErrorMessage error={doc.error} />;
   if (!doc.data) return <p className="muted">Loading…</p>;
   if (!profile) return <p className="muted">No details were read from this CV.</p>;
-  return <Review profile={profile} candidate={candidate} onDone={onDone} />;
+  return <Review profile={profile} candidate={candidate} onDone={onDone} onReread={onReread} canMerge={canMerge} />;
 }
 
-function Review({ profile, candidate, onDone }: { profile: Schemas["ParsedProfile"]; candidate: Candidate; onDone: () => void }) {
+function Review({ profile, candidate, onDone, onReread, canMerge }: { profile: Schemas["ParsedProfile"]; candidate: Candidate; onDone: () => void; onReread?: () => void; canMerge: boolean }) {
   const queryClient = useQueryClient();
   // Captured when the review opens: a background refresh must not change what is offered.
   const [opened] = useState(() => ({ candidate, rows: suggestions(profile, candidate), skills: newSkills(profile, candidate) }));
@@ -131,9 +132,10 @@ function Review({ profile, candidate, onDone }: { profile: Schemas["ParsedProfil
           Use ticked details
         </button>
         <button type="button" className="link" onClick={onDone}>Close</button>
+        {onReread && <button type="button" className="link" onClick={onReread}>Read this CV again</button>}
       </div>
       <SaveError error={apply.error} shown={[]} onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(candidate.id) }); onDone(); }} />
-      <DuplicateEmail error={apply.error} />
+      <DuplicateEmail error={apply.error} merge={canMerge ? { id: candidate.id, name: candidate.fullName } : undefined} />
       {profile.dropped > 0 && (
         <p className="muted">{profile.dropped} value(s) were left out because the CV text did not support them.</p>
       )}

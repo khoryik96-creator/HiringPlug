@@ -56,8 +56,12 @@ func TestCompanyBenefits(t *testing.T) {
 			}
 		}
 		require.True(t, benefits.Hints)
-		assert.Equal(t, "Annual leave", benefits.Options[1].Label)
-		assert.Contains(t, benefits.Options[3].Hint.MustGet(), "immediate family")
+		// No "Job grade/level" item: a client's grades are set at the top of its benefits.
+		assert.Equal(t, "Annual leave", benefits.Options[0].Label)
+		for _, o := range benefits.Options {
+			assert.NotEqual(t, "job_grade", o.Key)
+		}
+		assert.Contains(t, benefits.Options[2].Hint.MustGet(), "immediate family")
 
 		options := []map[string]any{}
 		for _, o := range benefits.Options {

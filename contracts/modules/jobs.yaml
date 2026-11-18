@@ -44,12 +44,12 @@ x-module:
     jd.render_pdf:
       queue: ai
       payload: JdRenderPdfJob
-      priority: low
-      description: Turn an uploaded Word (or RTF, ODT) job description into a PDF with LibreOffice, to preview it as it looks (Python AI worker).
+      priority: high
+      description: "Turn an uploaded Word (or RTF, ODT) job description into a PDF with LibreOffice, to preview it as it looks (Python AI worker). High: someone is on the job's page waiting for it; it takes seconds, so it must not wait behind fit scores and other AI calls."
     jd.pdf_rendered:
       queue: core
       payload: JdPdfRenderedJob
-      priority: low
+      priority: high
       description: Save a job description's PDF copy with it (Go worker).
     jd.blind:
       queue: ai

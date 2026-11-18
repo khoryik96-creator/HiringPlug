@@ -75,11 +75,11 @@ function Docked({ state, onState, width, onWidth, children }: {
       <h3>AI assistant</h3>
       <span className="assistant-tools">
         {state === "inline" ? (
-          <button type="button" className="tool-btn" onClick={() => { onState("right"); }}>Dock right ⇥</button>
+          <button type="button" className="doc-btn dock-btn" onClick={() => { onState("right"); }}>Dock right ⇥</button>
         ) : (
           <>
             <button type="button" className="tool-btn" aria-label="Minimise the AI assistant" title="Minimise" onClick={() => { onState("min"); }}>–</button>
-            <button type="button" className="tool-btn" onClick={() => { onState("inline"); }}>⇤ Back in the page</button>
+            <button type="button" className="doc-btn dock-btn" onClick={() => { onState("inline"); }}>⇤ Back in the page</button>
           </>
         )}
       </span>

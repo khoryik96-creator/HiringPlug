@@ -5826,6 +5826,8 @@ export interface components {
             extractedText?: string | null;
             /** @description Null when the document was never parsed (formatted CVs, or uploaded before parsing existed). */
             parseStatus: components["schemas"]["DocumentParseStatus"] | null;
+            /** @description Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise. */
+            parseError: string | null;
             /** @description Only included when fetching a single document. */
             parsedProfile?: components["schemas"]["ParsedProfile"] | null;
             /** Format: date-time */
@@ -7698,6 +7700,8 @@ export interface components {
             candidateName: string;
             /** @description The candidate's current job title. */
             candidateTitle: string | null;
+            /** @description The candidate's status (Looking out, Passive, Not looking, Placed), which colours their initials; null when not set. */
+            candidateAvailability: components["schemas"]["CandidateAvailability"] | null;
             stage: components["schemas"]["Stage"];
             /** @description Set when rejected or withdrawn. */
             reason: components["schemas"]["CloseReason"] | null;

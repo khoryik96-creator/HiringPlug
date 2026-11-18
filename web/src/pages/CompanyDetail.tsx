@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { EditIcon, IconActions, IconButton, IconSeparator, TrashIcon } from "../components/ActionIcons";
 import { DeleteRecord } from "../components/DeleteRecord";
 import { FindHR } from "../components/FindHR";
 
@@ -79,10 +80,10 @@ export function CompanyDetail({ id, permissions }: { id: string; permissions: Pe
       )}
       {(canEdit || permissions.includes("bin:manage")) && !editing && (
         <div className="row spread"><span />
-          <span className="row">
-            {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit company</button>}
-            {permissions.includes("bin:manage") && <DeleteRecord kind="company" id={c.id} />}
-          </span>
+          <IconActions label="Company actions">
+            {canEdit && <IconButton label="Edit company" icon={<EditIcon />} onClick={() => { setEditing(true); setActive("details"); }} />}
+            {permissions.includes("bin:manage") && <>{canEdit && <IconSeparator />}<DeleteRecord kind="company" id={c.id} icon={<TrashIcon />} /></>}
+          </IconActions>
         </div>
       )}
       {/* While the edit form is open the card is read-only: a change there would make the form's save stale. */}

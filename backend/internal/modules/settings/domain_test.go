@@ -124,8 +124,8 @@ func TestBenefitItemsCarryHints(t *testing.T) {
 	i := slices.IndexFunc(all, func(l List) bool { return l.Name == "company_benefits" })
 	require.GreaterOrEqual(t, i, 0)
 	assert.True(t, all[i].Hints)
-	assert.Equal(t, "Annual leave", all[i].Options[1].Label, "Hyppies' template")
-	assert.NotEmpty(t, all[i].Options[1].Hint)
+	assert.Equal(t, "Annual leave", all[i].Options[0].Label, "Hyppies' template, without a job grade item (grades are set at the top)")
+	assert.NotEmpty(t, all[i].Options[0].Hint)
 
 	var in []OptionInput
 	for _, o := range all[i].Options {

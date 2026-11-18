@@ -28,9 +28,22 @@ async function show(candidate: Candidate, permissions: Permission[]) {
   return view;
 }
 
-const buttons = () => screen.queryAllByRole("button").map((b) => b.textContent);
+// Each button's name: an icon button's is its label (Edit profile is a pencil).
+const buttons = () => screen.queryAllByRole("button").map((b) => b.getAttribute("aria-label") ?? b.textContent);
 
 describe("candidate page", () => {
+  it("shows its actions as named icons, each with a tooltip", async () => {
+    await show(testCandidate(), RECRUITER);
+    const bar = screen.getByRole("toolbar", { name: "Candidate actions" });
+    for (const name of ["Edit profile"]) {
+      const b = within(bar).getByRole("button", { name });
+      expect(b.textContent).toBe(""); // an icon, not a word
+      expect(b.getAttribute("data-tip")).toBe(name);
+    }
+    expect(within(bar).getByRole("link", { name: "Screening call" }).getAttribute("href")).toContain("/screening");
+  });
+
+
   it("explains when a saved screening call kept the later salary", async () => {
     const c = testCandidate();
     window.location.hash = `#/candidates/${c.id}?screeningSalary=kept`;

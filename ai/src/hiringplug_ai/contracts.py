@@ -4101,6 +4101,12 @@ class Application(BaseModel):
     candidateId: CandidateId
     candidateName: str
     candidateTitle: Annotated[str | None, Field(description="The candidate's current job title.")]
+    candidateAvailability: Annotated[
+        CandidateAvailability | None,
+        Field(
+            description="The candidate's status (Looking out, Passive, Not looking, Placed), which colours their initials; null when not set."
+        ),
+    ]
     stage: Stage
     reason: Annotated[CloseReason | None, Field(description="Set when rejected or withdrawn.")]
     reasonNote: Annotated[str | None, Field(...)]
@@ -5860,6 +5866,12 @@ class Document(BaseModel):
         DocumentParseStatus | None,
         Field(
             description="Null when the document was never parsed (formatted CVs, or uploaded before parsing existed)."
+        ),
+    ]
+    parseError: Annotated[
+        str | None,
+        Field(
+            description="Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
         ),
     ]
     parsedProfile: Annotated[

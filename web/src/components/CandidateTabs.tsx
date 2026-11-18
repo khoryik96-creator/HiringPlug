@@ -1,6 +1,6 @@
 import { type Section, SectionTabs } from "./SectionTabs";
 
-export type CandidateTab = "details" | "cv" | "jobs" | "activity" | "salary" | "email";
+export type CandidateTab = "details" | "cv" | "jobs" | "activity" | "salary" | "email" | "assistant";
 export type CandidateSection = Section<CandidateTab>;
 
 /** A candidate's sections as tabs (see SectionTabs). */

@@ -85,7 +85,7 @@ export function PipelineSteps(props: Shared & { stage: Stage | "all"; onStage: (
           const match = props.fit.get(a.id);
           return (
             <div role="listitem" key={a.id} className={`step-row${props.picked.includes(a.id) ? " picked" : ""}${props.onPick ? " pickable" : ""}`} onClick={choose(props, a)}>
-              <Initials name={a.candidateName} />
+              <Initials name={a.candidateName} status={a.candidateAvailability} />
               <span className="who-text">
                 <a href={`#/candidates/${a.candidateId}`}
                   onKeyDown={(e) => { if (props.onPick && e.key === " ") { e.preventDefault(); props.onPick(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
@@ -124,13 +124,13 @@ export function BoardLine(props: Shared & { a: Application; onDragStart: (a: App
   return (
     <div className={`board-line${props.picked.includes(a.id) ? " picked" : ""}${waiting(a, now) && days >= 14 ? " stale" : ""}${props.onPick ? " pickable" : ""}`}
       draggable={props.canMove} onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.id); props.onDragStart(a); }} onClick={choose(props, a)}>
-      <Initials name={a.candidateName} />
+      <Initials name={a.candidateName} status={a.candidateAvailability} />
       <a href={`#/candidates/${a.candidateId}`} title={a.candidateTitle ? `${a.candidateName} · ${a.candidateTitle}` : a.candidateName}
         onKeyDown={(e) => { if (props.onPick && e.key === " ") { e.preventDefault(); props.onPick(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
       {props.picked.includes(a.id) && <span className="visually-hidden"> (chosen)</span>}
       <span className="line-chips">
         {match && <button type="button" className="link" aria-label={`Fit of ${a.candidateName}: why?`} onClick={() => { props.onShowFit(a); }}>
-          <FitBadge match={match} /></button>}
+          <FitBadge match={match} compact /></button>}
         {(upcoming?.interviewAt || upcoming?.offerExpiresOn) && <Info a={a} upcoming={upcoming} now={now} />}
         <span className={`chip${waitTone(a, days)}`} title={`${timeInStage(a, now)} in ${STAGE[a.stage].toLowerCase()}`}>{days < 1 ? "today" : `${String(days)}d`}</span>
       </span>

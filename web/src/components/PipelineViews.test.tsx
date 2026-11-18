@@ -14,7 +14,7 @@ beforeEach(() => { localStorage.removeItem("hp.pipelineView"); });
 const ago = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
 const app = (n: number, stage: Application["stage"], days: number): Application => ({
   id: `appl_${String(n)}`, version: 2, jobId: "jo_1", jobTitle: "Risk Analyst", companyId: "comp_1", companyName: "Contoh", candidateId: `cand_${String(n)}`,
-  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", stage, reason: null, reasonNote: null, channel: null,
+  candidateName: `Person ${String(n)}`, candidateTitle: "Analyst", candidateAvailability: null, stage, reason: null, reasonNote: null, channel: null,
   stageChangedAt: ago(days), createdAt: ago(30), updatedAt: ago(1),
 });
 
@@ -72,5 +72,14 @@ describe("pipeline steps", () => {
     expect(within(column).getAllByRole("link")[0]?.textContent).toBe("Person 1"); // 12 days: longest first
     fireEvent.click(within(column).getByRole("button", { name: "+4 more" }));
     expect(within(column).getAllByRole("listitem")).toHaveLength(12);
+  });
+
+  it("colours each person's initials by their status, in Steps and on the board", async () => {
+    show([{ ...app(1, "submitted", 3), candidateAvailability: "placed" }, app(2, "submitted", 2)]);
+    const placed = await screen.findByTitle("Person 1 · Placed");
+    expect(placed.style.background).toBe("rgb(224, 212, 247)"); // Placed's purple, as on their page
+    expect(screen.getByTitle("Person 2 · Not set")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
+    expect(within(screen.getByRole("list", { name: "Submitted" })).getByTitle("Person 1 · Placed")).toBeTruthy();
   });
 });

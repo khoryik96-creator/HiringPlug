@@ -14,7 +14,8 @@ import { findMatches, matchText } from "./duplicateCvs";
 import { ErrorMessage } from "./ErrorMessage";
 import { fileKind } from "./fileKind";
 import { FormatCv } from "./FormatCv";
-import { StudioProgress, useStudioRun } from "./StudioProgress";
+import { DetailsButton, isReading, ReadProgress, readSeconds } from "./ReadDetails";
+import { StudioProgress, useNow, useStudioRun } from "./StudioProgress";
 
 const SOURCES = ["original", "jobstreet", "linkedin", "formatted", "other"] as const;
 type Source = (typeof SOURCES)[number];
@@ -43,7 +44,10 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
   const [source, setSource] = useState<Source>("original");
   const [open, setOpen] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
-  const [rereading, setRereading] = useState<string | null>(null);
+  // CVs seen being read here (green "ready" once done, until opened), and those
+  // whose details were asked for (their review opens once read).
+  const [watched, setWatched] = useState<ReadonlySet<string>>(new Set());
+  const [asked, setAsked] = useState<ReadonlySet<string>>(new Set());
   const [comparing, setComparing] = useState(false);
   const canFormat = permissions.includes("cvformats:create");
   const studio = useStudioRun(candidateId, canFormat);
@@ -62,7 +66,11 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
     mutationFn: async (documentId: string) =>
       unwrap(await api.POST("/v1/documents/{documentId}/parse", { params: { path: { documentId } } })),
     onSuccess: (d) => {
-      setRereading(d.id);
+      // The list shows it being read at once (an earlier "read" must not open the old review).
+      queryClient.setQueryData<Document[]>(["documents", candidateId], (list) => list?.map((x) => (x.id === d.id ? { ...x, status: d.status, parseStatus: d.parseStatus, updatedAt: d.updatedAt } : x)));
+      setAsked(new Set([...asked, d.id]));
+      setWatched(new Set([...watched, d.id]));
+      setPicked(d.id);
       setReviewing(null);
       void queryClient.invalidateQueries({ queryKey: ["document", d.id] });
       return queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });
@@ -117,48 +125,69 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
   });
 
   const all = docs.data ?? [];
-  const selected = all.find(d => d.id === picked) ?? latestCv(all);
+  const reviewed = all.find((d) => d.id === reviewing);
+  const selected = reviewed ?? all.find(d => d.id === picked) ?? latestCv(all);
+  const now = useNow(all.some(isReading));
+  // Follow every CV being read; one whose details were asked for opens its review once read.
+  const unseen = all.filter((d) => isReading(d) && !watched.has(d.id));
+  if (unseen.length > 0) setWatched(new Set([...watched, ...unseen.map((d) => d.id)]));
+  const finished = (d: Document) => watched.has(d.id) && !isReading(d);
+  const forget = (id: string) => {
+    if (watched.has(id)) setWatched(new Set([...watched].filter((x) => x !== id)));
+    if (asked.has(id)) setAsked(new Set([...asked].filter((x) => x !== id)));
+  };
+  const review = (id: string) => {
+    if (reviewing === id) { setReviewing(null); return; }
+    setReviewing(id);
+    setPicked(id);
+    forget(id);
+  };
+  const ready = all.find((d) => asked.has(d.id) && !isReading(d));
+  if (ready) {
+    if (ready.parseStatus === "parsed" && canEdit) { forget(ready.id); setReviewing(ready.id); setPicked(ready.id); }
+    // Not read: the bar stays, saying so, until dismissed.
+    else setAsked(new Set([...asked].filter((x) => x !== ready.id)));
+  }
   const groups = [
     { title: "From the candidate", items: all.filter((d) => d.source !== "formatted") },
     { title: "Formatted", items: all.filter((d) => d.source === "formatted") },
   ].filter((g) => g.items.length > 0);
 
   const actions = (d: Document) => {
-    const canReview = canEdit && d.parseStatus === "parsed" && d.source !== "formatted";
     const canReread = canUpload && d.status === "extracted" && d.parseStatus !== "queued";
-    return (          <div className="doc-buttons">
-            {canReview && (
-              <button type="button" className="doc-btn primary-soft" onClick={() => { setReviewing(reviewing === d.id ? null : d.id); }}>
-                Review details
+    // On the CV tab a PDF shows in the viewer, which has its own download; other files download from the menu.
+    const fromMenu = workspace && d.contentType !== "application/pdf";
+    const word = kindOf(d) === "DOC" || kindOf(d) === "DOCX";
+    const menu = !workspace || fromMenu || d.pdfStatus === "failed" || (canDelete && d.source === "formatted");
+    return (
+      <div className="doc-buttons">
+        <DetailsButton doc={d} seconds={readSeconds(d, now)} ready={finished(d)} reviewing={reviewing === d.id}
+          canReview={canEdit} canRead={canReread} busy={parse.isPending}
+          onRead={() => { parse.mutate(d.id); }} onReview={() => { review(d.id); }} />
+        {!workspace && <button type="button" className="doc-btn" onClick={() => { void downloadDocument(d); }}>{word ? "Word" : "Download"}</button>}
+        {!workspace && d.pdfStatus === "ready" && <button type="button" className="doc-btn" onClick={() => { pdf.mutate(d); }}>PDF</button>}
+        {menu && <details className="doc-more">
+          <summary aria-label={`More for ${d.fileName}`}>⋯</summary>
+          <div className="doc-menu" role="menu">
+            {!workspace && <button type="button" role="menuitem" onClick={(e) => { setOpen(open === d.id ? null : d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
+              {open === d.id ? "Hide the text" : "Show the text"}
+            </button>}
+            {fromMenu && <button type="button" role="menuitem" onClick={(e) => { void downloadDocument(d); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
+              {word ? "Download the Word file" : "Download the file"}
+            </button>}
+            {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
+            {canDelete && d.source === "formatted" && (
+              <button type="button" role="menuitem" className="danger" disabled={remove.isPending}
+                onClick={(e) => {
+                  e.currentTarget.closest("details")?.removeAttribute("open");
+                  if (window.confirm(`Delete the formatted CV "${d.fileName}"? Its Word and PDF files go too; this cannot be undone.`)) remove.mutate(d);
+                }}>
+                Delete this formatted CV
               </button>
             )}
-            <button type="button" className="doc-btn" onClick={() => { void downloadDocument(d); }}>{kindOf(d) === "DOC" || kindOf(d) === "DOCX" ? "Word" : "Download"}</button>
-            {d.pdfStatus === "ready" && <button type="button" className="doc-btn" onClick={() => { pdf.mutate(d); }}>PDF</button>}
-            <details className="doc-more">
-              <summary aria-label={`More for ${d.fileName}`}>⋯</summary>
-              <div className="doc-menu" role="menu">
-                {!workspace && <button type="button" role="menuitem" onClick={(e) => { setOpen(open === d.id ? null : d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
-                  {open === d.id ? "Hide the text" : "Show the text"}
-                </button>}
-                {canReread && (
-                  <button type="button" role="menuitem" disabled={parse.isPending}
-                    onClick={(e) => { parse.mutate(d.id); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
-                    {d.parseStatus ? "Read details again" : "Read details from this CV"}
-                  </button>
-                )}
-                {d.pdfStatus === "failed" && <p className="muted small">No PDF copy (the Word file is fine).</p>}
-                {canDelete && d.source === "formatted" && (
-                  <button type="button" role="menuitem" className="danger" disabled={remove.isPending}
-                    onClick={(e) => {
-                      e.currentTarget.closest("details")?.removeAttribute("open");
-                      if (window.confirm(`Delete the formatted CV "${d.fileName}"? Its Word and PDF files go too; this cannot be undone.`)) remove.mutate(d);
-                    }}>
-                    Delete this formatted CV
-                  </button>
-                )}
-              </div>
-            </details>
-          </div>);
+          </div>
+        </details>}
+      </div>);
   };
   const row = (d: Document) => {
     const note = [
@@ -184,7 +213,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
           <p key={w} className="warning small">{w}</p>
         ))}
         {!workspace && open === d.id && <DocumentText id={d.id} />}
-        {!workspace && reviewing === d.id && <CvReview documentId={d.id} candidate={candidate} onDone={() => { setReviewing(null); }} />}
+        {!workspace && reviewing === d.id && <CvReview documentId={d.id} candidate={candidate} canMerge={permissions.includes("candidates:merge")} onDone={() => { setReviewing(null); }} />}
       </li>
     );
   };
@@ -250,27 +279,18 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [], wor
       {canFormat && <StudioProgress run={studio} />}
       <ErrorMessage error={upload.error ?? parse.error ?? docs.error ?? pdf.error ?? remove.error} />
       {docs.data && all.length === 0 && <p className="muted">No CV yet.{canUpload ? " Upload one to read their details from it." : ""}</p>}
-      {(() => {
-        // "Read details again" says what it is doing, then offers the review.
-        const d = all.find((x) => x.id === rereading);
-        if (!d || reviewing === d.id) return null;
-        return <p className="reread-status" role="status">
-          {d.parseStatus === "queued" ? <>Reading the details from <strong>{d.fileName}</strong>…</>
-            : d.parseStatus === "parsed" ? <>Details read from <strong>{d.fileName}</strong>.{" "}
-              {canEdit && d.source !== "formatted" && <button type="button" className="doc-btn primary-soft" onClick={() => { setReviewing(d.id); setRereading(null); }}>Review details</button>}</>
-            : <>The details could not be read from <strong>{d.fileName}</strong>.</>}
-          {d.parseStatus !== "queued" && <button type="button" className="link" onClick={() => { setRereading(null); }}>Dismiss</button>}
-        </p>;
-      })()}
-      {/* The review opens above the CV, where the button is (not under the tall viewer). */}
-      {workspace && reviewing && all.some((d) => d.id === reviewing) &&
-        <CvReview key={reviewing} documentId={reviewing} candidate={candidate} onDone={() => { setReviewing(null); }} />}
       {workspace && selected && comparing && all.length >= 2 && <CvCompare docs={all} firstId={selected.id} />}
-      {workspace && selected && !(comparing && all.length >= 2) && <div className="cv-workspace">
-        <nav className="cv-library" aria-label="Candidate files">{groups.map(group => <div key={group.title}>
+      {workspace && selected && !(comparing && all.length >= 2) && <ReadProgress doc={selected} seconds={readSeconds(selected, now)} finished={finished(selected)}
+        action={selected.parseStatus === "parsed" && canEdit && reviewing !== selected.id
+          ? <button type="button" className="doc-btn format-done" onClick={() => { review(selected.id); }}>Review details</button> : null}
+        onDismiss={() => { forget(selected.id); }} />}
+      {workspace && selected && !(comparing && all.length >= 2) && <div className={reviewed ? "cv-workspace reviewing" : "cv-workspace"}>
+        {/* Reviewing: the details beside the CV they came from, in place of the list of files. */}
+        {reviewed ? <CvReview key={reviewed.id} documentId={reviewed.id} candidate={candidate} canMerge={permissions.includes("candidates:merge")} onDone={() => { setReviewing(null); }}
+          onReread={canUpload ? () => { parse.mutate(reviewed.id); } : undefined} /> : <nav className="cv-library" aria-label="Candidate files">{groups.map(group => <div key={group.title}>
           <h4>{group.title}</h4>{group.items.map(d => <button key={d.id} type="button" aria-pressed={selected.id === d.id}
             onClick={() => { setPicked(d.id); }}><strong>{d.fileName}</strong><span>{SOURCE_LABEL[d.source]} · {added(d.createdAt)} · {STATUS_NOTE[d.status] ?? "Text read"}{d.parseStatus === "failed" ? " · Details could not be read" : d.parseStatus === "queued" ? " · Reading details…" : d.parseStatus === "parsed" ? " · Details read" : ""}{d.pdfStatus === "queued" ? " · Making PDF…" : ""}</span></button>)}
-        </div>)}</nav>
+        </div>)}</nav>}
         <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")} />
       </div>}
       {groups.map((g) => (

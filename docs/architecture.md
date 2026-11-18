@@ -176,9 +176,12 @@ and called identically from Go and Python: `job_enqueue`, `job_claim`,
   `dead` with its last error, so failures are visible, never silent: owners
   and admins see them in **Settings > System** and can try one again.
 - **Most urgent first.** Each job kind has a priority in the contract: `high`
-  when someone waits on screen (an assistant question, an email), `low` for
-  upkeep (PDF copies, webhooks, calendar refreshes), `normal` otherwise. A
-  result job inherits the priority of the job that made it.
+  when someone waits on screen (an assistant question, an email, a job
+  description's preview on the job's page), `low` for upkeep (webhooks,
+  calendar refreshes, industry guesses), `normal` otherwise (a CV's preview
+  among them). A preview takes LibreOffice seconds but would wait behind every
+  fit score and AI call as `low`. A result job inherits the priority of the
+  job that made it.
 - **Several at once.** Each worker runs several jobs side by side
   (`HP_WORKER_CONCURRENCY`, `HP_AI_CONCURRENCY`), each slot holding its own
   leases, so one slow job (a webhook to a slow server, a long AI call) does

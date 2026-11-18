@@ -15,11 +15,20 @@ narrow screens.
 
 CV & files has one document library and one viewer: selecting a file changes its
 preview and action toolbar together. Upload, compare, formatting, formatting
-history, extracted-detail review, text/original view, Word/PDF download, reread
-and permission-gated formatted-file deletion remain available. Compare side by
+history, extracted-detail review, text/original view, reread and
+permission-gated formatted-file deletion remain available. A PDF has no
+Download button beside it (the viewer has its own); other files download from
+the ⋯ menu. Compare side by
 side shows two CVs next to each other in the tab itself (each with its own
-picker; what their details disagree on folded underneath). Review details opens
-above the CV; Read details again says while it reads, then offers the review. Jobs uses the
+picker; what their details disagree on folded underneath). One details
+button: **Read details** reads a CV never read (or one that failed), turning
+orange with a timer while it reads and a bar filling under it, as Format a CV
+does, then green; the review opens by itself when it was asked for. **Review
+details** opens the review **beside the CV** (in place of the list of files),
+the CV staying in view while the review scrolls; **Read this CV again** is at
+the review's foot. When the details cannot be read, the bar says so with
+where the reader broke (its error type and line, never CV text), until
+dismissed; asking again clears it. Jobs uses the
 existing stage badge and separate Move to menu, including reason/cancel/reopen,
 interviews, offers, placements and stage history. Profile/history editing,
 duplicate merging, privacy tools, call history and salary notes remain in their
@@ -142,6 +151,18 @@ text with the words marked ("4 places for ...", each word with its count
 to jump to its next place, "Next place", "Stop marking"). Words are matched
 in their other forms (manager, managers), as CVs are indexed; symbols are
 not searchable (C++ is C, .NET is NET).
+
+**A record's page** (candidate, company, contact, job) has its actions as a
+neat row of icons above the card: for a candidate email, screening call,
+reference check, edit profile; for a contact verify email, email, edit; for a
+company or job, edit; and, set apart, delete. Each is named in a tooltip on
+hover or keyboard focus (and for screen readers). The AI assistant is a tab
+of its own on candidate and job pages.
+
+**Each candidate's initials** sit in a disc of their status's colours
+(Looking out, Passive, Placed, Not looking; grey when not set), as on their
+page and in a job's pipeline; their work authorization is written under the
+name in its own colour.
 
 **Click opens: Profile | Full resume** (the switch above the results, kept
 on that computer). Profile is the usual table. Full resume reads the
@@ -306,8 +327,9 @@ Employers, clients and their branded products are masked as whole names
 
 ## 3.5 AI assistant sidebar ✅ (off until an AI provider is set up)
 
-A panel on candidate and job pages: **Summary**, **Gaps and red flags**, and
-your own questions. On a candidate's page, "About" switches to one of their
+A panel on candidate and job pages (on a candidate's page its own tab,
+**AI assistant**, beside Email; docked, it stays on the right whatever tab is
+open): **Summary**, **Gaps and red flags**, and your own questions. On a candidate's page, "About" switches to one of their
 jobs for **Fit for this job** ("how well does this candidate fit?").
 Answers come back in a few seconds and are kept, newest first; each person
 sees only their own. Each answer is a card; long ones past the newest are
@@ -457,12 +479,13 @@ for each of their jobs, with **Score fit** / **Score again**.
 - **Benefits & pre-offer process** ✅: on a client's page, under its details,
   what it offers and what it checks before an offer, recorded from the
   agency's template (Hyppies' Benefits & Pre-Offer Process to start with:
-  job grade, annual and other leave, medical and insurance, work mode,
+  annual and other leave, medical and insurance, work mode,
   working hours, dental and optical, fixed, performance and other bonuses,
   commission, special benefits; then reference and background checks,
   health screening, payslips, NRIC/passport, education certificate and
-  anything else). A client's grades (Executive, Manager...) are set on the
-  form; a benefit that differs by grade has a value per grade, shown as
+  anything else). A client's grades (Executive, Manager...) are set at the
+  top of the form (so the template has no "Job grade/level" item; one an
+  agency saved stays retired, still shown where a company wrote in it); a benefit that differs by grade has a value per grade, shown as
   chips (a grade chosen at the top shows only its values), and the Word/PDF
   has a column per grade. Filled in as one form, each item with a value and remarks
   and a hint saying what to write; each pre-offer step Yes, No or Not known
@@ -917,7 +940,9 @@ lead's company (with the built-in email check).
   why) when it has had no candidates for 2 weeks, someone has waited over 7
   days in one stage, or nothing has moved for 7 days. **All open / Mine /
   Needs attention** pick which jobs show.
-- **A job's board** ✅: each card shows initials, the candidate's current
+- **A job's board** ✅: each card shows initials (in the colours of the
+  candidate's status, Looking out, Passive, Placed or Not looking, as on their
+  page; grey when not set), the candidate's current
   title, days in the stage (amber after 7, red after 14), their next
   interview and a sent offer's last day to answer. **Choose: All | None**
   picks the whole board; a column's count picks that column.
@@ -1275,7 +1300,11 @@ education. A value the rules refuse (e.g. a phone in no known format) is left
 out and the rest kept. **One candidate per email:** when the CV's email
 belongs to a candidate already, the file is added to that candidate and the
 new one merged into them (their empty fields filled, nothing they have
-replaced). The page shows each import with its files' progress (reading, new
+replaced). On a candidate's page, when a CV's details (or an edit) give an
+email another candidate has, the message names them and, for those who may
+merge, offers **Merge into** them: this candidate's CVs, jobs and notes move
+there, their empty fields are filled, this one is deleted and their page
+opens. The page shows each import with its files' progress (reading, new
 candidate, added to existing, could not be read: fill it in, failed: not a CV
 file), refreshing while files are read, with a link to each candidate. Your
 imports are yours: others do not see them, and a candidate you may not see is

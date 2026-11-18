@@ -222,7 +222,7 @@ func fromRow(r store.Document) Document {
 		ID: r.ID, CandidateID: r.CandidateID, Source: r.Source, FileName: r.FileName,
 		ContentType: r.ContentType, SizeBytes: r.SizeBytes, SHA256: r.Sha256, Status: r.Status,
 		Extractor: r.Extractor, ErrorMessage: r.ErrorMessage, Warnings: r.ExtractionWarnings,
-		ParseStatus: r.ParseStatus, PdfStatus: r.PdfStatus, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		ParseStatus: r.ParseStatus, ParseError: r.ParseError, PdfStatus: r.PdfStatus, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 	if d.Warnings == nil {
 		d.Warnings = []string{}

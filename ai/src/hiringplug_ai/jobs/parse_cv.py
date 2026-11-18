@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import traceback
 from typing import TYPE_CHECKING
 
 from ..contracts import DocumentCvParsedJob, DocumentParseCvJob, JobKind, ParsedProfile
@@ -35,11 +37,12 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
                 profile, tokens = filled.profile, filled.tokens
             except Exception:  # an AI-step bug must not lose the rules' reading
                 log.warning("ai fill failed", exc_info=True, extra={"document_id": payload.documentId.root})
-    except Exception:  # a rule bug must not leave the CV "being read" forever
+    except Exception as exc:  # a rule bug must not leave the CV "being read" forever
         # Retrying cannot change the outcome for the same text: report the
-        # failure, so the document shows "details could not be read".
+        # failure, so the document shows "details could not be read", and where
+        # it broke, to be fixed (never the exception's message: it may quote the CV).
         log.warning("cv could not be parsed", exc_info=True, extra={"document_id": payload.documentId.root})
-        return [_result(payload, None, "The details could not be read from this CV.")]
+        return [_result(payload, None, f"The details could not be read from this CV ({where(exc)}).")]
     # Counts only: CV contents (names, emails) never go in logs.
     log.info(
         "cv parsed",
@@ -53,6 +56,16 @@ def run(payload: DocumentParseCvJob, deps: Deps) -> list[FollowUp]:
         },
     )
     return [_result(payload, profile, None, tokens)]
+
+
+def where(exc: BaseException) -> str:
+    """The error's type and the parser line it came from ("IndexError at experience.py:120"): no CV text."""
+    frames = traceback.extract_tb(exc.__traceback__)
+    ours = [f for f in frames if "hiringplug_ai" in f.filename] or frames
+    if not ours:
+        return type(exc).__name__
+    last = ours[-1]
+    return f"{type(exc).__name__} at {os.path.basename(last.filename)}:{last.lineno}"
 
 
 def _result(

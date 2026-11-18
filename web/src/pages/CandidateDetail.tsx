@@ -11,6 +11,7 @@ import { WorkAuthorizationPicker } from "../components/WorkAuthorizationPicker";
 import { hashParam } from "../hashQuery";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
+import { EditIcon, IconActions, IconButton, IconLink, IconSeparator, MailIcon, PhoneIcon, ReferenceIcon, TrashIcon } from "../components/ActionIcons";
 import { DeleteRecord } from "../components/DeleteRecord";
 import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
@@ -61,7 +62,7 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
     { id: "details", label: "Details", content: <>
       <SimilarCandidates candidate={c} canMerge={permissions.includes("candidates:merge")} />
       {editing ? (
-        <CandidateForm candidate={c} onDone={() => { setEditing(false); }} />
+        <CandidateForm candidate={c} canMerge={permissions.includes("candidates:merge")} onDone={() => { setEditing(false); }} />
       ) : (
         <section className="panel candidate-profile one-column" aria-label="Profile">
           {/* Email, phone and LinkedIn are on the card above (click to copy). */}
@@ -95,6 +96,9 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
       editing={editingSalary} onEditingChange={setEditingSalary} /> },
     ...(permissions.includes("emails:read") ? [{ id: "email" as const, label: "Email", content:
       <CandidateEmails candidateId={c.id} email={c.email} permissions={permissions} writing={writing} onWritingChange={setWriting} /> }] : []),
+    // Beside Email; kept mounted, as it may be docked on the right whatever tab is open.
+    ...(permissions.includes("assistant:use") ? [{ id: "assistant" as const, label: "AI assistant", keep: true, content:
+      <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} /> }] : []),
   ];
 
   return (
@@ -115,13 +119,14 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
             await queryClient.invalidateQueries({ queryKey: candidateKey(c.id) });
           }} /></span>
         {permissions.includes("candidates:update") && !editing && (
-          <span className="row candidate-actions">
-            {permissions.includes("emails:read") && permissions.includes("emails:send") && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
-            <a className="button" href={`#/candidates/${c.id}/screening`}>Screening call</a>
-            {permissions.includes("notes:create") && <a className="button" href={`#/candidates/${c.id}/reference-check`}>Reference check</a>}
-            <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit profile</button>
-            {permissions.includes("bin:manage") && <DeleteRecord kind="candidate" id={c.id} />}
-          </span>
+          <IconActions label="Candidate actions">
+            {permissions.includes("emails:read") && permissions.includes("emails:send") &&
+              <IconButton label="Email" icon={<MailIcon />} onClick={() => { setWriting(true); setActive("email"); }} />}
+            <IconLink label="Screening call" icon={<PhoneIcon />} href={`#/candidates/${c.id}/screening`} />
+            {permissions.includes("notes:create") && <IconLink label="Reference check" icon={<ReferenceIcon />} href={`#/candidates/${c.id}/reference-check`} />}
+            <IconButton label="Edit profile" icon={<EditIcon />} onClick={() => { setEditing(true); setActive("details"); }} />
+            {permissions.includes("bin:manage") && <><IconSeparator /><DeleteRecord kind="candidate" id={c.id} icon={<TrashIcon />} /></>}
+          </IconActions>
         )}
       </div>
       <CandidateBanner candidate={c} canEdit={permissions.includes("candidates:update")} canEditStatus={permissions.includes("candidates.status:update")}
@@ -136,9 +141,6 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         </div>
         {beside && <CvBeside candidateId={c.id} />}
       </div>
-      {permissions.includes("assistant:use") && <details className="candidate-assistant"><summary>AI assistant</summary>
-        <Assistant subjectType="candidate" subjectId={c.id} permissions={permissions} />
-      </details>}
     </main>
   );
 }

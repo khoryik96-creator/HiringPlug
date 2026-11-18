@@ -29,7 +29,7 @@ input.code { text-transform: uppercase; }
 .badge.filled { background: #dbeafe; }
 .badge.closed { background: #e5e7eb; }
 .board { display: grid; grid-template-columns: repeat(6, minmax(13rem, 1fr)); gap: 0.75rem; overflow-x: auto; padding-bottom: 0.25rem; } /* roomy cards; the board scrolls sideways on a small screen */
-.column { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem; min-height: 6rem; }
+.column { background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem; min-height: 6rem; grid-template-columns: minmax(0, 1fr); } /* a long name ends in … and never widens its column over the next */
 .column.drop { outline: 2px dashed var(--accent); }
 .column h4 { margin: 0.1rem 0.2rem 0.6rem; font-size: 0.74rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.75rem; margin-bottom: 0.55rem; cursor: grab; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 0.3rem; }
@@ -851,7 +851,8 @@ td .category-chip { margin-left: 0.5rem; vertical-align: middle; }
 /* The AI assistant: a header with its dock buttons, quick asks, a question box, answer cards. */
 .assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
 .assistant-head h3 { margin: 0; }
-.assistant-tools { display: flex; gap: 0.35rem; }
+.assistant-tools { display: flex; align-items: center; gap: 0.35rem; }
+.dock-btn { white-space: nowrap; } /* "Dock right ⇥" on one line, a button like the others */
 .tool-btn { min-height: 0; padding: 0.25rem 0.6rem; font-size: 0.8rem; font-weight: 600; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--muted); box-shadow: none; }
 .tool-btn:hover { color: var(--accent); border-color: var(--accent); }
 .assistant-about { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.6rem; }
@@ -1275,15 +1276,27 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .step-actions { display: flex; gap: 0.4rem; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .step-actions button, .step-actions select { min-height: 0; padding: 0.3rem 0.75rem; font-size: 0.82rem; }
 .board.compact .column { padding: 0.45rem; display: grid; align-content: start; gap: 3px; }
-.board-line { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 4px 6px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid transparent; font-size: 0.82rem; }
+.board-line { position: relative; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; padding: 4px 30px 4px 6px; border-radius: 8px; background: var(--surface, #fff); border: 1px solid transparent; font-size: 0.82rem; } /* in a narrow column the chips wrap under the name, never over the card's edge */
 .board-line.pickable { cursor: pointer; }
 .board-line.picked { border-color: var(--accent); background: var(--accent-soft); }
 .board-line.stale { box-shadow: inset 3px 0 0 #b91c1c; }
-.board-line a { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-line a { flex: 1 1 5.5rem; min-width: 5.5rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-line .avatar { width: 22px; height: 22px; font-size: 9px; }
 .board-line .chip { padding: 0 6px; font-size: 10.5px; }
-.board-line .line-chips { display: inline-flex; gap: 3px; align-items: center; }
-.board-line .line-next { min-height: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; opacity: 0; }
+.board-line .line-chips { display: inline-flex; flex-wrap: nowrap; gap: 3px; align-items: center; margin-left: auto; max-width: 100%; }
+.board-line .avatar { flex: none; }
+.board-line .line-next { position: absolute; top: 4px; right: 4px; min-height: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1; opacity: 0; }
 .board-line:hover .line-next, .board-line:focus-within .line-next { opacity: 1; }
 .fold-more { justify-self: center; font-size: 0.8rem; font-weight: 600; }
 @media (hover: none) { .board-line .line-next { opacity: 1; } }
+
+/* A page's actions as a neat row of icons (the candidate page): each named for screen
+   readers and in a tooltip shown on hover or keyboard focus. */
+.icon-actions { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(31, 41, 55, 0.05); }
+.icon-action { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border: 0; border-radius: 9px; background: transparent; box-shadow: none; color: #4b5563; text-decoration: none; cursor: pointer; }
+.icon-action:hover, .icon-action:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.icon-action.icon-danger:hover, .icon-action.icon-danger:focus-visible { background: #fef2f2; color: #b91c1c; }
+.icon-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--line); }
+.icon-action[data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 30; }
+.icon-action[data-tip]:hover::after, .icon-action[data-tip]:focus-visible::after { opacity: 1; }
+.icon-actions > :last-child[data-tip]::after { left: auto; right: 0; transform: none; } /* the last tooltip keeps to the screen's edge */

@@ -28,7 +28,8 @@ type TextKey = "firstName" | "lastName" | "email" | "phone" | "linkedinUrl" | "n
   | "specialization" | "currentTitle" | "currentCompany" | "location";
 
 /** Edit a candidate's profile. Salary is edited separately (its own permission). */
-export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onDone: () => void }) {
+/** canMerge: an email another candidate has offers to merge this one into them. */
+export function CandidateForm({ candidate, onDone, canMerge = false }: { candidate: Candidate; onDone: () => void; canMerge?: boolean }) {
   const queryClient = useQueryClient();
   // What the user started from. Saving sends this version even if the page
   // refreshes in the meantime, so a newer change by someone else comes back as
@@ -140,7 +141,7 @@ export function CandidateForm({ candidate, onDone }: { candidate: Candidate; onD
         shown={Object.values(FIELD_PATHS)}
         onReload={() => { void queryClient.invalidateQueries({ queryKey: candidateKey(opened.id) }); onDone(); }}
       />
-      <div className="full"><DuplicateEmail error={save.error} /></div>
+      <div className="full"><DuplicateEmail error={save.error} merge={canMerge ? { id: candidate.id, name: candidate.fullName } : undefined} /></div>
     </form>
   );
 }

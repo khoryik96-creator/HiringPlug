@@ -13,7 +13,7 @@ afterEach(() => {
 const doc = (over: Partial<Document>): Document => ({
   id: "doc_1", candidateId: "cand_1", source: "original", fileName: "Siti CV.pdf", contentType: "application/pdf", sizeBytes: 1000,
   sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "pdf", errorMessage: null, extractionWarnings: [],
-  parseStatus: "parsed", pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
+  parseStatus: "parsed", parseError: null, pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
 });
 const run = (over: Partial<Schemas["StudioCv"]>): Schemas["StudioCv"] => ({
   id: "scv_1", candidateId: "cand_1", sourceDocumentId: "doc_1", status: "queued", blind: false, correctLanguage: true,

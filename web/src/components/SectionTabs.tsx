@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
-export type Section<T extends string> = { id: T; label: string; content: ReactNode };
+/** keep: mounted from the start, not on first opening (the AI assistant, which may be docked on the right whatever tab is open). */
+export type Section<T extends string> = { id: T; label: string; content: ReactNode; keep?: boolean };
 
 /**
  * A record's sections as tabs (a candidate's, a company's, a contact's). Tabs
@@ -24,7 +25,7 @@ export function SectionTabs<T extends string>({ name, label, sections, active, o
           if (next) { event.preventDefault(); select(next.id); document.getElementById(`${name}-tab-${next.id}`)?.focus(); }
         }}>{section.label}</button>)}
     </div>
-    {sections.filter(s => s.id === current || visited.has(s.id)).map(s => <div key={s.id} role="tabpanel" id={`${name}-panel-${s.id}`}
+    {sections.filter(s => s.id === current || visited.has(s.id) || s.keep).map(s => <div key={s.id} role="tabpanel" id={`${name}-panel-${s.id}`}
       aria-labelledby={`${name}-tab-${s.id}`} hidden={s.id !== current} tabIndex={0}>{s.content}</div>)}
   </div>;
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/oapi-codegen/nullable"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apiconv"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/apperr"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/authz"
 )
@@ -114,6 +115,7 @@ func documentToAPI(d Document, withText bool) api.Document {
 		ExtractionWarnings: d.Warnings,
 		CreatedAt:          d.CreatedAt, UpdatedAt: d.UpdatedAt,
 	}
+	out.ParseError = apiconv.OrNull(d.ParseError)
 	if d.ParseStatus != nil {
 		out.ParseStatus = nullable.NewNullableWithValue(api.DocumentParseStatus(*d.ParseStatus))
 	} else {

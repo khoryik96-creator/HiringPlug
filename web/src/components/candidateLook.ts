@@ -15,6 +15,11 @@ export const AVAILABILITY: Record<Availability, { label: string; bg: string; edg
 /** The colour a card without an availability is drawn from (slate, like a company without a category). */
 export const NO_STATUS_EDGE = "#6B7280";
 
+/** A candidate's initials in their status's colours (as their page's banner): pale fill, its edge as a ring, dark letters. */
+export function statusLook(availability: Availability | null | undefined): { label: string; bg: string; edge: string } {
+  return availability ? AVAILABILITY[availability] : { label: "Not set", bg: "#E5E7EB", edge: NO_STATUS_EDGE };
+}
+
 /** The work authorization choices on the page (each a colour), from the stored status and pass. */
 export type WaKind = "local" | "pr" | "expat" | "needsPass" | "unknown";
 

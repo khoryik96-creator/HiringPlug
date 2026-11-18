@@ -107,7 +107,7 @@ describe("fit scores", () => {
 
 const app = (id: string, name: string): Application => ({
   id, candidateId: `cand_${id}`, candidateName: name, stage: "screening", version: 1, jobId: "jo_1", jobTitle: "Auditor", companyId: "comp_1",
-  companyName: "Maybank", candidateTitle: null, reason: null, reasonNote: null, channel: null,
+  companyName: "Maybank", candidateTitle: null, candidateAvailability: null, reason: null, reasonNote: null, channel: null,
   stageChangedAt: new Date().toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 });
 
@@ -164,5 +164,14 @@ describe("an outdated score", () => {
     renderWithClient(<><FitBadge match={match({ outdated: true })} /><FitReasons match={match({ outdated: true })} open /></>);
     expect(screen.getByText("Fit 50% · outdated").getAttribute("title")).toContain("score it again");
     expect(screen.getByText(/changed after this score/)).toBeTruthy();
+  });
+
+  it("is short on a board line, so the name keeps its room, and still says outdated", () => {
+    renderWithClient(<FitBadge match={match({ outdated: true })} compact />);
+    const badge = document.querySelector(".badge") as HTMLElement;
+    expect(badge.textContent).toBe("Fit 50% ↻ · outdated");
+    expect(badge.querySelector("[aria-hidden=true]")?.textContent).toBe(" ↻");
+    expect(badge.querySelector(".visually-hidden")?.textContent).toBe(" · outdated");
+    expect(badge.getAttribute("title")).toContain("score it again");
   });
 });

@@ -154,8 +154,8 @@ def test_a_lost_lease_discards_the_result_without_recording_a_failure() -> None:
 
 
 def test_a_parser_crash_is_reported_as_a_failed_parse(monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(text: str) -> None:
-        raise ValueError("a rule broke")
+    def broken(text: str, file_name: str | None = None) -> None:
+        raise ValueError("a rule broke on SITI AISYAH")  # an error's message may quote the CV
 
     monkeypatch.setattr(parse_job, "parse_cv", broken)
     queue = FakeQueue()
@@ -164,7 +164,11 @@ def test_a_parser_crash_is_reported_as_a_failed_parse(monkeypatch: pytest.Monkey
     result = queue.completed[0][0].payload
     assert isinstance(result, DocumentCvParsedJob)
     assert result.profile is None
-    assert result.errorMessage == "The details could not be read from this CV."
+    # Says where it broke, to be fixed, but never the error's message (CV text).
+    assert result.errorMessage is not None
+    assert result.errorMessage.startswith("The details could not be read from this CV (")
+    assert "(ValueError at parse_cv.py:" in result.errorMessage
+    assert "SITI" not in result.errorMessage
 
 
 def test_each_slot_holds_its_own_leases() -> None:

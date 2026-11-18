@@ -13,7 +13,7 @@ const LOST = 15 * 60_000; // the server takes a run queued this long as lost, to
 const TYPICAL = 60; // seconds a run usually takes
 
 /** Now, ticking every second while active. */
-function useNow(active: boolean) {
+export function useNow(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;

@@ -13,7 +13,7 @@ afterEach(() => {
 const doc = (over: Partial<Document>): Document => ({
   id: "doc_1", candidateId: "cand_1", source: "original", fileName: "Siti CV.pdf", contentType: "application/pdf", sizeBytes: 1000,
   sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "pdf", errorMessage: null, extractionWarnings: [],
-  parseStatus: "parsed", pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
+  parseStatus: "parsed", parseError: null, pdfStatus: null, createdAt: "2026-11-03T00:00:00Z", updatedAt: "2026-11-03T00:00:00Z", ...over,
 });
 
 describe("CVs and documents", () => {
@@ -27,7 +27,10 @@ describe("CVs and documents", () => {
     const library = await screen.findByRole("navigation", {name: "Candidate files"});
     expect(await screen.findByText("Original text")).toBeTruthy();
     expect(screen.queryByRole("combobox", {name: "CV version"})).toBeNull();
-    expect(screen.getAllByRole("button", {name: "Download"})).toHaveLength(1);
+    // No Download button beside the viewer: a file the viewer cannot download comes from the menu.
+    expect(screen.queryByRole("button", {name: "Download"})).toBeNull();
+    fireEvent.click(screen.getByLabelText("More for Original CV.txt"));
+    expect(screen.getByRole("menuitem", {name: "Download the file"})).toBeTruthy();
     fireEvent.click(within(library).getByRole("button", {name: /Formatted CV.txt/}));
     expect(await screen.findByText("Formatted text")).toBeTruthy();
     expect(screen.queryByText("Original text")).toBeNull();
@@ -36,9 +39,21 @@ describe("CVs and documents", () => {
     expect(screen.getByRole("menuitem", {name: "Delete this formatted CV"})).toBeTruthy();
   });
 
-  it("opens Review details above the CV, and says what Read details again is doing", async () => {
+  it("has nothing to download beside a PDF: the viewer has its own download", async () => {
+    const pdf = doc({ id: "doc_pdf", extractedText: "PDF text" });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [pdf] } : pdf
+    ))) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByRole("button", { name: "Review details" });
+    expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
+    expect(screen.queryByLabelText("More for Siti CV.pdf")).toBeNull(); // an empty menu is not shown
+  });
+
+  it("opens the review beside the CV, and reads it again from there", async () => {
     let parseStatus: Document["parseStatus"] = "parsed";
     const cv = () => doc({ id: "doc_cv", fileName: "Noelle CV.txt", contentType: "text/plain", extractedText: "CV text", parseStatus,
+      updatedAt: new Date().toISOString(),
       parsedProfile: { parser: "rules@1", fullName: { value: "Noelle Khoo", quote: "NOELLE KHOO" }, skills: [], experience: [], education: [], dropped: 0 } as never });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
@@ -48,32 +63,72 @@ describe("CVs and documents", () => {
     await screen.findByText("CV text");
     fireEvent.click(screen.getByRole("button", { name: "Review details" }));
     const review = await screen.findByRole("region", { name: "Details from this CV" });
-    const viewer = document.querySelector(".cv-workspace") as HTMLElement;
-    // Before the tall viewer, where the button is: it used to open below it, out of sight.
-    expect(review.compareDocumentPosition(viewer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Beside the CV, in place of the list of files.
+    const workspace = document.querySelector(".cv-workspace.reviewing") as HTMLElement;
+    expect(workspace.contains(review)).toBe(true);
+    expect(within(workspace).getByText("CV text")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Candidate files" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close review" }).getAttribute("aria-pressed")).toBe("true");
 
-    fireEvent.click(screen.getByLabelText("More for Noelle CV.txt"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Read details again" }));
-    expect((await screen.findByRole("status")).textContent).toContain("Reading the details from Noelle CV.txt…");
+    fireEvent.click(screen.getByRole("button", { name: "Read this CV again" }));
+    expect((await screen.findByRole("status", { name: "Reading the CV" })).textContent).toContain("Reading the details…");
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: /^Reading details…/ }).disabled).toBe(true);
     expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
     parseStatus = "parsed";
-    await waitFor(() => { expect(screen.getByRole("status").textContent).toContain("Details read from Noelle CV.txt."); }, { timeout: 4000 });
-    fireEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "Review details" }));
-    expect(await screen.findByRole("region", { name: "Details from this CV" })).toBeTruthy();
+    // Read: the review asked for opens by itself.
+    expect(await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 })).toBeTruthy();
   });
 
-  it("offers no review after re-reading a formatted CV (our own output)", async () => {
+  it("reads a CV never read with the same button, then shows it ready", async () => {
+    let parseStatus: Document["parseStatus"] = null;
+    const cv = () => doc({ id: "doc_old", fileName: "Old CV.txt", contentType: "text/plain", extractedText: "Old text", parseStatus,
+      parsedProfile: { parser: "rules@1", fullName: { value: "Ali", quote: "ALI" }, skills: [], experience: [], education: [], dropped: 0 } as never });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    const post = vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Old text");
+    expect(screen.queryByRole("button", { name: "Review details" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Read details" }));
+    await screen.findByRole("button", { name: /^Reading details…/ });
+    expect(post).toHaveBeenCalledTimes(1);
+    parseStatus = "parsed";
+    expect(await screen.findByRole("region", { name: "Details from this CV" }, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it("says so when the details asked for could not be read, until dismissed", async () => {
+    let parseStatus: Document["parseStatus"] = null;
+    const cv = () => doc({ id: "doc_bad", fileName: "Bad CV.txt", contentType: "text/plain", extractedText: "Bad text", parseStatus,
+      parseError: parseStatus === "failed" ? "The details could not be read from this CV (IndexError at experience.py:120)." : null });
+    vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
+      path === "/v1/candidates/{candidateId}/documents" ? { items: [cv()] } : cv()
+    ))) as never);
+    vi.spyOn(api, "POST").mockImplementation((() => { parseStatus = "queued"; return Promise.resolve(ok(cv())); }) as never);
+    renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
+    await screen.findByText("Bad text");
+    fireEvent.click(screen.getByRole("button", { name: "Read details" }));
+    await screen.findByRole("button", { name: /^Reading details…/ });
+    parseStatus = "failed";
+    const bar = await screen.findByRole("status", { name: "Reading the CV" }, { timeout: 4000 });
+    await waitFor(() => { expect(bar.textContent).toContain("The details could not be read"); }, { timeout: 4000 });
+    expect(screen.getByRole("alert").textContent).toContain("(IndexError at experience.py:120)"); // where it broke, to be fixed
+    expect(screen.queryByRole("region", { name: "Details from this CV" })).toBeNull();
+    fireEvent.click(within(bar).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("status", { name: "Reading the CV" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Read details again" })).toBeTruthy();
+  });
+
+  it("offers no details for a formatted CV (our own output)", async () => {
     const f = doc({ id: "doc_f", source: "formatted", fileName: "Formatted CV.txt", contentType: "text/plain", extractedText: "Formatted text" });
     vi.spyOn(api, "GET").mockImplementation(((path: string) => Promise.resolve(ok(
       path === "/v1/candidates/{candidateId}/documents" ? { items: [f] } : f
     ))) as never);
-    vi.spyOn(api, "POST").mockResolvedValue(ok(f));
     renderWithClient(<Documents workspace candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
     await screen.findByText("Formatted text");
+    expect(screen.queryByRole("button", { name: /details/ })).toBeNull();
     fireEvent.click(screen.getByLabelText("More for Formatted CV.txt"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Read details again" }));
-    expect((await screen.findByRole("status")).textContent).toContain("Details read from Formatted CV.txt.");
-    expect(within(screen.getByRole("status")).queryByRole("button", { name: "Review details" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /Read details/ })).toBeNull();
   });
 
   it("compares two CVs side by side right in the tab, and goes back to one", async () => {

@@ -5,7 +5,7 @@ import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { countryName, formatNotice } from "../labels";
-import { AVAILABILITY, rangeText, salaryText, sinceText, WA_KIND, waColumnLabel, waKind } from "./candidateLook";
+import { AVAILABILITY, rangeText, salaryText, sinceText, statusLook, WA_KIND, waColumnLabel, waKind } from "./candidateLook";
 import { Chips } from "./LabelInput";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -83,7 +83,7 @@ export function initials(name: string): string {
   return ((words[0]?.[0] ?? "") + (words.length > 1 ? words[words.length - 1]?.[0] ?? "" : "")).toUpperCase() || "?";
 }
 
-/** Work authorization of a candidate in a list: their initials in a disc of its colour, its name under theirs. */
+/** A candidate in a list: their initials in a disc of their status colour, their name, and their work authorization (in its colour) under it. */
 export function WaName({ c, href, children }: { c: Summary; href: string; children?: React.ReactNode }) {
   const wa = workAuth(c);
   const kind = WA_KIND[waKind(wa)];
@@ -99,12 +99,12 @@ export function WaName({ c, href, children }: { c: Summary; href: string; childr
   );
 }
 
-/** Their initials in a disc of their work authorization's colour; with a label, said to screen readers too. */
+/** Their initials in a disc of their status's colours (Looking out, Placed...), as their page's banner; with a label, said to screen readers too. */
 export function WaDisc({ c, label, big = false }: { c: Summary; label?: string; big?: boolean }) {
-  const color = WA_KIND[waKind(workAuth(c))].color;
-  const said = label ? { role: "img", "aria-label": `Work authorization: ${label}`, title: `Work authorization: ${label}` } : { "aria-hidden": true };
+  const look = statusLook(c.availability);
+  const said = label ? { role: "img", "aria-label": `Status: ${look.label}`, title: `Status: ${look.label}` } : { "aria-hidden": true };
   return (
-    <span className={big ? "wa-disc big" : "wa-disc"} style={{ background: color, boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${color}` }} {...said}>
+    <span className={big ? "wa-disc big" : "wa-disc"} style={{ background: look.bg, color: "#1F2937", boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${look.edge}` }} {...said}>
       {initials(c.fullName)}
     </span>
   );

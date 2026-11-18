@@ -141,7 +141,7 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 		return err
 	}
 	status := string(api.DocumentParseStatusFailed)
-	params := store.SaveParseParams{ID: row.ID, ParseStatus: &status}
+	params := store.SaveParseParams{ID: row.ID, ParseStatus: &status, ParseError: parseError(result)}
 	changes := map[string]any{"status": status}
 	var kept *api.ParsedProfile
 	if profile, err := result.Profile.Get(); err == nil && hasText(row.ExtractedText) {
@@ -157,7 +157,7 @@ func (s *Service) saveParse(ctx context.Context, tx pgx.Tx, job jobqueue.Job) er
 			return err
 		}
 		status = string(api.DocumentParseStatusParsed)
-		params.ParsedProfile, params.Parser = data, &grounded.Parser
+		params.ParsedProfile, params.Parser, params.ParseError = data, &grounded.Parser, nil
 		// Counts only: CV contents never go in the audit log.
 		changes = map[string]any{
 			"status": status, "parser": grounded.Parser, "jobs": len(grounded.Experience),
@@ -200,4 +200,17 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// parseError is why the parser read nothing (its error type and where it
+// broke; never CV text), at most 300 characters as the column allows.
+func parseError(result api.DocumentCvParsedJob) *string {
+	msg, err := result.ErrorMessage.Get()
+	if err != nil || strings.TrimSpace(msg) == "" {
+		msg = "The details could not be read from this CV."
+	}
+	if r := []rune(strings.TrimSpace(msg)); len(r) > 300 {
+		msg = string(r[:300])
+	}
+	return &msg
 }

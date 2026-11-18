@@ -41,6 +41,7 @@ type Document struct {
 	Warnings      []string // e.g. pages OCR could not read
 	ExtractedText *string  // only loaded for single-document reads
 	ParseStatus   *string  // queued, parsed, failed; nil when never parsed
+	ParseError    *string  // why the details could not be read (failed only)
 	ParsedProfile []byte   // JSON (api.ParsedProfile); only loaded for single-document reads
 	PdfStatus     *string  // formatted CVs made by the app: queued, ready, failed
 	CreatedAt     time.Time

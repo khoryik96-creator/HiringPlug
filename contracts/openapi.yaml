@@ -8502,7 +8502,7 @@ components:
       enum: [queued, parsed, failed]
     Document:
       type: object
-      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, pdfStatus, createdAt, updatedAt]
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, parseError, pdfStatus, createdAt, updatedAt]
       properties:
         pdfStatus:
           description: "Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents."
@@ -8536,6 +8536,10 @@ components:
           allOf: [{$ref: '#/components/schemas/DocumentParseStatus'}]
           nullable: true
           description: Null when the document was never parsed (formatted CVs, or uploaded before parsing existed).
+        parseError:
+          type: string
+          nullable: true
+          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
         parsedProfile:
           allOf: [{$ref: '#/components/schemas/ParsedProfile'}]
           nullable: true
@@ -11075,7 +11079,7 @@ components:
       enum: [careers_page, jobstreet, linkedin, indeed, facebook, referral, other]
     Application:
       type: object
-      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
+      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, candidateAvailability, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
       properties:
         channel:
           allOf: [{$ref: '#/components/schemas/ApplicationChannel'}]
@@ -11090,6 +11094,10 @@ components:
         candidateId: {$ref: '#/components/schemas/CandidateId'}
         candidateName: {type: string}
         candidateTitle: {type: string, nullable: true, description: "The candidate's current job title."}
+        candidateAvailability:
+          description: "The candidate's status (Looking out, Passive, Not looking, Placed), which colours their initials; null when not set."
+          allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
+          nullable: true
         stage: {$ref: '#/components/schemas/Stage'}
         reason:
           description: Set when rejected or withdrawn.
@@ -12800,14 +12808,14 @@ x-jobs:
     module: documents
     queue: core
     payload: DocumentPdfRenderedJob
-    priority: low
+    priority: normal
     description: Save a formatted CV's PDF with it (Go worker).
   document.render_pdf:
     module: documents
     queue: ai
     payload: DocumentRenderPdfJob
-    priority: low
-    description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
+    priority: normal
+    description: 'Turn a Word CV (an uploaded one, to preview it as it looks, or a formatted one) into a PDF with LibreOffice (Python AI worker). Normal, not low: the CV''s page shows it; a bulk import still takes turns with reading the CVs.'
   document.text_extracted:
     module: documents
     queue: core
@@ -12848,14 +12856,14 @@ x-jobs:
     module: jobs
     queue: core
     payload: JdPdfRenderedJob
-    priority: low
+    priority: high
     description: Save a job description's PDF copy with it (Go worker).
   jd.render_pdf:
     module: jobs
     queue: ai
     payload: JdRenderPdfJob
-    priority: low
-    description: Turn an uploaded Word (or RTF, ODT) job description into a PDF with LibreOffice, to preview it as it looks (Python AI worker).
+    priority: high
+    description: 'Turn an uploaded Word (or RTF, ODT) job description into a PDF with LibreOffice, to preview it as it looks (Python AI worker). High: someone is on the job''s page waiting for it; it takes seconds, so it must not wait behind fit scores and other AI calls.'
   job.jd_read:
     module: jobs
     queue: core

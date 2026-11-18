@@ -45,12 +45,12 @@ x-module:
     document.render_pdf:
       queue: ai
       payload: DocumentRenderPdfJob
-      priority: low
-      description: Turn a formatted CV (.docx) into a PDF with LibreOffice (Python AI worker).
+      priority: normal
+      description: "Turn a Word CV (an uploaded one, to preview it as it looks, or a formatted one) into a PDF with LibreOffice (Python AI worker). Normal, not low: the CV's page shows it; a bulk import still takes turns with reading the CVs."
     document.pdf_rendered:
       queue: core
       payload: DocumentPdfRenderedJob
-      priority: low
+      priority: normal
       description: Save a formatted CV's PDF with it (Go worker).
 
 paths:
@@ -374,7 +374,7 @@ components:
 
     Document:
       type: object
-      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, pdfStatus, createdAt, updatedAt]
+      required: [id, candidateId, source, fileName, contentType, sizeBytes, sha256, status, pageCount, extractor, errorMessage, extractionWarnings, parseStatus, parseError, pdfStatus, createdAt, updatedAt]
       properties:
         pdfStatus:
           description: "Formatted CVs made by the app also come as a PDF: queued, ready (GET .../pdf) or failed; null for other documents."
@@ -408,6 +408,10 @@ components:
           allOf: [{ $ref: '#/components/schemas/DocumentParseStatus' }]
           nullable: true
           description: Null when the document was never parsed (formatted CVs, or uploaded before parsing existed).
+        parseError:
+          type: string
+          nullable: true
+          description: "Why the details could not be read (parseStatus failed): the parser's error type and where it broke, never CV text. Null otherwise."
         parsedProfile:
           allOf: [{ $ref: '#/components/schemas/ParsedProfile' }]
           nullable: true

@@ -230,7 +230,7 @@ components:
       enum: [careers_page, jobstreet, linkedin, indeed, facebook, referral, other]
     Application:
       type: object
-      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
+      required: [id, version, jobId, jobTitle, companyId, companyName, candidateId, candidateName, candidateTitle, candidateAvailability, stage, reason, reasonNote, channel, stageChangedAt, createdAt, updatedAt]
       properties:
         channel:
           allOf: [{ $ref: '#/components/schemas/ApplicationChannel' }]
@@ -245,6 +245,10 @@ components:
         candidateId: { $ref: '#/components/schemas/CandidateId' }
         candidateName: { type: string }
         candidateTitle: { type: string, nullable: true, description: "The candidate's current job title." }
+        candidateAvailability:
+          description: "The candidate's status (Looking out, Passive, Not looking, Placed), which colours their initials; null when not set."
+          allOf: [{ $ref: '#/components/schemas/CandidateAvailability' }]
+          nullable: true
         stage: { $ref: '#/components/schemas/Stage' }
         reason:
           description: Set when rejected or withdrawn.

@@ -86,6 +86,7 @@ type Brief struct {
 	Email        *string
 	CurrentTitle *string
 	Source       *string // where the candidate came from (jobstreet, linkedin, ...)
+	Availability *string // looking, passive, not_looking or placed; nil when not set
 }
 
 // Briefs returns name and current title of the given candidates (missing ones

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { EditIcon, IconActions, IconButton, IconSeparator, MailCheckIcon, MailIcon, TrashIcon } from "../components/ActionIcons";
 import { DeleteRecord } from "../components/DeleteRecord";
 
 import { api, type Permission, unwrap } from "../api/client";
@@ -111,18 +112,17 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
       {!editing && (canEdit || canEmail) && (
         <div className="row spread">
           <span />
-          <span className="row">
+          <IconActions label="Contact actions">
             {canEdit && c.email && (
-              <button type="button" disabled={verify.isPending || c.mailboxCheck?.status === "checking"}
-                title="Ask their mail server whether this mailbox exists (no email is sent)"
-                onClick={() => { setActive("details"); verify.mutate(); }}>
-                {c.mailboxCheck?.status === "checking" ? "Verifying…" : "Verify email"}
-              </button>
+              <IconButton label={c.mailboxCheck?.status === "checking" ? "Verifying…" : "Verify email"} icon={<MailCheckIcon />}
+                tip={c.mailboxCheck?.status === "checking" ? "Verifying…" : "Verify email (asks their mail server; no email is sent)"}
+                disabled={verify.isPending || c.mailboxCheck?.status === "checking"}
+                onClick={() => { setActive("details"); verify.mutate(); }} />
             )}
-            {canEmail && <button type="button" onClick={() => { setWriting(true); setActive("email"); }}>Email</button>}
-            {canEdit && <button type="button" onClick={() => { setEditing(true); setActive("details"); }}>Edit contact</button>}
-            {permissions.includes("bin:manage") && <DeleteRecord kind="contact" id={c.id} />}
-          </span>
+            {canEmail && <IconButton label="Email" icon={<MailIcon />} onClick={() => { setWriting(true); setActive("email"); }} />}
+            {canEdit && <IconButton label="Edit contact" icon={<EditIcon />} onClick={() => { setEditing(true); setActive("details"); }} />}
+            {permissions.includes("bin:manage") && <><IconSeparator /><DeleteRecord kind="contact" id={c.id} icon={<TrashIcon />} /></>}
+          </IconActions>
         </div>
       )}
       <ErrorMessage error={verify.error} />

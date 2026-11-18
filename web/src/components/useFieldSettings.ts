@@ -27,7 +27,7 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
     rehire: "Would you rehire them?",
   },
   company_benefits: {
-    job_grade: "Job grade/level", annual_leave: "Annual leave", other_leave: "Miscellaneous leave", medical: "Medical and insurance",
+    annual_leave: "Annual leave", other_leave: "Miscellaneous leave", medical: "Medical and insurance",
     work_mode: "Work mode", working_hours: "Working hours and flexibility", dental_optical: "Dental & optical", fixed_bonus: "Fixed bonus",
     performance_bonus: "Performance bonus", other_bonus: "Miscellaneous bonus", commission: "Commission structure", special: "Special benefits",
   },

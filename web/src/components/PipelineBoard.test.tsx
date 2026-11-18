@@ -14,7 +14,7 @@ beforeEach(() => { localStorage.setItem("hp.pipelineView", "board"); });
 
 const base: Omit<Application, "id" | "candidateId" | "candidateName" | "stage"> = {
   version: 3, jobId: "jo_01jbz6w0m0k8q9x2r3s4t5v6w7", jobTitle: "Auditor", companyId: "comp_01jbz6w0m0k8q9x2r3s4t5v6w7",
-  companyName: "Maybank", candidateTitle: "Accountant", reason: null, reasonNote: null, channel: null,
+  companyName: "Maybank", candidateTitle: "Accountant", candidateAvailability: null, reason: null, reasonNote: null, channel: null,
   stageChangedAt: new Date(Date.now() - 3 * 86_400_000).toISOString(), createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z",
 };
 const siti: Application = { ...base, id: "appl_01jbz6w0m0k8q9x2r3s4t5v6w1", candidateId: "cand_01jbz6w0m0k8q9x2r3s4t5v6w1", candidateName: "Siti Aisyah", stage: "screening" };
@@ -145,7 +145,7 @@ describe("pipeline board", () => {
     const name = screen.getByRole("link", { name: "Siti Aisyah" });
     const card = cardOf("Siti Aisyah");
     expect(screen.getByRole("link", { name: "Siti Aisyah" }).getAttribute("title")).toBe("Siti Aisyah · Accountant"); // one line each: the title on hover
-    expect(within(card).getByLabelText("Siti Aisyah").textContent).toBe("SA");
+    expect(within(card).getByLabelText("Siti Aisyah (status: Not set)").textContent).toBe("SA");
     expect(card.querySelector("input")).toBeNull();
     fireEvent.keyDown(name, { key: " " });
     expect(card.className).toContain("picked");

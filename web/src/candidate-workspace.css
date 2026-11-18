@@ -39,7 +39,6 @@
 .work-authorization-options button { border: 0; border-radius: 4px; background: transparent; box-shadow: none; padding: 6px 8px; font-size: 11px; min-height: 30px; }
 .work-authorization-options [aria-pressed=true] { background: #7450e5; color: white; }
 .pass-choices { margin-top: 8px; font-size: 12px; }
-.candidate-assistant { margin-top: 16px; }
 .cv-workspace { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 14px; }
 .cv-library { border-right: 1px solid #e2dcf5; padding-right: 12px; }
 .cv-library h4 { font-size: 11px; color: #736a86; margin: 10px 0; }
@@ -48,6 +47,15 @@
 .cv-library strong { display: block; font-size: 12px; overflow-wrap: anywhere; }
 .cv-library span { display: block; font-size: 10px; color: #736a86; margin-top: 5px; }
 .cv-workspace .candidate-cv { min-width: 0; }
+/* Reviewing a CV's details: the review and the CV side by side; the CV stays in view while the review scrolls. */
+.cv-workspace.reviewing { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.cv-workspace.reviewing > .panel { margin: 0; min-width: 0; }
+.cv-workspace.reviewing > .panel table { table-layout: fixed; width: 100%; font-size: 0.82rem; }
+.cv-workspace.reviewing > .panel th:first-child { width: 2.8rem; }
+.cv-workspace.reviewing > .panel th:nth-child(2) { width: 22%; }
+.cv-workspace.reviewing > .panel td { overflow-wrap: anywhere; }
+.cv-workspace.reviewing .candidate-cv { position: sticky; top: 12px; }
+.cv-workspace.reviewing .candidate-cv .cv-frame { height: calc(100vh - 110px); }
 .cv-workspace .candidate-cv > .panel { margin: 0; padding: 12px; }
 .cv-selected-name { font-size: 12px; overflow-wrap: anywhere; flex: 1; }
 .cv-workspace .doc-buttons { flex-wrap: wrap; }
@@ -65,7 +73,8 @@
   .candidate-tablist { gap: 18px; }
   .candidate-profile dl { grid-template-columns: 1fr; gap: 8px; }
   .candidate-profile dd { margin-bottom: 6px; }
-  .cv-workspace { grid-template-columns: minmax(0, 1fr); }
+  .cv-workspace, .cv-workspace.reviewing { grid-template-columns: minmax(0, 1fr); }
+  .cv-workspace.reviewing .candidate-cv { position: static; }
   .cv-library { border: 0; max-height: 190px; overflow-y: auto; padding: 0; }
 }
 
@@ -90,11 +99,7 @@
 .status-chip.left { border-color: #b91c1c; color: #b91c1c; background: #fef2f2; }
 @media (max-width: 760px) { .company-banner .banner-strip.four { grid-template-columns: 1fr; } }
 
-/* On a phone the candidate's actions stay on one line (swipe for more). */
-@media (max-width: 640px) {
-  .candidate-actions { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; padding-bottom: 2px; }
-  .candidate-actions > * { flex: none; min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.88rem; }
-}
+/* The candidate's actions are icons (styles.css .icon-actions): one short row, on a phone too. */
 
 /* A work authorization suggested from the CV: diagonal stripes of its colour, not a solid fill, until confirmed. */
 .work-authorization-options button.wa-suggested, .wa-suggested-chip {

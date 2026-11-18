@@ -572,6 +572,7 @@ type Document struct {
 	PdfStatus          *string
 	PdfKey             *string
 	PdfError           *string
+	ParseError         *string
 }
 
 type DocumentAiUse struct {

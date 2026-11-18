@@ -237,21 +237,22 @@ describe("candidate list", () => {
     expect(screen.getByText("Ali").closest("tr")?.textContent).toContain("Restricted");
   });
 
-  it("marks each name with a bar coloured by work authorization", async () => {
+  it("colours each disc by status, with the work authorization in its colour under the name", async () => {
     const rows = [
-      { ...summary, workAuthorizationStatus: "local" },
-      { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Ali", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "rp_t" },
-      { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w9", fullName: "Mei", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "permanent_resident" },
+      { ...summary, workAuthorizationStatus: "local", availability: "looking" },
+      { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w8", fullName: "Ali", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "rp_t", availability: "placed" },
+      { ...summary, id: "cand_01jbz6w0m0k8q9x2r3s4t5v6w9", fullName: "Mei", workAuthorizationStatus: "expat_eligible", workAuthorizationBasis: "permanent_resident", availability: null },
     ];
     vi.spyOn(api, "GET").mockImplementation(answer(rows));
     renderWithClient(<CandidateList />);
     await screen.findByText("Mei");
-    expect(screen.getByRole("img", { name: "Work authorization: Local" }).closest("tr")?.textContent).toContain("Siti Aisyah");
-    expect(screen.getByRole("img", { name: "Work authorization: RP-T" }).closest("tr")?.textContent).toContain("Ali");
-    expect(screen.getByRole("img", { name: "Work authorization: PR" }).closest("tr")?.textContent).toContain("Mei");
-    const local = screen.getByRole("img", { name: "Work authorization: Local" });
-    expect(local.textContent).toBe("SA"); // their initials, in the disc of its colour
-    expect(local.closest("td")?.textContent).toContain("Local"); // its name under theirs
+    const looking = screen.getByRole("img", { name: "Status: Looking out" });
+    expect(looking.closest("tr")?.textContent).toContain("Siti Aisyah");
+    expect(looking.textContent).toBe("SA"); // their initials
+    expect(looking.style.background).toBe("rgb(255, 243, 176)"); // Looking out's yellow, as on their page
+    expect(looking.closest("td")?.textContent).toContain("Local"); // the work authorization under the name
+    expect(screen.getByRole("img", { name: "Status: Placed" }).closest("tr")?.textContent).toContain("RP-T");
+    expect(screen.getByRole("img", { name: "Status: Not set" }).closest("tr")?.textContent).toContain("Mei");
   });
 
   it("switches clicks between opening the profile and reading the full resume, and remembers it", async () => {

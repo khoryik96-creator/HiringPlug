@@ -6,7 +6,7 @@ import { fetchDocumentFile } from "../api/files";
 vi.mock("../api/files", () => ({fetchDocumentFile: vi.fn(), fetchDocumentPdf: vi.fn(), downloadDocument: vi.fn()}));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const doc = (id: string): Document => ({id, candidateId: "cand_1", source: "original", fileName: id + ".pdf", contentType: "application/pdf", sizeBytes: 1,
-  sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "pdf", errorMessage: null, extractionWarnings: [], parseStatus: null, pdfStatus: null,
+  sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "pdf", errorMessage: null, extractionWarnings: [], parseStatus: null, parseError: null, pdfStatus: null,
   createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z"});
 it("clears the old file immediately when another document is selected", async () => {
   const first = doc("doc_first"), second = doc("doc_second");

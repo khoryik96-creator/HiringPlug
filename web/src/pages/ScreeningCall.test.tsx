@@ -16,7 +16,7 @@ afterEach(() => {
 const doc = (id: string, source: Document["source"], createdAt: string): Document => ({
   id, candidateId: "cand_1", source, fileName: `${id}.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   sizeBytes: 10, sha256: "0".repeat(64), status: "extracted", pageCount: 1, extractor: "x", errorMessage: null, extractionWarnings: [],
-  parseStatus: null, extractedText: `text of ${id}`, parsedProfile: null, pdfStatus: null, createdAt, updatedAt: createdAt,
+  parseStatus: null, parseError: null, extractedText: `text of ${id}`, parsedProfile: null, pdfStatus: null, createdAt, updatedAt: createdAt,
 });
 const docs = [doc("doc_old", "original", "2026-10-01T00:00:00Z"), doc("doc_new", "linkedin", "2026-11-01T00:00:00Z"), doc("doc_fmt", "formatted", "2026-11-02T00:00:00Z")];
 const CALLER: Permission[] = [...RECRUITER, "notes:create", "notes.sensitive:read"];

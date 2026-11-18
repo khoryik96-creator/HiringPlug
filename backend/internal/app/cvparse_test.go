@@ -172,3 +172,33 @@ func (a *testApp) getDocument(token, id string) api.Document {
 	res.JSON(&doc)
 	return doc
 }
+
+// A CV the parser could not read says why (the error type and where it broke,
+// never CV text), until its details are asked for again.
+func TestAFailedParseSaysWhy(t *testing.T) {
+	t.Parallel()
+	a := newTestApp(t)
+	ctx := context.Background()
+	token := testutil.Current.NewTenant(t, api.RoleRecruiter).Users[api.RoleRecruiter].Token
+	c := a.createCandidate(token, map[string]any{"firstName": "Syazwan"})
+	var doc api.Document
+	a.upload("/v1/candidates/"+c.Id+"/documents", token, "other", "seek.pdf", minimalPDF).JSON(&doc)
+	aiConn, err := pgx.Connect(ctx, testutil.Current.AIURL)
+	require.NoError(t, err)
+	defer func() { _ = aiConn.Close(ctx) }()
+	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentTextExtracted, extractedText(doc.Id, parsedCV))
+
+	why := "The details could not be read from this CV (IndexError at experience.py:120)."
+	answerAIJob(t, a, aiConn, claimAIJobFor(t, aiConn, doc.Id), api.JobKindDocumentCvParsed, api.DocumentCvParsedJob{
+		DocumentId: doc.Id, Profile: nullable.NewNullNullable[api.ParsedProfile](), ErrorMessage: nullable.NewNullableWithValue(why),
+	})
+	got := a.getDocument(token, doc.Id)
+	assert.Equal(t, api.DocumentParseStatusFailed, got.ParseStatus.MustGet())
+	assert.Equal(t, why, got.ParseError.MustGet())
+	list := a.request(http.MethodGet, "/v1/candidates/"+c.Id+"/documents", token, nil).Map()
+	assert.Equal(t, why, list["items"].([]any)[0].(map[string]any)["parseError"], "the list says why too")
+
+	again := a.request(http.MethodPost, "/v1/documents/"+doc.Id+"/parse", token, nil)
+	require.Equal(t, http.StatusAccepted, again.Status, "%s", again.Body)
+	assert.True(t, a.getDocument(token, doc.Id).ParseError.IsNull(), "asked again: the old reason goes")
+}

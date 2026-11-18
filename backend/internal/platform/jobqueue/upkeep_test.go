@@ -21,7 +21,9 @@ func TestEachJobKindHasThePriorityTheContractGivesIt(t *testing.T) {
 	assert.Equal(t, 1, k[api.JobKindEmailSend].Rank(), "someone is waiting for it")
 	assert.Equal(t, 1, k[api.JobKindAssistantAsk].Rank())
 	assert.Equal(t, 5, k[api.JobKindDocumentTextExtracted].Rank())
-	assert.Equal(t, 9, k[api.JobKindDocumentRenderPdf].Rank(), "a preview can wait")
+	assert.Equal(t, 5, k[api.JobKindDocumentRenderPdf].Rank(), "a CV's preview is looked at: not behind upkeep")
+	assert.Equal(t, 1, k[api.JobKindJdRenderPdf].Rank(), "a job description's preview is waited for on the job's page, not behind fit scores")
+	assert.Equal(t, 1, k[api.JobKindJdPdfRendered].Rank())
 	assert.Equal(t, 9, k[api.JobKindWebhookDeliver].Rank())
 }
 

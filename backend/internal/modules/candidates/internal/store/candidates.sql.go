@@ -50,7 +50,7 @@ func (q *Queries) BinnedCandidates(ctx context.Context, ids []string) ([]string,
 }
 
 const candidateBriefs = `-- name: CandidateBriefs :many
-SELECT id, first_name, last_name, current_title, email, source FROM candidate WHERE id = ANY($1::text[])
+SELECT id, first_name, last_name, current_title, email, source, availability FROM candidate WHERE id = ANY($1::text[])
 `
 
 type CandidateBriefsRow struct {
@@ -60,6 +60,7 @@ type CandidateBriefsRow struct {
 	CurrentTitle *string
 	Email        *string
 	Source       *string
+	Availability *string
 }
 
 func (q *Queries) CandidateBriefs(ctx context.Context, ids []string) ([]CandidateBriefsRow, error) {
@@ -78,6 +79,7 @@ func (q *Queries) CandidateBriefs(ctx context.Context, ids []string) ([]Candidat
 			&i.CurrentTitle,
 			&i.Email,
 			&i.Source,
+			&i.Availability,
 		); err != nil {
 			return nil, err
 		}

@@ -22,8 +22,9 @@ import (
 
 // CandidateInfo is what an application shows of its candidate.
 type CandidateInfo struct {
-	Name  string
-	Title *string
+	Name         string
+	Title        *string
+	Availability *string // their status, which colours their initials
 }
 
 // JobInfo is what an application shows of its job.

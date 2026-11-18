@@ -92,9 +92,9 @@ var lists = []listDef{
 		"role", "Role and responsibilities", "strengths", "Strengths", "improve", "Areas to improve",
 		"reason_left", "Reason for leaving", "rehire", "Would you rehire them?")},
 	// A client's benefits and its steps before an offer (the company page),
-	// as in the Hyppies Benefits & Pre-Offer Process template.
+	// as in the Hyppies Benefits & Pre-Offer Process template. A job grade is
+	// not an item: a client's grades are set at the top of its benefits.
 	{name: "company_benefits", label: "Company benefits", hints: true, defaults: withHints(
-		"job_grade", "Job grade/level", "",
 		"annual_leave", "Annual leave", "If it grows with service or grade, give the detail",
 		"other_leave", "Miscellaneous leave", "Compassionate, birthday, paternity/maternity: specify",
 		"medical", "Medical and insurance", "Put * if extended to immediate family members, or say so in the remarks",

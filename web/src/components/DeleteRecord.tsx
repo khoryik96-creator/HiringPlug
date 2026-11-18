@@ -2,7 +2,7 @@
 // days, where an admin can restore it. A company's contacts and jobs move to
 // another company you choose, or go to the Bin with it.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { CompanyPicker, type PickedCompany } from "./CompanyPicker";
@@ -13,11 +13,14 @@ const LIST: Record<Kind, string> = { candidate: "#/candidates", contact: "#/cont
 
 const plural = (n: number, one: string) => `${String(n)} ${one}${n === 1 ? "" : "s"}`;
 
-export function DeleteRecord({ kind, id }: { kind: Kind; id: string }) {
+/** icon: shown in place of the word (an icon toolbar), which stays its name and tooltip. */
+export function DeleteRecord({ kind, id, icon }: { kind: Kind; id: string; icon?: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="danger-quiet" onClick={() => { setOpen(true); }}>Delete</button>
+      {icon
+        ? <button type="button" className="icon-action icon-danger" aria-label="Delete" data-tip="Delete" onClick={() => { setOpen(true); }}>{icon}</button>
+        : <button type="button" className="danger-quiet" onClick={() => { setOpen(true); }}>Delete</button>}
       {open && <DeleteDialog kind={kind} id={id} onClose={() => { setOpen(false); }} />}
     </>
   );
