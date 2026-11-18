@@ -103,7 +103,7 @@ func draftView(row store.EmailOutlookMessage, remote outlookRemoteMessage, activ
 		MessageId: row.ID, Version: draftVersion(remote), Subject: remote.Subject, Body: shown, BodyTruncated: shown != body,
 		To: draftRecipientAddresses(remote.ToRecipients), Cc: draftRecipientAddresses(remote.CcRecipients), Bcc: draftRecipientAddresses(remote.BccRecipients),
 		HasAttachments: remote.HasAttachments, WebUrl: apiconv.OrNull(outlookWebLink(remote.WebLink)), Schedule: apiconv.OrNull(schedule),
-		ScheduleNeedsReview: active != nil && active.Status == "scheduled" && active.DraftVersion != draftVersion(remote),
+		ScheduleNeedsReview: active != nil && (active.Status == "needs_review" || active.Status == "scheduled" && active.DraftVersion != draftVersion(remote)),
 	}
 }
 
@@ -113,6 +113,76 @@ func activeOutlookSend(ctx context.Context, q *store.Queries, mailbox, remote st
 		return nil, nil //nolint:nilnil // this draft has no schedule
 	}
 	return &row, err
+}
+
+type openedOutlookDraft struct {
+	box    store.EmailMailbox
+	row    store.EmailOutlookMessage
+	remote outlookRemoteMessage
+	token  string
+}
+
+func (s *Service) patchRemoteDraft(ctx context.Context, draft openedOutlookDraft, patch map[string]any) (outlookRemoteMessage, error) {
+	var updated outlookRemoteMessage
+	if err := s.outlookConditional(ctx, draft.token, http.MethodPatch, s.outlookMessagePath(draft.row), patch, &updated, draft.remote.ETag); err != nil {
+		return updated, outlookDraftWriteFailure(err)
+	}
+	// Use the PATCH receipt, not a later read that could include other edits.
+	if updated.ID != draft.row.RemoteID || !updated.IsDraft || draftVersion(updated) == "" {
+		return updated, outlookFailure(nil, true)
+	}
+	return updated, nil
+}
+
+func (s *Service) openOutlookDraft(ctx context.Context, q *store.Queries, user, id string) (openedOutlookDraft, error) {
+	var out openedOutlookDraft
+	box, row, err := loadOutlookMessage(ctx, q, user, id)
+	if err != nil {
+		problem, safe := apperr.As(err)
+		if !safe || problem.Code != api.ErrorCodeNOTFOUND {
+			return out, err
+		}
+		// The folder index may be rebuilt independently of a scheduled send.
+		// Look up the immutable remote ID only in this user's current mailbox.
+		send, lookupErr := q.OutlookSendForDraftIndex(ctx, store.OutlookSendForDraftIndexParams{MailboxID: box.ID, MessageID: id})
+		if database.IsNoRows(lookupErr) {
+			return out, err
+		}
+		if lookupErr != nil {
+			return out, lookupErr
+		}
+		row, err = q.OutlookByRemoteID(ctx, store.OutlookByRemoteIDParams{MailboxID: box.ID, RemoteID: send.RemoteID})
+		if database.IsNoRows(err) {
+			row.RemoteID = send.RemoteID
+		} else if err != nil {
+			return out, err
+		}
+	}
+	token, err := s.mailboxAccess(ctx, box)
+	if err != nil {
+		return out, outlookFailure(err, false)
+	}
+	remote, err := s.readRemoteDraft(ctx, token, row.RemoteID)
+	if err != nil {
+		return out, outlookFailure(err, false)
+	}
+	if !remote.IsDraft {
+		return out, draftChanged()
+	}
+	if row.ID == "" {
+		folder, err := q.OutlookDraftFolder(ctx, box.ID)
+		if database.IsNoRows(err) {
+			return out, apperr.NotFound("Outlook drafts folder")
+		}
+		if err != nil {
+			return out, err
+		}
+		row, err = saveOutlookDraftIndex(ctx, q, box.ID, folder.ID, remote)
+		if err != nil {
+			return out, err
+		}
+	}
+	return openedOutlookDraft{box, row, remote, token}, nil
 }
 
 func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, version string, in api.OutlookDraftInput, discard bool) (api.OutlookDraft, error) {
@@ -131,21 +201,11 @@ func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, 
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "outlook.draft_created", EntityType: "outlook_message", EntityID: out.MessageId})
 		}
-		box, row, err := loadOutlookMessage(ctx, q, p.UserID, id)
+		draft, err := s.openOutlookDraft(ctx, q, p.UserID, id)
 		if err != nil {
 			return err
 		}
-		token, err := s.mailboxAccess(ctx, box)
-		if err != nil {
-			return outlookFailure(err, false)
-		}
-		remote, err := s.readRemoteDraft(ctx, token, row.RemoteID)
-		if err != nil {
-			return outlookFailure(err, false)
-		}
-		if !remote.IsDraft {
-			return draftChanged()
-		}
+		box, row, remote, token := draft.box, draft.row, draft.remote, draft.token
 		active, err := activeOutlookSend(ctx, q, box.ID, row.RemoteID)
 		if err != nil {
 			return err
@@ -158,7 +218,7 @@ func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, 
 		if draftVersion(remote) != version {
 			return draftChanged()
 		}
-		if active != nil && (discard || active.Status != "scheduled") {
+		if active != nil && (discard || active.Status != "scheduled" && active.Status != "needs_review") {
 			return sendInProgress()
 		}
 		path := s.outlookMessagePath(row)
@@ -177,21 +237,16 @@ func (s *Service) writeOutlookDraft(ctx context.Context, p authz.Principal, id, 
 			out = draftView(row, remote, active)
 			return nil
 		}
-		var updated outlookRemoteMessage
-		if err := s.outlookConditional(ctx, token, http.MethodPatch, path, patch, &updated, remote.ETag); err != nil {
-			return outlookDraftWriteFailure(err)
+		updated, err := s.patchRemoteDraft(ctx, draft, patch)
+		if err != nil {
+			return err
 		}
 		providerChanged = true
-		// Bind the schedule to the PATCH receipt so an unrelated edit made
-		// immediately afterward never becomes the reviewed version.
-		if updated.ID != row.RemoteID || !updated.IsDraft || draftVersion(updated) == "" {
-			return draftChanged()
-		}
 		row, err = saveOutlookDraftIndex(ctx, q, box.ID, row.FolderID, updated)
 		if err != nil {
 			return err
 		}
-		if active != nil && active.DraftVersion == version {
+		if active != nil && active.Status == "scheduled" && active.DraftVersion == version {
 			if err := q.ReviewOutlookScheduled(ctx, store.ReviewOutlookScheduledParams{ID: active.ID, DraftVersion: draftVersion(updated), Subject: row.Subject, PreviousDraftVersion: version}); err != nil {
 				return err
 			}

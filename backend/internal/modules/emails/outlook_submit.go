@@ -23,6 +23,35 @@ func (m *Module) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	return jobqueue.OutsideHandlers{api.JobKindEmailOutlookScheduled: m.service.submitOutlook}
 }
 
+func (m *Module) DeadJobHandlers() jobqueue.Handlers {
+	return jobqueue.Handlers{api.JobKindEmailOutlookScheduled: outlookSendDead}
+}
+
+func outlookSendDead(ctx context.Context, tx pgx.Tx, job jobqueue.Job) error {
+	var payload api.OutlookScheduledJob
+	if err := job.Decode(&payload); err != nil {
+		return nil //nolint:nilerr // The invalid job has no matching send to update.
+	}
+	row, err := store.New(tx).OutlookScheduled(ctx, payload.SendId)
+	if database.IsNoRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if row.UserID != payload.UserId || int(row.Version) != payload.Version {
+		return nil
+	}
+	switch row.Status {
+	case "scheduled":
+		return finishOutlookSend(ctx, tx, row, "needs_review", "HiringPlug could not process the scheduled send. Review it before scheduling again.")
+	case "confirming":
+		return finishOutlookSend(ctx, tx, row, "uncertain", "HiringPlug could not confirm the send. Check Outlook Drafts and Sent Items.")
+	default:
+		return nil
+	}
+}
+
 const confirmingWindow = 15 * time.Minute
 
 // A dedicated connection holds the same advisory lock that draft edits and
@@ -141,6 +170,9 @@ func (s *Service) submitOutlookLocked(ctx context.Context, conn *pgx.Conn, tenan
 	}
 
 	err = database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
+		if err := s.checkOutlookEnvelope(ctx, tx, p.TenantID, draftEnvelope(remote, nil)); err != nil {
+			return err
+		}
 		// Consent is rechecked right before the claim, using the send's pinned
 		// record even if the user unlinked the Outlook conversation meanwhile.
 		if err := s.canSendToOutlookCandidate(ctx, tx, p, row.CandidateID); err != nil {
@@ -159,7 +191,10 @@ func (s *Service) submitOutlookLocked(ctx context.Context, conn *pgx.Conn, tenan
 		return audit.Record(ctx, tx, audit.Entry{Action: "outlook.send_started", EntityType: "outlook_send", EntityID: row.ID})
 	})
 	if err != nil {
-		if _, safe := apperr.As(err); safe {
+		if problem, safe := apperr.As(err); safe {
+			if problem.Code == api.ErrorCodeEMAILDONOTCONTACT {
+				return settleOutlook(ctx, conn, p, row, "needs_review", "A recipient opted out of being contacted. Review the recipients before sending.")
+			}
 			return settleOutlook(ctx, conn, p, row, "needs_review", "The scheduled send needs review before it can go out.")
 		}
 		return err
@@ -207,12 +242,16 @@ func waitOutlookReceipt(ctx context.Context, conn *pgx.Conn, p authz.Principal, 
 }
 func settleOutlook(ctx context.Context, conn *pgx.Conn, p authz.Principal, row store.EmailOutlookSend, status, message string) error {
 	return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
-		n, err := store.New(tx).FinishOutlookSend(ctx, store.FinishOutlookSendParams{
-			ID: row.ID, Version: row.Version, PreviousStatus: row.Status, Status: status, Error: orNil(message),
-		})
-		if err != nil || n == 0 {
-			return err
-		}
-		return audit.Record(ctx, tx, audit.Entry{Action: "outlook.send_status", EntityType: "outlook_send", EntityID: row.ID, Changes: map[string]any{"status": status}})
+		return finishOutlookSend(ctx, tx, row, status, message)
 	})
+}
+
+func finishOutlookSend(ctx context.Context, tx pgx.Tx, row store.EmailOutlookSend, status, message string) error {
+	n, err := store.New(tx).FinishOutlookSend(ctx, store.FinishOutlookSendParams{
+		ID: row.ID, Version: row.Version, PreviousStatus: row.Status, Status: status, Error: orNil(message),
+	})
+	if err != nil || n == 0 {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "outlook.send_status", EntityType: "outlook_send", EntityID: row.ID, Changes: map[string]any{"status": status}})
 }

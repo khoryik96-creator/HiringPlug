@@ -115,9 +115,12 @@ type Worker struct {
 	Handlers Handlers
 	// Outside are the kinds whose handlers run with no transaction open.
 	Outside OutsideHandlers
-	Logger  *slog.Logger
-	Lease   time.Duration // how long a claimed job is ours before others may retry it
-	Idle    time.Duration // how long to wait for new jobs when the queue is empty
+	// OnDead updates related application state in the same transaction that
+	// exhausts a job's retries. Only declared kinds receive the callback.
+	OnDead Handlers
+	Logger *slog.Logger
+	Lease  time.Duration // how long a claimed job is ours before others may retry it
+	Idle   time.Duration // how long to wait for new jobs when the queue is empty
 	// Tenant, if set, limits the worker to one company's jobs (tests: each
 	// test's worker runs only its own companies' jobs). Empty: every company.
 	Tenant string
@@ -299,7 +302,15 @@ func (w *Worker) fail(ctx context.Context, job Job, jobErr error) (string, error
 	defer cancel()
 	var status string
 	// job_fail also schedules the retry (growing waits), the same for every worker language.
-	err := w.Pool.QueryRow(ctx, `SELECT job_fail($1, $2, $3)`, job.ID, w.ID, jobErr.Error()).Scan(&status)
+	err := database.InTx(ctx, w.Pool, authz.System(job.TenantID), func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `SELECT job_fail($1, $2, $3)`, job.ID, w.ID, jobErr.Error()).Scan(&status); err != nil {
+			return err
+		}
+		if handler := w.OnDead[job.Kind]; status == "dead" && handler != nil {
+			return handler(ctx, tx, job)
+		}
+		return nil
+	})
 	return status, err
 }
 

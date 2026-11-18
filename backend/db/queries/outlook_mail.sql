@@ -103,7 +103,11 @@ SELECT * FROM email_outlook_send WHERE id = @id;
 
 -- name: OutlookActiveSend :one
 SELECT * FROM email_outlook_send WHERE mailbox_id = @mailbox_id AND remote_id = @remote_id
- AND status IN ('scheduled','confirming','uncertain');
+ AND status IN ('scheduled','confirming','uncertain','needs_review');
+
+-- name: OutlookSendForDraftIndex :one
+SELECT * FROM email_outlook_send WHERE mailbox_id = @mailbox_id AND message_id = @message_id
+ AND status IN ('scheduled','needs_review');
 
 -- name: OutlookRecentSends :many
 SELECT * FROM email_outlook_send WHERE user_id=app_current_user()
@@ -116,10 +120,10 @@ VALUES (@mailbox_id,@message_id,@remote_id,@draft_version,sqlc.narg(candidate_id
 RETURNING *;
 
 -- name: RescheduleOutlookSend :one
-UPDATE email_outlook_send SET send_at= @send_at, version=version+1,
+UPDATE email_outlook_send SET send_at= @send_at, version=version+1,status='scheduled',
  message_id= @message_id,draft_version= @draft_version,subject= @subject,
  candidate_id=sqlc.narg(candidate_id),updated_at=now(),error=NULL,attempted_at=NULL
-WHERE id= @id AND status='scheduled' AND version= @version RETURNING *;
+WHERE id= @id AND status IN ('scheduled','needs_review') AND version= @version RETURNING *;
 
 -- name: ReviewOutlookScheduled :exec
 UPDATE email_outlook_send SET draft_version= @draft_version,subject= @subject,updated_at=now()

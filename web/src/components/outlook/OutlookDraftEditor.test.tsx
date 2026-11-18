@@ -17,29 +17,30 @@ const schedule: Schemas["OutlookScheduledSend"] = {
   version: 2, sendAt: "2026-11-20T01:00:00Z", updatedAt: "2026-11-19T00:00:00Z", error: null,
 };
 
-it("saves only edited fields and binds the scheduled send to the returned draft version", async () => {
+it("submits the revised draft and new time in the same request", async () => {
   if (typeof HTMLDialogElement.prototype.showModal !== "function") {
     Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
   }
   const draft: Schemas["OutlookDraft"] = {
     messageId: "omg_test", version: "opened", subject: "Interview", body: "Tuesday is available.",
     to: ["nadia@example.test"], cc: [], bcc: [], hasAttachments: true, bodyTruncated: false,
-    schedule: null, scheduleNeedsReview: false, webUrl: null,
+    schedule, scheduleNeedsReview: false, webUrl: null,
   };
   vi.spyOn(api, "GET").mockResolvedValue(ok(draft));
-  const patch = vi.spyOn(api, "PATCH").mockResolvedValue(ok({ ...draft, version: "saved", subject: "Tuesday interview" }));
+  const patch = vi.spyOn(api, "PATCH");
   const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(schedule));
   const onClose = vi.fn();
   renderWithClient(<OutlookDraftEditor id="omg_test" onClose={onClose}/>);
   fireEvent.change(await screen.findByLabelText("Subject"), { target: { value: "Tuesday interview" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send later" }));
+  fireEvent.click(screen.getByRole("button", { name: "Change time" }));
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const future = new Date(Math.ceil(Date.now() / 60000) * 60000 + 7200000);
   fireEvent.change(screen.getByLabelText(/Send at/), { target: { value: zonedInput(future, zone) } });
-  fireEvent.click(screen.getByRole("button", { name: "Schedule email" }));
+  fireEvent.click(screen.getByRole("button", { name: "Update schedule" }));
   await waitFor(() => { expect(onClose).toHaveBeenCalledWith("schedule"); });
-  expect(sentBody(patch)).toEqual({ version: "opened", subject: "Tuesday interview" });
-  expect(sentBody(put)).toEqual({ expectedVersion: 0, draftVersion: "saved", sendAt: future.toISOString() });
+  expect(patch).not.toHaveBeenCalled();
+  expect(sentBody(put)).toEqual({ expectedVersion: schedule.version, draftVersion: "opened", sendAt: future.toISOString(),
+    changes: { subject: "Tuesday interview" } });
 });
 
 it("cancels only a scheduled send, using its displayed version", async () => {

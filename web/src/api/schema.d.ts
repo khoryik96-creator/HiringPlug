@@ -6393,6 +6393,7 @@ export interface components {
             expectedVersion: number;
             /** Format: date-time */
             sendAt?: string | null;
+            changes?: components["schemas"]["OutlookDraftInput"];
         };
         OutlookScheduleVersion: {
             version: number;

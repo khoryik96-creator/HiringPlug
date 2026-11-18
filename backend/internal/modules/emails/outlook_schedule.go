@@ -3,10 +3,12 @@ package emails
 import (
 	"context"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails/internal/store"
@@ -42,16 +44,66 @@ func (s *Service) scheduledOutlook(ctx context.Context, p authz.Principal) (api.
 
 func validScheduledVersion(version int) bool { return version >= 0 && version < math.MaxInt32 }
 
-func checkOutlookEnvelope(draft outlookRemoteMessage) error {
+func draftEnvelope(draft outlookRemoteMessage, changes *api.OutlookDraftInput) Outgoing {
 	body := draft.Body.Content
 	if strings.EqualFold(draft.Body.ContentType, "html") {
 		body = TextFromHTML(SanitizeHTML(body))
 	}
-	_, fields := NormalizeOutgoing(Outgoing{
+	out := Outgoing{
 		To: draftRecipientAddresses(draft.ToRecipients), Cc: draftRecipientAddresses(draft.CcRecipients), Bcc: draftRecipientAddresses(draft.BccRecipients),
 		Subject: draft.Subject, Body: body,
+	}
+	if changes == nil {
+		return out
+	}
+	if changes.Subject != nil {
+		out.Subject = *changes.Subject
+	}
+	if changes.Body != nil {
+		out.Body = *changes.Body
+	}
+	for _, field := range []struct {
+		change *[]openapi_types.Email
+		target *[]string
+	}{{changes.To, &out.To}, {changes.Cc, &out.Cc}, {changes.Bcc, &out.Bcc}} {
+		if field.change == nil {
+			continue
+		}
+		addresses := make([]string, 0, len(*field.change))
+		for _, address := range *field.change {
+			addresses = append(addresses, string(address))
+		}
+		*field.target = addresses
+	}
+	return out
+}
+
+func (s *Service) checkOutlookEnvelope(ctx context.Context, tx pgx.Tx, tenant string, envelope Outgoing) error {
+	clean, fields := NormalizeOutgoing(envelope)
+	if err := fields.Err(); err != nil {
+		return err
+	}
+	if s.deps.Consent == nil || s.deps.Candidates == nil {
+		return nil
+	}
+	// A recruiter may know an address without having access to the candidate
+	// record. Enforce consent across the tenant without revealing that record.
+	return database.AsSystem(ctx, tx, tenant, func() error {
+		ids, err := s.deps.Candidates.IDsByEmails(ctx, tx, slices.Concat(clean.To, clean.Cc, clean.Bcc))
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			withdrawn, err := s.deps.Consent.DoNotContact(ctx, tx, id)
+			if err != nil {
+				return err
+			}
+			if withdrawn {
+				return apperr.New(api.ErrorCodeEMAILDONOTCONTACT, "A recipient opted out of being contacted. Check the email addresses before sending.")
+			}
+		}
+		return nil
 	})
-	return fields.Err()
 }
 
 func (s *Service) scheduledCandidate(ctx context.Context, tx pgx.Tx, p authz.Principal, box, conversation string) (*string, error) {
@@ -94,47 +146,66 @@ func (s *Service) scheduleOutlook(ctx context.Context, p authz.Principal, id str
 		if err := q.LockMailboxUser(ctx); err != nil {
 			return err
 		}
-		box, row, err := loadOutlookMessage(ctx, q, p.UserID, id)
+		draft, err := s.openOutlookDraft(ctx, q, p.UserID, id)
 		if err != nil {
 			return err
 		}
+		box, row, remote := draft.box, draft.row, draft.remote
 		active, err := activeOutlookSend(ctx, q, box.ID, row.RemoteID)
 		if err != nil {
 			return err
 		}
-		if active != nil && active.Status != "scheduled" {
+		if active != nil && active.Status != "scheduled" && active.Status != "needs_review" {
 			return sendInProgress()
 		}
 		if active == nil && expected != 0 || active != nil && active.Version != expected {
 			return apperr.StaleVersion("scheduled send")
 		}
-		token, err := s.mailboxAccess(ctx, box)
-		if err != nil {
-			return outlookFailure(err, false)
-		}
-		remote, err := s.readRemoteDraft(ctx, token, row.RemoteID)
-		if err != nil {
-			return outlookFailure(err, false)
-		}
-		if !remote.IsDraft || draftVersion(remote) != in.DraftVersion {
+		if draftVersion(remote) != in.DraftVersion {
 			return draftChanged()
 		}
-		if err := checkOutlookEnvelope(remote); err != nil {
+		if err := s.checkOutlookEnvelope(ctx, tx, p.TenantID, draftEnvelope(remote, in.Changes)); err != nil {
 			return err
 		}
-		candidate, err := s.scheduledCandidate(ctx, tx, p, box.ID, row.Conversation)
+		candidate, err := s.scheduledCandidate(ctx, tx, p, box.ID, remote.ConversationID)
 		if err != nil {
 			return err
+		}
+		if active != nil && active.CandidateID != nil {
+			if err := s.canSendToOutlookCandidate(ctx, tx, p, active.CandidateID); err != nil {
+				return err
+			}
+			if candidate == nil {
+				candidate = active.CandidateID
+			}
+		}
+		if in.Changes != nil {
+			patch := draftPatch(*in.Changes)
+			if len(patch) > 0 {
+				// The mailbox lock spans the Graph patch and the new schedule
+				// commit. The old job can never claim the revised content.
+				remote, err = s.patchRemoteDraft(ctx, draft, patch)
+				if err != nil {
+					return err
+				}
+				if err := s.checkOutlookEnvelope(ctx, tx, p.TenantID, draftEnvelope(remote, nil)); err != nil {
+					return err
+				}
+				row, err = saveOutlookDraftIndex(ctx, q, box.ID, row.FolderID, remote)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		var saved store.EmailOutlookSend
 		if active == nil {
 			saved, err = q.CreateOutlookScheduled(ctx, store.CreateOutlookScheduledParams{
-				MailboxID: box.ID, MessageID: id, RemoteID: row.RemoteID, DraftVersion: in.DraftVersion,
+				MailboxID: box.ID, MessageID: row.ID, RemoteID: row.RemoteID, DraftVersion: draftVersion(remote),
 				CandidateID: candidate, Subject: truncate(remote.Subject, 300), SendAt: at,
 			})
 		} else {
 			saved, err = q.RescheduleOutlookSend(ctx, store.RescheduleOutlookSendParams{
-				ID: active.ID, MessageID: id, Version: expected, DraftVersion: in.DraftVersion,
+				ID: active.ID, MessageID: row.ID, Version: expected, DraftVersion: draftVersion(remote),
 				CandidateID: candidate, Subject: truncate(remote.Subject, 300), SendAt: at,
 			})
 		}

@@ -2262,6 +2262,7 @@ class OutlookScheduleInput(BaseModel):
     draftVersion: Annotated[str, Field(max_length=64, min_length=64, pattern="^[a-f0-9]+$")]
     expectedVersion: Annotated[int, Field(ge=0, le=2147483647)]
     sendAt: AwareDatetime | None = None
+    changes: OutlookDraftInput | None = None
 
 
 class OutlookScheduleVersion(BaseModel):

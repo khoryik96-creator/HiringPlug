@@ -91,16 +91,19 @@ function DraftFields({ opened, onClose, onReload }: { opened?: Draft; onClose: (
       let saved = draft;
       if (!saved) {
         saved = unwrap(await api.POST("/v1/outlook/drafts", { body: changes }));
-      } else if (Object.keys(changes).length) {
+      } else if (operation === "save" && Object.keys(changes).length) {
         saved = unwrap(await api.PATCH("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: saved.messageId } }, body: { ...changes, version: saved.version } }));
       }
-      setDraft(saved);
-      setForm({ to: saved.to.join(", "), cc: saved.cc.join(", "), bcc: saved.bcc.join(", "), subject: saved.subject, body: saved.body });
       if (operation === "send" || operation === "schedule") {
+        if (!draft) setDraft(saved);
         unwrap(await api.PUT("/v1/outlook/drafts/{messageId}/send", {
           params: { path: { messageId: saved.messageId } },
-          body: { draftVersion: saved.version, expectedVersion: saved.schedule?.version ?? 0, sendAt },
+          body: { draftVersion: saved.version, expectedVersion: saved.schedule?.version ?? 0, sendAt,
+            changes: draft && Object.keys(changes).length ? changes : undefined },
         }));
+      } else {
+        setDraft(saved);
+        setForm({ to: saved.to.join(", "), cc: saved.cc.join(", "), bcc: saved.bcc.join(", "), subject: saved.subject, body: saved.body });
       }
       return operation;
     },
@@ -141,7 +144,8 @@ function DraftFields({ opened, onClose, onReload }: { opened?: Draft; onClose: (
       </div>}
       {plan && <p className="full small muted">
         {locked ? "Check the send status in Scheduled."
-          : draft.scheduleNeedsReview ? "Outlook changed this draft. Review it and update the schedule."
+          : plan.status === "needs_review" ? plan.error || "Review the draft and update the schedule."
+            : draft.scheduleNeedsReview ? "Outlook changed this draft. Review it and update the schedule."
             : `Scheduled for ${formatWhen(plan.sendAt)}. Saving keeps this time.`}
       </p>}
       {later && !locked && <div className="full row outlook-actions outlook-schedule-time">
@@ -152,7 +156,7 @@ function DraftFields({ opened, onClose, onReload }: { opened?: Draft; onClose: (
       {notice && <p className="full" role="status">{notice}</p>}
       <div className="row full outlook-actions">
         <button type="submit" className="primary" disabled={locked || action.isPending}>Save draft</button>
-        {!plan && <button type="button" disabled={!readyToSend || action.isPending} onClick={() => { action.mutate("send"); }}>Send now</button>}
+        {(!plan || plan.status === "needs_review") && <button type="button" disabled={!readyToSend || action.isPending} onClick={() => { action.mutate("send"); }}>Send now</button>}
         <button type="button" disabled={locked || action.isPending} aria-expanded={later} onClick={() => { setLater(!later); }}>
           {draft?.scheduleNeedsReview ? "Review schedule" : plan ? "Change time" : "Send later"}
         </button>

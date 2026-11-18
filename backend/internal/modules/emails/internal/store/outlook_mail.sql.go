@@ -278,7 +278,7 @@ func (q *Queries) NudgeOutlookFolders(ctx context.Context, mailboxID string) err
 
 const outlookActiveSend = `-- name: OutlookActiveSend :one
 SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE mailbox_id = $1 AND remote_id = $2
- AND status IN ('scheduled','confirming','uncertain')
+ AND status IN ('scheduled','confirming','uncertain','needs_review')
 `
 
 type OutlookActiveSendParams struct {
@@ -592,6 +592,39 @@ func (q *Queries) OutlookScheduled(ctx context.Context, id string) (EmailOutlook
 	return i, err
 }
 
+const outlookSendForDraftIndex = `-- name: OutlookSendForDraftIndex :one
+SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE mailbox_id = $1 AND message_id = $2
+ AND status IN ('scheduled','needs_review')
+`
+
+type OutlookSendForDraftIndexParams struct {
+	MailboxID string
+	MessageID string
+}
+
+func (q *Queries) OutlookSendForDraftIndex(ctx context.Context, arg OutlookSendForDraftIndexParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, outlookSendForDraftIndex, arg.MailboxID, arg.MessageID)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
 const outlookSync = `-- name: OutlookSync :one
 SELECT mailbox_id, tenant_id, user_id, generation, requested_at, last_sync_at, folders_at, sync_error FROM email_outlook_sync WHERE mailbox_id = $1
 `
@@ -709,10 +742,10 @@ func (q *Queries) RequestOutlookSync(ctx context.Context, arg RequestOutlookSync
 }
 
 const rescheduleOutlookSend = `-- name: RescheduleOutlookSend :one
-UPDATE email_outlook_send SET send_at= $1, version=version+1,
+UPDATE email_outlook_send SET send_at= $1, version=version+1,status='scheduled',
  message_id= $2,draft_version= $3,subject= $4,
  candidate_id=$5,updated_at=now(),error=NULL,attempted_at=NULL
-WHERE id= $6 AND status='scheduled' AND version= $7 RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
+WHERE id= $6 AND status IN ('scheduled','needs_review') AND version= $7 RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
 `
 
 type RescheduleOutlookSendParams struct {

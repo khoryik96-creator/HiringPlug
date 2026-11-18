@@ -191,15 +191,17 @@ and formatted emails.
 
 The **Scheduled** list shows the send time in your time zone. Open the draft
 to change its content or time, or choose **Cancel send** to leave it in
-Outlook Drafts. A pending send stays tied to the same mailbox and reviewed
-draft even across worker restarts. If Outlook changes the draft, reopen it
-and review the new version before scheduling again. Turning off Outlook sync
+Outlook Drafts. **Update schedule** applies the edits and the new send time
+together. A pending send stays tied to the same mailbox and draft even if the
+mail index is rebuilt. If Outlook changes the draft, reopen it and review it
+before updating the same schedule. Turning off Outlook sync
 or disconnecting or replacing the mailbox cancels its pending sends.
 Previous send status remains available in the Scheduled list.
 
 The HiringPlug Go worker must be running to send at the chosen time.
 If the worker comes back within 24 hours of the send time, it sends the
-reviewed draft after rechecking access. Later sends need review.
+reviewed draft after rechecking access and consent for the To, Cc, and Bcc
+addresses, including unlinked recipients. Later sends need review.
 HiringPlug submits the Outlook draft once and checks the same immutable ID
 for its sent copy. If Outlook's response is lost, HiringPlug checks the
 receipt without resubmitting. **Check Outlook** means the outcome could not
