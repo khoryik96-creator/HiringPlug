@@ -144,13 +144,19 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 	if err != nil {
 		return err
 	}
-	return s.network(ctx, p.TenantID, p.UserID, func(ctx context.Context, conn *pgx.Conn) error {
+	return s.network(ctx, p.TenantID, p.UserID, false, func(ctx context.Context, conn *pgx.Conn) error {
 		// Another account: the interviews put into the old one come out of it
-		// (they would never be updated again there).
-		if old, err := s.liveConnection(ctx, conn, p); err == nil && (old.SubjectID != profile.ID || old.CalendarID != profile.CalendarID) {
-			s.withdraw(ctx, conn, old)
+		// (they would never be updated again there), once the new one is
+		// saved: a connect that fails leaves the old calendar as it was.
+		var old store.CalendarConnection
+		var oldHolds []store.CalendarEvent
+		if o, err := s.liveConnection(ctx, conn, p); err == nil && (o.SubjectID != profile.ID || o.CalendarID != profile.CalendarID) {
+			if oldHolds, err = s.pushedHolds(ctx, conn, o); err != nil {
+				return err
+			}
+			old = o
 		}
-		return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
+		err := database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
 			q := store.New(tx)
 			if err := q.LockCalendarUser(ctx, p.UserID); err != nil {
 				return err
@@ -226,24 +232,36 @@ func (s *Service) complete(ctx context.Context, p authz.Principal, ticket string
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "calendar.connected", EntityType: "user", EntityID: p.UserID, Changes: map[string]any{"provider": "microsoft"}})
 		})
+		if err == nil && len(oldHolds) > 0 {
+			if token, tokenErr := s.tokenOf(ctx, old); tokenErr == nil {
+				s.withdraw(ctx, token, old, oldHolds)
+			}
+		}
+		return err
 	})
 }
 func (s *Service) disconnect(ctx context.Context, p authz.Principal) error {
-	return s.network(ctx, p.TenantID, p.UserID, func(ctx context.Context, conn *pgx.Conn) error {
+	return s.network(ctx, p.TenantID, p.UserID, false, func(ctx context.Context, conn *pgx.Conn) error {
 		// The interviews and bookings HiringPlug put into Outlook come out:
 		// nothing would update them once disconnected. (Events the person
-		// made themselves stay: they are theirs.)
-		old, oldErr := s.liveConnection(ctx, conn, p)
-		if oldErr == nil {
-			s.withdraw(ctx, conn, old)
+		// made themselves stay: they are theirs.) Only those Outlook really
+		// deleted are forgotten; the others keep their link, so reconnecting
+		// the account updates them instead of making copies.
+		var deleted []string
+		if old, err := s.liveConnection(ctx, conn, p); err == nil {
+			if holds, err := s.pushedHolds(ctx, conn, old); err == nil && len(holds) > 0 {
+				if token, err := s.access(ctx, conn, old); err == nil {
+					deleted = s.withdraw(ctx, token, old, holds)
+				}
+			}
 		}
 		return database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
 			q := store.New(tx)
 			if err := q.LockCalendarUser(ctx, p.UserID); err != nil {
 				return err
 			}
-			if oldErr == nil {
-				if err := q.ForgetPushedSourceHolds(ctx, ptr(old.ID)); err != nil {
+			if len(deleted) > 0 {
+				if err := q.ForgetPushedHolds(ctx, deleted); err != nil {
 					return err
 				}
 			}
@@ -295,23 +313,49 @@ func (s *Service) liveConnection(ctx context.Context, conn *pgx.Conn, p authz.Pr
 	return row, err
 }
 
-// withdraw deletes from an Outlook connection the interview and booking
-// holds HiringPlug put there, as far as Outlook still lets it: a connection
-// that no longer works keeps them (the person is told to remove them).
-func (s *Service) withdraw(ctx context.Context, conn *pgx.Conn, c store.CalendarConnection) {
-	token, err := s.access(ctx, conn, c)
-	if err != nil {
-		return
-	}
+// pushedHolds are the interview and booking holds HiringPlug put into c.
+func (s *Service) pushedHolds(ctx context.Context, conn *pgx.Conn, c store.CalendarConnection) ([]store.CalendarEvent, error) {
 	var holds []store.CalendarEvent
-	if err := database.InTx(ctx, conn, authz.System(c.TenantID), func(tx pgx.Tx) error {
+	err := database.InTx(ctx, conn, authz.System(c.TenantID), func(tx pgx.Tx) error {
 		var err error
 		holds, err = store.New(tx).PushedSourceHolds(ctx, store.PushedSourceHoldsParams{UserID: c.UserID, ConnectionID: ptr(c.ID)})
 		return err
-	}); err != nil {
-		return
-	}
+	})
+	return holds, err
+}
+
+// withdraw deletes holds from an Outlook connection, as far as Outlook lets
+// it, and says which are gone (deleted now, or already).
+func (s *Service) withdraw(ctx context.Context, token string, c store.CalendarConnection, holds []store.CalendarEvent) []string {
+	var deleted []string
 	for _, h := range holds {
-		_, _ = s.request(ctx, "DELETE", s.graph(s.calendarPath(c.CalendarID)+"/events/"+url.PathEscape(*h.RemoteID)), token, nil, "")
+		_, err := s.request(ctx, "DELETE", s.graph(s.calendarPath(c.CalendarID)+"/events/"+url.PathEscape(*h.RemoteID)), token, nil, "")
+		var provider *providerError
+		if err == nil || (errors.As(err, &provider) && provider.Status == 404) {
+			deleted = append(deleted, h.ID)
+		}
 	}
+	return deleted
+}
+
+// tokenOf is an access token for a connection that may no longer be the
+// current one (an account just replaced): its sealed tokens, refreshed if
+// need be, never saved back.
+func (s *Service) tokenOf(ctx context.Context, c store.CalendarConnection) (string, error) {
+	var secret tokens
+	if err := s.open(c.TenantID, c.UserID, "tokens", c.SealedTokens, &secret); err != nil {
+		return "", err
+	}
+	if secret.ExpiresAt.Sub(s.now()) > time.Minute {
+		return secret.AccessToken, nil
+	}
+	if secret.RefreshToken == "" {
+		return "", errors.New("the old Outlook authorization has expired")
+	}
+	app, err := s.appIn(ctx, authz.System(c.TenantID))
+	if err != nil || app.ClientID != c.AppClientID {
+		return "", errors.New("the Microsoft application changed")
+	}
+	next, err := s.exchange(ctx, app, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {secret.RefreshToken}})
+	return next.AccessToken, err
 }

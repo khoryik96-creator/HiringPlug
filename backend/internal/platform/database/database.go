@@ -54,6 +54,33 @@ func InTx(ctx context.Context, pool interface {
 	})
 }
 
+// AsSystem runs fn in tx scoped to the whole company (the system principal),
+// then puts the caller's scope back. It is for checks a caller's own limits
+// must not narrow: whether an interview still exists is not the same as
+// whether this user may see it. It stays in tx, so it sees and waits on
+// nothing tx does not (a second transaction would wait on tx's own locks).
+func AsSystem(ctx context.Context, tx pgx.Tx, tenantID string, fn func() error) error {
+	const keys = `'app.tenant_id','app.user_id','app.permissions','app.scope_users','app.scope_jobs'`
+	var saved []string
+	if err := tx.QueryRow(ctx, `SELECT array_agg(coalesce(current_setting(k, true), '') ORDER BY n) FROM unnest(ARRAY[`+keys+`]) WITH ORDINALITY AS t(k, n)`).Scan(&saved); err != nil {
+		return fmt.Errorf("database: reading scope: %w", err)
+	}
+	set := func(v []string) error {
+		_, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true), set_config('app.user_id', $2, true), set_config('app.permissions', $3, true),
+			set_config('app.scope_users', $4, true), set_config('app.scope_jobs', $5, true)`, v[0], v[1], v[2], v[3], v[4])
+		return err
+	}
+	p := authz.System(tenantID)
+	if err := set([]string{p.TenantID, p.UserID, p.PermissionCSV(), p.ScopeUsersSetting(), p.ScopeJobsSetting()}); err != nil {
+		return fmt.Errorf("database: scoping to the company: %w", err)
+	}
+	err := fn()
+	if restore := set(saved); restore != nil && err == nil {
+		err = fmt.Errorf("database: restoring scope: %w", restore)
+	}
+	return err
+}
+
 // CheckRestrictedRole refuses to run the app as a database role that would
 // bypass row-level security: a superuser, a role with BYPASSRLS, or the owner
 // of the tables. Called at startup by the API and the worker.

@@ -12,9 +12,9 @@ import (
 // Calendar shares only scheduling facts, never feedback or candidate salaries.
 type OutlookCalendar interface {
 	SourceChanged(context.Context, pgx.Tx, string, string, string) error
-	// Conflicts: interviewers busy by their calendars then (other interviews
-	// aside) and those whose Outlook is not current.
-	Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string) (busy, stale []string, err error)
+	// Conflicts: interviewers busy by their calendars then (the interviews in
+	// named aside) and those whose Outlook has stopped syncing.
+	Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string, named []string) (busy, stale []string, err error)
 }
 
 func (m *Module) UseCalendar(c OutlookCalendar) { m.service.calendar = c }

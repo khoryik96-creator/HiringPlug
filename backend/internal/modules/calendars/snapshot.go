@@ -22,10 +22,7 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 	}
 	busy := store.InsertOutlookBusyParams{UserID: c.UserID}
 	seen := map[string]bool{}
-	ours, err := s.byTransaction(ctx, q, c)
-	if err != nil {
-		return err
-	}
+	var ours map[string]store.CalendarEvent // loaded only when an unknown event carries a transaction ID
 	for _, e := range events {
 		start, end, err := e.times()
 		if err != nil {
@@ -36,6 +33,11 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 		unknown := database.IsNoRows(err)
 		if err != nil && !unknown {
 			return err
+		}
+		if e.TransactionID != "" && (unknown || row.Source == "outlook") && ours == nil {
+			if ours, err = s.byTransaction(ctx, q, c); err != nil {
+				return err
+			}
 		}
 		if mine, ok := ours[e.TransactionID]; ok && e.TransactionID != "" && (unknown || row.Source == "outlook") {
 			// Our create reached Outlook but its answer was lost: the event is
@@ -76,7 +78,9 @@ func (s *Service) applySnapshot(ctx context.Context, tx pgx.Tx, c store.Calendar
 				return err
 			}
 		}
-		if !e.IsCancelled && e.ShowAs != "free" && start.Before(to) && end.After(from) {
+		// A HiringPlug appointment cancelled here (a panel member taken off, say)
+		// no longer counts while its Outlook copy waits to be deleted.
+		if !e.IsCancelled && e.ShowAs != "free" && start.Before(to) && end.After(from) && (unknown || row.Status == "active") {
 			busy.Starts = append(busy.Starts, start)
 			busy.Ends = append(busy.Ends, end)
 			busy.Sources = append(busy.Sources, source)

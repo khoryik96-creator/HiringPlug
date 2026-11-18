@@ -195,6 +195,13 @@ describe("pipeline board", () => {
     expect(fireEvent.click(name, { detail: 0 })).toBe(true);
     expect(fireEvent.click(name, { detail: 1, ctrlKey: true })).toBe(true);
     expect(screen.queryByText("1 chosen")).toBeNull();
+    // A tap on a phone (no double-tap there) opens them too.
+    for (const pointerType of ["touch", "pen"]) {
+      const tap = new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 });
+      Object.defineProperty(tap, "pointerType", { value: pointerType });
+      expect(fireEvent(name, tap)).toBe(true);
+    }
+    expect(screen.queryByText("1 chosen")).toBeNull();
   });
 });
 

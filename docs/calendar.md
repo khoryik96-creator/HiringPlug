@@ -58,15 +58,24 @@ shared/delegated calendars are not included.
   count and nothing is blocked: a candidate's booking page keeps working, and
   scheduling an interview names the interviewer whose Outlook "has not synced
   lately" beside other clashes (other interviews, by name; calendar
-  appointments, by owner only). Every clash can be scheduled over. The optional
+  appointments, by owner only). An interview the scheduler may not see (another
+  recruiter's candidate) still counts, as a calendar appointment. A calendar
+  connected a moment ago, its first sync on its way, is not "not synced
+  lately". Every clash can be scheduled over. The optional
   ICS feed counts again while Outlook is not working; native Outlook takes
   precedence while it is.
 - An appointment Outlook has, marked Free there, does not block the time: once
   Outlook shows it, Outlook's busy time governs (the interval kept while it was
-  on its way is dropped). Interview and booking holds always block.
+  on its way is dropped). Interview and booking holds always block, until
+  HiringPlug takes someone off them: then they are free at once, even while
+  Outlook has not deleted its copy yet.
 - A hold whose interview or booking is gone (deleted with its candidate, or a
   link no longer booked) never blocks a time, is hidden from the calendar, and
   is cancelled and taken out of Outlook (checked when read and at each sync).
+  Whether it is gone is checked as the system, not as the reader, so an
+  interview the reader may not see is not mistaken for a deleted one. It is
+  cancelled the first time it is read, in that same transaction, with no job
+  queued per view.
 - Source jobs for one interview or booking run one at a time, and a hold only
   moves forward in its source's version: an older job never cancels or brings
   back what a newer one decided.
@@ -78,8 +87,13 @@ made themselves stay in Outlook. Microsoft has no API to revoke one app's
 refresh token: HiringPlug erases it; to withdraw consent entirely, remove the
 app at myaccount.microsoft.com > Apps (or an admin in Entra). An identity-only
 connection tombstone preserves remote event links for a same-account reconnect.
-Switching accounts takes the interview and booking holds out of the old account
-and makes them in the new one; it blocks automatic rerouting of existing
+Only the holds Outlook confirmed deleted lose their link (and get a new
+transaction ID, which Outlook would otherwise treat as already made); one it
+refused keeps its link, so reconnecting the same account updates it instead of
+making a copy. Switching accounts takes the interview and booking holds out of
+the old account only after the new connection is saved, so a switch that fails
+(that calendar is a colleague's) leaves the old Outlook as it was, and makes
+them in the new one; it blocks automatic rerouting of existing
 attendee invitations (review and explicitly retry those from the new account).
 One Outlook calendar can belong to only one HiringPlug user per agency.
 
@@ -92,7 +106,10 @@ Source changes enqueue `calendar.source_changed` in the source transaction.
 Provider reads/writes use `calendar.refresh` and `calendar.push`, which run as
 outside-transaction jobs (`jobqueue.OutsideHandlers`): no queue transaction is
 held open while Microsoft answers, each step commits in its own short one, and
-at most four hold a database connection at once.
+at most four background ones hold a database connection at once (what a person
+is waiting for, such as Disconnect, never queues behind them). A job reads data
+the reader may not see only through `database.AsSystem`, inside the same
+transaction, so it never waits on its own row locks.
 
 All personal event data and credentials are protected by tenant and user RLS,
 even from agency owners. Schedulers read only separate intervals/health rows,

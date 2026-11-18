@@ -3,6 +3,12 @@ export function localInput(date: Date): string {
 }
 export function startDay(date: Date): Date { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
 export function addDays(date: Date, days: number): Date { const next = new Date(date); next.setDate(next.getDate() + days); return next; }
+/** The day after a "YYYY-MM-DD" day, as one (calendar arithmetic, no time zone). */
+export function nextDay(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 export function sameDay(a: Date, b: Date): boolean { return startDay(a).getTime() === startDay(b).getTime(); }
 export function daysFor(date: Date, mode: "month" | "week" | "agenda"): Date[] {
   const first = mode === "month" ? new Date(date.getFullYear(), date.getMonth(), 1) : startDay(date);

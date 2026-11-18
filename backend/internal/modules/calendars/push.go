@@ -28,7 +28,7 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 	if err != nil {
 		return err
 	}
-	return s.network(ctx, job.TenantID, initial.UserID, func(ctx context.Context, conn *pgx.Conn) error {
+	return s.network(ctx, job.TenantID, initial.UserID, true, func(ctx context.Context, conn *pgx.Conn) error {
 		p := authz.System(job.TenantID)
 		var current store.CalendarConnection
 		var row store.CalendarEvent

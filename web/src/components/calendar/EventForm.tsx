@@ -4,7 +4,7 @@ import { api, type Schemas, unwrap } from "../../api/client";
 import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
-import { zonedInput, wallTime, localInput, startDay, addDays } from "./dates";
+import { nextDay, wallTime, zonedInput } from "./dates";
 
 type Event = Schemas["CalendarEvent"];
 export function EventForm({ event, date, connection, onClose, onSaved }: { event?: Event; date: Date; connection: Schemas["OutlookConnection"]; onClose: () => void; onSaved: () => void }) {
@@ -22,7 +22,8 @@ export function EventForm({ event, date, connection, onClose, onSaved }: { event
     return unwrap(await api.POST("/v1/calendar/events", { body }));
   }, onSuccess: onSaved });
   const errors = fieldErrors(save.error);
-  function allDay(value: boolean) { setForm((f) => ({ ...f, allDay: value, startsAt: localInput(startDay(new Date(f.startsAt))), endsAt: localInput(addDays(startDay(new Date(f.startsAt)), 1)) })); }
+  // The day is the one written in the form (in the appointment's own time zone), never re-read in the browser's.
+  function allDay(value: boolean) { setForm((f) => ({ ...f, allDay: value, startsAt: `${f.startsAt.slice(0, 10)}T00:00`, endsAt: `${nextDay(f.startsAt.slice(0, 10))}T00:00` })); }
   return <section className="panel calendar-form" role="dialog" aria-modal="true" aria-label={event ? "Edit appointment" : "New appointment"}>
     <div className="calendar-heading"><h3>{event ? "Edit appointment" : "New appointment"}</h3><button type="button" onClick={onClose} disabled={save.isPending}>Close</button></div>
     <form className="form-grid" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
@@ -32,7 +33,8 @@ export function EventForm({ event, date, connection, onClose, onSaved }: { event
       <div className="row full"><small className="muted">{zone}</small><label><input type="checkbox" checked={form.allDay} onChange={(e) => { allDay(e.target.checked); }}/> All day</label></div>
       <Field label="Location" error={errors.location}><input maxLength={500} value={form.location} onChange={(e) => { setForm({ ...form, location: e.target.value }); }}/></Field>
       <Field label="Attendees" error={errors.attendees ?? Object.entries(errors).find(([key]) => key.startsWith("attendees"))?.[1]}><input disabled={!connection.connected} type="text" value={form.attendees} onChange={(e) => { setForm({ ...form, attendees: e.target.value }); }}/></Field>
-      <div className="full"><Field label="Notes" error={errors.notes}><textarea rows={3} maxLength={4000} value={form.notes} onChange={(e) => { setForm({ ...form, notes: e.target.value }); }}/></Field></div>
+      <div className="full"><Field label="Notes" error={errors.notes}><textarea rows={3} maxLength={4000} value={form.notes} onChange={(e) => { setForm({ ...form, notes: e.target.value }); }}/></Field>
+        {event?.teams && <small className="muted">Changed notes stay in HiringPlug: Outlook keeps this Teams meeting&apos;s own notes, which hold its join details.</small>}</div>
       {connection.teamsAvailable && <label className="full"><input type="checkbox" checked={form.teams} disabled={event?.teams} onChange={(e) => { setForm({ ...form, teams: e.target.checked }); }}/> Teams meeting</label>}
       <div className="full"><ErrorMessage error={save.error}/></div>
       <div className="row full"><button className="primary" disabled={save.isPending} type="submit">{save.isPending ? "Saving…" : form.attendees.trim() ? event ? "Save & send updates" : "Create & send invitations" : "Save appointment"}</button><button type="button" onClick={onClose} disabled={save.isPending}>Cancel</button></div>

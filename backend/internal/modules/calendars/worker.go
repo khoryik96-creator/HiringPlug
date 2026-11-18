@@ -28,16 +28,20 @@ const networkConns = 4
 
 // A pooled connection serializes this user's provider operations without
 // holding business-row locks or a transaction while Microsoft answers; at
-// most networkConns are held at once, so Outlook work never starves the
-// pool (it used to open a new database connection per job).
-func (s *Service) network(ctx context.Context, tenant, user string, fn func(context.Context, *pgx.Conn) error) error {
+// most networkConns background ones are held at once, so Outlook syncs never
+// starve the pool (they used to open a new database connection per job).
+// Background work (sync, push) waits for a slot; a person connecting or
+// disconnecting does not queue behind it.
+func (s *Service) network(ctx context.Context, tenant, user string, background bool, fn func(context.Context, *pgx.Conn) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	select {
-	case s.netSlots <- struct{}{}:
-		defer func() { <-s.netSlots }()
-	case <-ctx.Done():
-		return ctx.Err()
+	if background {
+		select {
+		case s.netSlots <- struct{}{}:
+			defer func() { <-s.netSlots }()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	pc, err := s.pool.Acquire(ctx)
 	if err != nil {

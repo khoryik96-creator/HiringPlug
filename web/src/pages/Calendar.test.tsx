@@ -35,6 +35,14 @@ it("requires valid intervals before sending and uses local midnight for all-day 
   fireEvent.click(screen.getByRole("button", { name: "Save appointment" })); await waitFor(() => { expect(onSaved).toHaveBeenCalled(); });
   expect(sentBody(post)).toMatchObject({ allDay: true, attendees: [] });
 });
+it("says that a Teams meeting's changed notes stay in HiringPlug", () => {
+  const event = { id: "cev_1", version: 1, title: "Interview", notes: "", location: "", startsAt: "2026-11-18T01:00:00Z", endsAt: "2026-11-18T02:00:00Z", timeZone: "Asia/Kuala_Lumpur", allDay: false, attendees: [], teams: true } as unknown as Schemas["CalendarEvent"];
+  renderWithClient(<EventForm event={event} date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  expect(screen.getByText(/Changed notes stay in HiringPlug/)).toBeTruthy();
+  cleanup();
+  renderWithClient(<EventForm event={{ ...event, teams: false }} date={new Date(2026, 10, 18, 9)} connection={connection} onClose={vi.fn()} onSaved={vi.fn()}/>);
+  expect(screen.queryByText(/Changed notes stay in HiringPlug/)).toBeNull();
+});
 it("builds Monday-first grids that cover the whole month", () => {
   const days = daysFor(new Date(2026, 10, 18), "month"); expect(days).toHaveLength(42); expect(days[0]?.getDay()).toBe(1); expect(days.some((day) => sameDay(day, new Date(2026, 10, 30)))).toBe(true);
 });

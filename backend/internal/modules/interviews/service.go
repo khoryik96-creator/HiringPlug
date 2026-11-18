@@ -124,7 +124,11 @@ func (s *Service) check(ctx context.Context, tx pgx.Tx, q *store.Queries, selfID
 	}
 	var calendarBusy, calendarStale []string
 	if s.calendar != nil {
-		if calendarBusy, calendarStale, err = s.calendar.Conflicts(ctx, tx, d.Interviewers, d.StartsAt, d.Ends(), selfID); err != nil {
+		named := make([]string, 0, len(clashes))
+		for _, c := range clashes {
+			named = append(named, c.ID)
+		}
+		if calendarBusy, calendarStale, err = s.calendar.Conflicts(ctx, tx, d.Interviewers, d.StartsAt, d.Ends(), selfID, named); err != nil {
 			return err
 		}
 	}

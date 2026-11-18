@@ -73,8 +73,12 @@ export function ScoreJobFit({ jobId, enabled, chosen = [] }: { jobId: string; en
   const score = useMutation({
     mutationFn: async (ids: string[]): Promise<{ queued: number; withoutCv?: number; consentWithdrawn?: number; failed?: string[] }> => {
       if (ids.length === 0) return unwrap(await api.POST("/v1/matches/for-job", { body: { jobId, rescore: false } }));
-      const done = await Promise.allSettled(ids.map(async (applicationId) => unwrap(await api.POST("/v1/matches", { body: { applicationId } }))));
-      const failed = done.flatMap((d) => (d.status === "rejected" ? [d.reason instanceof Error ? d.reason.message : String(d.reason)] : []));
+      // A few at a time, not one request per person at once.
+      const failed: string[] = [];
+      for (let i = 0; i < ids.length; i += 4) {
+        const done = await Promise.allSettled(ids.slice(i, i + 4).map(async (applicationId) => unwrap(await api.POST("/v1/matches", { body: { applicationId } }))));
+        failed.push(...done.flatMap((d) => (d.status === "rejected" ? [d.reason instanceof Error ? d.reason.message : String(d.reason)] : [])));
+      }
       return { queued: ids.length - failed.length, failed };
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: matchesKey }),

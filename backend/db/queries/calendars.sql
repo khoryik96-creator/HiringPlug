@@ -55,7 +55,8 @@ ON CONFLICT(tenant_id,user_id,source,source_id) DO UPDATE SET title=excluded.tit
 WHERE calendar_event.source_version<excluded.source_version OR (calendar_event.source_version=excluded.source_version AND calendar_event.status<>excluded.status) RETURNING *;
 -- An older version of the source never cancels a hold a newer one made.
 -- name: CancelCalendarHold :one
-UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,@source_version),version=version+1,sync_status='pending',updated_at=now() WHERE id= @id AND status<>'cancelled' AND source_version<= @source_version RETURNING *;
+-- Never in Outlook: nothing to sync (a lost create's event is found by its transaction ID and deleted then).
+UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,@source_version),version=version+1,sync_status=CASE WHEN remote_id IS NULL THEN 'local' ELSE 'pending' END,updated_at=now() WHERE id= @id AND status<>'cancelled' AND source_version<= @source_version RETURNING *;
 -- Source jobs for one interview or booking run one at a time.
 -- name: LockCalendarSource :exec
 SELECT pg_advisory_xact_lock(hashtextextended(app_current_tenant() || ':calendar-source:' || @kind::text || ':' || @source_id::text,0));
@@ -140,8 +141,9 @@ UPDATE calendar_event SET remote_id= @remote_id,remote_key=sqlc.narg(remote_key)
 -- Interview and booking holds put into one Outlook connection (taken out of it on disconnect or account change).
 -- name: PushedSourceHolds :many
 SELECT * FROM calendar_event WHERE user_id= @user_id AND remote_connection= @connection_id AND remote_id IS NOT NULL AND source IN ('interview','booking');
--- name: ForgetPushedSourceHolds :exec
-UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND remote_connection= @connection_id AND source IN ('interview','booking');
+-- Holds deleted from Outlook forget their event; the next create carries a new transaction ID (the deleted event's would be deduplicated away).
+-- name: ForgetPushedHolds :exec
+UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,remote_generation=remote_generation+1,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND id=ANY(@ids::text[]) AND source IN ('interview','booking');
 -- Live interview and booking holds (checked against their sources at each sync).
 -- name: ActiveSourceHolds :many
 SELECT source,source_id FROM calendar_event WHERE user_id= @user_id AND source IN ('interview','booking') AND status='active' AND ends_at> @from_time::timestamptz AND source_id IS NOT NULL;

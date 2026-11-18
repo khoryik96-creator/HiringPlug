@@ -91,7 +91,8 @@ tasks:
     cmds:
       - |
         base=$(git merge-base origin/main HEAD 2>/dev/null) || { echo "no origin/main to compare with; skipping"; exit 0; }
-        if git diff --quiet "$base" -- . ':(exclude)docs' ':(exclude)VERSION'; then exit 0; fi
+        # Changed files, and new ones not added to git yet.
+        if git diff --quiet "$base" -- . ':(exclude)docs' ':(exclude)VERSION' && [ -z "$(git ls-files --others --exclude-standard -- . ':(exclude)docs')" ]; then exit 0; fi
         new=$(cat VERSION)
         echo "$new" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "VERSION must be major.minor.patch, not '$new'"; exit 1; }
         old=$(git show "$base:VERSION" 2>/dev/null || echo none)

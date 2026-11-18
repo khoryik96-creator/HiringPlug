@@ -48,23 +48,29 @@ interface Shared {
 const choose = (props: Shared, a: Application) => (e: React.MouseEvent) => {
   const target = e.target as HTMLElement;
   if (!props.onPick || target.closest("a:not(.pick-name), button, input, select, label, form")) return;
-  if (target.closest("a.pick-name") && (e.detail === 0 || opensElsewhere(e))) return; // Enter, or a new tab: opening them
+  if (target.closest("a.pick-name") && opens(e)) return; // a tap, Enter or a new tab: opening them
   props.onPick(a, !props.picked.includes(a.id));
 };
 
 const opensElsewhere = (e: React.MouseEvent) => e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0;
+/** A tap (touch, pen) or a click with no mouse (Enter, a screen reader) opens the profile: only a mouse click chooses. */
+const opens = (e: React.MouseEvent) => {
+  const pointer = (e.nativeEvent as PointerEvent).pointerType;
+  return e.detail === 0 || pointer === "touch" || pointer === "pen" || opensElsewhere(e);
+};
 
 /**
- * Their name. Where people can be chosen, a click chooses them (the line's
- * own click) and a double-click opens their profile; Enter, Ctrl/Cmd-click
- * and a middle click still open it. Elsewhere it is a plain link.
+ * Their name. Where people can be chosen, a mouse click chooses them (the
+ * line's own click) and a double-click opens their profile; a tap on a phone,
+ * Enter, a screen reader, Ctrl/Cmd-click and a middle click open it (on a
+ * phone the rest of the line chooses). Elsewhere it is a plain link.
  */
 function PickName({ props, a, title }: { props: Shared; a: Application; title?: string }) {
   const href = `#/candidates/${a.candidateId}`;
   if (!props.onPick) return <a href={href} title={title}>{a.candidateName}</a>;
   return (
     <a href={href} className="pick-name" title={`${title ? `${title}\n` : ""}Click to choose · double-click to open`}
-      onClick={(e) => { if (e.detail !== 0 && !opensElsewhere(e)) e.preventDefault(); }}
+      onClick={(e) => { if (!opens(e)) e.preventDefault(); }}
       onDoubleClick={() => { window.location.hash = href; }}
       onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); props.onPick?.(a, !props.picked.includes(a.id)); } }}>{a.candidateName}</a>
   );

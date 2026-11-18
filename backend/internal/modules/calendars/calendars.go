@@ -95,10 +95,11 @@ func (m *Module) BusyFor(ctx context.Context, tx pgx.Tx, users []string, from, t
 	return m.service.busy(ctx, tx, users, from, to, exceptKind, exceptID)
 }
 
-// Conflicts are the interviewers busy by their calendars (other interviews
-// aside) and those whose Outlook is not current, for scheduling an interview.
-func (m *Module) Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string) (busy, stale []string, err error) {
-	return m.service.conflicts(ctx, tx, users, from, to, exceptInterview)
+// Conflicts are the interviewers busy by their calendars (the interviews in
+// named aside: the clash check names those) and those whose Outlook has
+// stopped syncing, for scheduling an interview.
+func (m *Module) Conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptInterview string, named []string) (busy, stale []string, err error) {
+	return m.service.conflicts(ctx, tx, users, from, to, exceptInterview, named)
 }
 
 // Connected is whether the user's Outlook is working, so it sends them their

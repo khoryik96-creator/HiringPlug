@@ -316,7 +316,7 @@ func (q *Queries) CancelCalendarEvent(ctx context.Context, arg CancelCalendarEve
 }
 
 const cancelCalendarHold = `-- name: CancelCalendarHold :one
-UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,$1),version=version+1,sync_status='pending',updated_at=now() WHERE id= $2 AND status<>'cancelled' AND source_version<= $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
+UPDATE calendar_event SET status='cancelled',source_version=GREATEST(source_version,$1),version=version+1,sync_status=CASE WHEN remote_id IS NULL THEN 'local' ELSE 'pending' END,updated_at=now() WHERE id= $2 AND status<>'cancelled' AND source_version<= $1 RETURNING id, tenant_id, user_id, version, title, notes, location, starts_at, ends_at, time_zone, all_day, teams, attendees, source, source_id, source_version, status, sync_status, sync_error, remote_generation, remote_id, remote_key, remote_connection, sent_version, web_url, join_url, remote_snapshot, created_at, updated_at
 `
 
 type CancelCalendarHoldParams struct {
@@ -325,6 +325,7 @@ type CancelCalendarHoldParams struct {
 }
 
 // An older version of the source never cancels a hold a newer one made.
+// Never in Outlook: nothing to sync (a lost create's event is found by its transaction ID and deleted then).
 func (q *Queries) CancelCalendarHold(ctx context.Context, arg CancelCalendarHoldParams) (CalendarEvent, error) {
 	row := q.db.QueryRow(ctx, cancelCalendarHold, arg.SourceVersion, arg.ID)
 	var i CalendarEvent
@@ -511,12 +512,13 @@ func (q *Queries) FinishOutlookRefresh(ctx context.Context, arg FinishOutlookRef
 	return result.RowsAffected(), nil
 }
 
-const forgetPushedSourceHolds = `-- name: ForgetPushedSourceHolds :exec
-UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND remote_connection= $1 AND source IN ('interview','booking')
+const forgetPushedHolds = `-- name: ForgetPushedHolds :exec
+UPDATE calendar_event SET remote_id=NULL,remote_key=NULL,remote_connection=NULL,sent_version=0,remote_snapshot=NULL,remote_generation=remote_generation+1,sync_status='local',sync_error=NULL WHERE user_id=app_current_user() AND id=ANY($1::text[]) AND source IN ('interview','booking')
 `
 
-func (q *Queries) ForgetPushedSourceHolds(ctx context.Context, connectionID *string) error {
-	_, err := q.db.Exec(ctx, forgetPushedSourceHolds, connectionID)
+// Holds deleted from Outlook forget their event; the next create carries a new transaction ID (the deleted event's would be deduplicated away).
+func (q *Queries) ForgetPushedHolds(ctx context.Context, ids []string) error {
+	_, err := q.db.Exec(ctx, forgetPushedHolds, ids)
 	return err
 }
 

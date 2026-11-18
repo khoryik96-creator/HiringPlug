@@ -38,6 +38,7 @@ type outlookFixture struct {
 	account                     string         // the signed-in Microsoft account ("synthetic-account" when empty)
 	loseCreateAnswer            int            // creates whose event is stored but whose answer is lost (a 503)
 	lastPatch                   map[string]any // what the last change sent
+	deleteStatus                int            // answer to deletes when not 0 (a broken or busy Outlook)
 	config                      calendars.Config
 }
 
@@ -106,6 +107,10 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		switch r.Method {
 		case "DELETE":
+			if f.deleteStatus != 0 {
+				w.WriteHeader(f.deleteStatus)
+				return
+			}
 			delete(f.events, id)
 			w.WriteHeader(204)
 			return

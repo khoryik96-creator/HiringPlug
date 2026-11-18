@@ -165,6 +165,27 @@ describe("fit on a job's board", () => {
     expect(await screen.findByText("Scoring 1…")).toBeTruthy();
   });
 
+  it("scores many chosen people a few at a time", async () => {
+    const people = ["Ali", "Siti", "Wei", "Mei", "Raj", "Tan"];
+    gets({
+      "/v1/jobs/{jobId}/applications": { items: people.map((name, i) => app(`a${String(i)}`, name)) },
+      "/v1/matches": { enabled: true, items: [] },
+    });
+    let open = 0, most = 0;
+    const post = vi.spyOn(api, "POST").mockImplementation((async () => {
+      open++; most = Math.max(most, open);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      open--;
+      return ok({ queued: 1 });
+    }) as never);
+    renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={[...SCORE, "emails:send"]} />);
+    for (const name of people) fireEvent.click(await screen.findByRole("link", { name }), { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Score 6" }));
+    await waitFor(() => { expect(post).toHaveBeenCalledTimes(6); });
+    expect(await screen.findByText("Scoring 6…")).toBeTruthy();
+    expect(most).toBe(4);
+  });
+
   it("says when matching is off, and shows nothing without the permission", async () => {
     gets({ "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali")] }, "/v1/matches": { enabled: false, items: [] } });
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} permissions={SCORE} />);

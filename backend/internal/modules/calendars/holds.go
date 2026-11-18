@@ -54,19 +54,26 @@ func (s *Service) sourceChanged(ctx context.Context, tx pgx.Tx, job jobqueue.Job
 	if err := job.Decode(&payload); err != nil {
 		return err
 	}
+	return s.reconcileSource(ctx, tx, job.TenantID, string(payload.Kind), payload.SourceId)
+}
+
+// reconcileSource brings an interview's or booking's holds in line with it as
+// it is now (in a transaction scoped to the whole company): made, moved,
+// cancelled, or taken off for people no longer on it.
+func (s *Service) reconcileSource(ctx context.Context, tx pgx.Tx, tenant, kind, id string) error {
 	q := store.New(tx)
 	// One at a time per source, each reading it as it is now: a job that read
 	// an older version can never finish after a newer one.
-	if err := q.LockCalendarSource(ctx, store.LockCalendarSourceParams{Kind: string(payload.Kind), SourceID: payload.SourceId}); err != nil {
+	if err := q.LockCalendarSource(ctx, store.LockCalendarSourceParams{Kind: kind, SourceID: id}); err != nil {
 		return err
 	}
-	m, err := s.deps.Sources.Meeting(ctx, tx, string(payload.Kind), payload.SourceId)
+	m, err := s.deps.Sources.Meeting(ctx, tx, kind, id)
 	if database.IsNoRows(err) {
-		m = Meeting{Kind: string(payload.Kind), ID: payload.SourceId, Cancelled: true, Version: math.MaxInt32} // gone: newer than any hold
+		m = Meeting{Kind: kind, ID: id, Cancelled: true, Version: math.MaxInt32} // gone: newer than any hold
 	} else if err != nil {
 		return err
 	}
-	previous, err := q.SourceCalendarEvents(ctx, store.SourceCalendarEventsParams{Source: string(payload.Kind), SourceID: ptr(payload.SourceId)})
+	previous, err := q.SourceCalendarEvents(ctx, store.SourceCalendarEventsParams{Source: kind, SourceID: ptr(id)})
 	if err != nil {
 		return err
 	}
@@ -83,7 +90,7 @@ func (s *Service) sourceChanged(ctx context.Context, tx pgx.Tx, job jobqueue.Job
 				return err
 			}
 			if conn, err := q.CalendarConnection(ctx, old.UserID); err == nil {
-				if err := s.queuePush(ctx, tx, job.TenantID, row.ID, conn.ID); err != nil {
+				if err := s.queuePush(ctx, tx, tenant, row.ID, conn.ID); err != nil {
 					return err
 				}
 			} else if !database.IsNoRows(err) {
@@ -102,7 +109,7 @@ func (s *Service) sourceChanged(ctx context.Context, tx pgx.Tx, job jobqueue.Job
 		if !active {
 			continue
 		}
-		if _, err := s.holdIn(ctx, tx, job.TenantID, user, m); err != nil {
+		if _, err := s.holdIn(ctx, tx, tenant, user, m); err != nil {
 			return err
 		}
 	}
@@ -113,7 +120,7 @@ func (s *Service) sourceChanged(ctx context.Context, tx pgx.Tx, job jobqueue.Job
 // its last sync, kept while a sync is late or failing (a broken connection
 // never blocks booking or scheduling; Conflicts reports it instead), and
 // HiringPlug's own appointments. A hold whose interview or booking is gone
-// (deleted with its candidate, say) is ignored and cleared in the background.
+// (deleted with its candidate, say) is ignored and cleared.
 func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptKind, exceptID string) ([]store.CalendarBusyRowsRow, error) {
 	q := store.New(tx)
 	rows, err := q.CalendarBusyRows(ctx, store.CalendarBusyRowsParams{UserIds: users, FromTime: from, ToTime: to, ExceptKind: exceptKind, ExceptID: exceptID})
@@ -140,43 +147,46 @@ func (s *Service) busyRows(ctx context.Context, tx pgx.Tx, users []string, from,
 type sourceKey struct{ kind, id string }
 
 // gone are the interview and booking holds among keys whose source no longer
-// stands (deleted with its candidate, cancelled, ...); each gets a source
-// job, which cancels the hold and takes it out of Outlook.
+// stands (deleted with its candidate, cancelled, ...). They are checked for
+// the whole company, not as the caller (an interview on a candidate the
+// caller may not see still stands), and cleared at once in tx: cancelled,
+// their time freed and their Outlook copies queued for deletion. Nothing is
+// queued per read, so a page viewed again and again adds no work.
 func (s *Service) gone(ctx context.Context, tx pgx.Tx, keys []sourceKey) (map[sourceKey]bool, error) {
+	gone := map[sourceKey]bool{}
 	ids := map[string][]string{}
 	for _, k := range keys {
 		if (k.kind == "interview" || k.kind == "booking") && !slices.Contains(ids[k.kind], k.id) {
 			ids[k.kind] = append(ids[k.kind], k.id)
 		}
 	}
-	if s.deps.Sources == nil {
-		return map[sourceKey]bool{}, nil
-	}
-	gone := map[sourceKey]bool{}
-	for kind, list := range ids {
-		live, err := s.deps.Sources.Existing(ctx, tx, kind, list)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range list {
-			if !live[id] {
-				gone[sourceKey{kind, id}] = true
-			}
-		}
-	}
-	if len(gone) == 0 {
+	if s.deps.Sources == nil || len(ids) == 0 {
 		return gone, nil
 	}
 	tenant, err := store.New(tx).CurrentCalendarTenant(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for k := range gone {
-		if _, err := jobqueue.Enqueue(ctx, tx, tenant, api.JobKindCalendarSourceChanged, api.CalendarSourceJob{Kind: api.CalendarSourceJobKind(k.kind), SourceId: k.id}); err != nil {
-			return nil, err
+	err = database.AsSystem(ctx, tx, tenant, func() error {
+		for kind, list := range ids {
+			live, err := s.deps.Sources.Existing(ctx, tx, kind, list)
+			if err != nil {
+				return err
+			}
+			for _, id := range list {
+				if !live[id] {
+					gone[sourceKey{kind, id}] = true
+				}
+			}
 		}
-	}
-	return gone, nil
+		for k := range gone {
+			if err := s.reconcileSource(ctx, tx, tenant, k.kind, k.id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return gone, err
 }
 
 func (s *Service) busy(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptKind, exceptID string) ([]ical.Interval, error) {
@@ -192,16 +202,17 @@ func (s *Service) busy(ctx context.Context, tx pgx.Tx, users []string, from, to 
 }
 
 // conflicts are, for an interview being scheduled, the users whose calendars
-// are busy then (other interviews are left out: the interview clash check
-// names those) and the users whose Outlook has not synced recently enough to
-// be sure; both can be scheduled over.
-func (s *Service) conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptID string) (busy, stale []string, err error) {
+// are busy then (interviews the clash check already named are left out; one
+// the scheduler may not see, on another recruiter's candidate, counts as a
+// calendar appointment, named by its interviewer only) and the users whose
+// Outlook has stopped syncing; all can be scheduled over.
+func (s *Service) conflicts(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptID string, named []string) (busy, stale []string, err error) {
 	rows, err := s.busyRows(ctx, tx, users, from, to, "interview", exceptID)
 	if err != nil {
 		return nil, nil, err
 	}
 	for _, r := range rows {
-		if r.Source != "interview" && !slices.Contains(busy, r.UserID) {
+		if (r.Source != "interview" || !slices.Contains(named, r.SourceID)) && !slices.Contains(busy, r.UserID) {
 			busy = append(busy, r.UserID)
 		}
 	}
@@ -210,7 +221,8 @@ func (s *Service) conflicts(ctx context.Context, tx pgx.Tx, users []string, from
 		return nil, nil, err
 	}
 	for _, h := range health {
-		if !current(h, s.now(), from, to) {
+		// Just connected (its first sync on its way) is not "stopped syncing".
+		if h.Status != "pending" && !current(h, s.now(), from, to) {
 			stale = append(stale, h.UserID)
 		}
 	}
