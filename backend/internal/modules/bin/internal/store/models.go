@@ -83,6 +83,7 @@ type Application struct {
 	// NULL when a recruiter added the candidate
 	Channel *string
 	Binned  bool
+	Step    *string
 }
 
 type ApplicationStageChange struct {
@@ -1140,6 +1141,17 @@ type JobRetainerStage struct {
 	PaidOn        pgtype.Date
 }
 
+type JobStagePlan struct {
+	TenantID   string
+	JobOrderID string
+	Version    int32
+	TemplateID *string
+	Steps      []byte
+	Customized bool
+	UpdatedBy  string
+	UpdatedAt  time.Time
+}
+
 type LeadSource struct {
 	ID            string
 	TenantID      string
@@ -1356,6 +1368,18 @@ type ScreeningCallSalary struct {
 	CallID   string
 	TenantID string
 	Snapshot []byte
+}
+
+type StageTemplate struct {
+	ID        string
+	TenantID  string
+	Version   int32
+	Name      string
+	IsDefault bool
+	Steps     []byte
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type StudioCv struct {

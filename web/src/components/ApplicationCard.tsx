@@ -2,17 +2,29 @@ import { useState } from "react";
 
 import type { Application, Schemas } from "../api/client";
 import { CLOSE_REASON, keysOf, OPEN_STAGES, STAGE } from "../labels";
+import { type Column, columnOf } from "./stages/columns";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
 const isClosed = (s: Stage) => s === "rejected" || s === "withdrawn";
 
+/** Where an application can be moved: the job's own stages when known, else the standard ones. */
+function targets(columns?: Column[]): Column[] {
+  return columns ?? OPEN_STAGES.map((st) => ({ key: st, label: STAGE[st], stage: st }));
+}
+
 /** The "Move to…" menu of an application, with the reason asked when closing it. */
-export function MoveMenu({ app, onMove, busy }: { app: Application; onMove: (m: MoveRequest) => void; busy: boolean }) {
+export function MoveMenu({ app, onMove, busy, columns }: {
+  app: Application; onMove: (m: MoveRequest) => void; busy: boolean;
+  /** The job's stages (the board's columns); the standard stages without. */
+  columns?: Column[];
+}) {
   const [closing, setClosing] = useState<Stage | null>(null);
   const [reason, setReason] = useState<"" | Schemas["CloseReason"]>("");
   const [note, setNote] = useState("");
-  const options = [...OPEN_STAGES, "rejected", "withdrawn"].filter((s) => s !== app.stage) as Stage[];
+  const here = columns ? columnOf(app, columns) : undefined;
+  const open = targets(columns).filter((c) => (columns ? c.key !== here?.key : c.stage !== app.stage));
+  const closes = (["rejected", "withdrawn"] as Stage[]).filter((s) => s !== app.stage);
 
   if (closing) {
     return (
@@ -42,13 +54,15 @@ export function MoveMenu({ app, onMove, busy }: { app: Application; onMove: (m: 
       value=""
       disabled={busy}
       onChange={(e) => {
-        const to = e.target.value as Stage;
-        if (isClosed(to)) setClosing(to);
-        else onMove({ app, stage: to });
+        const value = e.target.value;
+        if (value === "rejected" || value === "withdrawn") { setClosing(value); return; }
+        const to = open.find((c) => c.key === value);
+        if (to) onMove({ app, stage: to.stage, step: to.step });
       }}
     >
       <option value="">{isClosed(app.stage) ? "Reopen at…" : "Move to…"}</option>
-      {options.map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
+      {open.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+      {closes.map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
     </select>
   );
 }
@@ -91,7 +105,11 @@ export function offerChip(expiresOn: string, now: number) {
 
 
 /** "Move to…" for the chosen cards, asking the reason once when closing them. */
-export function MoveChosen({ apps, onMove, busy }: { apps: Application[]; onMove: (m: Omit<MoveRequest, "app">) => void; busy: boolean }) {
+export function MoveChosen({ apps, onMove, busy, columns }: {
+  apps: Application[]; onMove: (m: Omit<MoveRequest, "app">) => void; busy: boolean;
+  /** The job's stages (the board's columns); the standard stages without. */
+  columns?: Column[];
+}) {
   const [closing, setClosing] = useState<Stage | null>(null);
   const [reason, setReason] = useState<"" | Schemas["CloseReason"]>("");
   const [note, setNote] = useState("");
@@ -113,9 +131,15 @@ export function MoveChosen({ apps, onMove, busy }: { apps: Application[]; onMove
   }
   return (
     <select aria-label="Move the chosen candidates" value="" disabled={busy}
-      onChange={(e) => { const to = e.target.value as Stage; if (isClosed(to)) setClosing(to); else onMove({ stage: to }); }}>
+      onChange={(e) => {
+        const value = e.target.value;
+        if (value === "rejected" || value === "withdrawn") { setClosing(value); return; }
+        const to = targets(columns).find((c) => c.key === value);
+        if (to) onMove({ stage: to.stage, step: to.step });
+      }}>
       <option value="">Move to…</option>
-      {([...OPEN_STAGES, "rejected", "withdrawn"] as Stage[]).map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
+      {targets(columns).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+      {(["rejected", "withdrawn"] as Stage[]).map((s) => <option key={s} value={s}>{STAGE[s]}</option>)}
     </select>
   );
 }

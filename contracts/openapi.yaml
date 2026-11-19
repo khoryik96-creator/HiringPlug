@@ -5565,6 +5565,117 @@ paths:
         '400': {$ref: '#/components/responses/ValidationFailed'}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/stage-templates:
+    get:
+      operationId: listStageTemplates
+      tags: [pipeline]
+      summary: The company's stage templates (the default first, then by name)
+      x-permission: pipeline:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageTemplateList'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: createStageTemplate
+      tags: [pipeline]
+      summary: Save a stage template
+      x-permission: pipeline.templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StageTemplateInput'}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/stage-templates/{stageTemplateId}:
+    parameters:
+      - $ref: '#/components/parameters/StageTemplateIdPath'
+    put:
+      operationId: updateStageTemplate
+      tags: [pipeline]
+      summary: Change a stage template
+      description: >
+        Jobs that chose it keep the stages they have (each job keeps its own copy); jobs that follow the default template see the change.
+
+      x-permission: pipeline.templates:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StageTemplateUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StageTemplate'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteStageTemplate
+      tags: [pipeline]
+      summary: Delete a stage template (jobs that chose it keep their stages)
+      x-permission: pipeline.templates:manage
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/jobs/{jobId}/stages:
+    parameters:
+      - $ref: '#/components/parameters/JobOrderIdPath'
+    get:
+      operationId: getJobStages
+      tags: [pipeline]
+      summary: A job's stages, in order (its own, else the default template's, else the standard ones)
+      x-permission: pipeline:read
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobStages'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      operationId: setJobStages
+      tags: [pipeline]
+      summary: Choose a job's stages (from a template, or its own); null steps follow the default again
+      description: >
+        Candidates in a stage taken away stay in the first stage of the same kind (or, with none left of that kind, a column of that kind is shown until they move on).
+
+      x-permission: pipeline:update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JobStagesInput'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/JobStages'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/placements:
     get:
       operationId: listPlacements
@@ -6642,6 +6753,7 @@ components:
         - offers:approve
         - offers:manage
         - offers:read
+        - pipeline.templates:manage
         - pipeline:read
         - pipeline:update
         - placements.fees:read
@@ -12132,6 +12244,112 @@ components:
         version: {type: integer, minimum: 1}
         approve: {type: boolean}
         note: {type: string, maxLength: 1000, description: Why it was sent back (or a remark on the approval).}
+    StageTemplateId:
+      type: string
+      pattern: '^stpl_[0-9a-hjkmnp-tv-z]{26}$'
+      example: stpl_01jbz6w0m0k8q9x2r3s4t5v6w7
+    OpenStage:
+      type: string
+      description: The kind of a custom stage (reports, automations, offers and placements go by it).
+      enum: [applied, screening, submitted, interview, offer, placed]
+    StageStep:
+      type: object
+      required: [key, label, stage]
+      properties:
+        key: {type: string, pattern: '^[a-z0-9_]{1,40}$', description: Stays the same when renamed.}
+        label: {type: string, minLength: 1, maxLength: 40}
+        stage: {$ref: '#/components/schemas/OpenStage'}
+    StageStepInput:
+      type: object
+      additionalProperties: false
+      required: [label, stage]
+      properties:
+        key: {type: string, pattern: '^[a-z0-9_]{1,40}$', description: A stage kept from before (renamed or moved); omit for a new one.}
+        label: {type: string, maxLength: 60}
+        stage: {$ref: '#/components/schemas/OpenStage'}
+    StageTemplate:
+      type: object
+      required: [id, version, name, isDefault, steps, jobCount, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/StageTemplateId'}
+        version: {type: integer}
+        name: {type: string}
+        isDefault: {type: boolean, description: New jobs and jobs that chose none follow it.}
+        steps:
+          type: array
+          items: {$ref: '#/components/schemas/StageStep'}
+        jobCount: {type: integer, description: Jobs that chose it.}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    StageTemplateList:
+      type: object
+      required: [items, standard]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/StageTemplate'}
+        standard:
+          description: The standard stages (what a job has with no template).
+          type: array
+          items: {$ref: '#/components/schemas/StageStep'}
+    StageTemplateInput:
+      type: object
+      additionalProperties: false
+      required: [name, steps]
+      properties:
+        name: {type: string, maxLength: 80}
+        isDefault: {type: boolean}
+        steps:
+          type: array
+          maxItems: 20
+          items: {$ref: '#/components/schemas/StageStepInput'}
+    StageTemplateUpdate:
+      type: object
+      additionalProperties: false
+      required: [version, name, steps]
+      properties:
+        version: {type: integer, minimum: 1, description: The version you loaded.}
+        name: {type: string, maxLength: 80}
+        isDefault: {type: boolean}
+        steps:
+          type: array
+          maxItems: 20
+          items: {$ref: '#/components/schemas/StageStepInput'}
+    JobStages:
+      type: object
+      required: [jobId, version, source, templateId, templateName, steps]
+      properties:
+        jobId: {$ref: '#/components/schemas/JobOrderId'}
+        version: {type: integer, description: 0 while the job follows the default (nothing of its own saved).}
+        source:
+          type: string
+          enum: [standard, default, template, custom]
+          description: >
+            standard: the standard stages (no template, none default); default: the default template's, followed; template: a template's copy, chosen for this job; custom: changed for this job.
+
+        templateId:
+          allOf: [{$ref: '#/components/schemas/StageTemplateId'}]
+          nullable: true
+        templateName: {type: string, nullable: true}
+        steps:
+          type: array
+          items: {$ref: '#/components/schemas/StageStep'}
+    JobStagesInput:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 0, description: The version you loaded (0 while following the default).}
+        templateId:
+          allOf: [{$ref: '#/components/schemas/StageTemplateId'}]
+          nullable: true
+          description: The template these stages came from (its stages are used when steps are omitted).
+        steps:
+          type: array
+          nullable: true
+          maxItems: 20
+          items: {$ref: '#/components/schemas/StageStepInput'}
+          description: The job's own stages; null (with no templateId) follows the default again.
     ApplicationId:
       type: string
       pattern: '^appl_[0-9a-hjkmnp-tv-z]{26}$'
@@ -12172,6 +12390,10 @@ components:
           allOf: [{$ref: '#/components/schemas/CandidateAvailability'}]
           nullable: true
         stage: {$ref: '#/components/schemas/Stage'}
+        step:
+          type: string
+          nullable: true
+          description: The job's own stage it is in (StageStep.key), when the job has custom stages; null at a standard stage or when closed.
         reason:
           description: Set when rejected or withdrawn.
           allOf: [{$ref: '#/components/schemas/CloseReason'}]
@@ -12203,6 +12425,10 @@ components:
       properties:
         version: {type: integer, minimum: 1, description: The version you loaded.}
         stage: {$ref: '#/components/schemas/Stage'}
+        step:
+          type: string
+          pattern: '^[a-z0-9_]{1,40}$'
+          description: One of the job's stages (its key), whose kind must be `stage`; omit for a standard stage or when closing.
         reason:
           description: Required for rejected and withdrawn; not allowed otherwise.
           allOf: [{$ref: '#/components/schemas/CloseReason'}]
@@ -13332,6 +13558,11 @@ components:
       in: path
       required: true
       schema: {$ref: '#/components/schemas/OfferId'}
+    StageTemplateIdPath:
+      name: stageTemplateId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/StageTemplateId'}
     ApplicationIdPath:
       name: applicationId
       in: path
@@ -13673,6 +13904,11 @@ x-permissions:
     description: View offers (the salary needs offers.salary:read).
     sensitive: false
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
+  pipeline.templates:manage:
+    module: pipeline
+    description: Create, change and delete the company's stage templates, and choose the default.
+    sensitive: false
+    roles: [owner, admin]
   pipeline:read:
     module: pipeline
     description: See which candidates are on which jobs, and their stages.
@@ -13680,7 +13916,7 @@ x-permissions:
     roles: [owner, admin, recruiter, sourcer, hiring_manager, viewer]
   pipeline:update:
     module: pipeline
-    description: Add candidates to jobs and move them between stages.
+    description: Add candidates to jobs, move them between stages, and choose a job's stages.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
   placements.fees:read:

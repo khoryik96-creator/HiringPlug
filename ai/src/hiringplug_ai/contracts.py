@@ -82,6 +82,7 @@ class Permission(StrEnum):
     offers_approve = "offers:approve"
     offers_manage = "offers:manage"
     offers_read = "offers:read"
+    pipeline_templates_manage = "pipeline.templates:manage"
     pipeline_read = "pipeline:read"
     pipeline_update = "pipeline:update"
     placements_fees_read = "placements.fees:read"
@@ -4297,6 +4298,124 @@ class OfferDecisionInput(BaseModel):
     ] = None
 
 
+class StageTemplateId(RootModel[str]):
+    root: Annotated[
+        str, Field(examples=["stpl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^stpl_[0-9a-hjkmnp-tv-z]{26}$")
+    ]
+
+
+class OpenStage(StrEnum):
+    applied = "applied"
+    screening = "screening"
+    submitted = "submitted"
+    interview = "interview"
+    offer = "offer"
+    placed = "placed"
+
+
+class StageStep(BaseModel):
+    key: Annotated[str, Field(description="Stays the same when renamed.", pattern="^[a-z0-9_]{1,40}$")]
+    label: Annotated[str, Field(max_length=40, min_length=1)]
+    stage: OpenStage
+
+
+class StageStepInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: Annotated[
+        str | None,
+        Field(
+            description="A stage kept from before (renamed or moved); omit for a new one.",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
+    label: Annotated[str, Field(max_length=60)]
+    stage: OpenStage
+
+
+class StageTemplate(BaseModel):
+    id: StageTemplateId
+    version: int
+    name: str
+    isDefault: Annotated[bool, Field(description="New jobs and jobs that chose none follow it.")]
+    steps: list[StageStep]
+    jobCount: Annotated[int, Field(description="Jobs that chose it.")]
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class StageTemplateList(BaseModel):
+    items: list[StageTemplate]
+    standard: Annotated[
+        list[StageStep], Field(description="The standard stages (what a job has with no template).")
+    ]
+
+
+class StageTemplateInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=80)]
+    isDefault: bool | None = None
+    steps: Annotated[list[StageStepInput], Field(max_length=20)]
+
+
+class StageTemplateUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+    name: Annotated[str, Field(max_length=80)]
+    isDefault: bool | None = None
+    steps: Annotated[list[StageStepInput], Field(max_length=20)]
+
+
+class Source2(StrEnum):
+    standard = "standard"
+    default = "default"
+    template = "template"
+    custom = "custom"
+
+
+class JobStages(BaseModel):
+    jobId: JobOrderId
+    version: Annotated[
+        int, Field(description="0 while the job follows the default (nothing of its own saved).")
+    ]
+    source: Annotated[
+        Source2,
+        Field(
+            description="standard: the standard stages (no template, none default); default: the default template's, followed; template: a template's copy, chosen for this job; custom: changed for this job.\n"
+        ),
+    ]
+    templateId: Annotated[StageTemplateId | None, Field(...)]
+    templateName: Annotated[str | None, Field(...)]
+    steps: list[StageStep]
+
+
+class JobStagesInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[
+        int, Field(description="The version you loaded (0 while following the default).", ge=0)
+    ]
+    templateId: Annotated[
+        StageTemplateId | None,
+        Field(
+            description="The template these stages came from (its stages are used when steps are omitted)."
+        ),
+    ] = None
+    steps: Annotated[
+        list[StageStepInput] | None,
+        Field(
+            description="The job's own stages; null (with no templateId) follows the default again.",
+            max_length=20,
+        ),
+    ] = None
+
+
 class ApplicationId(RootModel[str]):
     root: Annotated[
         str, Field(examples=["appl_01jbz6w0m0k8q9x2r3s4t5v6w7"], pattern="^appl_[0-9a-hjkmnp-tv-z]{26}$")
@@ -4356,6 +4475,12 @@ class Application(BaseModel):
         ),
     ]
     stage: Stage
+    step: Annotated[
+        str | None,
+        Field(
+            description="The job's own stage it is in (StageStep.key), when the job has custom stages; null at a standard stage or when closed."
+        ),
+    ] = None
     reason: Annotated[CloseReason | None, Field(description="Set when rejected or withdrawn.")]
     reasonNote: Annotated[str | None, Field(...)]
     stageChangedAt: Annotated[AwareDatetime, Field(description="When it entered its current stage.")]
@@ -4381,6 +4506,13 @@ class ApplicationMove(BaseModel):
     )
     version: Annotated[int, Field(description="The version you loaded.", ge=1)]
     stage: Stage
+    step: Annotated[
+        str | None,
+        Field(
+            description="One of the job's stages (its key), whose kind must be `stage`; omit for a standard stage or when closing.",
+            pattern="^[a-z0-9_]{1,40}$",
+        ),
+    ] = None
     reason: Annotated[
         CloseReason | None, Field(description="Required for rejected and withdrawn; not allowed otherwise.")
     ] = None

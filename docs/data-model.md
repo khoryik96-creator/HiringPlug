@@ -91,7 +91,7 @@ candidate belonging to the same company.
 | `identity` | new named roles, single sign-on | 7 |
 | `companies` | enrichment suggestions with source (auto-fill) | Phase 5 |
 | `jobs` | job ad (advertised text, channels), owner recruiter | Phase 3 |
-| `pipeline` | stage templates per company | M3 |
+| `pipeline` | stage templates per company (`stage_template`), each job's own stages (`job_stage_plan`), the job's stage an application is in (`application.step`) | ✅ |
 | `interviews` | interview (application, time, interviewers, location/link), feedback | M3 |
 | `assistant` | conversation, message, AI usage (tokens, cost) | M4 |
 | `matching` | possible candidates by meaning (embeddings) | later |

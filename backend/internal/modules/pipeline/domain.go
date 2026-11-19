@@ -4,6 +4,8 @@ package pipeline
 // rule lives here, once, and is tested move by move.
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,6 +37,7 @@ type Application struct {
 	JobID          string
 	CandidateID    string
 	Stage          string
+	Step           *string // the job's own stage it is in (Step.Key), when the job has custom stages
 	Reason         *string
 	ReasonNote     *string
 	Channel        *string // where the application came from; nil when a recruiter added it
@@ -54,9 +57,11 @@ type View struct {
 	CandidateAvailability *string
 }
 
-// Move is a request to change an application's stage.
+// Move is a request to change an application's stage, and with custom
+// stages which of the job's stages (Step, whose kind is To).
 type Move struct {
 	To     string
+	Step   *string
 	Reason *string
 	Note   *string
 }
@@ -94,7 +99,10 @@ func CheckMove(current Application, m Move) (Move, bool, error) {
 	if err := errs.Err(); err != nil {
 		return m, false, err
 	}
-	if m.To == current.Stage && same(m.Reason, current.Reason) && same(m.Note, current.ReasonNote) {
+	if IsClosed(m.To) {
+		m.Step = nil
+	}
+	if m.To == current.Stage && same(m.Step, current.Step) && same(m.Reason, current.Reason) && same(m.Note, current.ReasonNote) {
 		return m, false, nil // nothing changes
 	}
 	switch {
@@ -117,3 +125,95 @@ func notAllowed(message string) error { return MoveNotAllowedError{Message: mess
 func same(a, b *string) bool {
 	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
+
+// Step is one of a job's own stages (a custom stage): a name, and the
+// standard stage it is a kind of (reports, automations, offers and
+// placements go by the kind).
+type Step struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Stage string `json:"stage"`
+}
+
+// MaxSteps is the most stages a job or template has.
+const MaxSteps = 20
+
+var stageLabels = map[string]string{Applied: "Applied", Screening: "Screening", Submitted: "Submitted", Interview: "Interview", Offer: "Offer", Placed: "Placed"}
+
+// StandardSteps are the stages a job has with no template: one of each kind.
+func StandardSteps() []Step {
+	out := make([]Step, len(OpenStages))
+	for i, st := range OpenStages {
+		out[i] = Step{Key: st, Label: stageLabels[st], Stage: st}
+	}
+	return out
+}
+
+func stageIndex(stage string) int {
+	for i, st := range OpenStages {
+		if st == stage {
+			return i
+		}
+	}
+	return -1
+}
+
+// NormalizeSteps tidies and checks a list of stages: 1 to 20, each named
+// (at most 40 characters, no two alike) and of an open kind, in the order of
+// their kinds (all the screening stages after the applied ones, and so on).
+// A stage keeps its key; a new one gets newKey's.
+func NormalizeSteps(in []Step, newKey func() string) ([]Step, apperr.FieldErrors) {
+	var errs apperr.FieldErrors
+	switch {
+	case len(in) == 0:
+		errs.Add("steps", "add at least one stage")
+		return nil, errs
+	case len(in) > MaxSteps:
+		errs.Add("steps", "at most 20 stages")
+		return nil, errs
+	}
+	out := make([]Step, len(in))
+	names, keys := map[string]bool{}, map[string]bool{}
+	last := 0
+	for i, st := range in {
+		at := func(field string) string { return fmt.Sprintf("steps.%d.%s", i, field) }
+		st.Label = strings.Join(strings.Fields(st.Label), " ")
+		switch n := len([]rune(st.Label)); {
+		case n == 0:
+			errs.Add(at("label"), "enter a name")
+		case n > 40:
+			errs.Add(at("label"), "at most 40 characters")
+		case names[strings.ToLower(st.Label)]:
+			errs.Add(at("label"), "another stage has this name")
+		}
+		names[strings.ToLower(st.Label)] = true
+		k := stageIndex(st.Stage)
+		switch {
+		case k < 0:
+			errs.Add(at("stage"), "must be applied, screening, submitted, interview, offer or placed")
+		case k < last:
+			errs.Add(at("stage"), "comes before the stage above it: keep the stages in order (applied first, placed last)")
+		default:
+			last = k
+		}
+		if st.Key == "" || keys[st.Key] {
+			st.Key = newKey()
+		}
+		keys[st.Key] = true
+		out[i] = st
+	}
+	return out, errs
+}
+
+// StepFor is the job's stage with key, when it is of kind stage.
+func StepFor(steps []Step, key, stage string) (Step, bool) {
+	for _, st := range steps {
+		if st.Key == key && st.Stage == stage {
+			return st, true
+		}
+	}
+	return Step{}, false
+}
+
+// SameSteps reports whether two lists of stages are the same.
+func SameSteps(a, b []Step) bool { return slices.Equal(a, b) }

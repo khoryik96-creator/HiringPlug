@@ -118,10 +118,21 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 		if err != nil {
 			return err
 		}
+		if move.Step != nil { // one of the job's own stages, of the kind moved to
+			js, err := s.jobStages(ctx, tx, current.JobID)
+			if err != nil {
+				return err
+			}
+			if _, ok := StepFor(js.Steps, *move.Step, move.To); !ok {
+				var errs apperr.FieldErrors
+				errs.Add("step", "is not one of this job's "+move.To+" stages")
+				return errs.Err()
+			}
+		}
 		if changed {
 			row, err = q.MoveApplication(ctx, store.MoveApplicationParams{
 				ID: id, ExpectedVersion: int32(expectedVersion), //nolint:gosec // versions are small positive integers
-				Stage: move.To, Reason: move.Reason, ReasonNote: move.Note,
+				Stage: move.To, Step: move.Step, Reason: move.Reason, ReasonNote: move.Note,
 			})
 			if database.IsNoRows(err) {
 				return apperr.StaleVersion("application")
@@ -132,8 +143,8 @@ func (s *Service) Move(ctx context.Context, p authz.Principal, id string, expect
 			if err := audit.Record(ctx, tx, audit.Entry{
 				Action: "application.moved", EntityType: "application", EntityID: id,
 				Changes: audit.Diff(
-					map[string]any{"stage": current.Stage, "reason": current.Reason, "reasonNote": current.ReasonNote},
-					map[string]any{"stage": move.To, "reason": move.Reason, "reasonNote": move.Note},
+					map[string]any{"stage": current.Stage, "step": current.Step, "reason": current.Reason, "reasonNote": current.ReasonNote},
+					map[string]any{"stage": move.To, "step": move.Step, "reason": move.Reason, "reasonNote": move.Note},
 				),
 			}); err != nil {
 				return err
@@ -241,7 +252,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, rows []store.Application
 
 func fromRow(r store.Application) Application {
 	return Application{
-		ID: r.ID, Version: int(r.Version), JobID: r.JobOrderID, CandidateID: r.CandidateID, Stage: r.Stage,
+		ID: r.ID, Version: int(r.Version), JobID: r.JobOrderID, CandidateID: r.CandidateID, Stage: r.Stage, Step: r.Step,
 		Reason: r.Reason, ReasonNote: r.ReasonNote, Channel: r.Channel, StageChangedAt: r.StageChangedAt, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }

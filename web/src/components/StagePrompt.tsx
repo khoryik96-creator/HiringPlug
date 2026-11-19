@@ -23,8 +23,10 @@ export function needsDetails(m: MoveRequest, permissions: Permission[]): boolean
   return false;
 }
 
-export function StagePrompt({ app, stage, permissions, onMove, onClose }: {
+export function StagePrompt({ app, stage, step, permissions, onMove, onClose }: {
   app: Application; stage: "offer" | "placed"; permissions: Permission[];
+  /** The job's own stage it goes to, when the job has custom stages. */
+  step?: string;
   /** A plain move (an offer already open, or back to Offer). */
   onMove: (m: MoveRequest) => void;
   onClose: () => void;
@@ -37,7 +39,7 @@ export function StagePrompt({ app, stage, permissions, onMove, onClose }: {
   const openOffer = offers.data?.some((o) => o.status !== "declined" && o.status !== "withdrawn");
   // An offer is already open: the move needs nothing new.
   useEffect(() => {
-    if (stage === "offer" && openOffer) { onMove({ app, stage }); onClose(); }
+    if (stage === "offer" && openOffer) { onMove({ app, stage, step }); onClose(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openOffer]);
   if (stage === "offer") {

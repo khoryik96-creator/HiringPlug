@@ -1,0 +1,35 @@
+/* Custom pipeline stages: the template editor (Settings › Pipeline stages)
+   and a job's stages above its pipeline. Stage colours follow the kind. */
+.stage-applied { --stage: #94a3b8; } .stage-screening { --stage: #a78bfa; } .stage-submitted { --stage: #7352d8; }
+.stage-interview { --stage: #2563eb; } .stage-offer { --stage: #e8a317; } .stage-placed { --stage: #16a34a; }
+
+.stage-templates { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: 0.8rem; max-width: 56rem; }
+.stage-template h3 { margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.stage-template.standard { background: var(--soft); }
+.stage-template.editing { display: grid; gap: 0.7rem; }
+.stage-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0; margin: 0.6rem 0 0.3rem; counter-reset: stage; }
+.stage-chip { counter-increment: stage; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.65rem 0.2rem 0.35rem; border-radius: 999px;
+  background: var(--surface, #fff); border: 1px solid var(--line); font-size: 0.82rem; font-weight: 600; }
+.stage-chip::before { content: counter(stage); display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%;
+  background: var(--stage, var(--line-strong)); color: #fff; font-size: 0.7rem; font-weight: 700; }
+
+.steps-editor { display: grid; gap: 0.4rem; }
+.steps-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
+.steps-row { display: grid; grid-template-columns: 10px minmax(8rem, 1fr) minmax(10rem, 14rem) auto; gap: 0.5rem; align-items: center; }
+.steps-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--stage, var(--line-strong)); }
+.steps-row input, .steps-row select { min-height: 34px; padding: 0.3rem 0.6rem; font-size: 0.88rem; }
+.steps-actions { display: inline-flex; gap: 0.2rem; }
+.steps-actions .icon-btn { min-height: 30px; min-width: 30px; padding: 0 0.4rem; }
+.steps-error { grid-column: 2 / -1; }
+.steps-editor > .link { justify-self: start; }
+
+.job-stages { position: relative; }
+.job-stages-panel { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: min(36rem, calc(100vw - 32px)); display: grid; gap: 0.6rem;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 0.16); }
+.job-stages-panel .field { display: grid; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; }
+.job-stages-panel form { display: grid; gap: 0.6rem; }
+
+@media (max-width: 640px) {
+  .steps-row { grid-template-columns: 10px 1fr; }
+  .steps-row select, .steps-actions, .steps-error { grid-column: 2; }
+}

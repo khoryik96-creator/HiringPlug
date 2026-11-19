@@ -99,6 +99,37 @@ func (q *Queries) ApplicationsOf(ctx context.Context, arg ApplicationsOfParams) 
 	return items, nil
 }
 
+const clearDefaultStageTemplate = `-- name: ClearDefaultStageTemplate :exec
+UPDATE stage_template SET is_default = false, updated_at = now() WHERE is_default AND id <> $1
+`
+
+// Only one default: the others stop being it.
+func (q *Queries) ClearDefaultStageTemplate(ctx context.Context, keepID string) error {
+	_, err := q.db.Exec(ctx, clearDefaultStageTemplate, keepID)
+	return err
+}
+
+const defaultStageTemplate = `-- name: DefaultStageTemplate :one
+SELECT id, tenant_id, version, name, is_default, steps, created_by, created_at, updated_at FROM stage_template WHERE is_default
+`
+
+func (q *Queries) DefaultStageTemplate(ctx context.Context) (StageTemplate, error) {
+	row := q.db.QueryRow(ctx, defaultStageTemplate)
+	var i StageTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.IsDefault,
+		&i.Steps,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteApplications = `-- name: DeleteApplications :execrows
 DELETE FROM application WHERE id = ANY($1::text[])
 `
@@ -106,6 +137,35 @@ DELETE FROM application WHERE id = ANY($1::text[])
 // Merging candidates: the applications that carry nothing (see merge.go).
 func (q *Queries) DeleteApplications(ctx context.Context, ids []string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteApplications, ids)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteJobStagePlan = `-- name: DeleteJobStagePlan :execrows
+DELETE FROM job_stage_plan WHERE job_order_id = $1 AND version = $2
+`
+
+type DeleteJobStagePlanParams struct {
+	JobOrderID      string
+	ExpectedVersion int32
+}
+
+func (q *Queries) DeleteJobStagePlan(ctx context.Context, arg DeleteJobStagePlanParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteJobStagePlan, arg.JobOrderID, arg.ExpectedVersion)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStageTemplate = `-- name: DeleteStageTemplate :execrows
+DELETE FROM stage_template WHERE id = $1
+`
+
+func (q *Queries) DeleteStageTemplate(ctx context.Context, id string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStageTemplate, id)
 	if err != nil {
 		return 0, err
 	}
@@ -174,8 +234,18 @@ func (q *Queries) FirstPlacedBetween(ctx context.Context, arg FirstPlacedBetween
 	return items, nil
 }
 
+const forgetStageTemplate = `-- name: ForgetStageTemplate :exec
+UPDATE job_stage_plan SET template_id = NULL, customized = true WHERE template_id = $1
+`
+
+// Jobs that chose a deleted template keep their stages, as their own.
+func (q *Queries) ForgetStageTemplate(ctx context.Context, templateID *string) error {
+	_, err := q.db.Exec(ctx, forgetStageTemplate, templateID)
+	return err
+}
+
 const getApplication = `-- name: GetApplication :one
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE id = $1
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id string) (Application, error) {
@@ -196,6 +266,48 @@ func (q *Queries) GetApplication(ctx context.Context, id string) (Application, e
 		&i.UpdatedAt,
 		&i.Channel,
 		&i.Binned,
+		&i.Step,
+	)
+	return i, err
+}
+
+const getJobStagePlan = `-- name: GetJobStagePlan :one
+SELECT tenant_id, job_order_id, version, template_id, steps, customized, updated_by, updated_at FROM job_stage_plan WHERE job_order_id = $1
+`
+
+func (q *Queries) GetJobStagePlan(ctx context.Context, jobOrderID string) (JobStagePlan, error) {
+	row := q.db.QueryRow(ctx, getJobStagePlan, jobOrderID)
+	var i JobStagePlan
+	err := row.Scan(
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.TemplateID,
+		&i.Steps,
+		&i.Customized,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStageTemplate = `-- name: GetStageTemplate :one
+SELECT id, tenant_id, version, name, is_default, steps, created_by, created_at, updated_at FROM stage_template WHERE id = $1
+`
+
+func (q *Queries) GetStageTemplate(ctx context.Context, id string) (StageTemplate, error) {
+	row := q.db.QueryRow(ctx, getStageTemplate, id)
+	var i StageTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.IsDefault,
+		&i.Steps,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -205,7 +317,7 @@ const insertApplication = `-- name: InsertApplication :one
 INSERT INTO application (tenant_id, job_order_id, candidate_id, stage, channel, created_by)
 VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
 ON CONFLICT (tenant_id, job_order_id, candidate_id) DO NOTHING
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step
 `
 
 type InsertApplicationParams struct {
@@ -240,6 +352,36 @@ func (q *Queries) InsertApplication(ctx context.Context, arg InsertApplicationPa
 		&i.UpdatedAt,
 		&i.Channel,
 		&i.Binned,
+		&i.Step,
+	)
+	return i, err
+}
+
+const insertStageTemplate = `-- name: InsertStageTemplate :one
+INSERT INTO stage_template (tenant_id, name, is_default, steps, created_by)
+VALUES (app_current_tenant(), $1, $2, $3, app_current_user())
+RETURNING id, tenant_id, version, name, is_default, steps, created_by, created_at, updated_at
+`
+
+type InsertStageTemplateParams struct {
+	Name      string
+	IsDefault bool
+	Steps     []byte
+}
+
+func (q *Queries) InsertStageTemplate(ctx context.Context, arg InsertStageTemplateParams) (StageTemplate, error) {
+	row := q.db.QueryRow(ctx, insertStageTemplate, arg.Name, arg.IsDefault, arg.Steps)
+	var i StageTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.IsDefault,
+		&i.Steps,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -287,7 +429,7 @@ func (q *Queries) JobActivity(ctx context.Context, jobIds []string) ([]JobActivi
 }
 
 const listCandidateApplications = `-- name: ListCandidateApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE candidate_id = $1 ORDER BY id DESC LIMIT 200
 `
 
 func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID string) ([]Application, error) {
@@ -314,6 +456,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 			&i.UpdatedAt,
 			&i.Channel,
 			&i.Binned,
+			&i.Step,
 		); err != nil {
 			return nil, err
 		}
@@ -326,7 +469,7 @@ func (q *Queries) ListCandidateApplications(ctx context.Context, candidateID str
 }
 
 const listJobApplications = `-- name: ListJobApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application WHERE job_order_id = $1 ORDER BY id LIMIT 1000
 `
 
 // A job's pipeline, oldest first (the order cards were added).
@@ -354,6 +497,57 @@ func (q *Queries) ListJobApplications(ctx context.Context, jobOrderID string) ([
 			&i.UpdatedAt,
 			&i.Channel,
 			&i.Binned,
+			&i.Step,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStageTemplates = `-- name: ListStageTemplates :many
+SELECT t.id, t.tenant_id, t.version, t.name, t.is_default, t.steps, t.created_by, t.created_at, t.updated_at, (SELECT count(*) FROM job_stage_plan p WHERE p.template_id = t.id)::integer AS job_count
+FROM stage_template t ORDER BY t.is_default DESC, lower(t.name), t.id
+`
+
+type ListStageTemplatesRow struct {
+	ID        string
+	TenantID  string
+	Version   int32
+	Name      string
+	IsDefault bool
+	Steps     []byte
+	CreatedBy string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	JobCount  int32
+}
+
+// Stage templates: the default first, then by name.
+func (q *Queries) ListStageTemplates(ctx context.Context) ([]ListStageTemplatesRow, error) {
+	rows, err := q.db.Query(ctx, listStageTemplates)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListStageTemplatesRow
+	for rows.Next() {
+		var i ListStageTemplatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Version,
+			&i.Name,
+			&i.IsDefault,
+			&i.Steps,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.JobCount,
 		); err != nil {
 			return nil, err
 		}
@@ -368,17 +562,19 @@ func (q *Queries) ListJobApplications(ctx context.Context, jobOrderID string) ([
 const moveApplication = `-- name: MoveApplication :one
 UPDATE application SET
   stage = $1,
-  reason = $2,
-  reason_note = $3,
+  step = $2,
+  reason = $3,
+  reason_note = $4,
   stage_changed_at = now(),
   version = version + 1,
   updated_at = now()
-WHERE id = $4 AND version = $5
-RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned
+WHERE id = $5 AND version = $6
+RETURNING id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step
 `
 
 type MoveApplicationParams struct {
 	Stage           string
+	Step            *string
 	Reason          *string
 	ReasonNote      *string
 	ID              string
@@ -389,6 +585,7 @@ type MoveApplicationParams struct {
 func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams) (Application, error) {
 	row := q.db.QueryRow(ctx, moveApplication,
 		arg.Stage,
+		arg.Step,
 		arg.Reason,
 		arg.ReasonNote,
 		arg.ID,
@@ -410,6 +607,7 @@ func (q *Queries) MoveApplication(ctx context.Context, arg MoveApplicationParams
 		&i.UpdatedAt,
 		&i.Channel,
 		&i.Binned,
+		&i.Step,
 	)
 	return i, err
 }
@@ -632,7 +830,7 @@ func (q *Queries) StageMoves(ctx context.Context, arg StageMovesParams) ([]Stage
 }
 
 const stuckApplications = `-- name: StuckApplications :many
-SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned FROM application
+SELECT id, tenant_id, version, job_order_id, candidate_id, stage, reason, reason_note, stage_changed_at, created_by, created_at, updated_at, channel, binned, step FROM application
 WHERE job_order_id = ANY($1::text[])
   AND stage IN ('applied', 'screening', 'submitted', 'interview', 'offer')
   AND stage_changed_at < now() - make_interval(days => $2::integer)
@@ -669,6 +867,7 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 			&i.UpdatedAt,
 			&i.Channel,
 			&i.Binned,
+			&i.Step,
 		); err != nil {
 			return nil, err
 		}
@@ -678,6 +877,83 @@ func (q *Queries) StuckApplications(ctx context.Context, arg StuckApplicationsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateStageTemplate = `-- name: UpdateStageTemplate :one
+UPDATE stage_template SET name = $1, is_default = $2, steps = $3, version = version + 1, updated_at = now()
+WHERE id = $4 AND version = $5
+RETURNING id, tenant_id, version, name, is_default, steps, created_by, created_at, updated_at
+`
+
+type UpdateStageTemplateParams struct {
+	Name            string
+	IsDefault       bool
+	Steps           []byte
+	ID              string
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpdateStageTemplate(ctx context.Context, arg UpdateStageTemplateParams) (StageTemplate, error) {
+	row := q.db.QueryRow(ctx, updateStageTemplate,
+		arg.Name,
+		arg.IsDefault,
+		arg.Steps,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i StageTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Version,
+		&i.Name,
+		&i.IsDefault,
+		&i.Steps,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertJobStagePlan = `-- name: UpsertJobStagePlan :one
+INSERT INTO job_stage_plan (tenant_id, job_order_id, template_id, steps, customized, updated_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, app_current_user())
+ON CONFLICT (tenant_id, job_order_id) DO UPDATE
+SET template_id = EXCLUDED.template_id, steps = EXCLUDED.steps, customized = EXCLUDED.customized,
+    updated_by = EXCLUDED.updated_by, updated_at = now(), version = job_stage_plan.version + 1
+WHERE job_stage_plan.version = $5
+RETURNING tenant_id, job_order_id, version, template_id, steps, customized, updated_by, updated_at
+`
+
+type UpsertJobStagePlanParams struct {
+	JobOrderID      string
+	TemplateID      *string
+	Steps           []byte
+	Customized      bool
+	ExpectedVersion int32
+}
+
+func (q *Queries) UpsertJobStagePlan(ctx context.Context, arg UpsertJobStagePlanParams) (JobStagePlan, error) {
+	row := q.db.QueryRow(ctx, upsertJobStagePlan,
+		arg.JobOrderID,
+		arg.TemplateID,
+		arg.Steps,
+		arg.Customized,
+		arg.ExpectedVersion,
+	)
+	var i JobStagePlan
+	err := row.Scan(
+		&i.TenantID,
+		&i.JobOrderID,
+		&i.Version,
+		&i.TemplateID,
+		&i.Steps,
+		&i.Customized,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const weekTrends = `-- name: WeekTrends :one

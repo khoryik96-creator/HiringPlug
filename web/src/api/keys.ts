@@ -49,3 +49,5 @@ export const stageMovesKey = (candidateId?: string) => ["applications", "moves",
 export const emailBannersKey = ["email-banners"] as const;
 export const policiesKey = ["settings", "policies"] as const;
 export const screeningCallsKey = (candidateId: string) => ["screening-calls", candidateId] as const;
+export const stageTemplatesKey = ["stage-templates"] as const;
+export const jobStagesKey = (jobId: string) => ["job-stages", jobId] as const;

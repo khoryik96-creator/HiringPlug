@@ -14,6 +14,8 @@ import { FitBadge, FitReasons, ScoreJobFit, useJobMatches } from "./Fit";
 import { type Picked, SearchPicker } from "./SearchPicker";
 import { FoldedLines, longestFirst, PipelineSteps, usePipelineView } from "./PipelineViews";
 import { needsDetails, StagePrompt } from "./StagePrompt";
+import { columnOf, columnsFor, ownStages, STANDARD, useJobStages } from "./stages/columns";
+import { JobStagesControl } from "./stages/JobStagesControl";
 import { type MoveRequest, useMoveApplication, useMoveApplications } from "./useMoveApplication";
 
 /**
@@ -32,8 +34,9 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
     queryFn: async () => unwrap(await api.GET("/v1/jobs/{jobId}/applications", { params: { path: { jobId } } })),
   });
   const move = useMoveApplication();
+  const stages = useJobStages(jobId);
   const [dragging, setDragging] = useState<Application | null>(null);
-  const [over, setOver] = useState<Schemas["Stage"] | null>(null);
+  const [over, setOver] = useState<string | null>(null);
   const apps = list.data?.items ?? [];
   // Opened from a dashboard number ("?stage=screening"): that stage is shown
   // and marked for a few seconds.
@@ -54,6 +57,9 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const upcoming = useUpcoming(permissions, now);
   const closed = apps.filter((a) => a.stage === "rejected" || a.stage === "withdrawn");
   const active = apps.filter((a) => a.stage !== "rejected" && a.stage !== "withdrawn");
+  // The job's own stages (else the standard ones), and a column for anyone in a kind it no longer has.
+  const columns = columnsFor(stages.data?.steps ?? STANDARD, active, ownStages(stages.data?.source));
+  const inColumn = (key: string) => active.filter((a) => columnOf(a, columns)?.key === key);
   const matches = useJobMatches(jobId, permissions.includes("matching:read"));
   const fit = new Map((matches.data?.items ?? []).map((m) => [m.applicationId, m]));
   const [bestFirst, setBestFirst] = useState(false);
@@ -93,24 +99,24 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
   const shownOrder = (a: Application, b: Application) => (bestFirst ? scoreOf(b) - scoreOf(a) : longestFirst(now)(a, b));
   const startShortlist = () => {
     // In the order they are shown: stage by stage, as ordered in each.
-    const chosen = OPEN_STAGES.flatMap((st) => apps.filter((a) => a.stage === st && picked.includes(a.id)).sort(shownOrder));
+    const chosen = columns.flatMap((c) => inColumn(c.key).filter((a) => picked.includes(a.id)).sort(shownOrder));
     // One candidate: the email about their application, with their own fields filled in.
     if (chosen.length === 1 && chosen[0]) { setEmailing(chosen[0]); return; }
     setShortlist(chosen.map((a) => ({ candidateId: a.candidateId, applicationId: a.id, name: a.candidateName, title: a.candidateTitle, stage: a.stage })));
   };
   const [view, setView] = usePipelineView();
   // Steps opens where most people have waited 7+ days (else the first stage with anyone).
-  const waitingIn = (st: Schemas["Stage"]) => st === "placed" ? 0 : active.filter((a) => a.stage === st && Date.parse(a.stageChangedAt) < now - 7 * 86_400_000).length;
-  const mostWaiting = [...OPEN_STAGES].sort((x, y) => waitingIn(y) - waitingIn(x))[0];
-  const firstStage = (): Schemas["Stage"] | "all" => spotlight
-    ?? (mostWaiting && waitingIn(mostWaiting) > 0 ? mostWaiting : undefined)
-    ?? OPEN_STAGES.find((st) => active.some((a) => a.stage === st)) ?? "all";
-  const [stepStage, setStepStage] = useState<Schemas["Stage"] | "all" | null>(null);
+  const waitingIn = (key: string) => inColumn(key).filter((a) => a.stage !== "placed" && Date.parse(a.stageChangedAt) < now - 7 * 86_400_000).length;
+  const mostWaiting = [...columns].sort((x, y) => waitingIn(y.key) - waitingIn(x.key))[0];
+  const firstStage = (): string => (spotlight ? columns.find((c) => c.stage === spotlight)?.key : undefined)
+    ?? (mostWaiting && waitingIn(mostWaiting.key) > 0 ? mostWaiting.key : undefined)
+    ?? columns.find((c) => inColumn(c.key).length > 0)?.key ?? "all";
+  const [stepStage, setStepStage] = useState<string | null>(null);
   // Chosen once, when the pipeline loads: it does not jump when people move or the spotlight ends.
-  if (loaded && stepStage === null) setStepStage(firstStage()); // set during render, once (React's adjust-state pattern)
+  if (loaded && !stages.isPending && stepStage === null) setStepStage(firstStage()); // set during render, once (React's adjust-state pattern)
   const shared = {
     picked, onPick: canPick ? pick : undefined, canMove: canUpdate, busy: move.isPending || moveMany.isPending, onMove: requestMove,
-    upcoming, now, fit, onShowFit: setFitShown,
+    upcoming, now, fit, onShowFit: setFitShown, columns,
   };
   const shownMatch = fitShown ? fit.get(fitShown.id) : undefined;
 
@@ -118,6 +124,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
     <section className="panel" aria-label="Pipeline">
       <div className="pipeline-head">
         <h3>Pipeline <span className="count-chip">{String(apps.length - closed.length)} active</span></h3>
+        {stages.data && <JobStagesControl jobId={jobId} stages={stages.data} canChange={canUpdate} />}
         <span className="view-tabs" role="group" aria-label="View">
           <button type="button" aria-pressed={view === "steps"} onClick={() => { setView("steps"); }}>Steps</button>
           <button type="button" aria-pressed={view === "board"} onClick={() => { setView("board"); }}>Board</button>
@@ -148,13 +155,13 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
               setSeparately(chosenApps.map((a) => ({ candidateId: a.candidateId, name: a.candidateName })));
             }}>Email each candidate separately</button>
           </>}
-          {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} />}
+          {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} columns={columns} />}
           <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
           {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
       )}
       {askingNow && (askingNow.stage === "offer" || askingNow.stage === "placed") && (
-        <StagePrompt key={`${askingNow.app.id}-${askingNow.stage}`} app={askingNow.app} stage={askingNow.stage} permissions={permissions}
+        <StagePrompt key={`${askingNow.app.id}-${askingNow.stage}`} app={askingNow.app} stage={askingNow.stage} step={askingNow.step} permissions={permissions}
           onMove={(m) => { move.mutate(m); }} onClose={() => { setAsking((q) => q.slice(1)); }} />
       )}
       {emailing && (
@@ -187,31 +194,31 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
             setPicked((ids) => (on ? [...new Set([...ids, ...these.map((a) => a.id)])] : ids.filter((id) => !these.some((a) => a.id === id))));
           } : undefined} />
       )}
-      {view === "board" && <div className="board compact" ref={board}>
-        {OPEN_STAGES.map((stage) => {
-          const inStage = apps.filter((a) => a.stage === stage);
-          const cards = inStage.sort(shownOrder);
+      {view === "board" && <div className="board compact" ref={board} style={{ "--cols": columns.length, ...(columns.length > 6 ? { "--col-min": "10.5rem" } : {}) } as React.CSSProperties}>
+        {columns.map((col) => {
+          const cards = inColumn(col.key).sort(shownOrder);
+          const elsewhere = (a: Application) => columnOf(a, columns)?.key !== col.key;
           return (
             <div
-              key={stage}
+              key={col.key}
               role="list"
-              aria-label={STAGE[stage]}
-              className={`column stage-${stage}${over === stage ? " drop" : ""}${spotlight === stage ? " spotlight" : ""}`}
-              onDragOver={(e) => { if (dragging && dragging.stage !== stage) { e.preventDefault(); setOver(stage); } }}
+              aria-label={col.label}
+              className={`column stage-${col.stage}${over === col.key ? " drop" : ""}${spotlight === col.stage && columns.find((c) => c.stage === spotlight) === col ? " spotlight" : ""}`}
+              onDragOver={(e) => { if (dragging && elsewhere(dragging)) { e.preventDefault(); setOver(col.key); } }}
               onDragLeave={() => { setOver(null); }}
               onDrop={(e) => {
                 e.preventDefault();
                 setOver(null);
-                if (dragging && dragging.stage !== stage) requestMove({ app: dragging, stage });
+                if (dragging && elsewhere(dragging)) requestMove({ app: dragging, stage: col.stage, step: col.step });
                 setDragging(null);
               }}
             >
               <div className="column-head">
-                <h4>{STAGE[stage]}</h4>
+                <h4>{col.label}</h4>
                 {canPick && cards.length > 0 ? (
                   // The count chooses the column's candidates (again: unchooses them).
-                  <button type="button" className="count-chip column-count" title={`Choose all in ${STAGE[stage]}`}
-                    aria-label={`Choose all ${String(cards.length)} in ${STAGE[stage]}`}
+                  <button type="button" className="count-chip column-count" title={`Choose all in ${col.label}`}
+                    aria-label={`Choose all ${String(cards.length)} in ${col.label}`}
                     aria-pressed={cards.every((a) => picked.includes(a.id))}
                     onClick={() => {
                       const all = cards.every((a) => picked.includes(a.id));
@@ -219,7 +226,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                     }}>{String(cards.length)}</button>
                 ) : <span className="count-chip">{String(cards.length)}</span>}
               </div>
-              {cards.length === 0 && <p className="column-empty">{stage === "placed" ? "Drag here when they accept" : "Nobody here"}</p>}
+              {cards.length === 0 && <p className="column-empty">{col.stage === "placed" ? "Drag here when they accept" : "Nobody here"}</p>}
               <FoldedLines {...shared} apps={cards} lines={cards} onDragStart={setDragging} />
             </div>
           );
@@ -234,7 +241,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                 <a href={`#/candidates/${a.candidateId}`}>{a.candidateName}</a>{" "}
                 <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>{" "}
                 <span className="muted">{a.reason ? CLOSE_REASON[a.reason] : ""}{a.reasonNote ? `: ${a.reasonNote}` : ""}</span>{" "}
-                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={requestMove} />}
+                {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={requestMove} columns={columns} />}
               </li>
             ))}
           </ul>

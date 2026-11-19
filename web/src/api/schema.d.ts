@@ -3525,6 +3525,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/stage-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company's stage templates (the default first, then by name) */
+        get: operations["listStageTemplates"];
+        put?: never;
+        /** Save a stage template */
+        post: operations["createStageTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/stage-templates/{stageTemplateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stageTemplateId: components["parameters"]["StageTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a stage template
+         * @description Jobs that chose it keep the stages they have (each job keeps its own copy); jobs that follow the default template see the change.
+         */
+        put: operations["updateStageTemplate"];
+        post?: never;
+        /** Delete a stage template (jobs that chose it keep their stages) */
+        delete: operations["deleteStageTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        /** A job's stages, in order (its own, else the default template's, else the standard ones) */
+        get: operations["getJobStages"];
+        /**
+         * Choose a job's stages (from a template, or its own); null steps follow the default again
+         * @description Candidates in a stage taken away stay in the first stage of the same kind (or, with none left of that kind, a column of that kind is shown until they move on).
+         */
+        put: operations["setJobStages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/placements": {
         parameters: {
             query?: never;
@@ -4219,7 +4283,7 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
         ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
@@ -8060,6 +8124,77 @@ export interface components {
             /** @description Why it was sent back (or a remark on the approval). */
             note?: string;
         };
+        /** @example stpl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
+        StageTemplateId: string;
+        /**
+         * @description The kind of a custom stage (reports, automations, offers and placements go by it).
+         * @enum {string}
+         */
+        OpenStage: "applied" | "screening" | "submitted" | "interview" | "offer" | "placed";
+        StageStep: {
+            /** @description Stays the same when renamed. */
+            key: string;
+            label: string;
+            stage: components["schemas"]["OpenStage"];
+        };
+        StageStepInput: {
+            /** @description A stage kept from before (renamed or moved); omit for a new one. */
+            key?: string;
+            label: string;
+            stage: components["schemas"]["OpenStage"];
+        };
+        StageTemplate: {
+            id: components["schemas"]["StageTemplateId"];
+            version: number;
+            name: string;
+            /** @description New jobs and jobs that chose none follow it. */
+            isDefault: boolean;
+            steps: components["schemas"]["StageStep"][];
+            /** @description Jobs that chose it. */
+            jobCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        StageTemplateList: {
+            items: components["schemas"]["StageTemplate"][];
+            /** @description The standard stages (what a job has with no template). */
+            standard: components["schemas"]["StageStep"][];
+        };
+        StageTemplateInput: {
+            name: string;
+            isDefault?: boolean;
+            steps: components["schemas"]["StageStepInput"][];
+        };
+        StageTemplateUpdate: {
+            /** @description The version you loaded. */
+            version: number;
+            name: string;
+            isDefault?: boolean;
+            steps: components["schemas"]["StageStepInput"][];
+        };
+        JobStages: {
+            jobId: components["schemas"]["JobOrderId"];
+            /** @description 0 while the job follows the default (nothing of its own saved). */
+            version: number;
+            /**
+             * @description standard: the standard stages (no template, none default); default: the default template's, followed; template: a template's copy, chosen for this job; custom: changed for this job.
+             * @enum {string}
+             */
+            source: "standard" | "default" | "template" | "custom";
+            templateId: components["schemas"]["StageTemplateId"] | null;
+            templateName: string | null;
+            steps: components["schemas"]["StageStep"][];
+        };
+        JobStagesInput: {
+            /** @description The version you loaded (0 while following the default). */
+            version: number;
+            /** @description The template these stages came from (its stages are used when steps are omitted). */
+            templateId?: components["schemas"]["StageTemplateId"] | null;
+            /** @description The job's own stages; null (with no templateId) follows the default again. */
+            steps?: components["schemas"]["StageStepInput"][] | null;
+        };
         /** @example appl_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         ApplicationId: string;
         /**
@@ -8093,6 +8228,8 @@ export interface components {
             /** @description The candidate's status (Looking out, Passive, Not looking, Placed), which colours their initials; null when not set. */
             candidateAvailability: components["schemas"]["CandidateAvailability"] | null;
             stage: components["schemas"]["Stage"];
+            /** @description The job's own stage it is in (StageStep.key), when the job has custom stages; null at a standard stage or when closed. */
+            step?: string | null;
             /** @description Set when rejected or withdrawn. */
             reason: components["schemas"]["CloseReason"] | null;
             reasonNote: string | null;
@@ -8118,6 +8255,8 @@ export interface components {
             /** @description The version you loaded. */
             version: number;
             stage: components["schemas"]["Stage"];
+            /** @description One of the job's stages (its key), whose kind must be `stage`; omit for a standard stage or when closing. */
+            step?: string;
             /** @description Required for rejected and withdrawn; not allowed otherwise. */
             reason?: components["schemas"]["CloseReason"];
             reasonNote?: string;
@@ -9334,6 +9473,7 @@ export interface components {
         LeadSourceIdPath: components["schemas"]["LeadSourceId"];
         JobLeadIdPath: components["schemas"]["JobLeadId"];
         OfferIdPath: components["schemas"]["OfferId"];
+        StageTemplateIdPath: components["schemas"]["StageTemplateId"];
         ApplicationIdPath: components["schemas"]["ApplicationId"];
         PlacementIdPath: components["schemas"]["PlacementId"];
         BookingTokenPath: string;
@@ -16143,6 +16283,165 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listStageTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createStageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateStageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stageTemplateId: components["parameters"]["StageTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StageTemplate"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteStageTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stageTemplateId: components["parameters"]["StageTemplateIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getJobStages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStages"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setJobStages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobOrderIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobStagesInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStages"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listPlacements: {

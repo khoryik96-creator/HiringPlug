@@ -718,6 +718,21 @@ lead's company (with the built-in email check).
   file downloads as sent, and those given "Delete job descriptions"
   (`jobs.documents:delete`, admins to start with) delete it; what was filled
   in from it stays.
+- **Custom pipeline stages** ✅: Settings › **Pipeline stages** (owners and
+  admins, `pipeline.templates:manage`) saves stage templates, e.g. "Tech
+  hiring": Applied, Phone screen, Sent to client, Tech test, Panel interview,
+  Offer, Placed. Each stage counts as one standard stage (applied, screening,
+  submitted, interview, offer or placed), in that order, so reports, the
+  dashboard, automations, offers and placements work as before. Templates are
+  created, edited (renamed, stages added, removed, moved), deleted, and one
+  may be the default. A job follows the default (else the standard stages)
+  until it is given its own: **Stages: …** above its pipeline (`pipeline:update`)
+  chooses a template (the job keeps its own copy: changing or deleting the
+  template later leaves it as it is), or changes the stages for that job only.
+  The board's columns, the Steps view, the move menus and the "next" buttons
+  follow the job's stages; a candidate in a stage that was removed stays in
+  the first stage of the same kind, or, with none of that kind left, in a
+  column of that kind until they move on.
 - **The job page** ✅: the pipeline comes first, across the width of the
   screen, with the possible candidates folded under it; the rest is in tabs
   under it, like a candidate's: **Notes & activity**, **Job details** (and its

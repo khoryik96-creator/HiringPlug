@@ -196,7 +196,7 @@ describe("fit on a job's board", () => {
     const get = gets({ "/v1/jobs/{jobId}/applications": { items: [app("a1", "Ali")] } });
     renderWithClient(<PipelineBoard jobId="jo_1" canUpdate={false} />);
     await screen.findByText("Ali");
-    expect(get.mock.calls.map((c) => c[0])).toEqual(["/v1/jobs/{jobId}/applications"]);
+    expect(get.mock.calls.map((c) => c[0])).toEqual(["/v1/jobs/{jobId}/applications", "/v1/jobs/{jobId}/stages"]); // no matches asked for;
   });
 });
 

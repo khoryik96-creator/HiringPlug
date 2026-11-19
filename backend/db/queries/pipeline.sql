@@ -17,6 +17,7 @@ SELECT * FROM application WHERE id = @id;
 -- name: MoveApplication :one
 UPDATE application SET
   stage = @stage,
+  step = sqlc.narg(step),
   reason = sqlc.narg(reason),
   reason_note = sqlc.narg(reason_note),
   stage_changed_at = now(),
@@ -131,3 +132,50 @@ UPDATE application SET binned = @binned WHERE id = ANY(@ids::text[]);
 
 -- name: PurgeApplications :exec
 DELETE FROM application WHERE id = ANY(@ids::text[]) AND binned;
+
+-- Stage templates: the default first, then by name.
+-- name: ListStageTemplates :many
+SELECT t.*, (SELECT count(*) FROM job_stage_plan p WHERE p.template_id = t.id)::integer AS job_count
+FROM stage_template t ORDER BY t.is_default DESC, lower(t.name), t.id;
+
+-- name: GetStageTemplate :one
+SELECT * FROM stage_template WHERE id = @id;
+
+-- name: DefaultStageTemplate :one
+SELECT * FROM stage_template WHERE is_default;
+
+-- Only one default: the others stop being it.
+-- name: ClearDefaultStageTemplate :exec
+UPDATE stage_template SET is_default = false, updated_at = now() WHERE is_default AND id <> @keep_id;
+
+-- name: InsertStageTemplate :one
+INSERT INTO stage_template (tenant_id, name, is_default, steps, created_by)
+VALUES (app_current_tenant(), @name, @is_default, @steps, app_current_user())
+RETURNING *;
+
+-- name: UpdateStageTemplate :one
+UPDATE stage_template SET name = @name, is_default = @is_default, steps = @steps, version = version + 1, updated_at = now()
+WHERE id = @id AND version = @expected_version
+RETURNING *;
+
+-- name: DeleteStageTemplate :execrows
+DELETE FROM stage_template WHERE id = @id;
+
+-- Jobs that chose a deleted template keep their stages, as their own.
+-- name: ForgetStageTemplate :exec
+UPDATE job_stage_plan SET template_id = NULL, customized = true WHERE template_id = @template_id;
+
+-- name: GetJobStagePlan :one
+SELECT * FROM job_stage_plan WHERE job_order_id = @job_order_id;
+
+-- name: UpsertJobStagePlan :one
+INSERT INTO job_stage_plan (tenant_id, job_order_id, template_id, steps, customized, updated_by)
+VALUES (app_current_tenant(), @job_order_id, sqlc.narg(template_id), @steps, @customized, app_current_user())
+ON CONFLICT (tenant_id, job_order_id) DO UPDATE
+SET template_id = EXCLUDED.template_id, steps = EXCLUDED.steps, customized = EXCLUDED.customized,
+    updated_by = EXCLUDED.updated_by, updated_at = now(), version = job_stage_plan.version + 1
+WHERE job_stage_plan.version = @expected_version
+RETURNING *;
+
+-- name: DeleteJobStagePlan :execrows
+DELETE FROM job_stage_plan WHERE job_order_id = @job_order_id AND version = @expected_version;

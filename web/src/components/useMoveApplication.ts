@@ -6,6 +6,8 @@ import { applicationsKey, placementsKey } from "../api/keys";
 export interface MoveRequest {
   app: Application;
   stage: Schemas["Stage"];
+  /** One of the job's own stages (its key), of the kind `stage`. */
+  step?: string;
   reason?: Schemas["CloseReason"];
   reasonNote?: string;
 }
@@ -15,8 +17,9 @@ export interface MoveRequest {
  * showed, so if someone else moved it meanwhile the API answers
  * CONFLICT_STALE_VERSION instead of silently overwriting their move.
  */
-async function moveOne({ app, stage, reason, reasonNote }: MoveRequest) {
+async function moveOne({ app, stage, step, reason, reasonNote }: MoveRequest) {
   const body: Schemas["ApplicationMove"] = { version: app.version, stage };
+  if (step) body.step = step;
   if (reason) body.reason = reason;
   if (reasonNote?.trim()) body.reasonNote = reasonNote.trim();
   return unwrap(await api.POST("/v1/applications/{applicationId}/move", {

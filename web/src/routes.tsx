@@ -36,6 +36,7 @@ const Companion = page(() => import("./pages/Companion"), "Companion");
 const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
+const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
 const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
@@ -124,6 +125,8 @@ export const ROUTES: Route[] = [
     render: () => <SalarySettings /> },
   { section: "settings-lists", path: /^#\/settings\/lists/, permission: "settings:manage", menu: { in: "settings", label: "Dropdowns & categories", href: "#/settings/lists" },
     render: () => <ListSettings /> },
+  { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
+    render: () => <StageTemplates /> },
   { section: "industries", path: /^#\/industries/, permission: "settings:manage", menu: { in: "settings", label: "Industries", href: "#/industries" }, render: () => <Industries /> },
   { section: "ai-provider", path: /^#\/ai-provider/, permission: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
     render: () => <AiProvider /> },

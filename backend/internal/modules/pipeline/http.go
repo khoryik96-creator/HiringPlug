@@ -47,7 +47,7 @@ func (h *HTTP) ListCandidateApplications(ctx context.Context, req api.ListCandid
 func (h *HTTP) MoveApplication(ctx context.Context, req api.MoveApplicationRequestObject) (api.MoveApplicationResponseObject, error) {
 	b := req.Body
 	view, err := h.svc.Move(ctx, authz.MustFromContext(ctx), req.ApplicationId, b.Version, Move{
-		To: string(b.Stage), Reason: c.Convert[string](b.Reason), Note: b.ReasonNote,
+		To: string(b.Stage), Step: b.Step, Reason: c.Convert[string](b.Reason), Note: b.ReasonNote,
 	})
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func toAPI(v View) api.Application {
 		Id: v.ID, Version: v.Version, JobId: v.JobID, JobTitle: v.JobTitle, CompanyId: v.CompanyID, CompanyName: v.CompanyName,
 		CandidateId: v.CandidateID, CandidateName: v.CandidateName, CandidateTitle: c.OrNull(v.CandidateTitle),
 		CandidateAvailability: c.OrNull(c.Convert[api.CandidateAvailability](v.CandidateAvailability)),
-		Stage:                 api.Stage(v.Stage), Reason: c.OrNull(c.Convert[api.CloseReason](v.Reason)), ReasonNote: c.OrNull(v.ReasonNote),
+		Stage:                 api.Stage(v.Stage), Step: c.OrNull(v.Step), Reason: c.OrNull(c.Convert[api.CloseReason](v.Reason)), ReasonNote: c.OrNull(v.ReasonNote),
 		Channel:        c.OrNull(c.Convert[api.ApplicationChannel](v.Channel)),
 		StageChangedAt: v.StageChangedAt, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
 	}

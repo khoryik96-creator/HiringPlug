@@ -8,10 +8,11 @@
 import { useState } from "react";
 
 import type { Application, Schemas } from "../api/client";
-import { CHANNEL, OPEN_STAGES, STAGE } from "../labels";
+import { CHANNEL, STAGE } from "../labels";
 import { daysInStage, MoveMenu, offerChip, timeInStage, type Upcoming, waitTone, when } from "./ApplicationCard";
 import { FitBadge, type Match } from "./Fit";
 import { Initials } from "./Initials";
+import { type Column, columnOf, nextColumn } from "./stages/columns";
 import type { MoveRequest } from "./useMoveApplication";
 
 type Stage = Schemas["Stage"];
@@ -42,6 +43,16 @@ interface Shared {
   now: number;
   fit: Map<string, Match>;
   onShowFit: (a: Application) => void;
+  /** The job's stages, as columns (see stages/columns.ts). */
+  columns: Column[];
+}
+
+/** Their usual next step: the next of the job's stages, named as the standard step when it is one. */
+function nextStep(a: Application, columns: Column[]): { to: Column; label: string } | undefined {
+  const to = nextColumn(a, columns);
+  if (!to) return undefined;
+  const usual = NEXT[a.stage];
+  return { to, label: usual && usual.stage === to.stage && to.label === STAGE[to.stage] ? usual.label : to.label };
 }
 
 /** Clicking anywhere but a control (their name included) chooses the person. */
@@ -84,26 +95,29 @@ function Info({ a, upcoming, now }: { a: Application; upcoming?: Upcoming; now: 
 }
 
 export function PipelineSteps(props: Shared & {
-  stage: Stage | "all"; onStage: (s: Stage | "all") => void; order: (a: Application, b: Application) => number;
+  /** The column shown (its key), or everyone. */
+  stage: string; onStage: (key: string) => void; order: (a: Application, b: Application) => number;
   /** Choose (or, all chosen, unchoose) everyone shown. */
   onPickAll?: (apps: Application[], on: boolean) => void;
 }) {
-  const { apps, stage, now } = props;
-  const shown = (stage === "all" ? [...apps] : apps.filter((a) => a.stage === stage)).sort(props.order);
+  const { apps, stage, now, columns } = props;
+  const column = columns.find((c) => c.key === stage);
+  const inColumn = (c: Column) => apps.filter((a) => columnOf(a, columns)?.key === c.key);
+  const shown = (column ? inColumn(column) : [...apps]).sort(props.order);
   const allPicked = shown.length > 0 && shown.every((a) => props.picked.includes(a.id));
-  const where = stage === "all" ? "" : ` in ${STAGE[stage]}`;
+  const where = column ? ` in ${column.label}` : "";
   return (
     <div className="pipeline-steps">
-      <div className="funnel" role="tablist" aria-label="Stages">
+      <div className="funnel" role="tablist" aria-label="Stages" style={{ "--cols": columns.length } as React.CSSProperties}>
         <button type="button" role="tab" aria-selected={stage === "all"} className="stage-step all" onClick={() => { props.onStage("all"); }}>
           <small>All</small><b>{apps.length}</b>
         </button>
-        {OPEN_STAGES.map((st) => {
-          const inStage = apps.filter((a) => a.stage === st);
+        {columns.map((c) => {
+          const inStage = inColumn(c);
           const long = inStage.filter((a) => waiting(a, now)).length;
           return (
-            <button key={st} type="button" role="tab" aria-selected={stage === st} className={`stage-step stage-${st}`} onClick={() => { props.onStage(st); }}>
-              <small>{STAGE[st]}</small><b>{inStage.length}</b>
+            <button key={c.key} type="button" role="tab" aria-selected={stage === c.key} className={`stage-step stage-${c.stage}`} onClick={() => { props.onStage(c.key); }}>
+              <small>{c.label}</small><b>{inStage.length}</b>
               {long > 0 && <span className="stage-wait">{long} waiting 7+ days</span>}
             </button>
           );
@@ -116,10 +130,10 @@ export function PipelineSteps(props: Shared & {
           </button>
         </div>
       )}
-      <div role="list" aria-label={stage === "all" ? "Everyone" : STAGE[stage]} className="step-rows">
-        {shown.length === 0 && <p className="column-empty">{stage === "placed" ? "Nobody placed yet" : "Nobody here"}</p>}
+      <div role="list" aria-label={column ? column.label : "Everyone"} className="step-rows">
+        {shown.length === 0 && <p className="column-empty">{column?.stage === "placed" ? "Nobody placed yet" : "Nobody here"}</p>}
         {shown.map((a) => {
-          const next = NEXT[a.stage];
+          const next = nextStep(a, columns);
           const days = daysInStage(a, now);
           const match = props.fit.get(a.id);
           return (
@@ -131,15 +145,15 @@ export function PipelineSteps(props: Shared & {
                 {a.candidateTitle && <span className="who-title">{a.candidateTitle}</span>}
               </span>
               <span className="step-info">
-                {stage === "all" && <span className={`badge ${a.stage}`}>{STAGE[a.stage]}</span>}
+                {!column && <span className={`badge ${a.stage}`}>{columnOf(a, columns)?.label ?? STAGE[a.stage]}</span>}
                 <Info a={a} upcoming={props.upcoming.get(a.id)} now={now} />
                 {match && <button type="button" className="link" aria-label={`Fit of ${a.candidateName}: why?`} onClick={() => { props.onShowFit(a); }}><FitBadge match={match} /></button>}
               </span>
               <span className={`chip${waitTone(a, days)}`}>{timeInStage(a, now)}</span>
               {props.canMove && (
                 <span className="step-actions">
-                  {next && <button type="button" className="primary" disabled={props.busy} onClick={() => { props.onMove({ app: a, stage: next.stage }); }}>{next.label}</button>}
-                  <MoveMenu app={a} busy={props.busy} onMove={props.onMove} />
+                  {next && <button type="button" className="primary" disabled={props.busy} onClick={() => { props.onMove({ app: a, stage: next.to.stage, step: next.to.step }); }}>{next.label}</button>}
+                  <MoveMenu app={a} busy={props.busy} onMove={props.onMove} columns={columns} />
                 </span>
               )}
             </div>
@@ -155,7 +169,8 @@ const FOLD = 8;
 /** One person on one line of the board. */
 export function BoardLine(props: Shared & { a: Application; onDragStart: (a: Application) => void }) {
   const { a, now } = props;
-  const next = NEXT[a.stage];
+  const next = nextStep(a, props.columns);
+  const here = columnOf(a, props.columns);
   const days = daysInStage(a, now);
   const upcoming = props.upcoming.get(a.id);
   const match = props.fit.get(a.id);
@@ -169,11 +184,11 @@ export function BoardLine(props: Shared & { a: Application; onDragStart: (a: App
         {match && <button type="button" className="link" aria-label={`Fit of ${a.candidateName}: why?`} onClick={() => { props.onShowFit(a); }}>
           <FitBadge match={match} compact /></button>}
         {(upcoming?.interviewAt || upcoming?.offerExpiresOn) && <Info a={a} upcoming={upcoming} now={now} />}
-        <span className={`chip${waitTone(a, days)}`} title={`${timeInStage(a, now)} in ${STAGE[a.stage].toLowerCase()}`}>{days < 1 ? "today" : `${String(days)}d`}</span>
+        <span className={`chip${waitTone(a, days)}`} title={`${timeInStage(a, now)} in ${(here?.label ?? STAGE[a.stage]).toLowerCase()}`}>{days < 1 ? "today" : `${String(days)}d`}</span>
       </span>
       {props.canMove && next && (
-        <button type="button" className="line-next" disabled={props.busy} title={`Move to ${STAGE[next.stage]}`}
-          aria-label={`${next.label}: ${a.candidateName}`} onClick={() => { props.onMove({ app: a, stage: next.stage }); }}>›</button>
+        <button type="button" className="line-next" disabled={props.busy} title={`Move to ${next.to.label}`}
+          aria-label={`${next.label}: ${a.candidateName}`} onClick={() => { props.onMove({ app: a, stage: next.to.stage, step: next.to.step }); }}>›</button>
       )}
     </div>
   );
