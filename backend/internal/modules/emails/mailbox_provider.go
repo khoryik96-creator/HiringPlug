@@ -67,11 +67,15 @@ func (s *Service) exchangeMailboxToken(ctx context.Context, endpoint OAuthProvid
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int    `json:"expires_in"`
 		TokenType    string `json:"token_type"`
+		Scope        string `json:"scope"`
 	}
 	if json.Unmarshal(raw, &result) != nil || result.AccessToken == "" || !strings.EqualFold(result.TokenType, "Bearer") || result.ExpiresIn <= 0 || result.ExpiresIn > 86400 {
 		return mailboxSecret{}, errors.New("mail provider returned an invalid authorization")
 	}
-	return mailboxSecret{AccessToken: result.AccessToken, RefreshToken: result.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(result.ExpiresIn) * time.Second)}, nil
+	return mailboxSecret{
+		AccessToken: result.AccessToken, RefreshToken: result.RefreshToken, ExpiresAt: time.Now().Add(time.Duration(result.ExpiresIn) * time.Second),
+		GrantedScopes: result.Scope,
+	}, nil
 }
 func (s *Service) mailboxProfile(ctx context.Context, provider string, endpoint OAuthProvider, token string) (string, error) {
 	raw, err := s.providerRequest(ctx, "GET", endpoint.ProfileURL, "application/json", token, nil)

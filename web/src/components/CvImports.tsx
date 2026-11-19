@@ -30,15 +30,16 @@ type Review = {
   asks: { file: File; others: Schemas["DocumentMatch"][]; upload: boolean }[];
   clean: File[];
 };
+type ImportRequest = { files: File[]; source: string };
 
 /** Sends one file to an import (multipart, so not through the typed client). */
-async function sendFile(importId: string, file: File): Promise<void> {
+async function sendFile(importId: string, file: File, token: string | null): Promise<void> {
   const body = new FormData();
   body.append("file", file);
   const res = await fetch(`/v1/cv-imports/${importId}/files`, {
     method: "POST",
     body,
-    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+    headers: { Authorization: `Bearer ${token ?? ""}` },
   });
   if (!res.ok) await throwFor(res);
 }
@@ -58,10 +59,11 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
   const [source, setSource] = useState(initialSource);
   const [tried, setTried] = useState(false); // Import was pressed: a missing source is outlined
   const [files, setFiles] = useState<File[]>(initialFiles ?? []);
-  const [sent, setSent] = useState<number | null>(null);
+  const [progress, setProgress] = useState<{ processed: number; total: number } | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
   const [review, setReview] = useState<Review | null>(null);
   const [historyOpen, setHistoryOpen] = useState(!foldedHistory);
+  const [sessionToken] = useState(getToken);
 
   const imports = useQuery({
     queryKey: cvImportsKey,
@@ -73,10 +75,11 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
 
   // Step one: look for CVs already in HiringPlug; import at once when nothing needs asking.
   const check = useMutation({
-    mutationFn: async () => {
-      const found = await findMatches(files);
+    mutationFn: async (request: ImportRequest) => {
+      if (getToken() !== sessionToken) throw new Error("Your sign-in changed. Open the page again before importing.");
+      const found = await findMatches(request.files);
       const r: Review = { skipped: [], asks: [], clean: [] };
-      files.forEach((file, i) => {
+      request.files.forEach((file, i) => {
         const m = found[i];
         if (m?.sameContent) r.skipped.push({ file, match: m.sameContent });
         else if (m && m.sameName.length > 0) r.asks.push({ file, others: m.sameName, upload: false });
@@ -84,50 +87,58 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
       });
       return r;
     },
-    onSuccess: (r) => {
+    onSuccess: (r, request) => {
       if (r.asks.length === 0) {
         setReview(r.skipped.length > 0 ? r : null); // what was skipped stays shown
-        start.mutate(r.clean);
+        start.mutate({ ...request, files: r.clean });
       } else setReview(r);
     },
-    onError: () => { start.mutate(files); }, // the check is a help, not a gate
+    onError: (_error, request) => { start.mutate(request); }, // the upload checks for exact duplicates too
   });
   const toImport = review ? [...review.clean, ...review.asks.filter((a) => a.upload).map((a) => a.file)] : files;
 
   const start = useMutation({
-    mutationFn: async (chosen: File[]) => {
+    mutationFn: async (request: ImportRequest) => {
       setFailures([]);
-      if (chosen.length === 0) return;
-      const imp = unwrap(await api.POST("/v1/cv-imports", { body: { source } }));
+      if (getToken() !== sessionToken) throw new Error("Your sign-in changed. Open the page again before importing.");
+      if (request.files.length === 0) return [];
+      const imp = unwrap(await api.POST("/v1/cv-imports", { body: { source: request.source } }));
       setHistoryOpen(true); // follow this import's files
-      setSent(0);
-      for (const [i, f] of chosen.entries()) {
+      const failed: File[] = [];
+      setProgress({ processed: 0, total: request.files.length });
+      for (const [i, f] of request.files.entries()) {
         try {
-          await sendFile(imp.id, f);
+          if (getToken() !== sessionToken) throw new Error("Your sign-in changed. Open the page again before importing.");
+          await sendFile(imp.id, f, sessionToken);
         } catch (e) {
+          failed.push(f);
           setFailures((fl) => [...fl, `${f.name}: ${e instanceof Error ? e.message : String(e)}`]);
         }
-        setSent(i + 1);
+        setProgress({ processed: i + 1, total: request.files.length });
         void queryClient.invalidateQueries({ queryKey: cvImportsKey });
       }
+      return failed;
+    },
+    onSuccess: (failed) => {
+      setFiles(failed);
+      setReview((r) => (r && r.skipped.length > 0 ? { ...r, asks: [], clean: [] } : null));
     },
     onSettled: () => {
-      setSent(null);
-      setFiles([]);
-      setReview((r) => (r && r.skipped.length > 0 ? { ...r, asks: [], clean: [] } : null));
+      setProgress(null);
       void queryClient.invalidateQueries({ queryKey: cvImportsKey });
       void queryClient.invalidateQueries({ queryKey: candidatesKey });
     },
   });
+  const busy = check.isPending || start.isPending;
 
   return (
     <section className="panel" aria-label="CV import">
       <div className={foldedHistory ? "import-line" : undefined}>
       <h3>Import profiles {!foldedHistory && <span className="muted small">CVs and LinkedIn PDFs</span>}</h3>
-      <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} />
+      <SourceSelect value={source} onChange={setSource} invalid={tried && source === ""} disabled={busy} />
       </div>
       {/* Under the source, roomy enough to aim at. */}
-      <DropZone accept={CV_TYPES} multiple disabled={start.isPending} label="Drop CVs here"
+      <DropZone accept={CV_TYPES} multiple disabled={busy} label="Drop CVs here"
         hint="PDF, Word, text or a photo of each CV"
         onFiles={(dropped) => {
           // Dropping more adds to the list; the same file twice is kept once.
@@ -139,7 +150,7 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
           {files.map((f) => (
             <li key={`${f.name}-${String(f.size)}`}>
               {f.name}
-              {!start.isPending && (
+              {!busy && (
                 <button type="button" className="link" aria-label={`Remove ${f.name}`}
                   onClick={() => { setFiles(files.filter((x) => x !== f)); setReview(null); }}>×</button>
               )}
@@ -149,17 +160,18 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
       )}
       {(!foldedHistory || files.length > 0 || review) && <div className="row">
         {review && review.asks.length > 0 ? (
-          <button type="button" className="primary" disabled={start.isPending} onClick={() => { start.mutate(toImport); }}>
+          <button type="button" className="primary" disabled={busy || source === "" || toImport.length === 0}
+            onClick={() => { start.mutate({ files: toImport, source }); }}>
             Import {toImport.length === 1 ? "1 file" : `${String(toImport.length)} files`}
           </button>
         ) : (
-          <button type="button" className="primary" disabled={files.length === 0 || start.isPending || check.isPending}
-            onClick={() => { setTried(true); if (source !== "") check.mutate(); }}>
+          <button type="button" className="primary" disabled={files.length === 0 || busy}
+            onClick={() => { setTried(true); if (source !== "") check.mutate({ files, source }); }}>
             {check.isPending ? "Checking for CVs already here…" : `Import ${files.length === 1 ? "1 file" : `${String(files.length)} files`}`}
           </button>
         )}
-        {files.length > 0 && !start.isPending && <button type="button" className="link" onClick={() => { setFiles([]); setReview(null); }}>Clear</button>}
-        {sent !== null && <span className="muted">Sent {sent} of {files.length}…</span>}
+        {files.length > 0 && !busy && <button type="button" className="link" onClick={() => { setFiles([]); setReview(null); }}>Clear</button>}
+        {progress && <span className="muted">Processed {progress.processed} of {progress.total}…</span>}
       </div>}
       {review && review.skipped.length > 0 && (
         <div className="dup-ask" role="status" aria-label="Skipped files">
@@ -172,7 +184,7 @@ export function CvImports({ foldedHistory = false, initialFiles, initialSource =
           <p>These have the same name as a CV already in HiringPlug, with other content. Tick the ones to import anyway:</p>
           {review.asks.map((x, i) => (
             <label key={x.file.name} className="check">
-              <input type="checkbox" checked={x.upload}
+              <input type="checkbox" checked={x.upload} disabled={busy}
                 onChange={(e) => { setReview({ ...review, asks: review.asks.map((y, j) => (j === i ? { ...y, upload: e.target.checked } : y)) }); }} />{" "}
               <strong>{x.file.name}</strong>: like {x.others.map(matchText).join("; ")}
             </label>

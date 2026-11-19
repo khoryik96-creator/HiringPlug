@@ -18,6 +18,18 @@ it("offers an explicit permission upgrade when the mailbox cannot access rules",
   expect(post).not.toHaveBeenCalled();
 });
 
+it("offers the permission upgrade when a mailbox can list rules but cannot change them", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({
+    items: [{ id: "rule", name: "Applications", enabled: true, readOnly: false, hasError: false, destination: "Archive" }],
+    folders: [],
+  }));
+  vi.spyOn(api, "PATCH").mockResolvedValue(failure("OUTLOOK_RULES_ACCESS", "Outlook needs rules permission.", undefined, 403));
+  renderWithClient(<OutlookRules />);
+  fireEvent.click(await screen.findByRole("button", { name: "Turn off Applications" }));
+  expect(await screen.findByRole("button", { name: "Allow inbox rules" })).toBeTruthy();
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Turn off Applications" }).disabled).toBe(true);
+});
+
 it("creates a rule with the chosen sender, subject and Outlook folder", async () => {
   vi.spyOn(api, "GET").mockResolvedValue(ok({ items: [], folders: [{ id: "omf_archive", name: "Archive", kind: "archive" }] }));
   const post = vi.spyOn(api, "POST").mockResolvedValue(ok({ id: "rule", name: "Applications" }));

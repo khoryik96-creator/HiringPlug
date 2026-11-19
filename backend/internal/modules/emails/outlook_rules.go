@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -125,9 +126,9 @@ func (s *Service) withOutlookRules(ctx context.Context, p authz.Principal, fn fu
 	})
 }
 
-func outlookRuleToAPI(rule outlookRule, folder string) api.OutlookRule {
+func outlookRuleToAPI(rule outlookRule, mailbox, folder string) api.OutlookRule {
 	return api.OutlookRule{
-		Id: base64.RawURLEncoding.EncodeToString([]byte(rule.ID)), Name: rule.DisplayName, Enabled: rule.IsEnabled,
+		Id: base64.RawURLEncoding.EncodeToString([]byte(mailbox + ":" + rule.ID)), Name: rule.DisplayName, Enabled: rule.IsEnabled,
 		ReadOnly: rule.IsReadOnly, HasError: rule.HasError, Destination: folder,
 	}
 }
@@ -136,35 +137,63 @@ func ruleDestination(kind string) bool { return kind == "archive" || kind == "ot
 
 func (s *Service) listOutlookRules(ctx context.Context, p authz.Principal) (api.OutlookRuleList, error) {
 	out := api.OutlookRuleList{Items: []api.OutlookRule{}, Folders: []api.OutlookRuleFolder{}}
-	err := s.withOutlookRules(ctx, p, func(_ pgx.Tx, q *store.Queries, mailbox, token string) error {
-		rules, err := s.remoteOutlookRules(ctx, token)
-		if err != nil {
-			return outlookRuleFailure(err)
-		}
-		folders, err := q.OutlookFolders(ctx, mailbox)
-		if err != nil {
-			return err
-		}
-		names := make(map[string]string, len(folders))
-		for _, folder := range folders {
-			names[folder.RemoteID] = folder.Name
-			if ruleDestination(folder.Kind) {
-				out.Folders = append(out.Folders, api.OutlookRuleFolder{Id: folder.ID, Name: folder.Name})
-			}
-		}
-		for _, rule := range rules {
-			if !outlookGraphID.MatchString(rule.ID) {
-				continue
-			}
-			destination := names[rule.Actions.MoveToFolder]
-			if destination == "" && rule.Actions.MoveToFolder != "" {
-				destination = "Outlook folder"
-			}
-			out.Items = append(out.Items, outlookRuleToAPI(rule, destination))
-		}
-		return nil
+	var mailbox, token string
+	var folders []store.EmailOutlookFolder
+	err := s.withOutlookRules(ctx, p, func(_ pgx.Tx, q *store.Queries, id, access string) error {
+		mailbox, token = id, access
+		var err error
+		folders, err = q.OutlookFolders(ctx, mailbox)
+		return err
 	})
-	return out, err
+	if err != nil {
+		return out, err
+	}
+	// Reading the provider can be slow. Release the mailbox lock before the
+	// read so the sync and writes may proceed. Returned rule IDs bind this
+	// mailbox snapshot, so a stale list cannot mutate its replacement.
+	rules, err := s.remoteOutlookRules(ctx, token)
+	if err != nil {
+		return out, outlookRuleFailure(err)
+	}
+	byRemoteID := make(map[string]store.EmailOutlookFolder, len(folders))
+	names := make(map[string]string, len(folders))
+	for _, folder := range folders {
+		byRemoteID[folder.RemoteID] = folder
+	}
+	for _, folder := range folders {
+		name := outlookRuleFolderPath(folder, byRemoteID)
+		names[folder.RemoteID] = name
+		if ruleDestination(folder.Kind) {
+			out.Folders = append(out.Folders, api.OutlookRuleFolder{Id: folder.ID, Name: name})
+		}
+	}
+	for _, rule := range rules {
+		if !outlookGraphID.MatchString(rule.ID) {
+			continue
+		}
+		destination := names[rule.Actions.MoveToFolder]
+		if destination == "" && rule.Actions.MoveToFolder != "" {
+			destination = "Outlook folder"
+		}
+		out.Items = append(out.Items, outlookRuleToAPI(rule, mailbox, destination))
+	}
+	return out, nil
+}
+
+func outlookRuleFolderPath(folder store.EmailOutlookFolder, byRemoteID map[string]store.EmailOutlookFolder) string {
+	names := []string{folder.Name}
+	seen := map[string]bool{folder.RemoteID: true}
+	for folder.ParentID != nil {
+		parent, found := byRemoteID[*folder.ParentID]
+		if !found || seen[parent.RemoteID] {
+			break
+		}
+		seen[parent.RemoteID] = true
+		names = append(names, parent.Name)
+		folder = parent
+	}
+	slices.Reverse(names)
+	return strings.Join(names, " / ")
 }
 
 func (s *Service) createOutlookRule(ctx context.Context, p authz.Principal, in api.OutlookRuleInput) (api.OutlookRule, error) {
@@ -230,7 +259,7 @@ func (s *Service) createOutlookRule(ctx context.Context, p authz.Principal, in a
 		if !outlookGraphID.MatchString(created.ID) {
 			return outlookRuleFailure(&outlookGraphError{status: http.StatusBadGateway})
 		}
-		out = outlookRuleToAPI(created, folder.Name)
+		out = outlookRuleToAPI(created, mailbox, folder.Name)
 		return audit.Record(ctx, tx, audit.Entry{Action: "outlook.rule_created", EntityType: "outlook_rule", EntityID: out.Id})
 	})
 	return out, err
@@ -238,16 +267,20 @@ func (s *Service) createOutlookRule(ctx context.Context, p authz.Principal, in a
 
 func (s *Service) changeOutlookRule(ctx context.Context, p authz.Principal, id string, enabled *bool) error {
 	decoded, err := base64.RawURLEncoding.Strict().DecodeString(id)
-	if err != nil || !outlookGraphID.Match(decoded) {
+	pinnedMailbox, remoteID, valid := strings.Cut(string(decoded), ":")
+	if err != nil || !valid || !outlookGraphID.MatchString(remoteID) {
 		return apperr.NotFound("Outlook rule")
 	}
-	return s.withOutlookRules(ctx, p, func(tx pgx.Tx, _ *store.Queries, _ string, token string) error {
-		target := s.outlookRulesPath() + "/" + url.PathEscape(string(decoded))
+	return s.withOutlookRules(ctx, p, func(tx pgx.Tx, _ *store.Queries, mailbox, token string) error {
+		if mailbox != pinnedMailbox {
+			return apperr.NotFound("Outlook rule")
+		}
+		target := s.outlookRulesPath() + "/" + url.PathEscape(remoteID)
 		var rule outlookRule
 		if err := s.outlookRequest(ctx, token, http.MethodGet, target, nil, &rule); err != nil {
 			return outlookRuleFailure(err)
 		}
-		if rule.ID != string(decoded) || rule.IsReadOnly {
+		if rule.ID != remoteID || rule.IsReadOnly {
 			return apperr.Validation(apperr.FieldErrors{{Field: "rule", Message: "this Outlook rule cannot be changed in HiringPlug"}})
 		}
 		if enabled == nil {

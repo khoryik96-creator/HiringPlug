@@ -179,6 +179,7 @@ candidate's CVs can see the saved copy. The Outlook message stays private.
 Choose **Import CV** to open an attachment within the upload limit in **Import profiles**. Choose
 the candidate source and confirm the import to start reading the CV. The
 normal import checks for existing copies and candidates with the same email.
+A file whose upload fails stays selected so you can retry it.
 
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook
@@ -202,7 +203,7 @@ registration needs Microsoft Graph delegated **MailboxSettings.ReadWrite**.
 Have an administrator grant consent if your organisation requires it. The
 existing email and calendar permissions still use their own consent.
 
-Name the rule, pick a synced folder, and enter a sender email address, text
+Name the rule, pick a synced folder by its full folder path, and enter a sender email address, text
 to find in the subject, or both. When you enter both, both must match. Outlook
 adds the rule after your existing rules and applies it to incoming messages.
 It can do this while HiringPlug is closed. Turn rules on or off, or delete

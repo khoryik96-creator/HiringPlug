@@ -7,9 +7,12 @@ import { Field } from "../Field";
 import { fieldErrors } from "../forms";
 
 const rulesKey = ["outlook", "rules"] as const;
+const missingRulesAccess = (error: unknown) => error instanceof ApiError && error.code === "OUTLOOK_RULES_ACCESS";
 
 export function OutlookRules() {
   const client = useQueryClient();
+  const [writeDenied, setWriteDenied] = useState(false);
+  const onWriteError = (error: unknown) => { if (missingRulesAccess(error)) setWriteDenied(true); };
   const list = useQuery({
     queryKey: rulesKey,
     queryFn: async () => unwrap(await api.GET("/v1/outlook/rules")),
@@ -26,12 +29,16 @@ export function OutlookRules() {
       else unwrap(await api.PATCH("/v1/outlook/rules/{ruleId}", { params, body: { enabled } }));
     },
     onSuccess: () => client.invalidateQueries({ queryKey: rulesKey }),
+    onError: onWriteError,
   });
-  const needsAccess = list.error instanceof ApiError && list.error.code === "OUTLOOK_RULES_ACCESS";
+  const needsAccess = writeDenied || missingRulesAccess(list.error);
   return <main className="outlook-page">
     <div className="row spread">
       <h2>Inbox rules</h2>
-      <a className="button" href="#/outlook">Back to Outlook Mail</a>
+      <div className="row outlook-actions">
+        {list.data && <button type="button" disabled={list.isFetching} onClick={() => { void list.refetch(); }}>Refresh</button>}
+        <a className="button" href="#/outlook">Back to Outlook Mail</a>
+      </div>
     </div>
     <ErrorMessage error={change.error ?? connect.error} />
     {list.isPending && <p className="muted" role="status">Loading inbox rules…</p>}
@@ -52,21 +59,25 @@ export function OutlookRules() {
               <td>{rule.name}</td><td>{rule.destination || "—"}</td>
               <td>{rule.enabled ? "On" : "Off"}{rule.hasError && <span className="warning"> · Check in Outlook</span>}</td>
               <td>{rule.readOnly ? <span className="muted">Read only</span> : <div className="row outlook-actions">
-                <button type="button" aria-label={`${rule.enabled ? "Turn off" : "Turn on"} ${rule.name}`} disabled={change.isPending}
+                <button type="button" aria-label={`${rule.enabled ? "Turn off" : "Turn on"} ${rule.name}`} disabled={change.isPending || needsAccess}
                   onClick={() => { change.mutate({ id: rule.id, enabled: !rule.enabled }); }}>{rule.enabled ? "Turn off" : "Turn on"}</button>
-                <button type="button" aria-label={`Delete ${rule.name}`} disabled={change.isPending}
+                <button type="button" aria-label={`Delete ${rule.name}`} disabled={change.isPending || needsAccess}
                   onClick={() => { if (window.confirm(`Delete the Outlook rule “${rule.name}”?`)) change.mutate({ id: rule.id }); }}>Delete</button>
               </div>}</td>
             </tr>)}</tbody>
           </table>
         </div>}
       </section>
-      <NewRule folders={list.data.folders} />
+      <NewRule folders={list.data.folders} disabled={needsAccess} onWriteError={onWriteError} />
     </>}
   </main>;
 }
 
-function NewRule({ folders }: { folders: Schemas["OutlookRuleFolder"][] }) {
+function NewRule({ folders, disabled, onWriteError }: {
+  folders: Schemas["OutlookRuleFolder"][];
+  disabled: boolean;
+  onWriteError: (error: unknown) => void;
+}) {
   const client = useQueryClient();
   const [name, setName] = useState("");
   const [from, setFrom] = useState("");
@@ -80,12 +91,14 @@ function NewRule({ folders }: { folders: Schemas["OutlookRuleFolder"][] }) {
       setName(""); setFrom(""); setSubject(""); setFolderId("");
       await client.invalidateQueries({ queryKey: rulesKey });
     },
+    onError: onWriteError,
   });
   const errors = fieldErrors(create.error);
   return <section className="panel" aria-label="New inbox rule">
     <h3>New rule</h3>
-    {folders.length === 0 ? <p className="muted">Sync Outlook Mail to load your folders.</p> : <form className="outlook-rule-form"
-      onSubmit={(event) => { event.preventDefault(); if (!create.isPending) create.mutate(); }}>
+    {folders.length === 0 ? <p className="muted">Sync Outlook Mail to load your folders.</p> : <form
+      onSubmit={(event) => { event.preventDefault(); if (!disabled && !create.isPending) create.mutate(); }}>
+      <fieldset className="outlook-rule-form" disabled={disabled || create.isPending}>
       <Field label="Rule name" error={errors.name}>
         <input required maxLength={120} value={name} onChange={(e) => { setName(e.target.value); }} />
       </Field>
@@ -106,6 +119,7 @@ function NewRule({ folders }: { folders: Schemas["OutlookRuleFolder"][] }) {
       <div><button className="primary" type="submit" disabled={create.isPending || !name.trim() || !folderId || !(from.trim() || subject.trim())}>
         {create.isPending ? "Creating…" : "Create rule"}
       </button></div>
+      </fieldset>
     </form>}
   </section>;
 }

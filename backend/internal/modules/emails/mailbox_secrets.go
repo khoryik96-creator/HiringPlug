@@ -13,10 +13,11 @@ import (
 )
 
 type mailboxSecret struct {
-	Password     string    `json:"password,omitempty"`
-	AccessToken  string    `json:"accessToken,omitempty"`
-	RefreshToken string    `json:"refreshToken,omitempty"`
-	ExpiresAt    time.Time `json:"expiresAt,omitempty"`
+	GrantedScopes string    `json:"-"`
+	Password      string    `json:"password,omitempty"`
+	AccessToken   string    `json:"accessToken,omitempty"`
+	RefreshToken  string    `json:"refreshToken,omitempty"`
+	ExpiresAt     time.Time `json:"expiresAt,omitempty"`
 }
 
 func (s *Service) sealMailbox(tenant, user, provider string, value any) (string, error) {

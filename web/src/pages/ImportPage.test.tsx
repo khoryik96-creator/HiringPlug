@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
 import * as files from "../api/files";
-import { ok, renderWithClient, testFieldSettings } from "../test-utils";
+import { failure, ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { CvImports } from "../components/CvImports";
 import { ImportPage } from "./ImportPage";
 
@@ -118,9 +118,21 @@ describe("importing CVs and LinkedIn PDFs", () => {
     expect(url).toBe("/v1/cv-imports/cvi_01jbz6w0m0k8q9x2r3s4t5v6w7/files");
     expect(((init.body as FormData).get("file") as File).name).toBe("Siti Aisyah.pdf");
     expect(new Headers(init.headers).has("Authorization")).toBe(true);
-    // The list is emptied once sent.
-    await waitFor(() => { expect(screen.getByRole("button", { name: "Import 0 files" })).toBeTruthy(); });
-    expect(screen.queryByRole("list", { name: "Files to import" })).toBeNull();
+    // Only the failed file stays ready to retry.
+    await waitFor(() => { expect(screen.getByRole("button", { name: "Import 1 file" })).toBeTruthy(); });
+    const remaining = screen.getByRole("list", { name: "Files to import" });
+    expect(within(remaining).getByText("huge.pdf")).toBeTruthy();
+    expect(within(remaining).queryByText("Siti Aisyah.pdf")).toBeNull();
+  });
+
+  it("keeps the staged Outlook file when creating an import fails", async () => {
+    reads([]);
+    vi.spyOn(api, "POST").mockResolvedValue(failure("VALIDATION_FAILED", "Pick a valid source."));
+    renderWithClient(<CvImports initialFiles={[new File(["Synthetic CV"], "Nadia.pdf")]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Import 1 file" }));
+    expect(await screen.findByText("Pick a valid source.")).toBeTruthy();
+    const remaining = screen.getByRole("list", { name: "Files to import" });
+    expect(within(remaining).getByText("Nadia.pdf")).toBeTruthy();
   });
 
   it("takes CVs dropped on it, in several drops, skipping other files and the same file twice", async () => {

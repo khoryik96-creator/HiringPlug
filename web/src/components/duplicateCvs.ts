@@ -2,6 +2,7 @@
 // worked out here, then the API says which are exactly a CV already there
 // (skip them) and which share a CV's file name (ask first).
 import { api, type Schemas, unwrap } from "../api/client";
+import { getToken } from "../auth";
 
 export type MatchResult = Schemas["DocumentMatchResult"];
 
@@ -13,7 +14,9 @@ export async function sha256Of(file: Blob): Promise<string> {
 
 /** What is already there for each file: one candidate's CVs, or (no candidateId) any you may see. */
 export async function findMatches(files: File[], candidateId?: string): Promise<MatchResult[]> {
+  const token = getToken();
   const refs = await Promise.all(files.map(async (f) => ({ fileName: f.name, sha256: await sha256Of(f) })));
+  if (getToken() !== token) throw new Error("Your sign-in changed. Open the page again before checking CVs.");
   return unwrap(await api.POST("/v1/document-matches", { body: { files: refs, ...(candidateId ? { candidateId } : {}) } })).items;
 }
 

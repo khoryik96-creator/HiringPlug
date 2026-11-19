@@ -29,7 +29,14 @@ func (f *outlookRulesFixture) serve(w http.ResponseWriter, r *http.Request) {
 	const root = "/me/mailFolders/inbox/messageRules"
 	write := func(value any) { _ = json.NewEncoder(w).Encode(value) }
 	if r.URL.Path == "/token" && strings.HasPrefix(r.FormValue("code"), "rules-") {
-		write(map[string]any{"access_token": r.FormValue("code"), "refresh_token": "synthetic-renewal", "expires_in": 3600, "token_type": "Bearer"})
+		scopes := "Mail.ReadWrite Mail.Send MailboxSettings.ReadWrite"
+		if r.FormValue("code") == "rules-read-only" {
+			scopes = "Mail.ReadWrite Mail.Send MailboxSettings.Read"
+		}
+		write(map[string]any{
+			"access_token": r.FormValue("code"), "refresh_token": "synthetic-renewal", "expires_in": 3600,
+			"token_type": "Bearer", "scope": scopes,
+		})
 		return
 	}
 	if r.URL.Path == "/me" {
@@ -126,6 +133,9 @@ func TestNativeOutlookRulesKeepTheExistingMailboxAndFolders(t *testing.T) {
 	r = authorizeInboxRules(t, a, recruiter, "rules-other")
 	require.Equal(t, 400, r.Status, "%s", r.Body)
 	require.Equal(t, 403, a.request("GET", root, recruiter, nil).Status)
+	r = authorizeInboxRules(t, a, recruiter, "rules-read-only")
+	require.Equal(t, 400, r.Status, "%s", r.Body)
+	require.Equal(t, 403, a.request("GET", root, recruiter, nil).Status)
 	r = authorizeInboxRules(t, a, recruiter, "rules-same")
 	require.Equal(t, 200, r.Status, "%s", r.Body)
 	var after api.OutlookMailPage
@@ -169,4 +179,17 @@ func TestNativeOutlookRulesKeepTheExistingMailboxAndFolders(t *testing.T) {
 	assert.False(t, list.Items[1].Enabled)
 	require.Equal(t, 204, a.request("DELETE", path, recruiter, nil).Status)
 	require.Equal(t, 404, a.request("DELETE", path, recruiter, nil).Status)
+
+	created := a.request("POST", root, recruiter, input)
+	require.Equal(t, 201, created.Status)
+	created.JSON(&saved)
+	setupOutlookMail(t, a, recruiter)
+	configureOutlookFixture(t, a, http.HandlerFunc(f.serve))
+	require.Equal(t, 200, authorizeInboxRules(t, a, recruiter, "rules-same").Status)
+	stale := root + "/" + saved.Id
+	require.Equal(t, 404, a.request("PATCH", stale, recruiter, map[string]bool{"enabled": false}).Status)
+	require.Equal(t, 404, a.request("DELETE", stale, recruiter, nil).Status)
+	a.request("GET", root, recruiter, nil).JSON(&list)
+	require.Len(t, list.Items, 2, "a stale tab does not delete the provider rule")
+	assert.True(t, list.Items[1].Enabled)
 }

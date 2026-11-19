@@ -270,7 +270,7 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		return notCompleted
 	}
 	if grant.RulesMailbox != "" {
-		if tokens.RefreshToken == "" {
+		if tokens.RefreshToken == "" || !outlookRulesGrantIncludesMail(tokens.GrantedScopes) {
 			return notCompleted
 		}
 		account, err := s.outlookAccountID(ctx, tokens.AccessToken)
@@ -319,4 +319,12 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "mailbox.connected", EntityType: "user", EntityID: p.UserID, Changes: map[string]any{"provider": saved.Provider}})
 	})
+}
+
+func outlookRulesGrantIncludesMail(scopes string) bool {
+	granted := map[string]bool{}
+	for _, scope := range strings.Fields(scopes) {
+		granted[strings.TrimPrefix(scope, "https://graph.microsoft.com/")] = true
+	}
+	return granted[outlookRulesScope] && granted["Mail.ReadWrite"] && granted["Mail.Send"]
 }
