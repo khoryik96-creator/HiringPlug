@@ -176,6 +176,10 @@ for their linked mail, never for other messages read from there. HiringPlug chec
 using the same upload rules as the candidate profile. People who can access the
 candidate's CVs can see the saved copy. The Outlook message stays private.
 
+Choose **Import CV** to open an attachment within the upload limit in **Import profiles**. Choose
+the candidate source and confirm the import to start reading the CV. The
+normal import checks for existing copies and candidates with the same email.
+
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook
 address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save

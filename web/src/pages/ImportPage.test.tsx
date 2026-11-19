@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, type Schemas } from "../api/client";
+import * as files from "../api/files";
 import { ok, renderWithClient, testFieldSettings } from "../test-utils";
 import { CvImports } from "../components/CvImports";
 import { ImportPage } from "./ImportPage";
@@ -10,6 +11,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  window.location.hash = "";
 });
 
 const item = (over: Partial<Schemas["CvImportItem"]>): Schemas["CvImportItem"] => ({
@@ -24,6 +26,40 @@ const anImport = (items: Schemas["CvImportItem"][]): Schemas["CvImport"] => {
 const reads = (imports: Schemas["CvImport"][]) =>
   vi.spyOn(api, "GET").mockImplementation(((path: string) =>
     Promise.resolve(ok(path === "/v1/settings/fields" ? testFieldSettings() : { items: imports }))) as never);
+
+describe("importing an Outlook attachment", () => {
+  it("prefills the authorized CV and waits for the recruiter to choose a source", async () => {
+    window.location.hash = "#/import?outlookMessage=omg_message&outlookAttachment=cvFile";
+    vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(ok(
+      path === "/v1/outlook/messages/{messageId}/attachments" ? {
+        items: [{ id: "cvFile", fileName: "Nadia – CV.pdf", downloadable: true, savable: true, sizeBytes: 50 }], more: false,
+      } : path === "/v1/settings/fields" ? testFieldSettings() : { items: [] },
+    )));
+    const fetchFile = vi.spyOn(files, "fetchFile").mockResolvedValue(new Blob(["Synthetic CV"]));
+    const post = vi.spyOn(api, "POST");
+
+    renderWithClient(<ImportPage permissions={["intake:create", "emails:send"]} />);
+    const pending = await screen.findByRole("list", { name: "Files to import" });
+    expect(within(pending).getByText("Nadia – CV.pdf")).toBeTruthy();
+    expect(fetchFile).toHaveBeenCalledWith("/v1/outlook/messages/omg_message/attachments/cvFile/file",
+      "application/octet-stream", expect.any(AbortSignal));
+    const source = screen.getByRole<HTMLSelectElement>("combobox", { name: "Preset the source" });
+    expect(source.value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Import 1 file" }));
+    expect(source.getAttribute("aria-invalid")).toBe("true");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("keeps the ordinary importer available when Outlook access is missing", async () => {
+    window.location.hash = "#/import?outlookMessage=omg_message&outlookAttachment=cvFile";
+    const get = reads([]);
+    const fetchFile = vi.spyOn(files, "fetchFile");
+    renderWithClient(<ImportPage permissions={["intake:create"]} />);
+    expect(await screen.findByRole("region", { name: "CV import" })).toBeTruthy();
+    expect(get).not.toHaveBeenCalledWith("/v1/outlook/messages/{messageId}/attachments", expect.anything());
+    expect(fetchFile).not.toHaveBeenCalled();
+  });
+});
 
 describe("importing CVs and LinkedIn PDFs", () => {
   it("is on the Import page too (as on the dashboard), beside the spreadsheet import", async () => {
