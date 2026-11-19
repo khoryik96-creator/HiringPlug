@@ -1,9 +1,11 @@
 # Outlook calendar
 
-Calendar (under More in the top bar) is each person's private calendar. It has
-month, week and agenda views, local appointments, Outlook events and the
+Open the calendar icon beside **Settings** to view your private calendar.
+Month, Week, Day and Agenda show local appointments, Outlook events and the
 person's HiringPlug interviews and booked calls. Email connections continue to
-work independently.
+work independently. **Day** and **Week** show hourly slots in your browser's
+time zone, with all-day events above them. Click an empty hour to start an
+appointment.
 
 ## Connect Microsoft
 
@@ -62,6 +64,14 @@ shared/delegated calendars are not included.
   Outlook has accepted it. **Join Teams** appears on the interview when
   Microsoft returns the link. The panel's day-before email includes it if the
   link is available when the reminder runs.
+- **Outlook invitation** shows the candidate's latest reply from the organizer's
+  calendar sync. **Email candidate a day before** opts into a separate reminder
+  through HiringPlug's configured mail server. The organizer can turn it off
+  from the invitation panel. Moving an interview moves the reminder. At delivery
+  HiringPlug checks the latest schedule, organizer, address, known RSVP, and
+  consent. If an interview is first invited within 24 hours, the email can go
+  once Outlook confirms the invitation, while the interview is over an hour
+  away. The reminder includes the Teams link when available.
 - An Outlook change to an own appointment is reflected on the next refresh.
   A changed/deleted interview or booking hold is flagged for review; its source
   schedule stays in HiringPlug. **Keep HiringPlug details & sync** explicitly

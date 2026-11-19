@@ -266,38 +266,43 @@ type CalendarConnection struct {
 }
 
 type CalendarEvent struct {
-	ID                 string
-	TenantID           string
-	UserID             string
-	Version            int32
-	Title              string
-	Notes              string
-	Location           string
-	StartsAt           time.Time
-	EndsAt             time.Time
-	TimeZone           string
-	AllDay             bool
-	Teams              bool
-	Attendees          []byte
-	Source             string
-	SourceID           *string
-	SourceVersion      int32
-	Status             string
-	SyncStatus         string
-	SyncError          *string
-	RemoteGeneration   int32
-	RemoteID           *string
-	RemoteKey          *string
-	RemoteConnection   *string
-	SentVersion        int32
-	WebUrl             *string
-	JoinUrl            *string
-	RemoteSnapshot     []byte
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	InvitationCalendar *string
-	InvitationSubject  *string
-	ReminderMinutes    int32
+	ID                         string
+	TenantID                   string
+	UserID                     string
+	Version                    int32
+	Title                      string
+	Notes                      string
+	Location                   string
+	StartsAt                   time.Time
+	EndsAt                     time.Time
+	TimeZone                   string
+	AllDay                     bool
+	Teams                      bool
+	Attendees                  []byte
+	Source                     string
+	SourceID                   *string
+	SourceVersion              int32
+	Status                     string
+	SyncStatus                 string
+	SyncError                  *string
+	RemoteGeneration           int32
+	RemoteID                   *string
+	RemoteKey                  *string
+	RemoteConnection           *string
+	SentVersion                int32
+	WebUrl                     *string
+	JoinUrl                    *string
+	RemoteSnapshot             []byte
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	InvitationCalendar         *string
+	InvitationSubject          *string
+	ReminderMinutes            int32
+	CandidateResponse          *string
+	CandidateReminder          bool
+	CandidateReminderVersion   int32
+	CandidateReminderQueuedFor *time.Time
+	CandidateReminderSentFor   *time.Time
 }
 
 type CalendarOauthState struct {

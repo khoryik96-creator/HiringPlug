@@ -112,6 +112,14 @@ describe("top bar", () => {
     await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
   });
 
+  it("places the Calendar shortcut beside Settings for calendar users", async () => {
+    signedIn([...RECRUITER, "calendars:use"]);
+    const icon = await screen.findByRole("link", { name: /^Calendar$/ });
+    expect(icon.getAttribute("href")).toBe("#/calendar");
+    expect(icon.nextElementSibling).toBe(screen.getByRole("link", { name: /^Settings$/ }));
+    expect(within(screen.getByRole("navigation", { name: "Main" })).queryByRole("link", { name: "Calendar" })).toBeNull();
+  });
+
   it("ends the session on the server when signing out", async () => {
     const post = vi.spyOn(api, "POST").mockResolvedValue(ok(undefined));
     signedIn(RECRUITER);

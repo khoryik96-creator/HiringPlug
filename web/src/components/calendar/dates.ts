@@ -10,7 +10,9 @@ export function nextDay(day: string): string {
   return d.toISOString().slice(0, 10);
 }
 export function sameDay(a: Date, b: Date): boolean { return startDay(a).getTime() === startDay(b).getTime(); }
-export function daysFor(date: Date, mode: "month" | "week" | "agenda"): Date[] {
+export type CalendarView = "month" | "week" | "day" | "agenda";
+export function daysFor(date: Date, mode: CalendarView): Date[] {
+  if (mode === "day") return [startDay(date)];
   const first = mode === "month" ? new Date(date.getFullYear(), date.getMonth(), 1) : startDay(date);
   if (mode !== "agenda") first.setDate(first.getDate() - (first.getDay() + 6) % 7);
   return Array.from({ length: mode === "month" ? 42 : 7 }, (_, i) => addDays(first, i));

@@ -114,7 +114,7 @@ export const ROUTES: Route[] = [
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true }, render: () => <OutlookMail /> },
-  { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", menu: { in: "main", label: "Calendar", href: "#/calendar", more: true }, render: () => <Calendar /> },
+  { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: () => <Calendar /> },
 
   // Settings, in its menu's order.
   // "#/settings" (and "#/settings#…") is General; its other parts have their own addresses.

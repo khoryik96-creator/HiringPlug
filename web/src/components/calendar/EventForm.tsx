@@ -7,10 +7,10 @@ import { fieldErrors, FormInvalid } from "../forms";
 import { nextDay, wallTime, zonedInput } from "./dates";
 
 type Event = Schemas["CalendarEvent"];
-export function EventForm({ event, date, connection, onClose, onSaved }: { event?: Event; date: Date; connection: Schemas["OutlookConnection"]; onClose: () => void; onSaved: () => void }) {
+export function EventForm({ event, date, startAtSlot = false, connection, onClose, onSaved }: { event?: Event; date: Date; startAtSlot?: boolean; connection: Schemas["OutlookConnection"]; onClose: () => void; onSaved: () => void }) {
   const zone = event?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const start = new Date(event?.startsAt ?? date);
-  if (!event) start.setHours(Math.max(9, start.getHours()), 0, 0, 0);
+  if (!event && !startAtSlot) start.setHours(Math.max(9, start.getHours()), 0, 0, 0);
   const [form, setForm] = useState({ title: event?.title ?? "", notes: event?.notes ?? "", location: event?.location ?? "", startsAt: zonedInput(start, zone), endsAt: zonedInput(new Date(event?.endsAt ?? start.getTime() + 3600000), zone), attendees: event?.attendees.map((a) => a.email).join(", ") ?? "", teams: event?.teams ?? false, allDay: event?.allDay ?? false });
   const save = useMutation({ mutationFn: async () => {
     let from: Date, to: Date;

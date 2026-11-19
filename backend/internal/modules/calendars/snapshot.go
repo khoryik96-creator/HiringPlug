@@ -153,6 +153,10 @@ func (s *Service) adopt(ctx context.Context, tx pgx.Tx, c store.CalendarConnecti
 
 func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, e graphEvent) error {
 	q := store.New(tx)
+	missingAttendee, err := saveCandidateResponse(ctx, q, row, e)
+	if err != nil {
+		return err
+	}
 	if row.Source == invitationSource && row.Teams && row.JoinUrl == nil && !e.IsCancelled {
 		if link := e.join(); link != nil {
 			if err := q.SaveInterviewJoinLink(ctx, store.SaveInterviewJoinLinkParams{ID: row.ID, JoinUrl: link, ExpectedVersion: row.Version}); err != nil {
@@ -160,7 +164,8 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 			}
 		}
 	}
-	if text(row.RemoteKey) == text(e.key()) || row.Version != row.SentVersion {
+	changedInvitation := row.Source == invitationSource && (missingAttendee || e.IsCancelled)
+	if !changedInvitation && text(row.RemoteKey) == text(e.key()) || row.Version != row.SentVersion {
 		return nil
 	}
 	snapshot, _ := json.Marshal(e)
@@ -169,8 +174,13 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 		return err
 	}
 	if row.Source != "local" {
-		if e.IsCancelled || !start.Equal(row.StartsAt) || !end.Equal(row.EndsAt) {
+		if missingAttendee || e.IsCancelled || !start.Equal(row.StartsAt) || !end.Equal(row.EndsAt) {
 			return q.MarkCalendarConflict(ctx, store.MarkCalendarConflictParams{ID: row.ID, RemoteKey: e.key(), RemoteSnapshot: snapshot})
+		}
+		if row.Source == invitationSource && responseOnly(row, e) {
+			return q.AcceptInvitationResponseReceipt(ctx, store.AcceptInvitationResponseReceiptParams{
+				ID: row.ID, ExpectedVersion: row.Version, RemoteKey: e.key(), RemoteSnapshot: snapshot,
+			})
 		}
 		return nil
 	}

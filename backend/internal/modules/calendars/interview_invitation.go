@@ -50,6 +50,7 @@ func (m *Module) InterviewInvitation(ctx context.Context, tx pgx.Tx, p authz.Pri
 	if !p.Can(api.PermissionInterviewsSchedule) || !p.Can(api.PermissionCalendarsUse) || row.ID != "" && row.UserID != p.UserID {
 		return out, nil
 	}
+	out.CanManageReminder = ptr(row.ID != "" && (row.CandidateReminder || meeting.Scheduled && meeting.Start.After(s.now().Add(candidateReminderCutoff))))
 	conn, err := store.New(tx).CalendarConnection(ctx, p.UserID)
 	if err != nil && !database.IsNoRows(err) {
 		return out, err
@@ -132,6 +133,10 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 		return out, invitationDenied(issue)
 	}
 	if row.ID == "" {
+		reminder := in.CandidateReminder != nil && *in.CandidateReminder
+		if reminder && !meeting.Start.After(s.now().Add(candidateReminderCutoff)) {
+			return out, invitationDenied("Choose an interview more than an hour away to enable the email reminder.")
+		}
 		if in.Teams && (!conn.TeamsAvailable || meeting.Mode != "video") {
 			return out, apperr.Validation(apperr.FieldErrors{{Field: "teams", Message: "choose a video interview and a Teams-enabled Outlook calendar"}})
 		}
@@ -139,7 +144,7 @@ func (m *Module) SendInterviewInvitation(ctx context.Context, tx pgx.Tx, p authz
 		row, err = q.InsertInterviewInvitation(ctx, store.InsertInterviewInvitationParams{
 			InterviewID: ptr(id), SourceVersion: int32(in.Version), Title: meeting.Title, Notes: meeting.Instructions, Location: bounded(meeting.Location, 500), //nolint:gosec // checked against the database version
 			StartsAt: meeting.Start, EndsAt: meeting.End, Teams: in.Teams, Attendees: attendees, ReminderMinutes: int32(in.ReminderMinutes), //nolint:gosec // reminder range is bounded by the contract
-			InvitationSubject: ptr(conn.SubjectID), InvitationCalendar: ptr(conn.CalendarID),
+			InvitationSubject: ptr(conn.SubjectID), InvitationCalendar: ptr(conn.CalendarID), CandidateReminder: reminder,
 		})
 	} else {
 		row, err = s.syncInvitationProjection(ctx, tx, row, meeting)
@@ -195,8 +200,12 @@ func invitationAPI(row store.CalendarEvent) api.InterviewInvitation {
 	if row.Status != "active" {
 		link = nil
 	}
-	return api.InterviewInvitation{Status: api.InterviewInvitationStatus(status), Teams: row.Teams, ReminderMinutes: int(row.ReminderMinutes),
-		Recipient: c.OrNull[string](nil), JoinUrl: c.OrNull(link), Issue: c.OrNull(row.SyncError)}
+	out := api.InterviewInvitation{Status: api.InterviewInvitationStatus(status), Teams: row.Teams, ReminderMinutes: int(row.ReminderMinutes),
+		Recipient: c.OrNull[string](nil), JoinUrl: c.OrNull(link), Issue: c.OrNull(row.SyncError), CandidateReminder: ptr(row.CandidateReminder)}
+	if row.CandidateResponse != nil {
+		out.CandidateResponse = ptr(api.InterviewInvitationCandidateResponse(*row.CandidateResponse))
+	}
+	return out
 }
 
 func inviteCalendar(row store.CalendarEvent, conn store.CalendarConnection) bool {

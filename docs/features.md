@@ -1572,7 +1572,7 @@ Email composers show Cc and Bcc on demand beside To. Filled copy recipients and 
 
 ## Calendar and Outlook
 
-More > Calendar provides private month, week and agenda views, local appointments,
+The calendar icon beside Settings opens private month, hourly week and day, and agenda views, local appointments,
 Microsoft default-calendar connection, Teams when supported, and Outlook busy-time
 checks for interviews and booking links. HiringPlug meetings sync as private holds;
 candidate invitations retain their existing flow. Attendee invitations on ordinary

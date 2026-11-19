@@ -95,6 +95,23 @@ type calendarRecipients struct {
 	privacy    *privacy.Module
 }
 
+type calendarReminderMail struct{ modules *Modules }
+
+func (a calendarReminderMail) QueueInterviewReminder(ctx context.Context, tx pgx.Tx, tenant, application, email string, at time.Time, reminder api.InterviewReminderDelivery) error {
+	return a.modules.Emails.Notify(ctx, tx, tenant, emails.Notice{
+		To: []string{email}, Subject: "Interview reminder", Body: "A reminder about your upcoming interview.",
+		ApplicationID: &application, DeliverAt: at, InterviewReminder: &reminder,
+	})
+}
+
+func (a calendarReminderMail) ReminderBody(ctx context.Context, tx pgx.Tx, tenant string, reminder api.InterviewReminderDelivery, to []string) (string, error) {
+	return a.modules.Calendars.ReminderBody(ctx, tx, tenant, reminder, to)
+}
+
+func (a calendarReminderMail) ReminderSent(ctx context.Context, tx pgx.Tx, reminder api.InterviewReminderDelivery) error {
+	return a.modules.Calendars.ReminderSent(ctx, tx, reminder)
+}
+
 func (a calendarRecipients) InterviewRecipient(ctx context.Context, tx pgx.Tx, applicationID string) (string, bool, error) {
 	apps, err := a.pipeline.Briefs(ctx, tx, []string{applicationID})
 	if err != nil {
