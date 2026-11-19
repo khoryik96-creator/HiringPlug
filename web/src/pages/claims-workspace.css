@@ -70,3 +70,5 @@
 .claim-bars .bar { display: block; height: 12px; min-width: 3px; background: var(--accent); border-radius: 0 4px 4px 0; }
 .claim-bars td.num { text-align: right; white-space: nowrap; padding-left: 0.6rem; font-variant-numeric: tabular-nums; }
 .claim-bars td.num small { display: block; font-size: 0.75rem; }
+.claims-table .claim-upload a { color: var(--accent); font-weight: 500; }
+.claim-upload.error { color: #b91c1c; }

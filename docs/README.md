@@ -47,3 +47,4 @@ Short records of the big choices, so nobody has to re-argue them:
 - [0006 Local first, cloud ready](adr/0006-local-first.md)
 
 - [Outlook calendar](calendar.md): personal calendar, Microsoft setup, scheduling and privacy.
+- [Claims storage](claims-storage.md): uploading claim receipts to Google Drive, OneDrive or Dropbox; app setup.

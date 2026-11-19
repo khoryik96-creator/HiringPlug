@@ -42,6 +42,7 @@ it("writes a CSV a spreadsheet cannot run", () => {
     contentType: "image/png", sizeBytes: 1, receiptDate: "2026-11-03", amount: "23.00", currency: "MYR", merchant: "=HYPERLINK(\"x\")",
     receiptType: "grab_fare", claimType: "travel", purpose: "Meeting, \"Acme\"", link: { kind: "company", id: "comp_1", name: "Acme", detail: null },
     fromReceipt: [], missing: [], claimedAt: "2026-11-04T01:00:00Z", reviewedAt: null, reviewedByName: null, reviewNote: null, paidAt: null,
+    upload: { status: "done", path: "Claims/2026-11/Aisyah/Grab fare/r.png", url: null, error: null, uploadedAt: null },
     version: 2, createdAt: "", updatedAt: "",
   }], { receiptType: () => "Grab / e-hailing fare", claimType: () => "Travel" });
   const [head, row] = csv.trim().split("\r\n");

@@ -115,6 +115,8 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, p authz.Principal, rows 
 			Purpose: nullableOf(r.Purpose), FromReceipt: fields(r.FromReceipt), Missing: fields(Missing(v)),
 			ClaimedAt: nullableOf(r.ClaimedAt), ReviewedAt: nullableOf(r.ReviewedAt), ReviewNote: nullableOf(r.ReviewNote),
 			PaidAt: nullableOf(r.PaidAt), ReviewedByName: nullable.NewNullNullable[string](), Link: nullable.NewNullNullable[api.ClaimLink](),
+			Upload: api.ClaimUpload{Status: api.ClaimUploadStatus(r.UploadStatus), Path: nullableOf(r.UploadPath), Url: nullableOf(r.UploadUrl),
+				Error: nullableOf(r.UploadError), UploadedAt: nullableOf(r.UploadedAt)},
 			Version: int(r.Version), CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, ReceiptDate: nullable.NewNullNullable[openapi_types.Date](),
 		}
 		if v.ReceiptDate != nil {

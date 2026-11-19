@@ -37,6 +37,7 @@ const MyDropdowns = page(() => import("./pages/MyDropdowns"), "MyDropdowns");
 const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
 const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
+const ClaimsStorage = page(() => import("./pages/ClaimsStorage"), "ClaimsStorage");
 const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 export const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Claims = page(() => import("./pages/Claims"), "Claims");
@@ -134,6 +135,8 @@ export const ROUTES: Route[] = [
     render: () => <ListSettings /> },
   { section: "settings-stages", path: /^#\/settings\/stages/, permission: "pipeline.templates:manage", menu: { in: "settings", label: "Pipeline stages", href: "#/settings/stages" },
     render: () => <StageTemplates /> },
+  { section: "settings-claims-storage", path: /^#\/settings\/claims-storage/, permission: "claims.storage:manage",
+    menu: { in: "settings", label: "Claims storage", href: "#/settings/claims-storage" }, render: () => <ClaimsStorage /> },
   { section: "industries", path: /^#\/industries/, permission: "settings:manage", menu: { in: "settings", label: "Industries", href: "#/industries" }, render: () => <Industries /> },
   { section: "ai-provider", path: /^#\/ai-provider/, permission: "aiproviders:manage", menu: { in: "settings", label: "AI provider", href: "#/ai-provider" },
     render: () => <AiProvider /> },

@@ -17,6 +17,8 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "calendar.source_changed": "Update calendar meeting",
   "claim.read_receipt": "Reading a claim's receipt",
   "claim.receipt_read": "Filling in a claim from its receipt",
+  "claim.upload": "Uploading a claim's receipt to the claims storage",
+  "claim.remove_upload": "Removing a deleted claim's receipt from the claims storage",
   "aiprovider.check": "Checking an AI key",
   "aiprovider.checked": "Saving an AI key check",
   "aiprovider.reported": "Noting whether the AI answered",

@@ -12,6 +12,7 @@ import { useFieldSettings } from "../useFieldSettings";
 import { type Claim, CLAIM_STATUS, type ClaimStatus, claimsCsv, formatTotals, totals } from "./claims";
 import { linkWords } from "./LinkPicker";
 import { TypeChip } from "./MyClaims";
+import { UploadNote } from "./UploadNote";
 
 const VIEWS: [ClaimStatus | "", string][] = [
   ["submitted", "Waiting for approval"], ["approved", "Approved, to pay"], ["paid", "Paid"], ["rejected", "Rejected"], ["", "All"],
@@ -135,6 +136,7 @@ export function ClaimApprovals() {
                   <td>
                     <span className={`badge claim-${c.status}`}>{CLAIM_STATUS[c.status]}</span>
                     {c.status === "rejected" && c.reviewNote && <span className="sub claim-why">{c.reviewNote}</span>}
+                    <UploadNote upload={c.upload} />
                   </td>
                   <td className="claim-tools"><button type="button" className="link" onClick={() => { setViewing(c); }}>Receipt</button></td>
                 </tr>

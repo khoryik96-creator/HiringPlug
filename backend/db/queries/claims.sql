@@ -109,7 +109,7 @@ RETURNING *;
 -- name: DeleteClaim :one
 DELETE FROM claim
 WHERE id = @id AND user_id = app_current_user() AND status IN ('draft', 'rejected')
-RETURNING storage_key;
+RETURNING storage_key, upload_provider, upload_account, upload_remote_id;
 
 -- Counted and added up for the dashboard: the person's own claims, or
 -- (team) everyone's but drafts.
@@ -138,3 +138,90 @@ SELECT count(*)::int FROM claim WHERE claim_type = @key;
 
 -- name: CurrentClaimTenant :one
 SELECT app_current_tenant()::text;
+
+-- Claims storage: the company account receipts are uploaded to (owners and
+-- admins; the worker as the system).
+
+-- name: GetClaimStorage :one
+SELECT * FROM claim_storage;
+
+-- name: LockClaimStorage :one
+SELECT * FROM claim_storage FOR UPDATE;
+
+-- name: SaveClaimStorageFolder :one
+INSERT INTO claim_storage (tenant_id, root_folder) VALUES (app_current_tenant(), @root_folder)
+ON CONFLICT (tenant_id) DO UPDATE SET root_folder = excluded.root_folder, version = claim_storage.version + 1, updated_at = now()
+  WHERE claim_storage.version = @version
+RETURNING *;
+
+-- name: ConnectClaimStorage :one
+INSERT INTO claim_storage (tenant_id, provider, account, sealed_tokens, app_client_id, status, connected_at, connected_by)
+VALUES (app_current_tenant(), @provider, @account, @sealed_tokens, @app_client_id, 'ok', now(), app_current_user())
+ON CONFLICT (tenant_id) DO UPDATE SET provider = excluded.provider, account = excluded.account,
+  sealed_tokens = excluded.sealed_tokens, app_client_id = excluded.app_client_id, status = 'ok', error = NULL,
+  connected_at = now(), connected_by = app_current_user(), version = claim_storage.version + 1, updated_at = now()
+RETURNING *;
+
+-- name: SaveClaimStorageTokens :execrows
+UPDATE claim_storage SET sealed_tokens = @sealed_tokens
+WHERE provider = @provider AND account = @account;
+
+-- name: MarkClaimStorage :execrows
+UPDATE claim_storage SET status = @status, error = sqlc.narg(error), version = version + 1, updated_at = now()
+WHERE provider = @provider AND account = @account AND (status <> @status OR error IS DISTINCT FROM sqlc.narg(error));
+
+-- name: DisconnectClaimStorage :exec
+UPDATE claim_storage SET provider = NULL, account = NULL, sealed_tokens = NULL, app_client_id = NULL,
+  status = 'disconnected', error = NULL, connected_at = NULL, connected_by = NULL, version = version + 1, updated_at = now();
+
+-- name: ClaimUploadCounts :one
+SELECT count(*) FILTER (WHERE upload_status = 'pending')::int AS pending,
+       count(*) FILTER (WHERE upload_status = 'failed')::int AS failed,
+       count(*) FILTER (WHERE upload_status = 'done')::int AS done
+FROM claim;
+
+-- name: SaveClaimStorageState :exec
+INSERT INTO claim_storage_state (tenant_id, user_id, provider, state_hash, app_client_id, sealed_verifier, expires_at)
+VALUES (app_current_tenant(), app_current_user(), @provider, @state_hash, @app_client_id, @sealed_verifier, @expires_at)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET provider = excluded.provider, state_hash = excluded.state_hash,
+  app_client_id = excluded.app_client_id, sealed_verifier = excluded.sealed_verifier, expires_at = excluded.expires_at,
+  sealed_code = NULL, ticket_hash = NULL, consumed = false;
+
+-- name: ParkClaimStorageCode :execrows
+UPDATE claim_storage_state SET consumed = true, sealed_code = sqlc.narg(sealed_code), ticket_hash = sqlc.narg(ticket_hash)
+WHERE state_hash = @state_hash AND NOT consumed AND expires_at > now();
+
+-- name: ParkedClaimStorageCode :one
+SELECT * FROM claim_storage_state WHERE ticket_hash = @ticket_hash AND consumed AND expires_at > now();
+
+-- name: TakeClaimStorageCode :execrows
+DELETE FROM claim_storage_state WHERE state_hash = @state_hash AND consumed AND expires_at > now();
+
+-- Uploads. They change no claim version: the claimant's edits are not
+-- turned stale by an upload finishing.
+
+-- name: QueueClaimUpload :one
+UPDATE claim SET upload_status = 'pending', upload_error = NULL, upload_sequence = upload_sequence + 1
+WHERE id = @id RETURNING upload_sequence;
+
+-- name: ClaimsToUploadAgain :many
+SELECT id FROM claim
+WHERE upload_status IN ('pending', 'failed') AND status IN ('submitted', 'approved', 'paid')
+ORDER BY claimed_at, id LIMIT 1000;
+
+-- name: SaveClaimUpload :execrows
+UPDATE claim SET upload_status = 'done', upload_path = @upload_path, upload_url = sqlc.narg(upload_url), upload_error = NULL,
+  uploaded_at = now(), upload_provider = @upload_provider, upload_account = @upload_account, upload_remote_id = @upload_remote_id
+WHERE id = @id AND upload_sequence = @upload_sequence;
+
+-- name: FailClaimUpload :execrows
+UPDATE claim SET upload_status = 'failed', upload_error = @upload_error
+WHERE id = @id AND upload_sequence = @upload_sequence AND upload_status = 'pending';
+
+-- name: ForgetClaimUpload :exec
+UPDATE claim SET upload_remote_id = NULL
+WHERE id = @id AND upload_remote_id = @upload_remote_id;
+
+-- name: ResetClaimUpload :exec
+UPDATE claim SET upload_status = 'none', upload_error = NULL
+WHERE id = @id AND upload_sequence = @upload_sequence AND upload_status = 'pending';

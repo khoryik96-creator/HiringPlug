@@ -36,6 +36,8 @@ type Service struct {
 	deps  Deps
 	zone  *time.Location
 	now   func() time.Time
+	// storage uploads submitted receipts (nil: not set up).
+	storage *Storage
 }
 
 // today is the company's date, at midnight UTC (as dates are kept).
@@ -275,8 +277,15 @@ func (s *Service) Delete(ctx context.Context, p authz.Principal, id string) erro
 		if !Editable(row.Status) {
 			return apperr.New(api.ErrorCodeCLAIMWRONGSTATUS, "This claim is "+row.Status+": only draft and rejected claims can be deleted.")
 		}
-		if key, err = q.DeleteClaim(ctx, id); err != nil {
+		gone, err := q.DeleteClaim(ctx, id)
+		if err != nil {
 			return err
+		}
+		key = gone.StorageKey
+		if s.storage != nil {
+			if err := s.storage.Deleted(ctx, tx, p.TenantID, gone); err != nil {
+				return err
+			}
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "claim.deleted", EntityType: "claim", EntityID: id})
 	})

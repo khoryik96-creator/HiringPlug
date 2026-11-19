@@ -101,6 +101,10 @@ x-error-codes:
     module: claims
     status: 409
     description: 'You already uploaded this exact receipt (the same file): `details.existingClaimId` is its claim.'
+  CLAIM_STORAGE_NOT_CONNECTED:
+    module: claims
+    status: 409
+    description: 'No claims storage account is connected: connect Google Drive, OneDrive or Dropbox in Settings > Claims storage first.'
   CLAIM_WRONG_STATUS:
     module: claims
     status: 409
@@ -1762,6 +1766,121 @@ paths:
               schema: {type: string, format: binary}
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/claims/storage:
+    get:
+      operationId: getClaimStorage
+      tags: [claims]
+      summary: Where submitted receipts are uploaded, and how the uploads are going
+      x-permission: claims.storage:manage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimStorage'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      operationId: updateClaimStorage
+      tags: [claims]
+      summary: Change the folder receipts are uploaded into
+      x-permission: claims.storage:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimStorageUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimStorage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: disconnectClaimStorage
+      tags: [claims]
+      summary: Stop uploading receipts and forget the account (files already uploaded stay)
+      x-permission: claims.storage:manage
+      responses:
+        '204': {description: Disconnected}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/storage/authorize:
+    post:
+      operationId: authorizeClaimStorage
+      tags: [claims]
+      summary: Start connecting a Google Drive, OneDrive or Dropbox account (open the URL returned)
+      x-permission: claims.storage:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimStorageAuthorize'}
+      responses:
+        '200':
+          description: The provider's sign-in page
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimStorageAuthorization'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/storage/callback:
+    get:
+      operationId: claimStorageCallback
+      tags: [claims]
+      summary: Park the provider's consent; the signed-in person who started it finishes it
+      x-permission: public
+      parameters:
+        - {name: state, in: query, schema: {type: string}}
+        - {name: code, in: query, schema: {type: string}}
+        - {name: error, in: query, schema: {type: string}}
+      responses:
+        '303':
+          description: Back to Settings > Claims storage to finish connecting
+          headers:
+            Location: {schema: {type: string}}
+            Cache-Control: {schema: {type: string}}
+            Referrer-Policy: {schema: {type: string}}
+  /v1/claims/storage/complete:
+    post:
+      operationId: completeClaimStorage
+      tags: [claims]
+      summary: Finish connecting the account the provider approved
+      x-permission: claims.storage:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimStorageTicket'}
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimStorage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/storage/retry:
+    post:
+      operationId: retryClaimUploads
+      tags: [claims]
+      summary: Upload again the receipts whose upload failed
+      x-permission: claims.storage:manage
+      responses:
+        '200':
+          description: How many were queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimUploadsQueued'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /v1/companies:
     get:
       operationId: listCompanies
@@ -7536,6 +7655,7 @@ components:
         - candidates:merge
         - candidates:read
         - candidates:update
+        - claims.storage:manage
         - claims:approve
         - claims:create
         - companies.category:update
@@ -7622,6 +7742,7 @@ components:
         - CANDIDATE_DUPLICATE_EMAIL
         - CAREERS_TOO_MANY_APPLICATIONS
         - CLAIM_DUPLICATE
+        - CLAIM_STORAGE_NOT_CONNECTED
         - CLAIM_WRONG_STATUS
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
@@ -7690,6 +7811,8 @@ components:
         - calendar.source_changed
         - claim.read_receipt
         - claim.receipt_read
+        - claim.remove_upload
+        - claim.upload
         - company.autofill
         - company.industried
         - company.industry
@@ -9313,7 +9436,7 @@ components:
         id: {type: string, maxLength: 40, pattern: '^(comp|cont|cand)_[0-9a-hjkmnp-tv-z]{26}$'}
     Claim:
       type: object
-      required: [id, userId, userName, status, ocrStatus, ocrError, fileName, contentType, sizeBytes, receiptDate, amount, currency, merchant, receiptType, claimType, purpose, link, fromReceipt, missing, claimedAt, reviewedAt, reviewedByName, reviewNote, paidAt, version, createdAt, updatedAt]
+      required: [id, userId, userName, status, ocrStatus, ocrError, fileName, contentType, sizeBytes, receiptDate, amount, currency, merchant, receiptType, claimType, purpose, link, fromReceipt, missing, claimedAt, reviewedAt, reviewedByName, reviewNote, paidAt, upload, version, createdAt, updatedAt]
       properties:
         id: {$ref: '#/components/schemas/ClaimId'}
         userId: {$ref: '#/components/schemas/UserId'}
@@ -9349,6 +9472,7 @@ components:
         reviewedByName: {type: string, nullable: true}
         reviewNote: {type: string, nullable: true, description: Why it was rejected.}
         paidAt: {type: string, format: date-time, nullable: true}
+        upload: {$ref: '#/components/schemas/ClaimUpload'}
         version: {type: integer}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
@@ -9527,6 +9651,102 @@ components:
         receiptType: {type: string, maxLength: 100, nullable: true, description: "One of the receipt types sent, or null."}
         extractor: {type: string, description: "Which reader produced the text, e.g. pdfplumber@0.11 or tesseract@5.3."}
         errorMessage: {type: string, nullable: true, description: Why nothing could be read (shown to the person).}
+    ClaimUploadStatus:
+      type: string
+      description: "none = not uploaded (a draft, or no storage connected when it was submitted); pending = being uploaded; done = in the claims storage; failed = see error (an owner or admin can try again)."
+      enum: [none, pending, done, failed]
+    ClaimUpload:
+      type: object
+      required: [status, path, url, error, uploadedAt]
+      properties:
+        status: {$ref: '#/components/schemas/ClaimUploadStatus'}
+        path: {type: string, nullable: true, description: "Where the receipt is, e.g. Claims/2026-11/Aisyah Rahman/Grab fare/2026-11-03 Grab MYR 23.00 (t5v6w7).pdf"}
+        url: {type: string, nullable: true, description: The file (or its folder) in the provider's web app.}
+        error: {type: string, nullable: true}
+        uploadedAt: {type: string, format: date-time, nullable: true}
+    ClaimStorageProvider:
+      type: string
+      enum: [google_drive, onedrive, dropbox]
+    ClaimStorageStatus:
+      type: string
+      description: "disconnected = no account; ok = uploading; reconnect = the provider stopped accepting HiringPlug's access: connect the account again."
+      enum: [disconnected, ok, reconnect]
+    ClaimStorageOption:
+      type: object
+      required: [provider, ready, problem]
+      properties:
+        provider: {$ref: '#/components/schemas/ClaimStorageProvider'}
+        ready: {type: boolean, description: The server has an app registered with this provider to connect through.}
+        problem: {type: string, nullable: true, description: Why it cannot be connected yet.}
+    ClaimUploadCounts:
+      type: object
+      required: [pending, failed, done]
+      properties:
+        pending: {type: integer}
+        failed: {type: integer}
+        done: {type: integer}
+    ClaimStorage:
+      type: object
+      required: [provider, account, rootFolder, status, error, callbackUrl, options, uploads, connectedAt, version]
+      properties:
+        provider:
+          allOf: [{$ref: '#/components/schemas/ClaimStorageProvider'}]
+          nullable: true
+        account: {type: string, nullable: true, description: The connected account (its email address).}
+        rootFolder: {type: string, description: "The folder at the top of the drive receipts go into, e.g. Claims or Finance/Claims."}
+        status: {$ref: '#/components/schemas/ClaimStorageStatus'}
+        error: {type: string, nullable: true}
+        callbackUrl: {type: string, description: The redirect URL to register in each provider's app.}
+        options:
+          type: array
+          items: {$ref: '#/components/schemas/ClaimStorageOption'}
+        uploads: {$ref: '#/components/schemas/ClaimUploadCounts'}
+        connectedAt: {type: string, format: date-time, nullable: true}
+        version: {type: integer}
+    ClaimStorageUpdate:
+      type: object
+      additionalProperties: false
+      required: [rootFolder, version]
+      properties:
+        rootFolder: {type: string, minLength: 1, maxLength: 200}
+        version: {type: integer}
+    ClaimStorageAuthorize:
+      type: object
+      additionalProperties: false
+      required: [provider]
+      properties:
+        provider: {$ref: '#/components/schemas/ClaimStorageProvider'}
+    ClaimStorageAuthorization:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string}
+    ClaimStorageTicket:
+      type: object
+      additionalProperties: false
+      required: [ticket]
+      properties:
+        ticket: {type: string, minLength: 1, maxLength: 200}
+    ClaimUploadsQueued:
+      type: object
+      required: [queued]
+      properties:
+        queued: {type: integer}
+    ClaimUploadJob:
+      type: object
+      additionalProperties: false
+      required: [claimId, sequence]
+      properties:
+        claimId: {$ref: '#/components/schemas/ClaimId'}
+        sequence: {type: integer, description: "The claim's upload sequence when queued: an older job (the claim submitted again since) does nothing."}
+    ClaimRemoveUploadJob:
+      type: object
+      additionalProperties: false
+      required: [provider, account, remoteId]
+      properties:
+        provider: {$ref: '#/components/schemas/ClaimStorageProvider'}
+        account: {type: string}
+        remoteId: {type: string, maxLength: 500}
     CompanyDocumentId:
       type: string
       pattern: '^cdoc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -15107,6 +15327,11 @@ x-permissions:
     description: Edit candidate profiles.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
+  claims.storage:manage:
+    module: claims
+    description: Choose where submitted receipts are uploaded (the company's Google Drive, OneDrive or Dropbox) and connect its account.
+    sensitive: true
+    roles: [owner, admin]
   claims:approve:
     module: claims
     description: See everyone's claims and the team's claims dashboard; approve, reject and mark claims paid.
@@ -15529,6 +15754,18 @@ x-jobs:
     payload: ClaimReceiptReadJob
     priority: high
     description: Fill in what was read from a receipt on its claim, in the fields still empty (Go worker).
+  claim.remove_upload:
+    module: claims
+    queue: core
+    payload: ClaimRemoveUploadJob
+    priority: low
+    description: Delete a deleted claim's receipt from the claims storage it was uploaded to (Go worker).
+  claim.upload:
+    module: claims
+    queue: core
+    payload: ClaimUploadJob
+    priority: normal
+    description: Upload a submitted claim's receipt to the company's claims storage, in Month / Person / Receipt type folders (Go worker; replaces the claim's earlier upload).
   company.autofill:
     module: companies
     queue: core

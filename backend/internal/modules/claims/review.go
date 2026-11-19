@@ -93,6 +93,18 @@ func (s *Service) Submit(ctx context.Context, p authz.Principal, refs []Ref) ([]
 			}
 			saved = append(saved, row)
 		}
+		if s.storage != nil {
+			ids := make([]string, 0, len(saved))
+			for _, r := range saved {
+				ids = append(ids, r.ID)
+			}
+			if err := s.storage.Submitted(ctx, tx, p.TenantID, ids); err != nil {
+				return err
+			}
+			if saved, err = q.LockClaims(ctx, ids); err != nil { // with their upload queued
+				return err
+			}
+		}
 		out, err = s.views(ctx, tx, p, saved)
 		return err
 	})

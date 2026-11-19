@@ -56,6 +56,8 @@ type Deps struct {
 		HasOption(ctx context.Context, tx pgx.Tx, list, key string) (bool, error)
 		// Choices are a list's options offered for new choices, in order.
 		Choices(ctx context.Context, tx pgx.Tx, list string) ([]Option, error)
+		// Labels are every list's words for its options (hidden ones too): list -> key -> label.
+		Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error)
 	}
 	// Records names the companies, contacts or candidates (kind) among ids
 	// that the transaction's person may see; the others are left out.

@@ -34,6 +34,7 @@ class Permission(StrEnum):
     candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
+    claims_storage_manage = "claims.storage:manage"
     claims_approve = "claims:approve"
     claims_create = "claims:create"
     companies_category_update = "companies.category:update"
@@ -120,6 +121,7 @@ class ErrorCode(StrEnum):
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
     CLAIM_DUPLICATE = "CLAIM_DUPLICATE"
+    CLAIM_STORAGE_NOT_CONNECTED = "CLAIM_STORAGE_NOT_CONNECTED"
     CLAIM_WRONG_STATUS = "CLAIM_WRONG_STATUS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
@@ -188,6 +190,8 @@ class JobKind(StrEnum):
     calendar_source_changed = "calendar.source_changed"
     claim_read_receipt = "claim.read_receipt"
     claim_receipt_read = "claim.receipt_read"
+    claim_remove_upload = "claim.remove_upload"
+    claim_upload = "claim.upload"
     company_autofill = "company.autofill"
     company_industried = "company.industried"
     company_industry = "company.industry"
@@ -1343,58 +1347,9 @@ class ClaimLinkInput(BaseModel):
     id: Annotated[str, Field(max_length=40, pattern="^(comp|cont|cand)_[0-9a-hjkmnp-tv-z]{26}$")]
 
 
-class Claim(BaseModel):
-    id: ClaimId
-    userId: UserId
-    userName: Annotated[str, Field(description="Who claims it.")]
-    status: ClaimStatus
-    ocrStatus: ClaimOcrStatus
-    ocrError: Annotated[str | None, Field(description="Why the receipt could not be read.")]
-    fileName: str
-    contentType: str
-    sizeBytes: int
-    receiptDate: Annotated[date | None, Field(...)]
-    amount: Annotated[DecimalAmount | None, Field(...)]
-    currency: CurrencyCode
-    merchant: Annotated[str | None, Field(...)]
-    receiptType: Annotated[str | None, Field(description="An option of the claim_receipt_type dropdown.")]
-    claimType: Annotated[str | None, Field(description="An option of the claim_type dropdown.")]
-    purpose: Annotated[str | None, Field(...)]
-    link: Annotated[ClaimLink | None, Field(...)]
-    fromReceipt: Annotated[
-        list[ClaimField],
-        Field(
-            description="The fields whose value was read from the receipt and not changed since (show them as suggestions)."
-        ),
-    ]
-    missing: Annotated[
-        list[ClaimField], Field(description="What must still be filled in before the claim can be submitted.")
-    ]
-    claimedAt: Annotated[AwareDatetime | None, Field(description="When it was (last) submitted.")]
-    reviewedAt: Annotated[AwareDatetime | None, Field(...)]
-    reviewedByName: Annotated[str | None, Field(...)]
-    reviewNote: Annotated[str | None, Field(description="Why it was rejected.")]
-    paidAt: Annotated[AwareDatetime | None, Field(...)]
-    version: int
-    createdAt: AwareDatetime
-    updatedAt: AwareDatetime
-
-
 class ClaimAmount(BaseModel):
     currency: CurrencyCode
     amount: DecimalAmount
-
-
-class ClaimPage(BaseModel):
-    items: list[Claim]
-    total: Annotated[int, Field(description="Claims matching (the page holds at most `limit`).")]
-    totals: Annotated[
-        list[ClaimAmount], Field(description="The amount of all matching claims, per currency.")
-    ]
-
-
-class ClaimList(BaseModel):
-    items: list[Claim]
 
 
 class ClaimUpdate(BaseModel):
@@ -1543,6 +1498,122 @@ class ClaimReceiptReadJob(BaseModel):
         str, Field(description="Which reader produced the text, e.g. pdfplumber@0.11 or tesseract@5.3.")
     ]
     errorMessage: Annotated[str | None, Field(description="Why nothing could be read (shown to the person).")]
+
+
+class ClaimUploadStatus(StrEnum):
+    none = "none"
+    pending = "pending"
+    done = "done"
+    failed = "failed"
+
+
+class ClaimUpload(BaseModel):
+    status: ClaimUploadStatus
+    path: Annotated[
+        str | None,
+        Field(
+            description="Where the receipt is, e.g. Claims/2026-11/Aisyah Rahman/Grab fare/2026-11-03 Grab MYR 23.00 (t5v6w7).pdf"
+        ),
+    ]
+    url: Annotated[str | None, Field(description="The file (or its folder) in the provider's web app.")]
+    error: Annotated[str | None, Field(...)]
+    uploadedAt: Annotated[AwareDatetime | None, Field(...)]
+
+
+class ClaimStorageProvider(StrEnum):
+    google_drive = "google_drive"
+    onedrive = "onedrive"
+    dropbox = "dropbox"
+
+
+class ClaimStorageStatus(StrEnum):
+    disconnected = "disconnected"
+    ok = "ok"
+    reconnect = "reconnect"
+
+
+class ClaimStorageOption(BaseModel):
+    provider: ClaimStorageProvider
+    ready: Annotated[
+        bool, Field(description="The server has an app registered with this provider to connect through.")
+    ]
+    problem: Annotated[str | None, Field(description="Why it cannot be connected yet.")]
+
+
+class ClaimUploadCounts(BaseModel):
+    pending: int
+    failed: int
+    done: int
+
+
+class ClaimStorage(BaseModel):
+    provider: Annotated[ClaimStorageProvider | None, Field(...)]
+    account: Annotated[str | None, Field(description="The connected account (its email address).")]
+    rootFolder: Annotated[
+        str,
+        Field(
+            description="The folder at the top of the drive receipts go into, e.g. Claims or Finance/Claims."
+        ),
+    ]
+    status: ClaimStorageStatus
+    error: Annotated[str | None, Field(...)]
+    callbackUrl: Annotated[str, Field(description="The redirect URL to register in each provider's app.")]
+    options: list[ClaimStorageOption]
+    uploads: ClaimUploadCounts
+    connectedAt: Annotated[AwareDatetime | None, Field(...)]
+    version: int
+
+
+class ClaimStorageUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    rootFolder: Annotated[str, Field(max_length=200, min_length=1)]
+    version: int
+
+
+class ClaimStorageAuthorize(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: ClaimStorageProvider
+
+
+class ClaimStorageAuthorization(BaseModel):
+    url: str
+
+
+class ClaimStorageTicket(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    ticket: Annotated[str, Field(max_length=200, min_length=1)]
+
+
+class ClaimUploadsQueued(BaseModel):
+    queued: int
+
+
+class ClaimUploadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    claimId: ClaimId
+    sequence: Annotated[
+        int,
+        Field(
+            description="The claim's upload sequence when queued: an older job (the claim submitted again since) does nothing."
+        ),
+    ]
+
+
+class ClaimRemoveUploadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    provider: ClaimStorageProvider
+    account: str
+    remoteId: Annotated[str, Field(max_length=500)]
 
 
 class CompanyDocumentId(RootModel[str]):
@@ -6072,6 +6143,56 @@ class PublicJobAd(BaseModel):
     description: Annotated[str, Field(description="The blind text when the ad is published blind.")]
     closesOn: Annotated[date | None, Field(...)]
     publishedAt: AwareDatetime
+
+
+class Claim(BaseModel):
+    id: ClaimId
+    userId: UserId
+    userName: Annotated[str, Field(description="Who claims it.")]
+    status: ClaimStatus
+    ocrStatus: ClaimOcrStatus
+    ocrError: Annotated[str | None, Field(description="Why the receipt could not be read.")]
+    fileName: str
+    contentType: str
+    sizeBytes: int
+    receiptDate: Annotated[date | None, Field(...)]
+    amount: Annotated[DecimalAmount | None, Field(...)]
+    currency: CurrencyCode
+    merchant: Annotated[str | None, Field(...)]
+    receiptType: Annotated[str | None, Field(description="An option of the claim_receipt_type dropdown.")]
+    claimType: Annotated[str | None, Field(description="An option of the claim_type dropdown.")]
+    purpose: Annotated[str | None, Field(...)]
+    link: Annotated[ClaimLink | None, Field(...)]
+    fromReceipt: Annotated[
+        list[ClaimField],
+        Field(
+            description="The fields whose value was read from the receipt and not changed since (show them as suggestions)."
+        ),
+    ]
+    missing: Annotated[
+        list[ClaimField], Field(description="What must still be filled in before the claim can be submitted.")
+    ]
+    claimedAt: Annotated[AwareDatetime | None, Field(description="When it was (last) submitted.")]
+    reviewedAt: Annotated[AwareDatetime | None, Field(...)]
+    reviewedByName: Annotated[str | None, Field(...)]
+    reviewNote: Annotated[str | None, Field(description="Why it was rejected.")]
+    paidAt: Annotated[AwareDatetime | None, Field(...)]
+    upload: ClaimUpload
+    version: int
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class ClaimPage(BaseModel):
+    items: list[Claim]
+    total: Annotated[int, Field(description="Claims matching (the page holds at most `limit`).")]
+    totals: Annotated[
+        list[ClaimAmount], Field(description="The amount of all matching claims, per currency.")
+    ]
+
+
+class ClaimList(BaseModel):
+    items: list[Claim]
 
 
 class CompanyBenefit(BaseModel):

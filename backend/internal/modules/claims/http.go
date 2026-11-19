@@ -20,6 +20,7 @@ import (
 // HTTP implements the claims part of the API: contract types <-> service.
 type HTTP struct {
 	svc            *Service
+	storage        *Storage // nil: claims storage is not set up
 	maxUploadBytes int64
 }
 

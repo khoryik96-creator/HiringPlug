@@ -156,6 +156,7 @@ export function testClaim(over: Partial<Schemas["Claim"]> = {}): Schemas["Claim"
     contentType: "image/png", sizeBytes: 100, receiptDate: "2026-11-03", amount: "23.00", currency: "MYR", merchant: "Grab",
     receiptType: "grab_fare", claimType: "travel", purpose: "Meeting Acme", link: null, fromReceipt: ["amount", "merchant", "receiptType"],
     missing: [], claimedAt: null, reviewedAt: null, reviewedByName: null, reviewNote: null, paidAt: null, version: 3,
+    upload: { status: "none", path: null, url: null, error: null, uploadedAt: null },
     createdAt: "2026-11-03T01:00:00Z", updatedAt: "2026-11-03T01:00:00Z", ...over,
   };
 }

@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -76,6 +77,93 @@ func (q *Queries) ClaimFacts(ctx context.Context, arg ClaimFactsParams) ([]Claim
 	return items, nil
 }
 
+const claimUploadCounts = `-- name: ClaimUploadCounts :one
+SELECT count(*) FILTER (WHERE upload_status = 'pending')::int AS pending,
+       count(*) FILTER (WHERE upload_status = 'failed')::int AS failed,
+       count(*) FILTER (WHERE upload_status = 'done')::int AS done
+FROM claim
+`
+
+type ClaimUploadCountsRow struct {
+	Pending int32
+	Failed  int32
+	Done    int32
+}
+
+func (q *Queries) ClaimUploadCounts(ctx context.Context) (ClaimUploadCountsRow, error) {
+	row := q.db.QueryRow(ctx, claimUploadCounts)
+	var i ClaimUploadCountsRow
+	err := row.Scan(&i.Pending, &i.Failed, &i.Done)
+	return i, err
+}
+
+const claimsToUploadAgain = `-- name: ClaimsToUploadAgain :many
+SELECT id FROM claim
+WHERE upload_status IN ('pending', 'failed') AND status IN ('submitted', 'approved', 'paid')
+ORDER BY claimed_at, id LIMIT 1000
+`
+
+func (q *Queries) ClaimsToUploadAgain(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, claimsToUploadAgain)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const connectClaimStorage = `-- name: ConnectClaimStorage :one
+INSERT INTO claim_storage (tenant_id, provider, account, sealed_tokens, app_client_id, status, connected_at, connected_by)
+VALUES (app_current_tenant(), $1, $2, $3, $4, 'ok', now(), app_current_user())
+ON CONFLICT (tenant_id) DO UPDATE SET provider = excluded.provider, account = excluded.account,
+  sealed_tokens = excluded.sealed_tokens, app_client_id = excluded.app_client_id, status = 'ok', error = NULL,
+  connected_at = now(), connected_by = app_current_user(), version = claim_storage.version + 1, updated_at = now()
+RETURNING tenant_id, provider, account, root_folder, sealed_tokens, app_client_id, status, error, connected_at, connected_by, version, updated_at
+`
+
+type ConnectClaimStorageParams struct {
+	Provider     *string
+	Account      *string
+	SealedTokens *string
+	AppClientID  *string
+}
+
+func (q *Queries) ConnectClaimStorage(ctx context.Context, arg ConnectClaimStorageParams) (ClaimStorage, error) {
+	row := q.db.QueryRow(ctx, connectClaimStorage,
+		arg.Provider,
+		arg.Account,
+		arg.SealedTokens,
+		arg.AppClientID,
+	)
+	var i ClaimStorage
+	err := row.Scan(
+		&i.TenantID,
+		&i.Provider,
+		&i.Account,
+		&i.RootFolder,
+		&i.SealedTokens,
+		&i.AppClientID,
+		&i.Status,
+		&i.Error,
+		&i.ConnectedAt,
+		&i.ConnectedBy,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countClaimsWithClaimType = `-- name: CountClaimsWithClaimType :one
 SELECT count(*)::int FROM claim WHERE claim_type = $1
 `
@@ -114,7 +202,7 @@ const decideClaim = `-- name: DecideClaim :one
 UPDATE claim SET status = $1, reviewed_at = now(), reviewed_by = app_current_user(), review_note = $2,
   version = version + 1, updated_at = now()
 WHERE id = $3 AND version = $4 AND status = 'submitted'
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type DecideClaimParams struct {
@@ -163,6 +251,15 @@ func (q *Queries) DecideClaim(ctx context.Context, arg DecideClaimParams) (Claim
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
 }
@@ -170,18 +267,74 @@ func (q *Queries) DecideClaim(ctx context.Context, arg DecideClaimParams) (Claim
 const deleteClaim = `-- name: DeleteClaim :one
 DELETE FROM claim
 WHERE id = $1 AND user_id = app_current_user() AND status IN ('draft', 'rejected')
-RETURNING storage_key
+RETURNING storage_key, upload_provider, upload_account, upload_remote_id
 `
 
-func (q *Queries) DeleteClaim(ctx context.Context, id string) (string, error) {
+type DeleteClaimRow struct {
+	StorageKey     string
+	UploadProvider *string
+	UploadAccount  *string
+	UploadRemoteID *string
+}
+
+func (q *Queries) DeleteClaim(ctx context.Context, id string) (DeleteClaimRow, error) {
 	row := q.db.QueryRow(ctx, deleteClaim, id)
-	var storage_key string
-	err := row.Scan(&storage_key)
-	return storage_key, err
+	var i DeleteClaimRow
+	err := row.Scan(
+		&i.StorageKey,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
+	)
+	return i, err
+}
+
+const disconnectClaimStorage = `-- name: DisconnectClaimStorage :exec
+UPDATE claim_storage SET provider = NULL, account = NULL, sealed_tokens = NULL, app_client_id = NULL,
+  status = 'disconnected', error = NULL, connected_at = NULL, connected_by = NULL, version = version + 1, updated_at = now()
+`
+
+func (q *Queries) DisconnectClaimStorage(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, disconnectClaimStorage)
+	return err
+}
+
+const failClaimUpload = `-- name: FailClaimUpload :execrows
+UPDATE claim SET upload_status = 'failed', upload_error = $1
+WHERE id = $2 AND upload_sequence = $3 AND upload_status = 'pending'
+`
+
+type FailClaimUploadParams struct {
+	UploadError    *string
+	ID             string
+	UploadSequence int32
+}
+
+func (q *Queries) FailClaimUpload(ctx context.Context, arg FailClaimUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failClaimUpload, arg.UploadError, arg.ID, arg.UploadSequence)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const forgetClaimUpload = `-- name: ForgetClaimUpload :exec
+UPDATE claim SET upload_remote_id = NULL
+WHERE id = $1 AND upload_remote_id = $2
+`
+
+type ForgetClaimUploadParams struct {
+	ID             string
+	UploadRemoteID *string
+}
+
+func (q *Queries) ForgetClaimUpload(ctx context.Context, arg ForgetClaimUploadParams) error {
+	_, err := q.db.Exec(ctx, forgetClaimUpload, arg.ID, arg.UploadRemoteID)
+	return err
 }
 
 const getClaim = `-- name: GetClaim :one
-SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at FROM claim WHERE id = $1
+SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id FROM claim WHERE id = $1
 `
 
 func (q *Queries) GetClaim(ctx context.Context, id string) (Claim, error) {
@@ -218,6 +371,42 @@ func (q *Queries) GetClaim(ctx context.Context, id string) (Claim, error) {
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
+	)
+	return i, err
+}
+
+const getClaimStorage = `-- name: GetClaimStorage :one
+
+SELECT tenant_id, provider, account, root_folder, sealed_tokens, app_client_id, status, error, connected_at, connected_by, version, updated_at FROM claim_storage
+`
+
+// Claims storage: the company account receipts are uploaded to (owners and
+// admins; the worker as the system).
+func (q *Queries) GetClaimStorage(ctx context.Context) (ClaimStorage, error) {
+	row := q.db.QueryRow(ctx, getClaimStorage)
+	var i ClaimStorage
+	err := row.Scan(
+		&i.TenantID,
+		&i.Provider,
+		&i.Account,
+		&i.RootFolder,
+		&i.SealedTokens,
+		&i.AppClientID,
+		&i.Status,
+		&i.Error,
+		&i.ConnectedAt,
+		&i.ConnectedBy,
+		&i.Version,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -225,7 +414,7 @@ func (q *Queries) GetClaim(ctx context.Context, id string) (Claim, error) {
 const insertClaim = `-- name: InsertClaim :one
 INSERT INTO claim (id, tenant_id, user_id, file_name, content_type, size_bytes, sha256, storage_key, currency)
 VALUES ($1, app_current_tenant(), app_current_user(), $2, $3, $4, $5, $6, $7)
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type InsertClaimParams struct {
@@ -280,12 +469,21 @@ func (q *Queries) InsertClaim(ctx context.Context, arg InsertClaimParams) (Claim
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
 }
 
 const listMyClaims = `-- name: ListMyClaims :many
-SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at FROM claim
+SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id FROM claim
 WHERE user_id = app_current_user()
   AND ($1::text IS NULL OR status = $1)
   AND ($2::date IS NULL OR coalesce(receipt_date, created_at::date) >= $2)
@@ -348,6 +546,15 @@ func (q *Queries) ListMyClaims(ctx context.Context, arg ListMyClaimsParams) ([]C
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UploadStatus,
+			&i.UploadSequence,
+			&i.UploadPath,
+			&i.UploadUrl,
+			&i.UploadError,
+			&i.UploadedAt,
+			&i.UploadProvider,
+			&i.UploadAccount,
+			&i.UploadRemoteID,
 		); err != nil {
 			return nil, err
 		}
@@ -360,7 +567,7 @@ func (q *Queries) ListMyClaims(ctx context.Context, arg ListMyClaimsParams) ([]C
 }
 
 const listTeamClaims = `-- name: ListTeamClaims :many
-SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at FROM claim
+SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id FROM claim
 WHERE status <> 'draft'
   AND ($1::text IS NULL OR status = $1)
   AND ($2::text IS NULL OR user_id = $2)
@@ -427,6 +634,15 @@ func (q *Queries) ListTeamClaims(ctx context.Context, arg ListTeamClaimsParams) 
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UploadStatus,
+			&i.UploadSequence,
+			&i.UploadPath,
+			&i.UploadUrl,
+			&i.UploadError,
+			&i.UploadedAt,
+			&i.UploadProvider,
+			&i.UploadAccount,
+			&i.UploadRemoteID,
 		); err != nil {
 			return nil, err
 		}
@@ -439,7 +655,7 @@ func (q *Queries) ListTeamClaims(ctx context.Context, arg ListTeamClaimsParams) 
 }
 
 const lockClaim = `-- name: LockClaim :one
-SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at FROM claim WHERE id = $1 FOR UPDATE
+SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id FROM claim WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockClaim(ctx context.Context, id string) (Claim, error) {
@@ -476,12 +692,45 @@ func (q *Queries) LockClaim(ctx context.Context, id string) (Claim, error) {
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
+	)
+	return i, err
+}
+
+const lockClaimStorage = `-- name: LockClaimStorage :one
+SELECT tenant_id, provider, account, root_folder, sealed_tokens, app_client_id, status, error, connected_at, connected_by, version, updated_at FROM claim_storage FOR UPDATE
+`
+
+func (q *Queries) LockClaimStorage(ctx context.Context) (ClaimStorage, error) {
+	row := q.db.QueryRow(ctx, lockClaimStorage)
+	var i ClaimStorage
+	err := row.Scan(
+		&i.TenantID,
+		&i.Provider,
+		&i.Account,
+		&i.RootFolder,
+		&i.SealedTokens,
+		&i.AppClientID,
+		&i.Status,
+		&i.Error,
+		&i.ConnectedAt,
+		&i.ConnectedBy,
+		&i.Version,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const lockClaims = `-- name: LockClaims :many
-SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at FROM claim WHERE id = ANY ($1::text[]) ORDER BY id FOR UPDATE
+SELECT id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id FROM claim WHERE id = ANY ($1::text[]) ORDER BY id FOR UPDATE
 `
 
 func (q *Queries) LockClaims(ctx context.Context, ids []string) ([]Claim, error) {
@@ -524,6 +773,15 @@ func (q *Queries) LockClaims(ctx context.Context, ids []string) ([]Claim, error)
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UploadStatus,
+			&i.UploadSequence,
+			&i.UploadPath,
+			&i.UploadUrl,
+			&i.UploadError,
+			&i.UploadedAt,
+			&i.UploadProvider,
+			&i.UploadAccount,
+			&i.UploadRemoteID,
 		); err != nil {
 			return nil, err
 		}
@@ -533,6 +791,31 @@ func (q *Queries) LockClaims(ctx context.Context, ids []string) ([]Claim, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const markClaimStorage = `-- name: MarkClaimStorage :execrows
+UPDATE claim_storage SET status = $1, error = $2, version = version + 1, updated_at = now()
+WHERE provider = $3 AND account = $4 AND (status <> $1 OR error IS DISTINCT FROM $2)
+`
+
+type MarkClaimStorageParams struct {
+	Status   string
+	Error    *string
+	Provider *string
+	Account  *string
+}
+
+func (q *Queries) MarkClaimStorage(ctx context.Context, arg MarkClaimStorageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markClaimStorage,
+		arg.Status,
+		arg.Error,
+		arg.Provider,
+		arg.Account,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const moveCandidateClaims = `-- name: MoveCandidateClaims :exec
@@ -620,10 +903,51 @@ func (q *Queries) NewClaimID(ctx context.Context) (string, error) {
 	return column_1, err
 }
 
+const parkClaimStorageCode = `-- name: ParkClaimStorageCode :execrows
+UPDATE claim_storage_state SET consumed = true, sealed_code = $1, ticket_hash = $2
+WHERE state_hash = $3 AND NOT consumed AND expires_at > now()
+`
+
+type ParkClaimStorageCodeParams struct {
+	SealedCode *string
+	TicketHash *string
+	StateHash  string
+}
+
+func (q *Queries) ParkClaimStorageCode(ctx context.Context, arg ParkClaimStorageCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, parkClaimStorageCode, arg.SealedCode, arg.TicketHash, arg.StateHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const parkedClaimStorageCode = `-- name: ParkedClaimStorageCode :one
+SELECT tenant_id, user_id, provider, state_hash, app_client_id, sealed_verifier, sealed_code, ticket_hash, consumed, expires_at FROM claim_storage_state WHERE ticket_hash = $1 AND consumed AND expires_at > now()
+`
+
+func (q *Queries) ParkedClaimStorageCode(ctx context.Context, ticketHash *string) (ClaimStorageState, error) {
+	row := q.db.QueryRow(ctx, parkedClaimStorageCode, ticketHash)
+	var i ClaimStorageState
+	err := row.Scan(
+		&i.TenantID,
+		&i.UserID,
+		&i.Provider,
+		&i.StateHash,
+		&i.AppClientID,
+		&i.SealedVerifier,
+		&i.SealedCode,
+		&i.TicketHash,
+		&i.Consumed,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const payClaim = `-- name: PayClaim :one
 UPDATE claim SET status = 'paid', paid_at = now(), version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2 AND status = 'approved'
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type PayClaimParams struct {
@@ -665,8 +989,47 @@ func (q *Queries) PayClaim(ctx context.Context, arg PayClaimParams) (Claim, erro
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
+}
+
+const queueClaimUpload = `-- name: QueueClaimUpload :one
+
+UPDATE claim SET upload_status = 'pending', upload_error = NULL, upload_sequence = upload_sequence + 1
+WHERE id = $1 RETURNING upload_sequence
+`
+
+// Uploads. They change no claim version: the claimant's edits are not
+// turned stale by an upload finishing.
+func (q *Queries) QueueClaimUpload(ctx context.Context, id string) (int32, error) {
+	row := q.db.QueryRow(ctx, queueClaimUpload, id)
+	var upload_sequence int32
+	err := row.Scan(&upload_sequence)
+	return upload_sequence, err
+}
+
+const resetClaimUpload = `-- name: ResetClaimUpload :exec
+UPDATE claim SET upload_status = 'none', upload_error = NULL
+WHERE id = $1 AND upload_sequence = $2 AND upload_status = 'pending'
+`
+
+type ResetClaimUploadParams struct {
+	ID             string
+	UploadSequence int32
+}
+
+func (q *Queries) ResetClaimUpload(ctx context.Context, arg ResetClaimUploadParams) error {
+	_, err := q.db.Exec(ctx, resetClaimUpload, arg.ID, arg.UploadSequence)
+	return err
 }
 
 const saveClaimFields = `-- name: SaveClaimFields :one
@@ -676,7 +1039,7 @@ UPDATE claim SET
   link_kind = $8, link_id = $9, from_receipt = $10::text[],
   version = version + 1, updated_at = now()
 WHERE id = $11 AND version = $12 AND status IN ('draft', 'rejected')
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type SaveClaimFieldsParams struct {
@@ -742,8 +1105,127 @@ func (q *Queries) SaveClaimFields(ctx context.Context, arg SaveClaimFieldsParams
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
+}
+
+const saveClaimStorageFolder = `-- name: SaveClaimStorageFolder :one
+INSERT INTO claim_storage (tenant_id, root_folder) VALUES (app_current_tenant(), $1)
+ON CONFLICT (tenant_id) DO UPDATE SET root_folder = excluded.root_folder, version = claim_storage.version + 1, updated_at = now()
+  WHERE claim_storage.version = $2
+RETURNING tenant_id, provider, account, root_folder, sealed_tokens, app_client_id, status, error, connected_at, connected_by, version, updated_at
+`
+
+type SaveClaimStorageFolderParams struct {
+	RootFolder string
+	Version    int32
+}
+
+func (q *Queries) SaveClaimStorageFolder(ctx context.Context, arg SaveClaimStorageFolderParams) (ClaimStorage, error) {
+	row := q.db.QueryRow(ctx, saveClaimStorageFolder, arg.RootFolder, arg.Version)
+	var i ClaimStorage
+	err := row.Scan(
+		&i.TenantID,
+		&i.Provider,
+		&i.Account,
+		&i.RootFolder,
+		&i.SealedTokens,
+		&i.AppClientID,
+		&i.Status,
+		&i.Error,
+		&i.ConnectedAt,
+		&i.ConnectedBy,
+		&i.Version,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const saveClaimStorageState = `-- name: SaveClaimStorageState :exec
+INSERT INTO claim_storage_state (tenant_id, user_id, provider, state_hash, app_client_id, sealed_verifier, expires_at)
+VALUES (app_current_tenant(), app_current_user(), $1, $2, $3, $4, $5)
+ON CONFLICT (tenant_id, user_id) DO UPDATE SET provider = excluded.provider, state_hash = excluded.state_hash,
+  app_client_id = excluded.app_client_id, sealed_verifier = excluded.sealed_verifier, expires_at = excluded.expires_at,
+  sealed_code = NULL, ticket_hash = NULL, consumed = false
+`
+
+type SaveClaimStorageStateParams struct {
+	Provider       string
+	StateHash      string
+	AppClientID    string
+	SealedVerifier string
+	ExpiresAt      time.Time
+}
+
+func (q *Queries) SaveClaimStorageState(ctx context.Context, arg SaveClaimStorageStateParams) error {
+	_, err := q.db.Exec(ctx, saveClaimStorageState,
+		arg.Provider,
+		arg.StateHash,
+		arg.AppClientID,
+		arg.SealedVerifier,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
+const saveClaimStorageTokens = `-- name: SaveClaimStorageTokens :execrows
+UPDATE claim_storage SET sealed_tokens = $1
+WHERE provider = $2 AND account = $3
+`
+
+type SaveClaimStorageTokensParams struct {
+	SealedTokens *string
+	Provider     *string
+	Account      *string
+}
+
+func (q *Queries) SaveClaimStorageTokens(ctx context.Context, arg SaveClaimStorageTokensParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveClaimStorageTokens, arg.SealedTokens, arg.Provider, arg.Account)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const saveClaimUpload = `-- name: SaveClaimUpload :execrows
+UPDATE claim SET upload_status = 'done', upload_path = $1, upload_url = $2, upload_error = NULL,
+  uploaded_at = now(), upload_provider = $3, upload_account = $4, upload_remote_id = $5
+WHERE id = $6 AND upload_sequence = $7
+`
+
+type SaveClaimUploadParams struct {
+	UploadPath     *string
+	UploadUrl      *string
+	UploadProvider *string
+	UploadAccount  *string
+	UploadRemoteID *string
+	ID             string
+	UploadSequence int32
+}
+
+func (q *Queries) SaveClaimUpload(ctx context.Context, arg SaveClaimUploadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, saveClaimUpload,
+		arg.UploadPath,
+		arg.UploadUrl,
+		arg.UploadProvider,
+		arg.UploadAccount,
+		arg.UploadRemoteID,
+		arg.ID,
+		arg.UploadSequence,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const saveReceiptRead = `-- name: SaveReceiptRead :one
@@ -752,7 +1234,7 @@ UPDATE claim SET
   receipt_type = $5, claim_type = $6, from_receipt = $7::text[],
   ocr_status = $8, ocr_error = $9, ocr_extractor = $10, updated_at = now()
 WHERE id = $11
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type SaveReceiptReadParams struct {
@@ -817,6 +1299,15 @@ func (q *Queries) SaveReceiptRead(ctx context.Context, arg SaveReceiptReadParams
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
 }
@@ -825,7 +1316,7 @@ const submitClaim = `-- name: SubmitClaim :one
 UPDATE claim SET status = 'submitted', claimed_at = now(), reviewed_at = NULL, reviewed_by = NULL,
   version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2 AND status IN ('draft', 'rejected')
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type SubmitClaimParams struct {
@@ -867,8 +1358,29 @@ func (q *Queries) SubmitClaim(ctx context.Context, arg SubmitClaimParams) (Claim
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
+}
+
+const takeClaimStorageCode = `-- name: TakeClaimStorageCode :execrows
+DELETE FROM claim_storage_state WHERE state_hash = $1 AND consumed AND expires_at > now()
+`
+
+func (q *Queries) TakeClaimStorageCode(ctx context.Context, stateHash string) (int64, error) {
+	result, err := q.db.Exec(ctx, takeClaimStorageCode, stateHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const teamClaimTotals = `-- name: TeamClaimTotals :many
@@ -924,7 +1436,7 @@ func (q *Queries) TeamClaimTotals(ctx context.Context, arg TeamClaimTotalsParams
 const withdrawClaim = `-- name: WithdrawClaim :one
 UPDATE claim SET status = 'draft', claimed_at = NULL, version = version + 1, updated_at = now()
 WHERE id = $1 AND version = $2 AND status = 'submitted' AND user_id = app_current_user()
-RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at
+RETURNING id, tenant_id, user_id, status, file_name, content_type, size_bytes, sha256, storage_key, ocr_status, ocr_error, ocr_extractor, receipt_date, amount, currency, merchant, receipt_type, claim_type, purpose, link_kind, link_id, from_receipt, claimed_at, reviewed_at, reviewed_by, review_note, paid_at, version, created_at, updated_at, upload_status, upload_sequence, upload_path, upload_url, upload_error, uploaded_at, upload_provider, upload_account, upload_remote_id
 `
 
 type WithdrawClaimParams struct {
@@ -966,6 +1478,15 @@ func (q *Queries) WithdrawClaim(ctx context.Context, arg WithdrawClaimParams) (C
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UploadStatus,
+		&i.UploadSequence,
+		&i.UploadPath,
+		&i.UploadUrl,
+		&i.UploadError,
+		&i.UploadedAt,
+		&i.UploadProvider,
+		&i.UploadAccount,
+		&i.UploadRemoteID,
 	)
 	return i, err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/claims"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/emails"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/settings"
 )
 
@@ -26,6 +27,19 @@ func (o claimOptions) Choices(ctx context.Context, tx pgx.Tx, list string) ([]cl
 		out = append(out, claims.Option{Key: opt.Key, Label: opt.Label})
 	}
 	return out, err
+}
+
+func (o claimOptions) Labels(ctx context.Context, tx pgx.Tx) (map[string]map[string]string, error) {
+	return o.settings.Labels(ctx, tx)
+}
+
+// claimStorageApps: OneDrive and Google Drive connect through the agency's
+// Microsoft and Google apps (Settings > Email connection).
+type claimStorageApps struct{ emails *emails.Module }
+
+func (a claimStorageApps) App(ctx context.Context, tx pgx.Tx, tenant, provider string) (claims.App, error) {
+	app, err := a.emails.StorageApplication(ctx, tx, tenant, provider)
+	return claims.App{ClientID: app.ClientID, ClientSecret: app.ClientSecret}, err
 }
 
 // claimRecords: a claim is tagged to a client (company or contact) or a

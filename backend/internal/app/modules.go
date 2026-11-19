@@ -212,6 +212,10 @@ func NewModules(d Deps) *Modules {
 	m.Claims = claims.New(d.Pool, d.Files, claims.Deps{
 		Users: m.Identity, Options: claimOptions{m.Settings}, Records: claimRecords{m.Candidates, m.Contacts, m.Companies},
 	}, d.Config.MaxUploadBytes, d.Config.TimeZone)
+	m.Claims.UseStorage(claimStorageApps{m.Emails}, claims.StorageConfig{
+		KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL,
+		Dropbox: claims.App{ClientID: d.Config.Dropbox.AppKey, ClientSecret: d.Config.Dropbox.AppSecret},
+	})
 	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies, m.Claims}) // records holding an option keep it
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
@@ -359,7 +363,7 @@ func (m *Modules) Server() *Server {
 // and so run with no queue transaction open (see jobqueue.OutsideHandlers).
 func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	all := jobqueue.OutsideHandlers{}
-	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers(), m.Emails.OutsideJobHandlers()} {
+	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers(), m.Emails.OutsideJobHandlers(), m.Claims.OutsideJobHandlers()} {
 		maps.Copy(all, handlers)
 	}
 	return all

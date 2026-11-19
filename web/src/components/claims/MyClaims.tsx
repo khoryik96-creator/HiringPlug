@@ -14,6 +14,7 @@ import { useFieldSettings } from "../useFieldSettings";
 import { type Claim, CLAIM_STATUS, formatTotals, totals } from "./claims";
 import { ClaimRow } from "./ClaimRow";
 import { linkWords } from "./LinkPicker";
+import { UploadNote } from "./UploadNote";
 
 /** Receipts: a photo or a PDF. */
 export const RECEIPT_TYPES = ".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp";
@@ -137,6 +138,7 @@ export function MyClaims({ permissions }: { permissions: Permission[] }) {
                   <td>
                     <span className={`badge claim-${c.status}`}>{CLAIM_STATUS[c.status]}</span>
                     {c.paidAt && <span className="sub">on {formatDay(c.paidAt.slice(0, 10))}</span>}
+                    <UploadNote upload={c.upload} />
                   </td>
                   <td className="claim-tools">
                     <button type="button" className="link" onClick={() => { setViewing(c); }}>Receipt</button>

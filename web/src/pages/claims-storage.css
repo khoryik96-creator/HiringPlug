@@ -1,0 +1,16 @@
+/* Settings > Claims storage. */
+.claims-storage .panel { margin-top: 1rem; }
+.storage-account { align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.storage-account .sub { display: block; margin-top: 0.15rem; }
+.storage-badge { display: inline-block; margin-left: 0.6rem; padding: 0.05rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+.storage-badge.ok { background: #dcfce7; color: #166534; }
+.storage-badge.reconnect { background: #fee2e2; color: #991b1b; }
+.storage-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.75rem; margin: 0.5rem 0; }
+.storage-choice { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.85rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--soft); }
+.storage-choice.current { border-color: var(--accent); }
+.storage-choice small { line-height: 1.35; }
+.storage-folder { align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.storage-folder input { flex: 1 1 16rem; max-width: 26rem; }
+.storage-path { word-break: break-all; }
+.storage-setup summary { cursor: pointer; font-weight: 600; }
+.storage-setup ul { padding-left: 1.2rem; }

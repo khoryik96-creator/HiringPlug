@@ -1632,6 +1632,19 @@ and month. A person sees their own claims; approvers see everyone's (the
 database enforces it). Receipt and claim types are dropdowns in **Settings >
 Dropdowns & categories > Expense claims**.
 
+**Claims storage** (Settings > Claims storage, owners and admins:
+`claims.storage:manage`): connect the company's **Google Drive**, **OneDrive**
+or **Dropbox** account once, and each claim's receipt is uploaded to it when it
+is submitted, into a folder for the month, the person and the receipt type:
+`Claims/2026-11/Aisyah Rahman/Grab / e-hailing fare/2026-11-03 Grab MYR 23.00 (t5v6w7).pdf`
+(the top folder can be changed, e.g. `Finance/Claims`). A claim rejected and
+submitted again replaces its file; a deleted claim's file is removed. Each
+claim shows whether its receipt is in the drive (with a link), uploading, or
+why it failed; Settings counts the uploads and tries failed ones again. When
+the provider stops accepting HiringPlug's access, the page asks to connect
+again, and connecting uploads what was waiting. See
+[claims-storage.md](claims-storage.md) for setup.
+
 ## Outlook Mail
 
 The Outlook icon beside Calendar opens Outlook Mail. It indexes a recruiter's
