@@ -9,6 +9,7 @@ import { ok, RECRUITER, testCandidate, testFieldSettings, testMe } from "./test-
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   window.location.hash = "";
   localStorage.removeItem(`hp.calendarView.${testMe([]).user.id}`);
 });
@@ -66,6 +67,20 @@ describe("top bar", () => {
     window.location.hash = hash;
     render(<App />);
   };
+
+  it("makes the covered app inert when Calendar opens as a small-screen dialog", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    signedIn([...RECRUITER, "calendars:use"]);
+    const toggle = await screen.findByRole("button", { name: "Dock calendar" });
+    fireEvent.click(toggle);
+    const panel = screen.getByRole("dialog", { name: "Calendar dock" });
+    expect(panel.getAttribute("aria-modal")).toBe("true");
+    expect(toggle.closest("header")?.hasAttribute("inert")).toBe(true);
+    expect(document.querySelector(".shell-page")?.hasAttribute("inert")).toBe(true);
+    fireEvent.keyDown(panel, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Calendar dock" })).toBeNull();
+    await waitFor(() => { expect(document.activeElement).toBe(toggle); });
+  });
 
   it("shows HiringPlug's version (the VERSION file) beside its name, so anyone can tell which update runs", async () => {
     signedIn(RECRUITER);

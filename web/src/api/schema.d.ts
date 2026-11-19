@@ -1850,6 +1850,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/outlook/scheduled/{sendId}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Outlook for an unconfirmed send without sending it again */
+        post: operations["resolveOutlookScheduled"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/outlook/rules": {
         parameters: {
             query?: never;
@@ -6955,6 +6972,7 @@ export interface components {
         };
         OutlookScheduleList: {
             items: components["schemas"]["OutlookScheduledSend"][];
+            nextOffset: number | null;
         };
         OutlookScheduledJob: {
             sendId: string;
@@ -13618,7 +13636,9 @@ export interface operations {
     };
     listOutlookScheduled: {
         parameters: {
-            query?: never;
+            query?: {
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13651,6 +13671,46 @@ export interface operations {
         };
     };
     cancelOutlookScheduled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sendId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutlookScheduleVersion"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutlookScheduledSend"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description Outlook is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    resolveOutlookScheduled: {
         parameters: {
             query?: never;
             header?: never;

@@ -27,14 +27,22 @@ func scheduledAPI(row store.EmailOutlookSend) api.OutlookScheduledSend {
 	}
 }
 
-func (s *Service) scheduledOutlook(ctx context.Context, p authz.Principal) (api.OutlookScheduleList, error) {
-	out := api.OutlookScheduleList{Items: []api.OutlookScheduledSend{}}
+func (s *Service) scheduledOutlook(ctx context.Context, p authz.Principal, offset int) (api.OutlookScheduleList, error) {
+	const pageSize = 50
+	out := api.OutlookScheduleList{Items: []api.OutlookScheduledSend{}, NextOffset: apiconv.OrNull[int](nil)}
+	if offset < 0 || offset > 100000 {
+		return out, apperr.Validation(apperr.FieldErrors{{Field: "offset", Message: "select a smaller offset"}})
+	}
 	err := database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		rows, err := store.New(tx).OutlookRecentSends(ctx)
+		rows, err := store.New(tx).OutlookRecentSends(ctx, int32(offset)) //nolint:gosec // offset bounded above
 		if err != nil {
 			return err
 		}
-		for _, row := range rows {
+		if len(rows) > pageSize && offset < 100000 {
+			next := offset + pageSize
+			out.NextOffset = apiconv.OrNull(&next)
+		}
+		for _, row := range rows[:min(pageSize, len(rows))] {
 			out.Items = append(out.Items, scheduledAPI(row))
 		}
 		return nil

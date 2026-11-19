@@ -40,7 +40,7 @@ func (s *Service) endpoint(name string) OAuthProvider {
 	}
 	return OAuthProvider{ //nolint:gosec // Official public OAuth endpoints/scopes, not credentials.
 		AuthorizeURL: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize", TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-		ProfileURL: "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName", SendURL: "https://graph.microsoft.com/v1.0/me/sendMail",
+		ProfileURL: "https://graph.microsoft.com/v1.0/me?$select=id,mail,userPrincipalName", SendURL: "https://graph.microsoft.com/v1.0/me/sendMail",
 		Scope: "openid offline_access User.Read Mail.Send Mail.ReadWrite",
 	}
 }
@@ -265,10 +265,12 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 	if err != nil {
 		return notCompleted
 	}
-	address, err := s.mailboxProfile(ctx, saved.Provider, endpoint, tokens.AccessToken)
+	profile, err := s.mailboxProfile(ctx, saved.Provider, endpoint, tokens.AccessToken)
 	if err != nil {
 		return notCompleted
 	}
+	address := profile.address
+	tokens.AccountID = profile.accountID
 	if grant.RulesMailbox != "" {
 		if tokens.RefreshToken == "" || !outlookRulesGrantIncludesMail(tokens.GrantedScopes) {
 			return notCompleted
@@ -277,6 +279,7 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		if err != nil || account != grant.RulesAccount {
 			return apperr.Validation(apperr.FieldErrors{{Field: "ticket", Message: "Sign in to the same Outlook mailbox to enable inbox rules."}})
 		}
+		tokens.AccountID = account
 		if _, err := s.remoteOutlookRules(ctx, tokens.AccessToken); err != nil {
 			return notCompleted
 		}
@@ -310,6 +313,13 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "outlook.rules_access_granted", EntityType: "user", EntityID: p.UserID})
 		}
+		if s.sameOutlookMailbox(box, saved.Provider, profile) {
+			if err := q.RefreshMailboxSecret(ctx, store.RefreshMailboxSecretParams{ID: box.ID, SealedSecret: sealed}); err != nil {
+				return err
+			}
+			return audit.Record(ctx, tx, audit.Entry{Action: "mailbox.reconnected", EntityType: "user", EntityID: p.UserID,
+				Changes: map[string]any{"provider": saved.Provider}})
+		}
 		if err := q.CancelOutlookSendsForMailbox(ctx); err != nil {
 			return err
 		}
@@ -322,6 +332,20 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "mailbox.connected", EntityType: "user", EntityID: p.UserID, Changes: map[string]any{"provider": saved.Provider}})
 	})
+}
+
+func (s *Service) sameOutlookMailbox(box store.EmailMailbox, provider string, profile verifiedMailbox) bool {
+	if provider != ProviderMicrosoft || box.Provider != ProviderMicrosoft || box.Address != profile.address {
+		return false
+	}
+	var previous mailboxSecret
+	if err := s.openMailbox(box.TenantID, box.UserID, box.Provider, box.SealedSecret, &previous); err != nil {
+		return false
+	}
+	// Existing deployments have address-only grants. The first reauthorization
+	// adopts the confirmed Graph identity. Dispatch still verifies the original
+	// immutable draft ID and version with the newly authorized token.
+	return previous.AccountID == "" || previous.AccountID == profile.accountID
 }
 
 func outlookRulesGrantIncludesMail(scopes string) bool {

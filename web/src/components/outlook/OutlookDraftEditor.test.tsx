@@ -53,3 +53,43 @@ it("cancels only a scheduled send, using its displayed version", async () => {
   await waitFor(() => { expect(cancel).toHaveBeenCalled(); });
   expect(sentBody(cancel)).toEqual({ version: 2 });
 });
+
+it("keeps the editor open when Escape is pressed during submission", async () => {
+  if (typeof HTMLDialogElement.prototype.showModal !== "function") {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.open = true; } });
+  }
+  const draft: Schemas["OutlookDraft"] = {
+    messageId: "omg_test", version: "opened", subject: "Interview", body: "Tuesday is available.",
+    to: ["nadia@example.test"], cc: [], bcc: [], hasAttachments: false, bodyTruncated: false,
+    schedule: null, scheduleNeedsReview: false, webUrl: null,
+  };
+  vi.spyOn(api, "GET").mockResolvedValue(ok(draft));
+  let finish = () => {};
+  const put = vi.spyOn(api, "PUT").mockImplementation(() => new Promise((resolve) => {
+    finish = () => { resolve(ok(schedule)); };
+  }));
+  const onClose = vi.fn();
+  renderWithClient(<OutlookDraftEditor id="omg_test" onClose={onClose} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Send now" }));
+  await waitFor(() => { expect(put).toHaveBeenCalledTimes(1); });
+  fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
+  expect(onClose).not.toHaveBeenCalled();
+  finish();
+  await waitFor(() => { expect(onClose).toHaveBeenCalledExactlyOnceWith("send"); });
+});
+
+it("opens later schedule pages and checks uncertain sends without submitting mail", async () => {
+  const uncertain = { ...schedule, id: "oms_uncertain", status: "uncertain" as const };
+  const get = vi.spyOn(api, "GET").mockResolvedValueOnce(ok({ items: [schedule], nextOffset: 50 }))
+    .mockResolvedValue(ok({ items: [uncertain], nextOffset: null }));
+  const resolve = vi.spyOn(api, "POST").mockResolvedValue(ok({ ...uncertain, status: "needs_review" }));
+  renderWithClient(<OutlookScheduledList onOpen={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Check Outlook again" }));
+  await waitFor(() => { expect(resolve).toHaveBeenCalledTimes(1); });
+  expect(get).toHaveBeenCalledWith("/v1/outlook/scheduled", { params: { query: { offset: 50 } } });
+  expect(resolve.mock.calls[0]?.[0]).toBe("/v1/outlook/scheduled/{sendId}/resolve");
+  expect(sentBody(resolve)).toEqual({ version: 2 });
+  fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+  await waitFor(() => { expect(get).toHaveBeenLastCalledWith("/v1/outlook/scheduled", { params: { query: { offset: 0 } } }); });
+});

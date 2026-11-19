@@ -77,19 +77,26 @@ func (s *Service) exchangeMailboxToken(ctx context.Context, endpoint OAuthProvid
 		GrantedScopes: result.Scope,
 	}, nil
 }
-func (s *Service) mailboxProfile(ctx context.Context, provider string, endpoint OAuthProvider, token string) (string, error) {
+
+type verifiedMailbox struct {
+	address   string
+	accountID string
+}
+
+func (s *Service) mailboxProfile(ctx context.Context, provider string, endpoint OAuthProvider, token string) (verifiedMailbox, error) {
 	raw, err := s.providerRequest(ctx, "GET", endpoint.ProfileURL, "application/json", token, nil)
 	if err != nil {
-		return "", err
+		return verifiedMailbox{}, err
 	}
 	var profile struct {
+		ID        string `json:"id"`
 		Email     string `json:"email"`
 		Verified  bool   `json:"email_verified"`
 		Mail      string `json:"mail"`
 		Principal string `json:"userPrincipalName"`
 	}
 	if json.Unmarshal(raw, &profile) != nil {
-		return "", errors.New("mail provider returned an invalid account")
+		return verifiedMailbox{}, errors.New("mail provider returned an invalid account")
 	}
 	address := profile.Mail
 	if address == "" {
@@ -97,15 +104,18 @@ func (s *Service) mailboxProfile(ctx context.Context, provider string, endpoint 
 	}
 	if provider == "google" {
 		if !profile.Verified {
-			return "", errors.New("mailbox address is not verified")
+			return verifiedMailbox{}, errors.New("mailbox address is not verified")
 		}
 		address = profile.Email
 	}
 	parsed, err := stdmail.ParseAddress(address)
 	if err != nil || parsed.Address != address || strings.ContainsAny(address, "\r\n") {
-		return "", errors.New("mail provider returned an invalid mailbox address")
+		return verifiedMailbox{}, errors.New("mail provider returned an invalid mailbox address")
 	}
-	return strings.ToLower(address), nil
+	if len(profile.ID) > 256 {
+		return verifiedMailbox{}, errors.New("mail provider returned an invalid account ID")
+	}
+	return verifiedMailbox{address: strings.ToLower(address), accountID: profile.ID}, nil
 }
 func (s *Service) mailboxAccessIn(ctx context.Context, tx pgx.Tx, row store.EmailMailbox) (string, error) {
 	var secret mailboxSecret
@@ -130,6 +140,7 @@ func (s *Service) mailboxAccessIn(ctx context.Context, tx pgx.Tx, row store.Emai
 	if refreshed.RefreshToken == "" {
 		refreshed.RefreshToken = secret.RefreshToken
 	}
+	refreshed.AccountID = secret.AccountID
 	sealed, err := s.sealMailbox(row.TenantID, row.UserID, row.Provider, refreshed)
 	if err != nil {
 		return "", err

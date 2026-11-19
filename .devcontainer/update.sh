@@ -12,5 +12,11 @@ if [[ "$(git branch --show-current)" != main ]]; then
   exit 1
 fi
 
+exec {HIRINGPLUG_CODESPACE_START_FD}>../.hiringplug-codespace.lock
+if ! flock -n "$HIRINGPLUG_CODESPACE_START_FD"; then
+  echo "Waiting for HiringPlug startup or another update to finish…"
+  flock "$HIRINGPLUG_CODESPACE_START_FD"
+fi
+export HIRINGPLUG_CODESPACE_START_FD
 git pull --ff-only origin main
 exec bash .devcontainer/start.sh

@@ -226,7 +226,8 @@ mail index is rebuilt. If Outlook changes the draft, reopen it and review it
 before updating the same schedule. Turning off Outlook sync
 or disconnecting or replacing the mailbox cancels its pending sends.
 Allowing inbox rules for the same connected mailbox keeps its scheduled sends.
-Previous send status remains available in the Scheduled list.
+Reauthorizing the same Outlook mailbox also keeps drafts, schedules and the
+mail index. Use **Next** or **Previous** to see more sends in the Scheduled list.
 
 The HiringPlug Go worker must be running to send at the chosen time.
 If the worker comes back within 24 hours of the send time, it sends the
@@ -235,4 +236,6 @@ addresses, including unlinked recipients. Later sends need review.
 HiringPlug submits the Outlook draft once and checks the same immutable ID
 for its sent copy. If Outlook's response is lost, HiringPlug checks the
 receipt without resubmitting. **Check Outlook** means the outcome could not
-be confirmed. Check Drafts and Sent Items before taking action.
+be confirmed. **Check Outlook again** checks the original message. If Outlook
+still has the draft, you can review it and verify Sent Items before scheduling
+it again. Rechecking never sends email.

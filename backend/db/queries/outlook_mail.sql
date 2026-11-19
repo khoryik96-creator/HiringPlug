@@ -112,7 +112,7 @@ SELECT * FROM email_outlook_send WHERE mailbox_id = @mailbox_id AND message_id =
 -- name: OutlookRecentSends :many
 SELECT * FROM email_outlook_send WHERE user_id=app_current_user()
 ORDER BY CASE status WHEN 'scheduled' THEN 0 WHEN 'confirming' THEN 1 WHEN 'needs_review' THEN 2 WHEN 'uncertain' THEN 3 ELSE 4 END,
- CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 200;
+ CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 51 OFFSET @skip::integer;
 
 -- name: CreateOutlookScheduled :one
 INSERT INTO email_outlook_send(mailbox_id,message_id,remote_id,draft_version,candidate_id,subject,send_at)
@@ -144,6 +144,11 @@ WHERE id= @id AND status='scheduled' AND version= @version;
 -- name: FinishOutlookSend :execrows
 UPDATE email_outlook_send SET status= @status,error=sqlc.narg(error),updated_at=now()
 WHERE id= @id AND version= @version AND status= @previous_status;
+
+-- name: ResolveOutlookSend :one
+UPDATE email_outlook_send SET status= @status,error=sqlc.narg(error),version=version+1,updated_at=now()
+WHERE id= @id AND version= @version AND status='uncertain'
+RETURNING *;
 
 -- name: TryLockOutlookSendMailbox :one
 SELECT pg_try_advisory_lock(hashtextextended(@tenant_id::text || ':' || @user_id::text,0)) AS acquired;

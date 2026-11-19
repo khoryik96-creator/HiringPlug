@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 
 import { api, ApiError, unwrap } from "./api/client";
 import { authLinkRoute, clearToken, getToken } from "./auth";
@@ -37,9 +37,19 @@ async function endSession(): Promise<void> {
   }
 }
 
+const calendarOverlayWidth = "(max-width: 1050px)";
+function watchCalendarWidth(change: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const media = window.matchMedia(calendarOverlayWidth);
+  media.addEventListener("change", change);
+  return () => { media.removeEventListener("change", change); };
+}
+const calendarOverlaysPage = () => typeof window.matchMedia === "function" && window.matchMedia(calendarOverlayWidth).matches;
+
 function Shell({ onSignOut }: { onSignOut: () => void }) {
   const hash = useHash();
   const [calendarDocked, setCalendarDocked] = useState(false);
+  const calendarOverlay = useSyncExternalStore(watchCalendarWidth, calendarOverlaysPage);
   const calendarDockButton = useRef<HTMLButtonElement>(null);
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   if (me.error instanceof ApiError && me.error.code === "UNAUTHENTICATED") {
@@ -56,13 +66,16 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   const canUseCalendar = permissions.includes("calendars:use");
   const onCalendar = route.section === "calendar";
   const showCalendarDock = canUseCalendar && calendarDocked && !onCalendar;
+  const calendarModal = showCalendarDock && calendarOverlay;
   const closeCalendarDock = () => {
     setCalendarDocked(false);
-    calendarDockButton.current?.focus();
+    if (calendarModal) {
+      requestAnimationFrame(() => { calendarDockButton.current?.focus(); });
+    } else calendarDockButton.current?.focus();
   };
   return (
     <div className={showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
-      <header className="topbar">
+      <header className="topbar" inert={calendarModal}>
         <span className="brand">Hiring<span>Plug</span></span>
         <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
@@ -98,7 +111,7 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
         </div>
       </header>
       <div className="shell-content">
-        <div className="shell-page">
+        <div className="shell-page" inert={calendarModal}>
           <AiNotice permissions={permissions} />
           {/* key: a new location starts with a fresh boundary */}
           <PageErrorBoundary key={hash}>
@@ -111,18 +124,31 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
             </Suspense>
           </PageErrorBoundary>
         </div>
-        {showCalendarDock && <CalendarDock userId={me.data.user.id} onClose={closeCalendarDock} />}
+        {calendarModal && <div className="calendar-dock-backdrop" aria-hidden="true" />}
+        {showCalendarDock && <CalendarDock userId={me.data.user.id} modal={calendarModal} onClose={closeCalendarDock} />}
       </div>
     </div>
   );
 }
 
-function CalendarDock({ userId, onClose }: { userId: string; onClose: () => void }) {
+function CalendarDock({ userId, modal, onClose }: { userId: string; modal: boolean; onClose: () => void }) {
   const dock = useRef<HTMLElement>(null);
   useEffect(() => { dock.current?.focus(); }, []);
+  const onKey = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape" && !event.defaultPrevented) onClose();
+    // An appointment is a separate dialog rendered in a portal.
+    if (!modal || event.key !== "Tab" || !event.currentTarget.contains(event.target as Node)) return;
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("a[href], button, input, select, textarea, summary, [tabindex]"))
+      .filter((element) => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0);
+    const boundary = event.shiftKey ? controls[0] : controls.at(-1);
+    if (event.target === boundary || event.target === event.currentTarget) {
+      event.preventDefault();
+      (event.shiftKey ? controls.at(-1) : controls[0])?.focus();
+    }
+  };
   return (
     <aside ref={dock} id="calendar-dock" className="calendar-dock" aria-label="Calendar dock" tabIndex={-1}
-      onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); }}>
+      role={modal ? "dialog" : undefined} aria-modal={modal || undefined} onKeyDown={onKey}>
       <header className="calendar-dock-head">
         <h2>Calendar</h2>
         <IconButton label="Close calendar dock" icon={<CloseIcon />} onClick={onClose} />

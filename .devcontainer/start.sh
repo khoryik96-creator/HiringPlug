@@ -5,6 +5,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Updates pass an inherited lock so the checkout, Compose and initial agency
+# setup are serialized with the Codespace's postStartCommand.
+if [[ -z "${HIRINGPLUG_CODESPACE_START_FD:-}" ]]; then
+  exec {HIRINGPLUG_CODESPACE_START_FD}>../.hiringplug-codespace.lock
+fi
+flock "$HIRINGPLUG_CODESPACE_START_FD"
+
 secrets=/workspaces/.hiringplug-codespace.env # outside the repository: never committed
 if [ ! -f "$secrets" ]; then
   rnd() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40; }

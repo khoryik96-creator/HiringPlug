@@ -285,6 +285,13 @@ paths:
       - emails
       summary: List personal Outlook scheduled sends
       x-permission: emails:send
+      parameters:
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
       responses:
         '200':
           description: OK
@@ -314,6 +321,48 @@ paths:
       tags:
       - emails
       summary: Cancel a send that has not started
+      x-permission: emails:send
+      parameters:
+      - name: sendId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^oms_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookScheduleVersion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookScheduledSend'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/scheduled/{sendId}/resolve:
+    post:
+      operationId: resolveOutlookScheduled
+      tags: [emails]
+      summary: Check Outlook for an unconfirmed send without sending it again
       x-permission: emails:send
       parameters:
       - name: sendId
@@ -1522,11 +1571,15 @@ components:
       type: object
       required:
       - items
+      - nextOffset
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/OutlookScheduledSend'
+        nextOffset:
+          type: integer
+          nullable: true
     OutlookScheduledJob:
       type: object
       required:

@@ -14,6 +14,7 @@ import (
 
 type mailboxSecret struct {
 	GrantedScopes string    `json:"-"`
+	AccountID     string    `json:"accountId,omitempty"`
 	Password      string    `json:"password,omitempty"`
 	AccessToken   string    `json:"accessToken,omitempty"`
 	RefreshToken  string    `json:"refreshToken,omitempty"`

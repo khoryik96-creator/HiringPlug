@@ -16,6 +16,7 @@ const draftKey = (id: string | null) => ["outlook", "draft", id];
 
 export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose: (operation?: "send" | "schedule" | "discard") => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const busy = useRef(false);
   const query = useQuery({
     queryKey: draftKey(id),
     queryFn: async () => unwrap(await api.GET("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: id ?? "" } } })),
@@ -28,7 +29,7 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
     dialog.current?.showModal();
   }, []);
   return <dialog className="panel outlook-draft-dialog" ref={dialog} aria-labelledby="outlook-draft-heading"
-    onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    onCancel={(event) => { event.preventDefault(); if (!busy.current) onClose(); }}>
     {id && !query.data ? <>
       <div className="row spread">
         <h3 id="outlook-draft-heading">Outlook draft</h3>
@@ -36,7 +37,7 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
       </div>
       <ErrorMessage error={query.error}/>
       {query.isPending && <p className="muted">Opening draft…</p>}
-    </> : <DraftFields key={query.dataUpdatedAt} opened={query.data}
+    </> : <DraftFields key={query.dataUpdatedAt} opened={query.data} setBusy={(pending) => { busy.current = pending; }}
       onClose={onClose} onReload={() => { void query.refetch(); }}/>}
   </dialog>;
 }
@@ -58,7 +59,9 @@ function inputOf(value: typeof emptyDraft, before?: Draft): DraftInput {
 const emptyDraft = { to: "", cc: "", bcc: "", subject: "", body: "" };
 type Operation = "save" | "send" | "schedule" | "discard";
 
-function DraftFields({ opened, onClose, onReload }: { opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; onReload: () => void }) {
+function DraftFields({ opened, onClose, onReload, setBusy }: {
+  opened?: Draft; onClose: (operation?: "send" | "schedule" | "discard") => void; onReload: () => void; setBusy: (pending: boolean) => void;
+}) {
   const client = useQueryClient();
   const [draft, setDraft] = useState(opened);
   const [form, setForm] = useState(() => opened ? {
@@ -72,6 +75,8 @@ function DraftFields({ opened, onClose, onReload }: { opened?: Draft; onClose: (
   const plan = draft?.schedule;
   const locked = plan?.status === "confirming" || plan?.status === "uncertain";
   const action = useMutation({
+    onMutate: () => { setBusy(true); },
+    onSettled: () => { setBusy(false); },
     mutationFn: async (operation: Operation) => {
       if (operation === "discard" && draft) {
         unwrap(await api.DELETE("/v1/outlook/drafts/{messageId}", { params: { path: { messageId: draft.messageId }, query: { version: draft.version } } }));

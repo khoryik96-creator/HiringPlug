@@ -2556,6 +2556,7 @@ class OutlookScheduledSend(BaseModel):
 
 class OutlookScheduleList(BaseModel):
     items: list[OutlookScheduledSend]
+    nextOffset: Annotated[int | None, Field(...)]
 
 
 class OutlookScheduledJob(BaseModel):

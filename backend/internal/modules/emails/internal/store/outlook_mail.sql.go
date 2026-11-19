@@ -526,11 +526,11 @@ func (q *Queries) OutlookMessage(ctx context.Context, arg OutlookMessageParams) 
 const outlookRecentSends = `-- name: OutlookRecentSends :many
 SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE user_id=app_current_user()
 ORDER BY CASE status WHEN 'scheduled' THEN 0 WHEN 'confirming' THEN 1 WHEN 'needs_review' THEN 2 WHEN 'uncertain' THEN 3 ELSE 4 END,
- CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 200
+ CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 51 OFFSET $1::integer
 `
 
-func (q *Queries) OutlookRecentSends(ctx context.Context) ([]EmailOutlookSend, error) {
-	rows, err := q.db.Query(ctx, outlookRecentSends)
+func (q *Queries) OutlookRecentSends(ctx context.Context, skip int32) ([]EmailOutlookSend, error) {
+	rows, err := q.db.Query(ctx, outlookRecentSends, skip)
 	if err != nil {
 		return nil, err
 	}
@@ -765,6 +765,47 @@ func (q *Queries) RescheduleOutlookSend(ctx context.Context, arg RescheduleOutlo
 		arg.DraftVersion,
 		arg.Subject,
 		arg.CandidateID,
+		arg.ID,
+		arg.Version,
+	)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const resolveOutlookSend = `-- name: ResolveOutlookSend :one
+UPDATE email_outlook_send SET status= $1,error=$2,version=version+1,updated_at=now()
+WHERE id= $3 AND version= $4 AND status='uncertain'
+RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
+`
+
+type ResolveOutlookSendParams struct {
+	Status  string
+	Error   *string
+	ID      string
+	Version int32
+}
+
+func (q *Queries) ResolveOutlookSend(ctx context.Context, arg ResolveOutlookSendParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, resolveOutlookSend,
+		arg.Status,
+		arg.Error,
 		arg.ID,
 		arg.Version,
 	)

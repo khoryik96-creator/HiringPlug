@@ -47,13 +47,25 @@ func (h *HTTP) ScheduleOutlookDraft(ctx context.Context, r api.ScheduleOutlookDr
 	out, err := h.svc.scheduleOutlook(ctx, p, r.MessageId, *r.Body)
 	return api.ScheduleOutlookDraft202JSONResponse(out), err
 }
-func (h *HTTP) ListOutlookScheduled(ctx context.Context, _ api.ListOutlookScheduledRequestObject) (api.ListOutlookScheduledResponseObject, error) {
+func (h *HTTP) ListOutlookScheduled(ctx context.Context, r api.ListOutlookScheduledRequestObject) (api.ListOutlookScheduledResponseObject, error) {
 	p, err := mailboxUser(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out, err := h.svc.scheduledOutlook(ctx, p)
+	offset := 0
+	if r.Params.Offset != nil {
+		offset = *r.Params.Offset
+	}
+	out, err := h.svc.scheduledOutlook(ctx, p, offset)
 	return api.ListOutlookScheduled200JSONResponse(out), err
+}
+func (h *HTTP) ResolveOutlookScheduled(ctx context.Context, r api.ResolveOutlookScheduledRequestObject) (api.ResolveOutlookScheduledResponseObject, error) {
+	p, err := mailboxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out, err := h.svc.resolveOutlookSend(ctx, p, r.SendId, r.Body.Version)
+	return api.ResolveOutlookScheduled200JSONResponse(out), err
 }
 func (h *HTTP) CancelOutlookScheduled(ctx context.Context, r api.CancelOutlookScheduledRequestObject) (api.CancelOutlookScheduledResponseObject, error) {
 	p, err := mailboxUser(ctx)
