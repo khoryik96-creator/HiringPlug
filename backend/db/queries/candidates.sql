@@ -25,6 +25,9 @@ SELECT EXISTS (SELECT 1 FROM candidate WHERE id = @id);
 -- name: FindCandidateIDByEmail :one
 SELECT id FROM candidate WHERE email = @email;
 
+-- name: CandidateIDsByEmails :many
+SELECT id FROM candidate WHERE binned_at IS NULL AND email = ANY(@addresses::text[]);
+
 -- Optimistic concurrency: only updates if nobody changed the row since
 -- `expected_version` was read. No row returned = stale version (or not found).
 -- name: UpdateCandidate :one

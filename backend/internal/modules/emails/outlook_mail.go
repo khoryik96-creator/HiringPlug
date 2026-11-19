@@ -26,6 +26,9 @@ func (s *Service) requestOutlook(ctx context.Context, p authz.Principal, disable
 			return err
 		}
 		if disable {
+			if err := q.CancelOutlookSendsForMailbox(ctx); err != nil {
+				return err
+			}
 			if err := q.RemoveOutlookSync(ctx); err != nil {
 				return err
 			}

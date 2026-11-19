@@ -793,6 +793,24 @@ type EmailOutlookMessage struct {
 	WebUrl         *string
 }
 
+type EmailOutlookSend struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	MailboxID    string
+	MessageID    string
+	RemoteID     string
+	DraftVersion string
+	CandidateID  *string
+	Subject      string
+	SendAt       time.Time
+	Version      int32
+	Status       string
+	AttemptedAt  *time.Time
+	UpdatedAt    time.Time
+	Error        *string
+}
+
 type EmailOutlookSync struct {
 	MailboxID   string
 	TenantID    string

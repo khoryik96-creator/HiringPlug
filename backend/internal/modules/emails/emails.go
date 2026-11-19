@@ -88,6 +88,7 @@ type Deps struct {
 	}
 	Candidates interface {
 		Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[string]Candidate, error)
+		IDsByEmails(ctx context.Context, tx pgx.Tx, addresses []string) ([]string, error)
 		// Detailed is a candidate with Details, as p may see them (salary
 		// only with permission); NOT_FOUND when missing.
 		Detailed(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (Candidate, error)

@@ -31,6 +31,10 @@ type emailCandidates struct {
 	settings   *settings.Module
 }
 
+func (a emailCandidates) IDsByEmails(ctx context.Context, tx pgx.Tx, addresses []string) ([]string, error) {
+	return a.candidates.IDsByEmails(ctx, tx, addresses)
+}
+
 // Detailed is a candidate with what fields show, as p may see them: salary
 // only with permission (row-level security leaves it out otherwise).
 func (a emailCandidates) Detailed(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (emails.Candidate, error) {

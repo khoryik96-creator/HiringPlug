@@ -201,10 +201,18 @@ x-error-codes:
     module: offers
     status: 422
     description: The offer cannot be made or changed like this (the application is closed or has an open offer, an approval of your own request, a step out of order, ...). The message says why.
+  OUTLOOK_DRAFT_CHANGED:
+    module: emails
+    status: 409
+    description: The reviewed Outlook draft changed or was already sent.
   OUTLOOK_NOT_CONNECTED:
     module: emails
     status: 409
     description: Connect a personal Microsoft mailbox and enable inbox sync.
+  OUTLOOK_SEND_IN_PROGRESS:
+    module: emails
+    status: 409
+    description: The send already started or needs confirmation in Outlook.
   OUTLOOK_UNAVAILABLE:
     module: emails
     status: 503
@@ -2571,6 +2579,277 @@ paths:
         '401': {$ref: '#/components/responses/Unauthenticated'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /v1/outlook/drafts:
+    post:
+      operationId: createOutlookDraft
+      tags:
+        - emails
+      summary: Create a personal Outlook draft
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookDraftInput'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookDraft'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/drafts/{messageId}:
+    get:
+      operationId: getOutlookDraft
+      tags:
+        - emails
+      summary: Open the current Outlook draft
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^omg_[0-9a-z]{26}$
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookDraft'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      operationId: updateOutlookDraft
+      tags:
+        - emails
+      summary: Save edits to the reviewed Outlook draft
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^omg_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookDraftUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookDraft'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      operationId: deleteOutlookDraft
+      tags:
+        - emails
+      summary: Move an unscheduled draft to Outlook Deleted Items
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^omg_[0-9a-z]{26}$
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 64
+            maxLength: 64
+            pattern: ^[a-f0-9]+$
+      responses:
+        '204':
+          description: OK
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/drafts/{messageId}/send:
+    put:
+      operationId: scheduleOutlookDraft
+      tags:
+        - emails
+      summary: Send a reviewed Outlook draft now or later
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^omg_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookScheduleInput'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookScheduledSend'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/scheduled:
+    get:
+      operationId: listOutlookScheduled
+      tags:
+        - emails
+      summary: List personal Outlook scheduled sends
+      x-permission: emails:send
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookScheduleList'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/outlook/scheduled/{sendId}/cancel:
+    post:
+      operationId: cancelOutlookScheduled
+      tags:
+        - emails
+      summary: Cancel a send that has not started
+      x-permission: emails:send
+      parameters:
+        - name: sendId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^oms_[0-9a-z]{26}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutlookScheduleVersion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutlookScheduledSend'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /v1/outlook/mail:
     get:
       operationId: listOutlookMail
@@ -6878,7 +7157,9 @@ components:
         - METHOD_NOT_ALLOWED
         - NOT_FOUND
         - OFFER_NOT_ALLOWED
+        - OUTLOOK_DRAFT_CHANGED
         - OUTLOOK_NOT_CONNECTED
+        - OUTLOOK_SEND_IN_PROGRESS
         - OUTLOOK_UNAVAILABLE
         - PAYLOAD_TOO_LARGE
         - PLACEMENT_NOT_ALLOWED
@@ -6930,6 +7211,7 @@ components:
         - document.text_extracted
         - email.bounce_scan
         - email.interview_reminder
+        - email.outlook_scheduled
         - email.outlook_sync
         - email.send
         - interview.remind
@@ -9810,6 +10092,220 @@ components:
         profile: {allOf: [{$ref: '#/components/schemas/ParsedProfile'}], nullable: true}
         errorMessage: {type: string, nullable: true}
         aiTokens: {type: integer, minimum: 0, description: Tokens the AI used (counted in the monthly allowance).}
+    OutlookDraftInput:
+      type: object
+      properties:
+        subject:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 40000
+        to:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+        cc:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+        bcc:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+    OutlookDraftUpdate:
+      type: object
+      required:
+        - version
+      properties:
+        subject:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 40000
+        to:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+        cc:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+        bcc:
+          type: array
+          items:
+            type: string
+            format: email
+            maxLength: 254
+          maxItems: 100
+        version:
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: ^[a-f0-9]+$
+    OutlookDraft:
+      type: object
+      required:
+        - messageId
+        - version
+        - subject
+        - body
+        - bodyTruncated
+        - to
+        - cc
+        - bcc
+        - hasAttachments
+        - webUrl
+        - schedule
+        - scheduleNeedsReview
+      properties:
+        messageId:
+          type: string
+        version:
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: ^[a-f0-9]+$
+        subject:
+          type: string
+        body:
+          type: string
+        bodyTruncated:
+          type: boolean
+        to:
+          type: array
+          items:
+            type: string
+        cc:
+          type: array
+          items:
+            type: string
+        bcc:
+          type: array
+          items:
+            type: string
+        hasAttachments:
+          type: boolean
+        webUrl:
+          type: string
+          nullable: true
+        scheduleNeedsReview:
+          type: boolean
+        schedule:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/OutlookScheduledSend'
+    OutlookScheduleInput:
+      type: object
+      required:
+        - draftVersion
+        - expectedVersion
+      properties:
+        draftVersion:
+          type: string
+          minLength: 64
+          maxLength: 64
+          pattern: ^[a-f0-9]+$
+        expectedVersion:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        sendAt:
+          type: string
+          format: date-time
+          nullable: true
+        changes:
+          $ref: '#/components/schemas/OutlookDraftInput'
+    OutlookScheduleVersion:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+    OutlookScheduledSend:
+      type: object
+      required:
+        - id
+        - messageId
+        - version
+        - subject
+        - sendAt
+        - updatedAt
+        - status
+        - error
+      properties:
+        id:
+          type: string
+        messageId:
+          type: string
+        version:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        subject:
+          type: string
+        sendAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - scheduled
+            - confirming
+            - sent
+            - needs_review
+            - uncertain
+            - cancelled
+        error:
+          type: string
+          nullable: true
+    OutlookScheduleList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OutlookScheduledSend'
+    OutlookScheduledJob:
+      type: object
+      required:
+        - sendId
+        - userId
+        - version
+      properties:
+        sendId:
+          type: string
+        userId:
+          type: string
+        version:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
     OutlookMailFolder:
       type: object
       required:
@@ -14272,6 +14768,12 @@ x-jobs:
     payload: EmailSendJob
     priority: high
     description: Recheck the interview and candidate before sending the optional day-before email.
+  email.outlook_scheduled:
+    module: emails
+    queue: core
+    payload: OutlookScheduledJob
+    priority: high
+    description: Submit one reviewed Outlook draft and reconcile its immutable ID in Sent Items.
   email.outlook_sync:
     module: emails
     queue: core

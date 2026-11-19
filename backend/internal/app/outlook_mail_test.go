@@ -106,7 +106,13 @@ func outlookRecipientJSON(address string) map[string]any {
 func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixture {
 	t.Helper()
 	f := &outlookMailFixture{folder: "inbox"}
-	server := httptest.NewServer(http.HandlerFunc(f.serve))
+	connectTestOutlook(t, a, token, http.HandlerFunc(f.serve))
+	return f
+}
+
+func connectTestOutlook(t *testing.T, a *testApp, token string, handler http.Handler) {
+	t.Helper()
+	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 	a.modules.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
 		KeysSecret: []byte("synthetic-mailbox-encryption-key-32-chars"),
@@ -128,7 +134,6 @@ func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixtur
 	require.Equal(t, 303, r.Status)
 	r = a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": mailboxTicket(t, r.Header.Get("Location"))})
 	require.Equal(t, 200, r.Status, "%s", r.Body)
-	return f
 }
 
 func TestOutlookMailSyncActionsAndProfilePrivacy(t *testing.T) {

@@ -237,6 +237,9 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		if _, err := store.New(tx).MailboxForUser(ctx, p.UserID); err != nil && !database.IsNoRows(err) {
 			return err
 		}
+		if err := store.New(tx).CancelOutlookSendsForMailbox(ctx); err != nil {
+			return err
+		}
 		if err := store.New(tx).RemoveOutlookSync(ctx); err != nil {
 			return err
 		}

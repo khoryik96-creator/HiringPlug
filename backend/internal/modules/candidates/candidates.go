@@ -95,6 +95,11 @@ func (m *Module) Briefs(ctx context.Context, tx pgx.Tx, ids []string) (map[strin
 	return m.service.Briefs(ctx, tx, ids)
 }
 
+// IDsByEmails resolves normalized addresses within the caller's scope.
+func (m *Module) IDsByEmails(ctx context.Context, tx pgx.Tx, addresses []string) ([]string, error) {
+	return store.New(tx).CandidateIDsByEmails(ctx, addresses)
+}
+
 // ViewIn returns a candidate as the user may see them (salary only with
 // permission), in the caller's transaction: for formatted CVs.
 func (m *Module) ViewIn(ctx context.Context, tx pgx.Tx, p authz.Principal, id string) (View, error) {
