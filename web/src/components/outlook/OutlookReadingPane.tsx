@@ -10,12 +10,13 @@ import type { OutlookProfile } from "./OutlookProfileMail";
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, onThread }: {
+export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, canImportCv, onThread }: {
   message: Message;
   folders: Folder[];
   profile?: OutlookProfile;
   linked: boolean;
   canSaveCv: boolean;
+  canImportCv: boolean;
   onThread: () => void;
 }) {
   const client = useQueryClient();
@@ -95,7 +96,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
     {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
     {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
-      canSaveCv={canSaveCv} candidateId={linked ? profile?.candidateId : undefined} />}
+      canSaveCv={canSaveCv} canImportCv={canImportCv} candidateId={linked ? profile?.candidateId : undefined} />}
     {!message.isDraft && mode === null && <div className="row">
       <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
       <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>

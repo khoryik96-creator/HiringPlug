@@ -3,6 +3,12 @@ import { useId, useState } from "react";
 
 /** Files a CV comes in: PDF, Word, text, RTF, ODT, or a picture of it (read with OCR). */
 export const CV_TYPES = ".pdf,.docx,.doc,.txt,.rtf,.odt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp";
+const cvExtensions = CV_TYPES.split(",");
+
+export function isCvFileName(fileName: string): boolean {
+  const name = fileName.toLowerCase();
+  return cvExtensions.some((extension) => name.endsWith(extension));
+}
 
 /** The files whose extension is one of `accept` (".pdf,.docx"), and the names of the others. */
 export function acceptable(files: File[], accept: string): { ok: File[]; skipped: string[] } {

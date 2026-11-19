@@ -3,6 +3,8 @@ import { useState } from "react";
 
 import type { Permission } from "../api/client";
 import { CvImports } from "../components/CvImports";
+import { OutlookCvImport } from "../components/outlook/OutlookCvImport";
+import { hashParam } from "../hashQuery";
 import { parseCsv, toCsv } from "../import/csv";
 import { autoMap, FIELDS, type ImportKind, mappingProblems } from "../import/mapping";
 import { type RowResult, runImport } from "../import/runImport";
@@ -18,10 +20,14 @@ const STATUS: Record<RowResult["status"], string> = { added: "Added", exists: "A
 /** Everything that comes in from files: CVs and LinkedIn PDFs (also on the dashboard), and spreadsheets. */
 export function ImportPage({ permissions }: { permissions: Permission[] }) {
   const cvs = permissions.includes("intake:create");
+  const messageId = hashParam("outlookMessage");
+  const attachmentId = hashParam("outlookAttachment");
   return (
     <main>
       <h2>Import</h2>
-      {cvs && <CvImports />}
+      {cvs && (permissions.includes("emails:send") && messageId && attachmentId
+        ? <OutlookCvImport key={JSON.stringify([messageId, attachmentId])} messageId={messageId} attachmentId={attachmentId} />
+        : <CvImports />)}
       <CsvImport permissions={permissions} cvs={cvs} />
     </main>
   );

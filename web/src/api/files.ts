@@ -39,10 +39,14 @@ export async function fetchDocumentPdf(id: string): Promise<Blob> {
 }
 
 /** A file the API serves, as a blob of the given type (to show it in the app). */
-export async function fetchFile(path: string, type: string): Promise<Blob> {
-  const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+export async function fetchFile(path: string, type: string, signal?: AbortSignal): Promise<Blob> {
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${getToken() ?? ""}` }, signal });
   if (!res.ok) await throwFor(res);
   return new Blob([await res.arrayBuffer()], { type });
+}
+
+export function outlookAttachmentFilePath(messageId: string, attachmentId: string): string {
+  return `/v1/outlook/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/file`;
 }
 
 /** Saves a file the API serves (e.g. an interview's calendar entry) under the given name. */
