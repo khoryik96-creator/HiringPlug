@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
+import { IconButton, PlusIcon } from "../components/ActionIcons";
 import { ContactForm } from "../components/ContactForm";
 import { ContactTable } from "../components/ContactTable";
 import { useDebounced } from "../components/useDebounced";
@@ -63,7 +64,7 @@ export function ContactList({ canCreate, canEmail = false, canFolders = false, m
             <option value="left">Has left</option>
           </select>
         </BooleanSearchBox>
-        {canCreate && !adding && <button type="button" className="pill-btn primary" onClick={() => { setAdding(true); }}>+ Add contact</button>}
+        {canCreate && !adding && <IconButton label="Add contact" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (
         <ContactForm

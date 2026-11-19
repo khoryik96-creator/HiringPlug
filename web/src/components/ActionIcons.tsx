@@ -41,6 +41,11 @@ export const OutlookIcon = () => (
 export const UploadIcon = () => (
   <Svg><path d="M12 16V4m-5 5 5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></Svg>
 );
+export const DownloadIcon = () => (
+  <Svg><path d="M12 4v12m-5-5 5 5 5-5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></Svg>
+);
+export const ViewIcon = () => <Svg><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></Svg>;
+export const RefreshIcon = () => <Svg><path d="M20 5v5h-5m5 0a8 8 0 1 0 .1 4" /></Svg>;
 export const FileIcon = () => <Svg><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6" /></Svg>;
 export const TextIcon = () => <Svg><path d="M4 6h16M4 10h16M4 14h16M4 18h10" /></Svg>;
 export const CalendarPlusIcon = () => (
@@ -67,7 +72,8 @@ export function IconButton({ label, icon, onClick, disabled = false, tip = label
 }) {
   return (
     <button type="button" className={["icon-action", danger && "icon-danger", className].filter(Boolean).join(" ")}
-      aria-label={label} aria-pressed={pressed} data-tip={tip} disabled={disabled} onClick={onClick}>{icon}</button>
+      aria-label={label} aria-pressed={pressed} data-tip={disabled ? undefined : tip} title={disabled ? tip : undefined}
+      disabled={disabled} onClick={onClick}>{icon}</button>
   );
 }
 

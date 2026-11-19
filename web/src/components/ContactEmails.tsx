@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { api, type Permission, unwrap } from "../api/client";
 import { contactEmailsKey } from "../api/keys";
+import { IconButton, MailIcon } from "./ActionIcons";
 import { SentEmails } from "./CandidateEmails";
 import { EmailComposer } from "./EmailComposer";
 import { OutlookProfileMail } from "./outlook/OutlookProfileMail";
@@ -28,7 +29,8 @@ export function ContactEmails({ contactId, email, permissions, writing: controll
     <section className="panel" aria-label="Emails">
       <div className="row spread">
         <h3>Emails</h3>
-        {permissions.includes("emails:send") && !writing && <button type="button" onClick={() => { setWriting(true); }}>Write email</button>}
+        {permissions.includes("emails:send") && !writing && <IconButton label="Write email" icon={<MailIcon />} className="icon-outline"
+          onClick={() => { setWriting(true); }} />}
       </div>
       {writing && (
         <EmailComposer permissions={permissions} contactId={contactId} defaultTo={email ?? ""}

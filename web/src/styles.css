@@ -1320,6 +1320,14 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .icon-actions { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, #fff); box-shadow: 0 1px 2px rgba(31, 41, 55, 0.05); }
 .icon-action { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border: 0; border-radius: 9px; background: transparent; box-shadow: none; color: #4b5563; text-decoration: none; cursor: pointer; }
 .icon-action:hover, .icon-action:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.icon-action.icon-outline { border: 1px solid var(--line); }
+.icon-action.icon-primary { color: white; background: var(--accent); border: 1px solid var(--accent); }
+.icon-action.icon-primary:hover { filter: brightness(1.08); }
+.row.spread > .icon-action:last-child::after, .list-top > .icon-action:last-child::after,
+.row.spread > .row:last-child > .icon-action:last-child::after {
+  left: auto; right: 0; transform: none;
+}
+.company-docs .doc-buttons > .icon-action::after { inset: 50% calc(100% + 6px) auto auto; transform: translateY(-50%); }
 .icon-action.icon-danger:hover, .icon-action.icon-danger:focus-visible { background: #fef2f2; color: #b91c1c; }
 .icon-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--line); }
 .icon-action[data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 30; }

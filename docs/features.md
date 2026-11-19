@@ -1481,6 +1481,9 @@ one open). On a phone the pages wrap onto two lines. The lists (candidates,
 jobs, companies, contacts, placements, leads) and the job's pipeline use the
 width of the screen; a record's page stays centred.
 
+Common actions on candidate, contact, and company screens use icons with labels
+on hover and keyboard focus. The forms and their save actions keep visible labels.
+
 ## Main settings ✅
 
 One **Settings** button in the top bar leads to everything that is set up

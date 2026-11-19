@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Company, unwrap } from "../api/client";
 import { jobsKey } from "../api/keys";
+import { IconButton, PlusIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 import { JobForm } from "./JobForm";
 import { JobTable } from "./JobTable";
@@ -18,7 +19,7 @@ export function CompanyJobs({ company, canCreate }: { company: Company; canCreat
     <section className="panel" aria-label="Jobs">
       <div className="row spread">
         <h3>Jobs</h3>
-        {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add job</button>}
+        {canCreate && !adding && <IconButton label="Add job" icon={<PlusIcon />} className="icon-outline" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (
         <JobForm job={null} company={{ id: company.id, name: company.name }} onDone={() => { setAdding(false); }}

@@ -70,9 +70,8 @@
   background: var(--accent-soft); color: var(--accent); border-color: var(--line-strong);
 }
 .candidate-workspace .icon-action.icon-primary { color: white; background: var(--accent); border-color: var(--accent); }
-.candidate-workspace .icon-action.icon-primary:hover { filter: brightness(1.08); }
 .candidate-workspace .icon-action.icon-done { color: #15803d; background: #f0fdf4; border-color: #16a34a; }
-.candidate-workspace :is(.docs-actions, .row.spread, .app-card-actions) > .icon-action:last-child::after,
+.candidate-workspace :is(.docs-actions, .app-card-actions) > .icon-action:last-child::after,
 .candidate-workspace .cv-beside-toggle::after { left: auto; right: 0; transform: none; }
 .candidate-application-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
 .candidate-application-actions > :empty { display: none; }

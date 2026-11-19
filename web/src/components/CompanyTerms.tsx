@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { formatDay, formatWhen } from "../labels";
+import { EditIcon, IconButton, PlusIcon } from "./ActionIcons";
 import { CompanyDocuments } from "./CompanyDocuments";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
@@ -32,7 +33,8 @@ export function CompanyTerms({ companyId, permissions }: { companyId: string; pe
           <h3>Terms of business</h3>
           <p className="muted small">Each new placement for this client starts from the rate for its salary; it can be changed on the placement.</p>
         </div>
-        {canEdit && t && !editing && <button type="button" onClick={() => { setEditing(true); }}>{t.version === 0 ? "Add terms" : "Edit"}</button>}
+        {canEdit && t && !editing && <IconButton label={t.version === 0 ? "Add terms" : "Edit"} tip={t.version === 0 ? "Add terms" : "Edit terms"}
+          icon={t.version === 0 ? <PlusIcon /> : <EditIcon />} className="icon-outline" onClick={() => { setEditing(true); }} />}
       </div>
       <ErrorMessage error={terms.error} />
       {t && (editing ? <TermsForm companyId={companyId} terms={t} onDone={() => { setEditing(false); }} /> : <TermsView t={t} />)}
