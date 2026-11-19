@@ -49,10 +49,13 @@ database behind the code (run `hp migrate` or `hp bootstrap`).
 
 ### A migration number was used twice
 
-Migrations are numbered in the order they reach `main`. A database that ran a
-branch before it was renumbered has the old numbers recorded. For example,
-the Outlook invitation migrations were 00131/00132 on their branch and are
-00133/00134 on `main`, where 00131 adds pipeline stage templates. Check:
+Migrations are numbered in the order they reach `main`. A database that only
+ran releases from `main` needs nothing here: update as usual. This is only for
+a database someone ran from an unpushed working copy that used numbers taken
+since. For example, an early local copy of the Outlook invitation work
+numbered its migrations 00131/00132; they reached `main` as 00133/00134, and
+00131 there adds pipeline stage templates. No server or shared database ran
+that copy. Check:
 
 ```sql
 SELECT version_id FROM goose_db_version WHERE version_id BETWEEN 131 AND 134;
