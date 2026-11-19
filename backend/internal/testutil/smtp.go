@@ -17,6 +17,7 @@ type SMTPServer struct {
 	ln   net.Listener
 	mu   sync.Mutex
 	msgs []SMTPMessage
+	held map[string]func() // by recipient: runs once their message is in, before the server answers
 }
 
 // SMTPMessage is one received message.
@@ -56,6 +57,17 @@ func StartSMTPServer() (*SMTPServer, error) {
 		}
 	}()
 	return s, nil
+}
+
+// OnMessage runs fn whenever a message for address has been received, while
+// the sender is still waiting for the server's answer.
+func (s *SMTPServer) OnMessage(address string, fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.held == nil {
+		s.held = map[string]func(){}
+	}
+	s.held[address] = fn
 }
 
 // Close stops the server.
@@ -127,7 +139,16 @@ func (s *SMTPServer) serve(conn net.Conn) {
 			msg.Data = data.String()
 			s.mu.Lock()
 			s.msgs = append(s.msgs, msg)
+			var hooks []func()
+			for _, to := range msg.To {
+				if fn := s.held[to]; fn != nil {
+					hooks = append(hooks, fn)
+				}
+			}
 			s.mu.Unlock()
+			for _, fn := range hooks {
+				fn()
+			}
 			reply("250 queued")
 		case cmd == "QUIT":
 			reply("221 bye")

@@ -18,6 +18,7 @@ type candidateFollowUp struct {
 	t                              *testing.T
 	f                              *outlookFixture
 	tenant, user, email, candidate string
+	userID, organizer              string // the organizer's id and name
 	iv                             api.Interview
 	path                           string
 }
@@ -42,7 +43,9 @@ func startCandidateFollowUp(t *testing.T) candidateFollowUp {
 	res := a.request(http.MethodPost, path+"/outlook-invitation", user.Token, in)
 	require.Equal(t, 202, res.Status, "%s", res.Body)
 	runCoreJobsUntilIdle(t, a, tenant.ID)
-	return candidateFollowUp{a, t, f, tenant.ID, user.Token, email, candidate, iv, path}
+	var name string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), "SELECT name FROM app_user WHERE id=$1", user.ID).Scan(&name))
+	return candidateFollowUp{a, t, f, tenant.ID, user.Token, email, candidate, user.ID, name, iv, path}
 }
 
 func (c candidateFollowUp) reply(status string) api.InterviewInvitation {
@@ -83,6 +86,10 @@ func TestOutlookInterviewCandidateRSVPAndMovingReminder(t *testing.T) {
 		require.NotNil(t, state.CandidateResponse)
 		require.EqualValues(t, expected, *state.CandidateResponse)
 	}
+	c.reply("accepted")
+	state := c.reply("organizer") // an answer HiringPlug does not map
+	require.NotNil(t, state.CandidateResponse, "an answer we do not know leaves the last one")
+	require.EqualValues(t, "accepted", *state.CandidateResponse)
 	res := c.a.request(http.MethodPatch, c.path, c.user, map[string]any{
 		"version": c.iv.Version, "startsAt": c.iv.StartsAt.Add(2 * time.Hour), "title": "Updated technical interview",
 	})
@@ -99,6 +106,19 @@ func TestOutlookInterviewCandidateRSVPAndMovingReminder(t *testing.T) {
 	require.NoError(t, err)
 	runCoreJobsUntilIdle(t, c.a, c.tenant)
 	assert.Len(t, mailServer.To(c.email), 1, "a retry cannot send a second reminder")
+}
+
+func TestOutlookInterviewCandidateReminderIsTheOrganizersEmailOnTheCandidate(t *testing.T) {
+	t.Parallel()
+	c := startCandidateFollowUp(t)
+	c.deliver()
+	require.Len(t, mailServer.To(c.email), 1)
+	var candidate, sentBy, sender string
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT coalesce(candidate_id,''),sent_by,sender_name FROM email WHERE tenant_id=$1 AND $2=ANY(to_addresses)", c.tenant, c.email).Scan(&candidate, &sentBy, &sender))
+	assert.Equal(t, c.candidate, candidate, "the reminder is on the candidate's record (their Emails tab, deleted with them)")
+	assert.Equal(t, c.userID, sentBy, "the organizer sends the reminder, not the server")
+	assert.Equal(t, c.organizer, sender)
 }
 
 func TestOutlookInterviewCandidateReminderChecksEligibilityAtDelivery(t *testing.T) {
@@ -126,6 +146,12 @@ func TestOutlookInterviewCandidateReminderChecksEligibilityAtDelivery(t *testing
 		require.Equal(t, 200, res.Status, "%s", res.Body)
 		c.deliver()
 		require.Empty(t, mailServer.To(c.email))
+		var kept, skipped int
+		require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(), `SELECT
+			(SELECT count(*) FROM email WHERE tenant_id=$1),
+			(SELECT count(*) FROM audit_log WHERE tenant_id=$1 AND action='email.reminder_skipped')`, c.tenant).Scan(&kept, &skipped))
+		assert.Zero(t, kept, "a reminder no longer due is not listed as a failed email")
+		assert.Equal(t, 1, skipped)
 	})
 	t.Run("cancelled", func(t *testing.T) {
 		t.Parallel()

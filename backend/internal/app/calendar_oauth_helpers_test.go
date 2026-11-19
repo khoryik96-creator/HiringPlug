@@ -40,6 +40,7 @@ type outlookFixture struct {
 	lastPatch                   map[string]any // what the last change sent
 	deleteStatus                int            // answer to deletes when not 0 (a broken or busy Outlook)
 	trialJoinURL                string
+	onWrite                     func() // runs as Outlook takes a create or change, before it answers
 	config                      calendars.Config
 }
 
@@ -74,6 +75,9 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(body)
 	case strings.HasSuffix(r.URL.Path, "/events") && r.Method == "POST":
 		f.creates++
+		if f.onWrite != nil {
+			f.onWrite()
+		}
 		if f.writeStatus != 0 {
 			w.WriteHeader(f.writeStatus)
 			return
@@ -120,6 +124,9 @@ func (f *outlookFixture) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		case "PATCH":
 			f.patches++
+			if f.onWrite != nil {
+				f.onWrite()
+			}
 			if f.writeStatus != 0 {
 				w.WriteHeader(f.writeStatus)
 				return

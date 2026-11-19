@@ -18,3 +18,9 @@ func (m *Module) OnApplications(ctx context.Context, tx pgx.Tx, applicationIDs [
 	}
 	return out, err
 }
+
+// IDsOnApplications returns the interviews on some applications, in the
+// caller's transaction (they go when the applications are deleted for good).
+func (m *Module) IDsOnApplications(ctx context.Context, tx pgx.Tx, applicationIDs []string) ([]string, error) {
+	return store.New(tx).InterviewIDsOnApplications(ctx, applicationIDs)
+}

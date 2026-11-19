@@ -60,7 +60,18 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 			if !locked {
 				return jobqueue.Later(s.now().Add(5 * time.Second))
 			}
-			defer releaseInvitationLock(conn, args)
+			// Held while the invitation is checked against its interview, never
+			// across Outlook's answer: an edit to the interview must not wait on
+			// Microsoft. An edit made meanwhile leaves the row pending (its version
+			// moves on past the one sent), so the receipt queues another push.
+			released := false
+			unlock := func() {
+				if !released {
+					released = true
+					releaseInvitationLock(conn, args)
+				}
+			}
+			defer unlock()
 			var organizer authz.Principal
 			var active bool
 			err = database.InTx(ctx, conn, p, func(tx pgx.Tx) error {
@@ -90,6 +101,7 @@ func (s *Service) push(ctx context.Context, job jobqueue.Job) error {
 			if err != nil {
 				return err
 			}
+			unlock()
 		}
 		token, err := s.access(ctx, conn, current)
 		if err != nil {
@@ -179,6 +191,15 @@ func (s *Service) receipt(ctx context.Context, conn *pgx.Conn, p authz.Principal
 			}
 		}
 		updated, err := q.SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
+		if err == nil && updated != 0 && row.Source == invitationSource && row.Status == "cancelled" {
+			// Cancelled in Outlook for an interview deleted with its candidate:
+			// nothing is left to manage, and the row holds their address.
+			if _, err := s.deps.Sources.Meeting(ctx, tx, "interview", text(row.SourceID)); database.IsNoRows(err) {
+				return dropInvitation(ctx, tx, row)
+			} else if err != nil {
+				return err
+			}
+		}
 		if err == nil && updated != 0 && row.Source == invitationSource && remoteID != nil {
 			var missing bool
 			missing, err = saveCandidateResponse(ctx, q, row, remote)

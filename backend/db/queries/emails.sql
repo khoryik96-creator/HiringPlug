@@ -61,6 +61,10 @@ UPDATE email SET status = @status, error = sqlc.narg(error),
   sent_at = CASE WHEN @status = 'sent' THEN now() ELSE sent_at END
 WHERE id = @id;
 
+-- A queued reminder no longer due is not kept (it was never sent).
+-- name: DeleteQueuedEmail :exec
+DELETE FROM email WHERE id = @id AND status = 'queued';
+
 -- name: UpdateQueuedReminderBody :exec
 UPDATE email SET body = @body WHERE id = @id AND status='queued';
 

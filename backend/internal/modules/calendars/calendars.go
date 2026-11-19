@@ -47,7 +47,8 @@ type Deps struct {
 		InterviewRecipient(context.Context, pgx.Tx, string) (email string, optedOut bool, err error)
 	}
 	ReminderMail interface {
-		QueueInterviewReminder(context.Context, pgx.Tx, string, string, string, time.Time, api.InterviewReminderDelivery) error
+		// QueueInterviewReminder(tenant, application, organizer, email, at, reminder): sent as the organizer.
+		QueueInterviewReminder(context.Context, pgx.Tx, string, string, string, string, time.Time, api.InterviewReminderDelivery) error
 	}
 }
 type Provider struct{ AuthorizeURL, TokenURL, GraphURL string }
@@ -113,6 +114,26 @@ func (m *Module) SourceChanged(ctx context.Context, tx pgx.Tx, tenant, kind, id 
 	_, err := jobqueue.Enqueue(ctx, tx, tenant, api.JobKindCalendarSourceChanged, api.CalendarSourceJob{Kind: api.CalendarSourceJobKind(kind), SourceId: id})
 	return err
 }
+
+// InterviewsDeleted is told, in the deleting transaction, of interviews
+// deleted for good (with their candidate or application): their Outlook
+// invitations are cancelled, and their rows deleted, once it commits.
+func (m *Module) InterviewsDeleted(ctx context.Context, tx pgx.Tx, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tenant, err := store.New(tx).CurrentCalendarTenant(ctx)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := m.SourceChanged(ctx, tx, tenant, "interview", id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Module) BusyFor(ctx context.Context, tx pgx.Tx, users []string, from, to time.Time, exceptKind, exceptID string) ([]ical.Interval, error) {
 	return m.service.busy(ctx, tx, users, from, to, exceptKind, exceptID)
 }

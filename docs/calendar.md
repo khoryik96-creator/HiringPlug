@@ -65,13 +65,21 @@ shared/delegated calendars are not included.
   Microsoft returns the link. The panel's day-before email includes it if the
   link is available when the reminder runs.
 - **Outlook invitation** shows the candidate's latest reply from the organizer's
-  calendar sync. **Email candidate a day before** opts into a separate reminder
-  through HiringPlug's configured mail server. The organizer can turn it off
+  calendar sync (a reply Outlook reports that HiringPlug does not know leaves
+  the last one shown). **Email candidate a day before** opts into a separate
+  reminder, sent as the organizer's email (from their connected mailbox, else
+  the configured mail server; replies go to them) and listed on the candidate's
+  Emails tab. The organizer can turn it off
   from the invitation panel. Moving an interview moves the reminder. At delivery
   HiringPlug checks the latest schedule, organizer, address, known RSVP, and
   consent. If an interview is first invited within 24 hours, the email can go
   once Outlook confirms the invitation, while the interview is over an hour
-  away. The reminder includes the Teams link when available.
+  away. The reminder includes the Teams link when available. A reminder no
+  longer due is dropped, not listed as a failed email.
+- Deleting a candidate for good (or their pipeline entry) cancels their Outlook
+  invitations, and removes HiringPlug's copy (it holds the candidate's address)
+  once Outlook confirms. A conflict stays marked once; a sync with nothing new
+  in Outlook does not mark it again.
 - An Outlook change to an own appointment is reflected on the next refresh.
   A changed/deleted interview or booking hold is flagged for review; its source
   schedule stays in HiringPlug. **Keep HiringPlug details & sync** explicitly
@@ -143,7 +151,10 @@ keys. Audit records contain event IDs/actions, not appointment contents.
 OAuth uses signed expiring state, PKCE, authenticated one-use completion and
 encrypted codes/tokens. Refresh-token rotation and provider receipts commit
 independently of queue completion. A per-user advisory lock serializes provider
-operations, disconnect and reconnect. Graph create requests have a stable
+operations, disconnect and reconnect. An interview's own lock is held while
+its invitation is checked, never while Outlook or the mail server answers, so
+an edit to the interview never waits on Microsoft; an edit made meanwhile
+queues another push. Graph create requests have a stable
 transaction ID; queued writes bind the connection they were scheduled for. A
 create Outlook stored but whose answer was lost is matched by that ID at the
 next sync: the event is taken back from the import, and the appointment pushed

@@ -308,6 +308,31 @@ func (q *Queries) InsertInterview(ctx context.Context, arg InsertInterviewParams
 	return i, err
 }
 
+const interviewIDsOnApplications = `-- name: InterviewIDsOnApplications :many
+SELECT id FROM interview WHERE application_id = ANY ($1::text[]) ORDER BY id
+`
+
+// The interviews on some applications (deleted with them for good: the Bin).
+func (q *Queries) InterviewIDsOnApplications(ctx context.Context, applicationIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, interviewIDsOnApplications, applicationIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listApplicationInterviews = `-- name: ListApplicationInterviews :many
 SELECT id, tenant_id, application_id, version, title, starts_at, duration_minutes, ends_at, mode, location, instructions, status, interviewer_ids, created_by, created_at, updated_at, reminded_for FROM interview WHERE application_id = $1 ORDER BY starts_at LIMIT 100
 `

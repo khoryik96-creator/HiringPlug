@@ -576,6 +576,15 @@ func (q *Queries) DeleteCalendarConnection(ctx context.Context) error {
 	return err
 }
 
+const deleteInterviewInvitation = `-- name: DeleteInterviewInvitation :exec
+DELETE FROM calendar_event WHERE id= $1 AND source='interview_invitation'
+`
+
+func (q *Queries) DeleteInterviewInvitation(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteInterviewInvitation, id)
+	return err
+}
+
 const failOutlookRefresh = `-- name: FailOutlookRefresh :execrows
 UPDATE calendar_connection SET status= $1,sync_error= $2,sync_sequence=sync_sequence+1 WHERE id= $3 AND sync_sequence= $4
 `

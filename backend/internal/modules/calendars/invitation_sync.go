@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars/internal/store"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/audit"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/database"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/platform/jobqueue"
 )
@@ -50,6 +51,9 @@ func (s *Service) reconcileInvitation(ctx context.Context, tx pgx.Tx, tenant str
 		return "", err
 	}
 	before := row.Version
+	if meeting.Version == math.MaxInt32 {
+		return "", s.invitationOfDeleted(ctx, tx, tenant, row, meeting)
+	}
 	if meeting.Scheduled || meeting.Cancelled {
 		row, err = s.syncInvitationProjection(ctx, tx, row, meeting)
 		if err != nil {
@@ -69,8 +73,6 @@ func (s *Service) reconcileInvitation(ctx context.Context, tx pgx.Tx, tenant str
 	same := inviteCalendar(row, conn)
 	if row.SyncStatus == "pending" && row.Version != before {
 		switch {
-		case meeting.Version == math.MaxInt32:
-			err = q.CalendarPushFailed(ctx, store.CalendarPushFailedParams{ID: row.ID, ExpectedVersion: row.Version, SyncError: ptr("This interview was deleted. Manage the original invitation in Outlook.")})
 		case same && conn.Status != "reconnect":
 			err = s.queuePush(ctx, tx, tenant, row.ID, conn.ID)
 		default:
@@ -83,11 +85,59 @@ func (s *Service) reconcileInvitation(ctx context.Context, tx pgx.Tx, tenant str
 	return "", err
 }
 
+// invitationOfDeleted handles the invitation of an interview deleted (with its
+// candidate or application): the candidate is sent Outlook's cancellation
+// when the organizer's calendar can still do it, and the row (which holds
+// their address) is deleted once that is done, or at once when it cannot be.
+func (s *Service) invitationOfDeleted(ctx context.Context, tx pgx.Tx, tenant string, row store.CalendarEvent, meeting Meeting) error {
+	q := store.New(tx)
+	conn, err := q.CalendarConnection(ctx, row.UserID)
+	if err != nil && !database.IsNoRows(err) {
+		return err
+	}
+	if row.RemoteID == nil || !inviteCalendar(row, conn) || conn.Status == "reconnect" {
+		return dropInvitation(ctx, tx, row) // never in Outlook, or nothing can reach it there now
+	}
+	if row.Status != "cancelled" {
+		if row, err = s.syncInvitationProjection(ctx, tx, row, meeting); err != nil {
+			return err
+		}
+		if err := managedBusy(ctx, tx, row); err != nil {
+			return err
+		}
+	}
+	if row.SyncStatus == "failed" || row.SyncStatus == "conflict" { // retried by its cancellation, as nobody can retry it any more
+		if row, err = q.RetryCalendarEvent(ctx, store.RetryCalendarEventParams{ID: row.ID, ExpectedVersion: row.Version}); err != nil {
+			return err
+		}
+	}
+	if row.SyncStatus != "pending" {
+		return nil
+	}
+	return s.queuePush(ctx, tx, tenant, row.ID, conn.ID)
+}
+
+// dropInvitation deletes an interview invitation and its busy time.
+func dropInvitation(ctx context.Context, tx pgx.Tx, row store.CalendarEvent) error {
+	q := store.New(tx)
+	if err := q.ClearSourceBusy(ctx, store.ClearSourceBusyParams{UserID: row.UserID, Source: invitationSource, SourceID: text(row.SourceID)}); err != nil {
+		return err
+	}
+	if err := q.DeleteInterviewInvitation(ctx, row.ID); err != nil {
+		return err
+	}
+	return audit.Record(ctx, tx, audit.Entry{Action: "interview.outlook_invitation_removed", EntityType: "interview", EntityID: text(row.SourceID),
+		Changes: map[string]any{"reason": "interview deleted"}})
+}
+
 func (s *Service) validateInvitationPush(ctx context.Context, tx pgx.Tx, row store.CalendarEvent, c store.CalendarConnection) error {
 	if !inviteCalendar(row, c) {
 		return invitationDenied("Reconnect the original Outlook calendar to manage this invitation.")
 	}
 	meeting, err := s.deps.Sources.Meeting(ctx, tx, "interview", text(row.SourceID))
+	if database.IsNoRows(err) && row.Status == "cancelled" {
+		return nil // the interview was deleted: only its cancellation goes out
+	}
 	if database.IsNoRows(err) {
 		return invitationDenied("This interview is unavailable to its original organizer. Manage the invitation in Outlook.")
 	}

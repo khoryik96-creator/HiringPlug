@@ -96,6 +96,8 @@ RETURNING *;
 -- name: AdvanceInterviewInvitationSource :one
 UPDATE calendar_event SET source_version= @source_version
 WHERE id= @id AND source_version< @source_version RETURNING *;
+-- name: DeleteInterviewInvitation :exec
+DELETE FROM calendar_event WHERE id= @id AND source='interview_invitation';
 -- name: SaveInterviewJoinLink :exec
 UPDATE calendar_event SET join_url= @join_url
 WHERE id= @id AND source='interview_invitation' AND version= @expected_version AND status='active';

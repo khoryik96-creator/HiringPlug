@@ -61,10 +61,15 @@ func saveCandidateResponse(ctx context.Context, q *store.Queries, row store.Cale
 			response = ptr("declined")
 		case "none", "notResponded":
 			response = ptr("not_responded")
+		default:
+			return false, nil // a value we do not know: the last answer stands
 		}
 		break
 	}
-	return !found, q.SaveCandidateResponse(ctx, store.SaveCandidateResponseParams{ID: row.ID, Response: response})
+	if !found {
+		return true, nil
+	}
+	return false, q.SaveCandidateResponse(ctx, store.SaveCandidateResponseParams{ID: row.ID, Response: response})
 }
 
 // A reply can advance Outlook's ETag. Accept it only while all content
@@ -152,29 +157,21 @@ func (s *Service) queueCandidateReminder(ctx context.Context, tx pgx.Tx, tenant 
 		at = s.now()
 	}
 	payload := api.InterviewReminderDelivery{EventId: row.ID, StartsAt: meeting.Start, Version: int(row.CandidateReminderVersion)}
-	return s.deps.ReminderMail.QueueInterviewReminder(ctx, tx, tenant, meeting.ApplicationID, email, at, payload)
+	return s.deps.ReminderMail.QueueInterviewReminder(ctx, tx, tenant, meeting.ApplicationID, row.UserID, email, at, payload)
 }
 
-// ReminderBody runs in the email delivery transaction. Its source lock keeps
-// the last-minute decision aligned with interview edits and reminder toggles.
+// ReminderBody runs in the email delivery transaction, which sends the email
+// before it commits. It takes no lock on the interview (an edit to it must
+// not wait on the mail server): the reminder's version and start time, checked
+// here, stop a reminder that was turned off or moved since it was queued.
 func (m *Module) ReminderBody(ctx context.Context, tx pgx.Tx, tenant string, job api.InterviewReminderDelivery, to []string) (string, error) {
 	s := m.service
 	q := store.New(tx)
-	initial, err := q.CalendarEvent(ctx, job.EventId)
-	if database.IsNoRows(err) {
-		return "", nil
-	}
-	if err != nil || initial.Source != invitationSource {
-		return "", err
-	}
-	if err := m.LockInterview(ctx, tx, text(initial.SourceID)); err != nil {
-		return "", err
-	}
 	row, err := q.CalendarEvent(ctx, job.EventId)
 	if database.IsNoRows(err) {
 		return "", nil
 	}
-	if err != nil {
+	if err != nil || row.Source != invitationSource {
 		return "", err
 	}
 	if !row.CandidateReminder || int(row.CandidateReminderVersion) != job.Version || row.Status != "active" ||

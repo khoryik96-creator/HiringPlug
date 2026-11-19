@@ -97,11 +97,27 @@ type calendarRecipients struct {
 
 type calendarReminderMail struct{ modules *Modules }
 
-func (a calendarReminderMail) QueueInterviewReminder(ctx context.Context, tx pgx.Tx, tenant, application, email string, at time.Time, reminder api.InterviewReminderDelivery) error {
-	return a.modules.Emails.Notify(ctx, tx, tenant, emails.Notice{
+// QueueInterviewReminder queues the candidate's reminder as the organizer's
+// email (from their mailbox when connected, replies to them), on the
+// candidate's record (their Emails tab, deleted with them).
+func (a calendarReminderMail) QueueInterviewReminder(ctx context.Context, tx pgx.Tx, tenant, application, organizer, email string, at time.Time, reminder api.InterviewReminderDelivery) error {
+	n := emails.Notice{
 		To: []string{email}, Subject: "Interview reminder", Body: "A reminder about your upcoming interview.",
-		ApplicationID: &application, DeliverAt: at, InterviewReminder: &reminder,
-	})
+		ApplicationID: &application, DeliverAt: at, InterviewReminder: &reminder, SentBy: &organizer,
+	}
+	apps, err := a.modules.Pipeline.Briefs(ctx, tx, []string{application})
+	if err != nil {
+		return err
+	}
+	if app, ok := apps[application]; ok {
+		n.CandidateID = &app.CandidateID
+	}
+	names, err := a.modules.Identity.UserNames(ctx, tx, []string{organizer})
+	if err != nil {
+		return err
+	}
+	n.SenderName = names[organizer]
+	return a.modules.Emails.Notify(ctx, tx, tenant, n)
 }
 
 func (a calendarReminderMail) ReminderBody(ctx context.Context, tx pgx.Tx, tenant string, reminder api.InterviewReminderDelivery, to []string) (string, error) {

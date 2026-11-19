@@ -165,8 +165,9 @@ func (s *Service) mergeRemote(ctx context.Context, tx pgx.Tx, row store.Calendar
 		}
 	}
 	changedInvitation := row.Source == invitationSource && (missingAttendee || e.IsCancelled)
-	if !changedInvitation && text(row.RemoteKey) == text(e.key()) || row.Version != row.SentVersion {
-		return nil
+	sameRemote := text(row.RemoteKey) == text(e.key())
+	if (sameRemote && (!changedInvitation || row.SyncStatus == "conflict")) || row.Version != row.SentVersion {
+		return nil // nothing new in Outlook (or its change is already marked), or ours is on its way
 	}
 	snapshot, _ := json.Marshal(e)
 	start, end, err := e.times()

@@ -46,3 +46,29 @@ Look at the document: `status`, `extractor` (which tools read it),
 It prints every configuration problem at once. Common ones: a missing
 `HP_DATABASE_URL`; connecting as a superuser (use the restricted app role); the
 database behind the code (run `hp migrate` or `hp bootstrap`).
+
+### A migration number was used twice
+
+Migrations are numbered in the order they reach `main`. A database that ran a
+branch before it was renumbered has the old numbers recorded. For example,
+the Outlook invitation migrations were 00131/00132 on their branch and are
+00133/00134 on `main`, where 00131 adds pipeline stage templates. Check:
+
+```sql
+SELECT version_id FROM goose_db_version WHERE version_id BETWEEN 131 AND 134;
+SELECT to_regclass('stage_template');
+```
+
+If 131 is recorded but `stage_template` is missing, `hp migrate` stops on 00133
+(its tables are already there). For a development database, recreate it. For
+any other database, take a backup first. Then move the records to the new
+numbers, and run 00131's `-- +goose Up` part by hand:
+
+```sql
+BEGIN;
+DELETE FROM goose_db_version WHERE version_id IN (131, 132);
+INSERT INTO goose_db_version (version_id, is_applied) VALUES (133, true), (134, true);
+-- paste the Up part of backend/db/migrations/00131_stage_templates.sql here
+INSERT INTO goose_db_version (version_id, is_applied) VALUES (131, true);
+COMMIT;
+```

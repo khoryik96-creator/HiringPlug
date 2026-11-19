@@ -54,9 +54,8 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 		if err != nil {
 			return err
 		}
-		if body == "" {
-			reason := "This interview reminder was skipped because it is no longer due or eligible."
-			if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(api.EmailStatusFailed), Error: &reason}); err != nil {
+		if body == "" { // no longer due (moved, turned off, declined, cancelled): it never was an email, so it is not kept as a failed one
+			if err := q.DeleteQueuedEmail(ctx, e.ID); err != nil {
 				return err
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "email.reminder_skipped", EntityType: "email", EntityID: e.ID})

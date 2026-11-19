@@ -21,7 +21,7 @@ import (
 func binDeps(m *Modules) bin.Deps {
 	return bin.Deps{
 		Candidates: m.Candidates, Contacts: m.Contacts, Companies: m.Companies, Jobs: m.Jobs,
-		Pipeline: binPipeline{m.Pipeline, m.Placements, m.Assistant},
+		Pipeline: binPipeline{m.Pipeline, m.Placements, m.Assistant, m},
 		Files:    binFiles{m.Documents, m.Notes, m.Assistant},
 		Taken: func(err error) bool {
 			return errors.Is(err, candidates.ErrEmailTaken) || errors.Is(err, contacts.ErrEmailTaken) || errors.Is(err, companies.ErrNameTaken)
@@ -33,6 +33,7 @@ type binPipeline struct {
 	pipeline   *pipeline.Module
 	placements *placements.Module
 	assistant  *assistant.Module
+	modules    *Modules // interviews and calendars, wired after the Bin
 }
 
 func (a binPipeline) ApplicationsOf(ctx context.Context, tx pgx.Tx, candidateIDs, jobIDs []string) ([]bin.Application, error) {
@@ -64,6 +65,15 @@ func (a binPipeline) Purge(ctx context.Context, tx pgx.Tx, ids []string) error {
 		return nil
 	}
 	if err := a.assistant.Forget(ctx, tx, "application", ids); err != nil {
+		return err
+	}
+	// Their interviews go with them: Outlook invitations are cancelled, and
+	// the candidate's address no longer kept for them.
+	interviewIDs, err := a.modules.Interviews.IDsOnApplications(ctx, tx, ids)
+	if err != nil {
+		return err
+	}
+	if err := a.modules.Calendars.InterviewsDeleted(ctx, tx, interviewIDs); err != nil {
 		return err
 	}
 	return a.pipeline.Purge(ctx, tx, ids)

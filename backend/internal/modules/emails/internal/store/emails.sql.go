@@ -81,6 +81,16 @@ func (q *Queries) DeleteMailbox(ctx context.Context) error {
 	return err
 }
 
+const deleteQueuedEmail = `-- name: DeleteQueuedEmail :exec
+DELETE FROM email WHERE id = $1 AND status = 'queued'
+`
+
+// A queued reminder no longer due is not kept (it was never sent).
+func (q *Queries) DeleteQueuedEmail(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteQueuedEmail, id)
+	return err
+}
+
 const deleteStaleAttachments = `-- name: DeleteStaleAttachments :many
 DELETE FROM email_attachment WHERE email_id IS NULL AND created_at < now() - interval '1 day' RETURNING storage_key
 `

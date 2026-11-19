@@ -74,3 +74,7 @@ SELECT * FROM interview WHERE @user_id::text=ANY(interviewer_ids) AND starts_at<
 -- Which of these interviews still stand: not deleted or cancelled (the calendar drops holds of the others).
 -- name: StandingInterviewIDs :many
 SELECT id FROM interview WHERE id = ANY(@ids::text[]) AND status <> 'cancelled';
+
+-- The interviews on some applications (deleted with them for good: the Bin).
+-- name: InterviewIDsOnApplications :many
+SELECT id FROM interview WHERE application_id = ANY (@application_ids::text[]) ORDER BY id;
