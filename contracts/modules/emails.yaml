@@ -1059,12 +1059,15 @@ components:
           description: There are more attachments to view in Outlook.
     OutlookAttachment:
       type: object
-      required: [id, fileName, sizeBytes, downloadable]
+      required: [id, fileName, sizeBytes, downloadable, savable]
       properties:
         id: { type: string }
         fileName: { type: string }
         sizeBytes: { type: integer, format: int64, minimum: 0 }
         downloadable: { type: boolean }
+        savable:
+          type: boolean
+          description: Downloadable and within the upload limit for a candidate's CV & files.
     OutlookMessageChange:
       type: object
       properties:

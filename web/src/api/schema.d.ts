@@ -6460,6 +6460,8 @@ export interface components {
             /** Format: int64 */
             sizeBytes: number;
             downloadable: boolean;
+            /** @description Downloadable and within the upload limit for a candidate's CV & files. */
+            savable: boolean;
         };
         OutlookMessageChange: {
             isRead?: boolean;

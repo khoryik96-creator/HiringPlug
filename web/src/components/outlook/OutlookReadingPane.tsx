@@ -93,8 +93,9 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     {body.isPending && <p className="muted">Opening message…</p>}
     {body.data && <p className="outlook-body">{body.data.text}</p>}
     {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
+    {/* The candidate is suggested only for their own linked mail, never for any message read from their page. */}
     {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
-      canSaveCv={canSaveCv} candidateId={profile?.candidateId} />}
+      canSaveCv={canSaveCv} candidateId={linked ? profile?.candidateId : undefined} />}
     {!message.isDraft && mode === null && <div className="row">
       <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
       <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>

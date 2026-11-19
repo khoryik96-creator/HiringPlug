@@ -53,7 +53,13 @@ func outlookAttachmentName(name string) string {
 	if name == "" || name == "/" {
 		return "attachment"
 	}
-	return truncate(name, 240)
+	// A long name is shortened before its extension, which says what the
+	// file is (and whether it can be a CV).
+	ext := path.Ext(name)
+	if len([]rune(ext)) > 16 {
+		ext = ""
+	}
+	return truncate(strings.TrimSuffix(name, ext), 240-len([]rune(ext))) + ext
 }
 
 // Authorize against the private local index and refresh credentials under
@@ -100,11 +106,15 @@ func (s *Service) listOutlookAttachments(ctx context.Context, p authz.Principal,
 			out.More = true
 			continue
 		}
+		downloadable := attachment.file() && attachment.Size >= 0 && attachment.Size <= outlookAttachmentLimit
 		out.Items = append(out.Items, api.OutlookAttachment{
 			Id:           base64.RawURLEncoding.EncodeToString([]byte(attachment.ID)),
 			FileName:     outlookAttachmentName(attachment.Name),
 			SizeBytes:    max(0, attachment.Size),
-			Downloadable: attachment.file() && attachment.Size >= 0 && attachment.Size <= outlookAttachmentLimit,
+			Downloadable: downloadable,
+			// Offered for a CV only when a candidate's files take it: never
+			// fetched in full only to be refused.
+			Savable: downloadable && s.deps.Documents != nil && attachment.Size <= s.deps.Documents.MaxUploadBytes(),
 		})
 	}
 	return out, nil

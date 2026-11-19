@@ -26,6 +26,9 @@ func serveOutlookAttachmentFixture(w http.ResponseWriter, r *http.Request) {
 		"name":        "uploads\\Nadia – CV.pdf",
 		"size":        len(outlookFixtureCV),
 	}
+	scanned := map[string]any{ // downloadable, but over the test upload limit (256 KiB)
+		"@odata.type": "#microsoft.graph.fileAttachment", "id": "scanned", "name": "Scanned CV.pdf", "size": 1 << 20,
+	}
 	large := map[string]any{
 		"@odata.type": "#microsoft.graph.fileAttachment", "id": "large", "name": "Portfolio.pdf", "size": 21 << 20,
 	}
@@ -38,7 +41,7 @@ func serveOutlookAttachmentFixture(w http.ResponseWriter, r *http.Request) {
 	write := func(v any) { _ = json.NewEncoder(w).Encode(v) }
 	switch r.URL.Path {
 	case root:
-		write(map[string]any{"value": []any{file, large, reference, inline}})
+		write(map[string]any{"value": []any{file, scanned, large, reference, inline}})
 	case root + "/file/01+=":
 		write(file)
 	case root + "/file/01+=/$value":
@@ -91,12 +94,17 @@ func TestOutlookAttachmentsArePrivateAndDownloadOriginalFiles(t *testing.T) {
 	assert.Equal(t, "no-store", list.Header.Get("Cache-Control"))
 	var attachments api.OutlookAttachmentList
 	list.JSON(&attachments)
-	require.Len(t, attachments.Items, 3, "inline signature images are not shown")
+	require.Len(t, attachments.Items, 4, "inline signature images are not shown")
 	cv := attachments.Items[0]
 	require.Equal(t, "Nadia – CV.pdf", cv.FileName)
 	require.True(t, cv.Downloadable)
-	assert.False(t, attachments.Items[1].Downloadable)
+	assert.True(t, cv.Savable)
+	scan := attachments.Items[1]
+	assert.True(t, scan.Downloadable)
+	assert.False(t, scan.Savable, "a file over the upload limit is not offered for a candidate's files")
 	assert.False(t, attachments.Items[2].Downloadable)
+	assert.False(t, attachments.Items[3].Downloadable)
+	assert.False(t, attachments.Items[2].Savable || attachments.Items[3].Savable)
 	assert.NotContains(t, string(list.Body), outlookFixtureCV)
 
 	filePath := func(id string) string { return root + "/" + id + "/file" }

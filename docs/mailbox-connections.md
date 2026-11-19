@@ -169,7 +169,10 @@ participants, dates and folder/read state locally and does not store bodies or
 attachment contents in the inbox index.
 
 For a CV attachment, choose **Save CV**, select the right candidate and confirm
-**Save to CV & files**. HiringPlug checks file types and skips exact duplicates
+**Save to CV & files**. **Save CV** is offered for files within the upload limit
+for candidate files (`HP_MAX_UPLOAD_BYTES`); larger ones can still be
+downloaded. Opened from a candidate's page, the candidate is suggested only
+for their linked mail, never for other messages read from there. HiringPlug checks file types and skips exact duplicates
 using the same upload rules as the candidate profile. People who can access the
 candidate's CVs can see the saved copy. The Outlook message stays private.
 

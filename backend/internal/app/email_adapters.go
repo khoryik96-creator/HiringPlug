@@ -127,6 +127,8 @@ func countryName(code string) string {
 // emailDocuments gives the emails module a candidate's CVs to attach.
 type emailDocuments struct{ documents *documents.Module }
 
+func (a emailDocuments) MaxUploadBytes() int64 { return a.documents.MaxUploadBytes() }
+
 func (a emailDocuments) CVFile(ctx context.Context, tx pgx.Tx, id string, asPDF bool) (emails.CVFile, error) {
 	doc, data, err := a.documents.CVFile(ctx, tx, id, asPDF)
 	return emails.CVFile{CandidateID: doc.CandidateID, FileName: doc.FileName, ContentType: doc.ContentType, Data: data}, err

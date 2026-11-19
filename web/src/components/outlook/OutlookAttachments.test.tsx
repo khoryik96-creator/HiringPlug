@@ -14,8 +14,8 @@ afterEach(() => {
 it("shows Outlook-only attachments and downloads a file from the current message", async () => {
   const list = vi.spyOn(api, "GET").mockResolvedValue(ok({
     items: [
-      { id: "cvFile", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true },
-      { id: "linked", fileName: "Work samples", sizeBytes: 0, downloadable: false },
+      { id: "cvFile", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true, savable: true },
+      { id: "linked", fileName: "Work samples", sizeBytes: 0, downloadable: false, savable: false },
     ],
     more: true,
   }));
@@ -38,7 +38,7 @@ it("shows Outlook-only attachments and downloads a file from the current message
 it.each([false, true])("saves to the confirmed candidate and handles exact duplicates (%s)", async (duplicate) => {
   vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(
     path === "/v1/outlook/messages/{messageId}/attachments" ? ok({
-      items: [{ id: "cvFile", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true }],
+      items: [{ id: "cvFile", fileName: "Nadia – CV.pdf", sizeBytes: 4400, downloadable: true, savable: true }],
       more: false,
     }) : ok({
       items: [{ id: "cand_nadia", fullName: "Nadia Aziz", email: "nadia@example.test", currentTitle: "QA Engineer" }],
@@ -67,4 +67,14 @@ it.each([false, true])("saves to the confirmed candidate and handles exact dupli
   expect(fetchFile).toHaveBeenCalledWith("/v1/outlook/messages/omg_test/attachments/cvFile/file", "application/octet-stream");
   expect(upload).toHaveBeenCalledWith("cand_nadia", "original", cv, "Nadia – CV.pdf");
   expect(screen.getByRole("link", { name: "Open candidate" }).getAttribute("href")).toBe("#/candidates/cand_nadia?tab=cv");
+});
+
+it("does not offer Save CV for a file over the upload limit, which can still be downloaded", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({
+    items: [{ id: "scan", fileName: "Scanned CV.pdf", sizeBytes: 15 * 1024 ** 2, downloadable: true, savable: false }],
+    more: false,
+  }));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canSaveCv />);
+  expect(await screen.findByRole("button", { name: "Download Scanned CV.pdf" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Save Scanned CV.pdf to candidate" })).toBeNull();
 });

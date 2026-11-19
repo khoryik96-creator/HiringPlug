@@ -2272,6 +2272,9 @@ class OutlookAttachment(BaseModel):
     fileName: str
     sizeBytes: Annotated[int, Field(ge=0)]
     downloadable: bool
+    savable: Annotated[
+        bool, Field(description="Downloadable and within the upload limit for a candidate's CV & files.")
+    ]
 
 
 class OutlookMessageChange(BaseModel):

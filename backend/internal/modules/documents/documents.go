@@ -51,6 +51,9 @@ func New(pool *pgxpool.Pool, files *blob.Store, candidates Candidates, maxUpload
 	return &Module{service: svc, HTTP: &HTTP{svc: svc, maxUploadBytes: maxUploadBytes}}
 }
 
+// MaxUploadBytes is the largest file a candidate's CV & files take.
+func (m *Module) MaxUploadBytes() int64 { return m.HTTP.maxUploadBytes }
+
 // AddFile stores a CV for a candidate and queues reading it, in the caller's
 // transaction (the careers page's apply form). The file type is checked from
 // its bytes. undo removes the stored file; call it if the transaction rolls

@@ -96,6 +96,8 @@ type Deps struct {
 	// only those they may see).
 	Documents interface {
 		CVFile(ctx context.Context, tx pgx.Tx, documentID string, asPDF bool) (CVFile, error)
+		// MaxUploadBytes is the largest file a candidate's CV & files take.
+		MaxUploadBytes() int64
 	}
 	// Policy is the company's choice on who sees emails that show salary
 	// (settings module): "salary_roles" or "everyone".

@@ -56,7 +56,7 @@ export function OutlookAttachments({ messageId, canSaveCv = false, candidateId }
             onClick={() => { download.mutate(file); }}>
             {download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
           </button>
-          {canSaveCv && cvExtensions.some((extension) => file.fileName.toLowerCase().endsWith(extension)) &&
+          {canSaveCv && file.savable && cvExtensions.some((extension) => file.fileName.toLowerCase().endsWith(extension)) &&
             <button type="button" aria-label={`Save ${file.fileName} to candidate`} disabled={chosen !== undefined}
               onClick={() => { setSaveId(file.id); }}>Save CV</button>}
         </div> : <small className="muted">Available in Outlook</small>}
