@@ -5,6 +5,7 @@ import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import type { OutlookProfile } from "../components/outlook/OutlookProfileMail";
 import { OutlookReadingPane } from "../components/outlook/OutlookReadingPane";
+import { OutlookRules } from "../components/outlook/OutlookRules";
 import { formatWhen } from "../labels";
 import "./outlook-workspace.css";
 
@@ -13,6 +14,7 @@ type Folder = Schemas["OutlookMailFolder"];
 
 export function OutlookMail({ canSaveCv = false, canImportCv = false }: { canSaveCv?: boolean; canImportCv?: boolean }) {
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
+  if (params.has("rules")) return <OutlookRules />;
   const candidateId = params.get("candidateId");
   const contactId = params.get("contactId");
   const profile = candidateId ? { candidateId } : contactId ? { contactId } : undefined;
@@ -88,6 +90,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
     <div className="row spread">
       <h2>Outlook Mail</h2>
       {data?.enabled && <div className="row outlook-actions">
+        <a className="button" href="#/outlook?rules=1">Inbox rules</a>
         <button type="button" disabled={sync.isPending} onClick={() => { sync.mutate(false); }}>Refresh</button>
         <button type="button" disabled={sync.isPending} onClick={() => {
           if (window.confirm("Turn off Outlook sync and remove HiringPlug’s local index and profile links? Your Outlook mail stays in Outlook.")) sync.mutate(true);

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -29,8 +28,6 @@ const (
 	outlookAttachmentPage   = 50
 	outlookAttachmentFields = "?$select=id,name,size,isInline"
 )
-
-var outlookAttachmentID = regexp.MustCompile(`^[A-Za-z0-9_+=/-]{1,1000}$`)
 
 type outlookAttachment struct {
 	ID, Name string
@@ -102,7 +99,7 @@ func (s *Service) listOutlookAttachments(ctx context.Context, p authz.Principal,
 		if attachment.IsInline {
 			continue
 		}
-		if len(out.Items) == outlookAttachmentPage || !outlookAttachmentID.MatchString(attachment.ID) {
+		if len(out.Items) == outlookAttachmentPage || !outlookGraphID.MatchString(attachment.ID) {
 			out.More = true
 			continue
 		}
@@ -134,7 +131,7 @@ func attachmentFailure(err error) error {
 
 func (s *Service) downloadOutlookAttachment(ctx context.Context, p authz.Principal, messageID, attachmentID string) ([]byte, string, error) {
 	id, err := base64.RawURLEncoding.Strict().DecodeString(attachmentID)
-	if err != nil || !outlookAttachmentID.Match(id) {
+	if err != nil || !outlookGraphID.Match(id) {
 		return nil, "", apperr.NotFound("Outlook attachment")
 	}
 	target, token, err := s.outlookAttachmentAccess(ctx, p, messageID)

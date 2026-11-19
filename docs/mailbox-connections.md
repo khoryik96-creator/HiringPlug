@@ -193,3 +193,17 @@ profile link. Linking a conversation does not share it with other recruiters or
 admins. It remains visible only to you and only through profiles you can access.
 **Turn off sync** or disconnecting/replacing the mailbox removes its local index
 and links. Your original mail and drafts remain in Outlook.
+
+### Inbox rules
+
+Open **Inbox rules** from Outlook Mail. The first time, choose **Allow inbox
+rules** and sign in to the same connected Outlook mailbox. In Entra, the app
+registration needs Microsoft Graph delegated **MailboxSettings.ReadWrite**.
+Have an administrator grant consent if your organisation requires it. The
+existing email and calendar permissions still use their own consent.
+
+Name the rule, pick a synced folder, and enter a sender email address, text
+to find in the subject, or both. When you enter both, both must match. Outlook
+adds the rule after your existing rules and applies it to incoming messages.
+It can do this while HiringPlug is closed. Turn rules on or off, or delete
+them, in HiringPlug. Read-only rules and advanced editing are handled in Outlook.
