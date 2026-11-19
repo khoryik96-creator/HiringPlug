@@ -31,6 +31,10 @@ func (s *Service) outlookRoot() string {
 }
 
 func (s *Service) outlookRequest(ctx context.Context, token, method, target string, body any, out any) error {
+	return s.outlookConditional(ctx, token, method, target, body, out, "")
+}
+
+func (s *Service) outlookConditional(ctx context.Context, token, method, target string, body any, out any, etag string) error {
 	var data []byte
 	if body != nil {
 		var err error
@@ -39,7 +43,7 @@ func (s *Service) outlookRequest(ctx context.Context, token, method, target stri
 			return err
 		}
 	}
-	response, err := s.openOutlookResponse(ctx, token, method, target, bytes.NewReader(data))
+	response, err := s.openOutlookResponse(ctx, token, method, target, bytes.NewReader(data), etag)
 	if err != nil {
 		return err
 	}
@@ -55,12 +59,15 @@ func (s *Service) outlookRequest(ctx context.Context, token, method, target stri
 	return nil
 }
 
-func (s *Service) openOutlookResponse(ctx context.Context, token, method, target string, body io.Reader) (*http.Response, error) {
+func (s *Service) openOutlookResponse(ctx context.Context, token, method, target string, body io.Reader, etag string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
 		return nil, &outlookGraphError{}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
+	if etag != "" {
+		req.Header.Set("If-Match", etag)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text", odata.maxpagesize=50`)
 	client := *s.connections.HTTPClient
@@ -119,13 +126,15 @@ func outlookFolderPath(path string) string {
 
 type outlookRecipient struct{ EmailAddress struct{ Address string } }
 type outlookRemoteMessage struct {
-	ID, ConversationID, Subject, WebLink, ParentFolderID    string
-	From, Sender                                            outlookRecipient
-	ToRecipients, CcRecipients, ReplyTo                     []outlookRecipient
-	ReceivedDateTime, LastModifiedDateTime, CreatedDateTime time.Time
-	IsRead, IsDraft, HasAttachments                         bool
-	Removed                                                 json.RawMessage `json:"@removed"`
-	Body                                                    struct{ ContentType, Content string }
+	ID, ConversationID, Subject, WebLink, ParentFolderID, ChangeKey string
+	ETag                                                            string `json:"@odata.etag"`
+	SentDateTime                                                    time.Time
+	From, Sender                                                    outlookRecipient
+	ToRecipients, CcRecipients, BccRecipients, ReplyTo              []outlookRecipient
+	ReceivedDateTime, LastModifiedDateTime, CreatedDateTime         time.Time
+	IsRead, IsDraft, HasAttachments                                 bool
+	Removed                                                         json.RawMessage `json:"@removed"`
+	Body                                                            struct{ ContentType, Content string }
 }
 
 func (m outlookRemoteMessage) sender() string {

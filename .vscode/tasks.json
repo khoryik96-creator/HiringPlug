@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Update HiringPlug from main",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/.devcontainer/update.sh"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

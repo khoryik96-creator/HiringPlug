@@ -310,6 +310,9 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 			}
 			return audit.Record(ctx, tx, audit.Entry{Action: "outlook.rules_access_granted", EntityType: "user", EntityID: p.UserID})
 		}
+		if err := q.CancelOutlookSendsForMailbox(ctx); err != nil {
+			return err
+		}
 		if err := q.RemoveOutlookSync(ctx); err != nil {
 			return err
 		}

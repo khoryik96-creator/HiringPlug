@@ -359,7 +359,7 @@ func (m *Modules) Server() *Server {
 // and so run with no queue transaction open (see jobqueue.OutsideHandlers).
 func (m *Modules) OutsideJobHandlers() jobqueue.OutsideHandlers {
 	all := jobqueue.OutsideHandlers{}
-	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers()} {
+	for _, handlers := range []jobqueue.OutsideHandlers{m.Calendars.OutsideJobHandlers(), m.Integrations.OutsideJobHandlers(), m.Emails.OutsideJobHandlers()} {
 		maps.Copy(all, handlers)
 	}
 	return all

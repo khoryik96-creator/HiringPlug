@@ -184,9 +184,8 @@ A file whose upload fails stays selected so you can retry it.
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook
 address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save
-in Outlook Drafts** creates the draft in the original thread. Open it in Outlook
-to continue editing. HiringPlug reports provider acceptance and asks you to check
-Outlook before retrying if the result is uncertain.
+in Outlook Drafts** creates the draft in the original thread. Open the draft
+from the Drafts folder to continue editing.
 
 On a candidate or contact's **Email** tab, open **My Outlook conversations**.
 **Find in Outlook** starts an exact address search. Open a message and confirm the
@@ -208,3 +207,32 @@ to find in the subject, or both. When you enter both, both must match. Outlook
 adds the rule after your existing rules and applies it to incoming messages.
 It can do this while HiringPlug is closed. Turn rules on or off, or delete
 them, in HiringPlug. Read-only rules and advanced editing are handled in Outlook.
+
+### Drafts and scheduled email
+
+Use **New message** to start an Outlook draft, or open one from **Drafts**.
+Save edits to the same draft, discard it to Deleted Items, send it now, or
+choose **Send later**. The editor accepts plain text. It keeps existing body
+formatting when the body has not been edited, and keeps Outlook attachments
+when other fields change. Use Outlook to add attachments or edit a rich body.
+The candidate and client package composer continues to handle CV selection
+and formatted emails.
+
+The **Scheduled** list shows the send time in your time zone. Open the draft
+to change its content or time, or choose **Cancel send** to leave it in
+Outlook Drafts. **Update schedule** applies the edits and the new send time
+together. A pending send stays tied to the same mailbox and draft even if the
+mail index is rebuilt. If Outlook changes the draft, reopen it and review it
+before updating the same schedule. Turning off Outlook sync
+or disconnecting or replacing the mailbox cancels its pending sends.
+Allowing inbox rules for the same connected mailbox keeps its scheduled sends.
+Previous send status remains available in the Scheduled list.
+
+The HiringPlug Go worker must be running to send at the chosen time.
+If the worker comes back within 24 hours of the send time, it sends the
+reviewed draft after rechecking access and consent for the To, Cc, and Bcc
+addresses, including unlinked recipients. Later sends need review.
+HiringPlug submits the Outlook draft once and checks the same immutable ID
+for its sent copy. If Outlook's response is lost, HiringPlug checks the
+receipt without resubmitting. **Check Outlook** means the outcome could not
+be confirmed. Check Drafts and Sent Items before taking action.

@@ -23,6 +23,7 @@ data/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
 .DS_Store
 Thumbs.db
 /backups/

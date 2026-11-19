@@ -102,6 +102,30 @@ func (q *Queries) CandidateExists(ctx context.Context, id string) (bool, error) 
 	return exists, err
 }
 
+const candidateIDsByEmails = `-- name: CandidateIDsByEmails :many
+SELECT id FROM candidate WHERE binned_at IS NULL AND email = ANY($1::text[])
+`
+
+func (q *Queries) CandidateIDsByEmails(ctx context.Context, addresses []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, candidateIDsByEmails, addresses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const candidateLabel = `-- name: CandidateLabel :one
 SELECT btrim(first_name || ' ' || last_name)::text AS label FROM candidate WHERE id = $1
 `

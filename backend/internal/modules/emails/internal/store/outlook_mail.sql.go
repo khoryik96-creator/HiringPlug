@@ -10,6 +10,67 @@ import (
 	"time"
 )
 
+const cancelOutlookSend = `-- name: CancelOutlookSend :one
+UPDATE email_outlook_send SET status='cancelled',version=version+1,updated_at=now(),error=NULL
+WHERE id= $1 AND status IN ('scheduled','needs_review') AND version= $2 RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
+`
+
+type CancelOutlookSendParams struct {
+	ID      string
+	Version int32
+}
+
+func (q *Queries) CancelOutlookSend(ctx context.Context, arg CancelOutlookSendParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, cancelOutlookSend, arg.ID, arg.Version)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const cancelOutlookSendsForMailbox = `-- name: CancelOutlookSendsForMailbox :exec
+UPDATE email_outlook_send SET status='cancelled',version=version+1,updated_at=now(),error='The Outlook mailbox was disconnected or replaced.'
+WHERE user_id=app_current_user() AND status='scheduled'
+`
+
+func (q *Queries) CancelOutlookSendsForMailbox(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, cancelOutlookSendsForMailbox)
+	return err
+}
+
+const claimOutlookSend = `-- name: ClaimOutlookSend :execrows
+UPDATE email_outlook_send SET status='confirming',attempted_at=now(),updated_at=now(),error=NULL
+WHERE id= $1 AND status='scheduled' AND version= $2
+`
+
+type ClaimOutlookSendParams struct {
+	ID      string
+	Version int32
+}
+
+func (q *Queries) ClaimOutlookSend(ctx context.Context, arg ClaimOutlookSendParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimOutlookSend, arg.ID, arg.Version)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const clearOutlookFolder = `-- name: ClearOutlookFolder :exec
 DELETE FROM email_outlook_message WHERE folder_id= $1
 `
@@ -17,6 +78,80 @@ DELETE FROM email_outlook_message WHERE folder_id= $1
 func (q *Queries) ClearOutlookFolder(ctx context.Context, folderID string) error {
 	_, err := q.db.Exec(ctx, clearOutlookFolder, folderID)
 	return err
+}
+
+const createOutlookScheduled = `-- name: CreateOutlookScheduled :one
+INSERT INTO email_outlook_send(mailbox_id,message_id,remote_id,draft_version,candidate_id,subject,send_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
+`
+
+type CreateOutlookScheduledParams struct {
+	MailboxID    string
+	MessageID    string
+	RemoteID     string
+	DraftVersion string
+	CandidateID  *string
+	Subject      string
+	SendAt       time.Time
+}
+
+func (q *Queries) CreateOutlookScheduled(ctx context.Context, arg CreateOutlookScheduledParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, createOutlookScheduled,
+		arg.MailboxID,
+		arg.MessageID,
+		arg.RemoteID,
+		arg.DraftVersion,
+		arg.CandidateID,
+		arg.Subject,
+		arg.SendAt,
+	)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const finishOutlookSend = `-- name: FinishOutlookSend :execrows
+UPDATE email_outlook_send SET status= $1,error=$2,updated_at=now()
+WHERE id= $3 AND version= $4 AND status= $5
+`
+
+type FinishOutlookSendParams struct {
+	Status         string
+	Error          *string
+	ID             string
+	Version        int32
+	PreviousStatus string
+}
+
+func (q *Queries) FinishOutlookSend(ctx context.Context, arg FinishOutlookSendParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishOutlookSend,
+		arg.Status,
+		arg.Error,
+		arg.ID,
+		arg.Version,
+		arg.PreviousStatus,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listOutlookMessages = `-- name: ListOutlookMessages :many
@@ -139,6 +274,95 @@ UPDATE email_outlook_folder SET checked_at=NULL WHERE mailbox_id = $1
 func (q *Queries) NudgeOutlookFolders(ctx context.Context, mailboxID string) error {
 	_, err := q.db.Exec(ctx, nudgeOutlookFolders, mailboxID)
 	return err
+}
+
+const outlookActiveSend = `-- name: OutlookActiveSend :one
+SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE mailbox_id = $1 AND remote_id = $2
+ AND status IN ('scheduled','confirming','uncertain','needs_review')
+`
+
+type OutlookActiveSendParams struct {
+	MailboxID string
+	RemoteID  string
+}
+
+func (q *Queries) OutlookActiveSend(ctx context.Context, arg OutlookActiveSendParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, outlookActiveSend, arg.MailboxID, arg.RemoteID)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const outlookByRemoteID = `-- name: OutlookByRemoteID :one
+SELECT id, mailbox_id, tenant_id, user_id, folder_id, remote_id, conversation, subject, sender, participants, received_at, changed_at, is_read, is_draft, has_attachments, web_url FROM email_outlook_message WHERE mailbox_id = $1 AND remote_id = $2
+`
+
+type OutlookByRemoteIDParams struct {
+	MailboxID string
+	RemoteID  string
+}
+
+func (q *Queries) OutlookByRemoteID(ctx context.Context, arg OutlookByRemoteIDParams) (EmailOutlookMessage, error) {
+	row := q.db.QueryRow(ctx, outlookByRemoteID, arg.MailboxID, arg.RemoteID)
+	var i EmailOutlookMessage
+	err := row.Scan(
+		&i.ID,
+		&i.MailboxID,
+		&i.TenantID,
+		&i.UserID,
+		&i.FolderID,
+		&i.RemoteID,
+		&i.Conversation,
+		&i.Subject,
+		&i.Sender,
+		&i.Participants,
+		&i.ReceivedAt,
+		&i.ChangedAt,
+		&i.IsRead,
+		&i.IsDraft,
+		&i.HasAttachments,
+		&i.WebUrl,
+	)
+	return i, err
+}
+
+const outlookDraftFolder = `-- name: OutlookDraftFolder :one
+SELECT id, mailbox_id, tenant_id, user_id, remote_id, name, kind, parent_id, cursor_url, complete, checked_at FROM email_outlook_folder WHERE mailbox_id = $1 AND kind='drafts'
+`
+
+func (q *Queries) OutlookDraftFolder(ctx context.Context, mailboxID string) (EmailOutlookFolder, error) {
+	row := q.db.QueryRow(ctx, outlookDraftFolder, mailboxID)
+	var i EmailOutlookFolder
+	err := row.Scan(
+		&i.ID,
+		&i.MailboxID,
+		&i.TenantID,
+		&i.UserID,
+		&i.RemoteID,
+		&i.Name,
+		&i.Kind,
+		&i.ParentID,
+		&i.CursorUrl,
+		&i.Complete,
+		&i.CheckedAt,
+	)
+	return i, err
 }
 
 const outlookDueFolders = `-- name: OutlookDueFolders :many
@@ -299,6 +523,108 @@ func (q *Queries) OutlookMessage(ctx context.Context, arg OutlookMessageParams) 
 	return i, err
 }
 
+const outlookRecentSends = `-- name: OutlookRecentSends :many
+SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE user_id=app_current_user()
+ORDER BY CASE status WHEN 'scheduled' THEN 0 WHEN 'confirming' THEN 1 WHEN 'needs_review' THEN 2 WHEN 'uncertain' THEN 3 ELSE 4 END,
+ CASE WHEN status='scheduled' THEN send_at END ASC, updated_at DESC,id LIMIT 200
+`
+
+func (q *Queries) OutlookRecentSends(ctx context.Context) ([]EmailOutlookSend, error) {
+	rows, err := q.db.Query(ctx, outlookRecentSends)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EmailOutlookSend
+	for rows.Next() {
+		var i EmailOutlookSend
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.UserID,
+			&i.MailboxID,
+			&i.MessageID,
+			&i.RemoteID,
+			&i.DraftVersion,
+			&i.CandidateID,
+			&i.Subject,
+			&i.SendAt,
+			&i.Version,
+			&i.Status,
+			&i.AttemptedAt,
+			&i.UpdatedAt,
+			&i.Error,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const outlookScheduled = `-- name: OutlookScheduled :one
+SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE id = $1
+`
+
+func (q *Queries) OutlookScheduled(ctx context.Context, id string) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, outlookScheduled, id)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const outlookSendForDraftIndex = `-- name: OutlookSendForDraftIndex :one
+SELECT id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error FROM email_outlook_send WHERE mailbox_id = $1 AND message_id = $2
+ AND status IN ('scheduled','needs_review')
+`
+
+type OutlookSendForDraftIndexParams struct {
+	MailboxID string
+	MessageID string
+}
+
+func (q *Queries) OutlookSendForDraftIndex(ctx context.Context, arg OutlookSendForDraftIndexParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, outlookSendForDraftIndex, arg.MailboxID, arg.MessageID)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
 const outlookSync = `-- name: OutlookSync :one
 SELECT mailbox_id, tenant_id, user_id, generation, requested_at, last_sync_at, folders_at, sync_error FROM email_outlook_sync WHERE mailbox_id = $1
 `
@@ -413,6 +739,76 @@ func (q *Queries) RequestOutlookSync(ctx context.Context, arg RequestOutlookSync
 		&i.SyncError,
 	)
 	return i, err
+}
+
+const rescheduleOutlookSend = `-- name: RescheduleOutlookSend :one
+UPDATE email_outlook_send SET send_at= $1, version=version+1,status='scheduled',
+ message_id= $2,draft_version= $3,subject= $4,
+ candidate_id=$5,updated_at=now(),error=NULL,attempted_at=NULL
+WHERE id= $6 AND status IN ('scheduled','needs_review') AND version= $7 RETURNING id, tenant_id, user_id, mailbox_id, message_id, remote_id, draft_version, candidate_id, subject, send_at, version, status, attempted_at, updated_at, error
+`
+
+type RescheduleOutlookSendParams struct {
+	SendAt       time.Time
+	MessageID    string
+	DraftVersion string
+	Subject      string
+	CandidateID  *string
+	ID           string
+	Version      int32
+}
+
+func (q *Queries) RescheduleOutlookSend(ctx context.Context, arg RescheduleOutlookSendParams) (EmailOutlookSend, error) {
+	row := q.db.QueryRow(ctx, rescheduleOutlookSend,
+		arg.SendAt,
+		arg.MessageID,
+		arg.DraftVersion,
+		arg.Subject,
+		arg.CandidateID,
+		arg.ID,
+		arg.Version,
+	)
+	var i EmailOutlookSend
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.UserID,
+		&i.MailboxID,
+		&i.MessageID,
+		&i.RemoteID,
+		&i.DraftVersion,
+		&i.CandidateID,
+		&i.Subject,
+		&i.SendAt,
+		&i.Version,
+		&i.Status,
+		&i.AttemptedAt,
+		&i.UpdatedAt,
+		&i.Error,
+	)
+	return i, err
+}
+
+const reviewOutlookScheduled = `-- name: ReviewOutlookScheduled :exec
+UPDATE email_outlook_send SET draft_version= $1,subject= $2,updated_at=now()
+WHERE id= $3 AND status='scheduled' AND draft_version= $4
+`
+
+type ReviewOutlookScheduledParams struct {
+	DraftVersion         string
+	Subject              string
+	ID                   string
+	PreviousDraftVersion string
+}
+
+func (q *Queries) ReviewOutlookScheduled(ctx context.Context, arg ReviewOutlookScheduledParams) error {
+	_, err := q.db.Exec(ctx, reviewOutlookScheduled,
+		arg.DraftVersion,
+		arg.Subject,
+		arg.ID,
+		arg.PreviousDraftVersion,
+	)
+	return err
 }
 
 const saveOutlookCursor = `-- name: SaveOutlookCursor :exec
@@ -542,4 +938,20 @@ type SetOutlookReadParams struct {
 func (q *Queries) SetOutlookRead(ctx context.Context, arg SetOutlookReadParams) error {
 	_, err := q.db.Exec(ctx, setOutlookRead, arg.IsRead, arg.ChangedAt, arg.ID)
 	return err
+}
+
+const tryLockOutlookSendMailbox = `-- name: TryLockOutlookSendMailbox :one
+SELECT pg_try_advisory_lock(hashtextextended($1::text || ':' || $2::text,0)) AS acquired
+`
+
+type TryLockOutlookSendMailboxParams struct {
+	TenantID string
+	UserID   string
+}
+
+func (q *Queries) TryLockOutlookSendMailbox(ctx context.Context, arg TryLockOutlookSendMailboxParams) (bool, error) {
+	row := q.db.QueryRow(ctx, tryLockOutlookSendMailbox, arg.TenantID, arg.UserID)
+	var acquired bool
+	err := row.Scan(&acquired)
+	return acquired, err
 }

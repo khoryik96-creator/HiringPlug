@@ -39,17 +39,22 @@ never real CVs.
 
 ## New versions
 
-Other changes merged to `main` do not appear by themselves. In the codespace
-terminal:
+In the browser editor for your Codespace, open the Command Palette
+(**Ctrl+Shift+P** on Windows or **Cmd+Shift+P** on Mac). Choose
+**Tasks: Run Task**, then **Update HiringPlug from main**. This pulls the
+latest changes and rebuilds HiringPlug in the same Codespace, keeping its
+database and settings.
+
+You can also run the updater from the Codespace terminal.
 
 ```bash
-git pull && bash .devcontainer/start.sh
+bash .devcontainer/update.sh
 ```
 
-It rebuilds what changed and keeps the data. Plain `docker compose -f
-deploy/docker-compose.yml …` also works: `start.sh` links `deploy/.env` to the
-codespace's secrets, so Compose uses the passwords the database was made with.
-If a start fails, `start.sh` prints what the database set-up (bootstrap) said.
+If the task is missing in a Codespace created before this update, run
+`git pull --ff-only && bash .devcontainer/start.sh` once from the `main`
+checkout. Reopening the Codespace starts its current checkout. Run the update
+task when you want to pull a newer version.
 
 ## Safety
 

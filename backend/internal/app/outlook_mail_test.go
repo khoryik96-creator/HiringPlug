@@ -108,7 +108,13 @@ func outlookRecipientJSON(address string) map[string]any {
 func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixture {
 	t.Helper()
 	f := &outlookMailFixture{folder: "inbox"}
-	configureOutlookFixture(t, a, http.HandlerFunc(f.serve))
+	connectTestOutlook(t, a, token, http.HandlerFunc(f.serve))
+	return f
+}
+
+func connectTestOutlook(t *testing.T, a *testApp, token string, handler http.Handler) {
+	t.Helper()
+	configureOutlookFixture(t, a, handler)
 	r := a.request("POST", "/v1/mailbox/authorize", token, map[string]any{"provider": "microsoft"})
 	require.Equal(t, 200, r.Status, "%s", r.Body)
 	var start api.MailboxAuthorization
@@ -118,7 +124,6 @@ func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixtur
 	require.NotContains(t, target.Query().Get("scope"), "MailboxSettings.ReadWrite")
 	r = finishOutlookFixture(t, a, token, target, "synthetic-code")
 	require.Equal(t, 200, r.Status, "%s", r.Body)
-	return f
 }
 
 func configureOutlookFixture(t *testing.T, a *testApp, handler http.Handler) {

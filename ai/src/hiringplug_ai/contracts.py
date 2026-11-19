@@ -148,8 +148,10 @@ class ErrorCode(StrEnum):
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
     OUTLOOK_ATTACHMENT_TOO_LARGE = "OUTLOOK_ATTACHMENT_TOO_LARGE"
+    OUTLOOK_DRAFT_CHANGED = "OUTLOOK_DRAFT_CHANGED"
     OUTLOOK_NOT_CONNECTED = "OUTLOOK_NOT_CONNECTED"
     OUTLOOK_RULES_ACCESS = "OUTLOOK_RULES_ACCESS"
+    OUTLOOK_SEND_IN_PROGRESS = "OUTLOOK_SEND_IN_PROGRESS"
     OUTLOOK_UNAVAILABLE = "OUTLOOK_UNAVAILABLE"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
@@ -203,6 +205,7 @@ class JobKind(StrEnum):
     document_text_extracted = "document.text_extracted"
     email_bounce_scan = "email.bounce_scan"
     email_interview_reminder = "email.interview_reminder"
+    email_outlook_scheduled = "email.outlook_scheduled"
     email_outlook_sync = "email.outlook_sync"
     email_send = "email.send"
     interview_remind = "interview.remind"
@@ -2491,6 +2494,76 @@ class DocumentCvParsedJob(BaseModel):
     ] = None
 
 
+class ToItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class CcItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class BccItem(RootModel[EmailStr]):
+    root: Annotated[EmailStr, Field(max_length=254)]
+
+
+class OutlookDraftInput(BaseModel):
+    subject: Annotated[str | None, Field(max_length=200)] = None
+    body: Annotated[str | None, Field(max_length=40000)] = None
+    to: Annotated[list[ToItem] | None, Field(max_length=100)] = None
+    cc: Annotated[list[CcItem] | None, Field(max_length=100)] = None
+    bcc: Annotated[list[BccItem] | None, Field(max_length=100)] = None
+
+
+class OutlookDraftUpdate(BaseModel):
+    subject: Annotated[str | None, Field(max_length=200)] = None
+    body: Annotated[str | None, Field(max_length=40000)] = None
+    to: Annotated[list[ToItem] | None, Field(max_length=100)] = None
+    cc: Annotated[list[CcItem] | None, Field(max_length=100)] = None
+    bcc: Annotated[list[BccItem] | None, Field(max_length=100)] = None
+    version: Annotated[str, Field(max_length=64, min_length=64, pattern="^[a-f0-9]+$")]
+
+
+class OutlookScheduleInput(BaseModel):
+    draftVersion: Annotated[str, Field(max_length=64, min_length=64, pattern="^[a-f0-9]+$")]
+    expectedVersion: Annotated[int, Field(ge=0, le=2147483647)]
+    sendAt: AwareDatetime | None = None
+    changes: OutlookDraftInput | None = None
+
+
+class OutlookScheduleVersion(BaseModel):
+    version: Annotated[int, Field(ge=0, le=2147483647)]
+
+
+class Status5(StrEnum):
+    scheduled = "scheduled"
+    confirming = "confirming"
+    sent = "sent"
+    needs_review = "needs_review"
+    uncertain = "uncertain"
+    cancelled = "cancelled"
+
+
+class OutlookScheduledSend(BaseModel):
+    id: str
+    messageId: str
+    version: Annotated[int, Field(ge=0, le=2147483647)]
+    subject: str
+    sendAt: AwareDatetime
+    updatedAt: AwareDatetime
+    status: Status5
+    error: Annotated[str | None, Field(...)]
+
+
+class OutlookScheduleList(BaseModel):
+    items: list[OutlookScheduledSend]
+
+
+class OutlookScheduledJob(BaseModel):
+    sendId: str
+    userId: str
+    version: Annotated[int, Field(ge=0, le=2147483647)]
+
+
 class OutlookMailFolder(BaseModel):
     id: str
     name: str
@@ -2881,18 +2954,6 @@ class DeliveryMode1(StrEnum):
     test = "test"
     live = "live"
     unknown = "unknown"
-
-
-class ToItem(RootModel[EmailStr]):
-    root: Annotated[EmailStr, Field(max_length=254)]
-
-
-class CcItem(RootModel[EmailStr]):
-    root: Annotated[EmailStr, Field(max_length=254)]
-
-
-class BccItem(RootModel[EmailStr]):
-    root: Annotated[EmailStr, Field(max_length=254)]
 
 
 class EmailBounceScanJob(BaseModel):
@@ -3323,7 +3384,7 @@ class IndustryEmployer(BaseModel):
     current: bool
 
 
-class Status5(StrEnum):
+class Status6(StrEnum):
     ready = "ready"
     needs_review = "needs_review"
 
@@ -3334,7 +3395,7 @@ class IndustrySuggestion(BaseModel):
     )
     catalogueVersion: int
     candidateVersion: int
-    status: Status5
+    status: Status6
     reason: str
     categoryId: IndustryId | None = None
     employerIndex: int | None = None
@@ -3575,7 +3636,7 @@ class InterviewOutlookReminderInput(BaseModel):
     enabled: bool
 
 
-class Status6(StrEnum):
+class Status7(StrEnum):
     none = "none"
     pending = "pending"
     sent = "sent"
@@ -3592,7 +3653,7 @@ class CandidateResponse(StrEnum):
 
 
 class InterviewInvitation(BaseModel):
-    status: Status6
+    status: Status7
     canSend: bool
     teamsAvailable: bool
     teams: bool
@@ -3742,7 +3803,7 @@ class BlindRewriteInput(BaseModel):
     ] = None
 
 
-class Status7(StrEnum):
+class Status8(StrEnum):
     queued = "queued"
     done = "done"
     failed = "failed"
@@ -5324,7 +5385,7 @@ class WeeklyHours(BaseModel):
     ]
 
 
-class Status8(StrEnum):
+class Status9(StrEnum):
     pending = "pending"
     ok = "ok"
     failed = "failed"
@@ -5337,7 +5398,7 @@ class CalendarFeed(BaseModel):
             description="The address's host only, e.g. calendar.google.com (the address itself is private)."
         ),
     ]
-    status: Status8
+    status: Status9
     error: Annotated[str | None, Field(...)]
     checkedAt: Annotated[AwareDatetime | None, Field(...)]
     busyCount: Annotated[int, Field(description="Busy times found in the next weeks.")]
@@ -5445,7 +5506,7 @@ class OffsiteStatus(StrEnum):
     off = "off"
 
 
-class Status9(StrEnum):
+class Status10(StrEnum):
     running = "running"
     done = "done"
     failed = "failed"
@@ -5465,7 +5526,7 @@ class BackupStatus(BaseModel):
     name: Annotated[str, Field(description="The backup's folder, e.g. hiringplug-20261107-020000.")]
     startedAt: AwareDatetime
     finishedAt: Annotated[AwareDatetime | None, Field(...)]
-    status: Status9
+    status: Status10
     sizeBytes: Annotated[int | None, Field(...)]
     error: Annotated[str | None, Field(...)]
 
@@ -6614,6 +6675,21 @@ class DocumentList(BaseModel):
     items: list[Document]
 
 
+class OutlookDraft(BaseModel):
+    messageId: str
+    version: Annotated[str, Field(max_length=64, min_length=64, pattern="^[a-f0-9]+$")]
+    subject: str
+    body: str
+    bodyTruncated: bool
+    to: list[str]
+    cc: list[str]
+    bcc: list[str]
+    hasAttachments: bool
+    webUrl: Annotated[str | None, Field(...)]
+    scheduleNeedsReview: bool
+    schedule: Annotated[OutlookScheduledSend | None, Field(...)]
+
+
 class OutlookRuleList(BaseModel):
     items: list[OutlookRule]
     folders: list[OutlookRuleFolder]
@@ -6859,7 +6935,7 @@ class InterviewList(BaseModel):
 class BlindRewrite(BaseModel):
     id: BlindRewriteId
     adId: JobAdId
-    status: Annotated[Status7, Field(description="done: it is now the ad's blind version.")]
+    status: Annotated[Status8, Field(description="done: it is now the ad's blind version.")]
     tone: BlindRewriteTone
     strength: BlindRewriteStrength
     error: Annotated[str | None, Field(description="Why there is no rewrite.")]

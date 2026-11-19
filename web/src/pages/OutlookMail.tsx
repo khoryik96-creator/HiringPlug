@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../api/client";
 import { ErrorMessage } from "../components/ErrorMessage";
 import type { OutlookProfile } from "../components/outlook/OutlookProfileMail";
+import { OutlookDraftEditor } from "../components/outlook/OutlookDraftEditor";
+import { OutlookScheduledList } from "../components/outlook/OutlookScheduledList";
 import { OutlookReadingPane } from "../components/outlook/OutlookReadingPane";
 import { OutlookRules } from "../components/outlook/OutlookRules";
 import { formatWhen } from "../labels";
@@ -37,6 +39,10 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   const [thread, setThread] = useState(initialThread);
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<string>();
+  const [scheduled, setScheduled] = useState(false);
+  // undefined closes the editor. A null message starts a new draft.
+  const [draft, setDraft] = useState<string | null>();
+
   const queryParams = {
     ...(linked ? profile : {}),
     folder: folder || undefined,
@@ -89,25 +95,30 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
   return <main className="outlook-page">
     <div className="row spread">
       <h2>Outlook Mail</h2>
-      {data?.enabled && <div className="row outlook-actions">
+      <div className="row outlook-actions">
+        {data?.enabled && <button className="primary" type="button" disabled={!folders.some((item) => item.kind === "drafts")}
+          onClick={() => { setDraft(null); }}>New message</button>}
+        <button type="button" aria-pressed={scheduled} onClick={() => { setScheduled(!scheduled); }}>{scheduled ? "Back to mail" : "Scheduled"}</button>
+        {data?.enabled && <>
         <a className="button" href="#/outlook?rules=1">Inbox rules</a>
         <button type="button" disabled={sync.isPending} onClick={() => { sync.mutate(false); }}>Refresh</button>
         <button type="button" disabled={sync.isPending} onClick={() => {
-          if (window.confirm("Turn off Outlook sync and remove HiringPlug’s local index and profile links? Your Outlook mail stays in Outlook.")) sync.mutate(true);
+          if (window.confirm("Turn off Outlook sync? Pending sends will be cancelled and HiringPlug’s profile links removed. Mail and drafts stay in Outlook.")) sync.mutate(true);
         }}>Turn off sync</button>
-      </div>}
+        </>}
+      </div>
     </div>
     <ErrorMessage error={result.error ?? sync.error}/>
     {result.isPending && <p className="muted">Loading Outlook Mail…</p>}
-    {data && !data.connected && <section className="panel">
+    {!scheduled && data && !data.connected && <section className="panel">
       <p>Connect your Microsoft mailbox to use Outlook Mail.</p>
       <a className="button" href="#/email-connection">Email connection</a>
     </section>}
-    {data?.connected && !data.enabled && <section className="panel">
+    {!scheduled && data?.connected && !data.enabled && <section className="panel">
       <p>Sync your folders and recent messages. Only you can see your Outlook mail here.</p>
       <button className="primary" type="button" disabled={sync.isPending} onClick={() => { sync.mutate(false); }}>Enable sync</button>
     </section>}
-    {data?.enabled && <>
+    {!scheduled && data?.enabled && <>
       {data.error && <p className="warning" role="alert">{data.error}</p>}
       {data.syncing && <p className="muted" role="status">Syncing Outlook folders…</p>}
       <section className="panel outlook-workspace">
@@ -127,7 +138,10 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
             <div className="outlook-messages" aria-label="Messages">
               {data.items.length === 0 && <p className="muted">No messages to display.</p>}
               {data.items.map((item) => <button type="button" className="outlook-message" aria-pressed={item.id === selected} key={item.id}
-                onClick={() => { setSelected(item.id); }}>
+                onClick={() => {
+                  if (item.isDraft) setDraft(item.id);
+                  else setSelected(item.id);
+                }}>
                 <span>{!item.isRead && !item.isDraft && <span className="outlook-unread" aria-label="Unread"/>}{subject(item)}</span>
                 <small>{item.sender || (item.isDraft ? "Draft" : "Outlook")} · {formatWhen(item.receivedAt)}</small>
               </button>)}
@@ -144,5 +158,10 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
         </div>
       </section>
     </>}
+    {scheduled && <OutlookScheduledList onOpen={setDraft}/>}
+    {draft !== undefined && <OutlookDraftEditor key={draft ?? "new"} id={draft} onClose={(operation) => {
+      setDraft(undefined);
+      if (operation === "send" || operation === "schedule") setScheduled(true);
+    }}/>}
   </main>;
 }

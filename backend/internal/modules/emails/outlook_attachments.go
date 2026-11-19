@@ -149,7 +149,7 @@ func (s *Service) downloadOutlookAttachment(ctx context.Context, p authz.Princip
 	if attachment.Size > outlookAttachmentLimit {
 		return nil, "", attachmentTooLarge()
 	}
-	response, err := s.openOutlookResponse(ctx, token, http.MethodGet, target+"/$value", nil)
+	response, err := s.openOutlookResponse(ctx, token, http.MethodGet, target+"/$value", nil, "")
 	if err != nil {
 		return nil, "", attachmentFailure(err)
 	}

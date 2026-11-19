@@ -1640,3 +1640,8 @@ tabs links private threads after the recruiter confirms an exact email match.
 **Inbox rules** can move incoming messages to a selected Outlook folder based
 on the sender address or words in the subject.
 See [Outlook Mail setup](mailbox-connections.md#outlook-mail).
+
+Use **New message** or **Drafts** in Outlook Mail to edit a personal draft or
+queue it for immediate or scheduled send. **Scheduled** shows send status,
+lets the owner cancel pending delivery, and opens the reviewed draft for edits
+or rescheduling. Outlook changes after scheduling require a fresh review.

@@ -103,3 +103,41 @@
   .outlook-messages { max-height: 15rem; border-right: 0; border-bottom: 1px solid var(--line, #ded8eb); }
   .outlook-content input { flex: 1; width: 0; min-width: 8rem; max-width: 100%; }
 }
+
+.outlook-draft-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  margin: auto;
+  box-sizing: border-box;
+}
+.outlook-draft-dialog::backdrop { background: #20172b65; }
+.outlook-draft-head h3 { margin: 0; }
+.outlook-draft-head { margin-bottom: 1rem; }
+.outlook-draft-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .6rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+}
+.outlook-draft-fields > button { justify-self: start; padding: 0; }
+.outlook-copy-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.outlook-draft-dialog .outlook-actions { flex-wrap: wrap; }
+.outlook-draft-dialog .outlook-schedule-time { align-items: end; }
+.outlook-send-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  padding: .8rem 0;
+  border-bottom: 1px solid var(--line, #ded8eb);
+}
+.outlook-send-row:last-child { border-bottom: 0; }
+.outlook-send-row p { margin: .25rem 0; }
+@media (max-width: 600px) {
+  .outlook-send-row { flex-wrap: wrap; }
+  .outlook-copy-fields { grid-template-columns: 1fr; }
+}

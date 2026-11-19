@@ -105,8 +105,8 @@ tasks:
     cmds: [task: lint:shell, task: lint:go, task: lint:py, task: lint:web, task: lint:migrator]
 
   lint:shell:
-    desc: Check CI shell scripts (requires ShellCheck)
-    cmds: [shellcheck .github/scripts/*.sh deploy/*.sh]
+    desc: Check CI, deployment and Codespaces update scripts (requires ShellCheck)
+    cmds: [shellcheck .github/scripts/*.sh deploy/*.sh .devcontainer/update.sh]
 
   lint:go:
     dir: backend
