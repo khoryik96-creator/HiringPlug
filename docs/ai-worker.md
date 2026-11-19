@@ -44,6 +44,10 @@ rebuilt here as small, separately tested modules.
      don't count.
 3. **OCR** (`ocr.py`): pages are rendered with PDFium at 220 DPI and read by
    Tesseract, with limits on pages (30), pixels, per-page time and total time.
+   Each Tesseract runs one thread (`OMP_THREAD_LIMIT=1` unless the server sets
+   it): the worker reads several files at once, and Tesseracts each using every
+   core starved one another (three receipt photos: 90 seconds together, 0.3 s
+   each this way).
 4. **Word** (`docx_reader.py`): page headers first (names often live there),
    list paragraphs keep a `•` marker (including numbering inherited from
    styles), tables keep their rows and multi-line cells, and text boxes are read
@@ -377,3 +381,19 @@ part of a key) are replaced by fixed messages. See
    fail until you do.
 4. Test the logic with plain unit tests, and the handler with the fakes in
    `tests/test_jobs.py`.
+
+## Receipts (expense claims)
+
+`claim.read_receipt` reads a claim's receipt with the same extraction (a PDF's
+text, OCR for photos and scans), then `parsing/receipt.py` finds, by rules (no
+AI): the **date** (on a line saying "Date" if there is one; Malaysia writes the
+day first; never ahead of tomorrow or over three years old), the **total** (a
+grand total, amount due or total paid, else a total line, else what was paid;
+subtotals, tax, rounding, cash given and change never count), the **currency**
+(RM/MYR, S$/SGD, US$/USD and others), the **merchant** (a known brand, else the
+first line that is not a heading or an address) and the **receipt type**: one
+of the company's types, by the words its receipts say (`receipt_words.py`) or,
+for a company's own type, the words of its name. Anything doubtful is left out
+for the claimant to fill in. The answer, `claim.receipt_read`, fills only the
+claim's empty fields, and the Go worker checks each value again.
+

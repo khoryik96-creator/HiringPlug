@@ -11,6 +11,7 @@ read again turned 90, 180 and 270 degrees, and the clearly best reading wins.
 from __future__ import annotations
 
 import io
+import os
 import re
 import shutil
 import time
@@ -51,6 +52,11 @@ class TesseractOcr:
     def __init__(self, languages: str = "eng", binary: str = "tesseract") -> None:
         self.languages = languages
         self.binary = binary
+        # One thread per Tesseract: the worker reads several files at once,
+        # and each Tesseract's threads for every core fight over them (three
+        # receipts took 90 seconds together, 0.3 each this way). The process
+        # environment is what pytesseract's Tesseract runs with.
+        os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 
     @property
     def name(self) -> str:

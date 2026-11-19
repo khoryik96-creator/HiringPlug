@@ -1,0 +1,72 @@
+/* Expense claims: receipts read into editable claims, approvals, dashboard. */
+.claims-page .candidate-tabs { margin-top: 0.5rem; }
+.claims-page h3 { margin: 1.1rem 0 0.4rem; }
+
+/* A value read from the receipt: stripes of the accent until someone changes it. */
+.claims-page .from-receipt, .claims-page .from-receipt-key {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, #fff) 0 5px, #fff 5px 10px);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.claims-page .from-receipt-key { display: inline-block; width: 1.4rem; height: 0.85rem; border: 1px solid; border-radius: 3px; vertical-align: -2px; margin-right: 0.3rem; }
+
+.claim-uploads { margin: 0.4rem 0; padding-left: 1.2rem; font-size: 0.85rem; }
+.claim-submit-bar { margin-top: 0.6rem; flex-wrap: wrap; gap: 0.5rem; }
+.claim-submit-bar h3 { margin: 0.6rem 0 0.2rem; }
+.claim-legend { margin: 0 0 0.4rem; }
+.claim-rows { display: flex; flex-direction: column; gap: 0.6rem; }
+.claim-row { border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface, #fff); padding: 0.6rem 0.8rem 0.7rem; box-shadow: var(--shadow); }
+.claim-row.rejected { border-color: #f1b4b4; }
+.claim-row-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.claim-row-head .claim-file { font-weight: 650; overflow-wrap: anywhere; text-align: left; }
+.claim-row-tools { margin-left: auto; display: flex; gap: 0.6rem; align-items: center; }
+.claim-reading { font-size: 0.85rem; color: var(--accent); font-weight: 600; }
+.claim-note { margin: 0.4rem 0 0; padding: 0.4rem 0.6rem; border-radius: 8px; background: #fef2f2; font-size: 0.88rem; }
+.claim-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 0.5rem 0.8rem; margin-top: 0.5rem; }
+.claim-fields .field { margin: 0; min-width: 0; }
+.claim-fields .field label { font-size: 0.8rem; color: var(--muted); }
+.claim-fields input, .claim-fields select { width: 100%; min-width: 0; box-sizing: border-box; }
+.claim-fields .claim-amount .row { flex-wrap: nowrap; gap: 0.3rem; }
+.claim-fields .claim-amount select { width: 5.2rem; flex: none; }
+.claim-fields .claim-purpose { grid-column: span 2; }
+.claim-fields .claim-link { grid-column: span 2; }
+@media (max-width: 640px) { .claim-fields .claim-purpose, .claim-fields .claim-link { grid-column: auto; } }
+
+/* Tables of sent and team claims: what goes together shares a cell (a date over its merchant), so they fit. */
+.claims-table td { white-space: normal; vertical-align: top; overflow-wrap: anywhere; }
+.claims-table td.num, .claims-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.claims-table .sub { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.1rem; }
+.claims-table .badge { white-space: nowrap; }
+.claims-table .claim-purpose-cell { min-width: 11rem; max-width: 22rem; }
+.claims-table td.claim-tools { white-space: nowrap; }
+.claims-table td.claim-tools button + button { margin-left: 0.9rem; }
+.claims-table tr.selected td { background: var(--accent-soft); }
+.claim-type-chip { display: inline-flex; align-items: center; gap: 0.35rem; }
+.claim-type-chip .swatch, .claim-bars .swatch { width: 0.65rem; height: 0.65rem; border-radius: 3px; flex: none; display: inline-block; }
+.badge.claim-draft { background: #eceef1; }
+.badge.claim-submitted { background: #fef3c7; }
+.badge.claim-approved { background: #dbeafe; }
+.badge.claim-rejected { background: #fee2e2; }
+.badge.claim-paid { background: #dcfce7; }
+.claim-why { display: block; white-space: normal; max-width: 16rem; }
+
+.claim-filters { flex-wrap: wrap; gap: 0.5rem 0.8rem; margin: 0.4rem 0; }
+.claim-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.7rem; padding: 0.6rem 0.8rem; margin: 0.4rem 0; position: sticky; top: 0.5rem; z-index: 2; }
+.claim-reject { flex-basis: 100%; gap: 0.5rem; }
+.claim-reject input { flex: 1; min-width: 12rem; }
+
+/* Dashboard: tiles, then bar lists (a name, one-colour bar, figures). */
+.claim-tiles .claim-tile { cursor: default; }
+.claim-tiles .claim-tile strong { font-size: 1.5rem; }
+.claim-breakdowns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 27rem), 1fr)); gap: 0.8rem; margin-top: 0.6rem; }
+.claim-bars { margin: 0; padding: 0.7rem 0.9rem; }
+.claim-bars h4 { margin: 0 0 0.45rem; }
+.claim-bars table { width: 100%; border-collapse: collapse; table-layout: fixed; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.claim-bars th, .claim-bars td { padding: 0.3rem 0; border: 0; font-size: 0.86rem; background: none; }
+.claim-bars th { text-align: left; font-weight: 550; width: 38%; padding-right: 0.6rem; overflow-wrap: anywhere; white-space: normal;
+  text-transform: none; letter-spacing: normal; color: var(--text); }
+.claim-bars th .swatch { margin-right: 0.4rem; vertical-align: -1px; }
+.claim-bars .bar-cell { width: 30%; }
+.claim-bars td.num { width: 32%; }
+.claim-bars .bar { display: block; height: 12px; min-width: 3px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.claim-bars td.num { text-align: right; white-space: nowrap; padding-left: 0.6rem; font-variant-numeric: tabular-nums; }
+.claim-bars td.num small { display: block; font-size: 0.75rem; }

@@ -1594,6 +1594,38 @@ candidate invitations retain their existing flow. Attendee invitations on ordina
 appointments are explicit. See [calendar.md](calendar.md) for setup, privacy,
 synchronization behavior and the sync window.
 
+## Expense claims ✅
+
+**More > Claims** is where consultants claim expenses. Drop receipts (photos or
+PDFs; several at once) and each becomes a draft claim. The receipt is read in
+the background (OCR for photos and scans, the text of a PDF) and fills in its
+**receipt date**, **total**, **currency**, **merchant** and **receipt type**
+(Grab / e-hailing fare, food, drinks, parking & toll, fuel, flights, trains &
+hotels, phone & internet, office supplies, or the company's own types). A fare,
+parking, fuel or a trip also suggests the **claim type** (travel). Every value
+is a suggestion: striped until someone changes it, and always editable. Each
+claim also takes its **purpose**, its **claim type** (travel, client
+entertainment, candidate meeting, staff welfare...) and, optionally, the
+**client or candidate** it was for: an existing company, contact or candidate,
+found by name. A value read later never replaces what the person typed. The
+same receipt cannot be claimed twice by one person.
+
+Claims are **submitted** (several at once, all or none; each needs its date,
+amount, both types and purpose, and says what is missing), then **approved**
+or **rejected** with a reason (the claimant fixes it and submits again; a
+claim not yet decided can be withdrawn), and approved claims are **marked
+paid**. The date claimed, who decided and when, and the date paid are kept.
+
+**Approvals** (owners and admins by default: `claims:approve`) lists everyone's
+claims but drafts, by status, person and receipt dates, with each receipt, bulk
+approve, reject and mark paid, the total of what is selected, and a CSV for
+payroll. **Dashboard**: what is waiting, approved but not paid, paid and
+rejected, for this month, last month, the last three months or the year, then
+the amounts by receipt type, claim type, client or candidate, person (team view)
+and month. A person sees their own claims; approvers see everyone's (the
+database enforces it). Receipt and claim types are dropdowns in **Settings >
+Dropdowns & categories > Expense claims**.
+
 ## Outlook Mail
 
 **More > Outlook** indexes a recruiter's own Outlook folders on request.

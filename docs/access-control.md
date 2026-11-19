@@ -89,6 +89,8 @@ details get their own permissions.
 | `automations:read`, `automations:approve` (send or skip emails waiting for approval) | ✓ | ✓ | ✓ | | | |
 | `automations:manage` (add, change, switch on and off) | ✓ | ✓ | | | | |
 | `automations.tasks:read`, `automations.tasks:update` (your own tasks) | ✓ | ✓ | ✓ | ✓ | ✓ | |
+| `claims:create` (expense claims: upload receipts, fill in and submit your own, see them) | ✓ | ✓ | ✓ | ✓ | | |
+| `claims:approve` (see everyone's claims and the team dashboard; approve, reject, mark paid) | ✓ | ✓ | | | | |
 | `offers:read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `offers:manage` (make, change, ask for approval, send, record the answer) | ✓ | ✓ | ✓ | | | |
 | `offers:approve` (approve others' requests; send without asking) | ✓ | ✓ | | | ✓ | |

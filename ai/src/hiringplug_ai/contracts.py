@@ -34,6 +34,8 @@ class Permission(StrEnum):
     candidates_merge = "candidates:merge"
     candidates_read = "candidates:read"
     candidates_update = "candidates:update"
+    claims_approve = "claims:approve"
+    claims_create = "claims:create"
     companies_category_update = "companies.category:update"
     companies_documents_delete = "companies.documents:delete"
     companies_create = "companies:create"
@@ -117,6 +119,8 @@ class ErrorCode(StrEnum):
     CALENDAR_NOT_CONNECTED = "CALENDAR_NOT_CONNECTED"
     CANDIDATE_DUPLICATE_EMAIL = "CANDIDATE_DUPLICATE_EMAIL"
     CAREERS_TOO_MANY_APPLICATIONS = "CAREERS_TOO_MANY_APPLICATIONS"
+    CLAIM_DUPLICATE = "CLAIM_DUPLICATE"
+    CLAIM_WRONG_STATUS = "CLAIM_WRONG_STATUS"
     COMPANY_DUPLICATE_NAME = "COMPANY_DUPLICATE_NAME"
     CONFLICT_STALE_VERSION = "CONFLICT_STALE_VERSION"
     CONTACT_DUPLICATE_EMAIL = "CONTACT_DUPLICATE_EMAIL"
@@ -179,6 +183,8 @@ class JobKind(StrEnum):
     calendar_push = "calendar.push"
     calendar_refresh = "calendar.refresh"
     calendar_source_changed = "calendar.source_changed"
+    claim_read_receipt = "claim.read_receipt"
+    claim_receipt_read = "claim.receipt_read"
     company_autofill = "company.autofill"
     company_industried = "company.industried"
     company_industry = "company.industry"
@@ -1279,6 +1285,260 @@ class ScreeningSalarySnapshot(BaseModel):
 
 class ApplicationReceived(BaseModel):
     received: bool
+
+
+class ClaimId(RootModel[str]):
+    root: Annotated[str, Field(pattern="^clm_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class ClaimStatus(StrEnum):
+    draft = "draft"
+    submitted = "submitted"
+    approved = "approved"
+    rejected = "rejected"
+    paid = "paid"
+
+
+class ClaimOcrStatus(StrEnum):
+    reading = "reading"
+    done = "done"
+    failed = "failed"
+
+
+class ClaimField(StrEnum):
+    receiptDate = "receiptDate"
+    amount = "amount"
+    currency = "currency"
+    merchant = "merchant"
+    receiptType = "receiptType"
+    claimType = "claimType"
+    purpose = "purpose"
+    link = "link"
+
+
+class ClaimLinkKind(StrEnum):
+    company = "company"
+    contact = "contact"
+    candidate = "candidate"
+
+
+class ClaimLink(BaseModel):
+    kind: ClaimLinkKind
+    id: str
+    name: Annotated[
+        str | None, Field(description="Null when you may not see the record (or it was deleted).")
+    ]
+    detail: Annotated[str | None, Field(description="A contact's company, a candidate's current title.")]
+
+
+class ClaimLinkInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: ClaimLinkKind
+    id: Annotated[str, Field(max_length=40, pattern="^(comp|cont|cand)_[0-9a-hjkmnp-tv-z]{26}$")]
+
+
+class Claim(BaseModel):
+    id: ClaimId
+    userId: UserId
+    userName: Annotated[str, Field(description="Who claims it.")]
+    status: ClaimStatus
+    ocrStatus: ClaimOcrStatus
+    ocrError: Annotated[str | None, Field(description="Why the receipt could not be read.")]
+    fileName: str
+    contentType: str
+    sizeBytes: int
+    receiptDate: Annotated[date | None, Field(...)]
+    amount: Annotated[DecimalAmount | None, Field(...)]
+    currency: CurrencyCode
+    merchant: Annotated[str | None, Field(...)]
+    receiptType: Annotated[str | None, Field(description="An option of the claim_receipt_type dropdown.")]
+    claimType: Annotated[str | None, Field(description="An option of the claim_type dropdown.")]
+    purpose: Annotated[str | None, Field(...)]
+    link: Annotated[ClaimLink | None, Field(...)]
+    fromReceipt: Annotated[
+        list[ClaimField],
+        Field(
+            description="The fields whose value was read from the receipt and not changed since (show them as suggestions)."
+        ),
+    ]
+    missing: Annotated[
+        list[ClaimField], Field(description="What must still be filled in before the claim can be submitted.")
+    ]
+    claimedAt: Annotated[AwareDatetime | None, Field(description="When it was (last) submitted.")]
+    reviewedAt: Annotated[AwareDatetime | None, Field(...)]
+    reviewedByName: Annotated[str | None, Field(...)]
+    reviewNote: Annotated[str | None, Field(description="Why it was rejected.")]
+    paidAt: Annotated[AwareDatetime | None, Field(...)]
+    version: int
+    createdAt: AwareDatetime
+    updatedAt: AwareDatetime
+
+
+class ClaimAmount(BaseModel):
+    currency: CurrencyCode
+    amount: DecimalAmount
+
+
+class ClaimPage(BaseModel):
+    items: list[Claim]
+    total: Annotated[int, Field(description="Claims matching (the page holds at most `limit`).")]
+    totals: Annotated[
+        list[ClaimAmount], Field(description="The amount of all matching claims, per currency.")
+    ]
+
+
+class ClaimList(BaseModel):
+    items: list[Claim]
+
+
+class ClaimUpdate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+    receiptDate: date | None = None
+    amount: DecimalAmount | None = None
+    currency: CurrencyCode | None = None
+    merchant: Annotated[str | None, Field(max_length=200)] = None
+    receiptType: Annotated[str | None, Field(max_length=100)] = None
+    claimType: Annotated[str | None, Field(max_length=100)] = None
+    purpose: Annotated[str | None, Field(max_length=500)] = None
+    link: Annotated[
+        ClaimLinkInput | None,
+        Field(
+            description="The client (company or contact) or candidate it was for, one you may see; null removes it."
+        ),
+    ] = None
+
+
+class ClaimVersion(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    version: Annotated[int, Field(ge=1)]
+
+
+class ClaimRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: ClaimId
+    version: Annotated[int, Field(description="The version you loaded.", ge=1)]
+
+
+class ClaimSelection(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    claims: Annotated[list[ClaimRef], Field(max_length=200, min_length=1)]
+
+
+class ClaimDecision(StrEnum):
+    approve = "approve"
+    reject = "reject"
+    pay = "pay"
+
+
+class ClaimReview(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    claims: Annotated[list[ClaimRef], Field(max_length=200, min_length=1)]
+    decision: ClaimDecision
+    note: Annotated[
+        str | None, Field(description="Why they are rejected (required to reject).", max_length=500)
+    ] = None
+
+
+class ClaimFact(BaseModel):
+    status: ClaimStatus
+    receiptType: Annotated[str | None, Field(...)]
+    claimType: Annotated[str | None, Field(...)]
+    linkKind: Annotated[ClaimLinkKind | None, Field(...)]
+    linkId: Annotated[str | None, Field(...)]
+    userId: UserId
+    month: Annotated[
+        str,
+        Field(
+            description="The receipt date's month (else the upload's), e.g. 2026-11.",
+            pattern="^[0-9]{4}-[0-9]{2}$",
+        ),
+    ]
+    currency: CurrencyCode
+    count: int
+    amount: DecimalAmount
+
+
+class ClaimPerson(BaseModel):
+    id: UserId
+    name: str
+
+
+class ClaimRecord(BaseModel):
+    kind: ClaimLinkKind
+    id: str
+    name: Annotated[str | None, Field(description="Null when you may not see it (or it was deleted).")]
+    detail: Annotated[str | None, Field(...)]
+
+
+class ClaimSummary(BaseModel):
+    facts: Annotated[
+        list[ClaimFact],
+        Field(description="Every combination present, for the dashboard to add up as it shows them."),
+    ]
+    people: Annotated[list[ClaimPerson], Field(description="The names of the people in the facts.")]
+    records: Annotated[list[ClaimRecord], Field(description="The clients and candidates in the facts.")]
+
+
+class ClaimReceiptTypeOption(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    key: str
+    label: str
+
+
+class ClaimReadReceiptJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    claimId: ClaimId
+    downloadUrl: Annotated[str, Field(description="Short-lived signed URL to download the receipt from.")]
+    contentType: str
+    fileName: str
+    sizeBytes: int
+    receiptTypes: Annotated[
+        list[ClaimReceiptTypeOption],
+        Field(
+            description="The company's receipt types (claim_receipt_type) to choose from; the worker answers with one of these keys or none."
+        ),
+    ]
+
+
+class ClaimReadStatus(StrEnum):
+    read = "read"
+    unreadable = "unreadable"
+
+
+class ClaimReceiptReadJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    claimId: ClaimId
+    status: ClaimReadStatus
+    receiptDate: Annotated[date | None, Field(...)]
+    amount: Annotated[DecimalAmount | None, Field(...)]
+    currency: Annotated[CurrencyCode | None, Field(...)]
+    merchant: Annotated[str | None, Field(max_length=200)]
+    receiptType: Annotated[
+        str | None, Field(description="One of the receipt types sent, or null.", max_length=100)
+    ]
+    extractor: Annotated[
+        str, Field(description="Which reader produced the text, e.g. pdfplumber@0.11 or tesseract@5.3.")
+    ]
+    errorMessage: Annotated[str | None, Field(description="Why nothing could be read (shown to the person).")]
 
 
 class CompanyDocumentId(RootModel[str]):
@@ -5230,6 +5490,8 @@ class FieldListName(StrEnum):
     specialization = "specialization"
     it_skill = "it_skill"
     certification = "certification"
+    claim_receipt_type = "claim_receipt_type"
+    claim_type = "claim_type"
 
 
 class FieldListKind(StrEnum):

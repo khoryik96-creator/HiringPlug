@@ -15,6 +15,15 @@ export async function uploadCandidateDocument(candidateId: string, source: Schem
   if (!res.ok) await throwFor(res);
 }
 
+/** Uploads a receipt as a new draft claim (it is read in the background). */
+export async function uploadClaimReceipt(file: Blob, fileName: string): Promise<Schemas["Claim"]> {
+  const body = new FormData();
+  body.append("file", file, fileName);
+  const res = await fetch("/v1/claims", { method: "POST", body, headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
+  if (!res.ok) await throwFor(res);
+  return await res.json() as Schemas["Claim"];
+}
+
 export async function fetchDocumentFile(doc: Pick<Document, "id" | "contentType">): Promise<Blob> {
   const res = await fetch(`/v1/documents/${doc.id}/file`, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });
   if (!res.ok) await throwFor(res); // throws the API's error

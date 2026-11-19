@@ -77,3 +77,18 @@ func (m *Module) HasOption(ctx context.Context, tx pgx.Tx, list, key string) (bo
 	}
 	return false, nil
 }
+
+// Choices returns a list's options offered for new choices (not hidden), in
+// order, in the caller's transaction.
+func (m *Module) Choices(ctx context.Context, tx pgx.Tx, list string) ([]Option, error) {
+	all, err := listsIn(ctx, store.New(tx))
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range all {
+		if l.Name == list {
+			return slices.DeleteFunc(slices.Clone(l.Options), func(o Option) bool { return o.Hidden }), nil
+		}
+	}
+	return []Option{}, nil
+}

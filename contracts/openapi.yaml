@@ -97,6 +97,14 @@ x-error-codes:
     module: careers
     status: 429
     description: Too many applications from one place in a short time. Try again later.
+  CLAIM_DUPLICATE:
+    module: claims
+    status: 409
+    description: 'You already uploaded this exact receipt (the same file): `details.existingClaimId` is its claim.'
+  CLAIM_WRONG_STATUS:
+    module: claims
+    status: 409
+    description: 'The claim''s status does not allow this: drafts and rejected claims are changed and submitted, submitted claims approved or rejected, approved claims paid.'
   COMPANY_DUPLICATE_NAME:
     module: companies
     status: 409
@@ -1487,6 +1495,261 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
+  /v1/claims:
+    get:
+      operationId: listMyClaims
+      tags: [claims]
+      summary: Your claims, newest first
+      x-permission: claims:create
+      parameters:
+        - $ref: '#/components/parameters/ClaimStatusQuery'
+        - $ref: '#/components/parameters/ClaimFromQuery'
+        - $ref: '#/components/parameters/ClaimToQuery'
+        - $ref: '#/components/parameters/ClaimLimitQuery'
+        - $ref: '#/components/parameters/ClaimOffsetQuery'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      operationId: uploadClaimReceipt
+      tags: [claims]
+      summary: Upload a receipt (photo or PDF) as a new draft claim
+      description: >
+        Returns at once with `ocrStatus` reading; the receipt is read in the background and fills in the fields that are still empty. Poll the claim (or the list) until `ocrStatus` is done or failed.
+
+      x-permission: claims:create
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Claim'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: You already uploaded this receipt (CLAIM_DUPLICATE).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '415': {$ref: '#/components/responses/UnsupportedMediaType'}
+  /v1/claims/team:
+    get:
+      operationId: listTeamClaims
+      tags: [claims]
+      summary: Everyone's claims (drafts excluded), newest claimed first
+      x-permission: claims:approve
+      parameters:
+        - $ref: '#/components/parameters/ClaimStatusQuery'
+        - name: userId
+          in: query
+          schema: {$ref: '#/components/schemas/UserId'}
+        - $ref: '#/components/parameters/ClaimFromQuery'
+        - $ref: '#/components/parameters/ClaimToQuery'
+        - $ref: '#/components/parameters/ClaimLimitQuery'
+        - $ref: '#/components/parameters/ClaimOffsetQuery'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimPage'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/summary:
+    get:
+      operationId: getMyClaimSummary
+      tags: [claims]
+      summary: The figures for your claims dashboard
+      x-permission: claims:create
+      parameters:
+        - $ref: '#/components/parameters/ClaimFromQuery'
+        - $ref: '#/components/parameters/ClaimToQuery'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimSummary'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/team/summary:
+    get:
+      operationId: getTeamClaimSummary
+      tags: [claims]
+      summary: The figures for the team's claims dashboard (drafts excluded)
+      x-permission: claims:approve
+      parameters:
+        - $ref: '#/components/parameters/ClaimFromQuery'
+        - $ref: '#/components/parameters/ClaimToQuery'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimSummary'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /v1/claims/submit:
+    post:
+      operationId: submitClaims
+      tags: [claims]
+      summary: Submit your draft or rejected claims for approval (all or none)
+      description: >
+        Each claim needs its receipt date, amount, receipt type, claim type and purpose. A missing one fails the request with VALIDATION_FAILED, naming the claim and field.
+
+      x-permission: claims:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimSelection'}
+      responses:
+        '200':
+          description: The claims, submitted
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/claims/review:
+    post:
+      operationId: reviewClaims
+      tags: [claims]
+      summary: Approve or reject submitted claims, or mark approved ones paid (all or none)
+      x-permission: claims:approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimReview'}
+      responses:
+        '200':
+          description: The claims, decided
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ClaimList'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/claims/{claimId}:
+    parameters:
+      - $ref: '#/components/parameters/ClaimIdPath'
+    get:
+      operationId: getClaim
+      tags: [claims]
+      summary: One claim (yours, or anyone's for approvers)
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Claim'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      operationId: updateClaim
+      tags: [claims]
+      summary: Change your draft or rejected claim (null clears a field)
+      x-permission: claims:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimUpdate'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Claim'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      operationId: deleteClaim
+      tags: [claims]
+      summary: Delete your draft or rejected claim and its receipt
+      x-permission: claims:create
+      responses:
+        '204': {description: Deleted}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/claims/{claimId}/withdraw:
+    parameters:
+      - $ref: '#/components/parameters/ClaimIdPath'
+    post:
+      operationId: withdrawClaim
+      tags: [claims]
+      summary: Take your submitted claim back to draft, before it is decided
+      x-permission: claims:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ClaimVersion'}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Claim'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/claims/{claimId}/receipt:
+    parameters:
+      - $ref: '#/components/parameters/ClaimIdPath'
+    get:
+      operationId: getClaimReceipt
+      tags: [claims]
+      summary: The claim's receipt as uploaded (yours, or anyone's for approvers)
+      description: The claim's contentType says what the bytes are.
+      x-permission: authenticated
+      responses:
+        '200':
+          description: OK
+          headers:
+            Content-Disposition: {required: true, schema: {type: string}}
+            Cache-Control: {required: true, schema: {type: string}}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /v1/companies:
     get:
       operationId: listCompanies
@@ -6841,6 +7104,8 @@ components:
         - candidates:merge
         - candidates:read
         - candidates:update
+        - claims:approve
+        - claims:create
         - companies.category:update
         - companies.documents:delete
         - companies:create
@@ -6924,6 +7189,8 @@ components:
         - CALENDAR_NOT_CONNECTED
         - CANDIDATE_DUPLICATE_EMAIL
         - CAREERS_TOO_MANY_APPLICATIONS
+        - CLAIM_DUPLICATE
+        - CLAIM_WRONG_STATUS
         - COMPANY_DUPLICATE_NAME
         - CONFLICT_STALE_VERSION
         - CONTACT_DUPLICATE_EMAIL
@@ -6986,6 +7253,8 @@ components:
         - calendar.push
         - calendar.refresh
         - calendar.source_changed
+        - claim.read_receipt
+        - claim.receipt_read
         - company.autofill
         - company.industried
         - company.industry
@@ -8567,6 +8836,261 @@ components:
       required: [received]
       properties:
         received: {type: boolean}
+    ClaimId:
+      type: string
+      pattern: '^clm_[0-9a-hjkmnp-tv-z]{26}$'
+    ClaimStatus:
+      type: string
+      description: draft (being filled in) → submitted → approved or rejected; approved → paid. A rejected claim is changed and submitted again.
+      enum: [draft, submitted, approved, rejected, paid]
+    ClaimOcrStatus:
+      type: string
+      description: reading = the receipt is being read; done = what could be read was filled in; failed = nothing could be read (fill it in by hand).
+      enum: [reading, done, failed]
+    ClaimField:
+      type: string
+      enum: [receiptDate, amount, currency, merchant, receiptType, claimType, purpose, link]
+    ClaimLinkKind:
+      type: string
+      enum: [company, contact, candidate]
+    ClaimLink:
+      type: object
+      description: The client or candidate the claim was for.
+      required: [kind, id, name, detail]
+      properties:
+        kind: {$ref: '#/components/schemas/ClaimLinkKind'}
+        id: {type: string}
+        name:
+          type: string
+          nullable: true
+          description: Null when you may not see the record (or it was deleted).
+        detail:
+          type: string
+          nullable: true
+          description: "A contact's company, a candidate's current title."
+    ClaimLinkInput:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: {$ref: '#/components/schemas/ClaimLinkKind'}
+        id: {type: string, maxLength: 40, pattern: '^(comp|cont|cand)_[0-9a-hjkmnp-tv-z]{26}$'}
+    Claim:
+      type: object
+      required: [id, userId, userName, status, ocrStatus, ocrError, fileName, contentType, sizeBytes, receiptDate, amount, currency, merchant, receiptType, claimType, purpose, link, fromReceipt, missing, claimedAt, reviewedAt, reviewedByName, reviewNote, paidAt, version, createdAt, updatedAt]
+      properties:
+        id: {$ref: '#/components/schemas/ClaimId'}
+        userId: {$ref: '#/components/schemas/UserId'}
+        userName: {type: string, description: Who claims it.}
+        status: {$ref: '#/components/schemas/ClaimStatus'}
+        ocrStatus: {$ref: '#/components/schemas/ClaimOcrStatus'}
+        ocrError: {type: string, nullable: true, description: Why the receipt could not be read.}
+        fileName: {type: string}
+        contentType: {type: string}
+        sizeBytes: {type: integer, format: int64}
+        receiptDate: {type: string, format: date, nullable: true}
+        amount:
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        merchant: {type: string, nullable: true}
+        receiptType: {type: string, nullable: true, description: An option of the claim_receipt_type dropdown.}
+        claimType: {type: string, nullable: true, description: An option of the claim_type dropdown.}
+        purpose: {type: string, nullable: true}
+        link:
+          allOf: [{$ref: '#/components/schemas/ClaimLink'}]
+          nullable: true
+        fromReceipt:
+          type: array
+          description: The fields whose value was read from the receipt and not changed since (show them as suggestions).
+          items: {$ref: '#/components/schemas/ClaimField'}
+        missing:
+          type: array
+          description: What must still be filled in before the claim can be submitted.
+          items: {$ref: '#/components/schemas/ClaimField'}
+        claimedAt: {type: string, format: date-time, nullable: true, description: When it was (last) submitted.}
+        reviewedAt: {type: string, format: date-time, nullable: true}
+        reviewedByName: {type: string, nullable: true}
+        reviewNote: {type: string, nullable: true, description: Why it was rejected.}
+        paidAt: {type: string, format: date-time, nullable: true}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    ClaimAmount:
+      type: object
+      required: [currency, amount]
+      properties:
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        amount: {$ref: '#/components/schemas/DecimalAmount'}
+    ClaimPage:
+      type: object
+      required: [items, total, totals]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Claim'}
+        total: {type: integer, description: Claims matching (the page holds at most `limit`).}
+        totals:
+          type: array
+          description: The amount of all matching claims, per currency.
+          items: {$ref: '#/components/schemas/ClaimAmount'}
+    ClaimList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/Claim'}
+    ClaimUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+        receiptDate: {type: string, format: date, nullable: true}
+        amount:
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        merchant: {type: string, maxLength: 200, nullable: true}
+        receiptType: {type: string, maxLength: 100, nullable: true}
+        claimType: {type: string, maxLength: 100, nullable: true}
+        purpose: {type: string, maxLength: 500, nullable: true}
+        link:
+          description: The client (company or contact) or candidate it was for, one you may see; null removes it.
+          allOf: [{$ref: '#/components/schemas/ClaimLinkInput'}]
+          nullable: true
+    ClaimVersion:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: {type: integer, minimum: 1}
+    ClaimRef:
+      type: object
+      additionalProperties: false
+      required: [id, version]
+      properties:
+        id: {$ref: '#/components/schemas/ClaimId'}
+        version: {type: integer, minimum: 1, description: The version you loaded.}
+    ClaimSelection:
+      type: object
+      additionalProperties: false
+      required: [claims]
+      properties:
+        claims:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: {$ref: '#/components/schemas/ClaimRef'}
+    ClaimDecision:
+      type: string
+      description: approve or reject submitted claims; pay approved ones.
+      enum: [approve, reject, pay]
+    ClaimReview:
+      type: object
+      additionalProperties: false
+      required: [claims, decision]
+      properties:
+        claims:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: {$ref: '#/components/schemas/ClaimRef'}
+        decision: {$ref: '#/components/schemas/ClaimDecision'}
+        note: {type: string, maxLength: 500, description: Why they are rejected (required to reject).}
+    ClaimFact:
+      type: object
+      description: Claims sharing a status, receipt type, claim type, person, month and currency, counted and added up.
+      required: [status, receiptType, claimType, linkKind, linkId, userId, month, currency, count, amount]
+      properties:
+        status: {$ref: '#/components/schemas/ClaimStatus'}
+        receiptType: {type: string, nullable: true}
+        claimType: {type: string, nullable: true}
+        linkKind:
+          allOf: [{$ref: '#/components/schemas/ClaimLinkKind'}]
+          nullable: true
+        linkId: {type: string, nullable: true}
+        userId: {$ref: '#/components/schemas/UserId'}
+        month: {type: string, pattern: '^[0-9]{4}-[0-9]{2}$', description: "The receipt date's month (else the upload's), e.g. 2026-11."}
+        currency: {$ref: '#/components/schemas/CurrencyCode'}
+        count: {type: integer}
+        amount: {$ref: '#/components/schemas/DecimalAmount'}
+    ClaimPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id: {$ref: '#/components/schemas/UserId'}
+        name: {type: string}
+    ClaimRecord:
+      type: object
+      required: [kind, id, name, detail]
+      properties:
+        kind: {$ref: '#/components/schemas/ClaimLinkKind'}
+        id: {type: string}
+        name: {type: string, nullable: true, description: Null when you may not see it (or it was deleted).}
+        detail: {type: string, nullable: true}
+    ClaimSummary:
+      type: object
+      required: [facts, people, records]
+      properties:
+        facts:
+          type: array
+          description: Every combination present, for the dashboard to add up as it shows them.
+          items: {$ref: '#/components/schemas/ClaimFact'}
+        people:
+          type: array
+          description: The names of the people in the facts.
+          items: {$ref: '#/components/schemas/ClaimPerson'}
+        records:
+          type: array
+          description: The clients and candidates in the facts.
+          items: {$ref: '#/components/schemas/ClaimRecord'}
+    ClaimReceiptTypeOption:
+      type: object
+      additionalProperties: false
+      required: [key, label]
+      properties:
+        key: {type: string}
+        label: {type: string}
+    ClaimReadReceiptJob:
+      type: object
+      additionalProperties: false
+      required: [claimId, downloadUrl, contentType, fileName, sizeBytes, receiptTypes]
+      properties:
+        claimId: {$ref: '#/components/schemas/ClaimId'}
+        downloadUrl:
+          type: string
+          description: Short-lived signed URL to download the receipt from.
+        contentType: {type: string}
+        fileName: {type: string}
+        sizeBytes: {type: integer, format: int64}
+        receiptTypes:
+          type: array
+          description: The company's receipt types (claim_receipt_type) to choose from; the worker answers with one of these keys or none.
+          items: {$ref: '#/components/schemas/ClaimReceiptTypeOption'}
+    ClaimReadStatus:
+      type: string
+      description: read = the receipt's text was read (some fields may still be unknown); unreadable = no text could be read from it.
+      enum: [read, unreadable]
+    ClaimReceiptReadJob:
+      type: object
+      additionalProperties: false
+      required: [claimId, status, receiptDate, amount, currency, merchant, receiptType, extractor, errorMessage]
+      properties:
+        claimId: {$ref: '#/components/schemas/ClaimId'}
+        status: {$ref: '#/components/schemas/ClaimReadStatus'}
+        receiptDate: {type: string, format: date, nullable: true}
+        amount:
+          allOf: [{$ref: '#/components/schemas/DecimalAmount'}]
+          nullable: true
+        currency:
+          allOf: [{$ref: '#/components/schemas/CurrencyCode'}]
+          nullable: true
+        merchant: {type: string, maxLength: 200, nullable: true}
+        receiptType: {type: string, maxLength: 100, nullable: true, description: "One of the receipt types sent, or null."}
+        extractor: {type: string, description: "Which reader produced the text, e.g. pdfplumber@0.11 or tesseract@5.3."}
+        errorMessage: {type: string, nullable: true, description: Why nothing could be read (shown to the person).}
     CompanyDocumentId:
       type: string
       pattern: '^cdoc_[0-9a-hjkmnp-tv-z]{26}$'
@@ -13557,9 +14081,9 @@ components:
     FieldListName:
       type: string
       description: >
-        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour), specialization, it_skill and certification (the choices for a candidate's specialization, skills and certifications; stored as their words, like industries).
+        candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour), specialization, it_skill and certification (the choices for a candidate's specialization, skills and certifications; stored as their words, like industries), claim_receipt_type (what a receipt is for, e.g. Grab fare, food, drinks: read from receipts, each with its colour) and claim_type (what an expense claim is, e.g. travel or client entertainment).
 
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role, specialization, it_skill, certification]
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role, specialization, it_skill, certification, claim_receipt_type, claim_type]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.
@@ -13683,6 +14207,33 @@ components:
       in: path
       required: true
       schema: {type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', minLength: 3, maxLength: 60}
+    ClaimIdPath:
+      name: claimId
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/ClaimId'}
+    ClaimStatusQuery:
+      name: status
+      in: query
+      schema: {$ref: '#/components/schemas/ClaimStatus'}
+    ClaimFromQuery:
+      name: from
+      in: query
+      description: Claims whose receipt date (else upload date) is on or after this day.
+      schema: {type: string, format: date}
+    ClaimToQuery:
+      name: to
+      in: query
+      description: Claims whose receipt date (else upload date) is on or before this day.
+      schema: {type: string, format: date}
+    ClaimLimitQuery:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 500, default: 200}
+    ClaimOffsetQuery:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
     CompanyIdPath:
       name: companyId
       in: path
@@ -13862,6 +14413,16 @@ x-permissions:
   candidates:update:
     module: candidates
     description: Edit candidate profiles.
+    sensitive: false
+    roles: [owner, admin, recruiter, sourcer]
+  claims:approve:
+    module: claims
+    description: See everyone's claims and the team's claims dashboard; approve, reject and mark claims paid.
+    sensitive: true
+    roles: [owner, admin]
+  claims:create:
+    module: claims
+    description: Claim expenses — upload receipts, fill in and submit your own claims, and see them on your dashboard.
     sensitive: false
     roles: [owner, admin, recruiter, sourcer]
   companies.category:update:
@@ -14264,6 +14825,18 @@ x-jobs:
     payload: CalendarSourceJob
     priority: low
     description: Mirror the latest interview or booking to participants private calendars.
+  claim.read_receipt:
+    module: claims
+    queue: ai
+    payload: ClaimReadReceiptJob
+    priority: high
+    description: Read a receipt (PDF text, or OCR for photos and scans) and find its date, total, currency, merchant and type (Python AI worker).
+  claim.receipt_read:
+    module: claims
+    queue: core
+    payload: ClaimReceiptReadJob
+    priority: high
+    description: Fill in what was read from a receipt on its claim, in the fields still empty (Go worker).
   company.autofill:
     module: companies
     queue: core
@@ -14483,6 +15056,8 @@ x-modules:
     description: Candidate profiles. Salary details are stored and permissioned separately.
   - name: careers
     description: 'A company''s public careers page: its published job ads, and applying to one with a CV. Signed-out visitors; the page address picks the company, and everything after runs in that company''s scope.'
+  - name: claims
+    description: Expense claims. A consultant uploads receipts (photos or PDFs); the Python AI worker reads each one (OCR) and fills in the receipt's date, total, currency, merchant and type (e.g. Grab fare, food, drinks), which stay editable. They add the purpose and claim type, and may tag the client or candidate it was for (an existing company, contact or candidate), and submit; approvers approve or reject and mark claims paid. Receipt and claim types are Settings dropdowns (claim_receipt_type, claim_type).
   - name: companies
     description: Companies you recruit for or want to win as clients, and their details.
   - name: contacts

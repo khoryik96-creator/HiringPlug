@@ -26,6 +26,7 @@ import (
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/calendars"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/candidates"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/careers"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/claims"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/companies"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/contacts"
 	"github.com/khoryik96-creator/hiringplug/backend/internal/modules/cvformats"
@@ -85,6 +86,7 @@ type Modules struct {
 	Folders      *folders.Module
 	Bin          *bin.Module
 	Calendars    *calendars.Module
+	Claims       *claims.Module
 	// scaffold:fields
 }
 
@@ -188,7 +190,6 @@ func NewModules(d Deps) *Modules {
 	m.Companies.UseIndustries(companyIndustries{m.Industries})
 	m.Documents.UseIndustryRecognition(m.Industries.EnrichParsed)
 	m.Settings.UseIndustries(m.Industries)
-	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies})
 	m.Automations = automations.New(d.Pool, automations.Deps{
 		Applications: automationApplications{m.Pipeline, m.Jobs}, Interviews: automationInterviews{m.Interviews},
 		Placements: automationPlacements{m.Placements}, Companies: m.Companies, Users: m.Identity,
@@ -208,9 +209,13 @@ func NewModules(d Deps) *Modules {
 	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, TimeZone: d.Config.TimeZone})
 	m.Interviews.UseCalendar(m.Calendars)
 	m.Scheduling.UseCalendar(m.Calendars)
+	m.Claims = claims.New(d.Pool, d.Files, claims.Deps{
+		Users: m.Identity, Options: claimOptions{m.Settings}, Records: claimRecords{m.Candidates, m.Contacts, m.Companies},
+	}, d.Config.MaxUploadBytes, d.Config.TimeZone)
+	m.Settings.CountUsesWith(optionUses{m.Contacts, m.Companies, m.Claims}) // records holding an option keep it
 	// scaffold:constructors
 	// A merged duplicate's CVs, jobs, notes, emails, consent and requests follow it.
-	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders)
+	m.Candidates.MoveRecordsWith(m.Industries, m.Documents, m.Pipeline, m.Notes, m.Emails, m.Privacy, m.Scheduling, m.Cvformats, m.Intake, m.Folders, m.Claims)
 	m.Pipeline.KeepRecordsWith(m.Interviews.OnApplications, m.Offers.OnApplications, m.Placements.OnApplications)
 	m.Candidates.WriteNotesWith(m.Notes)
 	matchingHooks(m)
@@ -268,6 +273,7 @@ type (
 	foldersHTTP      = folders.HTTP
 	binHTTP          = bin.HTTP
 	calendarsHTTP    = calendars.HTTP
+	claimsHTTP       = claims.HTTP
 	// scaffold:aliases
 )
 
@@ -305,6 +311,7 @@ type Server struct {
 	*foldersHTTP
 	*binHTTP
 	*calendarsHTTP
+	*claimsHTTP
 	// scaffold:embeds
 }
 
@@ -343,6 +350,7 @@ func (m *Modules) Server() *Server {
 		foldersHTTP:      m.Folders.HTTP,
 		binHTTP:          m.Bin.HTTP,
 		calendarsHTTP:    m.Calendars.HTTP,
+		claimsHTTP:       m.Claims.HTTP,
 		// scaffold:server-fields
 	}
 }
@@ -378,6 +386,7 @@ func (m *Modules) JobHandlers() (jobqueue.Handlers, error) {
 		m.Scheduling.JobHandlers(),
 		m.Calendars.JobHandlers(),
 		m.Bin.JobHandlers(),
+		m.Claims.JobHandlers(),
 		// scaffold:job-handlers
 	} {
 		for kind, h := range handlers {

@@ -74,6 +74,7 @@ tenant ─┬─ app_user (role)
 | `candidate_education` | candidate, position, qualification, institution, year finished |
 | `candidate_compensation` | current amount/currency/period, expected min/max/currency/period, `version` |
 | `document` | candidate, source (jobstreet/linkedin/original/formatted/other), file name, type, size, SHA-256, storage key, status (queued/extracted/needs_ocr/failed), extracted text, page count, extractor, warnings, error; parse status (queued/parsed/failed), parsed profile (JSON, only values whose quote is in the text), parser |
+| `claim` | an expense claim, one per receipt: claimant, status (draft/submitted/approved/rejected/paid), the receipt (file name, type, size, SHA-256: the same receipt once per person, storage key), reading it (reading/done/failed, error, reader), receipt date, amount (numeric) and currency, merchant, receipt type and claim type (Settings options), purpose, the client or candidate it was for (company, contact or candidate id), the fields read from the receipt and not changed since, claimed, decided (by, note) and paid dates, `version`; row-level security: the claimant's own, everyone's with `claims:approve` |
 | `audit_log` | actor, action (`candidate.updated`), entity, changes (from → to; sensitive fields redacted), request ID |
 | `job` | queue (core/ai), kind, payload, status (pending/running/done/dead), attempts, lease, last error, request ID |
 

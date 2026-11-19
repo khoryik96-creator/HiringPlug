@@ -408,6 +408,39 @@ type CandidateWork struct {
 	Description *string
 }
 
+type Claim struct {
+	ID           string
+	TenantID     string
+	UserID       string
+	Status       string
+	FileName     string
+	ContentType  string
+	SizeBytes    int64
+	Sha256       string
+	StorageKey   string
+	OcrStatus    string
+	OcrError     *string
+	OcrExtractor *string
+	ReceiptDate  pgtype.Date
+	Amount       pgtype.Numeric
+	Currency     string
+	Merchant     *string
+	ReceiptType  *string
+	ClaimType    *string
+	Purpose      *string
+	LinkKind     *string
+	LinkID       *string
+	FromReceipt  []string
+	ClaimedAt    *time.Time
+	ReviewedAt   *time.Time
+	ReviewedBy   *string
+	ReviewNote   *string
+	PaidAt       *time.Time
+	Version      int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type Company struct {
 	ID                  string
 	TenantID            string

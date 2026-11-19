@@ -858,6 +858,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your claims, newest first */
+        get: operations["listMyClaims"];
+        put?: never;
+        /**
+         * Upload a receipt (photo or PDF) as a new draft claim
+         * @description Returns at once with `ocrStatus` reading; the receipt is read in the background and fills in the fields that are still empty. Poll the claim (or the list) until `ocrStatus` is done or failed.
+         */
+        post: operations["uploadClaimReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everyone's claims (drafts excluded), newest claimed first */
+        get: operations["listTeamClaims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The figures for your claims dashboard */
+        get: operations["getMyClaimSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/team/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The figures for the team's claims dashboard (drafts excluded) */
+        get: operations["getTeamClaimSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit your draft or rejected claims for approval (all or none)
+         * @description Each claim needs its receipt date, amount, receipt type, claim type and purpose. A missing one fails the request with VALIDATION_FAILED, naming the claim and field.
+         */
+        post: operations["submitClaims"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve or reject submitted claims, or mark approved ones paid (all or none) */
+        post: operations["reviewClaims"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/{claimId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        /** One claim (yours, or anyone's for approvers) */
+        get: operations["getClaim"];
+        put?: never;
+        post?: never;
+        /** Delete your draft or rejected claim and its receipt */
+        delete: operations["deleteClaim"];
+        options?: never;
+        head?: never;
+        /** Change your draft or rejected claim (null clears a field) */
+        patch: operations["updateClaim"];
+        trace?: never;
+    };
+    "/v1/claims/{claimId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take your submitted claim back to draft, before it is decided */
+        post: operations["withdrawClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/{claimId}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The claim's receipt as uploaded (yours, or anyone's for approvers)
+         * @description The claim's contentType says what the bytes are.
+         */
+        get: operations["getClaimReceipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/companies": {
         parameters: {
             query?: never;
@@ -4361,11 +4532,11 @@ export interface components {
         /** @enum {string} */
         Role: "owner" | "admin" | "recruiter" | "sourcer" | "hiring_manager" | "viewer";
         /** @enum {string} */
-        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
+        Permission: "aiproviders:manage" | "assistant:use" | "automations.tasks:read" | "automations.tasks:update" | "automations:approve" | "automations:manage" | "automations:read" | "bin:manage" | "calendars:use" | "candidates.compensation:read" | "candidates.compensation:update" | "candidates.status:update" | "candidates:create" | "candidates:merge" | "candidates:read" | "candidates:update" | "claims:approve" | "claims:create" | "companies.category:update" | "companies.documents:delete" | "companies:create" | "companies:read" | "companies:update" | "contacts.role:update" | "contacts:create" | "contacts:read" | "contacts:update" | "cvformats.templates:manage" | "cvformats:create" | "documents:create" | "documents:delete" | "documents:read" | "emails.apps:manage" | "emails.templates:create" | "emails.templates:manage" | "emails:read" | "emails:send" | "folders:use" | "identity.roles:manage" | "identity.team:manage" | "intake:create" | "integrations:manage" | "interviews:feedback" | "interviews:read" | "interviews:schedule" | "jobs.documents:delete" | "jobs.salary:read" | "jobs.salary:update" | "jobs:create" | "jobs:read" | "jobs:update" | "leads:manage" | "leads:read" | "market:read" | "matching:create" | "matching:read" | "notes.activity:read" | "notes.sensitive:read" | "notes:create" | "notes:manage" | "notes:read" | "offers.salary:read" | "offers.salary:update" | "offers:approve" | "offers:manage" | "offers:read" | "pipeline.templates:manage" | "pipeline:read" | "pipeline:update" | "placements.fees:read" | "placements.fees:update" | "placements:manage" | "placements:read" | "privacy:manage" | "privacy:read" | "privacy:record" | "reports:read" | "scheduling.team:read" | "scheduling:use" | "settings.backups:manage" | "settings:manage" | "settings:read";
         /** @enum {string} */
-        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
+        ErrorCode: "AI_KEYS_NOT_SET_UP" | "AI_PROVIDER_NO_KEY" | "APPLICATIONS_OVERLAP" | "APPLICATION_EXISTS" | "ASSISTANT_LIMIT_REACHED" | "ASSISTANT_OFF" | "AUTOMATION_NOT_ALLOWED" | "BIN_BLOCKED" | "BIN_RESTORE_CONFLICT" | "BOOKING_CLOSED" | "BOOKING_SLOT_TAKEN" | "BOOKING_TOO_MANY_TRIES" | "CALENDAR_EVENT_READ_ONLY" | "CALENDAR_NOT_CONNECTED" | "CANDIDATE_DUPLICATE_EMAIL" | "CAREERS_TOO_MANY_APPLICATIONS" | "CLAIM_DUPLICATE" | "CLAIM_WRONG_STATUS" | "COMPANY_DUPLICATE_NAME" | "CONFLICT_STALE_VERSION" | "CONTACT_DUPLICATE_EMAIL" | "CONTACT_LINKEDIN_CHECK_CLOSED" | "CV_NOT_BLIND" | "DOCUMENT_DUPLICATE" | "DOCUMENT_HAS_NO_TEXT" | "DOCUMENT_NOT_DELETABLE" | "EMAIL_DO_NOT_CONTACT" | "EMAIL_UNDELIVERABLE" | "FOLDER_OWNER_ONLY" | "FORBIDDEN" | "INTERNAL" | "INTERVIEW_CLASH" | "INTERVIEW_NOT_ALLOWED" | "JOB_AD_BLIND_AI_OFF" | "JOB_AD_BLIND_TOO_SHORT" | "JOB_AD_NOT_PUBLISHABLE" | "LINK_NOT_VALID" | "MATCHING_LIMIT_REACHED" | "MATCHING_OFF" | "MATCH_CONSENT_WITHDRAWN" | "MATCH_NEEDS_TEXT" | "METHOD_NOT_ALLOWED" | "NOT_FOUND" | "OFFER_NOT_ALLOWED" | "OUTLOOK_ATTACHMENT_TOO_LARGE" | "OUTLOOK_NOT_CONNECTED" | "OUTLOOK_UNAVAILABLE" | "PAYLOAD_TOO_LARGE" | "PLACEMENT_NOT_ALLOWED" | "ROLE_NOT_EDITABLE" | "ROUTE_NOT_FOUND" | "SCHEDULING_NOT_SET_UP" | "SERVICE_UNAVAILABLE" | "SIGN_IN_CHOOSE_COMPANY" | "SIGN_IN_FAILED" | "STAGE_MOVE_NOT_ALLOWED" | "STUDIO_CV_OFF" | "STUDIO_CV_RUNNING" | "STUDIO_CV_SOURCE" | "TEAM_CHANGE_NOT_ALLOWED" | "TOO_MANY_ATTEMPTS" | "UNAUTHENTICATED" | "UNSUPPORTED_MEDIA_TYPE" | "VALIDATION_FAILED";
         /** @enum {string} */
-        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_sync" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
+        JobKind: "aiprovider.check" | "aiprovider.checked" | "aiprovider.reported" | "assistant.answered" | "assistant.ask" | "assistant.email" | "assistant.emailed" | "automation.event" | "automation.run" | "bin.purge" | "calendar.push" | "calendar.refresh" | "calendar.source_changed" | "claim.read_receipt" | "claim.receipt_read" | "company.autofill" | "company.industried" | "company.industry" | "company.industry_ask" | "contact.check_mailbox" | "contact.linkedin_read" | "contact.read_linkedin" | "cv.format_studio" | "cv.studio_formatted" | "document.cv_parsed" | "document.extract_text" | "document.parse_cv" | "document.pdf_rendered" | "document.render_pdf" | "document.text_extracted" | "email.bounce_scan" | "email.interview_reminder" | "email.outlook_sync" | "email.send" | "interview.remind" | "jd.blind" | "jd.blinded" | "jd.pdf_rendered" | "jd.render_pdf" | "job.jd_read" | "job.read_jd" | "lead_source.check" | "match.score" | "match.scored" | "placement.invoice" | "scheduling.refresh_calendar" | "talent.rank" | "talent.ranked" | "webhook.deliver";
         Error: {
             error: {
                 code: components["schemas"]["ErrorCode"];
@@ -5411,6 +5582,197 @@ export interface components {
         };
         ApplicationReceived: {
             received: boolean;
+        };
+        ClaimId: string;
+        /**
+         * @description draft (being filled in) → submitted → approved or rejected; approved → paid. A rejected claim is changed and submitted again.
+         * @enum {string}
+         */
+        ClaimStatus: "draft" | "submitted" | "approved" | "rejected" | "paid";
+        /**
+         * @description reading = the receipt is being read; done = what could be read was filled in; failed = nothing could be read (fill it in by hand).
+         * @enum {string}
+         */
+        ClaimOcrStatus: "reading" | "done" | "failed";
+        /** @enum {string} */
+        ClaimField: "receiptDate" | "amount" | "currency" | "merchant" | "receiptType" | "claimType" | "purpose" | "link";
+        /** @enum {string} */
+        ClaimLinkKind: "company" | "contact" | "candidate";
+        /** @description The client or candidate the claim was for. */
+        ClaimLink: {
+            kind: components["schemas"]["ClaimLinkKind"];
+            id: string;
+            /** @description Null when you may not see the record (or it was deleted). */
+            name: string | null;
+            /** @description A contact's company, a candidate's current title. */
+            detail: string | null;
+        };
+        ClaimLinkInput: {
+            kind: components["schemas"]["ClaimLinkKind"];
+            id: string;
+        };
+        Claim: {
+            id: components["schemas"]["ClaimId"];
+            userId: components["schemas"]["UserId"];
+            /** @description Who claims it. */
+            userName: string;
+            status: components["schemas"]["ClaimStatus"];
+            ocrStatus: components["schemas"]["ClaimOcrStatus"];
+            /** @description Why the receipt could not be read. */
+            ocrError: string | null;
+            fileName: string;
+            contentType: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            /** Format: date */
+            receiptDate: string | null;
+            amount: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"];
+            merchant: string | null;
+            /** @description An option of the claim_receipt_type dropdown. */
+            receiptType: string | null;
+            /** @description An option of the claim_type dropdown. */
+            claimType: string | null;
+            purpose: string | null;
+            link: components["schemas"]["ClaimLink"] | null;
+            /** @description The fields whose value was read from the receipt and not changed since (show them as suggestions). */
+            fromReceipt: components["schemas"]["ClaimField"][];
+            /** @description What must still be filled in before the claim can be submitted. */
+            missing: components["schemas"]["ClaimField"][];
+            /**
+             * Format: date-time
+             * @description When it was (last) submitted.
+             */
+            claimedAt: string | null;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            reviewedByName: string | null;
+            /** @description Why it was rejected. */
+            reviewNote: string | null;
+            /** Format: date-time */
+            paidAt: string | null;
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ClaimAmount: {
+            currency: components["schemas"]["CurrencyCode"];
+            amount: components["schemas"]["DecimalAmount"];
+        };
+        ClaimPage: {
+            items: components["schemas"]["Claim"][];
+            /** @description Claims matching (the page holds at most `limit`). */
+            total: number;
+            /** @description The amount of all matching claims, per currency. */
+            totals: components["schemas"]["ClaimAmount"][];
+        };
+        ClaimList: {
+            items: components["schemas"]["Claim"][];
+        };
+        ClaimUpdate: {
+            version: number;
+            /** Format: date */
+            receiptDate?: string | null;
+            amount?: components["schemas"]["DecimalAmount"] | null;
+            currency?: components["schemas"]["CurrencyCode"];
+            merchant?: string | null;
+            receiptType?: string | null;
+            claimType?: string | null;
+            purpose?: string | null;
+            /** @description The client (company or contact) or candidate it was for, one you may see; null removes it. */
+            link?: components["schemas"]["ClaimLinkInput"] | null;
+        };
+        ClaimVersion: {
+            version: number;
+        };
+        ClaimRef: {
+            id: components["schemas"]["ClaimId"];
+            /** @description The version you loaded. */
+            version: number;
+        };
+        ClaimSelection: {
+            claims: components["schemas"]["ClaimRef"][];
+        };
+        /**
+         * @description approve or reject submitted claims; pay approved ones.
+         * @enum {string}
+         */
+        ClaimDecision: "approve" | "reject" | "pay";
+        ClaimReview: {
+            claims: components["schemas"]["ClaimRef"][];
+            decision: components["schemas"]["ClaimDecision"];
+            /** @description Why they are rejected (required to reject). */
+            note?: string;
+        };
+        /** @description Claims sharing a status, receipt type, claim type, person, month and currency, counted and added up. */
+        ClaimFact: {
+            status: components["schemas"]["ClaimStatus"];
+            receiptType: string | null;
+            claimType: string | null;
+            linkKind: components["schemas"]["ClaimLinkKind"] | null;
+            linkId: string | null;
+            userId: components["schemas"]["UserId"];
+            /** @description The receipt date's month (else the upload's), e.g. 2026-11. */
+            month: string;
+            currency: components["schemas"]["CurrencyCode"];
+            count: number;
+            amount: components["schemas"]["DecimalAmount"];
+        };
+        ClaimPerson: {
+            id: components["schemas"]["UserId"];
+            name: string;
+        };
+        ClaimRecord: {
+            kind: components["schemas"]["ClaimLinkKind"];
+            id: string;
+            /** @description Null when you may not see it (or it was deleted). */
+            name: string | null;
+            detail: string | null;
+        };
+        ClaimSummary: {
+            /** @description Every combination present, for the dashboard to add up as it shows them. */
+            facts: components["schemas"]["ClaimFact"][];
+            /** @description The names of the people in the facts. */
+            people: components["schemas"]["ClaimPerson"][];
+            /** @description The clients and candidates in the facts. */
+            records: components["schemas"]["ClaimRecord"][];
+        };
+        ClaimReceiptTypeOption: {
+            key: string;
+            label: string;
+        };
+        ClaimReadReceiptJob: {
+            claimId: components["schemas"]["ClaimId"];
+            /** @description Short-lived signed URL to download the receipt from. */
+            downloadUrl: string;
+            contentType: string;
+            fileName: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            /** @description The company's receipt types (claim_receipt_type) to choose from; the worker answers with one of these keys or none. */
+            receiptTypes: components["schemas"]["ClaimReceiptTypeOption"][];
+        };
+        /**
+         * @description read = the receipt's text was read (some fields may still be unknown); unreadable = no text could be read from it.
+         * @enum {string}
+         */
+        ClaimReadStatus: "read" | "unreadable";
+        ClaimReceiptReadJob: {
+            claimId: components["schemas"]["ClaimId"];
+            status: components["schemas"]["ClaimReadStatus"];
+            /** Format: date */
+            receiptDate: string | null;
+            amount: components["schemas"]["DecimalAmount"] | null;
+            currency: components["schemas"]["CurrencyCode"] | null;
+            merchant: string | null;
+            /** @description One of the receipt types sent, or null. */
+            receiptType: string | null;
+            /** @description Which reader produced the text, e.g. pdfplumber@0.11 or tesseract@5.3. */
+            extractor: string;
+            /** @description Why nothing could be read (shown to the person). */
+            errorMessage: string | null;
         };
         /** @example cdoc_01jbz6w0m0k8q9x2r3s4t5v6w7 */
         CompanyDocumentId: string;
@@ -9216,10 +9578,10 @@ export interface components {
             emailSalaryVisibility: components["schemas"]["EmailSalaryVisibility"];
         };
         /**
-         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour), specialization, it_skill and certification (the choices for a candidate's specialization, skills and certifications; stored as their words, like industries).
+         * @description candidate_source (a candidate's source), notice_period (keys like 1_month), industry (candidates and companies), work_type and work_arrangement (jobs and ads; fixed), screening_call and reference_check (what to ask on those calls, in order: each label is written before its answer in the call's note, e.g. "RFL: better prospects"; screening starts with RFL and LF, as notice period and salaries have their own fields on the call), company_benefits and pre_offer_process (the template for a client's benefits and its steps before an offer, on the company page; each item may carry a hint), company_category (a company's category, e.g. Signed client or VIP client, each with its colour), contact_role (what a contact does in hiring, e.g. Hiring manager or HR, each with its colour), specialization, it_skill and certification (the choices for a candidate's specialization, skills and certifications; stored as their words, like industries), claim_receipt_type (what a receipt is for, e.g. Grab fare, food, drinks: read from receipts, each with its colour) and claim_type (what an expense claim is, e.g. travel or client entertainment).
          * @enum {string}
          */
-        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category" | "contact_role" | "specialization" | "it_skill" | "certification";
+        FieldListName: "candidate_source" | "notice_period" | "industry" | "work_type" | "work_arrangement" | "screening_call" | "reference_check" | "company_benefits" | "pre_offer_process" | "company_category" | "contact_role" | "specialization" | "it_skill" | "certification" | "claim_receipt_type" | "claim_type";
         /**
          * @description open = options can be added and removed; fixed = rename, reorder and hide only.
          * @enum {string}
@@ -9583,6 +9945,14 @@ export interface components {
         AutomationRunIdPath: components["schemas"]["AutomationRunId"];
         CandidateIdPath: components["schemas"]["CandidateId"];
         CareersSlugPath: string;
+        ClaimIdPath: components["schemas"]["ClaimId"];
+        ClaimStatusQuery: components["schemas"]["ClaimStatus"];
+        /** @description Claims whose receipt date (else upload date) is on or after this day. */
+        ClaimFromQuery: string;
+        /** @description Claims whose receipt date (else upload date) is on or before this day. */
+        ClaimToQuery: string;
+        ClaimLimitQuery: number;
+        ClaimOffsetQuery: number;
         CompanyIdPath: components["schemas"]["CompanyId"];
         ContactIdPath: components["schemas"]["ContactId"];
         CvTemplateIdPath: components["schemas"]["CvTemplateId"];
@@ -11087,6 +11457,360 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listMyClaims: {
+        parameters: {
+            query?: {
+                status?: components["parameters"]["ClaimStatusQuery"];
+                /** @description Claims whose receipt date (else upload date) is on or after this day. */
+                from?: components["parameters"]["ClaimFromQuery"];
+                /** @description Claims whose receipt date (else upload date) is on or before this day. */
+                to?: components["parameters"]["ClaimToQuery"];
+                limit?: components["parameters"]["ClaimLimitQuery"];
+                offset?: components["parameters"]["ClaimOffsetQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    uploadClaimReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Claim"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description You already uploaded this receipt (CLAIM_DUPLICATE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            413: components["responses"]["PayloadTooLarge"];
+            415: components["responses"]["UnsupportedMediaType"];
+        };
+    };
+    listTeamClaims: {
+        parameters: {
+            query?: {
+                status?: components["parameters"]["ClaimStatusQuery"];
+                userId?: components["schemas"]["UserId"];
+                /** @description Claims whose receipt date (else upload date) is on or after this day. */
+                from?: components["parameters"]["ClaimFromQuery"];
+                /** @description Claims whose receipt date (else upload date) is on or before this day. */
+                to?: components["parameters"]["ClaimToQuery"];
+                limit?: components["parameters"]["ClaimLimitQuery"];
+                offset?: components["parameters"]["ClaimOffsetQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimPage"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getMyClaimSummary: {
+        parameters: {
+            query?: {
+                /** @description Claims whose receipt date (else upload date) is on or after this day. */
+                from?: components["parameters"]["ClaimFromQuery"];
+                /** @description Claims whose receipt date (else upload date) is on or before this day. */
+                to?: components["parameters"]["ClaimToQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSummary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getTeamClaimSummary: {
+        parameters: {
+            query?: {
+                /** @description Claims whose receipt date (else upload date) is on or after this day. */
+                from?: components["parameters"]["ClaimFromQuery"];
+                /** @description Claims whose receipt date (else upload date) is on or before this day. */
+                to?: components["parameters"]["ClaimToQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSummary"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    submitClaims: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimSelection"];
+            };
+        };
+        responses: {
+            /** @description The claims, submitted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    reviewClaims: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReview"];
+            };
+        };
+        responses: {
+            /** @description The claims, decided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimList"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Claim"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Claim"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    withdrawClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimVersion"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Claim"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getClaimReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                claimId: components["parameters"]["ClaimIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Content-Disposition": string;
+                    "Cache-Control": string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
         };
     };
     listCompanies: {

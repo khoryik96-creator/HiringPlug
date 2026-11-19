@@ -39,6 +39,7 @@ const Automations = page(() => import("./pages/Automations"), "Automations");
 const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
 const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
 const Calendar = page(() => import("./pages/Calendar"), "Calendar");
+const Claims = page(() => import("./pages/Claims"), "Claims");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
 const Invoicing = page(() => import("./pages/Invoicing"), "Invoicing");
@@ -117,6 +118,11 @@ export const ROUTES: Route[] = [
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true },
     render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} /> },
   { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: () => <Calendar /> },
+  // Expense claims: for those who claim, and for approvers who do not claim themselves.
+  { section: "claims", path: /^#\/claims$/, permission: "claims:create", menu: { in: "main", label: "Claims", href: "#/claims", more: true },
+    render: (c) => <Claims permissions={c.permissions} /> },
+  { section: "claims", path: /^#\/claims$/, permission: "claims:approve", unless: "claims:create",
+    menu: { in: "main", label: "Claims", href: "#/claims", more: true }, render: (c) => <Claims permissions={c.permissions} /> },
 
   // Settings, in its menu's order.
   // "#/settings" (and "#/settings#…") is General; its other parts have their own addresses.

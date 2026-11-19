@@ -5,7 +5,7 @@ import { render } from "@testing-library/react";
 import { vi } from "vitest";
 import type { ReactElement } from "react";
 
-import type { Candidate, ErrorBody, Me, Permission } from "./api/client";
+import type { Candidate, ErrorBody, Me, Permission, Schemas } from "./api/client";
 
 export function testCandidate(overrides: Partial<Candidate> = {}): Candidate {
   return {
@@ -146,5 +146,16 @@ export function fakeCompanion(answer: (action: string, args: Record<string, unkn
     stop: () => { window.removeEventListener("message", listen); },
     /** Answers a call later, as a slow read would. */
     reply: (id: string, reply: { result?: unknown; error?: string }) => { send({ type: "reply", id, ...reply }); },
+  };
+}
+
+/** An expense claim, ready to submit (read from a Grab receipt). */
+export function testClaim(over: Partial<Schemas["Claim"]> = {}): Schemas["Claim"] {
+  return {
+    id: "clm_ready", userId: "usr_1", userName: "Aisyah Rahman", status: "draft", ocrStatus: "done", ocrError: null, fileName: "grab.png",
+    contentType: "image/png", sizeBytes: 100, receiptDate: "2026-11-03", amount: "23.00", currency: "MYR", merchant: "Grab",
+    receiptType: "grab_fare", claimType: "travel", purpose: "Meeting Acme", link: null, fromReceipt: ["amount", "merchant", "receiptType"],
+    missing: [], claimedAt: null, reviewedAt: null, reviewedByName: null, reviewNote: null, paidAt: null, version: 3,
+    createdAt: "2026-11-03T01:00:00Z", updatedAt: "2026-11-03T01:00:00Z", ...over,
   };
 }

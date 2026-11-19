@@ -447,8 +447,11 @@ components:
         hiring, e.g. Hiring manager or HR, each with its colour),
         specialization, it_skill and certification (the choices for a
         candidate's specialization, skills and certifications; stored as
-        their words, like industries).
-      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role, specialization, it_skill, certification]
+        their words, like industries), claim_receipt_type (what a receipt
+        is for, e.g. Grab fare, food, drinks: read from receipts, each with
+        its colour) and claim_type (what an expense claim is, e.g. travel or
+        client entertainment).
+      enum: [candidate_source, notice_period, industry, work_type, work_arrangement, screening_call, reference_check, company_benefits, pre_offer_process, company_category, contact_role, specialization, it_skill, certification, claim_receipt_type, claim_type]
     FieldListKind:
       type: string
       description: open = options can be added and removed; fixed = rename, reorder and hide only.

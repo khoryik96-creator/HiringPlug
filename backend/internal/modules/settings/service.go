@@ -154,7 +154,7 @@ func (s *Service) checkRemovedUnused(ctx context.Context, tx pgx.Tx, q *store.Qu
 }
 
 func usedBy(list string, n int) string {
-	what := map[string]string{"contact_role": "contact", "company_category": "company"}[list]
+	what := map[string]string{"contact_role": "contact", "company_category": "company", "claim_receipt_type": "claim", "claim_type": "claim"}[list]
 	if what == "" {
 		what = "record"
 	}

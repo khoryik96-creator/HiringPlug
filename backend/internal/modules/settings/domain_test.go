@@ -34,8 +34,12 @@ func builtIns(name string) []OptionInput {
 
 func TestDefaultsUntilACompanySaves(t *testing.T) {
 	all := Lists(map[string][]Option{"candidate_source": {{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true}}})
-	require.Len(t, all, 14)
+	require.Len(t, all, 16)
 	assert.Equal(t, []string{"RFL", "LF"}, labelsOf(all[5].Options), "a screening call's items, ready to change")
+	assert.Equal(t, "claim_receipt_type", all[14].Name)
+	assert.True(t, all[14].Colors, "receipt types show in their colours")
+	assert.Equal(t, []string{"Grab / e-hailing fare", "Food", "Drinks"}, labelsOf(all[14].Options)[:3])
+	assert.Equal(t, "claim_type", all[15].Name)
 	assert.Equal(t, "candidate_source", all[0].Name)
 	assert.Equal(t, []Option{{Key: "job_fair", Label: "Job fair"}, {Key: "linkedin", Label: "LinkedIn", Hidden: true, BuiltIn: true}}, all[0].Options)
 	assert.Len(t, all[2].Options, 10, "Kano's industries")

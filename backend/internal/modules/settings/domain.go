@@ -137,6 +137,23 @@ var lists = []listDef{
 		"Ruby on Rails", "SD", "Solidity/Blockchain Tech", "Swift", "Vuejs")},
 	{name: "certification", label: "Professional certifications", defaults: words(
 		"ACCA", "CFA", "CIA", "CIMA", "CPA", "MIA", "ICAEW", "CISCO", "CompTIA", "Palo Alto", "Fortinet")},
+	// Expense claims: what a receipt is for (read from the receipt, shown in
+	// its colour; the receipt reader knows these keys) and what a claim is.
+	{name: "claim_receipt_type", label: "Receipt types", colors: true, defaults: []Option{
+		// Colours in an order checked for colour-blind readers (each shown with its name).
+		{Key: "grab_fare", Label: "Grab / e-hailing fare", Color: "#16a34a", BuiltIn: true},
+		{Key: "food", Label: "Food", Color: "#ea580c", BuiltIn: true},
+		{Key: "drinks", Label: "Drinks", Color: "#9333ea", BuiltIn: true},
+		{Key: "parking_toll", Label: "Parking & toll", Color: "#0891b2", BuiltIn: true},
+		{Key: "fuel", Label: "Fuel", Color: "#dc2626", BuiltIn: true},
+		{Key: "travel", Label: "Flights, trains & hotels", Color: "#2563eb", BuiltIn: true},
+		{Key: "phone", Label: "Phone & internet", Color: "#b8860b", BuiltIn: true},
+		{Key: "office", Label: "Office supplies", Color: "#4f46e5", BuiltIn: true},
+		{Key: "other", Label: "Other", Color: "#6b7280", BuiltIn: true},
+	}},
+	{name: "claim_type", label: "Claim types", defaults: opts(
+		"travel", "Travel", "client_entertainment", "Client entertainment", "candidate_meeting", "Candidate meeting",
+		"staff_welfare", "Staff welfare", "office", "Office expense", "training", "Training & events", "other", "Other")},
 }
 
 // words makes a list stored as its words (key and label alike).

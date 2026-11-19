@@ -213,3 +213,9 @@ sql:
       go:
         <<: *go
         out: internal/modules/calendars/internal/store
+  - <<: *module
+    queries: db/queries/claims.sql
+    gen:
+      go:
+        <<: *go
+        out: internal/modules/claims/internal/store

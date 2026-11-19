@@ -57,7 +57,7 @@ export function ListSettings() {
         <>
           <p className="muted">Industries and subindustries have <a href="#/industries">their own page</a>.</p>
           <h3>Dropdowns</h3>
-          {lists.filter((l) => !l.hints && !l.colors && l.name !== "industry").map((l) => <ListEditor key={l.name} list={l} />)}
+          {lists.filter((l) => !l.hints && !l.colors && l.name !== "industry" && !CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
           <h3 id="company-categories">Company categories</h3>
           <p className="muted">
             The categories a company can be in (signed client, prospect, VIP…), each with its colour: the colour of its card on the
@@ -76,11 +76,21 @@ export function ListSettings() {
             hide or add items; the hint under each says what to write.
           </p>
           {lists.filter((l) => l.hints).map((l) => <ListEditor key={l.name} list={l} />)}
+          <h3 id="claims">Expense claims</h3>
+          <p className="muted">
+            Receipt types are what a receipt is for (Grab fare, food, drinks…), each with its colour: a receipt is matched to one
+            when it is read, by the words of its name. Claim types are what people choose a claim is. Rename them, add your own;
+            one used by a claim is hidden rather than removed.
+          </p>
+          {lists.filter((l) => CLAIM_LISTS.includes(l.name)).map((l) => <ListEditor key={l.name} list={l} />)}
         </>
       )}
     </main>
   );
 }
+
+/** The expense claims' dropdowns, in their own part of the page. */
+const CLAIM_LISTS: Schemas["FieldListName"][] = ["claim_receipt_type", "claim_type"];
 
 const useFieldSettingsQuery = () => useQuery({ queryKey: fieldSettingsKey, queryFn: async () => unwrap(await api.GET("/v1/settings/fields")) });
 
@@ -268,7 +278,7 @@ function ListEditor({ list }: { list: List }) {
             </>
           ) : (
             <>
-              <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder={list.hints ? "New item" : list.name === "contact_role" ? "New role" : list.colors ? "New category" : "New option"} value={adding.label}
+              <input aria-label={`New ${list.label.toLowerCase()} option`} placeholder={list.hints ? "New item" : list.name === "contact_role" ? "New role" : list.name === "claim_receipt_type" ? "New receipt type" : list.colors ? "New category" : "New option"} value={adding.label}
                 onChange={(e) => { setAdding({ ...adding, label: e.target.value }); }} />
               {list.colors && (
                 <input type="color" className="color-input" aria-label="Colour of the new category" value={adding.color}

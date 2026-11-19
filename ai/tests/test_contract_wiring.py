@@ -9,7 +9,16 @@ from typing import Any
 import yaml
 
 from hiringplug_ai import contracts
-from hiringplug_ai.jobs import HANDLERS, assistant_ask, blind_jd, extract_text, match_score, parse_cv, read_jd
+from hiringplug_ai.jobs import (
+    HANDLERS,
+    assistant_ask,
+    blind_jd,
+    extract_text,
+    match_score,
+    parse_cv,
+    read_jd,
+    read_receipt,
+)
 
 CONTRACT = Path(__file__).resolve().parents[2] / "contracts" / "openapi.yaml"
 
@@ -39,6 +48,7 @@ def test_results_go_to_the_queue_the_contract_names() -> None:
     assert x_jobs()["match.scored"]["queue"] == match_score.RESULT_QUEUE
     assert x_jobs()["job.jd_read"]["queue"] == read_jd.RESULT_QUEUE
     assert x_jobs()["jd.blinded"]["queue"] == blind_jd.RESULT_QUEUE
+    assert x_jobs()["claim.receipt_read"]["queue"] == read_receipt.RESULT_QUEUE
 
 
 def test_generated_models_cover_every_job_payload() -> None:

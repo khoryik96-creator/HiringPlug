@@ -39,12 +39,23 @@ const BUILT_IN: Record<ListName, Record<string, string>> = {
   contact_role: { hiring_manager: "Hiring manager", hr: "HR" },
   // Words lists: their choices come from Settings (nothing to fall back on).
   specialization: {}, it_skill: {}, certification: {},
+  claim_receipt_type: {
+    grab_fare: "Grab / e-hailing fare", food: "Food", drinks: "Drinks", parking_toll: "Parking & toll", fuel: "Fuel",
+    travel: "Flights, trains & hotels", phone: "Phone & internet", office: "Office supplies", other: "Other",
+  },
+  claim_type: {
+    travel: "Travel", client_entertainment: "Client entertainment", candidate_meeting: "Candidate meeting", staff_welfare: "Staff welfare",
+    office: "Office expense", training: "Training & events", other: "Other",
+  },
 };
 
 /** The built-in categories' and contact roles' colours, used until the company's load. */
 const BUILT_IN_COLOR: Record<string, string> = {
   signed_client: "#16a34a", prospective_client: "#2563eb", unknown: "#6b7280", vip_client: "#b8860b",
   hiring_manager: "#2563eb", hr: "#db2777",
+  // Receipt types (keys of claim_receipt_type; its own list asks for them).
+  grab_fare: "#16a34a", food: "#ea580c", drinks: "#9333ea", parking_toll: "#0891b2", fuel: "#dc2626",
+  travel: "#2563eb", phone: "#b8860b", office: "#4f46e5", other: "#6b7280",
 };
 
 /** A notice period key (2_week) in words, for one no longer in the list. */
