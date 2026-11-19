@@ -213,8 +213,28 @@ input[type="file"]::file-selector-button:hover { background: var(--soft); }
 .settings-link { display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0; color: var(--topbar-text); font-weight: 550; padding: 0.45rem 0.8rem; border-radius: 999px; text-decoration: none; }
 .settings-link:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
 .topbar-tools { display:inline-flex; align-items:center; gap:.1rem; flex-shrink:0; }
-.calendar-shortcut { padding-inline:.55rem; }
+.topbar-shortcut { justify-content:center; width:34px; height:34px; padding:0; }
+.topbar-tools .calendar-dock-toggle { border:0; background:transparent; box-shadow:none; min-height:0; }
+.topbar-tools .calendar-dock-toggle:hover { background:rgba(255,255,255,.16); }
+.topbar-tools .calendar-dock-toggle[aria-pressed="true"] { color:var(--topbar-active-text); background:var(--topbar-active); }
 .settings-link[aria-current="page"] { color: var(--topbar-active-text); background: var(--topbar-active); }
+.calendar-docked { --calendar-dock-top:56px; }
+.calendar-docked > .topbar { box-sizing:border-box; }
+.calendar-docked .shell-content { display:grid; grid-template-columns:minmax(0,1fr) clamp(320px,29vw,420px); align-items:start; }
+.shell-page { min-width:0; }
+.calendar-dock { position:sticky; top:var(--calendar-dock-top); height:calc(100dvh - var(--calendar-dock-top)); overflow:auto; z-index:9; background:var(--surface); border-left:1px solid var(--line); }
+.calendar-dock-head { position:sticky; top:0; z-index:5; display:flex; justify-content:space-between; align-items:center; gap:.5rem; padding:.45rem .75rem; background:var(--soft); border-bottom:1px solid var(--line); }
+.calendar-dock-head h2 { margin:0; font-size:1rem; }
+.calendar-dock-head .icon-action::after { left:auto; right:0; transform:none; }
+@media (width > 1050px) { .calendar-docked > .topbar { height:var(--calendar-dock-top); } }
+@media (max-width: 1050px) {
+  .calendar-docked .shell-content { display:block; }
+  .calendar-dock { position:fixed; inset:0 0 0 auto; z-index:25; width:min(100%,390px); height:100dvh; box-shadow:-10px 0 30px rgba(40,20,90,.12); }
+}
+@media (1050px < width <= 1500px) {
+  .dock-right .calendar-docked .shell-content { display:block; }
+  .dock-right .calendar-dock { position:fixed; inset:0 0 0 auto; z-index:25; width:390px; height:100dvh; box-shadow:-10px 0 30px rgba(40,20,90,.12); }
+}
 .settings-layout { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 1.75rem; max-width: 1280px; margin: 0 auto; padding: 0 2rem; align-items: start; }
 .settings-layout > .settings-body > main { max-width: none; margin: 1.5rem 0 3rem; padding: 0; }
 .settings-nav { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); margin-top: 1.5rem; }

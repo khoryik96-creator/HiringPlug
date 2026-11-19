@@ -11,7 +11,7 @@ import { WorkAuthorizationPicker } from "../components/WorkAuthorizationPicker";
 import { hashParam } from "../hashQuery";
 import { CandidateForm } from "../components/CandidateForm";
 import { CandidateEmails } from "../components/CandidateEmails";
-import { EditIcon, IconActions, IconButton, IconLink, IconSeparator, MailIcon, PhoneIcon, ReferenceIcon, TrashIcon } from "../components/ActionIcons";
+import { EditIcon, IconActions, IconButton, IconLink, IconSeparator, MailIcon, PhoneIcon, ReferenceIcon, SideBySideIcon, TrashIcon } from "../components/ActionIcons";
 import { DeleteRecord } from "../components/DeleteRecord";
 import { Documents } from "../components/Documents";
 import { PrivacyPanel } from "../components/PrivacyPanel";
@@ -136,8 +136,8 @@ export function CandidateDetail({ id, permissions }: { id: string; permissions: 
         canEditSalary={permissions.includes("candidates.compensation:update")}
         onSalary={() => { setEditingSalary(true); setActive("salary"); }} />
       <div className={beside ? "candidate-workspace with-cv" : "candidate-workspace"}>
-        {canSeeCv && active !== "cv" && <button type="button" className={beside ? "cv-beside-toggle on" : "cv-beside-toggle"} aria-pressed={beside}
-          onClick={() => { setBeside(!beside); }}>CV beside</button>}
+        {canSeeCv && active !== "cv" && <IconButton label="CV beside" icon={<SideBySideIcon />} className="cv-beside-toggle"
+          pressed={beside} onClick={() => { setBeside(!beside); }} />}
         <div className="candidate-main">
         <CandidateTabs sections={sections} active={active} onChange={setActive} />
         </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, type Document, unwrap } from "../api/client";
 import { downloadDocument, fetchDocumentFile, fetchDocumentPdf } from "../api/files";
+import { FileIcon, IconButton, TextIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 
 export const SOURCE: Record<Document["source"], string> = {
@@ -57,6 +58,8 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", u
   const [view, setView] = useState<"original" | "text">(marking ? "text" : "original");
   // A PDF or a picture shows itself; a Word, RTF or ODT file shows its PDF copy once made.
   const isPdf = doc?.contentType === "application/pdf" || isImage(doc) || doc?.pdfStatus === "ready";
+  const showOtherView = () => { setView(view === "original" ? "text" : "original"); };
+  const viewLabel = view === "original" ? "Show text" : "Show original";
   return (
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
       <div className="row">
@@ -65,11 +68,9 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", u
         {!unified && <select aria-label="CV version" value={selected ?? ""} onChange={(e) => { onSelect(e.target.value); }}>
           {docs.map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
         </select>}
-        {isPdf && (
-          <button type="button" className="link" onClick={() => { setView(view === "original" ? "text" : "original"); }}>
-            {view === "original" ? "Show text" : "Show original"}
-          </button>
-        )}
+        {isPdf && (unified
+          ? <IconButton label={viewLabel} icon={view === "original" ? <TextIcon /> : <FileIcon />} onClick={showOtherView} />
+          : <button type="button" className="link" onClick={showOtherView}>{viewLabel}</button>)}
         {!unified && doc && <button type="button" className="link" onClick={() => { void downloadDocument(doc); }}>Download</button>}
         {actions}
       </div>

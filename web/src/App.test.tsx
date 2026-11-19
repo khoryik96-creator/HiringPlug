@@ -10,6 +10,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   window.location.hash = "";
+  localStorage.removeItem(`hp.calendarView.${testMe([]).user.id}`);
 });
 
 const alice = testCandidate({ id: "cand_aaaaaaaaaaaaaaaaaaaaaaaaaa", firstName: "Alice", fullName: "Alice Tan", email: "alice@example.com" });
@@ -112,12 +113,48 @@ describe("top bar", () => {
     await waitFor(() => { expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull(); });
   });
 
-  it("places the Calendar shortcut beside Settings for calendar users", async () => {
-    signedIn([...RECRUITER, "calendars:use"]);
+  it("places Outlook beside Calendar in the header for permitted users", async () => {
+    signedIn([...RECRUITER, "calendars:use", "emails:send"]);
     const icon = await screen.findByRole("link", { name: /^Calendar$/ });
+    const outlook = await screen.findByRole("link", { name: "Outlook" });
     expect(icon.getAttribute("href")).toBe("#/calendar");
-    expect(icon.nextElementSibling).toBe(screen.getByRole("link", { name: /^Settings$/ }));
-    expect(within(screen.getByRole("navigation", { name: "Main" })).queryByRole("link", { name: "Calendar" })).toBeNull();
+    expect(outlook.getAttribute("href")).toBe("#/outlook");
+    expect(outlook.nextElementSibling).toBe(icon);
+    expect(icon.nextElementSibling).toBe(screen.getByRole("button", { name: "Dock calendar" }));
+    const nav = within(screen.getByRole("navigation", { name: "Main" }));
+    expect(nav.queryByRole("link", { name: /^(Calendar|Outlook)$/ })).toBeNull();
+  });
+
+  it("docks the calendar without leaving an open candidate form, and remembers the view", async () => {
+    const permissions = [...RECRUITER, "calendars:use"] as const;
+    vi.spyOn(api, "GET").mockImplementation((path: string) => {
+      if (path === "/v1/me") return Promise.resolve(ok(testMe([...permissions])));
+      if (path === "/v1/candidates/{candidateId}") return Promise.resolve(ok(alice));
+      if (path === "/v1/settings/fields") return Promise.resolve(ok(testFieldSettings()));
+      if (path === "/v1/calendar/events") return Promise.resolve(ok({ items: [] }));
+      return Promise.reject(new Error(`unexpected GET ${path}`));
+    });
+    setToken("test-token");
+    const candidateHash = `#/candidates/${alice.id}`;
+    window.location.hash = candidateHash;
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit profile" }));
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Unsaved name" } });
+    const toggle = screen.getByRole("button", { name: "Dock calendar" });
+    fireEvent.click(toggle);
+    const dock = await screen.findByRole("complementary", { name: "Calendar dock" });
+    const day = await within(dock).findByRole("button", { name: "Day" });
+    expect(day.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(dock).getByRole("button", { name: "Week" }));
+    fireEvent.click(within(dock).getByRole("button", { name: "Today" }));
+    expect(within(dock).getByRole("button", { name: "Week" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.keyDown(dock, { key: "Escape" });
+    expect(screen.queryByRole("complementary", { name: "Calendar dock" })).toBeNull();
+    expect(document.activeElement).toBe(toggle);
+    expect(window.location.hash).toBe(candidateHash);
+    expect(screen.getByLabelText<HTMLInputElement>("First name").value).toBe("Unsaved name");
+    window.location.hash = "#/calendar";
+    expect((await screen.findByRole("button", { name: "Week" })).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("ends the session on the server when signing out", async () => {

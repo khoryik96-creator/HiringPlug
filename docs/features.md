@@ -1587,7 +1587,10 @@ Email composers show Cc and Bcc on demand beside To. Filled copy recipients and 
 
 ## Calendar and Outlook
 
-The calendar icon beside Settings opens private month, hourly week and day, and agenda views, local appointments,
+The Calendar icon opens the full calendar. The dock icon beside it opens the calendar
+on the right while you stay on your current page. Day, Week, Month, and Agenda
+selections are remembered in this browser. Today returns to the current date.
+Calendar supports local appointments,
 Microsoft default-calendar connection, Teams when supported, and Outlook busy-time
 checks for interviews and booking links. HiringPlug meetings sync as private holds;
 candidate invitations retain their existing flow. Attendee invitations on ordinary
@@ -1628,7 +1631,8 @@ Dropdowns & categories > Expense claims**.
 
 ## Outlook Mail
 
-**More > Outlook** indexes a recruiter's own Outlook folders on request.
+The Outlook icon beside Calendar opens Outlook Mail. It indexes a recruiter's
+own Outlook folders on request.
 Browse, search, mark read or unread, archive, move and reply in the original
 thread. Download file attachments of up to 20 MiB from the reading pane.
 Use **Save CV** to put an attachment in the selected candidate's **CV & files**.

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationOffersKey, offersKey } from "../api/keys";
 import { OFFER_STATUS, PAY_PERIOD, formatDay, formatMoney, keysOf } from "../labels";
+import { IconButton, OfferIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors } from "./forms";
@@ -31,7 +32,7 @@ export function ApplicationOffers({ applicationId, stage, permissions }: { appli
       {current && <OfferItem offer={current} permissions={permissions} />}
       {making && <OfferForm applicationId={applicationId} permissions={permissions} onDone={() => { setMaking(false); }} />}
       {!current && !making && list.isSuccess && stage !== "placed" && permissions.includes("offers:manage") && (
-        <button type="button" className="link" onClick={() => { setMaking(true); }}>Make offer</button>
+        <IconButton label="Make offer" icon={<OfferIcon />} onClick={() => { setMaking(true); }} />
       )}
     </div>
   );

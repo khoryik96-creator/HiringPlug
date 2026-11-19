@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, unwrap } from "../api/client";
 import { candidateApplicationsKey, jobsKey } from "../api/keys";
 import { CLOSE_REASON, STAGE } from "../labels";
+import { IconButton, MailIcon, PlusIcon } from "./ActionIcons";
 import { MoveMenu, timeInStage } from "./ApplicationCard";
 import { ApplicationPlacement } from "./ApplicationPlacement";
 import { ApplicationFit } from "./Fit";
@@ -50,14 +51,14 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
               <div className="app-card-actions">
                 {canUpdate && <MoveMenu app={a} busy={move.isPending} onMove={requestMove} />}
                 {permissions.includes("emails:send") && (
-                  <button type="button" className="small-button" onClick={() => { setEmailing(a.id); }}>Email client</button>
+                  <IconButton label="Email client" icon={<MailIcon />} onClick={() => { setEmailing(a.id); }} />
                 )}
               </div>
             </div>
             {asking?.app.id === a.id && (asking.stage === "offer" || asking.stage === "placed") && (
               <StagePrompt app={a} stage={asking.stage} permissions={permissions} onMove={(m) => { move.mutate(m); }} onClose={() => { setAsking(null); }} />
             )}
-            <div className="app-card-body">
+            <div className="app-card-body candidate-application-actions">
               {permissions.includes("matching:read") && <ApplicationFit applicationId={a.id} permissions={permissions} />}
               {permissions.includes("offers:read") && <ApplicationOffers applicationId={a.id} stage={a.stage} permissions={permissions} />}
               {permissions.includes("placements:read") && <ApplicationPlacement applicationId={a.id} stage={a.stage} permissions={permissions} />}
@@ -81,7 +82,7 @@ export function CandidateApplications({ candidateId, canUpdate, permissions }: {
             noMatch="No open job matches."
             search={searchOpenJobs}
           />
-          {job && <button type="button" disabled={add.isPending} onClick={() => { add.mutate(job.id); }}>Add to job</button>}
+          {job && <IconButton label="Add to job" icon={<PlusIcon />} disabled={add.isPending} onClick={() => { add.mutate(job.id); }} />}
           <ErrorMessage error={add.error} />
         </div>
       )}

@@ -5,6 +5,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
 import { applicationInterviewsKey, interviewsKey } from "../api/keys";
 import { INTERVIEW_MODE, INTERVIEW_STATUS, RECOMMENDATION, formatWhen } from "../labels";
+import { CalendarPlusIcon, IconButton } from "./ActionIcons";
 import { EmailComposer } from "./EmailComposer";
 import { ErrorMessage } from "./ErrorMessage";
 import { InterviewForm } from "./InterviewForm";
@@ -25,7 +26,7 @@ export function ApplicationInterviews({ applicationId, closed, permissions }: { 
       <ErrorMessage error={list.error} />
       {list.data?.map((iv) => <InterviewItem key={iv.id} interview={iv} permissions={permissions} />)}
       {canSchedule && !closed && !scheduling && (
-        <button type="button" className="link" onClick={() => { setScheduling(true); }}>Schedule interview</button>
+        <IconButton label="Schedule interview" icon={<CalendarPlusIcon />} onClick={() => { setScheduling(true); }} />
       )}
       {scheduling && <InterviewForm applicationId={applicationId} onDone={() => { setScheduling(false); }} />}
     </div>

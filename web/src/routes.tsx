@@ -38,7 +38,7 @@ const CvTemplates = page(() => import("./pages/CvTemplates"), "CvTemplates");
 const Automations = page(() => import("./pages/Automations"), "Automations");
 const StageTemplates = page(() => import("./pages/StageTemplates"), "StageTemplates");
 const OutlookMail = page(() => import("./pages/OutlookMail"), "OutlookMail");
-const Calendar = page(() => import("./pages/Calendar"), "Calendar");
+export const Calendar = page(() => import("./pages/Calendar"), "Calendar");
 const Claims = page(() => import("./pages/Claims"), "Claims");
 const Dashboard = page(() => import("./pages/Dashboard"), "Dashboard");
 const EmailTemplates = page(() => import("./pages/EmailTemplates"), "EmailTemplates");
@@ -115,9 +115,9 @@ export const ROUTES: Route[] = [
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
-  { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true },
+  { section: "outlook", path: /^#\/outlook$/, permission: "emails:send",
     render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} canImportCv={can(c, "intake:create")} /> },
-  { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: () => <Calendar /> },
+  { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: (c) => <Calendar userId={c.me.user.id} /> },
   // Expense claims: for those who claim, and for approvers who do not claim themselves.
   { section: "claims", path: /^#\/claims$/, permission: "claims:create", menu: { in: "main", label: "Claims", href: "#/claims", more: true },
     render: (c) => <Claims permissions={c.permissions} /> },

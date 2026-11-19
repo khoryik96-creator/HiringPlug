@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, unwrap } from "./api/client";
 import { authLinkRoute, clearToken, getToken } from "./auth";
 import { AiNotice } from "./components/AiNotice";
+import { CloseIcon, DockRightIcon, IconButton, OutlookIcon } from "./components/ActionIcons";
 import { ErrorMessage } from "./components/ErrorMessage";
 import { careersRoute } from "./careersRoute";
 import { PageErrorBoundary } from "./components/PageErrorBoundary";
@@ -13,7 +14,7 @@ import { Careers } from "./pages/Careers";
 import { ChoosePassword } from "./pages/ChoosePassword";
 import { SignIn } from "./pages/SignIn";
 import { Menu } from "./components/Menu";
-import { menu, resolve, type Route } from "./routes";
+import { Calendar, menu, resolve, type Route } from "./routes";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -38,6 +39,8 @@ async function endSession(): Promise<void> {
 
 function Shell({ onSignOut }: { onSignOut: () => void }) {
   const hash = useHash();
+  const [calendarDocked, setCalendarDocked] = useState(false);
+  const calendarDockButton = useRef<HTMLButtonElement>(null);
   const me = useQuery({ queryKey: ["me"], queryFn: async () => unwrap(await api.GET("/v1/me")) });
   if (me.error instanceof ApiError && me.error.code === "UNAUTHENTICATED") {
     onSignOut();
@@ -50,19 +53,32 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
   const permissions = me.data.permissions;
   const { route, id } = resolve(hash, permissions);
   const inSettings = route.menu?.in === "settings" || menu("settings", permissions).some((r) => r.section === route.section);
+  const canUseCalendar = permissions.includes("calendars:use");
+  const onCalendar = route.section === "calendar";
+  const showCalendarDock = canUseCalendar && calendarDocked && !onCalendar;
+  const closeCalendarDock = () => {
+    setCalendarDocked(false);
+    calendarDockButton.current?.focus();
+  };
   return (
-    <>
+    <div className={showCalendarDock ? "app-shell calendar-docked" : "app-shell"}>
       <header className="topbar">
         <span className="brand">Hiring<span>Plug</span></span>
         <span className="app-version" title="HiringPlug version">v{__APP_VERSION__}</span>
         <MainMenu routes={menu("main", permissions)} current={route.section} />
         <div className="topbar-tools">
-          {permissions.includes("calendars:use") && <a className="settings-link calendar-shortcut" href="#/calendar" aria-label="Calendar" title="Calendar" aria-current={route.section === "calendar" ? "page" : undefined}>
+          {permissions.includes("emails:send") && <a className="settings-link topbar-shortcut" href="#/outlook" aria-label="Outlook" title="Outlook"
+            aria-current={route.section === "outlook" ? "page" : undefined}><OutlookIcon /></a>}
+          {canUseCalendar && <a className="settings-link topbar-shortcut" href="#/calendar" aria-label="Calendar" title="Calendar"
+            aria-current={onCalendar ? "page" : undefined} onClick={() => { setCalendarDocked(false); }}>
             <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="18" height="16" rx="2" />
               <path d="M8 3v4m8-4v4M3 10h18m-13 5h2m4 0h2" />
             </svg>
           </a>}
+          {canUseCalendar && !onCalendar && <button type="button" ref={calendarDockButton} className="settings-link topbar-shortcut calendar-dock-toggle"
+            aria-label="Dock calendar" title={showCalendarDock ? "Close calendar dock" : "Dock calendar"} aria-pressed={showCalendarDock}
+            aria-controls={showCalendarDock ? "calendar-dock" : undefined} onClick={() => { setCalendarDocked(!showCalendarDock); }}><DockRightIcon /></button>}
           <a className="settings-link" href="#/settings" aria-current={inSettings ? "page" : undefined}>
             <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />
@@ -81,18 +97,40 @@ function Shell({ onSignOut }: { onSignOut: () => void }) {
           </button>
         </div>
       </header>
-      <AiNotice permissions={permissions} />
-      {/* key: a new location starts with a fresh boundary */}
-      <PageErrorBoundary key={hash}>
-        <Suspense fallback={<p className="muted page-loading">Loading…</p>}>
-          {route.menu?.in === "settings" ? (
-            <SettingsLayout section={route.section} pages={menu("settings", permissions)}>
-              {route.render({ permissions, me: me.data, id })}
-            </SettingsLayout>
-          ) : route.render({ permissions, me: me.data, id })}
-        </Suspense>
+      <div className="shell-content">
+        <div className="shell-page">
+          <AiNotice permissions={permissions} />
+          {/* key: a new location starts with a fresh boundary */}
+          <PageErrorBoundary key={hash}>
+            <Suspense fallback={<p className="muted page-loading">Loading…</p>}>
+              {route.menu?.in === "settings" ? (
+                <SettingsLayout section={route.section} pages={menu("settings", permissions)}>
+                  {route.render({ permissions, me: me.data, id })}
+                </SettingsLayout>
+              ) : route.render({ permissions, me: me.data, id })}
+            </Suspense>
+          </PageErrorBoundary>
+        </div>
+        {showCalendarDock && <CalendarDock userId={me.data.user.id} onClose={closeCalendarDock} />}
+      </div>
+    </div>
+  );
+}
+
+function CalendarDock({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const dock = useRef<HTMLElement>(null);
+  useEffect(() => { dock.current?.focus(); }, []);
+  return (
+    <aside ref={dock} id="calendar-dock" className="calendar-dock" aria-label="Calendar dock" tabIndex={-1}
+      onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); }}>
+      <header className="calendar-dock-head">
+        <h2>Calendar</h2>
+        <IconButton label="Close calendar dock" icon={<CloseIcon />} onClick={onClose} />
+      </header>
+      <PageErrorBoundary>
+        <Suspense fallback={<p className="muted" role="status">Loading calendar…</p>}><Calendar docked userId={userId} /></Suspense>
       </PageErrorBoundary>
-    </>
+    </aside>
   );
 }
 
