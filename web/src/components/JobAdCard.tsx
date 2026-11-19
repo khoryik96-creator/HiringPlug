@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Schemas } from "../api/client";
 import { careersUrl } from "../careersRoute";
 import { CHANNEL, countryName } from "../labels";
+import { EditIcon, IconButton } from "./ActionIcons";
 import { AdVersions, type Shown } from "./AdVersions";
 import { useFieldSettings } from "./useFieldSettings";
 
@@ -42,7 +43,7 @@ export function AdCard({ ad, startOpen, canEdit, busy, careersSlug, onEdit, onSt
         <span className="posting-card-facts muted small">{facts}</span>
         {canEdit && (
           <span className="row posting-card-actions">
-            <button type="button" className="link" onClick={() => { setOpen(true); onEdit(); }}>Edit</button>
+            <IconButton label="Edit" tip="Edit ad" icon={<EditIcon />} className="icon-outline" onClick={() => { setOpen(true); onEdit(); }} />
             {ad.status !== "published" && (
               <button type="button" disabled={busy} onClick={() => { onStatus("published"); }}>Publish</button>
             )}

@@ -400,9 +400,10 @@ select { max-width: 100%; }
 .template-preview .preview-hits { list-style: none; padding: 0; margin: 0.3rem 0; }
 .template-preview .email-preview { background: var(--panel-alt, #f8fafc); border: 1px solid var(--border, #d0d7de); border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; }
 /* A candidate's CVs and documents: actions at the top right, one card per file. */
-.docs-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.docs-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.65rem; }
 .docs-head h3 { margin: 0; }
-.docs-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.docs-actions, .docs-file-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.docs-file-actions:empty { display: none; }
 .doc-btn { display: inline-flex; align-items: center; padding: 0.3rem 0.75rem; border: 1px solid var(--border, #d0d7de); border-radius: 999px; background: #fff; color: inherit; font-size: 0.85rem; font-weight: 550; text-decoration: none; cursor: pointer; }
 .doc-btn:hover { border-color: var(--accent); color: var(--accent); }
 .doc-btn.primary-soft { background: var(--accent-soft); border-color: transparent; color: #1e3a8a; }
@@ -1095,7 +1096,6 @@ tr.bounces td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 .column-head h4 { margin: 0; color: var(--ink); }
 .column-count { border: 0; cursor: pointer; min-height: 0; padding: 0 0.5rem; line-height: 1.5; }
 .column-count[aria-pressed="true"] { background: var(--accent); color: #fff; }
-.column-empty { margin: 1.2rem 0; text-align: center; font-size: 0.8rem; color: var(--muted); }
 .app-card .who { display: flex; gap: 0.5rem; align-items: center; }
 .app-card .who-text { min-width: 0; }
 .app-card .card-name a { font-weight: 700; color: var(--ink); }
@@ -1327,7 +1327,7 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .row.spread > .row:last-child > .icon-action:last-child::after {
   left: auto; right: 0; transform: none;
 }
-.company-docs .doc-buttons > .icon-action::after { inset: 50% calc(100% + 6px) auto auto; transform: translateY(-50%); }
+.company-doc-list .doc-buttons > .icon-action::after { inset: 50% calc(100% + 6px) auto auto; transform: translateY(-50%); }
 .icon-action.icon-danger:hover, .icon-action.icon-danger:focus-visible { background: #fef2f2; color: #b91c1c; }
 .icon-sep { width: 1px; height: 22px; margin: 0 3px; background: var(--line); }
 .icon-action[data-tip]::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 30; }
@@ -1354,6 +1354,7 @@ table.hr-people tbody tr.have td { color: var(--muted); }
 .view-tabs button { border: 0; background: transparent; box-shadow: none; min-height: 0; padding: 0.3rem 0.7rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 .view-tabs button:hover { color: var(--accent-dark); }
 .view-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-dark); }
+.view-tabs .icon-action { padding: 0; }
 .pipeline-tools { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; flex-wrap: wrap; margin: 0.7rem 0 0.9rem; }
 .pipeline-tools input { min-height: 34px; padding: 0.35rem 0.75rem; width: 16rem; max-width: 100%; font-size: 0.88rem; }
 .pipeline-tools > .row { gap: 0.5rem; flex-wrap: wrap; min-width: 0; }

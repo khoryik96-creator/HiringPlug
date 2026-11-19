@@ -67,7 +67,7 @@ export function JobDetail({ id, permissions }: { id: string; permissions: Permis
   return (
     <main className="list-page">
       <nav className="crumbs" aria-label="Breadcrumb">
-        <a href="#/jobs">Jobs</a><span aria-hidden="true">›</span><a href={`#/companies/${j.companyId}`}>{j.companyName}</a>
+        <a href="#/jobs">← Jobs</a>
       </nav>
       {job.error && (
         <ErrorMessage error={job.error}>

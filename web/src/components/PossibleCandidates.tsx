@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { api, ApiError, type Permission, unwrap } from "../api/client";
 import { applicationsKey, jobSuggestionsKey } from "../api/keys";
+import { IconButton, PlusIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 
 /** A snippet with the job's words, sent marked [[like this]], highlighted. */
@@ -70,10 +71,9 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
       <summary>
         <span className="fold-title">Possible candidates</span>
         {list.data && <span className="count-chip">{String(list.data.length)}</span>}
-        <span className="muted small">CVs that share this job&apos;s words</span>
       </summary>
-      {noText ? <p className="muted">Add a description or an ad to see possible candidates.</p> : <ErrorMessage error={list.error ?? add.error} />}
-      {list.data?.length === 0 && <p className="muted">No CV shares this job&apos;s words yet.</p>}
+      {noText ? <p className="muted">Add a description or an ad to find matches.</p> : <ErrorMessage error={list.error ?? add.error} />}
+      {list.data?.length === 0 && <p className="muted">No CV matches.</p>}
       <ul className="suggestions scroll-box">
         {list.data?.map((s) => {
           const words = matchedWords(s.snippet);
@@ -85,7 +85,7 @@ export function PossibleCandidates({ jobId, permissions }: { jobId: string; perm
                   {s.currentTitle && <div className="muted small">{s.currentTitle}</div>}
                 </div>
                 {permissions.includes("pipeline:update") && (
-                  <button type="button" className="small-button" disabled={add.isPending} onClick={() => { add.mutate(s.candidateId); }}>+ Add to job</button>
+                  <IconButton label="Add to job" icon={<PlusIcon />} className="icon-outline" disabled={add.isPending} onClick={() => { add.mutate(s.candidateId); }} />
                 )}
               </div>
               {words.length > 0 && (

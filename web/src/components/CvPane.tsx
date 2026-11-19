@@ -2,6 +2,7 @@
 // Used where a CV is read side by side with something else.
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { api, type Document, unwrap } from "../api/client";
 import { downloadDocument, fetchDocumentFile, fetchDocumentPdf } from "../api/files";
@@ -42,9 +43,10 @@ export function useCandidateCv(candidateId: string, enabled = true) {
   return { docs, list, selected, setPicked, doc };
 }
 
-export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", unified = false, actions }: {
+export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", unified = false, actions, toolbar }: {
   unified?: boolean;
   actions?: ReactNode;
+  toolbar?: { target: HTMLElement | null; details: ReactNode };
   docs: Document[];
   doc: Document | undefined;
   selected: string | undefined;
@@ -60,17 +62,19 @@ export function CvPane({ docs, doc, selected, onSelect, title, highlight = "", u
   const isPdf = doc?.contentType === "application/pdf" || isImage(doc) || doc?.pdfStatus === "ready";
   const showOtherView = () => { setView(view === "original" ? "text" : "original"); };
   const viewLabel = view === "original" ? "Show text" : "Show original";
+  const viewButton = isPdf && (unified
+    ? <IconButton label={viewLabel} icon={view === "original" ? <TextIcon /> : <FileIcon />} onClick={showOtherView} />
+    : <button type="button" className="link" onClick={showOtherView}>{viewLabel}</button>);
   return (
     <section className="panel" aria-label={doc ? label(doc) : "CV"}>
+      {toolbar?.target && createPortal(<>{viewButton}{toolbar.details}</>, toolbar.target)}
       <div className="row">
         {title && <h3 className="cv-pane-title">{title}</h3>}
         {unified && doc && <strong className="cv-selected-name">{doc.fileName}</strong>}
         {!unified && <select aria-label="CV version" value={selected ?? ""} onChange={(e) => { onSelect(e.target.value); }}>
           {docs.map((d) => <option key={d.id} value={d.id}>{label(d)}</option>)}
         </select>}
-        {isPdf && (unified
-          ? <IconButton label={viewLabel} icon={view === "original" ? <TextIcon /> : <FileIcon />} onClick={showOtherView} />
-          : <button type="button" className="link" onClick={showOtherView}>{viewLabel}</button>)}
+        {!toolbar && viewButton}
         {!unified && doc && <button type="button" className="link" onClick={() => { void downloadDocument(doc); }}>Download</button>}
         {actions}
       </div>

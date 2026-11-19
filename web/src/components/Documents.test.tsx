@@ -52,7 +52,13 @@ describe("CVs and documents", () => {
       path === "/v1/candidates/{candidateId}/documents" ? { items: [pdf] } : pdf
     ))) as never);
     renderWithClient(<Documents candidate={testCandidate()} canUpload canEdit permissions={["documents:read"]} />);
-    await screen.findByRole("button", { name: "Review details" });
+    const review = await screen.findByRole("button", { name: "Review details" });
+    const toolbar = screen.getByRole("button", { name: "Upload" }).closest(".docs-head");
+    expect(toolbar?.contains(review)).toBe(true);
+    const showText = await screen.findByRole("button", { name: "Show text" });
+    expect(toolbar?.contains(showText)).toBe(true);
+    fireEvent.click(showText);
+    expect(await screen.findByText("PDF text")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
     expect(screen.queryByLabelText("More for Siti CV.pdf")).toBeNull(); // an empty menu is not shown
   });

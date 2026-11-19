@@ -13,7 +13,10 @@ const WORD = new Set(["application/vnd.openxmlformats-officedocument.wordprocess
  * highlight: a boolean search whose words to mark (opened from the search's results).
  * empty: what to show when the candidate has no CV (nothing by default).
  */
-export function CandidateCv({ candidateId, highlight = "", selectedId, actions, unified = false, empty = null }: { candidateId: string; highlight?: string; selectedId?: string; actions?: ReactNode; unified?: boolean; empty?: ReactNode }) {
+export function CandidateCv({ candidateId, highlight = "", selectedId, actions, toolbar, unified = false, empty = null }: {
+  candidateId: string; highlight?: string; selectedId?: string; actions?: ReactNode;
+  toolbar?: { target: HTMLElement | null; details: ReactNode }; unified?: boolean; empty?: ReactNode;
+}) {
   const queryClient = useQueryClient();
   const docs = useQuery({
     queryKey: ["documents", candidateId],
@@ -40,7 +43,8 @@ export function CandidateCv({ candidateId, highlight = "", selectedId, actions, 
   const shown = doc.data && fromList ? { ...doc.data, pdfStatus: fromList.pdfStatus } : doc.data;
   return (
     <div className="candidate-cv">
-      <CvPane title={unified ? undefined : "CV"} unified={unified} actions={actions} docs={list} doc={shown} selected={selected} onSelect={setPicked} highlight={highlight} />
+      <CvPane title={unified ? undefined : "CV"} unified={unified} actions={actions} toolbar={toolbar} docs={list} doc={shown}
+        selected={selected} onSelect={setPicked} highlight={highlight} />
     </div>
   );
 }

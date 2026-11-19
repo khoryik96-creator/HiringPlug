@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { IconButton, PlusIcon } from "../components/ActionIcons";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { jobsKey } from "../api/keys";
@@ -69,12 +70,12 @@ export function JobList({ canCreate }: { canCreate: boolean }) {
       <div className="row spread">
         <h2>Jobs</h2>
         <div className="row">
-          <input aria-label="Search jobs" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); }} />
+          <input aria-label="Search jobs" placeholder="Search jobs" value={q} onChange={(e) => { setQ(e.target.value); }} />
           <select aria-label="Status" value={status} onChange={(e) => { setStatus(e.target.value as StatusFilter); }}>
             <option value="">All statuses</option>
             {keysOf(JOB_STATUS).map((s) => <option key={s} value={s}>{JOB_STATUS[s]}</option>)}
           </select>
-          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add job</button>}
+          {canCreate && !adding && <IconButton label="Add job" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
         </div>
       </div>
       {adding && (

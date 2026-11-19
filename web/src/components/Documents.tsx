@@ -43,6 +43,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
   const queryClient = useQueryClient();
   const [source, setSource] = useState<Source>("original");
   const [reviewing, setReviewing] = useState<string | null>(null);
+  const [fileToolbar, setFileToolbar] = useState<HTMLDivElement | null>(null);
   // CVs seen being read here (green "ready" once done, until opened), and those
   // whose details were asked for (their review opens once read).
   const [watched, setWatched] = useState<ReadonlySet<string>>(new Set());
@@ -146,12 +147,9 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     // A formatted CV (our own output) is read only for comparing: no review, read again from the menu.
     const rereadFormatted = canReread && d.source === "formatted";
     const menu = fromMenu || rereadFormatted || d.pdfStatus === "failed" || (canDelete && d.source === "formatted");
-    return (
+    return menu && (
       <div className="doc-buttons">
-        <DetailsButton doc={d} ready={finished(d)} reviewing={reviewing === d.id}
-          canReview={canEdit} canRead={canReread} busy={parse.isPending}
-          onRead={() => { parse.mutate(d.id); }} onReview={() => { review(d.id); }} />
-        {menu && <details className="doc-more">
+        <details className="doc-more">
           <summary aria-label={`More for ${d.fileName}`}>⋯</summary>
           <div className="doc-menu" role="menu">
             {fromMenu && <button type="button" role="menuitem" onClick={(e) => { void downloadDocument(d); e.currentTarget.closest("details")?.removeAttribute("open"); }}>
@@ -172,7 +170,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
               </button>
             )}
           </div>
-        </details>}
+        </details>
       </div>);
   };
   const oneCv = selected && !(comparing && all.length >= 2);
@@ -184,6 +182,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
         <div className="docs-actions">
           {all.length >= 2 && <IconButton label={comparing ? "Back to one CV" : "Compare side by side"}
             icon={<SideBySideIcon />} pressed={comparing} onClick={() => { setComparing(!comparing); }} />}
+          {oneCv && <div className="docs-file-actions" ref={setFileToolbar} />}
           {canFormat && !formatting && (studio.running
             ? <button type="button" className="doc-btn format-running" disabled>Formatting… {studio.seconds}s</button>
             : studio.finished?.status === "done"
@@ -249,7 +248,10 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
           <h4>{group.title}</h4>{group.items.map(d => <button key={d.id} type="button" aria-pressed={selected.id === d.id}
             onClick={() => { setPicked(d.id); }}><strong>{d.fileName}</strong><span>{SOURCE_LABEL[d.source]} · {added(d.createdAt)} · {STATUS_NOTE[d.status] ?? "Text read"}{d.parseStatus === "failed" ? " · Details could not be read" : d.parseStatus === "queued" ? " · Reading details…" : d.parseStatus === "parsed" ? " · Details read" : ""}{d.pdfStatus === "queued" ? " · Making PDF…" : ""}</span></button>)}
         </div>)}</nav>}
-        <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")} />
+        <CandidateCv candidateId={candidateId} selectedId={selected.id} unified actions={actions(selected)} highlight={hashParam("hl")}
+          toolbar={{ target: fileToolbar, details: <DetailsButton doc={selected} ready={finished(selected)} reviewing={reviewing === selected.id}
+            canReview={canEdit} canRead={canUpload && selected.status === "extracted"} busy={parse.isPending}
+            onRead={() => { parse.mutate(selected.id); }} onReview={() => { review(selected.id); }} /> }} />
       </div>}
     </section>
   );

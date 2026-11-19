@@ -34,6 +34,8 @@ export const MailCheckIcon = () => (
 export const PlusIcon = () => <Svg><path d="M12 5v14M5 12h14" /></Svg>;
 export const CloseIcon = () => <Svg><path d="m6 6 12 12M18 6 6 18" /></Svg>;
 export const SideBySideIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M12 5v14" /></Svg>;
+export const StepsIcon = () => <Svg><path d="M8 6h12M8 12h12M8 18h12M4 6h.1M4 12h.1M4 18h.1" /></Svg>;
+export const BoardIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M9 5v14m6-14v14" /></Svg>;
 export const DockRightIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M15 5v14m-8-7h4m-2-2 2 2-2 2" /></Svg>;
 export const OutlookIcon = () => (
   <Svg><rect x="2" y="4" width="11" height="15" rx="2" /><ellipse cx="7.5" cy="11.5" rx="2.2" ry="2.8" /><path d="M13 6h6a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2m5-9 4 3 4-3" /></Svg>

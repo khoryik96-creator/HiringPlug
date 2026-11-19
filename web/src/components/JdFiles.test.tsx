@@ -23,11 +23,12 @@ describe("job descriptions kept with a job", () => {
     expect(await screen.findByRole("button", { name: "Hub Operations Manager JD.pdf" })).toBeTruthy();
     expect(screen.getAllByText(/14 KB · added/)).toHaveLength(2);
     expect(screen.getByText(/reading…/)).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "View" })).toHaveLength(1); // a Word file is downloaded, not shown
+    expect(screen.getByRole("button", { name: "View Hub Operations Manager JD.pdf" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "View JD.docx" })).toBeNull();
     const del = screen.getByRole<HTMLButtonElement>("button", { name: "Delete JD.docx" });
     expect(del.disabled, "deleting is a permission of its own (admins)").toBe(true);
 
-    fireEvent.change(screen.getByLabelText("Drop the client's JD to keep it here"), { target: { files: [new File(["%PDF"], "JD v2.pdf")] } });
+    fireEvent.change(screen.getByLabelText("Drop a job description"), { target: { files: [new File(["%PDF"], "JD v2.pdf")] } });
     await waitFor(() => { expect(fetch).toHaveBeenCalled(); });
     expect(fetch.mock.calls[0]?.[0]).toBe("/v1/jobs/jo_1/jd-files");
   });
@@ -40,6 +41,6 @@ describe("job descriptions kept with a job", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Delete Hub Operations Manager JD.pdf" }));
     await waitFor(() => { expect(del).toHaveBeenCalled(); });
     expect(del.mock.calls[0]?.[1]).toEqual({ params: { path: { jdFileId: "jdf_1" } } });
-    expect(screen.queryByLabelText("Drop the client's JD to keep it here"), "adding needs jobs:update").toBeNull();
+    expect(screen.queryByLabelText("Drop a job description"), "adding needs jobs:update").toBeNull();
   });
 });

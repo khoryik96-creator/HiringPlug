@@ -27,12 +27,12 @@ describe("possible candidates", () => {
     renderWithClient(<PossibleCandidates jobId="jo_1" permissions={[...SEE, "pipeline:update"]} />);
     expect(await screen.findByText("Aina")).toBeTruthy();
     // Folded under the pipeline, with how many there are.
-    expect(screen.getByRole("group", { name: "Possible candidates" }).querySelector("summary")?.textContent).toBe("Possible candidates1CVs that share this job's words");
+    expect(screen.getByRole("group", { name: "Possible candidates" }).querySelector("summary")?.textContent).toBe("Possible candidates1");
     expect(screen.getByLabelText("Matched words").textContent).toBe("2 matched:auditgroups"); // once each
     const excerpt = document.querySelector(".suggestion-snippet");
     expect(excerpt?.textContent).toBe("Aina statutory audit of listed groups … Audit lead"); // contact details are on the profile
     expect(excerpt?.querySelector("mark")?.textContent).toBe("audit");
-    fireEvent.click(screen.getByRole("button", { name: "+ Add to job" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add to job" }));
     await waitFor(() => { expect(post).toHaveBeenCalled(); });
     expect(sentBody(post)).toEqual({ candidateId: "cand_1" });
   });

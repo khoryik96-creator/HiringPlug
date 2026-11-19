@@ -10,6 +10,7 @@ import { CURRENCIES, fieldErrors, FormInvalid } from "./forms";
 import { todayISO } from "./placementTimeline";
 import { blankStage, DUE_KIND, dueText, retainerBody, retainerForm, retainerProblems, type RetainerForm, type StageRow } from "./retainerFormState";
 import { SaveError } from "./SaveError";
+import { EditIcon, IconButton, PlusIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 
 const retainerKey = (jobId: string) => ["retainer", jobId];
@@ -30,7 +31,8 @@ export function JobRetainer({ jobId, permissions }: { jobId: string; permissions
     <section className="panel" aria-label="Retainer">
       <div className="row spread">
         <h3>Retainer</h3>
-        {canEdit && r && !editing && <button type="button" onClick={() => { setEditing(true); }}>{r.version === 0 ? "Add retainer" : "Edit"}</button>}
+        {canEdit && r && !editing && <IconButton label={r.version === 0 ? "Add retainer" : "Edit"} tip={r.version === 0 ? "Add retainer" : "Edit retainer"}
+          icon={r.version === 0 ? <PlusIcon /> : <EditIcon />} className="icon-outline" onClick={() => { setEditing(true); }} />}
       </div>
       <ErrorMessage error={q.error} />
       {r && (editing
@@ -41,7 +43,7 @@ export function JobRetainer({ jobId, permissions }: { jobId: string; permissions
 }
 
 function RetainerTable({ r }: { r: Retainer }) {
-  if (r.version === 0) return <p className="muted">None. A retained search is paid in stages, taken off the placement fee.</p>;
+  if (r.version === 0) return <p className="muted">No retainer recorded.</p>;
   const cur = r.currency ?? "";
   const today = todayISO();
   return (

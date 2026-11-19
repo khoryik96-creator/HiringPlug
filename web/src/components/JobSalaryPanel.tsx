@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type JobOrder, type Schemas, unwrap } from "../api/client";
 import { jobKey } from "../api/keys";
 import { keysOf, PAY_PERIOD } from "../labels";
+import { EditIcon, IconButton, PlusIcon } from "./ActionIcons";
 import { Field } from "./Field";
 import { CURRENCIES, fieldErrors, FormInvalid, sameBody } from "./forms";
 import { plainAmount } from "./salaryFormState";
@@ -52,7 +53,8 @@ export function JobSalaryPanel({ job, canEdit }: { job: JobOrder; canEdit: boole
     <section className="panel" aria-label="Salary budget">
       <div className="row spread">
         <h3>Salary budget</h3>
-        {canEdit && !editing && <button type="button" onClick={() => { setEditing(true); }}>{range ? "Edit budget" : "Add budget"}</button>}
+        {canEdit && !editing && <IconButton label={range ? "Edit budget" : "Add budget"} icon={range ? <EditIcon /> : <PlusIcon />}
+          className="icon-outline" onClick={() => { setEditing(true); }} />}
       </div>
       {editing ? (
         <BudgetForm job={job} onDone={() => { setEditing(false); }} />

@@ -8,6 +8,7 @@ import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadFrom } from "../api/files";
 import { jobJdFilesKey } from "../api/keys";
 import { formatWhen } from "../labels";
+import { DownloadIcon, IconButton, TrashIcon, ViewIcon } from "./ActionIcons";
 import { DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
 import { FileViewer } from "./FileViewer";
@@ -61,27 +62,27 @@ export function JdFiles({ jobId, permissions }: { jobId: string; permissions: Pe
                 </div>
               </div>
               <div className="doc-buttons">
-                {viewable(f) && <button type="button" className="doc-btn" onClick={() => { setViewing(f); }}>View</button>}
-                <button type="button" className="doc-btn" onClick={() => { download.mutate(f); }}>Download</button>
+                {viewable(f) && <IconButton label={`View ${f.fileName}`} tip="View file" icon={<ViewIcon />} className="icon-outline"
+                  onClick={() => { setViewing(f); }} />}
+                <IconButton label={`Download ${f.fileName}`} tip="Download file" icon={<DownloadIcon />} className="icon-outline"
+                  onClick={() => { download.mutate(f); }} />
                 {/* Always there; only those given jobs.documents:delete (admins, to start with) may use it. */}
-                <button type="button" className="doc-btn danger" aria-label={`Delete ${f.fileName}`} disabled={!canDelete || remove.isPending}
-                  title={canDelete ? undefined : "Only admins delete job descriptions: ask one, or for the permission to"}
-                  onClick={() => { if (window.confirm(`Delete ${f.fileName}? This cannot be undone.`)) remove.mutate(f); }}>
-                  Delete
-                </button>
+                <IconButton label={`Delete ${f.fileName}`} tip={canDelete ? "Delete file" : "Requires permission to delete job descriptions"}
+                  icon={<TrashIcon />} className="icon-outline" danger disabled={!canDelete || remove.isPending}
+                  onClick={() => { if (window.confirm(`Delete ${f.fileName}? This cannot be undone.`)) remove.mutate(f); }} />
               </div>
             </li>
           ))}
         </ul>
       )}
-      {list.length === 0 && !canAdd && files.isSuccess && <p className="muted small">No job description kept yet.</p>}
+      {list.length === 0 && !canAdd && files.isSuccess && <p className="muted small">No files.</p>}
       {viewing && (
         <FileViewer title={viewing.fileName} path={fileUrl(viewing)} type={viewing.contentType} onClose={() => { setViewing(null); }}
           actions={<button type="button" onClick={() => { download.mutate(viewing); }}>Download</button>} />
       )}
       {canAdd && (
         <DropZone compact accept={JD_TYPES} multiple disabled={upload.isPending}
-          label={upload.isPending ? "Uploading…" : "Drop the client's JD to keep it here"}
+          label={upload.isPending ? "Uploading…" : "Drop a job description"}
           hint="PDF, Word, text or a picture" onFiles={(f) => { upload.mutate(f); }} />
       )}
     </div>

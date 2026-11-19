@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api, ApiError, type Application, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationsKey, candidatesKey, jobApplicationsKey } from "../api/keys";
 import { CLOSE_REASON, OPEN_STAGES, STAGE } from "../labels";
+import { BoardIcon, CloseIcon, IconButton, PlusIcon, StepsIcon } from "./ActionIcons";
 import { MoveChosen, MoveMenu, type Upcoming } from "./ApplicationCard";
 import { ClientEmail } from "./clientEmail/ClientEmail";
 import type { Shortlisted } from "./clientEmail/Shortlist";
@@ -126,8 +127,8 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         <h3>Pipeline <span className="count-chip">{String(apps.length - closed.length)} active</span></h3>
         {stages.data && <JobStagesControl jobId={jobId} stages={stages.data} canChange={canUpdate} />}
         <span className="view-tabs" role="group" aria-label="View">
-          <button type="button" aria-pressed={view === "steps"} onClick={() => { setView("steps"); }}>Steps</button>
-          <button type="button" aria-pressed={view === "board"} onClick={() => { setView("board"); }}>Board</button>
+          <IconButton label="Steps" icon={<StepsIcon />} pressed={view === "steps"} onClick={() => { setView("steps"); }} />
+          <IconButton label="Board" icon={<BoardIcon />} pressed={view === "board"} onClick={() => { setView("board"); }} />
         </span>
       </div>
       <div className="pipeline-tools">
@@ -156,7 +157,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
             }}>Email each candidate separately</button>
           </>}
           {canUpdate && <MoveChosen apps={chosenApps} busy={move.isPending || moveMany.isPending} onMove={moveChosen} columns={columns} />}
-          <button type="button" className="link" onClick={() => { setPicked([]); }}>Clear</button>
+          <IconButton label="Clear" tip="Clear selection" icon={<CloseIcon />} onClick={() => { setPicked([]); }} />
           {canEmail && picked.length > 10 && <span className="warning small">At most 10 in one email to the client.</span>}
         </div>
       )}
@@ -176,7 +177,7 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
         <section className="fit-panel" aria-label={`Fit of ${fitShown.candidateName}`}>
           <div className="row spread">
             <h4>{fitShown.candidateName} <FitBadge match={shownMatch} /></h4>
-            <button type="button" className="link" onClick={() => { setFitShown(null); }}>Close</button>
+            <IconButton label="Close" tip="Close fit details" icon={<CloseIcon />} onClick={() => { setFitShown(null); }} />
           </div>
           <FitReasons match={shownMatch} open />
         </section>
@@ -226,7 +227,6 @@ export function PipelineBoard({ jobId, canUpdate, permissions = [], children }: 
                     }}>{String(cards.length)}</button>
                 ) : <span className="count-chip">{String(cards.length)}</span>}
               </div>
-              {cards.length === 0 && <p className="column-empty">{col.stage === "placed" ? "Drag here when they accept" : "Nobody here"}</p>}
               <FoldedLines {...shared} apps={cards} lines={cards} onDragStart={setDragging} />
             </div>
           );
@@ -271,11 +271,11 @@ function AddCandidate({ jobId }: { jobId: string }) {
         onChange={(p) => { setPicked(p); add.reset(); }}
         queryKey={candidatesKey}
         placeholder="Add a candidate"
-        noMatch="No candidate matches. Add them under Candidates first."
+        noMatch="No matching candidates."
         search={async (q) =>
           unwrap(await api.GET("/v1/candidates", { params: { query: { q, limit: 8 } } })).items.map((c) => ({ id: c.id, name: c.fullName, detail: c.currentTitle }))}
       />
-      {picked && <button type="button" disabled={add.isPending} onClick={() => { add.mutate(picked.id); }}>Add to job</button>}
+      {picked && <IconButton label="Add to job" icon={<PlusIcon />} className="icon-outline" disabled={add.isPending} onClick={() => { add.mutate(picked.id); }} />}
       <ErrorMessage error={add.error} />
     </div>
   );
