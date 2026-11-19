@@ -213,8 +213,11 @@ them, in HiringPlug. Read-only rules and advanced editing are handled in Outlook
 Use **New message** to start an Outlook draft, or open one from **Drafts**.
 Save edits to the same draft, discard it to Deleted Items, send it now, or
 choose **Send later**. The editor accepts plain text. It keeps existing body
-formatting when the body has not been edited, and keeps Outlook attachments
-when other fields change. Use Outlook to add attachments or edit a rich body.
+formatting when the body has not been edited. Use **Attach file** to add a file
+up to 10 MB. Use the trash icon beside a file to remove it from the draft.
+Adding a file to a new message first saves it to Outlook Drafts. If you change
+attachments on a scheduled message, review the files and update the schedule.
+Use Outlook to edit a rich body or manage inline attachments.
 The candidate and client package composer continues to handle CV selection
 and formatted emails.
 

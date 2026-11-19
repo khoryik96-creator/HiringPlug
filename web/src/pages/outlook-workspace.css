@@ -127,6 +127,10 @@
 .outlook-copy-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 .outlook-draft-dialog .outlook-actions { flex-wrap: wrap; }
 .outlook-draft-dialog .outlook-schedule-time { align-items: end; }
+.outlook-draft-files { min-width: 0; margin: 0; }
+.outlook-draft-files > button { min-height: 34px; padding: .3rem .65rem; }
+.outlook-draft-files li > span { overflow-wrap: anywhere; min-width: 0; }
+.outlook-draft-files .icon-action[data-tip]::after { left: auto; right: 0; transform: none; }
 .outlook-send-row {
   display: flex;
   justify-content: space-between;

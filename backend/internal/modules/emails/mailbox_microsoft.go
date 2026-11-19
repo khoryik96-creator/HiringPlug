@@ -55,35 +55,7 @@ func (s *Service) sendLargeMicrosoftMail(ctx context.Context, endpoint OAuthProv
 		parts = append(parts, mail.Part{Name: "invite.ics", ContentType: "text/calendar", Data: []byte(msg.Calendar)})
 	}
 	for _, part := range parts {
-		if len(part.Data) < 3<<20 {
-			attachment := map[string]any{"@odata.type": "#microsoft.graph.fileAttachment", "name": part.Name, "contentType": part.ContentType, "contentBytes": base64.StdEncoding.EncodeToString(part.Data)}
-			if part.ContentID != "" {
-				attachment["isInline"] = true
-				attachment["contentId"] = part.ContentID
-			}
-			body, _ := json.Marshal(attachment)
-			if _, err = s.providerRequest(ctx, "POST", target+"/attachments", "application/json", token, body); err != nil {
-				return err
-			}
-			continue
-		}
-		item := map[string]any{"attachmentType": "file", "name": part.Name, "size": len(part.Data), "contentType": part.ContentType}
-		if part.ContentID != "" {
-			item["isInline"] = true
-			item["contentId"] = part.ContentID
-		}
-		body, _ := json.Marshal(map[string]any{"AttachmentItem": item})
-		raw, err := s.providerRequest(ctx, "POST", target+"/attachments/createUploadSession", "application/json", token, body)
-		if err != nil {
-			return err
-		}
-		var session struct {
-			UploadURL string `json:"uploadUrl"`
-		}
-		if json.Unmarshal(raw, &session) != nil || !s.trustedUploadURL(session.UploadURL, endpoint.SendURL) {
-			return errors.New("mail provider returned an invalid attachment upload address")
-		}
-		if err = s.uploadMicrosoftPart(ctx, session.UploadURL, part.Data); err != nil {
+		if err = s.putMicrosoftAttachment(ctx, endpoint, token, target, part, false); err != nil {
 			return err
 		}
 	}
@@ -92,6 +64,45 @@ func (s *Service) sendLargeMicrosoftMail(ctx context.Context, endpoint OAuthProv
 	}
 	sent = true
 	return nil
+}
+func (s *Service) putMicrosoftAttachment(ctx context.Context, endpoint OAuthProvider, token, target string, part mail.Part, immutableID bool) error {
+	post := func(route string, body any, out any) error {
+		if immutableID {
+			return s.outlookRequest(ctx, token, http.MethodPost, target+route, body, out)
+		}
+		data, _ := json.Marshal(body)
+		raw, err := s.providerRequest(ctx, http.MethodPost, target+route, "application/json", token, data)
+		if err != nil || out == nil {
+			return err
+		}
+		if json.Unmarshal(raw, out) != nil {
+			return errors.New("mail provider returned an invalid attachment upload session")
+		}
+		return nil
+	}
+	if len(part.Data) < 3<<20 {
+		attachment := map[string]any{"@odata.type": "#microsoft.graph.fileAttachment", "name": part.Name, "contentType": part.ContentType, "contentBytes": base64.StdEncoding.EncodeToString(part.Data)}
+		if part.ContentID != "" {
+			attachment["isInline"] = true
+			attachment["contentId"] = part.ContentID
+		}
+		return post("/attachments", attachment, nil)
+	}
+	item := map[string]any{"attachmentType": "file", "name": part.Name, "size": len(part.Data), "contentType": part.ContentType}
+	if part.ContentID != "" {
+		item["isInline"] = true
+		item["contentId"] = part.ContentID
+	}
+	var session struct {
+		UploadURL string `json:"uploadUrl"`
+	}
+	if err := post("/attachments/createUploadSession", map[string]any{"AttachmentItem": item}, &session); err != nil {
+		return err
+	}
+	if !s.trustedUploadURL(session.UploadURL, endpoint.SendURL) {
+		return errors.New("mail provider returned an invalid attachment upload address")
+	}
+	return s.uploadMicrosoftPart(ctx, session.UploadURL, part.Data)
 }
 func (s *Service) trustedUploadURL(address, sendURL string) bool {
 	parsed, err := url.Parse(address)

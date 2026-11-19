@@ -3005,6 +3005,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /v1/outlook/drafts/{messageId}/attachments:
+    post:
+      operationId: addOutlookDraftAttachment
+      tags: [emails]
+      summary: Add a file to an Outlook draft
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^omg_[0-9a-z]{26}$'}
+        - name: version
+          in: query
+          required: true
+          schema: {type: string, minLength: 64, maxLength: 64, pattern: '^[a-f0-9]+$'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '200':
+          description: Updated draft
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutlookDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/outlook/drafts/{messageId}/attachments/{attachmentId}:
+    delete:
+      operationId: removeOutlookDraftAttachment
+      tags: [emails]
+      summary: Remove a file from an Outlook draft
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^omg_[0-9a-z]{26}$'}
+        - name: attachmentId
+          in: path
+          required: true
+          schema: {type: string, maxLength: 1400, pattern: '^[A-Za-z0-9_-]+$'}
+        - name: version
+          in: query
+          required: true
+          schema: {type: string, minLength: 64, maxLength: 64, pattern: '^[a-f0-9]+$'}
+      responses:
+        '200':
+          description: Updated draft
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutlookDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/outlook/drafts/{messageId}/send:
     put:
       operationId: scheduleOutlookDraft
