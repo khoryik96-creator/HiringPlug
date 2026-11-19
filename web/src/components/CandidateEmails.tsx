@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { candidateApplicationsKey, candidateEmailsKey } from "../api/keys";
 import { EMAIL_STATUS, formatWhen } from "../labels";
+import { IconButton, MailIcon } from "./ActionIcons";
 import { CandidateBookings } from "./CandidateBookings";
 import { EmailComposer } from "./EmailComposer";
 import { OutlookProfileMail } from "./outlook/OutlookProfileMail";
@@ -30,7 +31,7 @@ export function CandidateEmails({ candidateId, email, permissions, writing: cont
     <section className="panel" aria-label="Emails">
       <div className="row spread">
         <h3>Emails</h3>
-        {canSend && !writing && <button type="button" onClick={() => { setWriting(true); }}>Write email</button>}
+        {canSend && !writing && <IconButton label="Write email" icon={<MailIcon />} onClick={() => { setWriting(true); }} />}
       </div>
       {writing && (
         <EmailComposer permissions={permissions}

@@ -11,6 +11,7 @@
 .calendar-weekdays { border:1px solid #e4dcf6; border-bottom:0; border-radius:8px 8px 0 0; color:#726982; background:#f8f6fc; }
 .calendar-weekdays span { padding:.6rem; font-size:.75rem; }
 .calendar-grid { border-left:1px solid #e4dcf6; border-top:1px solid #e4dcf6; }
+.calendar-month-scroll { overflow-x:auto; }
 .calendar-day { min-height:105px; border-right:1px solid #e4dcf6; border-bottom:1px solid #e4dcf6; padding:.35rem; overflow:hidden; }
 .calendar-outside { background:#faf9fc; color:#a39cad; }
 .calendar-date { border:0; padding:.18rem; min-width:1.6rem; font-size:.75rem; background:none; box-shadow:none; margin-bottom:.25rem; }
@@ -26,7 +27,24 @@
 .calendar-overlay > .panel { width:min(650px,100%); max-height:90vh; overflow-y:auto; margin:0; background:white; box-shadow:0 12px 55px #241a3a40; }
 .calendar-form .calendar-heading { margin-bottom:1rem; }
 .calendar-notes { white-space:pre-wrap; }
-@media(max-width:700px) { .calendar-workspace { overflow:auto; } .calendar-grid,.calendar-weekdays { min-width:650px; } .calendar-agenda-day { grid-template-columns:95px 1fr; gap:.5rem; } .calendar-toolbar .row { flex-wrap:wrap; } }
+@media(max-width:700px) { .calendar-grid,.calendar-weekdays { min-width:650px; } .calendar-agenda-day { grid-template-columns:95px 1fr; gap:.5rem; } .calendar-toolbar .row { flex-wrap:wrap; } }
+
+.calendar-dock .calendar-page { padding:.75rem; }
+.calendar-dock-controls { align-items:flex-start; }
+.calendar-dock-controls > .icon-action { margin-left:auto; flex-shrink:0; }
+.calendar-dock-controls > .icon-action::after { left:auto; right:0; transform:none; }
+.calendar-dock-connection { margin:.5rem 0; font-size:.8rem; color:var(--muted); }
+.calendar-dock-connection summary { cursor:pointer; }
+.calendar-dock .calendar-connection { overflow-wrap:anywhere; }
+.calendar-dock .calendar-workspace { margin-top:.75rem; padding:.65rem; }
+.calendar-dock .calendar-toolbar { gap:.5rem; }
+.calendar-dock .calendar-toolbar .row { flex-wrap:wrap; gap:.25rem; }
+.calendar-dock .calendar-toolbar button { min-height:32px; padding:.25rem .55rem; font-size:.8rem; }
+.calendar-dock .calendar-toolbar h3 { flex-basis:100%; margin:.2rem 0; }
+.calendar-dock :is(.calendar-grid, .calendar-weekdays) { min-width:650px; }
+.calendar-dock .calendar-agenda-day { grid-template-columns:90px minmax(0,1fr); gap:.4rem; }
+.calendar-dock .calendar-day-view { --day-label-width:65px; }
+.calendar-dock .calendar-time-labels > time { white-space:nowrap; padding-inline:.35rem; }
 
 .calendar-cancelled { text-decoration:line-through; opacity:.7; }
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Candidate, type Schemas, unwrap } from "../api/client";
 import { candidateKey } from "../api/keys";
 import { formatPeriod } from "../labels";
+import { EditIcon, IconButton } from "./ActionIcons";
 import { SaveError } from "./SaveError";
 
 type Work = Schemas["WorkEntry"];
@@ -18,7 +19,7 @@ export function History({ candidate, canEdit }: { candidate: Candidate; canEdit:
     <section className="panel" aria-label="Work history and education">
       <div className="row spread">
         <h3>Work history</h3>
-        {canEdit && <button type="button" onClick={() => { setEditing(true); }}>Edit history</button>}
+        {canEdit && <IconButton label="Edit history" icon={<EditIcon />} onClick={() => { setEditing(true); }} />}
       </div>
       {experience.length === 0 ? <p className="muted">None recorded.</p> : (
         <ul>

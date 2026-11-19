@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { Candidate, Compensation } from "../api/client";
 import { PAY_PERIOD } from "../labels";
+import { EditIcon, IconButton, PlusIcon } from "./ActionIcons";
 import { SalaryForm } from "./SalaryForm";
 
 type Salary = NonNullable<Compensation["currentSalary"]>;
@@ -39,9 +40,8 @@ export function SalaryPanel({ candidate, canEdit = false, editing: shownEditing,
       <div className="row spread">
         <h3>Salary</h3>
         {canEdit && !editing && (
-          <button type="button" onClick={() => { setEditing(true); }}>
-            {comp ? "Edit salary" : "Add salary"}
-          </button>
+          <IconButton label={comp ? "Edit salary" : "Add salary"} icon={comp ? <EditIcon /> : <PlusIcon />}
+            onClick={() => { setEditing(true); }} />
         )}
       </div>
       {editing ? (

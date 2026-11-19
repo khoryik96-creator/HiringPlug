@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 
 import type { Document } from "../api/client";
+import { IconButton, ReferenceIcon, TextIcon } from "./ActionIcons";
 import { fill, ProgressLine, useNow } from "./StudioProgress";
 
 const TYPICAL = 15; // seconds reading a CV usually takes
@@ -39,16 +40,14 @@ export function DetailsButton({ doc, ready, reviewing, canReview, canRead, busy,
   if (isReading(doc)) return <ReadingButton doc={doc} />;
   if (doc.parseStatus === "parsed" && canReview) {
     return (
-      <button type="button" className={`doc-btn ${ready ? "format-done" : "primary-soft"}`} aria-pressed={reviewing} onClick={onReview}>
-        {reviewing ? "Close review" : "Review details"}
-      </button>
+      <IconButton label={reviewing ? "Close review" : "Review details"} icon={<ReferenceIcon />}
+        className={ready ? "icon-done" : "icon-soft"} pressed={reviewing} onClick={onReview} />
     );
   }
   if (canRead && doc.status === "extracted") {
     return (
-      <button type="button" className="doc-btn primary-soft" disabled={busy} onClick={onRead}>
-        {doc.parseStatus === "failed" ? "Read details again" : "Read details"}
-      </button>
+      <IconButton label={doc.parseStatus === "failed" ? "Read details again" : "Read details"} icon={<TextIcon />}
+        className="icon-soft" disabled={busy} onClick={onRead} />
     );
   }
   return null;

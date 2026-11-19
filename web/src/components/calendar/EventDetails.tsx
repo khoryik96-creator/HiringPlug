@@ -9,7 +9,7 @@ export function EventDetails({ event, onClose, onEdit, onChanged }: { event: Sch
     return unwrap(await api.POST(path, { params: { path: { eventId: event.id } }, body: { version: event.version } }));
   }, onSuccess: onChanged });
   return <section className="panel calendar-detail" role="dialog" aria-modal="true" aria-label="Appointment details">
-    <div className="calendar-heading"><span className="badge">{event.source === "local" ? "Appointment" : event.source === "interview_invitation" ? "Interview invitation" : event.source}</span><button onClick={onClose}>Close</button></div>
+    <div className="calendar-heading"><span className="badge">{event.source === "local" ? "Appointment" : event.source === "interview_invitation" ? "Interview invitation" : event.source}</span><button autoFocus onClick={onClose}>Close</button></div>
     <h3>{event.title}</h3>{event.status === "cancelled" && <p className="warning">Cancelled in HiringPlug; Outlook cancellation is awaiting confirmation.</p>}<p>{dateLabel(new Date(event.startsAt))} · {event.allDay ? "All day" : `${timeLabel(event.startsAt)} – ${timeLabel(event.endsAt)}`}</p>
     {event.location && <p>{event.location}</p>}
     {event.notes && <p className="calendar-notes">{event.notes}</p>}

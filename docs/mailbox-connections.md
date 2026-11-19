@@ -152,7 +152,7 @@ adding `Calendars.ReadWrite`; existing mailbox tokens/scopes remain separate.
 
 ## Outlook Mail
 
-Open **More > Outlook** after connecting Microsoft. Choose **Enable sync**
+Open the Outlook icon beside Calendar after connecting Microsoft. Choose **Enable sync**
 to index your personal Outlook mailbox in this agency. Outbound email keeps working
 through the same connection. Outlook Mail uses the existing delegated Microsoft
 permissions. Shared or delegated mailboxes require a separate workflow.

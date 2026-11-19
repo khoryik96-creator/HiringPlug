@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
 import { downloadDocument, uploadCandidateDocument } from "../api/files";
+import { CloseIcon, IconButton, ReferenceIcon, SideBySideIcon, SparkIcon, UploadIcon } from "./ActionIcons";
 import { CandidateCv } from "./CandidateCv";
 import { latestCv } from "./CvPane";
 import { CvCompare } from "./CvCompare";
@@ -181,18 +182,18 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       <div className="docs-head">
         <h3>CVs and documents</h3>
         <div className="docs-actions">
-          {all.length >= 2 && <button type="button" className={comparing ? "doc-btn primary-soft" : "doc-btn"} aria-pressed={comparing}
-            onClick={() => { setComparing(!comparing); }}>{comparing ? "Back to one CV" : "Compare side by side"}</button>}
+          {all.length >= 2 && <IconButton label={comparing ? "Back to one CV" : "Compare side by side"}
+            icon={<SideBySideIcon />} pressed={comparing} onClick={() => { setComparing(!comparing); }} />}
           {canFormat && !formatting && (studio.running
             ? <button type="button" className="doc-btn format-running" disabled>Formatting… {studio.seconds}s</button>
             : studio.finished?.status === "done"
               ? <button type="button" className="doc-btn format-done" onClick={() => { const id = studio.finished?.documentId; if (id) setPicked(id); studio.acknowledge(); }}>Done</button>
-              : <button type="button" className="doc-btn" onClick={() => {
+              : <IconButton label="Format a CV" icon={<SparkIcon />} onClick={() => {
                 studio.acknowledge();
                 if (all.some((d) => d.source === "formatted")) setAgain(true); else setFormatting(true);
-              }}>Format a CV</button>)}
-          {canUpload && !uploading && <button type="button" className="doc-btn primary" onClick={() => { setUploading(true); }}>Upload</button>}
-          {uploading && <button type="button" className="doc-btn" onClick={() => { setUploading(false); }}>Cancel upload</button>}
+              }} />)}
+          {canUpload && !uploading && <IconButton label="Upload" icon={<UploadIcon />} className="icon-primary" onClick={() => { setUploading(true); }} />}
+          {uploading && <IconButton label="Cancel upload" icon={<CloseIcon />} onClick={() => { setUploading(false); }} />}
         </div>
       </div>
       {uploading && (
@@ -239,7 +240,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
       {oneCv && selected.extractionWarnings.map((w) => <p key={w} className="warning small">{w}</p>)}
       {oneCv && <ReadProgress doc={selected} finished={finished(selected)}
         action={selected.parseStatus === "parsed" && canEdit && selected.source !== "formatted" && reviewing !== selected.id
-          ? <button type="button" className="doc-btn format-done" onClick={() => { review(selected.id); }}>Review details</button> : null}
+          ? <IconButton label="Review details" icon={<ReferenceIcon />} className="icon-done" onClick={() => { review(selected.id); }} /> : null}
         onDismiss={() => { forget(selected.id); }} />}
       {oneCv && <div className={reviewed ? "cv-workspace reviewing" : "cv-workspace"}>
         {/* Reviewing: the details beside the CV they came from, in place of the list of files. */}

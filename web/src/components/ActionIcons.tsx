@@ -31,6 +31,24 @@ export const LeaveIcon = () => <Svg><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-
 export const MailCheckIcon = () => (
   <Svg><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7" /><path d="m3 7 9 6 9-6" /><path d="m16 19 2 2 4-4" /></Svg>
 );
+export const PlusIcon = () => <Svg><path d="M12 5v14M5 12h14" /></Svg>;
+export const CloseIcon = () => <Svg><path d="m6 6 12 12M18 6 6 18" /></Svg>;
+export const SideBySideIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M12 5v14" /></Svg>;
+export const DockRightIcon = () => <Svg><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M15 5v14m-8-7h4m-2-2 2 2-2 2" /></Svg>;
+export const OutlookIcon = () => (
+  <Svg><rect x="2" y="4" width="11" height="15" rx="2" /><ellipse cx="7.5" cy="11.5" rx="2.2" ry="2.8" /><path d="M13 6h6a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2m5-9 4 3 4-3" /></Svg>
+);
+export const UploadIcon = () => (
+  <Svg><path d="M12 16V4m-5 5 5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></Svg>
+);
+export const FileIcon = () => <Svg><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9ZM14 3v6h6" /></Svg>;
+export const TextIcon = () => <Svg><path d="M4 6h16M4 10h16M4 14h16M4 18h10" /></Svg>;
+export const CalendarPlusIcon = () => (
+  <Svg><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4m8-4v4M3 10h18m-9 3v5m-2.5-2.5h5" /></Svg>
+);
+export const OfferIcon = () => (
+  <Svg><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 7h8m-8 4h8m-7 5 2 2 4-4" /></Svg>
+);
 
 /**
  * A page's actions as a neat row of icons (.icon-actions): each named for
@@ -40,14 +58,16 @@ export function IconActions({ label, children }: { label: string; children: Reac
   return <span className="icon-actions" role="toolbar" aria-label={label}>{children}</span>;
 }
 
-export function IconButton({ label, icon, onClick, disabled = false, tip = label, danger = false }: {
+export function IconButton({ label, icon, onClick, disabled = false, tip = label, danger = false, pressed, className = "" }: {
   label: string; icon: ReactNode; onClick: () => void; disabled?: boolean; tip?: string;
   /** Deletes or removes something: red on hover. */
   danger?: boolean;
+  pressed?: boolean;
+  className?: string;
 }) {
   return (
-    <button type="button" className={danger ? "icon-action icon-danger" : "icon-action"} aria-label={label} data-tip={tip}
-      disabled={disabled} onClick={onClick}>{icon}</button>
+    <button type="button" className={["icon-action", danger && "icon-danger", className].filter(Boolean).join(" ")}
+      aria-label={label} aria-pressed={pressed} data-tip={tip} disabled={disabled} onClick={onClick}>{icon}</button>
   );
 }
 

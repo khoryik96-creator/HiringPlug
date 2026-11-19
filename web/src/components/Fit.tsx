@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Permission, type Schemas, unwrap } from "../api/client";
 import { applicationMatchKey, jobMatchesKey, matchesKey } from "../api/keys";
 import { formatWhen, MATCH_VERDICT } from "../labels";
-import { SparkIcon } from "./ActionIcons";
+import { IconButton, SparkIcon } from "./ActionIcons";
 import { ErrorMessage } from "./ErrorMessage";
 import { FitStats } from "./FitStats";
 
@@ -125,9 +125,8 @@ export function ApplicationFit({ applicationId, permissions }: { applicationId: 
     <div className="application-fit">
       <FitBadge match={match} />{" "}
       {canScore && (
-        <button type="button" className="link" disabled={score.isPending} onClick={() => { score.mutate(); }}>
-          {match ? "Score again" : "Score fit"}
-        </button>
+        <IconButton label={match ? "Score again" : "Score fit"} icon={<SparkIcon />} disabled={score.isPending}
+          onClick={() => { score.mutate(); }} />
       )}
       <ErrorMessage error={score.error ?? list.error} />
       {match && <FitReasons match={match} />}
