@@ -40,6 +40,9 @@ x-module:
     OUTLOOK_NOT_CONNECTED:
       status: 409
       description: Connect a personal Microsoft mailbox and enable inbox sync.
+    OUTLOOK_RULES_ACCESS:
+      status: 403
+      description: The connected Outlook mailbox needs delegated permission to manage inbox rules.
     OUTLOOK_ATTACHMENT_TOO_LARGE:
       status: 413
       description: The Outlook attachment exceeds the in-app download limit.
@@ -66,6 +69,106 @@ x-module:
       description: Incrementally index the connected recruiter's Outlook folders.
 
 paths:
+  /v1/outlook/rules:
+    get:
+      operationId: listOutlookRules
+      tags: [emails]
+      summary: List inbox rules in the current user's Outlook mailbox
+      x-permission: emails:send
+      responses:
+        '200':
+          description: Outlook inbox rules and available destinations
+          headers:
+            Cache-Control: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OutlookRuleList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          description: Outlook rules are unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      operationId: createOutlookRule
+      tags: [emails]
+      summary: Create an Outlook inbox rule that moves incoming messages to a folder
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OutlookRuleInput' }
+      responses:
+        '201':
+          description: Outlook rule saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OutlookRule' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          description: Outlook rules are unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/outlook/rules/{ruleId}:
+    parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema: { type: string, maxLength: 1400, pattern: '^[A-Za-z0-9_-]+$' }
+    patch:
+      operationId: setOutlookRuleEnabled
+      tags: [emails]
+      summary: Enable or disable an existing Outlook inbox rule
+      x-permission: emails:send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '204': { description: Rule updated }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          description: Outlook rules are unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      operationId: deleteOutlookRule
+      tags: [emails]
+      summary: Delete an Outlook inbox rule from the user's mailbox
+      x-permission: emails:send
+      responses:
+        '204': { description: Rule deleted }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          description: Outlook rules are unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /v1/outlook/mail:
     get:
       operationId: listOutlookMail
@@ -1037,6 +1140,41 @@ components:
         nextOffset:
           type: integer
           nullable: true
+    OutlookRuleInput:
+      type: object
+      additionalProperties: false
+      required: [name, folderId]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        folderId: { type: string, pattern: '^omf_[0-9a-z]{26}$' }
+        fromAddress: { type: string, format: email, maxLength: 254 }
+        subjectContains: { type: string, minLength: 1, maxLength: 120 }
+    OutlookRule:
+      type: object
+      required: [id, name, enabled, readOnly, hasError, destination]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        enabled: { type: boolean }
+        readOnly: { type: boolean }
+        hasError: { type: boolean }
+        destination: { type: string }
+    OutlookRuleList:
+      type: object
+      required: [items, folders]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OutlookRule' }
+        folders:
+          type: array
+          items: { $ref: '#/components/schemas/OutlookRuleFolder' }
+    OutlookRuleFolder:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
     OutlookMessageBody:
       type: object
       required:
@@ -1241,6 +1379,9 @@ components:
           enum:
           - microsoft
           - google
+        inboxRules:
+          type: boolean
+          description: Request inbox-rule access for the existing Microsoft mailbox.
     MailboxAuthorization:
       type: object
       required:

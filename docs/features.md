@@ -1637,4 +1637,6 @@ selection, duplicate checks and CV parsing.
 Save reply drafts in Outlook or open a message there to see original formatting
 and linked attachments. **My Outlook conversations** on candidate and contact Email
 tabs links private threads after the recruiter confirms an exact email match.
+**Inbox rules** can move incoming messages to a selected Outlook folder based
+on the sender address or words in the subject.
 See [Outlook Mail setup](mailbox-connections.md#outlook-mail).

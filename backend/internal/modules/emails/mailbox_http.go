@@ -44,7 +44,8 @@ func (h *HTTP) AuthorizeMailbox(ctx context.Context, r api.AuthorizeMailboxReque
 	if err != nil {
 		return nil, err
 	}
-	target, err := h.svc.authorizeMailbox(ctx, p, string(r.Body.Provider))
+	rules := r.Body.InboxRules != nil && *r.Body.InboxRules
+	target, err := h.svc.authorizeMailbox(ctx, p, string(r.Body.Provider), rules)
 	if err != nil {
 		return nil, err
 	}

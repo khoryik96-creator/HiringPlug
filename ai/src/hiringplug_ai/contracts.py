@@ -149,6 +149,7 @@ class ErrorCode(StrEnum):
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
     OUTLOOK_ATTACHMENT_TOO_LARGE = "OUTLOOK_ATTACHMENT_TOO_LARGE"
     OUTLOOK_NOT_CONNECTED = "OUTLOOK_NOT_CONNECTED"
+    OUTLOOK_RULES_ACCESS = "OUTLOOK_RULES_ACCESS"
     OUTLOOK_UNAVAILABLE = "OUTLOOK_UNAVAILABLE"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
     PLACEMENT_NOT_ALLOWED = "PLACEMENT_NOT_ALLOWED"
@@ -2522,6 +2523,30 @@ class OutlookMailPage(BaseModel):
     nextOffset: Annotated[int | None, Field(...)]
 
 
+class OutlookRuleInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: Annotated[str, Field(max_length=120, min_length=1)]
+    folderId: Annotated[str, Field(pattern="^omf_[0-9a-z]{26}$")]
+    fromAddress: Annotated[EmailStr | None, Field(max_length=254)] = None
+    subjectContains: Annotated[str | None, Field(max_length=120, min_length=1)] = None
+
+
+class OutlookRule(BaseModel):
+    id: str
+    name: str
+    enabled: bool
+    readOnly: bool
+    hasError: bool
+    destination: str
+
+
+class OutlookRuleFolder(BaseModel):
+    id: str
+    name: str
+
+
 class OutlookMessageBody(BaseModel):
     text: str
     truncated: bool
@@ -2662,6 +2687,9 @@ class MailboxAuthorizeInput(BaseModel):
         extra="forbid",
     )
     provider: Provider
+    inboxRules: Annotated[
+        bool | None, Field(description="Request inbox-rule access for the existing Microsoft mailbox.")
+    ] = None
 
 
 class MailboxAuthorization(BaseModel):
@@ -6584,6 +6612,11 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class OutlookRuleList(BaseModel):
+    items: list[OutlookRule]
+    folders: list[OutlookRuleFolder]
 
 
 class OutlookAttachmentList(BaseModel):

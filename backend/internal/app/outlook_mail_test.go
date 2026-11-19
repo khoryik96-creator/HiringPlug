@@ -108,7 +108,22 @@ func outlookRecipientJSON(address string) map[string]any {
 func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixture {
 	t.Helper()
 	f := &outlookMailFixture{folder: "inbox"}
-	server := httptest.NewServer(http.HandlerFunc(f.serve))
+	configureOutlookFixture(t, a, http.HandlerFunc(f.serve))
+	r := a.request("POST", "/v1/mailbox/authorize", token, map[string]any{"provider": "microsoft"})
+	require.Equal(t, 200, r.Status, "%s", r.Body)
+	var start api.MailboxAuthorization
+	r.JSON(&start)
+	target, err := url.Parse(start.Url)
+	require.NoError(t, err)
+	require.NotContains(t, target.Query().Get("scope"), "MailboxSettings.ReadWrite")
+	r = finishOutlookFixture(t, a, token, target, "synthetic-code")
+	require.Equal(t, 200, r.Status, "%s", r.Body)
+	return f
+}
+
+func configureOutlookFixture(t *testing.T, a *testApp, handler http.Handler) {
+	t.Helper()
+	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 	a.modules.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
 		KeysSecret: []byte("synthetic-mailbox-encryption-key-32-chars"),
@@ -119,18 +134,14 @@ func setupOutlookMail(t *testing.T, a *testApp, token string) *outlookMailFixtur
 			SendURL: server.URL + "/me/sendMail", Scope: "Mail.ReadWrite Mail.Send",
 		}},
 	})
-	r := a.request("POST", "/v1/mailbox/authorize", token, map[string]any{"provider": "microsoft"})
-	require.Equal(t, 200, r.Status, "%s", r.Body)
-	var start api.MailboxAuthorization
-	r.JSON(&start)
-	target, err := url.Parse(start.Url)
-	require.NoError(t, err)
-	callback := "/v1/mailbox/callback?" + url.Values{"state": {target.Query().Get("state")}, "code": {"synthetic-code"}}.Encode()
-	r = a.request("GET", callback, "", nil)
+}
+
+func finishOutlookFixture(t *testing.T, a *testApp, token string, target *url.URL, code string) *response {
+	t.Helper()
+	callback := "/v1/mailbox/callback?" + url.Values{"state": {target.Query().Get("state")}, "code": {code}}.Encode()
+	r := a.request("GET", callback, "", nil)
 	require.Equal(t, 303, r.Status)
-	r = a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": mailboxTicket(t, r.Header.Get("Location"))})
-	require.Equal(t, 200, r.Status, "%s", r.Body)
-	return f
+	return a.request("POST", "/v1/mailbox/complete", token, map[string]any{"ticket": mailboxTicket(t, r.Header.Get("Location"))})
 }
 
 func TestOutlookMailSyncActionsAndProfilePrivacy(t *testing.T) {

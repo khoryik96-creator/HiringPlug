@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,8 @@ type outlookGraphError struct {
 	status int
 	retry  time.Time
 }
+
+var outlookGraphID = regexp.MustCompile(`^[A-Za-z0-9_+=/-]{1,1000}$`)
 
 func (e *outlookGraphError) Error() string {
 	return fmt.Sprintf("outlook mail request failed (HTTP %d)", e.status)
@@ -106,7 +109,7 @@ func outlookFolderPath(path string) string {
 	if !strings.HasPrefix(tail, "/") {
 		return lower[:start] + tail
 	}
-	for _, suffix := range []string{"/messages/delta", "/childfolders"} {
+	for _, suffix := range []string{"/messages/delta", "/childfolders", "/messagerules"} {
 		if strings.HasSuffix(strings.ToLower(tail), suffix) {
 			return lower[:start] + tail[:len(tail)-len(suffix)] + suffix
 		}

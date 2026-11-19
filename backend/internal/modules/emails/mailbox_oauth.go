@@ -51,6 +51,14 @@ func (s *Service) callbackURL() string {
 type oauthState struct {
 	Tenant, User, Provider, Nonce string
 	Expires                       int64
+	RulesMailbox                  string `json:",omitempty"`
+	RulesAccount                  string `json:",omitempty"`
+}
+
+const outlookRulesScope = "MailboxSettings.ReadWrite"
+
+type parkedMailboxGrant struct {
+	Code, RulesMailbox, RulesAccount string
 }
 
 func randomMailboxToken() string {
@@ -95,8 +103,11 @@ func (s *Service) readMailboxState(state string) (oauthState, error) {
 	}
 	return claim, nil
 }
-func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provider string) (string, error) {
+func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provider string, rules bool) (string, error) {
 	endpoint := s.endpoint(provider)
+	if rules && provider != ProviderMicrosoft {
+		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "Inbox rules use an Outlook mailbox."}})
+	}
 	if len(s.connections.KeysSecret) < 32 {
 		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "mailbox encryption is not configured on this server"}})
 	}
@@ -108,18 +119,39 @@ func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provi
 		return "", apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "this provider's app is not set up: an owner or admin enters it in Settings > Email connection"}})
 	}
 	expires := time.Now().Add(10 * time.Minute)
-	state := s.signMailboxState(oauthState{Tenant: p.TenantID, User: p.UserID, Provider: provider, Nonce: randomMailboxToken(), Expires: expires.Unix()})
+	claim := oauthState{Tenant: p.TenantID, User: p.UserID, Provider: provider, Nonce: randomMailboxToken(), Expires: expires.Unix()}
 	verifier := randomMailboxToken()
 	challenge := sha256.Sum256([]byte(verifier))
 	sealed, err := s.sealMailbox(p.TenantID, p.UserID, "state:"+provider, verifier)
 	if err != nil {
 		return "", err
 	}
+	var state string
 	err = database.InTx(ctx, s.pool, p, func(tx pgx.Tx) error {
-		if err := store.New(tx).LockMailboxUser(ctx); err != nil {
+		q := store.New(tx)
+		if err := q.LockMailboxUser(ctx); err != nil {
 			return err
 		}
-		return store.New(tx).SaveMailboxState(ctx, store.SaveMailboxStateParams{StateHash: stateHash(state), Provider: provider, SealedVerifier: sealed, ExpiresAt: expires})
+		if rules {
+			box, err := q.MailboxForUser(ctx, p.UserID)
+			if database.IsNoRows(err) || err == nil && box.Provider != ProviderMicrosoft {
+				return apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "Connect your Outlook mailbox first."}})
+			}
+			if err != nil {
+				return err
+			}
+			accessToken, err := s.mailboxAccess(ctx, box)
+			if err != nil {
+				return apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "Reconnect your Outlook mailbox before enabling inbox rules."}})
+			}
+			account, err := s.outlookAccountID(ctx, accessToken)
+			if err != nil {
+				return apperr.Validation(apperr.FieldErrors{{Field: "provider", Message: "Could not confirm the connected Outlook account. Try again."}})
+			}
+			claim.RulesMailbox, claim.RulesAccount = box.ID, account
+		}
+		state = s.signMailboxState(claim)
+		return q.SaveMailboxState(ctx, store.SaveMailboxStateParams{StateHash: stateHash(state), Provider: provider, SealedVerifier: sealed, ExpiresAt: expires})
 	})
 	if err != nil {
 		return "", err
@@ -130,6 +162,9 @@ func (s *Service) authorizeMailbox(ctx context.Context, p authz.Principal, provi
 	q.Set("redirect_uri", s.callbackURL())
 	q.Set("response_type", "code")
 	q.Set("scope", endpoint.Scope)
+	if rules {
+		q.Set("scope", endpoint.Scope+" "+outlookRulesScope)
+	}
 	q.Set("state", state)
 	q.Set("code_challenge", base64.RawURLEncoding.EncodeToString(challenge[:]))
 	q.Set("code_challenge_method", "S256")
@@ -157,7 +192,11 @@ func (s *Service) parkMailbox(ctx context.Context, state, code, denied string) (
 	var sealedCode, ticketHash *string
 	ticket := ""
 	if denied == "" && code != "" {
-		sealed, err := s.sealMailbox(claim.Tenant, claim.User, "code:"+claim.Provider, code)
+		var grant any = code
+		if claim.RulesMailbox != "" {
+			grant = parkedMailboxGrant{Code: code, RulesMailbox: claim.RulesMailbox, RulesAccount: claim.RulesAccount}
+		}
+		sealed, err := s.sealMailbox(claim.Tenant, claim.User, "code:"+claim.Provider, grant)
 		if err != nil {
 			return "", err
 		}
@@ -199,25 +238,48 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 	if err != nil {
 		return err
 	}
-	var verifier, code string
+	var verifier string
 	if err = s.openMailbox(p.TenantID, p.UserID, "state:"+saved.Provider, saved.SealedVerifier, &verifier); err != nil {
 		return err
 	}
-	if err = s.openMailbox(p.TenantID, p.UserID, "code:"+saved.Provider, *saved.SealedCode, &code); err != nil {
+	var raw json.RawMessage
+	if err = s.openMailbox(p.TenantID, p.UserID, "code:"+saved.Provider, *saved.SealedCode, &raw); err != nil {
 		return err
+	}
+	var grant parkedMailboxGrant
+	if err := json.Unmarshal(raw, &grant); err != nil {
+		// Codes parked before optional Inbox Rules consent were encrypted as strings.
+		if err := json.Unmarshal(raw, &grant.Code); err != nil {
+			return notCompleted
+		}
+	}
+	if grant.Code == "" {
+		return notCompleted
 	}
 	endpoint := s.endpoint(saved.Provider)
 	app, err := s.appIn(ctx, p, saved.Provider)
 	if err != nil {
 		return err
 	}
-	tokens, err := s.exchangeMailboxToken(ctx, endpoint, app, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {s.callbackURL()}, "code_verifier": {verifier}})
+	tokens, err := s.exchangeMailboxToken(ctx, endpoint, app, url.Values{"grant_type": {"authorization_code"}, "code": {grant.Code}, "redirect_uri": {s.callbackURL()}, "code_verifier": {verifier}})
 	if err != nil {
 		return notCompleted
 	}
 	address, err := s.mailboxProfile(ctx, saved.Provider, endpoint, tokens.AccessToken)
 	if err != nil {
 		return notCompleted
+	}
+	if grant.RulesMailbox != "" {
+		if tokens.RefreshToken == "" {
+			return notCompleted
+		}
+		account, err := s.outlookAccountID(ctx, tokens.AccessToken)
+		if err != nil || account != grant.RulesAccount {
+			return apperr.Validation(apperr.FieldErrors{{Field: "ticket", Message: "Sign in to the same Outlook mailbox to enable inbox rules."}})
+		}
+		if _, err := s.remoteOutlookRules(ctx, tokens.AccessToken); err != nil {
+			return notCompleted
+		}
 	}
 	sealed, err := s.sealMailbox(p.TenantID, p.UserID, saved.Provider, tokens)
 	if err != nil {
@@ -234,13 +296,24 @@ func (s *Service) finishMailbox(ctx context.Context, p authz.Principal, ticket s
 		if claimed != 1 {
 			return notCompleted // cancelled or replaced meanwhile
 		}
-		if _, err := store.New(tx).MailboxForUser(ctx, p.UserID); err != nil && !database.IsNoRows(err) {
+		q := store.New(tx)
+		box, err := q.MailboxForUser(ctx, p.UserID)
+		if err != nil && !database.IsNoRows(err) {
 			return err
 		}
-		if err := store.New(tx).RemoveOutlookSync(ctx); err != nil {
+		if grant.RulesMailbox != "" {
+			if box.ID != grant.RulesMailbox || box.Provider != ProviderMicrosoft || box.Address != address {
+				return apperr.Validation(apperr.FieldErrors{{Field: "ticket", Message: "Sign in to the same Outlook mailbox to enable inbox rules."}})
+			}
+			if err := q.RefreshMailboxSecret(ctx, store.RefreshMailboxSecretParams{ID: box.ID, SealedSecret: sealed}); err != nil {
+				return err
+			}
+			return audit.Record(ctx, tx, audit.Entry{Action: "outlook.rules_access_granted", EntityType: "user", EntityID: p.UserID})
+		}
+		if err := q.RemoveOutlookSync(ctx); err != nil {
 			return err
 		}
-		_, err = store.New(tx).SaveMailbox(ctx, store.SaveMailboxParams{Provider: saved.Provider, Address: address, SealedSecret: sealed})
+		_, err = q.SaveMailbox(ctx, store.SaveMailboxParams{Provider: saved.Provider, Address: address, SealedSecret: sealed})
 		if err != nil {
 			return err
 		}
