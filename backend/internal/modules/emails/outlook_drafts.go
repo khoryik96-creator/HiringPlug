@@ -279,10 +279,7 @@ func (s *Service) newOutlookDraft(ctx context.Context, q *store.Queries, p authz
 	if err != nil {
 		return zero, false, err
 	}
-	folder, err := q.OutlookDraftFolder(ctx, box.ID)
-	if database.IsNoRows(err) {
-		return zero, false, apperr.New(api.ErrorCodeOUTLOOKUNAVAILABLE, "Enable Outlook sync and wait for the Drafts folder to finish loading.")
-	}
+	folder, err := outlookDraftFolderForCreate(ctx, q, box.ID)
 	if err != nil {
 		return zero, false, err
 	}
@@ -295,14 +292,27 @@ func (s *Service) newOutlookDraft(ctx context.Context, q *store.Queries, p authz
 	if err != nil {
 		return zero, false, outlookFailure(err, true)
 	}
+	draft, err := indexNewOutlookDraft(ctx, q, box.ID, folder.ID, remote)
+	return draft, true, err
+}
+
+func outlookDraftFolderForCreate(ctx context.Context, q *store.Queries, mailbox string) (store.EmailOutlookFolder, error) {
+	folder, err := q.OutlookDraftFolder(ctx, mailbox)
+	if database.IsNoRows(err) {
+		return folder, apperr.New(api.ErrorCodeOUTLOOKUNAVAILABLE, "Enable Outlook sync and wait for the Drafts folder to finish loading.")
+	}
+	return folder, err
+}
+
+func indexNewOutlookDraft(ctx context.Context, q *store.Queries, box, folder string, remote outlookRemoteMessage) (api.OutlookDraft, error) {
 	if !remote.IsDraft || remote.ID == "" || draftVersion(remote) == "" {
-		return zero, true, outlookFailure(nil, true)
+		return api.OutlookDraft{}, outlookFailure(nil, true)
 	}
-	row, err := saveOutlookDraftIndex(ctx, q, box.ID, folder.ID, remote)
+	row, err := saveOutlookDraftIndex(ctx, q, box, folder, remote)
 	if err != nil {
-		return zero, true, err
+		return api.OutlookDraft{}, err
 	}
-	return draftView(row, remote, nil), true, nil
+	return draftView(row, remote, nil), nil
 }
 
 func saveOutlookDraftIndex(ctx context.Context, q *store.Queries, box, folder string, remote outlookRemoteMessage) (store.EmailOutlookMessage, error) {

@@ -26,7 +26,8 @@ it("submits the revised draft and new time in the same request", async () => {
     to: ["nadia@example.test"], cc: [], bcc: [], hasAttachments: true, bodyTruncated: false,
     schedule, scheduleNeedsReview: false, webUrl: null,
   };
-  vi.spyOn(api, "GET").mockResolvedValue(ok(draft));
+  vi.spyOn(api, "GET").mockImplementation((path) => Promise.resolve(path === "/v1/outlook/messages/{messageId}/attachments"
+    ? ok({ items: [], more: false }) : ok(draft)));
   const patch = vi.spyOn(api, "PATCH");
   const put = vi.spyOn(api, "PUT").mockResolvedValue(ok(schedule));
   const onClose = vi.fn();

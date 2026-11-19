@@ -5,12 +5,13 @@ import { api, type Schemas, unwrap } from "../../api/client";
 import { formatWhen } from "../../labels";
 import { ErrorMessage } from "../ErrorMessage";
 import { OutlookAttachments } from "./OutlookAttachments";
+import { OutlookForward } from "./OutlookForward";
 import type { OutlookProfile } from "./OutlookProfileMail";
 
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, canImportCv, onThread }: {
+export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, canImportCv, onThread, onOpenDraft }: {
   message: Message;
   folders: Folder[];
   profile?: OutlookProfile;
@@ -18,10 +19,11 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   canSaveCv: boolean;
   canImportCv: boolean;
   onThread: () => void;
+  onOpenDraft: (id: string) => void;
 }) {
   const client = useQueryClient();
   const [reply, setReply] = useState("");
-  const [mode, setMode] = useState<"reply" | "replyAll" | null>(null);
+  const [mode, setMode] = useState<"reply" | "replyAll" | "forward" | null>(null);
   const [destination, setDestination] = useState("");
   const [notice, setNotice] = useState("");
   const path = { messageId: message.id };
@@ -40,7 +42,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
   });
   const send = useMutation({
     mutationFn: async (saveDraft: boolean) => {
-      const result = await api.POST("/v1/outlook/messages/{messageId}/reply", { params, body: { text: reply, mode: mode ?? "reply", saveDraft } });
+      const result = await api.POST("/v1/outlook/messages/{messageId}/reply", { params, body: { text: reply, mode: mode === "replyAll" ? "replyAll" : "reply", saveDraft } });
       if (!result.response.ok) unwrap(result);
       return saveDraft;
     },
@@ -100,8 +102,11 @@ export function OutlookReadingPane({ message, folders, profile, linked, canSaveC
     {!message.isDraft && mode === null && <div className="row">
       <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
       <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>
+      {folders.some((folder) => folder.kind === "drafts") &&
+        <button type="button" onClick={() => { setMode("forward"); setNotice(""); }}>Forward</button>}
     </div>}
-    {mode && <form className="outlook-reply" onSubmit={(e) => { e.preventDefault(); send.mutate(false); }}>
+    {mode === "forward" && <OutlookForward messageId={message.id} onOpen={onOpenDraft} onClose={() => { setMode(null); }} />}
+    {(mode === "reply" || mode === "replyAll") && <form className="outlook-reply" onSubmit={(e) => { e.preventDefault(); send.mutate(false); }}>
       <label className="field">{mode === "replyAll" ? "Reply to all recipients" : "Reply to sender"}
         <textarea rows={5} maxLength={10000} required value={reply} onChange={(e) => { setReply(e.target.value); }} />
       </label>

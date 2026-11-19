@@ -124,7 +124,11 @@ func outlookFolderPath(path string) string {
 	return lower[:start] + tail
 }
 
-type outlookRecipient struct{ EmailAddress struct{ Address string } }
+type outlookRecipient struct {
+	EmailAddress struct {
+		Address string `json:"address"`
+	} `json:"emailAddress"`
+}
 type outlookRemoteMessage struct {
 	ID, ConversationID, Subject, WebLink, ParentFolderID, ChangeKey string
 	ETag                                                            string `json:"@odata.etag"`

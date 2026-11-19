@@ -50,6 +50,14 @@ func (h *HTTP) ReplyOutlookMessage(ctx context.Context, r api.ReplyOutlookMessag
 	}
 	return api.ReplyOutlookMessage202Response{}, h.svc.replyOutlook(ctx, p, r.MessageId, *r.Body)
 }
+func (h *HTTP) CreateOutlookForwardDraft(ctx context.Context, r api.CreateOutlookForwardDraftRequestObject) (api.CreateOutlookForwardDraftResponseObject, error) {
+	p, err := mailboxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	draft, err := h.svc.forwardOutlook(ctx, p, r.MessageId, *r.Body)
+	return api.CreateOutlookForwardDraft201JSONResponse(draft), err
+}
 func (h *HTTP) LinkOutlookConversation(ctx context.Context, r api.LinkOutlookConversationRequestObject) (api.LinkOutlookConversationResponseObject, error) {
 	p, err := mailboxUser(ctx)
 	if err != nil {

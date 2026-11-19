@@ -3683,6 +3683,38 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/OutlookReplyInput'
+  /v1/outlook/messages/{messageId}/forward:
+    post:
+      operationId: createOutlookForwardDraft
+      tags: [emails]
+      summary: Create an Outlook draft that forwards a message and its attachments
+      x-permission: emails:send
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema: {type: string, pattern: '^omg_[0-9a-z]{26}$'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OutlookForwardInput'}
+      responses:
+        '201':
+          description: Forward draft
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/OutlookDraft'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503':
+          description: Outlook is unavailable or the draft creation outcome is uncertain
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/outlook/messages/{messageId}/link:
     put:
       operationId: linkOutlookConversation
@@ -11467,6 +11499,16 @@ components:
             - replyAll
         saveDraft:
           type: boolean
+    OutlookForwardInput:
+      type: object
+      required: [to]
+      properties:
+        to:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {type: string, format: email, maxLength: 254}
+        note: {type: string, maxLength: 10000}
     OutlookConversationLink:
       type: object
       properties:

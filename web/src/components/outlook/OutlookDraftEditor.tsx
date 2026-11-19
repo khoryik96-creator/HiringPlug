@@ -7,6 +7,8 @@ import { ErrorMessage } from "../ErrorMessage";
 import { Field } from "../Field";
 import { fieldErrors, FormInvalid } from "../forms";
 import { wallTime, zonedInput } from "../calendar/dates";
+import { OutlookAttachments } from "./OutlookAttachments";
+import { outlookAddresses } from "./outlookAddresses";
 
 type Draft = Schemas["OutlookDraft"];
 type DraftInput = Schemas["OutlookDraftInput"];
@@ -42,15 +44,12 @@ export function OutlookDraftEditor({ id, onClose }: { id: string | null; onClose
   </dialog>;
 }
 
-function listFor(value: string): string[] {
-  return value.split(/[,;\s]+/).map((part) => part.trim()).filter(Boolean);
-}
 function inputOf(value: typeof emptyDraft, before?: Draft): DraftInput {
-  if (!before) return { to: listFor(value.to), cc: listFor(value.cc), bcc: listFor(value.bcc), subject: value.subject, body: value.body };
+  if (!before) return { to: outlookAddresses(value.to), cc: outlookAddresses(value.cc), bcc: outlookAddresses(value.bcc), subject: value.subject, body: value.body };
   return {
-    ...(value.to !== before.to.join(", ") ? { to: listFor(value.to) } : {}),
-    ...(value.cc !== before.cc.join(", ") ? { cc: listFor(value.cc) } : {}),
-    ...(value.bcc !== before.bcc.join(", ") ? { bcc: listFor(value.bcc) } : {}),
+    ...(value.to !== before.to.join(", ") ? { to: outlookAddresses(value.to) } : {}),
+    ...(value.cc !== before.cc.join(", ") ? { cc: outlookAddresses(value.cc) } : {}),
+    ...(value.bcc !== before.bcc.join(", ") ? { bcc: outlookAddresses(value.bcc) } : {}),
     ...(value.subject !== before.subject ? { subject: value.subject } : {}),
     ...(value.body !== before.body && !before.bodyTruncated ? { body: value.body } : {}),
   };
@@ -142,8 +141,8 @@ function DraftFields({ opened, onClose, onReload, setBusy }: {
         <Field label="Subject" error={errorFor("subject")}><input maxLength={200} value={form.subject} onChange={(e) => { update("subject", e.target.value); }}/></Field>
         <Field label="Message" error={errorFor("body")}><textarea readOnly={draft?.bodyTruncated} maxLength={40000} rows={9} value={form.body} onChange={(e) => { update("body", e.target.value); }}/></Field>
       </fieldset>
-      {(draft?.hasAttachments || draft?.bodyTruncated || draft?.webUrl) && <div className="full row outlook-actions small">
-        {draft.hasAttachments && <span className="muted">Keeps the attachments in Outlook.</span>}
+      {draft?.hasAttachments && <div className="full outlook-draft-attachments"><OutlookAttachments messageId={draft.messageId} /></div>}
+      {(draft?.bodyTruncated || draft?.webUrl) && <div className="full row outlook-actions small">
         {draft.bodyTruncated && <span className="muted">Edit the full message in Outlook.</span>}
         {draft.webUrl && <a href={draft.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
       </div>}

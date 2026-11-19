@@ -151,7 +151,7 @@ function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, init
               </div>}
             </div>
             {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
-              canSaveCv={canSaveCv} canImportCv={canImportCv}
+              canSaveCv={canSaveCv} canImportCv={canImportCv} onOpenDraft={setDraft}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
               : <p className="outlook-empty muted">Select a message to read it.</p>}
           </div>

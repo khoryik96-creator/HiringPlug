@@ -186,6 +186,9 @@ arrive through polling, which also works on a laptop without a public webhook
 address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save
 in Outlook Drafts** creates the draft in the original thread. Open the draft
 from the Drafts folder to continue editing.
+Choose **Forward**, enter the recipients and an optional note, then select
+**Review forward**. Outlook copies the original message and attachments into a
+draft. Review the files and send it now or schedule it from the draft editor.
 
 On a candidate or contact's **Email** tab, open **My Outlook conversations**.
 **Find in Outlook** starts an exact address search. Open a message and confirm the
