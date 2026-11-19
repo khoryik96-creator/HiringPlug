@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api, type Candidate, type Document, type Permission, type Schemas, throwFor, unwrap } from "../api/client";
-import { downloadDocument } from "../api/files";
-import { getToken } from "../auth";
+import { api, type Candidate, type Document, type Permission, type Schemas, unwrap } from "../api/client";
+import { downloadDocument, uploadCandidateDocument } from "../api/files";
 import { CandidateCv } from "./CandidateCv";
 import { latestCv } from "./CvPane";
 import { CvCompare } from "./CvCompare";
@@ -102,17 +101,7 @@ export function Documents({ candidate, canUpload, canEdit, permissions = [] }: {
     }
   };
   const upload = useMutation({
-    mutationFn: async (file: File) => {
-      const body = new FormData();
-      body.append("source", source);
-      body.append("file", file);
-      const res = await fetch(`/v1/candidates/${candidateId}/documents`, {
-        method: "POST",
-        body,
-        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
-      });
-      if (!res.ok) await throwFor(res);
-    },
+    mutationFn: (file: File) => uploadCandidateDocument(candidateId, source, file, file.name),
     onSuccess: async () => {
       setUploading(false);
       await queryClient.invalidateQueries({ queryKey: ["documents", candidateId] });

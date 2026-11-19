@@ -10,11 +10,12 @@ import type { OutlookProfile } from "./OutlookProfileMail";
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookReadingPane({ message, folders, profile, linked, onThread }: {
+export function OutlookReadingPane({ message, folders, profile, linked, canSaveCv, onThread }: {
   message: Message;
   folders: Folder[];
   profile?: OutlookProfile;
   linked: boolean;
+  canSaveCv: boolean;
   onThread: () => void;
 }) {
   const client = useQueryClient();
@@ -92,7 +93,8 @@ export function OutlookReadingPane({ message, folders, profile, linked, onThread
     {body.isPending && <p className="muted">Opening message…</p>}
     {body.data && <p className="outlook-body">{body.data.text}</p>}
     {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
-    {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id} />}
+    {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id}
+      canSaveCv={canSaveCv} candidateId={profile?.candidateId} />}
     {!message.isDraft && mode === null && <div className="row">
       <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
       <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>

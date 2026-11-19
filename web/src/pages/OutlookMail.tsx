@@ -11,16 +11,18 @@ import "./outlook-workspace.css";
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookMail() {
+export function OutlookMail({ canSaveCv = false }: { canSaveCv?: boolean }) {
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
   const candidateId = params.get("candidateId");
   const contactId = params.get("contactId");
   const profile = candidateId ? { candidateId } : contactId ? { contactId } : undefined;
-  return <OutlookWorkspace key={params.toString()} profile={profile} initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
+  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv}
+    initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
 }
 
-function OutlookWorkspace({ profile, initialSearch, initialThread }: {
+function OutlookWorkspace({ profile, canSaveCv, initialSearch, initialThread }: {
   profile?: OutlookProfile;
+  canSaveCv: boolean;
   initialSearch: string;
   initialThread: string;
 }) {
@@ -130,7 +132,7 @@ function OutlookWorkspace({ profile, initialSearch, initialThread }: {
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>
               </div>}
             </div>
-            {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
+            {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked} canSaveCv={canSaveCv}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
               : <p className="outlook-empty muted">Select a message to read it.</p>}
           </div>

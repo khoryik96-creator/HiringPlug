@@ -168,6 +168,11 @@ when requested. HiringPlug indexes subject,
 participants, dates and folder/read state locally and does not store bodies or
 attachment contents in the inbox index.
 
+For a CV attachment, choose **Save CV**, select the right candidate and confirm
+**Save to CV & files**. HiringPlug checks file types and skips exact duplicates
+using the same upload rules as the candidate profile. People who can access the
+candidate's CVs can see the saved copy. The Outlook message stays private.
+
 Read/unread, move and archive update the original Outlook message. Outlook changes
 arrive through polling, which also works on a laptop without a public webhook
 address. **Reply** and **Reply all** use Microsoft's thread-aware actions. **Save

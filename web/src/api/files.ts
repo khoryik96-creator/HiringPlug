@@ -1,7 +1,19 @@
 // Document files are fetched with the user's token (an <iframe> or a plain
 // link cannot send it) and handed to the browser as blob URLs.
 import { getToken } from "../auth";
-import { type Document, throwFor } from "./client";
+import { type Document, type Schemas, throwFor } from "./client";
+
+export async function uploadCandidateDocument(candidateId: string, source: Schemas["DocumentSource"], file: Blob, fileName: string): Promise<void> {
+  const body = new FormData();
+  body.append("source", source);
+  body.append("file", file, fileName);
+  const res = await fetch(`/v1/candidates/${encodeURIComponent(candidateId)}/documents`, {
+    method: "POST",
+    body,
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+  });
+  if (!res.ok) await throwFor(res);
+}
 
 export async function fetchDocumentFile(doc: Pick<Document, "id" | "contentType">): Promise<Blob> {
   const res = await fetch(`/v1/documents/${doc.id}/file`, { headers: { Authorization: `Bearer ${getToken() ?? ""}` } });

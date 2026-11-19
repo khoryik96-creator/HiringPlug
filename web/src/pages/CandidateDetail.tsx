@@ -33,7 +33,9 @@ import { useFieldSettings } from "../components/useFieldSettings";
 export function CandidateDetail({ id, permissions }: { id: string; permissions: Permission[] }) {
   const [editing, setEditing] = useState(false);
   const [editingSalary, setEditingSalary] = useState(false);
-  const [active, setActive] = useState<CandidateTab>(hashParam("hl") && permissions.includes("documents:read") ? "cv" : "details");
+  const [active, setActive] = useState<CandidateTab>(() =>
+    (hashParam("hl") || hashParam("tab") === "cv") && permissions.includes("documents:read") ? "cv" : "details",
+  );
   const [writing, setWriting] = useState(false);
   const [besideOn, setBeside] = useCvBeside();
   const fs = useFieldSettings();

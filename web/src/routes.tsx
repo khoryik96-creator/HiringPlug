@@ -114,7 +114,8 @@ export const ROUTES: Route[] = [
   { section: "import", path: /^#\/import/, menu: { in: "main", label: "Import", href: "#/import", more: true },
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
-  { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true }, render: () => <OutlookMail /> },
+  { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true },
+    render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} /> },
   { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: () => <Calendar /> },
 
   // Settings, in its menu's order.

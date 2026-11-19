@@ -1599,6 +1599,7 @@ synchronization behavior and the sync window.
 **More > Outlook** indexes a recruiter's own Outlook folders on request.
 Browse, search, mark read or unread, archive, move and reply in the original
 thread. Download file attachments of up to 20 MiB from the reading pane.
+Use **Save CV** to put an attachment in the selected candidate's **CV & files**.
 Save reply drafts in Outlook or open a message there to see original formatting
 and linked attachments. **My Outlook conversations** on candidate and contact Email
 tabs links private threads after the recruiter confirms an exact email match.

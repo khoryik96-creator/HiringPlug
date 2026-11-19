@@ -78,6 +78,18 @@
   border-bottom: 1px solid var(--line, #ded8eb);
 }
 .outlook-attachments li small { font-size: .8rem; }
+.outlook-attachment-buttons { flex-wrap: wrap; }
+.outlook-save-cv {
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  background: var(--page, #f7f4fc);
+  border-radius: .5rem;
+  padding: .65rem;
+}
+.outlook-save-cv fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.outlook-save-cv p { margin: .5rem 0; }
+.outlook-attachments .outlook-save-cv input { width: 100%; min-width: 0; }
 .outlook-reply textarea { width: 100%; }
 .outlook-reply .row { margin-top: .45rem; }
 @media (max-width: 830px) {
