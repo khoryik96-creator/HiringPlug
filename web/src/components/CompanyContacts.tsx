@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { api, type Company, unwrap } from "../api/client";
 import { contactsKey } from "../api/keys";
+import { IconButton, MailCheckIcon, PlusIcon } from "./ActionIcons";
 import { ContactForm } from "./ContactForm";
 import { ContactTable } from "./ContactTable";
 import { ErrorMessage } from "./ErrorMessage";
@@ -42,14 +43,14 @@ export function CompanyContacts({ company, canCreate, canEmail = false, canCheck
         <h3>Contacts</h3>
         <span className="row">
           {canLinkedin && linkedin.button}
-          {canCheck && withEmail > 0 && (
-            <button type="button" disabled={verify.isPending || checking > 0}
-              title="Ask each contact's mail server whether their mailbox exists (no email is sent)"
-              onClick={() => { verify.mutate(); }}>
-              {checking > 0 ? `Verifying ${String(checking)}…` : "Verify emails"}
-            </button>
-          )}
-          {canCreate && !adding && <button type="button" onClick={() => { setAdding(true); }}>Add contact</button>}
+          {canCheck && withEmail > 0 && <>
+            {(verify.isPending || checking > 0) && <span className="muted small" role="status">
+              {checking > 0 ? `Verifying ${String(checking)}…` : "Starting verification…"}
+            </span>}
+            <IconButton label="Verify emails" icon={<MailCheckIcon />} className="icon-outline" disabled={verify.isPending || checking > 0}
+              tip="Verify emails with their mail servers" onClick={() => { verify.mutate(); }} />
+          </>}
+          {canCreate && !adding && <IconButton label="Add contact" icon={<PlusIcon />} className="icon-outline" onClick={() => { setAdding(true); }} />}
         </span>
       </div>
       {adding && (

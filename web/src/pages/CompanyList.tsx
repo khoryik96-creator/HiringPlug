@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 
 import { api, type Schemas, unwrap } from "../api/client";
 import { companiesKey } from "../api/keys";
+import { IconButton, PlusIcon } from "../components/ActionIcons";
 import { CompanyForm } from "../components/CompanyForm";
 import { chipStyle, UNKNOWN_CATEGORY } from "../components/companyCategory";
 import { useDebounced } from "../components/useDebounced";
@@ -95,7 +96,7 @@ export function CompanyList({ canCreate, canFolders = false, meId = "" }: { canC
             {fs.options("company_category").filter((o) => o.key !== UNKNOWN_CATEGORY).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
         </BooleanSearchBox>
-        {canCreate && !adding && <button type="button" className="pill-btn primary" onClick={() => { setAdding(true); }}>+ Add company</button>}
+        {canCreate && !adding && <IconButton label="Add company" icon={<PlusIcon />} className="icon-primary" onClick={() => { setAdding(true); }} />}
       </div>
       {adding && (
         <CompanyForm

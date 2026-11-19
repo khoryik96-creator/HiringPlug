@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { EditIcon, IconActions, IconButton, IconSeparator, MailCheckIcon, MailIcon, TrashIcon } from "../components/ActionIcons";
+import { EditIcon, IconActions, IconButton, IconSeparator, MailCheckIcon, MailIcon, RefreshIcon, TrashIcon } from "../components/ActionIcons";
 import { DeleteRecord } from "../components/DeleteRecord";
 
 import { api, type Permission, unwrap } from "../api/client";
@@ -71,9 +71,9 @@ export function ContactDetail({ id, permissions }: { id: string; permissions: Pe
             {c.email && canEdit && (
               <>
                 {" "}
-                <button type="button" className="link" disabled={recheck.isPending} onClick={() => { recheck.mutate(); }}>
-                  {recheck.isPending ? "Checking…" : "Check again"}
-                </button>
+                <IconButton label={recheck.isPending ? "Checking…" : "Check again"} icon={<RefreshIcon />}
+                  disabled={recheck.isPending} onClick={() => { recheck.mutate(); }} />
+                {recheck.isPending && <span role="status" className="muted small">Checking…</span>}
               </>
             )}
           </dd>

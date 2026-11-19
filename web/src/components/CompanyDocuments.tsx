@@ -8,6 +8,7 @@ import { api, type Permission, type Schemas, throwFor, unwrap } from "../api/cli
 import { downloadFrom } from "../api/files";
 import { getToken } from "../auth";
 import { formatWhen } from "../labels";
+import { DownloadIcon, IconButton, TrashIcon, ViewIcon } from "./ActionIcons";
 import { CV_TYPES, DropZone } from "./DropZone";
 import { ErrorMessage } from "./ErrorMessage";
 import { FileViewer } from "./FileViewer";
@@ -73,14 +74,14 @@ export function CompanyDocuments({ companyId, section, permissions }: { companyI
                 <div className="doc-meta">{fileSize(d.sizeBytes)} · added {formatWhen(d.createdAt)}{d.createdByName ? ` by ${d.createdByName}` : ""}</div>
               </div>
               <div className="doc-buttons">
-                {viewable(d) && <button type="button" className="doc-btn" onClick={() => { setViewing(d); }}>View</button>}
-                <button type="button" className="doc-btn" onClick={() => { download.mutate(d); }}>Download</button>
+                {viewable(d) && <IconButton label={`View ${d.fileName}`} tip="View file" icon={<ViewIcon />} className="icon-outline"
+                  onClick={() => { setViewing(d); }} />}
+                <IconButton label={`Download ${d.fileName}`} tip="Download file" icon={<DownloadIcon />} className="icon-outline"
+                  onClick={() => { download.mutate(d); }} />
                 {/* Always there; only those given companies.documents:delete (admins, to start with) may use it. */}
-                <button type="button" className="doc-btn danger" aria-label={`Delete ${d.fileName}`} disabled={!canDelete || remove.isPending}
-                  title={canDelete ? undefined : "Only admins delete documents: ask one, or for the “Delete documents” permission"}
-                  onClick={() => { if (window.confirm(`Delete ${d.fileName}? This cannot be undone.`)) remove.mutate(d); }}>
-                  Delete
-                </button>
+                <IconButton label={`Delete ${d.fileName}`} tip={canDelete ? "Delete file" : "Only admins delete documents: ask one, or for the “Delete documents” permission"}
+                  icon={<TrashIcon />} className="icon-outline" danger disabled={!canDelete || remove.isPending}
+                  onClick={() => { if (window.confirm(`Delete ${d.fileName}? This cannot be undone.`)) remove.mutate(d); }} />
               </div>
             </li>
           ))}
