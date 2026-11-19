@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, type Schemas, unwrap } from "../../api/client";
 import { formatWhen } from "../../labels";
 import { ErrorMessage } from "../ErrorMessage";
+import { OutlookAttachments } from "./OutlookAttachments";
 import type { OutlookProfile } from "./OutlookProfileMail";
 
 type Message = Schemas["OutlookMessage"];
@@ -69,7 +70,6 @@ export function OutlookReadingPane({ message, folders, profile, linked, onThread
     <div className="row outlook-actions">
       <button type="button" onClick={onThread}>Conversation</button>
       {message.webUrl && <a href={message.webUrl} target="_blank" rel="noreferrer">Open in Outlook</a>}
-      {message.hasAttachments && <span className="muted">Attachments in Outlook</span>}
       <button type="button" disabled={change.isPending} onClick={() => { change.mutate({ isRead: !message.isRead }); }}>
         Mark {message.isRead ? "unread" : "read"}
       </button>
@@ -92,6 +92,7 @@ export function OutlookReadingPane({ message, folders, profile, linked, onThread
     {body.isPending && <p className="muted">Opening message…</p>}
     {body.data && <p className="outlook-body">{body.data.text}</p>}
     {body.data?.truncated && <p className="muted">Open in Outlook to read the rest.</p>}
+    {message.hasAttachments && <OutlookAttachments key={message.id} messageId={message.id} />}
     {!message.isDraft && mode === null && <div className="row">
       <button type="button" onClick={() => { setMode("reply"); setNotice(""); }}>Reply</button>
       <button type="button" onClick={() => { setMode("replyAll"); setNotice(""); }}>Reply all</button>

@@ -67,6 +67,8 @@ func (f *outlookMailFixture) serve(w http.ResponseWriter, r *http.Request) {
 		write(map[string]any{"value": items, "@odata.deltaLink": "http://" + r.Host + "/me/mailfolders('" + id + "')/messages/delta?$deltatoken=one"})
 	case strings.HasPrefix(r.URL.Path, "/me/mailFolders/"):
 		write(folder(strings.TrimPrefix(r.URL.Path, "/me/mailFolders/")))
+	case strings.HasPrefix(r.URL.Path, "/me/messages/remote-message/attachments"):
+		serveOutlookAttachmentFixture(w, r)
 	case r.URL.Path == "/me/messages/remote-message" && r.Method == "GET":
 		write(map[string]any{"body": map[string]string{"contentType": "html", "content": "<p>I can make Tuesday.</p><script>unsafe()</script>"}})
 	case r.URL.Path == "/me/messages/remote-message" && r.Method == "PATCH":

@@ -65,6 +65,19 @@
 .outlook-envelope { margin: .35rem 0 .8rem; font-size: .85rem; }
 .outlook-reading .outlook-actions { margin-bottom: .65rem; }
 .outlook-body { white-space: pre-wrap; margin: 1rem 0; }
+.outlook-attachments { margin: .9rem 0; }
+.outlook-attachments h4 { margin: 0 0 .4rem; }
+.outlook-attachments ul { list-style: none; margin: 0; padding: 0; }
+.outlook-attachments li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .4rem .7rem;
+  flex-wrap: wrap;
+  padding: .4rem .5rem;
+  border-bottom: 1px solid var(--line, #ded8eb);
+}
+.outlook-attachments li small { font-size: .8rem; }
 .outlook-reply textarea { width: 100%; }
 .outlook-reply .row { margin-top: .45rem; }
 @media (max-width: 830px) {

@@ -36,27 +36,11 @@ func (s *Service) outlookRequest(ctx context.Context, token, method, target stri
 			return err
 		}
 	}
-	req, err := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(data))
+	response, err := s.openOutlookResponse(ctx, token, method, target, bytes.NewReader(data))
 	if err != nil {
-		return &outlookGraphError{}
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text", odata.maxpagesize=50`)
-	client := *s.connections.HTTPClient
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	response, err := client.Do(req)
-	if err != nil {
-		return &outlookGraphError{}
+		return err
 	}
 	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode/100 != 2 {
-		retry, _ := http.ParseTime(response.Header.Get("Retry-After"))
-		if seconds, err := strconv.Atoi(response.Header.Get("Retry-After")); err == nil && seconds > 0 && seconds <= 86400 {
-			retry = time.Now().Add(time.Duration(seconds) * time.Second)
-		}
-		return &outlookGraphError{status: response.StatusCode, retry: retry}
-	}
 	if out == nil {
 		return nil
 	}
@@ -66,6 +50,31 @@ func (s *Service) outlookRequest(ctx context.Context, token, method, target stri
 		return &outlookGraphError{status: 502}
 	}
 	return nil
+}
+
+func (s *Service) openOutlookResponse(ctx context.Context, token, method, target string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, target, body)
+	if err != nil {
+		return nil, &outlookGraphError{}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text", odata.maxpagesize=50`)
+	client := *s.connections.HTTPClient
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, &outlookGraphError{}
+	}
+	if response.StatusCode/100 != 2 {
+		_ = response.Body.Close()
+		retry, _ := http.ParseTime(response.Header.Get("Retry-After"))
+		if seconds, err := strconv.Atoi(response.Header.Get("Retry-After")); err == nil && seconds > 0 && seconds <= 86400 {
+			retry = time.Now().Add(time.Duration(seconds) * time.Second)
+		}
+		return nil, &outlookGraphError{status: response.StatusCode, retry: retry}
+	}
+	return response, nil
 }
 
 func outlookContinuation(initial, next string) bool {

@@ -143,6 +143,7 @@ class ErrorCode(StrEnum):
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
     NOT_FOUND = "NOT_FOUND"
     OFFER_NOT_ALLOWED = "OFFER_NOT_ALLOWED"
+    OUTLOOK_ATTACHMENT_TOO_LARGE = "OUTLOOK_ATTACHMENT_TOO_LARGE"
     OUTLOOK_NOT_CONNECTED = "OUTLOOK_NOT_CONNECTED"
     OUTLOOK_UNAVAILABLE = "OUTLOOK_UNAVAILABLE"
     PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE"
@@ -2264,6 +2265,13 @@ class OutlookMailPage(BaseModel):
 class OutlookMessageBody(BaseModel):
     text: str
     truncated: bool
+
+
+class OutlookAttachment(BaseModel):
+    id: str
+    fileName: str
+    sizeBytes: Annotated[int, Field(ge=0)]
+    downloadable: bool
 
 
 class OutlookMessageChange(BaseModel):
@@ -6311,6 +6319,11 @@ class Document(BaseModel):
 
 class DocumentList(BaseModel):
     items: list[Document]
+
+
+class OutlookAttachmentList(BaseModel):
+    items: list[OutlookAttachment]
+    more: Annotated[bool, Field(description="There are more attachments to view in Outlook.")]
 
 
 class MailApps(BaseModel):

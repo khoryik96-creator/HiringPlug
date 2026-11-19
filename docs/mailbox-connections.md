@@ -161,8 +161,10 @@ HiringPlug discovers visible folders and reads message delta pages in the Go
 worker. Initial indexing covers up to 90 days of mail, subject to Microsoft's
 5,000-result limit for filtered delta queries per folder. Drafts are indexed
 without the date filter. Large mailboxes fill in over several background runs.
-Use **Open in Outlook** to see attachments, formatting and full history. Message
-details are fetched as plain text on demand. HiringPlug indexes subject,
+Open a message to see its attachments and download files up to 20 MiB. Open
+the message in Outlook for linked items, larger files, additional attachments,
+the original formatting or full history. Message details and files are fetched
+when requested. HiringPlug indexes subject,
 participants, dates and folder/read state locally and does not store bodies or
 attachment contents in the inbox index.
 

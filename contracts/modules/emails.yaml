@@ -40,6 +40,9 @@ x-module:
     OUTLOOK_NOT_CONNECTED:
       status: 409
       description: Connect a personal Microsoft mailbox and enable inbox sync.
+    OUTLOOK_ATTACHMENT_TOO_LARGE:
+      status: 413
+      description: The Outlook attachment exceeds the in-app download limit.
   jobs:
     email.send:
       queue: core
@@ -250,6 +253,74 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/OutlookMessageChange'
+  /v1/outlook/messages/{messageId}/attachments:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^omg_[0-9a-z]{26}$' }
+    get:
+      operationId: listOutlookAttachments
+      tags: [emails]
+      summary: List attachments on a message in the signed-in user's Outlook mailbox
+      x-permission: emails:send
+      responses:
+        '200':
+          description: Attachment names and sizes, with no file contents
+          headers:
+            Cache-Control: { required: true, schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OutlookAttachmentList' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/outlook/messages/{messageId}/attachments/{attachmentId}/file:
+    parameters:
+      - name: messageId
+        in: path
+        required: true
+        schema: { type: string, pattern: '^omg_[0-9a-z]{26}$' }
+      - name: attachmentId
+        in: path
+        required: true
+        schema: { type: string, minLength: 1, maxLength: 1400, pattern: '^[A-Za-z0-9_-]+$' }
+    get:
+      operationId: downloadOutlookAttachment
+      tags: [emails]
+      summary: Download an Outlook file attachment up to 20 MiB
+      x-permission: emails:send
+      responses:
+        '200':
+          description: Original attachment bytes
+          headers:
+            Content-Disposition: { required: true, schema: { type: string } }
+            Cache-Control: { required: true, schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413':
+          description: The attachment exceeds 20 MiB
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Outlook is unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /v1/outlook/messages/{messageId}/reply:
     post:
       operationId: replyOutlookMessage
@@ -976,6 +1047,24 @@ components:
           type: string
         truncated:
           type: boolean
+    OutlookAttachmentList:
+      type: object
+      required: [items, more]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OutlookAttachment' }
+        more:
+          type: boolean
+          description: There are more attachments to view in Outlook.
+    OutlookAttachment:
+      type: object
+      required: [id, fileName, sizeBytes, downloadable]
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        sizeBytes: { type: integer, format: int64, minimum: 0 }
+        downloadable: { type: boolean }
     OutlookMessageChange:
       type: object
       properties:
