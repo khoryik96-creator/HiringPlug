@@ -179,6 +179,20 @@ func (s *Service) receipt(ctx context.Context, conn *pgx.Conn, p authz.Principal
 			}
 		}
 		updated, err := q.SaveCalendarReceipt(ctx, store.SaveCalendarReceiptParams{ID: row.ID, ConnectionID: ptr(c.ID), SentVersion: row.Version, RemoteID: remoteID, RemoteKey: remote.key(), RemoteSnapshot: snapshot, WebUrl: safeWebURL(remote.WebLink), JoinUrl: remote.join()})
+		if err == nil && updated != 0 && row.Source == invitationSource && remoteID != nil {
+			var missing bool
+			missing, err = saveCandidateResponse(ctx, q, row, remote)
+			if err == nil && missing {
+				return q.MarkCalendarConflict(ctx, store.MarkCalendarConflictParams{ID: row.ID, RemoteKey: remote.key(), RemoteSnapshot: snapshot})
+			}
+			if err == nil && row.CandidateReminder && row.Status == "active" {
+				meeting, readErr := s.deps.Sources.Meeting(ctx, tx, "interview", text(row.SourceID))
+				if readErr != nil {
+					return readErr
+				}
+				err = s.queueCandidateReminder(ctx, tx, p.TenantID, row, meeting)
+			}
+		}
 		if err == nil && updated != 0 && row.Source == invitationSource && row.RemoteID == nil && remoteID != nil {
 			_, err = jobqueue.Enqueue(ctx, tx, p.TenantID, api.JobKindCalendarSourceChanged,
 				api.CalendarSourceJob{Kind: "interview", SourceId: text(row.SourceID)})

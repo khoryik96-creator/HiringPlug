@@ -198,6 +198,32 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/InterviewNotAllowed' }
 
+  /v1/interviews/{interviewId}/outlook-reminder:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    put:
+      operationId: setInterviewOutlookReminder
+      tags: [interviews]
+      summary: Turn the candidate's day-before reminder email on or off
+      x-permission: interviews:schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InterviewOutlookReminderInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InterviewInvitation' }
+        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/InterviewNotAllowed' }
+
   /v1/interviews/{interviewId}/calendar.ics:
     parameters:
       - $ref: '#/components/parameters/InterviewIdPath'
@@ -239,6 +265,13 @@ components:
         version: { type: integer, minimum: 1, maximum: 2147483647 }
         teams: { type: boolean }
         reminderMinutes: { type: integer, minimum: 0, maximum: 1440 }
+        candidateReminder: { type: boolean, description: Email the candidate the day before. Defaults to off. }
+    InterviewOutlookReminderInput:
+      type: object
+      required: [version, enabled]
+      properties:
+        version: { type: integer, minimum: 1, maximum: 2147483647 }
+        enabled: { type: boolean }
     InterviewInvitation:
       type: object
       required: [status, canSend, teamsAvailable, teams, reminderMinutes, recipient, joinUrl, issue]
@@ -251,6 +284,11 @@ components:
         recipient: { type: string, nullable: true }
         joinUrl: { type: string, nullable: true }
         issue: { type: string, nullable: true }
+        candidateResponse:
+          type: string
+          enum: [not_responded, accepted, tentative, declined]
+        candidateReminder: { type: boolean }
+        canManageReminder: { type: boolean }
     InterviewId:
       type: string
       pattern: '^intv_[0-9a-hjkmnp-tv-z]{26}$'

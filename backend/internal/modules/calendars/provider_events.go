@@ -39,6 +39,7 @@ func (t graphTime) instant() (time.Time, error) {
 
 type graphAttendee struct {
 	EmailAddress struct{ Address, Name string }
+	Status       *struct{ Response string }
 	Type         string
 }
 type graphEvent struct {

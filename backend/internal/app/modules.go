@@ -123,7 +123,7 @@ func NewModules(d Deps) *Modules {
 		Candidates: emailCandidates{m.Candidates, m.Industries, m.Settings}, Applications: emailApplications{m.Pipeline, m.Jobs, m.Contacts},
 		Interviews: emailInterviews{m}, Tenants: m.Identity, Consent: m.Privacy, Users: m.Identity,
 		Documents: emailDocuments{m.Documents}, Policy: m.Settings, Contacts: emailContacts{m.Contacts, m.Companies},
-		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts,
+		Undeliverable: emailUndeliverable{m.Contacts}, Bounces: m.Contacts, InterviewReminders: calendarReminderMail{m},
 	}, d.Mail, d.Files)
 	mode := mail.DeliveryMode(d.Config.SMTP.Addr)
 	m.Emails.ConnectMailboxesWith(emails.ConnectionSettings{
@@ -203,8 +203,9 @@ func NewModules(d Deps) *Modules {
 	m.Calendars = calendars.New(d.Pool)
 	m.Calendars.ConnectOutlookWith(calendars.Deps{
 		Apps: calendarApps{m.Emails}, Sources: calendarSources{m.Interviews, m.Scheduling}, Users: calendarUsers{m.Identity},
-		Recipients: calendarRecipients{m.Pipeline, m.Candidates, m.Privacy},
-	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL})
+		Recipients:   calendarRecipients{m.Pipeline, m.Candidates, m.Privacy},
+		ReminderMail: calendarReminderMail{m},
+	}, calendars.Config{KeysSecret: d.Config.MailConnections.KeysSecret, PublicURL: d.Config.PublicURL, TimeZone: d.Config.TimeZone})
 	m.Interviews.UseCalendar(m.Calendars)
 	m.Scheduling.UseCalendar(m.Calendars)
 	// scaffold:constructors

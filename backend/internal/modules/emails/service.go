@@ -387,7 +387,11 @@ func (s *Service) notify(ctx context.Context, tx pgx.Tx, tenantID string, n Noti
 			return err
 		}
 	}
-	if _, err := jobqueue.Enqueue(ctx, tx, tenantID, api.JobKindEmailSend, api.EmailSendJob{EmailId: row.ID}); err != nil {
+	kind := api.JobKindEmailSend
+	if n.InterviewReminder != nil {
+		kind = api.JobKindEmailInterviewReminder
+	}
+	if _, err := jobqueue.EnqueueAt(ctx, tx, tenantID, kind, api.EmailSendJob{EmailId: row.ID, InterviewReminder: n.InterviewReminder}, n.DeliverAt); err != nil {
 		return err
 	}
 	changes := map[string]any{"to": o.To, "subject": o.Subject, "automatic": true}

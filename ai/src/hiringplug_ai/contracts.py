@@ -194,6 +194,7 @@ class JobKind(StrEnum):
     document_render_pdf = "document.render_pdf"
     document_text_extracted = "document.text_extracted"
     email_bounce_scan = "email.bounce_scan"
+    email_interview_reminder = "email.interview_reminder"
     email_outlook_sync = "email.outlook_sync"
     email_send = "email.send"
     interview_remind = "interview.remind"
@@ -2602,11 +2603,13 @@ class EmailBounceScanJob(BaseModel):
     emailId: EmailId
 
 
-class EmailSendJob(BaseModel):
+class InterviewReminderDelivery(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    emailId: EmailId
+    eventId: Annotated[str, Field(pattern="^cev_[0-9a-hjkmnp-tv-z]{26}$")]
+    version: Annotated[int, Field(ge=1)]
+    startsAt: AwareDatetime
 
 
 class FolderId(RootModel[str]):
@@ -3263,6 +3266,14 @@ class InterviewInvitationInput(BaseModel):
     version: Annotated[int, Field(ge=1, le=2147483647)]
     teams: bool
     reminderMinutes: Annotated[int, Field(ge=0, le=1440)]
+    candidateReminder: Annotated[
+        bool | None, Field(description="Email the candidate the day before. Defaults to off.")
+    ] = None
+
+
+class InterviewOutlookReminderInput(BaseModel):
+    version: Annotated[int, Field(ge=1, le=2147483647)]
+    enabled: bool
 
 
 class Status6(StrEnum):
@@ -3274,6 +3285,13 @@ class Status6(StrEnum):
     cancelled = "cancelled"
 
 
+class CandidateResponse(StrEnum):
+    not_responded = "not_responded"
+    accepted = "accepted"
+    tentative = "tentative"
+    declined = "declined"
+
+
 class InterviewInvitation(BaseModel):
     status: Status6
     canSend: bool
@@ -3283,6 +3301,9 @@ class InterviewInvitation(BaseModel):
     recipient: Annotated[str | None, Field(...)]
     joinUrl: Annotated[str | None, Field(...)]
     issue: Annotated[str | None, Field(...)]
+    candidateResponse: CandidateResponse | None = None
+    candidateReminder: bool | None = None
+    canManageReminder: bool | None = None
 
 
 class InterviewId(RootModel[str]):
@@ -6450,6 +6471,14 @@ class EmailSend(BaseModel):
             max_length=10,
         ),
     ] = None
+
+
+class EmailSendJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    emailId: EmailId
+    interviewReminder: InterviewReminderDelivery | None = None
 
 
 class UserList(BaseModel):

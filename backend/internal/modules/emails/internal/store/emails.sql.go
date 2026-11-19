@@ -1049,6 +1049,20 @@ func (q *Queries) StagedAttachments(ctx context.Context, ids []string) ([]EmailA
 	return items, nil
 }
 
+const updateQueuedReminderBody = `-- name: UpdateQueuedReminderBody :exec
+UPDATE email SET body = $1 WHERE id = $2 AND status='queued'
+`
+
+type UpdateQueuedReminderBodyParams struct {
+	Body string
+	ID   string
+}
+
+func (q *Queries) UpdateQueuedReminderBody(ctx context.Context, arg UpdateQueuedReminderBodyParams) error {
+	_, err := q.db.Exec(ctx, updateQueuedReminderBody, arg.Body, arg.ID)
+	return err
+}
+
 const updateTemplate = `-- name: UpdateTemplate :one
 UPDATE email_template SET name = $1, subject = $2, body = $3, body_html = $4,
   version = version + 1, updated_at = now()

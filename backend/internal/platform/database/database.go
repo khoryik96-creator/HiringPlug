@@ -60,6 +60,12 @@ func InTx(ctx context.Context, pool interface {
 // whether this user may see it. It stays in tx, so it sees and waits on
 // nothing tx does not (a second transaction would wait on tx's own locks).
 func AsSystem(ctx context.Context, tx pgx.Tx, tenantID string, fn func() error) error {
+	return AsPrincipal(ctx, tx, authz.System(tenantID), fn)
+}
+
+// AsPrincipal temporarily applies the actor's scope in the caller's
+// transaction, restoring the original actor before any other work.
+func AsPrincipal(ctx context.Context, tx pgx.Tx, p authz.Principal, fn func() error) error {
 	const keys = `'app.tenant_id','app.user_id','app.permissions','app.scope_users','app.scope_jobs'`
 	var saved []string
 	if err := tx.QueryRow(ctx, `SELECT array_agg(coalesce(current_setting(k, true), '') ORDER BY n) FROM unnest(ARRAY[`+keys+`]) WITH ORDINALITY AS t(k, n)`).Scan(&saved); err != nil {
@@ -70,9 +76,8 @@ func AsSystem(ctx context.Context, tx pgx.Tx, tenantID string, fn func() error) 
 			set_config('app.scope_users', $4, true), set_config('app.scope_jobs', $5, true)`, v[0], v[1], v[2], v[3], v[4])
 		return err
 	}
-	p := authz.System(tenantID)
 	if err := set([]string{p.TenantID, p.UserID, p.PermissionCSV(), p.ScopeUsersSetting(), p.ScopeJobsSetting()}); err != nil {
-		return fmt.Errorf("database: scoping to the company: %w", err)
+		return fmt.Errorf("database: changing actor: %w", err)
 	}
 	err := fn()
 	if restore := set(saved); restore != nil && err == nil {

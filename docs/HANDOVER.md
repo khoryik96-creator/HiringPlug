@@ -6,7 +6,7 @@ first (the rules, enforced by `task verify`), then `docs/README.md`;
 
 ## Outlook calendar
 
-- More > Calendar is a private calendar per user, using the existing Microsoft
+- The calendar icon beside Settings opens a private calendar per user, using the existing Microsoft
   app registration with separate delegated calendar consent. Read
   [calendar.md](calendar.md) for the extra redirect URI, permissions and behavior.
 - Interviews/bookings queue private Outlook holds; scheduling reads only busy

@@ -17,6 +17,7 @@ type OutlookCalendar interface {
 	LockInterview(context.Context, pgx.Tx, string) error
 	InterviewInvitation(context.Context, pgx.Tx, authz.Principal, string) (api.InterviewInvitation, error)
 	SendInterviewInvitation(context.Context, pgx.Tx, authz.Principal, string, api.InterviewInvitationInput) (api.InterviewInvitation, error)
+	SetInterviewReminder(context.Context, pgx.Tx, authz.Principal, string, api.InterviewOutlookReminderInput) (api.InterviewInvitation, error)
 	InterviewJoinLink(context.Context, pgx.Tx, string, string) (string, error)
 	// Conflicts: interviewers busy by their calendars then (the interviews in
 	// named aside) and those whose Outlook has stopped syncing.

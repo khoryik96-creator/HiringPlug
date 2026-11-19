@@ -31,6 +31,9 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	if err := job.Decode(&payload); err != nil {
 		return err
 	}
+	if job.Kind == api.JobKindEmailInterviewReminder && payload.InterviewReminder == nil {
+		return errors.New("interview reminder is missing its delivery guard")
+	}
 	q := store.New(tx)
 	e, err := q.GetEmail(ctx, payload.EmailId)
 	if database.IsNoRows(err) {
@@ -42,6 +45,26 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	}
 	if e.Status != string(api.EmailStatusQueued) {
 		return nil // already sent, or given up on
+	}
+	if reminder := payload.InterviewReminder; reminder != nil {
+		if s.deps.InterviewReminders == nil {
+			return errors.New("interview reminder guard is unavailable")
+		}
+		body, err := s.deps.InterviewReminders.ReminderBody(ctx, tx, job.TenantID, *reminder, e.ToAddresses)
+		if err != nil {
+			return err
+		}
+		if body == "" {
+			reason := "This interview reminder was skipped because it is no longer due or eligible."
+			if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(api.EmailStatusFailed), Error: &reason}); err != nil {
+				return err
+			}
+			return audit.Record(ctx, tx, audit.Entry{Action: "email.reminder_skipped", EntityType: "email", EntityID: e.ID})
+		}
+		e.Body = body
+		if err := q.UpdateQueuedReminderBody(ctx, store.UpdateQueuedReminderBodyParams{ID: e.ID, Body: body}); err != nil {
+			return err
+		}
 	}
 	agency, err := s.deps.Tenants.TenantName(ctx, tx, job.TenantID)
 	if err != nil {
@@ -83,6 +106,11 @@ func (s *Service) deliver(ctx context.Context, tx pgx.Tx, job jobqueue.Job) erro
 	}
 	if err := q.MarkEmail(ctx, store.MarkEmailParams{ID: e.ID, Status: string(status), Error: reason}); err != nil {
 		return err
+	}
+	if sendErr == nil && payload.InterviewReminder != nil {
+		if err := s.deps.InterviewReminders.ReminderSent(ctx, tx, *payload.InterviewReminder); err != nil {
+			return err
+		}
 	}
 	if sendErr == nil && provider == ProviderMicrosoft { // a mailbox HiringPlug may read: look for bounces later
 		if err := scheduleBounceScans(ctx, tx, job.TenantID, e.ID); err != nil {

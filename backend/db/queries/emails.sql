@@ -61,6 +61,9 @@ UPDATE email SET status = @status, error = sqlc.narg(error),
   sent_at = CASE WHEN @status = 'sent' THEN now() ELSE sent_at END
 WHERE id = @id;
 
+-- name: UpdateQueuedReminderBody :exec
+UPDATE email SET body = @body WHERE id = @id AND status='queued';
+
 -- Merging candidates: the duplicate's emails follow them.
 -- name: MoveEmailsToCandidate :execrows
 UPDATE email SET candidate_id = @to_id WHERE candidate_id = @from_id;

@@ -4420,6 +4420,31 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/InterviewNotAllowed'}
+  /v1/interviews/{interviewId}/outlook-reminder:
+    parameters:
+      - $ref: '#/components/parameters/InterviewIdPath'
+    put:
+      operationId: setInterviewOutlookReminder
+      tags: [interviews]
+      summary: Turn the candidate's day-before reminder email on or off
+      x-permission: interviews:schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/InterviewOutlookReminderInput'}
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/InterviewInvitation'}
+        '400': {$ref: '#/components/responses/ValidationFailed'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/InterviewNotAllowed'}
   /v1/interviews/{interviewId}/calendar.ics:
     parameters:
       - $ref: '#/components/parameters/InterviewIdPath'
@@ -6904,6 +6929,7 @@ components:
         - document.render_pdf
         - document.text_extracted
         - email.bounce_scan
+        - email.interview_reminder
         - email.outlook_sync
         - email.send
         - interview.remind
@@ -10416,6 +10442,15 @@ components:
       required: [emailId]
       properties:
         emailId: {$ref: '#/components/schemas/EmailId'}
+        interviewReminder: {$ref: '#/components/schemas/InterviewReminderDelivery'}
+    InterviewReminderDelivery:
+      type: object
+      additionalProperties: false
+      required: [eventId, version, startsAt]
+      properties:
+        eventId: {type: string, pattern: '^cev_[0-9a-hjkmnp-tv-z]{26}$'}
+        version: {type: integer, minimum: 1}
+        startsAt: {type: string, format: date-time}
     FolderId:
       type: string
       pattern: '^fld_[0-9a-hjkmnp-tv-z]{26}$'
@@ -11054,6 +11089,13 @@ components:
         version: {type: integer, minimum: 1, maximum: 2147483647}
         teams: {type: boolean}
         reminderMinutes: {type: integer, minimum: 0, maximum: 1440}
+        candidateReminder: {type: boolean, description: Email the candidate the day before. Defaults to off.}
+    InterviewOutlookReminderInput:
+      type: object
+      required: [version, enabled]
+      properties:
+        version: {type: integer, minimum: 1, maximum: 2147483647}
+        enabled: {type: boolean}
     InterviewInvitation:
       type: object
       required: [status, canSend, teamsAvailable, teams, reminderMinutes, recipient, joinUrl, issue]
@@ -11066,6 +11108,11 @@ components:
         recipient: {type: string, nullable: true}
         joinUrl: {type: string, nullable: true}
         issue: {type: string, nullable: true}
+        candidateResponse:
+          type: string
+          enum: [not_responded, accepted, tentative, declined]
+        candidateReminder: {type: boolean}
+        canManageReminder: {type: boolean}
     InterviewId:
       type: string
       pattern: '^intv_[0-9a-hjkmnp-tv-z]{26}$'
@@ -14219,6 +14266,12 @@ x-jobs:
     payload: EmailBounceScanJob
     priority: normal
     description: Look in the sending Microsoft 365 mailbox's inbox for bounce notices about a sent email (Go worker).
+  email.interview_reminder:
+    module: emails
+    queue: core
+    payload: EmailSendJob
+    priority: high
+    description: Recheck the interview and candidate before sending the optional day-before email.
   email.outlook_sync:
     module: emails
     queue: core

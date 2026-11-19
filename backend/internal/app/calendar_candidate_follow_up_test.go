@@ -1,0 +1,138 @@
+package app_test
+
+import (
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/khoryik96-creator/hiringplug/backend/internal/api"
+	"github.com/khoryik96-creator/hiringplug/backend/internal/testutil"
+)
+
+type candidateFollowUp struct {
+	a                              *testApp
+	t                              *testing.T
+	f                              *outlookFixture
+	tenant, user, email, candidate string
+	iv                             api.Interview
+	path                           string
+}
+
+func startCandidateFollowUp(t *testing.T) candidateFollowUp {
+	t.Helper()
+	a := newTestApp(t)
+	tenant := testutil.Current.NewTenant(t, api.RoleRecruiter)
+	user := tenant.Users[api.RoleRecruiter]
+	f := setupOutlook(t, a)
+	f.mu.Lock()
+	f.trialJoinURL = trialJoin
+	f.mu.Unlock()
+	connectOutlook(t, a, user.Token)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+
+	email := "nadia." + tenant.ID + "@example.test"
+	iv, candidate := scheduleOutlookTestInterview(t, a, user.Token, email, []string{user.ID})
+	path := "/v1/interviews/" + iv.Id
+	in := inviteInput(iv, true)
+	in["candidateReminder"] = true
+	res := a.request(http.MethodPost, path+"/outlook-invitation", user.Token, in)
+	require.Equal(t, 202, res.Status, "%s", res.Body)
+	runCoreJobsUntilIdle(t, a, tenant.ID)
+	return candidateFollowUp{a, t, f, tenant.ID, user.Token, email, candidate, iv, path}
+}
+
+func (c candidateFollowUp) reply(status string) api.InterviewInvitation {
+	c.t.Helper()
+	c.f.mu.Lock()
+	for _, event := range c.f.events {
+		for _, attendee := range event["attendees"].([]any) {
+			attendee.(map[string]any)["status"] = map[string]string{"response": status}
+		}
+		event["changeKey"] = status
+	}
+	c.f.mu.Unlock()
+	refreshOutlook(c.t, c.a, c.user, c.tenant)
+	res := c.a.request(http.MethodGet, c.path+"/outlook-invitation", c.user, nil)
+	require.Equal(c.t, 200, res.Status, "%s", res.Body)
+	var out api.InterviewInvitation
+	res.JSON(&out)
+	return out
+}
+
+func (c candidateFollowUp) deliver() {
+	c.t.Helper()
+	_, err := testutil.Current.Admin.Exec(c.t.Context(),
+		"UPDATE job SET run_after=now() WHERE tenant_id=$1 AND kind='email.interview_reminder' AND status='pending'", c.tenant)
+	require.NoError(c.t, err)
+	runCoreJobsUntilIdle(c.t, c.a, c.tenant)
+}
+
+func TestOutlookInterviewCandidateRSVPAndMovingReminder(t *testing.T) {
+	t.Parallel()
+	c := startCandidateFollowUp(t)
+	var runAfter time.Time
+	require.NoError(t, testutil.Current.Admin.QueryRow(t.Context(),
+		"SELECT run_after FROM job WHERE tenant_id=$1 AND kind='email.interview_reminder'", c.tenant).Scan(&runAfter))
+	require.WithinDuration(t, c.iv.StartsAt.Add(-24*time.Hour), runAfter, time.Second)
+	for remote, expected := range map[string]string{"notResponded": "not_responded", "tentativelyAccepted": "tentative", "accepted": "accepted"} {
+		state := c.reply(remote)
+		require.NotNil(t, state.CandidateResponse)
+		require.EqualValues(t, expected, *state.CandidateResponse)
+	}
+	res := c.a.request(http.MethodPatch, c.path, c.user, map[string]any{
+		"version": c.iv.Version, "startsAt": c.iv.StartsAt.Add(2 * time.Hour), "title": "Updated technical interview",
+	})
+	require.Equal(t, 200, res.Status, "%s", res.Body)
+	runCoreJobsUntilIdle(t, c.a, c.tenant)
+	c.deliver()
+
+	items := mailServer.To(c.email)
+	require.Len(t, items, 1, "the original scheduled reminder was superseded")
+	assert.Contains(t, items[0].Data, "Updated technical interview")
+	assert.Contains(t, strings.ReplaceAll(items[0].Data, "=\r\n", ""), trialJoin)
+	_, err := testutil.Current.Admin.Exec(t.Context(),
+		"UPDATE job SET status='pending',run_after=now() WHERE tenant_id=$1 AND kind='email.interview_reminder'", c.tenant)
+	require.NoError(t, err)
+	runCoreJobsUntilIdle(t, c.a, c.tenant)
+	assert.Len(t, mailServer.To(c.email), 1, "a retry cannot send a second reminder")
+}
+
+func TestOutlookInterviewCandidateReminderChecksEligibilityAtDelivery(t *testing.T) {
+	t.Parallel()
+	t.Run("declined", func(t *testing.T) {
+		t.Parallel()
+		c := startCandidateFollowUp(t)
+		state := c.reply("declined")
+		require.NotNil(t, state.CandidateResponse)
+		require.EqualValues(t, "declined", *state.CandidateResponse)
+		c.deliver()
+		require.Empty(t, mailServer.To(c.email))
+	})
+	t.Run("consent withdrawn", func(t *testing.T) {
+		t.Parallel()
+		c := startCandidateFollowUp(t)
+		c.a.setConsent(c.user, c.candidate, map[string]any{"expectedVersion": 0, "status": "withdrawn", "method": "email", "day": klDay(t, 0)}, http.StatusOK)
+		c.deliver()
+		require.Empty(t, mailServer.To(c.email))
+	})
+	t.Run("turned off", func(t *testing.T) {
+		t.Parallel()
+		c := startCandidateFollowUp(t)
+		res := c.a.request(http.MethodPut, c.path+"/outlook-reminder", c.user, map[string]any{"version": c.iv.Version, "enabled": false})
+		require.Equal(t, 200, res.Status, "%s", res.Body)
+		c.deliver()
+		require.Empty(t, mailServer.To(c.email))
+	})
+	t.Run("cancelled", func(t *testing.T) {
+		t.Parallel()
+		c := startCandidateFollowUp(t)
+		res := c.a.request(http.MethodPatch, c.path, c.user, map[string]any{"version": c.iv.Version, "status": "cancelled"})
+		require.Equal(t, 200, res.Status, "%s", res.Body)
+		c.deliver()
+		require.Empty(t, mailServer.To(c.email))
+	})
+}

@@ -43,6 +43,7 @@ export const JOB_LABELS: Record<Schemas["JobKind"], string> = {
   "document.pdf_rendered": "Saving PDF copies",
   "email.outlook_sync": "Sync Outlook Mail",
   "email.send": "Sending emails",
+  "email.interview_reminder": "Sending candidate interview reminders",
   "interview.remind": "Interview reminders",
   "placement.invoice": "Invoices emailed on start dates",
   "jd.blind": "Rewriting blind ads with the AI",

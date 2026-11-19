@@ -67,9 +67,26 @@ SELECT pg_advisory_unlock(hashtextextended(@tenant_id::text || ':calendar-source
 -- name: InterviewInvitation :one
 SELECT * FROM calendar_event WHERE source='interview_invitation' AND source_id= @interview_id;
 -- name: InsertInterviewInvitation :one
-INSERT INTO calendar_event(tenant_id,user_id,title,notes,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes)
-VALUES(app_current_tenant(),app_current_user(),@title,@notes,@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes)
+INSERT INTO calendar_event(tenant_id,user_id,title,notes,location,starts_at,ends_at,source,source_id,source_version,status,sync_status,teams,attendees,invitation_calendar,invitation_subject,reminder_minutes,candidate_reminder)
+VALUES(app_current_tenant(),app_current_user(),@title,@notes,@location,@starts_at,@ends_at,'interview_invitation',@interview_id,@source_version,'active','pending',@teams,@attendees,@invitation_calendar,@invitation_subject,@reminder_minutes,@candidate_reminder)
 RETURNING *;
+-- name: SaveCandidateResponse :exec
+UPDATE calendar_event SET candidate_response = sqlc.narg(response)
+WHERE id= @id AND source='interview_invitation' AND candidate_response IS DISTINCT FROM sqlc.narg(response)::text;
+-- name: AcceptInvitationResponseReceipt :exec
+UPDATE calendar_event SET remote_key=sqlc.narg(remote_key),remote_snapshot= @remote_snapshot
+WHERE id= @id AND version= @expected_version AND version=sent_version AND sync_status='synced';
+-- name: SetCandidateReminder :one
+UPDATE calendar_event SET candidate_reminder= @enabled, candidate_reminder_version=candidate_reminder_version+1,
+ candidate_reminder_queued_for=NULL
+WHERE id= @id AND source='interview_invitation' AND candidate_reminder IS DISTINCT FROM @enabled RETURNING *;
+-- name: ReserveCandidateReminder :execrows
+UPDATE calendar_event SET candidate_reminder_queued_for=starts_at
+WHERE id= @id AND version= @expected_version AND candidate_reminder AND status='active' AND remote_id IS NOT NULL
+ AND sync_status='synced' AND candidate_reminder_queued_for IS DISTINCT FROM starts_at AND candidate_reminder_sent_for IS DISTINCT FROM starts_at;
+-- name: MarkCandidateReminded :exec
+UPDATE calendar_event SET candidate_reminder_sent_for= @starts_at
+WHERE id= @id AND candidate_reminder_version= @reminder_version AND starts_at= @starts_at;
 -- name: SyncInterviewInvitation :one
 UPDATE calendar_event SET source_version= @source_version,title= @title,notes= @notes,location= @location,
  starts_at= @starts_at,ends_at= @ends_at,status= @status,version=version+1,updated_at=now(),

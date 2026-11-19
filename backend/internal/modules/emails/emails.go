@@ -132,6 +132,10 @@ type Deps struct {
 	Consent interface {
 		DoNotContact(ctx context.Context, tx pgx.Tx, candidateID string) (bool, error)
 	}
+	InterviewReminders interface {
+		ReminderBody(context.Context, pgx.Tx, string, api.InterviewReminderDelivery, []string) (string, error)
+		ReminderSent(context.Context, pgx.Tx, api.InterviewReminderDelivery) error
+	}
 }
 
 // Contact is one of a client's contacts, written to from their page.
@@ -157,7 +161,10 @@ func New(pool *pgxpool.Pool, deps Deps, sender mail.Sender, files *blob.Store) *
 
 // JobHandlers returns the module's handlers for the core queue.
 func (m *Module) JobHandlers() jobqueue.Handlers {
-	return jobqueue.Handlers{api.JobKindEmailSend: m.service.deliver, api.JobKindEmailBounceScan: m.service.scanBounces, api.JobKindEmailOutlookSync: m.service.syncOutlook}
+	return jobqueue.Handlers{
+		api.JobKindEmailSend: m.service.deliver, api.JobKindEmailInterviewReminder: m.service.deliver,
+		api.JobKindEmailBounceScan: m.service.scanBounces, api.JobKindEmailOutlookSync: m.service.syncOutlook,
+	}
 }
 
 // MoveCandidate moves a merged duplicate's emails to the candidate kept, in
@@ -193,7 +200,9 @@ type Notice struct {
 	SenderName string
 	// SentBy, when given, is the user it is sent for: from their connected
 	// mailbox if they have one (else the server's), replies going to them.
-	SentBy *string
+	SentBy            *string
+	DeliverAt         time.Time
+	InterviewReminder *api.InterviewReminderDelivery
 }
 
 // NoticeFile is a file attached to a notice. Key, when given, names it in

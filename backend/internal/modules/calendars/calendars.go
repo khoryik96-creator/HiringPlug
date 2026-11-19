@@ -46,6 +46,9 @@ type Deps struct {
 	Recipients interface {
 		InterviewRecipient(context.Context, pgx.Tx, string) (email string, optedOut bool, err error)
 	}
+	ReminderMail interface {
+		QueueInterviewReminder(context.Context, pgx.Tx, string, string, string, time.Time, api.InterviewReminderDelivery) error
+	}
 }
 type Provider struct{ AuthorizeURL, TokenURL, GraphURL string }
 type Config struct {
@@ -53,6 +56,7 @@ type Config struct {
 	PublicURL  string
 	HTTP       *http.Client
 	Provider   Provider
+	TimeZone   *time.Location
 }
 type Module struct {
 	service *Service
@@ -84,6 +88,15 @@ func (m *Module) ConnectOutlookWith(deps Deps, c Config) {
 	}
 	if deps.Recipients != nil {
 		m.service.deps.Recipients = deps.Recipients
+	}
+	if deps.ReminderMail != nil {
+		m.service.deps.ReminderMail = deps.ReminderMail
+	}
+	if c.TimeZone == nil {
+		c.TimeZone = m.service.config.TimeZone
+		if c.TimeZone == nil {
+			c.TimeZone = time.UTC
+		}
 	}
 	m.service.config = c
 }

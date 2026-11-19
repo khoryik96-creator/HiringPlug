@@ -46,6 +46,11 @@ x-module:
       payload: EmailSendJob
       priority: high
       description: Send one queued email through the mail server (Go worker).
+    email.interview_reminder:
+      queue: core
+      payload: EmailSendJob
+      priority: high
+      description: Recheck the interview and candidate before sending the optional day-before email.
     email.bounce_scan:
       queue: core
       payload: EmailBounceScanJob
@@ -1506,3 +1511,12 @@ components:
       required: [emailId]
       properties:
         emailId: { $ref: '#/components/schemas/EmailId' }
+        interviewReminder: { $ref: '#/components/schemas/InterviewReminderDelivery' }
+    InterviewReminderDelivery:
+      type: object
+      additionalProperties: false
+      required: [eventId, version, startsAt]
+      properties:
+        eventId: { type: string, pattern: '^cev_[0-9a-hjkmnp-tv-z]{26}$' }
+        version: { type: integer, minimum: 1 }
+        startsAt: { type: string, format: date-time }

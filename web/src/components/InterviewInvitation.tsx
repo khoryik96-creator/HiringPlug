@@ -10,11 +10,16 @@ const labels: Record<Invitation["status"], string> = {
   none: "", pending: "Waiting for Outlook", sent: "Sent in Outlook",
   failed: "Needs attention", conflict: "Changed in Outlook", cancelled: "Cancellation synced",
 };
+const responses: Record<NonNullable<Invitation["candidateResponse"]>, string> = {
+  not_responded: "Awaiting response", accepted: "Accepted", tentative: "Tentative", declined: "Declined",
+};
 
 export function InterviewInvitation({ interview }: { interview: Interview }) {
   const [open, setOpen] = useState(false);
   const [teams, setTeams] = useState(false);
   const [minutes, setMinutes] = useState(15);
+  const [candidateReminder, setCandidateReminder] = useState(false);
+  const [now] = useState(() => Date.now());
   const client = useQueryClient();
   const key = ["interview-outlook-invitation", interview.id, interview.version];
   const params = { path: { interviewId: interview.id } };
@@ -26,7 +31,7 @@ export function InterviewInvitation({ interview }: { interview: Interview }) {
       if (!open) return false;
       const state = q.state.data;
       if (state?.status === "pending") return 3000;
-      return state?.status === "sent" && state.teams && !state.joinUrl ? 15000 : false;
+      return state?.status === "sent" ? 15000 : false;
     },
   });
   const send = useMutation({
@@ -35,6 +40,7 @@ export function InterviewInvitation({ interview }: { interview: Interview }) {
       body: {
         version: interview.version, teams: row.status === "none" ? row.teamsAvailable && teams : row.teams,
         reminderMinutes: row.status === "none" ? minutes : row.reminderMinutes,
+        candidateReminder: (row.status === "none" ? candidateReminder : row.candidateReminder) || undefined,
       },
     })),
     onSuccess: (row) => {
@@ -42,17 +48,26 @@ export function InterviewInvitation({ interview }: { interview: Interview }) {
       void client.invalidateQueries({ queryKey: key });
     },
   });
+  const reminder = useMutation({
+    mutationFn: async (enabled: boolean) => unwrap(await api.PUT("/v1/interviews/{interviewId}/outlook-reminder", {
+      params, body: { version: interview.version, enabled },
+    })),
+    onSuccess: (saved) => { client.setQueryData(key, saved); },
+  });
   const row = invite.data;
   return <>
     <div className="row">
       <button type="button" className="link" aria-expanded={open} onClick={() => { setOpen(!open); }}>Outlook invitation</button>
       {row && row.status !== "none" && <span className="small muted" role="status">{labels[row.status]}</span>}
+      {row?.candidateResponse && row.status !== "cancelled" && <span className="badge">{responses[row.candidateResponse]}</span>}
       {row?.joinUrl && <a href={row.joinUrl} target="_blank" rel="noreferrer">Join Teams</a>}
     </div>
     {open && <section className="panel" aria-label="Outlook invitation">
       {invite.isPending && <p className="muted">Loading Outlook invitation…</p>}
-      <ErrorMessage error={invite.error ?? send.error} />
+      <ErrorMessage error={invite.error ?? send.error ?? reminder.error} />
       {row?.issue && <p className="small muted">{row.issue}</p>}
+      {row?.canManageReminder && <label className="small"><input type="checkbox" checked={row.candidateReminder === true} disabled={reminder.isPending}
+        onChange={(event) => { reminder.mutate(event.target.checked); }} /> Email candidate a day before</label>}
       {row?.canSend && <form className="form-grid" onSubmit={(event) => { event.preventDefault(); send.mutate(row); }}>
         <div className="full small">To {row.recipient}</div>
         {row.status === "none" && <>
@@ -67,6 +82,9 @@ export function InterviewInvitation({ interview }: { interview: Interview }) {
               <option value={1440}>1 day before</option>
             </select>
           </label>
+          {Date.parse(interview.startsAt) > now + 3600000 && <label className="full">
+            <input type="checkbox" checked={candidateReminder} onChange={(event) => { setCandidateReminder(event.target.checked); }} /> Email candidate a day before
+          </label>}
         </>}
         <div className="full"><button className="primary" type="submit" disabled={send.isPending}>
           {row.status === "none" ? "Send Outlook invitation" : interview.status === "cancelled" ? "Retry Outlook cancellation" : "Retry Outlook invitation"}
