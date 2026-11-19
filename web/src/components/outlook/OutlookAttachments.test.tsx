@@ -33,6 +33,22 @@ it("shows Outlook-only attachments and downloads a file from the current message
   expect(screen.getByText("Open in Outlook to see the remaining attachments.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Download Work samples" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Save Nadia – CV.pdf to candidate" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Import Nadia – CV.pdf as a candidate" })).toBeNull();
+});
+
+it("links importable attachments to the CV importer", async () => {
+  vi.spyOn(api, "GET").mockResolvedValue(ok({
+    items: [
+      { id: "cvFile", fileName: "Nadia.PDF", sizeBytes: 4000, downloadable: true },
+      { id: "cloud", fileName: "Portfolio.docx", sizeBytes: 0, downloadable: false },
+      { id: "zip", fileName: "Work samples.zip", sizeBytes: 4000, downloadable: true },
+    ],
+    more: false,
+  }));
+  renderWithClient(<OutlookAttachments messageId="omg_test" canImportCv />);
+  const link = await screen.findByRole("link", { name: "Import Nadia.PDF as a candidate" });
+  expect(link.getAttribute("href")).toBe("#/import?outlookMessage=omg_test&outlookAttachment=cvFile");
+  expect(screen.queryByRole("link", { name: /Import (Portfolio|Work samples)/ })).toBeNull();
 });
 
 it.each([false, true])("saves to the confirmed candidate and handles exact duplicates (%s)", async (duplicate) => {

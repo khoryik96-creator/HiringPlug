@@ -11,18 +11,19 @@ import "./outlook-workspace.css";
 type Message = Schemas["OutlookMessage"];
 type Folder = Schemas["OutlookMailFolder"];
 
-export function OutlookMail({ canSaveCv = false }: { canSaveCv?: boolean }) {
+export function OutlookMail({ canSaveCv = false, canImportCv = false }: { canSaveCv?: boolean; canImportCv?: boolean }) {
   const params = new URLSearchParams(window.location.hash.split("?")[1]);
   const candidateId = params.get("candidateId");
   const contactId = params.get("contactId");
   const profile = candidateId ? { candidateId } : contactId ? { contactId } : undefined;
-  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv}
+  return <OutlookWorkspace key={params.toString()} profile={profile} canSaveCv={canSaveCv} canImportCv={canImportCv}
     initialSearch={params.get("search") ?? ""} initialThread={params.get("conversation") ?? ""}/>;
 }
 
-function OutlookWorkspace({ profile, canSaveCv, initialSearch, initialThread }: {
+function OutlookWorkspace({ profile, canSaveCv, canImportCv, initialSearch, initialThread }: {
   profile?: OutlookProfile;
   canSaveCv: boolean;
+  canImportCv: boolean;
   initialSearch: string;
   initialThread: string;
 }) {
@@ -132,7 +133,8 @@ function OutlookWorkspace({ profile, canSaveCv, initialSearch, initialThread }: 
                 <button type="button" disabled={data.nextOffset == null} onClick={() => { setOffset(data.nextOffset ?? offset); }}>Next</button>
               </div>}
             </div>
-            {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked} canSaveCv={canSaveCv}
+            {active ? <OutlookReadingPane key={active.id} message={active} folders={folders} profile={profile} linked={linked}
+              canSaveCv={canSaveCv} canImportCv={canImportCv}
               onThread={() => { setThread(active.conversation); setSearch(""); setFolder(""); setOffset(0); }} />
               : <p className="outlook-empty muted">Select a message to read it.</p>}
           </div>

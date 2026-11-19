@@ -2,17 +2,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, type Schemas, unwrap } from "../../api/client";
-import { downloadFrom } from "../../api/files";
-import { CV_TYPES } from "../DropZone";
+import { downloadFrom, outlookAttachmentFilePath } from "../../api/files";
+import { isCvFileName } from "../DropZone";
 import { ErrorMessage } from "../ErrorMessage";
 import { OutlookSaveCv } from "./OutlookSaveCv";
 
 type Attachment = Schemas["OutlookAttachment"];
-const cvExtensions = CV_TYPES.split(",");
-
-function attachmentPath(messageId: string, attachmentId: string) {
-  return `/v1/outlook/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/file`;
-}
 
 function attachmentSize(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`;
@@ -20,9 +15,10 @@ function attachmentSize(bytes: number): string {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
-export function OutlookAttachments({ messageId, canSaveCv = false, candidateId }: {
+export function OutlookAttachments({ messageId, canSaveCv = false, canImportCv = false, candidateId }: {
   messageId: string;
   canSaveCv?: boolean;
+  canImportCv?: boolean;
   candidateId?: string;
 }) {
   const [saveId, setSaveId] = useState<string>();
@@ -34,7 +30,7 @@ export function OutlookAttachments({ messageId, canSaveCv = false, candidateId }
   });
   const download = useMutation({
     mutationFn: (file: Attachment) => downloadFrom(
-      attachmentPath(messageId, file.id),
+      outlookAttachmentFilePath(messageId, file.id),
       file.fileName,
       "application/octet-stream",
     ),
@@ -56,12 +52,15 @@ export function OutlookAttachments({ messageId, canSaveCv = false, candidateId }
             onClick={() => { download.mutate(file); }}>
             {download.isPending && download.variables.id === file.id ? "Downloading…" : "Download"}
           </button>
-          {canSaveCv && cvExtensions.some((extension) => file.fileName.toLowerCase().endsWith(extension)) &&
+          {canSaveCv && isCvFileName(file.fileName) &&
             <button type="button" aria-label={`Save ${file.fileName} to candidate`} disabled={chosen !== undefined}
               onClick={() => { setSaveId(file.id); }}>Save CV</button>}
+          {canImportCv && isCvFileName(file.fileName) && <a className="button"
+            aria-label={`Import ${file.fileName} as a candidate`}
+            href={`#/import?${new URLSearchParams({ outlookMessage: messageId, outlookAttachment: file.id }).toString()}`}>Import CV</a>}
         </div> : <small className="muted">Available in Outlook</small>}
         {canSaveCv && chosen?.id === file.id && <OutlookSaveCv fileName={file.fileName}
-          filePath={attachmentPath(messageId, file.id)} candidateId={candidateId}
+          filePath={outlookAttachmentFilePath(messageId, file.id)} candidateId={candidateId}
           onClose={() => { setSaveId(undefined); }} />}
       </li>)}
     </ul>}

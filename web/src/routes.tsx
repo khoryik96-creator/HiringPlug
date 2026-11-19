@@ -115,7 +115,7 @@ export const ROUTES: Route[] = [
     render: (c) => <ImportPage permissions={c.permissions} /> },
 
   { section: "outlook", path: /^#\/outlook$/, permission: "emails:send", menu: { in: "main", label: "Outlook", href: "#/outlook", more: true },
-    render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} /> },
+    render: (c) => <OutlookMail canSaveCv={can(c, "documents:create") && can(c, "candidates:read")} canImportCv={can(c, "intake:create")} /> },
   { section: "calendar", path: /^#\/calendar(?:\?|$)/, permission: "calendars:use", render: () => <Calendar /> },
 
   // Settings, in its menu's order.
